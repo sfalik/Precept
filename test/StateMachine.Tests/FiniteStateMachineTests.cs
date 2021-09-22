@@ -1,11 +1,7 @@
-﻿using FluentAssertions;
+﻿using System;
+using FluentAssertions;
 using FluentAssertions.Execution;
 using FluentAssertions.Primitives;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace StateMachine.Tests
@@ -586,7 +582,7 @@ namespace StateMachine.Tests
 
     public static class StateMachineExtensions
     {
-        public static StateMachineAssertions<TState, TEvent> Should<TState, TEvent>(this FiniteStateMachine<TState, TEvent> instance)
+        public static StateMachineAssertions<TState, TEvent> Should<TState, TEvent>(this IStateful<TState, TEvent> instance)
             where TState : notnull
             where TEvent : notnull
         {
@@ -595,19 +591,19 @@ namespace StateMachine.Tests
     }
 
     public class StateMachineAssertions<TState, TEvent>
-        : ReferenceTypeAssertions<FiniteStateMachine<TState, TEvent>, StateMachineAssertions<TState, TEvent>>
+        : ReferenceTypeAssertions<IStateful<TState, TEvent>, StateMachineAssertions<TState, TEvent>>
             where TState : notnull
             where TEvent : notnull
     {
-        public StateMachineAssertions(FiniteStateMachine<TState, TEvent> subject)
-            :base(subject)
+        public StateMachineAssertions(IStateful<TState, TEvent> subject)
+            : base(subject)
         { }
 
         protected override string Identifier => "State Machine";
 
         public AndConstraint<StateMachineAssertions<TState, TEvent>> AcceptEvent(TEvent eventToAccept, string because = "", params object[] becauseArgs)
         {
-            if(Subject == null)
+            if (Subject == null)
                 throw new NullReferenceException("Subject should not be null");
 
             Execute.Assertion
@@ -636,7 +632,7 @@ namespace StateMachine.Tests
             if (Subject == null)
                 throw new NullReferenceException("Subject should not be null");
 
-            if(Subject.State == null)
+            if (Subject.State == null)
                 throw new NullReferenceException("Subject.State should not be null");
 
             Execute.Assertion
