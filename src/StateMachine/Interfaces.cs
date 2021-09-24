@@ -73,88 +73,100 @@ namespace StateMachine
     {
         IStateMachine<TState> Build(TState initialState);
 
-        ITransitionEventClause<TState> DefineTrigger(out StateMachineTrigger trigger, [CallerArgumentExpression("trigger")] string? name = null);
-        ITransitionEventClause<TState> DefineEvent(out IStateful<TState>.IEvent2 trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IEventBuilder DefineTrigger(out StateMachineTrigger trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IEventBuilder DefineEvent(out IStateful<TState>.IEvent2 trigger, [CallerArgumentExpression("trigger")] string? name = null);
 
-        ITransitionEventClause<TState, TArg> DefineTrigger<TArg>(out StateMachineTrigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
-        ITransitionEventClause<TState, TArg> DefineEvent<TArg>(out IStateful<TState>.IEvent2<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
-    }
+        IEventBuilder<TArg> DefineTrigger<TArg>(out StateMachineTrigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IEventBuilder<TArg> DefineEvent<TArg>(out IStateful<TState>.IEvent2<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
 
-    public interface ITransitionEventClause<TState> where TState : notnull
-    {
-        ITransitionStateClause<TState> IfStateIs(TState state);
-        ITransitionStateClause<TState> IfStateIs(params TState[] state);
-    }
+        public interface IEventBuilder
+        {
+            IStateClause IfStateIs(TState state);
+            IStateClause IfStateIs(params TState[] state);
 
-    public interface ITransitionEventClause<TState, TArg> where TState : notnull
-    {
-        ITransitionStateClause<TState, TArg> IfStateIs(TState state);
-        ITransitionStateClause<TState, TArg> IfStateIs(params TState[] state);
-    }
+            public delegate bool StateMachineGuard();
 
-    public delegate bool StateMachineGuard();
-    public delegate bool StateMachineGuard<TArg>(TArg eventArgument);
+            public interface IStateClause
+            {
+                ITransitionClause TransitionTo(TState state);
+                IExecuteClause Execute(StateMachineAction action);
 
-    public interface ITransitionStateClause<TState> where TState : notnull
-    {
-        ITransition<TState> TransitionTo(TState state);
-        ITransitionExecuteClause<TState> Execute(StateMachineAction action);
+                IIfClause If(StateMachineGuard guard, string reason);
+            }
 
-        ITransitionIfClause<TState> If(StateMachineGuard guard, string reason);
-    }
-    public interface ITransitionStateClause<TState, TArg> where TState : notnull
-    {
-        ITransition<TState> TransitionTo(TState state);
-        ITransitionExecuteClause<TState> Execute(StateMachineAction<TArg> action);
+            public interface IIfClause
+            {
+                ITransitionClause TransitionTo(TState state);
+                IGuardedExecuteClause Execute(StateMachineAction action);
+            }
 
-        ITransitionIfClause<TState, TArg> If(StateMachineGuard<TArg> guard, string reason);
-    }
+            public interface IExecuteClause
+            {
+                ITransitionClause ThenTransitionTo(TState state);
+                ITransitionClause AndKeepSameState();
+            }
 
-    public interface ITransitionIfClause<TState> where TState : notnull
-    {
-        ITransition<TState> TransitionTo(TState state);
-        ITransitionGuardedExecuteClause<TState> Execute(StateMachineAction action);
-    }
-    public interface ITransitionIfClause<TState, TArg> where TState : notnull
-    {
-        ITransitionGuardedExecuteClause<TState, TArg> Execute(StateMachineAction<TArg> action);
-    }
+            public interface IGuardedExecuteClause
+            {
+                IGuardedTransitionClause ThenTransitionTo(TState state);
+                IGuardedTransitionClause AndKeepSameState();
+            }
 
-    public interface ITransitionExecuteClause<TState> where TState : notnull
-    {
-        ITransition<TState> ThenTransitionTo(TState state);
-        ITransition<TState> AndKeepSameState();
-    }
+            public interface ITransitionClause : IStateMachineBuilder<TState>
+            {
+                public IEventBuilder Or { get; }
+            }
 
-    public interface ITransitionGuardedExecuteClause<TState> where TState : notnull
-    {
-        IGuardedTransition<TState> ThenTransitionTo(TState state);
-        IGuardedTransition<TState> AndKeepSameState();
-    }
-    public interface ITransitionGuardedExecuteClause<TState, TArg> where TState : notnull
-    {
-        IGuardedTransition<TState, TArg> ThenTransitionTo(TState state);
-        IGuardedTransition<TState, TArg> AndKeepSameState();
-    }
+            public interface IGuardedTransitionClause : IStateMachineBuilder<TState>
+            {
+                public IStateClause Else { get; }
+                public IEventBuilder Or { get; }
+            }
+        }
 
-    public interface ITransition<TState> : IStateMachineBuilder<TState> where TState : notnull
-    {
-        public ITransitionEventClause<TState> Or { get; }
-    }
-    public interface ITransition<TState, TArg> : IStateMachineBuilder<TState> where TState : notnull
-    {
-        public ITransitionEventClause<TState, TArg> Or { get; }
-    }
 
-    public interface IGuardedTransition<TState> : IStateMachineBuilder<TState> where TState : notnull
-    {
-        public ITransitionStateClause<TState> Else { get; }
-        public ITransitionEventClause<TState> Or { get; }
-    }
-    public interface IGuardedTransition<TState, TArg> : IStateMachineBuilder<TState> where TState : notnull
-    {
-        public ITransitionStateClause<TState, TArg> Else { get; }
-        public ITransitionEventClause<TState, TArg> Or { get; }
+        public interface IEventBuilder<TArg>
+        {
+            IStateClause IfStateIs(TState state);
+            IStateClause IfStateIs(params TState[] state);
+
+            public delegate bool StateMachineGuard(TArg eventArgument);
+
+            public interface IStateClause
+            {
+                ITransitionClause TransitionTo(TState state);
+                IExecuteClause Execute(StateMachineAction<TArg> action);
+
+                IIfClause If(StateMachineGuard guard, string reason);
+            }
+
+            public interface IIfClause
+            {
+                IGuardedExecuteClause Execute(StateMachineAction<TArg> action);
+            }
+
+            public interface IExecuteClause
+            {
+                ITransitionClause ThenTransitionTo(TState state);
+                ITransitionClause AndKeepSameState();
+            }
+
+            public interface IGuardedExecuteClause
+            {
+                IGuardedTransitionClause ThenTransitionTo(TState state);
+                IGuardedTransitionClause AndKeepSameState();
+            }
+            public interface ITransitionClause : IStateMachineBuilder<TState>
+            {
+                public IEventBuilder Or { get; }
+            }
+
+            public interface IGuardedTransitionClause : IStateMachineBuilder<TState>
+            {
+                public IStateClause Else { get; }
+                public IEventBuilder Or { get; }
+            }
+        }
     }
     #endregion
 }
