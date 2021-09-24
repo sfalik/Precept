@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace StateMachine
 {
@@ -8,26 +10,74 @@ namespace StateMachine
 
         public IReadOnlyList<TState> States { get; }
 
-        public bool IsEventAccepted(StateMachineEvent stateMachineEvent);
-        public bool IsEventAccepted(StateMachineEvent stateMachineEvent, out TState? newState, out string reason);
-        public bool IsEventAccepted<TArg>(StateMachineEvent<TArg> stateMachineEvent, TArg arg);
-        public bool IsEventAccepted<TArg>(StateMachineEvent<TArg> stateMachineEvent, TArg arg, out TState? newState, out string reason);
+        public IReadOnlyList<IEvent> Events { get; }
+
+        public interface IEvent
+        {
+            public string Name { get; }
+            public Delegate Trigger { get; }
+        }
+
+        public interface IEvent2 : IEvent
+        {
+            public new StateMachineTrigger Trigger { get; }
+        }
+
+        public interface IEvent2<TArg> : IEvent
+        {
+            public new StateMachineTrigger<TArg> Trigger { get; }
+        }
+
+        /*Questions to answer:
+         * 1. Which events can currently be fired, and which states will they transition to
+         * 2. Wich states can be accessed, and which events / guards are required to get there
+         * 3. If an event cannot be triggered, why not (not defined for the current state, or guard failing)
+         * 4. If a state cannot be accessed, why not (no transition defined, or guards failing)
+         * 5. All states and events, regardless of current state, as to be able to map out the full workflow
+         */
+        public (bool IsAccepted, TState? newState, string ReasonNotAccepted) TestTrigger(StateMachineTrigger stateMachineTrigger);
+        public (bool IsAccepted, TState? newState, string ReasonNotAccepted) TestTrigger<TArg>(StateMachineTrigger<TArg> stateMachineTrigger, TArg argument);
     }
 
-    public interface IFiniteStateMachine<TState> : IStateful<TState> where TState : notnull
+    public interface IStateMachine<TState> : IStateful<TState> where TState : notnull
     {
-
     }
 
-    public delegate void StateMachineEvent();
-    public delegate void StateMachineEvent<TArg>(TArg eventArgument);
 
-    public interface IFiniteStateMachineBuilder<TState> where TState : notnull
+
+
+    /// <summary>
+    /// Used to initiate an event on the state machine
+    /// </summary>
+    public delegate void StateMachineTrigger();
+    /// <summary>
+    /// Used to initiate an event on the state machine
+    /// </summary>
+    /// <typeparam name="TArg">The type of argument to be passed to the action and associated guards</typeparam>
+    /// <param name="eventArgument">Argument passed to the action and associated guards</param>
+    public delegate void StateMachineTrigger<TArg>(TArg eventArgument);
+    /// <summary>
+    /// An action to perform during a state transition
+    /// </summary>
+    public delegate void StateMachineAction();
+    /// <summary>
+    /// An action to perform during a state transition
+    /// </summary>
+    /// <typeparam name="TArg">The type of argument passed from the trigger</typeparam>
+    /// <param name="eventArgument">Argument passed from the trigger</param>
+    public delegate void StateMachineAction<TArg>(TArg eventArgument);
+
+    //These interfaces are used to create the fluent syntax for building a state machine.
+    #region FluentInterfaces
+    public interface IStateMachineBuilder<TState> where TState : notnull
     {
-        IFiniteStateMachine<TState> Build(TState initialState);
+        IStateMachine<TState> Build(TState initialState);
 
-        ITransitionEventClause<TState> WhenEventFired(out StateMachineEvent stateMachineEvent);
-        ITransitionEventClause<TState, TArg> WhenEventFired<TArg>(out StateMachineEvent<TArg> stateMachineEvent);
+        ITransitionEventClause<TState> DefineTrigger(out StateMachineTrigger trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        ITransitionEventClause<TState> DefineEvent(out IStateful<TState>.IEvent2 trigger, [CallerArgumentExpression("trigger")] string? name = null);
+
+        ITransitionEventClause<TState, TArg> DefineTrigger<TArg>(out StateMachineTrigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        ITransitionEventClause<TState, TArg> DefineEvent<TArg>(out IStateful<TState>.IEvent2<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
     }
 
     public interface ITransitionEventClause<TState> where TState : notnull
@@ -48,14 +98,14 @@ namespace StateMachine
     public interface ITransitionStateClause<TState> where TState : notnull
     {
         ITransition<TState> TransitionTo(TState state);
-        ITransitionExecuteClause<TState> Execute(StateMachineEvent action);
+        ITransitionExecuteClause<TState> Execute(StateMachineAction action);
 
         ITransitionIfClause<TState> If(StateMachineGuard guard, string reason);
     }
     public interface ITransitionStateClause<TState, TArg> where TState : notnull
     {
         ITransition<TState> TransitionTo(TState state);
-        ITransitionExecuteClause<TState> Execute(StateMachineEvent<TArg> action);
+        ITransitionExecuteClause<TState> Execute(StateMachineAction<TArg> action);
 
         ITransitionIfClause<TState, TArg> If(StateMachineGuard<TArg> guard, string reason);
     }
@@ -63,11 +113,11 @@ namespace StateMachine
     public interface ITransitionIfClause<TState> where TState : notnull
     {
         ITransition<TState> TransitionTo(TState state);
-        ITransitionGuardedExecuteClause<TState> Execute(StateMachineEvent action);
+        ITransitionGuardedExecuteClause<TState> Execute(StateMachineAction action);
     }
     public interface ITransitionIfClause<TState, TArg> where TState : notnull
     {
-        ITransitionGuardedExecuteClause<TState, TArg> Execute(StateMachineEvent<TArg> action);
+        ITransitionGuardedExecuteClause<TState, TArg> Execute(StateMachineAction<TArg> action);
     }
 
     public interface ITransitionExecuteClause<TState> where TState : notnull
@@ -87,23 +137,24 @@ namespace StateMachine
         IGuardedTransition<TState, TArg> AndKeepSameState();
     }
 
-    public interface ITransition<TState> : IFiniteStateMachineBuilder<TState> where TState : notnull
+    public interface ITransition<TState> : IStateMachineBuilder<TState> where TState : notnull
     {
         public ITransitionEventClause<TState> Or { get; }
     }
-    public interface ITransition<TState, TArg> : IFiniteStateMachineBuilder<TState> where TState : notnull
+    public interface ITransition<TState, TArg> : IStateMachineBuilder<TState> where TState : notnull
     {
         public ITransitionEventClause<TState, TArg> Or { get; }
     }
 
-    public interface IGuardedTransition<TState> : IFiniteStateMachineBuilder<TState> where TState : notnull
+    public interface IGuardedTransition<TState> : IStateMachineBuilder<TState> where TState : notnull
     {
         public ITransitionStateClause<TState> Else { get; }
         public ITransitionEventClause<TState> Or { get; }
     }
-    public interface IGuardedTransition<TState, TArg> : IFiniteStateMachineBuilder<TState> where TState : notnull
+    public interface IGuardedTransition<TState, TArg> : IStateMachineBuilder<TState> where TState : notnull
     {
         public ITransitionStateClause<TState, TArg> Else { get; }
         public ITransitionEventClause<TState, TArg> Or { get; }
     }
+    #endregion
 }
