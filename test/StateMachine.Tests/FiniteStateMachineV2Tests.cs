@@ -26,7 +26,7 @@ namespace StateMachine.Tests
                     .Execute(() => { })
                     .AndKeepSameState()
 
-                .DefineAsyncTrigger<string>(out var close)
+                .DefineAsyncEvent<string>(out var close)
                     .WhenStateIs(Status.Completed)
                     .Execute(async reason => await Task.CompletedTask)
                     .ThenTransitionTo(Status.Closed)
@@ -50,7 +50,8 @@ namespace StateMachine.Tests
             if (approve.IsAccepted)
                 approve.Trigger();
 
-            await close("because");
+            if (close.IsAccepted("Because"))
+                await close.Trigger("because");
 
             var result = workflow.TestTrigger(close, "Test");
             if (result.IsAccepted)

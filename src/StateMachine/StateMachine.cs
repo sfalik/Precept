@@ -27,10 +27,8 @@ namespace StateMachine
         private List<TState> _states = new();
         public IReadOnlyList<TState> States => _states;
 
-        private List<IEvent> _events = new();
-        public IReadOnlyList<IEvent> Events => _events;
-
-        IReadOnlyList<IEvent> IStateMachine<TState>.Events => throw new NotImplementedException();
+        private List<IStateMachineEvent<TState, Delegate>> _events = new();
+        public IReadOnlyList<IStateMachineEvent<TState, Delegate>> Events => _events;
 
         public StateMachine(TState initialState)
         {
