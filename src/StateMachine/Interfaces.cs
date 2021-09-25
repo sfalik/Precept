@@ -39,14 +39,14 @@ namespace StateMachine
     : IEvent<TTrigger>
     where TTrigger : Delegate
     {
-        bool IsAccepted { get; }
+        (bool IsAccepted, TState? newStateIfAccepted, string reasonNotAccepted) Evaluate();
     }
 
     public interface IEvent<TState, TArg, out TTrigger>
         : IEvent<TTrigger>
         where TTrigger : Delegate
     {
-        bool IsAccepted(TArg argument);
+        (bool IsAccepted, TState? newStateIfAccepted, string reasonNotAccepted) Evaluate(TArg argument);
     }
 
 

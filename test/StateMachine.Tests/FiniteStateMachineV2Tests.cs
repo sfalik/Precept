@@ -47,17 +47,14 @@ namespace StateMachine.Tests
                 .Build(Status.New)
             ;
 
-            if (approve.IsAccepted)
+            if (approve.Evaluate().IsAccepted)
                 approve.Trigger();
 
-            if (close.IsAccepted("Because"))
+            if (close.Evaluate("Because").IsAccepted)
                 await close.Trigger("because");
 
-            if (startWork.IsAccepted(DateTime.Now))
+            if (startWork.Evaluate(DateTime.Now).IsAccepted)
                 startWork.Trigger(DateTime.Now);
-
-
-
 
 
         }
