@@ -92,17 +92,19 @@ namespace StateMachine
         IStateMachine<TState> Build(TState initialState);
 
 
-        IEventBuilder DefineTrigger(out StateMachineTrigger trigger, [CallerArgumentExpression("trigger")] string? name = null);
-        IEventBuilder DefineEvent(out IStateMachine<TState>.IParameterlessEvent trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IEventBuilder<StateMachineTrigger, StateMachineGuard> DefineTrigger(out StateMachineTrigger trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IEventBuilder<StateMachineTrigger, StateMachineGuard> DefineEvent(out IStateMachine<TState>.IParameterlessEvent trigger, [CallerArgumentExpression("trigger")] string? name = null);
 
-        IEventBuilder<TArg> DefineTrigger<TArg>(out StateMachineTrigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
-        IEventBuilder<TArg> DefineEvent<TArg>(out IStateMachine<TState>.IParameterizedEvent<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IEventBuilder<StateMachineTrigger<TArg>, StateMachineGuard<TArg>> DefineTrigger<TArg>(out StateMachineTrigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IEventBuilder<StateMachineTrigger<TArg>, StateMachineGuard<TArg>> DefineEvent<TArg>(out IStateMachine<TState>.IParameterizedEvent<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
 
-        IAsyncEventBuilder<TArg> DefineAsyncTrigger<TArg>(out StateMachineAsyncTrigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
-        IAsyncEventBuilder<TArg> DefineAsyncEvent<TArg>(out IStateMachine<TState>.IParameterizedEvent<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IEventBuilder<StateMachineAsyncTrigger<TArg>, StateMachineGuard<TArg>> DefineAsyncTrigger<TArg>(out StateMachineAsyncTrigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IEventBuilder<StateMachineAsyncTrigger<TArg>, StateMachineGuard<TArg>> DefineAsyncEvent<TArg>(out IStateMachine<TState>.IParameterizedEvent<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
 
 
-        public interface IEventBuilder
+        public interface IEventBuilder<TAction, TGuard>
+            where TAction : System.Delegate
+            where TGuard : System.Delegate
         {
             IStateClause WhenStateIs(TState state);
             IStateClause WhenStateIs(params TState[] state);
@@ -110,12 +112,12 @@ namespace StateMachine
             public interface IStateClause
             {
                 ITransitionClause TransitionTo(TState state);
-                IExecuteClause Execute(StateMachineAction action);
+                IExecuteClause Execute(TAction action);
 
-                IIfClause If(StateMachineGuard guard, string reason);
+                IIfClause If(TGuard guard, string reason);
             }
 
-            public interface ITransitionClause : IEventBuilder, IStateMachineBuilder<TState>
+            public interface ITransitionClause : IEventBuilder<TAction, TGuard>, IStateMachineBuilder<TState>
             {
             }
 
@@ -128,93 +130,10 @@ namespace StateMachine
             public interface IIfClause
             {
                 ITransitionClause TransitionTo(TState state);
-                IIfExecuteClause Execute(StateMachineAction action);
+                IIfExecuteClause Execute(TAction action);
             }
 
-            public interface IIfTransitionClause : IEventBuilder, IStateMachineBuilder<TState>
-            {
-                public IStateClause Else { get; }
-            }
-
-            public interface IIfExecuteClause
-            {
-                IIfTransitionClause ThenTransitionTo(TState state);
-                IIfTransitionClause AndKeepSameState();
-            }
-
-        }
-
-
-        // These are almost an exact copy from above, but use the <TArg> parameter
-        public interface IEventBuilder<TArg>
-        {
-            IStateClause WhenStateIs(TState state);
-            IStateClause WhenStateIs(params TState[] state);
-
-            public interface IStateClause
-            {
-                ITransitionClause TransitionTo(TState state);
-                IExecuteClause Execute(StateMachineAction<TArg> action);
-
-                IIfClause If(StateMachineGuard<TArg> guard, string reason);
-            }
-
-            public interface ITransitionClause : IEventBuilder<TArg>, IStateMachineBuilder<TState>
-            {
-            }
-
-            public interface IExecuteClause
-            {
-                ITransitionClause ThenTransitionTo(TState state);
-                ITransitionClause AndKeepSameState();
-            }
-
-            public interface IIfClause
-            {
-                IIfExecuteClause Execute(StateMachineAction<TArg> action);
-            }
-            public interface IIfTransitionClause : IEventBuilder<TArg>, IStateMachineBuilder<TState>
-            {
-                public IStateClause Else { get; }
-            }
-
-            public interface IIfExecuteClause
-            {
-                IIfTransitionClause ThenTransitionTo(TState state);
-                IIfTransitionClause AndKeepSameState();
-            }
-
-        }
-
-        // These are almost an exact copy from above, but add Task return types for guards and actions
-        public interface IAsyncEventBuilder<TArg>
-        {
-            IStateClause WhenStateIs(TState state);
-            IStateClause WhenStateIs(params TState[] state);
-
-            public interface IStateClause
-            {
-                ITransitionClause TransitionTo(TState state);
-                IExecuteClause ExecuteAsync(StateMachineAsyncAction<TArg> action);
-
-                IIfClause If(StateMachineGuard<TArg> guard, string reason);
-            }
-
-            public interface ITransitionClause : IEventBuilder<TArg>, IStateMachineBuilder<TState>
-            {
-            }
-
-            public interface IExecuteClause
-            {
-                ITransitionClause ThenTransitionTo(TState state);
-                ITransitionClause AndKeepSameState();
-            }
-
-            public interface IIfClause
-            {
-                IIfExecuteClause Execute(StateMachineAsyncAction<TArg> action);
-            }
-            public interface IIfTransitionClause : IEventBuilder<TArg>, IStateMachineBuilder<TState>
+            public interface IIfTransitionClause : IEventBuilder<TAction, TGuard>, IStateMachineBuilder<TState>
             {
                 public IStateClause Else { get; }
             }
