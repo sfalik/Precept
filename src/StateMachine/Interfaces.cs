@@ -94,6 +94,8 @@ namespace StateMachine
         where TAction : System.Delegate
     {
         ITransitionClause<TState, TAction> TransitionTo(TState state);
+        ITransitionClause<TState, TAction> KeepSameState();
+
         IExecuteClause<TState, TAction> Execute(TransitionAction action);
     }
 
@@ -127,6 +129,8 @@ namespace StateMachine
         where TAction : System.Delegate
     {
         ITransitionClause<TState, TAction, TArg> TransitionTo(TState state);
+        ITransitionClause<TState, TAction, TArg> KeepSameState();
+
         IExecuteClause<TState, TAction, TArg> Execute(TAction action);
 
         IIfClause<TState, TAction, TArg> If(Guard<TArg> guard, string reason);
