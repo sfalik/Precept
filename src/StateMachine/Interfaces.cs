@@ -1,10 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
 namespace StateMachine
 {
-    public interface IStateful<TState> where TState : notnull
+    public interface IStateful<TState> : IStateMachine<TState> where TState : notnull
+    {
+
+    }
+
+    public interface IStateMachine<TState> where TState : notnull
     {
         public TState State { get; }
 
@@ -18,14 +24,22 @@ namespace StateMachine
             public Delegate Trigger { get; }
         }
 
-        public interface IEvent2 : IEvent
+        public interface IParameterlessEvent : IEvent
         {
             public new StateMachineTrigger Trigger { get; }
+
+            public bool IsAccepted { get; }
+            public bool TryAccept(out TState? nextState, out string reason);
+
+            public TState NextState { get; }
         }
 
-        public interface IEvent2<TArg> : IEvent
+        public interface IParameterizedEvent<TArg> : IEvent
         {
             public new StateMachineTrigger<TArg> Trigger { get; }
+
+            public bool IsAccepted(TArg eventArgument);
+            public TState NextState(TArg eventArgument);
         }
 
         /*Questions to answer:
@@ -37,13 +51,8 @@ namespace StateMachine
          */
         public (bool IsAccepted, TState? newState, string ReasonNotAccepted) TestTrigger(StateMachineTrigger stateMachineTrigger);
         public (bool IsAccepted, TState? newState, string ReasonNotAccepted) TestTrigger<TArg>(StateMachineTrigger<TArg> stateMachineTrigger, TArg argument);
+        public (bool IsAccepted, TState? newState, string ReasonNotAccepted) TestTrigger<TArg>(StateMachineAsyncTrigger<TArg> stateMachineTrigger, TArg argument);
     }
-
-    public interface IStateMachine<TState> : IStateful<TState> where TState : notnull
-    {
-    }
-
-
 
 
     /// <summary>
@@ -56,6 +65,8 @@ namespace StateMachine
     /// <typeparam name="TArg">The type of argument to be passed to the action and associated guards</typeparam>
     /// <param name="eventArgument">Argument passed to the action and associated guards</param>
     public delegate void StateMachineTrigger<TArg>(TArg eventArgument);
+    public delegate Task StateMachineAsyncTrigger<TArg>(TArg eventArgument);
+
     /// <summary>
     /// An action to perform during a state transition
     /// </summary>
@@ -66,25 +77,35 @@ namespace StateMachine
     /// <typeparam name="TArg">The type of argument passed from the trigger</typeparam>
     /// <param name="eventArgument">Argument passed from the trigger</param>
     public delegate void StateMachineAction<TArg>(TArg eventArgument);
+    public delegate Task StateMachineAsyncAction<TArg>(TArg eventArgument);
+
+
+    public delegate bool StateMachineGuard();
+    public delegate bool StateMachineGuard<TArg>(TArg eventArgument);
+
 
     //These interfaces are used to create the fluent syntax for building a state machine.
+    //The builder pattern is utilized to simplify construction of a complex object
     #region FluentInterfaces
     public interface IStateMachineBuilder<TState> where TState : notnull
     {
         IStateMachine<TState> Build(TState initialState);
 
+
         IEventBuilder DefineTrigger(out StateMachineTrigger trigger, [CallerArgumentExpression("trigger")] string? name = null);
-        IEventBuilder DefineEvent(out IStateful<TState>.IEvent2 trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IEventBuilder DefineEvent(out IStateMachine<TState>.IParameterlessEvent trigger, [CallerArgumentExpression("trigger")] string? name = null);
 
         IEventBuilder<TArg> DefineTrigger<TArg>(out StateMachineTrigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
-        IEventBuilder<TArg> DefineEvent<TArg>(out IStateful<TState>.IEvent2<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IEventBuilder<TArg> DefineEvent<TArg>(out IStateMachine<TState>.IParameterizedEvent<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
+
+        IAsyncEventBuilder<TArg> DefineAsyncTrigger<TArg>(out StateMachineAsyncTrigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IAsyncEventBuilder<TArg> DefineAsyncEvent<TArg>(out IStateMachine<TState>.IParameterizedEvent<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
+
 
         public interface IEventBuilder
         {
-            IStateClause IfStateIs(TState state);
-            IStateClause IfStateIs(params TState[] state);
-
-            public delegate bool StateMachineGuard();
+            IStateClause WhenStateIs(TState state);
+            IStateClause WhenStateIs(params TState[] state);
 
             public interface IStateClause
             {
@@ -94,10 +115,8 @@ namespace StateMachine
                 IIfClause If(StateMachineGuard guard, string reason);
             }
 
-            public interface IIfClause
+            public interface ITransitionClause : IEventBuilder, IStateMachineBuilder<TState>
             {
-                ITransitionClause TransitionTo(TState state);
-                IGuardedExecuteClause Execute(StateMachineAction action);
             }
 
             public interface IExecuteClause
@@ -106,43 +125,42 @@ namespace StateMachine
                 ITransitionClause AndKeepSameState();
             }
 
-            public interface IGuardedExecuteClause
+            public interface IIfClause
             {
-                IGuardedTransitionClause ThenTransitionTo(TState state);
-                IGuardedTransitionClause AndKeepSameState();
+                ITransitionClause TransitionTo(TState state);
+                IIfExecuteClause Execute(StateMachineAction action);
             }
 
-            public interface ITransitionClause : IStateMachineBuilder<TState>
-            {
-                public IEventBuilder Or { get; }
-            }
-
-            public interface IGuardedTransitionClause : IStateMachineBuilder<TState>
+            public interface IIfTransitionClause : IEventBuilder, IStateMachineBuilder<TState>
             {
                 public IStateClause Else { get; }
-                public IEventBuilder Or { get; }
             }
+
+            public interface IIfExecuteClause
+            {
+                IIfTransitionClause ThenTransitionTo(TState state);
+                IIfTransitionClause AndKeepSameState();
+            }
+
         }
 
 
+        // These are almost an exact copy from above, but use the <TArg> parameter
         public interface IEventBuilder<TArg>
         {
-            IStateClause IfStateIs(TState state);
-            IStateClause IfStateIs(params TState[] state);
-
-            public delegate bool StateMachineGuard(TArg eventArgument);
+            IStateClause WhenStateIs(TState state);
+            IStateClause WhenStateIs(params TState[] state);
 
             public interface IStateClause
             {
                 ITransitionClause TransitionTo(TState state);
                 IExecuteClause Execute(StateMachineAction<TArg> action);
 
-                IIfClause If(StateMachineGuard guard, string reason);
+                IIfClause If(StateMachineGuard<TArg> guard, string reason);
             }
 
-            public interface IIfClause
+            public interface ITransitionClause : IEventBuilder<TArg>, IStateMachineBuilder<TState>
             {
-                IGuardedExecuteClause Execute(StateMachineAction<TArg> action);
             }
 
             public interface IExecuteClause
@@ -151,21 +169,62 @@ namespace StateMachine
                 ITransitionClause AndKeepSameState();
             }
 
-            public interface IGuardedExecuteClause
+            public interface IIfClause
             {
-                IGuardedTransitionClause ThenTransitionTo(TState state);
-                IGuardedTransitionClause AndKeepSameState();
+                IIfExecuteClause Execute(StateMachineAction<TArg> action);
             }
-            public interface ITransitionClause : IStateMachineBuilder<TState>
-            {
-                public IEventBuilder Or { get; }
-            }
-
-            public interface IGuardedTransitionClause : IStateMachineBuilder<TState>
+            public interface IIfTransitionClause : IEventBuilder<TArg>, IStateMachineBuilder<TState>
             {
                 public IStateClause Else { get; }
-                public IEventBuilder Or { get; }
             }
+
+            public interface IIfExecuteClause
+            {
+                IIfTransitionClause ThenTransitionTo(TState state);
+                IIfTransitionClause AndKeepSameState();
+            }
+
+        }
+
+        // These are almost an exact copy from above, but add Task return types for guards and actions
+        public interface IAsyncEventBuilder<TArg>
+        {
+            IStateClause WhenStateIs(TState state);
+            IStateClause WhenStateIs(params TState[] state);
+
+            public interface IStateClause
+            {
+                ITransitionClause TransitionTo(TState state);
+                IExecuteClause ExecuteAsync(StateMachineAsyncAction<TArg> action);
+
+                IIfClause If(StateMachineGuard<TArg> guard, string reason);
+            }
+
+            public interface ITransitionClause : IEventBuilder<TArg>, IStateMachineBuilder<TState>
+            {
+            }
+
+            public interface IExecuteClause
+            {
+                ITransitionClause ThenTransitionTo(TState state);
+                ITransitionClause AndKeepSameState();
+            }
+
+            public interface IIfClause
+            {
+                IIfExecuteClause Execute(StateMachineAsyncAction<TArg> action);
+            }
+            public interface IIfTransitionClause : IEventBuilder<TArg>, IStateMachineBuilder<TState>
+            {
+                public IStateClause Else { get; }
+            }
+
+            public interface IIfExecuteClause
+            {
+                IIfTransitionClause ThenTransitionTo(TState state);
+                IIfTransitionClause AndKeepSameState();
+            }
+
         }
     }
     #endregion
