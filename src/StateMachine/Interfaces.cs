@@ -59,10 +59,9 @@ namespace StateMachine
     public delegate void Trigger<TArg>(TArg eventArgument);
     public delegate Task AsyncTrigger<TArg>(TArg eventArgument);
 
-    public delegate void Action();
-    public delegate void Action<TArg>(TArg eventArgument);
-    public delegate Task AsyncAction<TArg>(TArg eventArgument);
-
+    public delegate void TransitionAction();
+    public delegate void TransitionAction<TArg>(TArg eventArgument);
+    public delegate Task AsyncTransitionAction<TArg>(TArg eventArgument);
 
     public delegate bool Guard();
     public delegate bool Guard<TArg>(TArg eventArgument);
@@ -83,11 +82,6 @@ namespace StateMachine
 
         IEventBuilder<TState, AsyncTrigger<TArg>, Guard<TArg>> DefineAsyncTrigger<TArg>(out AsyncTrigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
         IEventBuilder<TState, AsyncTrigger<TArg>, Guard<TArg>> DefineAsyncEvent<TArg>(out IEvent<TState, TArg> @event, [CallerArgumentExpression("event")] string? name = null);
-    }
-
-    public interface IEventBuilder
-    {
-
     }
 
     public interface IEventBuilder<TState, TAction, TGuard>
