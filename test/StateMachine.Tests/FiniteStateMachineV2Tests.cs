@@ -21,8 +21,10 @@ namespace StateMachine.Tests
             var workflow = StateMachine.CreateBuilder<Status>()
                 .DefineEvent(out var approve, "Approve")
                     .WhenStateIs(Status.New)
-                    .If(() => true, "because")
                     .TransitionTo(Status.Approved)
+                    .WhenStateIs(Status.Approved)
+                    .Execute(() => { })
+                    .AndKeepSameState()
 
                 .DefineAsyncTrigger<string>(out var close)
                     .WhenStateIs(Status.Completed)

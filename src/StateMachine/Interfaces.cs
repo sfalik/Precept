@@ -57,13 +57,15 @@ namespace StateMachine
 
     public delegate void Trigger();
     public delegate void Trigger<TArg>(TArg eventArgument);
+    public delegate Task AsyncTrigger();
     public delegate Task AsyncTrigger<TArg>(TArg eventArgument);
+
 
     public delegate void TransitionAction();
     public delegate void TransitionAction<TArg>(TArg eventArgument);
+    public delegate Task AsyncTransitionAction();
     public delegate Task AsyncTransitionAction<TArg>(TArg eventArgument);
 
-    public delegate bool Guard();
     public delegate bool Guard<TArg>(TArg eventArgument);
 
 
@@ -74,77 +76,109 @@ namespace StateMachine
     {
         IStateMachine<TState> Build(TState initialState);
 
-        IEventBuilder<TState, Trigger, Guard> DefineTrigger(out Trigger trigger, [CallerArgumentExpression("trigger")] string? name = null);
-        IEventBuilder<TState, Trigger, Guard> DefineEvent(out IEvent<TState> @event, [CallerArgumentExpression("event")] string? name = null);
+        IEventBuilder<TState, TransitionAction> DefineTrigger(out Trigger trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IEventBuilder<TState, TransitionAction> DefineEvent(out IEvent<TState> @event, [CallerArgumentExpression("event")] string? name = null);
 
-        IEventBuilder<TState, Trigger<TArg>, Guard<TArg>> DefineTrigger<TArg>(out Trigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
-        IEventBuilder<TState, Trigger<TArg>, Guard<TArg>> DefineEvent<TArg>(out IEvent<TState, TArg> @event, [CallerArgumentExpression("event")] string? name = null);
+        IEventBuilder<TState, AsyncTransitionAction> DefineAsyncTrigger(out Trigger trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IEventBuilder<TState, AsyncTransitionAction> DefineAsyncEvent(out IEvent<TState> @event, [CallerArgumentExpression("event")] string? name = null);
 
-        IEventBuilder<TState, AsyncTrigger<TArg>, Guard<TArg>> DefineAsyncTrigger<TArg>(out AsyncTrigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
-        IEventBuilder<TState, AsyncTrigger<TArg>, Guard<TArg>> DefineAsyncEvent<TArg>(out IEvent<TState, TArg> @event, [CallerArgumentExpression("event")] string? name = null);
+
+        IEventBuilder<TState, TransitionAction<TArg>, TArg> DefineTrigger<TArg>(out Trigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IEventBuilder<TState, TransitionAction<TArg>, TArg> DefineEvent<TArg>(out IEvent<TState, TArg> @event, [CallerArgumentExpression("event")] string? name = null);
+
+        IEventBuilder<TState, AsyncTransitionAction<TArg>, TArg> DefineAsyncTrigger<TArg>(out AsyncTrigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
+        IEventBuilder<TState, AsyncTransitionAction<TArg>, TArg> DefineAsyncEvent<TArg>(out IEvent<TState, TArg> @event, [CallerArgumentExpression("event")] string? name = null);
     }
 
-    public interface IEventBuilder<TState, TAction, TGuard>
+    #region SimpleEvents
+    public interface IEventBuilder<TState, TAction>
         where TState : notnull
         where TAction : System.Delegate
-        where TGuard : System.Delegate
     {
-        IStateClause<TState, TAction, TGuard> WhenStateIs(TState state);
-        IStateClause<TState, TAction, TGuard> WhenStateIs(params TState[] state);
+        IStateClause<TState, TAction> WhenStateIs(TState state);
+        IStateClause<TState, TAction> WhenStateIs(params TState[] state);
 
     }
-    public interface IStateClause<TState, TAction, TGuard>
+
+    public interface IStateClause<TState, TAction>
         where TState : notnull
         where TAction : System.Delegate
-        where TGuard : System.Delegate
     {
-        ITransitionClause<TState, TAction, TGuard> TransitionTo(TState state);
-        IExecuteClause<TState, TAction, TGuard> Execute(TAction action);
-
-        IIfClause<TState, TAction, TGuard> If(TGuard guard, string reason);
+        ITransitionClause<TState, TAction> TransitionTo(TState state);
+        IExecuteClause<TState, TAction> Execute(TransitionAction action);
     }
 
-    public interface ITransitionClause<TState, TAction, TGuard> : IEventBuilder<TState, TAction, TGuard>, IStateMachineBuilder<TState>
+    public interface ITransitionClause<TState, TAction> : IEventBuilder<TState, TAction>, IStateMachineBuilder<TState>
+    where TState : notnull
+                where TAction : System.Delegate
+    {
+    }
+
+    public interface IExecuteClause<TState, TAction>
         where TState : notnull
         where TAction : System.Delegate
-        where TGuard : System.Delegate
     {
+        ITransitionClause<TState, TAction> ThenTransitionTo(TState state);
+        ITransitionClause<TState, TAction> AndKeepSameState();
     }
+    #endregion
 
-    public interface IExecuteClause<TState, TAction, TGuard>
+    #region ConditionalEvents
+    public interface IEventBuilder<TState, TAction, TArg>
         where TState : notnull
         where TAction : System.Delegate
-        where TGuard : System.Delegate
     {
-        ITransitionClause<TState, TAction, TGuard> ThenTransitionTo(TState state);
-        ITransitionClause<TState, TAction, TGuard> AndKeepSameState();
+        IStateClause<TState, TAction, TArg> WhenStateIs(TState state);
+        IStateClause<TState, TAction, TArg> WhenStateIs(params TState[] state);
+
     }
 
-    public interface IIfClause<TState, TAction, TGuard>
+    public interface IStateClause<TState, TAction, TArg>
         where TState : notnull
         where TAction : System.Delegate
-        where TGuard : System.Delegate
     {
-        ITransitionClause<TState, TAction, TGuard> TransitionTo(TState state);
-        IIfExecuteClause<TState, TAction, TGuard> Execute(TAction action);
+        ITransitionClause<TState, TAction, TArg> TransitionTo(TState state);
+        IExecuteClause<TState, TAction, TArg> Execute(TAction action);
+
+        IIfClause<TState, TAction, TArg> If(Guard<TArg> guard, string reason);
     }
 
-    public interface IIfTransitionClause<TState, TAction, TGuard> : IEventBuilder<TState, TAction, TGuard>, IStateMachineBuilder<TState>
+    public interface ITransitionClause<TState, TAction, TArg> : IEventBuilder<TState, TAction, TArg>, IStateMachineBuilder<TState>
         where TState : notnull
         where TAction : System.Delegate
-        where TGuard : System.Delegate
     {
-        public IStateClause<TState, TAction, TGuard> Else { get; }
     }
 
-    public interface IIfExecuteClause<TState, TAction, TGuard>
+    public interface IExecuteClause<TState, TAction, TArg>
         where TState : notnull
         where TAction : System.Delegate
-        where TGuard : System.Delegate
     {
-        IIfTransitionClause<TState, TAction, TGuard> ThenTransitionTo(TState state);
-        IIfTransitionClause<TState, TAction, TGuard> AndKeepSameState();
+        ITransitionClause<TState, TAction, TArg> ThenTransitionTo(TState state);
+        ITransitionClause<TState, TAction, TArg> AndKeepSameState();
     }
 
+    public interface IIfClause<TState, TAction, TArg>
+        where TState : notnull
+        where TAction : System.Delegate
+    {
+        ITransitionClause<TState, TAction, TArg> TransitionTo(TState state);
+        IIfExecuteClause<TState, TAction, TArg> Execute(TAction action);
+    }
+
+    public interface IIfTransitionClause<TState, TAction, TArg> : IEventBuilder<TState, TAction, TArg>, IStateMachineBuilder<TState>
+        where TState : notnull
+        where TAction : System.Delegate
+    {
+        public IStateClause<TState, TAction, TArg> Else { get; }
+    }
+
+    public interface IIfExecuteClause<TState, TAction, TArg>
+        where TState : notnull
+        where TAction : System.Delegate
+    {
+        IIfTransitionClause<TState, TAction, TArg> ThenTransitionTo(TState state);
+        IIfTransitionClause<TState, TAction, TArg> AndKeepSameState();
+    }
+    #endregion
     #endregion
 }
