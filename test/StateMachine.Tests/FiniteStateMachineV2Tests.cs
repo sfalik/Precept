@@ -19,6 +19,7 @@ namespace StateMachine.Tests
         {
 
             var workflow = StateMachine.CreateBuilder<Status>()
+
                 .DefineEvent(out var approve, "Approve")
                     .WhenStateIs(Status.New)
                     .TransitionTo(Status.Approved)
@@ -31,7 +32,7 @@ namespace StateMachine.Tests
                     .Execute(async reason => await Task.CompletedTask)
                     .ThenTransitionTo(Status.Closed)
 
-                .DefineTrigger<DateTime>(out var startWork)
+                .DefineEvent<DateTime>(out var startWork)
                     .WhenStateIs(Status.Planned, Status.Approved)
                         .If(time => time < DateTime.Now, "Because work cannot start in the past")
                             .Execute(time => { })
@@ -43,7 +44,6 @@ namespace StateMachine.Tests
                         .TransitionTo(Status.Approved)
 
 
-
                 .Build(Status.New)
             ;
 
@@ -53,19 +53,10 @@ namespace StateMachine.Tests
             if (close.IsAccepted("Because"))
                 await close.Trigger("because");
 
-            var result = workflow.TestTrigger(close, "Test");
-            if (result.IsAccepted)
-            {
-
-            }
-
-            if (workflow.TestTrigger(startWork, DateTime.Now).IsAccepted)
-            {
-
-            }
+            if (startWork.IsAccepted(DateTime.Now))
+                startWork.Trigger(DateTime.Now);
 
 
-            startWork(DateTime.Now);
 
 
 

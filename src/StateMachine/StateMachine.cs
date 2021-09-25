@@ -27,28 +27,15 @@ namespace StateMachine
         private List<TState> _states = new();
         public IReadOnlyList<TState> States => _states;
 
-        private List<IStateMachineEvent<TState, Delegate>> _events = new();
-        public IReadOnlyList<IStateMachineEvent<TState, Delegate>> Events => _events;
+        private List<IEvent<TState, Delegate>> _events = new();
+
+        public IReadOnlyList<IEvent<Delegate>> Events => _events;
 
         public StateMachine(TState initialState)
         {
             _state = State;
         }
 
-        public (bool IsAccepted, TState? newState, string ReasonNotAccepted) TestTrigger(Trigger stateMachineTrigger)
-        {
-            throw new NotImplementedException();
-        }
-
-        public (bool IsAccepted, TState? newState, string ReasonNotAccepted) TestTrigger<TArg>(Trigger<TArg> stateMachineTrigger, TArg argument)
-        {
-            throw new NotImplementedException();
-        }
-
-        public (bool IsAccepted, TState? newState, string ReasonNotAccepted) TestTrigger<TArg>(AsyncTrigger<TArg> stateMachineTrigger, TArg argument)
-        {
-            throw new NotImplementedException();
-        }
     }
 
 

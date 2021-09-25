@@ -16,7 +16,7 @@ namespace StateMachine
 
         public IReadOnlyList<TState> States { get; }
 
-        public IReadOnlyList<IStateMachineEvent<TState, Delegate>> Events { get; }
+        public IReadOnlyList<IEvent<Delegate>> Events { get; }
 
         /*Questions to answer:
          * 1. Which events can currently be fired, and which states will they transition to
@@ -25,43 +25,30 @@ namespace StateMachine
          * 4. If a state cannot be accessed, why not (no transition defined, or guards failing)
          * 5. All states and events, regardless of current state, as to be able to map out the full workflow
          */
-        public (bool IsAccepted, TState? newState, string ReasonNotAccepted) TestTrigger(Trigger stateMachineTrigger);
-        public (bool IsAccepted, TState? newState, string ReasonNotAccepted) TestTrigger<TArg>(Trigger<TArg> stateMachineTrigger, TArg argument);
-        public (bool IsAccepted, TState? newState, string ReasonNotAccepted) TestTrigger<TArg>(AsyncTrigger<TArg> stateMachineTrigger, TArg argument);
     }
 
-    public interface IStateMachineEvent<TState, out TTrigger>
+    public interface IEvent<out TTrigger>
         where TTrigger : Delegate
     {
         public string Name { get; }
         public TTrigger Trigger { get; }
 
+    }
+
+    public interface IEvent<TState, out TTrigger>
+    : IEvent<TTrigger>
+    where TTrigger : Delegate
+    {
         bool IsAccepted { get; }
-
     }
 
-    public interface IStateMachineEvent<TState, TArg, out TTrigger>
-        : IStateMachineEvent<TState, TTrigger>
+    public interface IEvent<TState, TArg, out TTrigger>
+        : IEvent<TTrigger>
         where TTrigger : Delegate
     {
-        new bool IsAccepted(TArg argument);
+        bool IsAccepted(TArg argument);
     }
 
-
-    class Test<TState, TArg, TTrigger> : IStateMachineEvent<TState, TArg, TTrigger>
-        where TTrigger : Delegate
-    {
-        public string Name => throw new NotImplementedException();
-
-        public TTrigger Trigger => throw new NotImplementedException();
-
-        bool IStateMachineEvent<TState, TTrigger>.IsAccepted => throw new NotImplementedException();
-
-        public bool IsAccepted(TArg argument)
-        {
-            throw new NotImplementedException();
-        }
-    }
 
     public delegate void Trigger();
     public delegate void Trigger<TArg>(TArg eventArgument);
@@ -83,18 +70,13 @@ namespace StateMachine
     {
         IStateMachine<TState> Build(TState initialState);
 
-        IEventBuilder<TState, TransitionAction> DefineTrigger(out Trigger trigger, [CallerArgumentExpression("trigger")] string? name = null);
-        IEventBuilder<TState, TransitionAction> DefineEvent(out IStateMachineEvent<TState, Trigger> @event, [CallerArgumentExpression("event")] string? name = null);
+        IEventBuilder<TState, TransitionAction> DefineEvent(out IEvent<TState, Trigger> @event, [CallerArgumentExpression("event")] string? name = null);
 
-        IEventBuilder<TState, AsyncTransitionAction> DefineAsyncTrigger(out AsyncTrigger trigger, [CallerArgumentExpression("trigger")] string? name = null);
-        IEventBuilder<TState, AsyncTransitionAction> DefineAsyncEvent(out IStateMachineEvent<TState, AsyncTrigger> @event, [CallerArgumentExpression("event")] string? name = null);
+        IEventBuilder<TState, AsyncTransitionAction> DefineAsyncEvent(out IEvent<TState, AsyncTrigger> @event, [CallerArgumentExpression("event")] string? name = null);
 
+        IEventBuilder<TState, TransitionAction<TArg>, TArg> DefineEvent<TArg>(out IEvent<TState, TArg, Trigger<TArg>> @event, [CallerArgumentExpression("event")] string? name = null);
 
-        IEventBuilder<TState, TransitionAction<TArg>, TArg> DefineTrigger<TArg>(out Trigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
-        IEventBuilder<TState, TransitionAction<TArg>, TArg> DefineEvent<TArg>(out IStateMachineEvent<TState, TArg, Trigger<TArg>> @event, [CallerArgumentExpression("event")] string? name = null);
-
-        IEventBuilder<TState, AsyncTransitionAction<TArg>, TArg> DefineAsyncTrigger<TArg>(out AsyncTrigger<TArg> trigger, [CallerArgumentExpression("trigger")] string? name = null);
-        IEventBuilder<TState, AsyncTransitionAction<TArg>, TArg> DefineAsyncEvent<TArg>(out IStateMachineEvent<TState, TArg, AsyncTrigger<TArg>> @event, [CallerArgumentExpression("event")] string? name = null);
+        IEventBuilder<TState, AsyncTransitionAction<TArg>, TArg> DefineAsyncEvent<TArg>(out IEvent<TState, TArg, AsyncTrigger<TArg>> @event, [CallerArgumentExpression("event")] string? name = null);
     }
 
     #region SimpleEvents
@@ -162,6 +144,8 @@ namespace StateMachine
     {
         ITransitionClause<TState, TAction, TArg> ThenTransitionTo(TState state);
         ITransitionClause<TState, TAction, TArg> AndKeepSameState();
+
+        public IEvent<TState, TAction> Build();
     }
 
     public interface IIfClause<TState, TAction, TArg>
