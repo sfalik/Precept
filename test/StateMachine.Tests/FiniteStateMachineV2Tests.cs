@@ -32,6 +32,9 @@ namespace StateMachine.Tests
             CreatedBy = "Shane Falik";
             CreatedOn = DateTime.Now;
 
+
+            AsyncTransitionAction reopenLogic = async () => await Task.CompletedTask;
+
             _stateMachine = StateMachine.CreateBuilder<Status>()
                 .DefineEvent(out var markAsPlanned)
                     .WhenStateIs(Status.New)
@@ -49,27 +52,28 @@ namespace StateMachine.Tests
                     .WhenStateIs(Status.WorkStarted, Status.Completed)
                     .KeepSameState()
 
-                .DefineAsyncEvent(out var complete)
+                .DefineEvent(out var complete)
                     .WhenStateIs(Status.Approved, Status.WorkStarted)
                     .Execute(() => CompletedOn = DateTime.Now)
                     .ThenTransitionTo(Status.Completed)
 
-                .DefineAsyncEvent(out var close)
+                .DefineEvent(out var close)
                     .WhenStateIs(Status.Completed)
                     .Execute(() => ClosedOn = DateTime.Now)
                     .ThenTransitionTo(Status.Closed)
 
                 .DefineAsyncEvent(out var reopen)
                     .WhenStateIs(Status.Closed)
-                    .Execute(() =>
+                    .Execute(async () =>
                         {
                             CompletedOn = null;
                             ClosedOn = null;
+                            await Task.CompletedTask;
                         })
                     .ThenTransitionTo(Status.WorkStarted)
 
-
                 .Build(Status.New);
+
         }
     }
 

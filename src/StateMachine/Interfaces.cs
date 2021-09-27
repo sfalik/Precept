@@ -76,8 +76,6 @@ namespace StateMachine
         IEventBuilder<TState, AsyncTransitionAction<TArg>, TArg> DefineAsyncEvent<TArg>(out IEvent<TState, TArg, AsyncTrigger<TArg>> @event, [CallerArgumentExpression("event")] string? name = null);
     }
 
-    #endregion
-
     #region SimpleEvents
     public interface IEventBuilder<TState, TAction>
         where TState : notnull
@@ -95,7 +93,7 @@ namespace StateMachine
         ITransitionClause<TState, TAction> TransitionTo(TState state);
         ITransitionClause<TState, TAction> KeepSameState();
 
-        IExecuteClause<TState, TAction> Execute(TransitionAction action);
+        IExecuteClause<TState, TAction> Execute(TAction action);
     }
 
     public interface ITransitionClause<TState, TAction> : IEventBuilder<TState, TAction>, IStateMachineBuilder<TState>
@@ -105,7 +103,7 @@ namespace StateMachine
     }
 
     public interface IExecuteClause<TState, TAction>
-        where TState : struct
+        where TState : notnull
         where TAction : System.Delegate
     {
         ITransitionClause<TState, TAction> ThenTransitionTo(TState state);
@@ -174,5 +172,5 @@ namespace StateMachine
         IIfTransitionClause<TState, TAction, TArg> AndKeepSameState();
     }
     #endregion
-#endregion
+    #endregion
 }
