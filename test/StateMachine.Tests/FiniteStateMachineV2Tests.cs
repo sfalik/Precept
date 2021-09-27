@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using FluentAssertions;
 using Xunit;
 
 namespace StateMachine.Tests
@@ -67,6 +68,7 @@ namespace StateMachine.Tests
                         })
                     .ThenTransitionTo(Status.WorkStarted)
 
+
                 .Build(Status.New);
         }
     }
@@ -111,8 +113,17 @@ namespace StateMachine.Tests
             if (close.Evaluate("Because").IsAccepted)
                 await close.Trigger("because");
 
-            if (startWork.Evaluate(DateTime.Now).IsAccepted)
+            if (startWork.Evaluate(DateTime.Now, out var newState, out string? reason))
+            {
                 startWork.Trigger(DateTime.Now);
+                workflow.State.Should().Be(newState, "because the new state should match what was returned from the evaluation");
+                reason.Should().BeNull("because a reason is not needed when the state is accepted");
+            }
+            else
+            {
+                newState.Should().Be(default(Status));
+                reason.Should().NotBeNullOrWhiteSpace("because if an event cannot be triggered, and explaination should always be returend");
+            }
 
 
         }
@@ -120,7 +131,7 @@ namespace StateMachine.Tests
         [Fact]
         public void Temp()
         {
-
+            default(Status).Should().Be(Status.New);
         }
 
 

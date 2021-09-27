@@ -27,29 +27,6 @@ namespace StateMachine
          */
     }
 
-    public interface IEvent<out TTrigger>
-        where TTrigger : Delegate
-    {
-        public string Name { get; }
-        public TTrigger Trigger { get; }
-
-    }
-
-    public interface IEvent<TState, out TTrigger>
-    : IEvent<TTrigger>
-    where TTrigger : Delegate
-    {
-        (bool IsAccepted, TState? newStateIfAccepted, string reasonNotAccepted) Evaluate();
-    }
-
-    public interface IEvent<TState, TArg, out TTrigger>
-        : IEvent<TTrigger>
-        where TTrigger : Delegate
-    {
-        (bool IsAccepted, TState? newStateIfAccepted, string reasonNotAccepted) Evaluate(TArg argument);
-    }
-
-
     public delegate void Trigger();
     public delegate void Trigger<TArg>(TArg eventArgument);
     public delegate Task AsyncTrigger();
@@ -62,6 +39,26 @@ namespace StateMachine
 
     public delegate bool Guard<TArg>(TArg eventArgument);
 
+    public interface IEvent<out TTrigger>
+        where TTrigger : Delegate
+    {
+        public string Name { get; }
+        public TTrigger Trigger { get; }
+    }
+
+    public interface IEvent<TState, out TTrigger> : IEvent<TTrigger>
+        where TTrigger : Delegate where TState : notnull
+    {
+        (bool IsAccepted, TState newStateIfAccepted, string? reasonNotAccepted) Evaluate();
+        bool Evaluate(out TState newStateIfAccepted, out string? reasonNotAccepted);
+    }
+
+    public interface IEvent<TState, TArg, out TTrigger> : IEvent<TTrigger>
+        where TTrigger : Delegate where TState : notnull
+    {
+        (bool IsAccepted, TState newStateIfAccepted, string? reasonNotAccepted) Evaluate(TArg eventArgument);
+        bool Evaluate(TArg eventArgument, out TState newStateIfAccepted, out string? reasonNotAccepted);
+    }
 
     //These interfaces are used to create the fluent syntax for building a state machine.
     //The builder pattern is utilized to simplify construction of a complex object
@@ -78,6 +75,8 @@ namespace StateMachine
 
         IEventBuilder<TState, AsyncTransitionAction<TArg>, TArg> DefineAsyncEvent<TArg>(out IEvent<TState, TArg, AsyncTrigger<TArg>> @event, [CallerArgumentExpression("event")] string? name = null);
     }
+
+    #endregion
 
     #region SimpleEvents
     public interface IEventBuilder<TState, TAction>
@@ -106,7 +105,7 @@ namespace StateMachine
     }
 
     public interface IExecuteClause<TState, TAction>
-        where TState : notnull
+        where TState : struct
         where TAction : System.Delegate
     {
         ITransitionClause<TState, TAction> ThenTransitionTo(TState state);
@@ -175,5 +174,5 @@ namespace StateMachine
         IIfTransitionClause<TState, TAction, TArg> AndKeepSameState();
     }
     #endregion
-    #endregion
+#endregion
 }
