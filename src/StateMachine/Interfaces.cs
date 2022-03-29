@@ -5,18 +5,19 @@ using System.Threading.Tasks;
 
 namespace StateMachine
 {
-    public interface IStateful<TState> : IStateMachine<TState> where TState : notnull
+    public interface IStateful<TState> : IStateMachine<TState> where TState : notnull, System.Enum
     {
 
     }
 
-    public interface IStateMachine<TState> where TState : notnull
+    public interface IStateMachine<TState> where TState : notnull, System.Enum
     {
         public TState State { get; }
 
+        // not needed if we assume 
         public IReadOnlyList<TState> States { get; }
 
-        public IReadOnlyList<IEvent<Delegate>> Events { get; }
+        public IReadOnlyList<IEvent> Events { get; }
 
         /*Questions to answer:
          * 1. Which events can currently be fired, and which states will they transition to
@@ -39,10 +40,14 @@ namespace StateMachine
 
     public delegate bool Guard<TArg>(TArg eventArgument);
 
-    public interface IEvent<out TTrigger>
-        where TTrigger : Delegate
+
+    public interface IEvent
     {
         public string Name { get; }
+    }
+    public interface IEvent<out TTrigger> : IEvent
+        where TTrigger : Delegate
+    {
         public TTrigger Trigger { get; }
     }
 
@@ -60,12 +65,19 @@ namespace StateMachine
         bool Evaluate(TArg eventArgument, out TState newStateIfAccepted, out string? reasonNotAccepted);
     }
 
+    public interface IAttribute<T>
+    {
+        public T Value { get; set; }
+    }
+
     //These interfaces are used to create the fluent syntax for building a state machine.
-    //The builder pattern is utilized to simplify construction of a complex object
+    //The builder pattern is utilized to simplify construction of this complex object
     #region FluentInterfaces
-    public interface IStateMachineBuilder<TState> where TState : notnull
+    public interface IStateMachineBuilder<TState> where TState : notnull, System.Enum
     {
         IStateMachine<TState> Build(TState initialState);
+
+        //IStateMachineBuilder<TState> DefineAttribute<T>(ref T attribute);
 
         IEventBuilder<TState, TransitionAction> DefineEvent(out IEvent<TState, Trigger> @event, [CallerArgumentExpression("event")] string? name = null);
 
@@ -76,18 +88,26 @@ namespace StateMachine
         IEventBuilder<TState, AsyncTransitionAction<TArg>, TArg> DefineAsyncEvent<TArg>(out IEvent<TState, TArg, AsyncTrigger<TArg>> @event, [CallerArgumentExpression("event")] string? name = null);
     }
 
+
+
+
+    public interface Test<TLambda>
+    {
+
+    }
+
     #region SimpleEvents
     public interface IEventBuilder<TState, TAction>
-        where TState : notnull
+        where TState : notnull, System.Enum
         where TAction : System.Delegate
     {
         IStateClause<TState, TAction> WhenStateIs(TState state);
         IStateClause<TState, TAction> WhenStateIs(params TState[] state);
-
+        IStateClause<TState, TAction> RegardlessOfState();
     }
 
     public interface IStateClause<TState, TAction>
-        where TState : notnull
+        where TState : notnull, System.Enum
         where TAction : System.Delegate
     {
         ITransitionClause<TState, TAction> TransitionTo(TState state);
@@ -97,13 +117,13 @@ namespace StateMachine
     }
 
     public interface ITransitionClause<TState, TAction> : IEventBuilder<TState, TAction>, IStateMachineBuilder<TState>
-    where TState : notnull
+    where TState : notnull, System.Enum
                 where TAction : System.Delegate
     {
     }
 
     public interface IExecuteClause<TState, TAction>
-        where TState : notnull
+        where TState : notnull, System.Enum
         where TAction : System.Delegate
     {
         ITransitionClause<TState, TAction> ThenTransitionTo(TState state);
@@ -113,7 +133,7 @@ namespace StateMachine
 
     #region ConditionalEvents
     public interface IEventBuilder<TState, TAction, TArg>
-        where TState : notnull
+        where TState : notnull, System.Enum
         where TAction : System.Delegate
     {
         IStateClause<TState, TAction, TArg> WhenStateIs(TState state);
@@ -122,7 +142,7 @@ namespace StateMachine
     }
 
     public interface IStateClause<TState, TAction, TArg>
-        where TState : notnull
+        where TState : notnull, System.Enum
         where TAction : System.Delegate
     {
         ITransitionClause<TState, TAction, TArg> TransitionTo(TState state);
@@ -134,13 +154,13 @@ namespace StateMachine
     }
 
     public interface ITransitionClause<TState, TAction, TArg> : IEventBuilder<TState, TAction, TArg>, IStateMachineBuilder<TState>
-        where TState : notnull
+        where TState : notnull, System.Enum
         where TAction : System.Delegate
     {
     }
 
     public interface IExecuteClause<TState, TAction, TArg>
-        where TState : notnull
+        where TState : notnull, System.Enum
         where TAction : System.Delegate
     {
         ITransitionClause<TState, TAction, TArg> ThenTransitionTo(TState state);
@@ -150,22 +170,24 @@ namespace StateMachine
     }
 
     public interface IIfClause<TState, TAction, TArg>
-        where TState : notnull
+        where TState : notnull, System.Enum
         where TAction : System.Delegate
     {
         ITransitionClause<TState, TAction, TArg> TransitionTo(TState state);
         IIfExecuteClause<TState, TAction, TArg> Execute(TAction action);
+
+        IIfClause<TState, TAction, TArg> And(Guard<TArg> guard, string reason);
     }
 
     public interface IIfTransitionClause<TState, TAction, TArg> : IEventBuilder<TState, TAction, TArg>, IStateMachineBuilder<TState>
-        where TState : notnull
+        where TState : notnull, System.Enum
         where TAction : System.Delegate
     {
         public IStateClause<TState, TAction, TArg> Else { get; }
     }
 
     public interface IIfExecuteClause<TState, TAction, TArg>
-        where TState : notnull
+        where TState : notnull, System.Enum
         where TAction : System.Delegate
     {
         IIfTransitionClause<TState, TAction, TArg> ThenTransitionTo(TState state);

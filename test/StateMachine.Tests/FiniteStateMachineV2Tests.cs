@@ -6,20 +6,19 @@ using Xunit;
 
 namespace StateMachine.Tests
 {
-
-    enum Status
+    internal enum Status
     {
-        New, Planned, Approved, WorkStarted, Completed, Closed
+        New, Planned, Approved, WorkStarted, Completed, Closed, Cancelled
     }
 
-    record Approval(string ApprovedBy, DateTime ApprovedOn);
+    internal record Approval(string ApprovedBy, DateTime ApprovedOn);
 
-    class WorkOrder : IStateful<Status>
+    internal class WorkOrder : IStateful<Status>
     {
-        private IStateMachine<Status> _stateMachine;
+        private readonly IStateMachine<Status> _stateMachine;
         public Status State => _stateMachine.State;
         public IReadOnlyList<Status> States => _stateMachine.States;
-        public IReadOnlyList<IEvent<Delegate>> Events => _stateMachine.Events;
+        public IReadOnlyList<IEvent> Events => _stateMachine.Events;
 
         public Approval? Approval { get; set; }
         public string CreatedBy { get; set; }
@@ -27,15 +26,16 @@ namespace StateMachine.Tests
         public DateTime? CompletedOn { get; set; }
         public DateTime? ClosedOn { get; set; }
 
+        public Trigger MarkAsPlanned { get; init; }
+
         public WorkOrder()
         {
             CreatedBy = "Shane Falik";
             CreatedOn = DateTime.Now;
 
-
-            AsyncTransitionAction reopenLogic = async () => await Task.CompletedTask;
-
             _stateMachine = StateMachine.CreateBuilder<Status>()
+                //.DefineAttribute<string>(ref CreatedBy)
+
                 .DefineEvent(out var markAsPlanned)
                     .WhenStateIs(Status.New)
                     .TransitionTo(Status.Planned)
@@ -74,6 +74,8 @@ namespace StateMachine.Tests
 
                 .Build(Status.New);
 
+            MarkAsPlanned = markAsPlanned.Trigger;
+
         }
     }
 
@@ -82,15 +84,15 @@ namespace StateMachine.Tests
         [Fact]
         public async void Test1()
         {
-
             var workflow = StateMachine.CreateBuilder<Status>()
+                //.DefineAttribute<string>(out var name)
 
-                .DefineEvent(out var approve, "Approve")
+                .DefineEvent(out var approve)
                     .WhenStateIs(Status.New)
                     .TransitionTo(Status.Approved)
                     .WhenStateIs(Status.Approved)
-                    .Execute(() => { })
-                    .AndKeepSameState()
+                        .Execute(() => { })
+                        .AndKeepSameState()
 
                 .DefineAsyncEvent<string>(out var close)
                     .WhenStateIs(Status.Completed)
@@ -100,24 +102,33 @@ namespace StateMachine.Tests
                 .DefineEvent<DateTime>(out var startWork)
                     .WhenStateIs(Status.Planned, Status.Approved)
                         .If(time => time < DateTime.Now, "Because work cannot start in the past")
+                        .And(time => time.Year < 2040, "can't plan that far ahead")
                             .Execute(time => { })
                             .ThenTransitionTo(Status.WorkStarted)
-                        .Else.If(time => false, "because")
+                        .Else.If(time => false, "arbitrary reason")
                             .Execute(time => { })
                             .AndKeepSameState()
                     .WhenStateIs(Status.Closed)
                         .TransitionTo(Status.Approved)
 
+                .DefineEvent(out var cancel)
+                    .RegardlessOfState()
+                    .TransitionTo(Status.Cancelled)
+
                 .Build(Status.New)
             ;
 
             if (approve.Evaluate().IsAccepted)
+            {
                 approve.Trigger();
+            }
 
             if (close.Evaluate("Because").IsAccepted)
+            {
                 await close.Trigger("because");
+            }
 
-            if (startWork.Evaluate(DateTime.Now, out var newState, out string? reason))
+            if (startWork.Evaluate(DateTime.Now, out var newState, out var reason))
             {
                 startWork.Trigger(DateTime.Now);
                 workflow.State.Should().Be(newState, "because the new state should match what was returned from the evaluation");
@@ -128,7 +139,6 @@ namespace StateMachine.Tests
                 newState.Should().Be(default(Status));
                 reason.Should().NotBeNullOrWhiteSpace("because if an event cannot be triggered, and explaination should always be returend");
             }
-
 
         }
 
