@@ -592,7 +592,7 @@ namespace StateMachine.Tests
             where TEvent : notnull
     {
         public StateMachineAssertions(IStateful<TState, TEvent> subject)
-            : base(subject)
+            : base(subject, AssertionChain.GetOrCreate())
         { }
 
         protected override string Identifier => "State Machine";
@@ -602,7 +602,7 @@ namespace StateMachine.Tests
             if (Subject == null)
                 throw new NullReferenceException("Subject should not be null");
 
-            Execute.Assertion
+            AssertionChain.GetOrCreate()
                 .BecauseOf(because, becauseArgs)
                 .ForCondition(Subject.IsEventAccepted(eventToAccept, out _))
                 .FailWith("Expected {context} to accept {0}{reason}, but it does not", eventToAccept);
@@ -615,7 +615,7 @@ namespace StateMachine.Tests
             if (Subject == null)
                 throw new NullReferenceException("Subject should not be null");
 
-            Execute.Assertion
+            AssertionChain.GetOrCreate()
                 .BecauseOf(because, becauseArgs)
                 .ForCondition(!Subject.IsEventAccepted(eventToAccept, out _))
                 .FailWith("Expected {context} to not accept {0}{reason}, but it does", eventToAccept);
@@ -631,7 +631,7 @@ namespace StateMachine.Tests
             if (Subject.State == null)
                 throw new NullReferenceException("Subject.State should not be null");
 
-            Execute.Assertion
+            AssertionChain.GetOrCreate()
                 .BecauseOf(because, becauseArgs)
                 .ForCondition(Subject.State.Equals(state))
                 .FailWith("Expected {context} to be in state {0}{reason}, but it is actually in state {1}", state, Subject.State);
@@ -647,7 +647,7 @@ namespace StateMachine.Tests
             if (Subject.State == null)
                 throw new NullReferenceException("Subject.State should not be null");
 
-            Execute.Assertion
+            AssertionChain.GetOrCreate()
                 .BecauseOf(because, becauseArgs)
                 .ForCondition(!Subject.State.Equals(state))
                 .FailWith("Expected {context} to not be in state {0}{reason}, but it is", state);
