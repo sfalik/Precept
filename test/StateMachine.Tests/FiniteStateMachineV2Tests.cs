@@ -28,6 +28,7 @@ namespace StateMachine.Tests
 
         public Trigger MarkAsPlanned { get; init; }
 
+ 
         public WorkOrder()
         {
             CreatedBy = "Shane Falik";
@@ -118,17 +119,17 @@ namespace StateMachine.Tests
                 .Build(Status.New)
             ;
 
-            if (approve.Evaluate().IsAccepted)
+            if (approve.Test().IsAccepted)
             {
                 approve.Trigger();
             }
 
-            if (close.Evaluate("Because").IsAccepted)
+            if (close.Test("Because").IsAccepted)
             {
                 await close.Trigger("because");
             }
 
-            if (startWork.Evaluate(DateTime.Now, out var newState, out var reason))
+            if (startWork.Test(DateTime.Now, out var newState, out var reason))
             {
                 startWork.Trigger(DateTime.Now);
                 workflow.State.Should().Be(newState, "because the new state should match what was returned from the evaluation");

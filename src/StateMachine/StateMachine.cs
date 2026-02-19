@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 namespace StateMachine
 {
     /// <summary>
-    /// My interpretation of a Finite State Machine, mostly meant to be used to managing the state of a business object
+    /// My interpretation of a Finite State Machine, mostly meant to be used to manage the state of a business object
     /// </summary>
     public static class StateMachine
     {

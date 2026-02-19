@@ -54,15 +54,15 @@ namespace StateMachine
     public interface IEvent<TState, out TTrigger> : IEvent<TTrigger>
         where TTrigger : Delegate where TState : notnull
     {
-        (bool IsAccepted, TState newStateIfAccepted, string? reasonNotAccepted) Evaluate();
-        bool Evaluate(out TState newStateIfAccepted, out string? reasonNotAccepted);
+        (bool IsAccepted, TState newStateIfAccepted, string? reasonNotAccepted) Test();
+        bool Test(out TState newStateIfAccepted, out string? reasonNotAccepted);
     }
 
     public interface IEvent<TState, TArg, out TTrigger> : IEvent<TTrigger>
         where TTrigger : Delegate where TState : notnull
     {
-        (bool IsAccepted, TState newStateIfAccepted, string? reasonNotAccepted) Evaluate(TArg eventArgument);
-        bool Evaluate(TArg eventArgument, out TState newStateIfAccepted, out string? reasonNotAccepted);
+        (bool IsAccepted, TState newStateIfAccepted, string? reasonNotAccepted) Test(TArg eventArgument);
+        bool Test(TArg eventArgument, out TState newStateIfAccepted, out string? reasonNotAccepted);
     }
 
     public interface IAttribute<T>
