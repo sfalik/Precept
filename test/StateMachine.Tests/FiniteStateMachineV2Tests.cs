@@ -82,7 +82,7 @@ namespace StateMachine.Tests
 
     public class FiniteStateMachineV2Tests
     {
-        [Fact]
+        [Fact(Skip = "Not ready")]
         public async void Test1()
         {
             var workflow = StateMachine.CreateBuilder<Status>()

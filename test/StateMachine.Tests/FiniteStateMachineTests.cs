@@ -569,15 +569,11 @@ namespace StateMachine.Tests
     }
 
 
-    [Serializable]
     public class ExpectedException : Exception
     {
         public ExpectedException() { }
         public ExpectedException(string message) : base(message) { }
         public ExpectedException(string message, Exception inner) : base(message, inner) { }
-        protected ExpectedException(
-          System.Runtime.Serialization.SerializationInfo info,
-          System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
     }
 
     public static class StateMachineExtensions
