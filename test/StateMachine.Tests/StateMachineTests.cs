@@ -80,7 +80,7 @@ namespace StateMachine.Tests
         }
     }
 
-    public class FiniteStateMachineV2Tests
+    public class StateMachineTests
     {
         [Fact(Skip = "Not ready")]
         public async void Test1()
