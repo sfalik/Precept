@@ -10,5 +10,10 @@
 
 # Visual Studio 2015 cache/options directory
 .vs/
-.vscode/
+
+# VS Code - ignore user settings but keep shared configs
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
