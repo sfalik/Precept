@@ -91,11 +91,6 @@ namespace StateMachine
 
 
 
-    public interface Test<TLambda>
-    {
-
-    }
-
     #region SimpleEvents
     public interface IEventBuilder<TState, TAction>
         where TState : notnull, System.Enum
@@ -165,8 +160,6 @@ namespace StateMachine
     {
         ITransitionClause<TState, TAction, TArg> ThenTransitionTo(TState state);
         ITransitionClause<TState, TAction, TArg> AndKeepSameState();
-
-        public IEvent<TState, TAction> Build();
     }
 
     public interface IIfClause<TState, TAction, TArg>

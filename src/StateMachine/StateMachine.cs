@@ -34,7 +34,7 @@ namespace StateMachine
 
         public StateMachine(TState initialState)
         {
-            _state = State;
+            _state = initialState;
         }
 
     }
