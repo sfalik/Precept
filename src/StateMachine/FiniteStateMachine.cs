@@ -438,18 +438,4 @@ namespace StateMachine
             { get { return new WhenEventClause(_transition.FromState, _transition.Trigger, _transition.StateMachine); } }
         }
     }
-
-    public class InvalidTransitionException : Exception
-    {
-        public InvalidTransitionException() { }
-        public InvalidTransitionException(string message) : base(message) { }
-        public InvalidTransitionException(string message, Exception inner) : base(message, inner) { }
-    }
-
-    public class ConditionFailedException : Exception
-    {
-        public ConditionFailedException() { }
-        public ConditionFailedException(string message) : base(message) { }
-        public ConditionFailedException(string message, Exception inner) : base(message, inner) { }
-    }
 }

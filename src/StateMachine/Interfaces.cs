@@ -1,191 +1,376 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 
 namespace StateMachine
 {
-    public interface IStateful<TState> : IStateMachine<TState> where TState : notnull, System.Enum
-    {
+    // ═══════════════════════════════════════════════════════════════════
+    // State Machine Interfaces (the built result)
+    // ═══════════════════════════════════════════════════════════════════
 
-    }
-
+    /// <summary>
+    /// A data-less state machine that manages state transitions only.
+    /// Thread-safe after construction.
+    /// </summary>
     public interface IStateMachine<TState> where TState : notnull, System.Enum
     {
-        public TState State { get; }
+        /// <summary>Current state of the machine</summary>
+        TState State { get; }
 
-        // not needed if we assume 
-        public IReadOnlyList<TState> States { get; }
+        /// <summary>All valid states for this machine, derived from the TState enum values</summary>
+        IReadOnlyList<TState> States { get; }
 
-        public IReadOnlyList<IEvent> Events { get; }
+        /// <summary>All defined events on this machine</summary>
+        IReadOnlyList<IEvent> Events { get; }
 
-        /*Questions to answer:
-         * 1. Which events can currently be fired, and which states will they transition to
-         * 2. Wich states can be accessed, and which events / guards are required to get there
-         * 3. If an event cannot be triggered, why not (not defined for the current state, or guard failing)
-         * 4. If a state cannot be accessed, why not (no transition defined, or guards failing)
-         * 5. All states and events, regardless of current state, as to be able to map out the full workflow
-         */
+        /// <summary>
+        /// Raised after every successful state transition.
+        /// Fires inside the transition lock — handlers should be fast and non-blocking.
+        /// </summary>
+        event Action<TransitionedEventArgs<TState>>? Transitioned;
     }
 
-    public delegate void Trigger();
-    public delegate void Trigger<TArg>(TArg eventArgument);
-    public delegate Task AsyncTrigger();
-    public delegate Task AsyncTrigger<TArg>(TArg eventArgument);
+    /// <summary>
+    /// A data-ful state machine that manages both state and immutable data records.
+    /// State is stored as a property on the TData record, identified via the state selector expression.
+    /// Transitions produce new TData records — the original is never mutated.
+    /// Thread-safe after construction.
+    /// </summary>
+    public interface IStateMachine<TState, TData> : IStateMachine<TState>
+        where TState : notnull, System.Enum
+    {
+        /// <summary>Current data record (immutable — includes the state property)</summary>
+        TData Data { get; }
 
-    public delegate void TransitionAction();
-    public delegate void TransitionAction<TArg>(TArg eventArgument);
-    public delegate Task AsyncTransitionAction();
-    public delegate Task AsyncTransitionAction<TArg>(TArg eventArgument);
+        /// <summary>
+        /// Raised after every successful transition, providing both old and new data records.
+        /// Fires inside the transition lock — handlers should be fast and non-blocking.
+        /// </summary>
+        event Action<DataTransitionedEventArgs<TState, TData>>? DataTransitioned;
+    }
 
-    public delegate bool Guard<TArg>(TArg eventArgument);
+    // ═══════════════════════════════════════════════════════════════════
+    // Transition Observation
+    // ═══════════════════════════════════════════════════════════════════
 
+    /// <summary>Information about a completed state transition</summary>
+    public record TransitionedEventArgs<TState>(
+        TState FromState,
+        TState ToState,
+        string EventName
+    ) where TState : notnull, System.Enum;
 
+    /// <summary>Information about a completed transition including before/after data</summary>
+    public record DataTransitionedEventArgs<TState, TData>(
+        TState FromState,
+        TState ToState,
+        TData OldData,
+        TData NewData,
+        string EventName
+    ) : TransitionedEventArgs<TState>(FromState, ToState, EventName)
+        where TState : notnull, System.Enum;
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Event Interfaces (what consumers interact with after Build)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>Base event interface — for untyped collections</summary>
     public interface IEvent
     {
-        public string Name { get; }
-    }
-    public interface IEvent<out TTrigger> : IEvent
-        where TTrigger : Delegate
-    {
-        public TTrigger Trigger { get; }
+        /// <summary>
+        /// Name of the event, auto-captured from the variable name via CallerArgumentExpression
+        /// </summary>
+        string Name { get; }
     }
 
-    public interface IEvent<TState, out TTrigger> : IEvent<TTrigger>
-        where TTrigger : Delegate where TState : notnull
+    /// <summary>Synchronous event with no arguments</summary>
+    public interface IEvent<TState> : IEvent where TState : notnull, System.Enum
     {
-        (bool IsAccepted, TState newStateIfAccepted, string? reasonNotAccepted) Test();
-        bool Test(out TState newStateIfAccepted, out string? reasonNotAccepted);
+        /// <summary>
+        /// Fire the event, performing the state transition and optional data transform.
+        /// </summary>
+        /// <exception cref="InvalidTransitionException">Event is not defined for the current state</exception>
+        /// <exception cref="GuardFailedException">All guards failed for the current state</exception>
+        void Trigger();
+
+        /// <summary>
+        /// Test whether this event would be accepted without actually firing it.
+        /// Best-effort check — state could change between Test and Trigger.
+        /// </summary>
+        (bool IsAccepted, TState NewState, string? Reason) Test();
     }
 
-    public interface IEvent<TState, TArg, out TTrigger> : IEvent<TTrigger>
-        where TTrigger : Delegate where TState : notnull
+    /// <summary>Synchronous event with a typed argument</summary>
+    public interface IEvent<TState, TArg> : IEvent where TState : notnull, System.Enum
     {
-        (bool IsAccepted, TState newStateIfAccepted, string? reasonNotAccepted) Test(TArg eventArgument);
-        bool Test(TArg eventArgument, out TState newStateIfAccepted, out string? reasonNotAccepted);
+        /// <summary>
+        /// Fire the event with the specified argument, performing the state transition and optional data transform.
+        /// </summary>
+        /// <exception cref="InvalidTransitionException">Event is not defined for the current state</exception>
+        /// <exception cref="GuardFailedException">All guards failed for the current state and argument</exception>
+        void Trigger(TArg arg);
+
+        /// <summary>
+        /// Test whether this event would be accepted with the given argument.
+        /// Best-effort check — state could change between Test and Trigger.
+        /// </summary>
+        (bool IsAccepted, TState NewState, string? Reason) Test(TArg arg);
     }
 
-    public interface IAttribute<T>
+    // ═══════════════════════════════════════════════════════════════════
+    // Exceptions
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>Thrown when an event is triggered in a state where it is not defined</summary>
+    public class InvalidTransitionException : Exception
     {
-        public T Value { get; set; }
+        public InvalidTransitionException() { }
+        public InvalidTransitionException(string message) : base(message) { }
+        public InvalidTransitionException(string message, Exception inner) : base(message, inner) { }
     }
 
-    //These interfaces are used to create the fluent syntax for building a state machine.
-    //The builder pattern is utilized to simplify construction of this complex object
-    #region FluentInterfaces
+    /// <summary>Thrown when all guards on a conditional event fail</summary>
+    public class GuardFailedException : Exception
+    {
+        /// <summary>The individual reason strings from each failed guard</summary>
+        public IReadOnlyList<string> Reasons { get; }
+
+        public GuardFailedException(IReadOnlyList<string> reasons)
+            : base("All guards failed: " + string.Join("; ", reasons))
+        {
+            Reasons = reasons;
+        }
+
+        public GuardFailedException(string message) : base(message)
+        {
+            Reasons = new[] { message };
+        }
+
+        public GuardFailedException(string message, Exception inner) : base(message, inner)
+        {
+            Reasons = new[] { message };
+        }
+    }
+
+    /// <summary>Thrown when all conditions on a conditional transition fail (legacy)</summary>
+    public class ConditionFailedException : Exception
+    {
+        public ConditionFailedException() { }
+        public ConditionFailedException(string message) : base(message) { }
+        public ConditionFailedException(string message, Exception inner) : base(message, inner) { }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Fluent Builder Interfaces
+    // ═══════════════════════════════════════════════════════════════════
+
+    #region Data-Less Builder
+
+    /// <summary>Builder for a data-less state machine that only tracks state transitions</summary>
     public interface IStateMachineBuilder<TState> where TState : notnull, System.Enum
     {
+        /// <summary>Build the state machine with the given initial state</summary>
         IStateMachine<TState> Build(TState initialState);
 
-        //IStateMachineBuilder<TState> DefineAttribute<T>(ref T attribute);
+        /// <summary>Define a new event with no arguments</summary>
+        IEventBuilder<TState> DefineEvent(
+            out IEvent<TState> @event,
+            [CallerArgumentExpression("event")] string? name = null);
 
-        IEventBuilder<TState, TransitionAction> DefineEvent(out IEvent<TState, Trigger> @event, [CallerArgumentExpression("event")] string? name = null);
-
-        IEventBuilder<TState, AsyncTransitionAction> DefineAsyncEvent(out IEvent<TState, AsyncTrigger> @event, [CallerArgumentExpression("event")] string? name = null);
-
-        IEventBuilder<TState, TransitionAction<TArg>, TArg> DefineEvent<TArg>(out IEvent<TState, TArg, Trigger<TArg>> @event, [CallerArgumentExpression("event")] string? name = null);
-
-        IEventBuilder<TState, AsyncTransitionAction<TArg>, TArg> DefineAsyncEvent<TArg>(out IEvent<TState, TArg, AsyncTrigger<TArg>> @event, [CallerArgumentExpression("event")] string? name = null);
+        /// <summary>
+        /// Attach an immutable data record to this builder, producing a data-ful state machine builder.
+        /// The expression identifies which property on TData holds the state.
+        /// </summary>
+        IStateMachineBuilder<TState, TData> WithData<TData>(
+            Expression<Func<TData, TState>> stateSelector);
     }
 
-
-
-
-    #region SimpleEvents
-    public interface IEventBuilder<TState, TAction>
+    /// <summary>Choose which state(s) to associate with the event</summary>
+    public interface IEventBuilder<TState>
         where TState : notnull, System.Enum
-        where TAction : System.Delegate
     {
-        IStateClause<TState, TAction> WhenStateIs(TState state);
-        IStateClause<TState, TAction> WhenStateIs(params TState[] state);
-        IStateClause<TState, TAction> RegardlessOfState();
+        IStateClause<TState> WhenStateIs(TState state);
+        IStateClause<TState> WhenStateIs(params TState[] states);
+        IStateClause<TState> RegardlessOfState();
     }
 
-    public interface IStateClause<TState, TAction>
+    /// <summary>Choose the transition target for the current state clause</summary>
+    public interface IStateClause<TState>
         where TState : notnull, System.Enum
-        where TAction : System.Delegate
     {
-        ITransitionClause<TState, TAction> TransitionTo(TState state);
-        ITransitionClause<TState, TAction> KeepSameState();
-
-        IExecuteClause<TState, TAction> Execute(TAction action);
+        ITransitionClause<TState> TransitionTo(TState state);
+        ITransitionClause<TState> KeepSameState();
     }
 
-    public interface ITransitionClause<TState, TAction> : IEventBuilder<TState, TAction>, IStateMachineBuilder<TState>
-    where TState : notnull, System.Enum
-                where TAction : System.Delegate
-    {
-    }
-
-    public interface IExecuteClause<TState, TAction>
+    /// <summary>
+    /// Transition is defined — continue defining more state clauses for this event,
+    /// define new events, or build the machine.
+    /// </summary>
+    public interface ITransitionClause<TState> : IEventBuilder<TState>, IStateMachineBuilder<TState>
         where TState : notnull, System.Enum
-        where TAction : System.Delegate
     {
-        ITransitionClause<TState, TAction> ThenTransitionTo(TState state);
-        ITransitionClause<TState, TAction> AndKeepSameState();
     }
+
     #endregion
 
-    #region ConditionalEvents
-    public interface IEventBuilder<TState, TAction, TArg>
-        where TState : notnull, System.Enum
-        where TAction : System.Delegate
-    {
-        IStateClause<TState, TAction, TArg> WhenStateIs(TState state);
-        IStateClause<TState, TAction, TArg> WhenStateIs(params TState[] state);
+    #region Data-Ful Builder — Simple Events (no TArg)
 
+    /// <summary>Builder for a data-ful state machine that manages both state and immutable data</summary>
+    public interface IStateMachineBuilder<TState, TData> where TState : notnull, System.Enum
+    {
+        /// <summary>Build the state machine with the given initial data (which includes the initial state)</summary>
+        IStateMachine<TState, TData> Build(TData initialData);
+
+        /// <summary>Define a synchronous event with no arguments</summary>
+        IEventBuilder<TState, TData> DefineEvent(
+            out IEvent<TState> @event,
+            [CallerArgumentExpression("event")] string? name = null);
+
+        /// <summary>Define a synchronous event with a typed argument</summary>
+        IEventBuilder<TState, TData, TArg> DefineEvent<TArg>(
+            out IEvent<TState, TArg> @event,
+            [CallerArgumentExpression("event")] string? name = null);
     }
 
-    public interface IStateClause<TState, TAction, TArg>
+    /// <summary>Choose which state(s) to associate with a data-ful event (no arguments)</summary>
+    public interface IEventBuilder<TState, TData>
         where TState : notnull, System.Enum
-        where TAction : System.Delegate
     {
-        ITransitionClause<TState, TAction, TArg> TransitionTo(TState state);
-        ITransitionClause<TState, TAction, TArg> KeepSameState();
-
-        IExecuteClause<TState, TAction, TArg> Execute(TAction action);
-
-        IIfClause<TState, TAction, TArg> If(Guard<TArg> guard, string reason);
+        IStateClause<TState, TData> WhenStateIs(TState state);
+        IStateClause<TState, TData> WhenStateIs(params TState[] states);
+        IStateClause<TState, TData> RegardlessOfState();
     }
 
-    public interface ITransitionClause<TState, TAction, TArg> : IEventBuilder<TState, TAction, TArg>, IStateMachineBuilder<TState>
+    /// <summary>Choose the action or transition for the current state clause (no arguments)</summary>
+    public interface IStateClause<TState, TData>
         where TState : notnull, System.Enum
-        where TAction : System.Delegate
+    {
+        ITransitionClause<TState, TData> TransitionTo(TState state);
+        ITransitionClause<TState, TData> KeepSameState();
+
+        /// <summary>Execute a pure data transform as part of this transition</summary>
+        IExecuteClause<TState, TData> Execute(Func<TData, TData> transform);
+
+        /// <summary>Add a guard condition — transition only proceeds if the guard returns true</summary>
+        IIfClause<TState, TData> If(Func<TData, bool> guard, string reason);
+    }
+
+    /// <summary>
+    /// Transition defined for a data-ful event — continue with more state clauses,
+    /// define new events, or build.
+    /// </summary>
+    public interface ITransitionClause<TState, TData> : IEventBuilder<TState, TData>, IStateMachineBuilder<TState, TData>
+        where TState : notnull, System.Enum
     {
     }
 
-    public interface IExecuteClause<TState, TAction, TArg>
+    /// <summary>A data transform has been specified — choose the transition target</summary>
+    public interface IExecuteClause<TState, TData>
         where TState : notnull, System.Enum
-        where TAction : System.Delegate
     {
-        ITransitionClause<TState, TAction, TArg> ThenTransitionTo(TState state);
-        ITransitionClause<TState, TAction, TArg> AndKeepSameState();
+        ITransitionClause<TState, TData> ThenTransitionTo(TState state);
+        ITransitionClause<TState, TData> AndKeepSameState();
     }
 
-    public interface IIfClause<TState, TAction, TArg>
+    /// <summary>A guard condition is active — choose the guarded action or add more conditions</summary>
+    public interface IIfClause<TState, TData>
         where TState : notnull, System.Enum
-        where TAction : System.Delegate
     {
-        ITransitionClause<TState, TAction, TArg> TransitionTo(TState state);
-        IIfExecuteClause<TState, TAction, TArg> Execute(TAction action);
-
-        IIfClause<TState, TAction, TArg> And(Guard<TArg> guard, string reason);
+        IIfTransitionClause<TState, TData> TransitionTo(TState state);
+        IIfExecuteClause<TState, TData> Execute(Func<TData, TData> transform);
+        IIfClause<TState, TData> And(Func<TData, bool> guard, string reason);
     }
 
-    public interface IIfTransitionClause<TState, TAction, TArg> : IEventBuilder<TState, TAction, TArg>, IStateMachineBuilder<TState>
+    /// <summary>
+    /// Guarded transition defined — continue with Else branch, more state clauses,
+    /// new events, or build.
+    /// </summary>
+    public interface IIfTransitionClause<TState, TData> : IEventBuilder<TState, TData>, IStateMachineBuilder<TState, TData>
         where TState : notnull, System.Enum
-        where TAction : System.Delegate
     {
-        public IStateClause<TState, TAction, TArg> Else { get; }
+        /// <summary>Define a fallback or another guarded branch for when the previous guard fails</summary>
+        IStateClause<TState, TData> Else { get; }
     }
 
-    public interface IIfExecuteClause<TState, TAction, TArg>
+    /// <summary>Guarded transform specified — choose the transition target</summary>
+    public interface IIfExecuteClause<TState, TData>
         where TState : notnull, System.Enum
-        where TAction : System.Delegate
     {
-        IIfTransitionClause<TState, TAction, TArg> ThenTransitionTo(TState state);
-        IIfTransitionClause<TState, TAction, TArg> AndKeepSameState();
+        IIfTransitionClause<TState, TData> ThenTransitionTo(TState state);
+        IIfTransitionClause<TState, TData> AndKeepSameState();
     }
+
     #endregion
+
+    #region Data-Ful Builder — Parameterized Events (with TArg)
+
+    /// <summary>Choose which state(s) to associate with a parameterized event</summary>
+    public interface IEventBuilder<TState, TData, TArg>
+        where TState : notnull, System.Enum
+    {
+        IStateClause<TState, TData, TArg> WhenStateIs(TState state);
+        IStateClause<TState, TData, TArg> WhenStateIs(params TState[] states);
+    }
+
+    /// <summary>Choose the action or transition for a parameterized event</summary>
+    public interface IStateClause<TState, TData, TArg>
+        where TState : notnull, System.Enum
+    {
+        ITransitionClause<TState, TData, TArg> TransitionTo(TState state);
+        ITransitionClause<TState, TData, TArg> KeepSameState();
+
+        /// <summary>Execute a pure data transform that receives the event argument</summary>
+        IExecuteClause<TState, TData, TArg> Execute(Func<TData, TArg, TData> transform);
+
+        /// <summary>Add a guard condition that evaluates both data and the event argument</summary>
+        IIfClause<TState, TData, TArg> If(Func<TData, TArg, bool> guard, string reason);
+    }
+
+    /// <summary>
+    /// Transition defined for a parameterized event — continue with more state clauses,
+    /// define new events, or build.
+    /// </summary>
+    public interface ITransitionClause<TState, TData, TArg> : IEventBuilder<TState, TData, TArg>, IStateMachineBuilder<TState, TData>
+        where TState : notnull, System.Enum
+    {
+    }
+
+    /// <summary>A parameterized transform specified — choose the transition target</summary>
+    public interface IExecuteClause<TState, TData, TArg>
+        where TState : notnull, System.Enum
+    {
+        ITransitionClause<TState, TData, TArg> ThenTransitionTo(TState state);
+        ITransitionClause<TState, TData, TArg> AndKeepSameState();
+    }
+
+    /// <summary>A guard is active on a parameterized event — choose action or add more conditions</summary>
+    public interface IIfClause<TState, TData, TArg>
+        where TState : notnull, System.Enum
+    {
+        IIfTransitionClause<TState, TData, TArg> TransitionTo(TState state);
+        IIfExecuteClause<TState, TData, TArg> Execute(Func<TData, TArg, TData> transform);
+        IIfClause<TState, TData, TArg> And(Func<TData, TArg, bool> guard, string reason);
+    }
+
+    /// <summary>
+    /// Guarded transition defined for a parameterized event — continue with Else,
+    /// more state clauses, new events, or build.
+    /// </summary>
+    public interface IIfTransitionClause<TState, TData, TArg> : IEventBuilder<TState, TData, TArg>, IStateMachineBuilder<TState, TData>
+        where TState : notnull, System.Enum
+    {
+        /// <summary>Define a fallback or another guarded branch</summary>
+        IStateClause<TState, TData, TArg> Else { get; }
+    }
+
+    /// <summary>Guarded parameterized transform specified — choose the transition target</summary>
+    public interface IIfExecuteClause<TState, TData, TArg>
+        where TState : notnull, System.Enum
+    {
+        IIfTransitionClause<TState, TData, TArg> ThenTransitionTo(TState state);
+        IIfTransitionClause<TState, TData, TArg> AndKeepSameState();
+    }
+
     #endregion
 }
