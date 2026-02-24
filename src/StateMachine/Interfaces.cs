@@ -26,29 +26,35 @@ namespace StateMachine
 
         /// <summary>
         /// Check whether a trigger would be accepted in the current state without actually firing it.
-        /// Best-effort check — state could change between CanHandle and invocation.
+        /// Best-effort — state could change between CanHandle and invocation.
+        /// <paramref name="state"/> is always assigned: the target state if accepted, current state if rejected.
+        /// <paramref name="reasons"/> is always assigned: empty on acceptance, guard failure messages on rejection.
         /// </summary>
-        EvaluationResult<TState> CanHandle(Action trigger);
+        bool CanHandle(Action trigger, out TState state, out IReadOnlyList<string> reasons);
 
         /// <summary>
         /// Check whether a parameterized trigger would be accepted with the given argument.
-        /// Best-effort check — state could change between CanHandle and invocation.
+        /// Best-effort — state could change between CanHandle and invocation.
+        /// <paramref name="state"/> is always assigned: the target state if accepted, current state if rejected.
+        /// <paramref name="reasons"/> is always assigned: empty on acceptance, guard failure messages on rejection.
         /// </summary>
-        EvaluationResult<TState> CanHandle<TArg>(Action<TArg> trigger, TArg arg);
+        bool CanHandle<TArg>(Action<TArg> trigger, TArg arg, out TState state, out IReadOnlyList<string> reasons);
 
         /// <summary>
         /// Atomically check guards and, if accepted, fire the trigger — all under a single lock.
-        /// Returns the result; <see cref="EvaluationResult{TState}.IsAccepted"/> indicates
-        /// whether the transition actually fired. Exceptions from Execute transforms propagate normally.
+        /// Returns <see langword="true"/> if the transition fired.
+        /// <paramref name="reasons"/> is always assigned: empty on success, guard failure messages on rejection.
+        /// Exceptions from Transform delegates propagate normally.
         /// </summary>
-        EvaluationResult<TState> TryHandle(Action trigger);
+        bool TryHandle(Action trigger, out IReadOnlyList<string> reasons);
 
         /// <summary>
         /// Atomically check guards and, if accepted, fire the parameterized trigger — all under a single lock.
-        /// Returns the result; <see cref="EvaluationResult{TState}.IsAccepted"/> indicates
-        /// whether the transition actually fired. Exceptions from Execute transforms propagate normally.
+        /// Returns <see langword="true"/> if the transition fired.
+        /// <paramref name="reasons"/> is always assigned: empty on success, guard failure messages on rejection.
+        /// Exceptions from Transform delegates propagate normally.
         /// </summary>
-        EvaluationResult<TState> TryHandle<TArg>(Action<TArg> trigger, TArg arg);
+        bool TryHandle<TArg>(Action<TArg> trigger, TArg arg, out IReadOnlyList<string> reasons);
 
         /// <summary>
         /// Raised after every successful state transition.
@@ -114,30 +120,15 @@ namespace StateMachine
     internal interface IEvent<TState> : IEvent where TState : notnull, System.Enum
     {
         void Trigger();
-        EvaluationResult<TState> Evaluate();
+        bool Evaluate(out TState state, out IReadOnlyList<string> reasons);
     }
 
     /// <summary>Synchronous event with a typed argument (internal — consumers use Action&lt;TArg&gt; delegates)</summary>
     internal interface IEvent<TState, TArg> : IEvent where TState : notnull, System.Enum
     {
         void Trigger(TArg arg);
-        EvaluationResult<TState> Evaluate(TArg arg);
+        bool Evaluate(TArg arg, out TState state, out IReadOnlyList<string> reasons);
     }
-
-    // ═══════════════════════════════════════════════════════════════════
-    // Evaluation Result
-    // ═══════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Result of evaluating whether an event would be accepted without firing it.
-    /// Best-effort — state could change between evaluation and invocation.
-    /// </summary>
-    public record EvaluationResult<TState>(
-        bool IsAccepted,
-        TState CurrentState,
-        TState TargetState,
-        IReadOnlyList<string> Reasons
-    ) where TState : notnull, System.Enum;
 
     // ═══════════════════════════════════════════════════════════════════
     // Exceptions

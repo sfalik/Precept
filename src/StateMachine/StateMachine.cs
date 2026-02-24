@@ -92,22 +92,22 @@ namespace StateMachine
 
         public event Action<TransitionedEventArgs<TState>>? Transitioned;
 
-        public EvaluationResult<TState> CanHandle(Action trigger)
+        public bool CanHandle(Action trigger, out TState state, out IReadOnlyList<string> reasons)
         {
             throw new NotImplementedException();
         }
 
-        public EvaluationResult<TState> CanHandle<TArg>(Action<TArg> trigger, TArg arg)
+        public bool CanHandle<TArg>(Action<TArg> trigger, TArg arg, out TState state, out IReadOnlyList<string> reasons)
         {
             throw new NotImplementedException();
         }
 
-        public EvaluationResult<TState> TryHandle(Action trigger)
+        public bool TryHandle(Action trigger, out IReadOnlyList<string> reasons)
         {
             throw new NotImplementedException();
         }
 
-        public EvaluationResult<TState> TryHandle<TArg>(Action<TArg> trigger, TArg arg)
+        public bool TryHandle<TArg>(Action<TArg> trigger, TArg arg, out IReadOnlyList<string> reasons)
         {
             throw new NotImplementedException();
         }
@@ -169,22 +169,22 @@ namespace StateMachine
         public event Action<TransitionedEventArgs<TState>>? Transitioned;
         public event Action<DataTransitionedEventArgs<TState, TData>>? DataTransitioned;
 
-        public EvaluationResult<TState> CanHandle(Action trigger)
+        public bool CanHandle(Action trigger, out TState state, out IReadOnlyList<string> reasons)
         {
             throw new NotImplementedException();
         }
 
-        public EvaluationResult<TState> CanHandle<TArg>(Action<TArg> trigger, TArg arg)
+        public bool CanHandle<TArg>(Action<TArg> trigger, TArg arg, out TState state, out IReadOnlyList<string> reasons)
         {
             throw new NotImplementedException();
         }
 
-        public EvaluationResult<TState> TryHandle(Action trigger)
+        public bool TryHandle(Action trigger, out IReadOnlyList<string> reasons)
         {
             throw new NotImplementedException();
         }
 
-        public EvaluationResult<TState> TryHandle<TArg>(Action<TArg> trigger, TArg arg)
+        public bool TryHandle<TArg>(Action<TArg> trigger, TArg arg, out IReadOnlyList<string> reasons)
         {
             throw new NotImplementedException();
         }
