@@ -92,37 +92,17 @@ namespace StateMachine
 
         public event Action<TransitionedEventArgs<TState>>? Transitioned;
 
-        public bool CanHandle(Action trigger, out TState state, out IReadOnlyList<string> reasons)
+        public EventInspection<TState> Inspect(Action trigger)
         {
             throw new NotImplementedException();
         }
 
-        public bool CanHandle<TArg>(Action<TArg> trigger, TArg arg, out TState state, out IReadOnlyList<string> reasons)
+        public EventInspection<TState> Inspect<TArg>(Action<TArg> trigger, TArg arg)
         {
             throw new NotImplementedException();
         }
 
-        public bool TryHandle(Action trigger, out IReadOnlyList<string> reasons)
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool TryHandle<TArg>(Action<TArg> trigger, TArg arg, out IReadOnlyList<string> reasons)
-        {
-            throw new NotImplementedException();
-        }
-
-        public IReadOnlyList<IEvent> GetEventsForCurrentState()
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool IsDefinedForCurrentState(Action trigger)
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool IsDefinedForCurrentState<TArg>(Action<TArg> trigger)
+        public PartialEventInspection<TState, TArg> Inspect<TArg>(Action<TArg> trigger)
         {
             throw new NotImplementedException();
         }
@@ -184,37 +164,17 @@ namespace StateMachine
         public event Action<TransitionedEventArgs<TState>>? Transitioned;
         public event Action<DataTransitionedEventArgs<TState, TData>>? DataTransitioned;
 
-        public bool CanHandle(Action trigger, out TState state, out IReadOnlyList<string> reasons)
+        public EventInspection<TState> Inspect(Action trigger)
         {
             throw new NotImplementedException();
         }
 
-        public bool CanHandle<TArg>(Action<TArg> trigger, TArg arg, out TState state, out IReadOnlyList<string> reasons)
+        public EventInspection<TState> Inspect<TArg>(Action<TArg> trigger, TArg arg)
         {
             throw new NotImplementedException();
         }
 
-        public bool TryHandle(Action trigger, out IReadOnlyList<string> reasons)
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool TryHandle<TArg>(Action<TArg> trigger, TArg arg, out IReadOnlyList<string> reasons)
-        {
-            throw new NotImplementedException();
-        }
-
-        public IReadOnlyList<IEvent> GetEventsForCurrentState()
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool IsDefinedForCurrentState(Action trigger)
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool IsDefinedForCurrentState<TArg>(Action<TArg> trigger)
+        public PartialEventInspection<TState, TArg> Inspect<TArg>(Action<TArg> trigger)
         {
             throw new NotImplementedException();
         }

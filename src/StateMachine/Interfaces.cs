@@ -25,55 +25,24 @@ namespace StateMachine
         IReadOnlyList<IEvent> Events { get; }
 
         /// <summary>
-        /// Check whether a trigger would be accepted in the current state without actually firing it.
-        /// Best-effort — state could change between CanHandle and invocation.
-        /// <paramref name="state"/> is always assigned: the target state if accepted, current state if rejected.
-        /// <paramref name="reasons"/> is always assigned: empty on acceptance, guard failure messages on rejection.
+        /// Evaluate a trigger against the current state — definition check and guard evaluation —
+        /// without committing a transition.
+        /// Returns an <see cref="EventInspection{TState}"/> whose fluent chain leads to Fire().
         /// </summary>
-        bool CanHandle(Action trigger, out TState state, out IReadOnlyList<string> reasons);
+        EventInspection<TState> Inspect(Action trigger);
 
         /// <summary>
-        /// Check whether a parameterized trigger would be accepted with the given argument.
-        /// Best-effort — state could change between CanHandle and invocation.
-        /// <paramref name="state"/> is always assigned: the target state if accepted, current state if rejected.
-        /// <paramref name="reasons"/> is always assigned: empty on acceptance, guard failure messages on rejection.
+        /// Evaluate a parameterized trigger with a known argument against the current state.
+        /// Returns an <see cref="EventInspection{TState}"/> whose fluent chain leads to Fire().
         /// </summary>
-        bool CanHandle<TArg>(Action<TArg> trigger, TArg arg, out TState state, out IReadOnlyList<string> reasons);
+        EventInspection<TState> Inspect<TArg>(Action<TArg> trigger, TArg arg);
 
         /// <summary>
-        /// Atomically check guards and, if accepted, fire the trigger — all under a single lock.
-        /// Returns <see langword="true"/> if the transition fired.
-        /// <paramref name="reasons"/> is always assigned: empty on success, guard failure messages on rejection.
-        /// Exceptions from Transform delegates propagate normally.
+        /// Inspect a parameterized trigger without providing an argument — definition check only,
+        /// no guard evaluation. Call <see cref="PartialEventInspection{TState, TArg}.WithArg"/> to
+        /// progress to full guard evaluation.
         /// </summary>
-        bool TryHandle(Action trigger, out IReadOnlyList<string> reasons);
-
-        /// <summary>
-        /// Atomically check guards and, if accepted, fire the parameterized trigger — all under a single lock.
-        /// Returns <see langword="true"/> if the transition fired.
-        /// <paramref name="reasons"/> is always assigned: empty on success, guard failure messages on rejection.
-        /// Exceptions from Transform delegates propagate normally.
-        /// </summary>
-        bool TryHandle<TArg>(Action<TArg> trigger, TArg arg, out IReadOnlyList<string> reasons);
-
-        /// <summary>
-        /// Returns all events that have a transition defined for the current state.
-        /// Does not evaluate guards — an event may be defined but still rejected by guards.
-        /// For parameterized events, does not require an argument to check.
-        /// </summary>
-        IReadOnlyList<IEvent> GetEventsForCurrentState();
-
-        /// <summary>
-        /// Check whether the trigger has a transition defined for the current state.
-        /// Does not evaluate guards — returns true even if guards would reject.
-        /// </summary>
-        bool IsDefinedForCurrentState(Action trigger);
-
-        /// <summary>
-        /// Check whether the parameterized trigger has a transition defined for the current state.
-        /// Does not evaluate guards or require the argument.
-        /// </summary>
-        bool IsDefinedForCurrentState<TArg>(Action<TArg> trigger);
+        PartialEventInspection<TState, TArg> Inspect<TArg>(Action<TArg> trigger);
 
         /// <summary>
         /// Raised after every successful state transition.
@@ -190,6 +159,18 @@ namespace StateMachine
         public ConditionFailedException() { }
         public ConditionFailedException(string message) : base(message) { }
         public ConditionFailedException(string message, Exception inner) : base(message, inner) { }
+    }
+
+    /// <summary>
+    /// Thrown by <see cref="AcceptedChain{TState}.Fire"/> when the machine's state changed
+    /// between <c>Inspect()</c> and <c>Fire()</c>, indicating a concurrent modification
+    /// invalidated the pre-evaluated inspection result.
+    /// </summary>
+    public class StaleStateException : Exception
+    {
+        public StaleStateException() { }
+        public StaleStateException(string message) : base(message) { }
+        public StaleStateException(string message, Exception inner) : base(message, inner) { }
     }
 
     // ═══════════════════════════════════════════════════════════════════
