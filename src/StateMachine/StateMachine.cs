@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
@@ -92,6 +92,26 @@ namespace StateMachine
 
         public event Action<TransitionedEventArgs<TState>>? Transitioned;
 
+        public EvaluationResult<TState> CanHandle(Action trigger)
+        {
+            throw new NotImplementedException();
+        }
+
+        public EvaluationResult<TState> CanHandle<TArg>(Action<TArg> trigger, TArg arg)
+        {
+            throw new NotImplementedException();
+        }
+
+        public EvaluationResult<TState> TryHandle(Action trigger)
+        {
+            throw new NotImplementedException();
+        }
+
+        public EvaluationResult<TState> TryHandle<TArg>(Action<TArg> trigger, TArg arg)
+        {
+            throw new NotImplementedException();
+        }
+
         public StateMachine(TState initialState)
         {
             // Touching EnumOrdinal<TState>.Count forces the static constructor
@@ -149,6 +169,26 @@ namespace StateMachine
         public event Action<TransitionedEventArgs<TState>>? Transitioned;
         public event Action<DataTransitionedEventArgs<TState, TData>>? DataTransitioned;
 
+        public EvaluationResult<TState> CanHandle(Action trigger)
+        {
+            throw new NotImplementedException();
+        }
+
+        public EvaluationResult<TState> CanHandle<TArg>(Action<TArg> trigger, TArg arg)
+        {
+            throw new NotImplementedException();
+        }
+
+        public EvaluationResult<TState> TryHandle(Action trigger)
+        {
+            throw new NotImplementedException();
+        }
+
+        public EvaluationResult<TState> TryHandle<TArg>(Action<TArg> trigger, TArg arg)
+        {
+            throw new NotImplementedException();
+        }
+
         public StateMachine(
             TData initialData,
             Func<TData, TState> getState,
@@ -194,9 +234,9 @@ namespace StateMachine
             throw new NotImplementedException();
         }
 
-        public IEventBuilder<TState> DefineEvent(
-            out IEvent<TState> @event,
-            [CallerArgumentExpression("event")] string? name = null)
+        public IEventBuilder<TState> On(
+            out Action trigger,
+            [CallerArgumentExpression("trigger")] string? name = null)
         {
             throw new NotImplementedException();
         }
@@ -227,16 +267,16 @@ namespace StateMachine
             throw new NotImplementedException();
         }
 
-        public IEventBuilder<TState, TData> DefineEvent(
-            out IEvent<TState> @event,
-            [CallerArgumentExpression("event")] string? name = null)
+        public IEventBuilder<TState, TData> On(
+            out Action trigger,
+            [CallerArgumentExpression("trigger")] string? name = null)
         {
             throw new NotImplementedException();
         }
 
-        public IEventBuilder<TState, TData, TArg> DefineEvent<TArg>(
-            out IEvent<TState, TArg> @event,
-            [CallerArgumentExpression("event")] string? name = null)
+        public IEventBuilder<TState, TData, TArg> On<TArg>(
+            out Action<TArg> trigger,
+            [CallerArgumentExpression("trigger")] string? name = null)
         {
             throw new NotImplementedException();
         }

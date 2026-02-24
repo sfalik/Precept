@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
@@ -23,6 +23,32 @@ namespace StateMachine
 
         /// <summary>All defined events on this machine</summary>
         IReadOnlyList<IEvent> Events { get; }
+
+        /// <summary>
+        /// Check whether a trigger would be accepted in the current state without actually firing it.
+        /// Best-effort check — state could change between CanHandle and invocation.
+        /// </summary>
+        EvaluationResult<TState> CanHandle(Action trigger);
+
+        /// <summary>
+        /// Check whether a parameterized trigger would be accepted with the given argument.
+        /// Best-effort check — state could change between CanHandle and invocation.
+        /// </summary>
+        EvaluationResult<TState> CanHandle<TArg>(Action<TArg> trigger, TArg arg);
+
+        /// <summary>
+        /// Atomically check guards and, if accepted, fire the trigger — all under a single lock.
+        /// Returns the result; <see cref="EvaluationResult{TState}.IsAccepted"/> indicates
+        /// whether the transition actually fired. Exceptions from Execute transforms propagate normally.
+        /// </summary>
+        EvaluationResult<TState> TryHandle(Action trigger);
+
+        /// <summary>
+        /// Atomically check guards and, if accepted, fire the parameterized trigger — all under a single lock.
+        /// Returns the result; <see cref="EvaluationResult{TState}.IsAccepted"/> indicates
+        /// whether the transition actually fired. Exceptions from Execute transforms propagate normally.
+        /// </summary>
+        EvaluationResult<TState> TryHandle<TArg>(Action<TArg> trigger, TArg arg);
 
         /// <summary>
         /// Raised after every successful state transition.
@@ -72,10 +98,10 @@ namespace StateMachine
         where TState : notnull, System.Enum;
 
     // ═══════════════════════════════════════════════════════════════════
-    // Event Interfaces (what consumers interact with after Build)
+    // Event Interfaces
     // ═══════════════════════════════════════════════════════════════════
 
-    /// <summary>Base event interface — for untyped collections</summary>
+    /// <summary>Base event interface — for introspection via <see cref="IStateMachine{TState}.Events"/></summary>
     public interface IEvent
     {
         /// <summary>
@@ -84,39 +110,34 @@ namespace StateMachine
         string Name { get; }
     }
 
-    /// <summary>Synchronous event with no arguments</summary>
-    public interface IEvent<TState> : IEvent where TState : notnull, System.Enum
+    /// <summary>Synchronous event with no arguments (internal — consumers use Action delegates)</summary>
+    internal interface IEvent<TState> : IEvent where TState : notnull, System.Enum
     {
-        /// <summary>
-        /// Fire the event, performing the state transition and optional data transform.
-        /// </summary>
-        /// <exception cref="InvalidTransitionException">Event is not defined for the current state</exception>
-        /// <exception cref="GuardFailedException">All guards failed for the current state</exception>
         void Trigger();
-
-        /// <summary>
-        /// Test whether this event would be accepted without actually firing it.
-        /// Best-effort check — state could change between Test and Trigger.
-        /// </summary>
-        (bool IsAccepted, TState NewState, string? Reason) Test();
+        EvaluationResult<TState> Evaluate();
     }
 
-    /// <summary>Synchronous event with a typed argument</summary>
-    public interface IEvent<TState, TArg> : IEvent where TState : notnull, System.Enum
+    /// <summary>Synchronous event with a typed argument (internal — consumers use Action&lt;TArg&gt; delegates)</summary>
+    internal interface IEvent<TState, TArg> : IEvent where TState : notnull, System.Enum
     {
-        /// <summary>
-        /// Fire the event with the specified argument, performing the state transition and optional data transform.
-        /// </summary>
-        /// <exception cref="InvalidTransitionException">Event is not defined for the current state</exception>
-        /// <exception cref="GuardFailedException">All guards failed for the current state and argument</exception>
         void Trigger(TArg arg);
-
-        /// <summary>
-        /// Test whether this event would be accepted with the given argument.
-        /// Best-effort check — state could change between Test and Trigger.
-        /// </summary>
-        (bool IsAccepted, TState NewState, string? Reason) Test(TArg arg);
+        EvaluationResult<TState> Evaluate(TArg arg);
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Evaluation Result
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Result of evaluating whether an event would be accepted without firing it.
+    /// Best-effort — state could change between evaluation and invocation.
+    /// </summary>
+    public record EvaluationResult<TState>(
+        bool IsAccepted,
+        TState CurrentState,
+        TState TargetState,
+        IReadOnlyList<string> Reasons
+    ) where TState : notnull, System.Enum;
 
     // ═══════════════════════════════════════════════════════════════════
     // Exceptions
@@ -173,10 +194,10 @@ namespace StateMachine
         /// <summary>Build the state machine with the given initial state</summary>
         IStateMachine<TState> Build(TState initialState);
 
-        /// <summary>Define a new event with no arguments</summary>
-        IEventBuilder<TState> DefineEvent(
-            out IEvent<TState> @event,
-            [CallerArgumentExpression("event")] string? name = null);
+        /// <summary>Define a new event with no arguments. The out Action delegate can be invoked directly to fire the event.</summary>
+        IEventBuilder<TState> On(
+            out Action trigger,
+            [CallerArgumentExpression("trigger")] string? name = null);
 
         /// <summary>
         /// Attach an immutable data record to this builder, producing a data-ful state machine builder.
@@ -222,15 +243,15 @@ namespace StateMachine
         /// <summary>Build the state machine with the given initial data (which includes the initial state)</summary>
         IStateMachine<TState, TData> Build(TData initialData);
 
-        /// <summary>Define a synchronous event with no arguments</summary>
-        IEventBuilder<TState, TData> DefineEvent(
-            out IEvent<TState> @event,
-            [CallerArgumentExpression("event")] string? name = null);
+        /// <summary>Define a synchronous event with no arguments. The out Action delegate can be invoked directly to fire the event.</summary>
+        IEventBuilder<TState, TData> On(
+            out Action trigger,
+            [CallerArgumentExpression("trigger")] string? name = null);
 
-        /// <summary>Define a synchronous event with a typed argument</summary>
-        IEventBuilder<TState, TData, TArg> DefineEvent<TArg>(
-            out IEvent<TState, TArg> @event,
-            [CallerArgumentExpression("event")] string? name = null);
+        /// <summary>Define a synchronous event with a typed argument. The out Action&lt;TArg&gt; delegate can be invoked directly to fire the event.</summary>
+        IEventBuilder<TState, TData, TArg> On<TArg>(
+            out Action<TArg> trigger,
+            [CallerArgumentExpression("trigger")] string? name = null);
     }
 
     /// <summary>Choose which state(s) to associate with a data-ful event (no arguments)</summary>
@@ -250,7 +271,7 @@ namespace StateMachine
         ITransitionClause<TState, TData> KeepSameState();
 
         /// <summary>Execute a pure data transform as part of this transition</summary>
-        IExecuteClause<TState, TData> Execute(Func<TData, TData> transform);
+        IExecuteClause<TState, TData> Transform(Func<TData, TData> transform);
 
         /// <summary>Add a guard condition — transition only proceeds if the guard returns true</summary>
         IIfClause<TState, TData> If(Func<TData, bool> guard, string reason);
@@ -278,7 +299,7 @@ namespace StateMachine
         where TState : notnull, System.Enum
     {
         IIfTransitionClause<TState, TData> TransitionTo(TState state);
-        IIfExecuteClause<TState, TData> Execute(Func<TData, TData> transform);
+        IIfExecuteClause<TState, TData> Transform(Func<TData, TData> transform);
     }
 
     /// <summary>
@@ -320,7 +341,7 @@ namespace StateMachine
         ITransitionClause<TState, TData, TArg> KeepSameState();
 
         /// <summary>Execute a pure data transform that receives the event argument</summary>
-        IExecuteClause<TState, TData, TArg> Execute(Func<TData, TArg, TData> transform);
+        IExecuteClause<TState, TData, TArg> Transform(Func<TData, TArg, TData> transform);
 
         /// <summary>Add a guard condition that evaluates both data and the event argument</summary>
         IIfClause<TState, TData, TArg> If(Func<TData, TArg, bool> guard, string reason);
@@ -348,7 +369,7 @@ namespace StateMachine
         where TState : notnull, System.Enum
     {
         IIfTransitionClause<TState, TData, TArg> TransitionTo(TState state);
-        IIfExecuteClause<TState, TData, TArg> Execute(Func<TData, TArg, TData> transform);
+        IIfExecuteClause<TState, TData, TArg> Transform(Func<TData, TArg, TData> transform);
     }
 
     /// <summary>
