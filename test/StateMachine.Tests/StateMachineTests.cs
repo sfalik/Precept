@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using FluentAssertions;
+using FluentAssertions.Execution;
+using FluentAssertions.Primitives;
 using Xunit;
 
 namespace StateMachine.Tests
@@ -187,7 +190,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Green)
                 .Build(Light.Green); // Start in Green — next only handles Red
 
-            machine.CanHandle(next, out _, out _).Should().BeFalse();
+            machine.Should().NotAccept(next);
         }
 
         [Fact(Skip = "Implementation not ready")]
@@ -199,8 +202,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Green)
                 .Build(Light.Red);
 
-            machine.CanHandle(next, out var state, out _).Should().BeTrue();
-            state.Should().Be(Light.Green);
+            machine.Should().Accept(next).WithState(Light.Green);
         }
 
         [Fact(Skip = "Implementation not ready")]
@@ -212,7 +214,7 @@ namespace StateMachine.Tests
                     .KeepSameState()
                 .Build(Light.Red);
 
-            machine.TryHandle(hold, out _).Should().BeTrue();
+            hold();
             machine.State.Should().Be(Light.Red);
         }
 
@@ -228,13 +230,13 @@ namespace StateMachine.Tests
 
             machine.State.Should().Be(Light.Red);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.Green);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.Yellow);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.Red);
         }
 
@@ -252,8 +254,8 @@ namespace StateMachine.Tests
 
             machine.Transitioned += args => transitions.Add(args);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
+            next();
 
             transitions.Should().HaveCount(2);
             transitions[0].FromState.Should().Be(Light.Red);
@@ -274,7 +276,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Off)
                 .Build(Light.Red);
 
-            machine.TryHandle(shutdown, out _).Should().BeTrue();
+            shutdown();
             machine.State.Should().Be(Light.Off);
         }
 
@@ -287,7 +289,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Green)
                 .Build(Light.Red);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.Green);
 
             // Triggering again from Green — not defined for this event
@@ -320,10 +322,10 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Red)
                 .Build(Light.Red);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.Green);
 
-            machine.TryHandle(back, out _).Should().BeTrue();
+            back();
             machine.State.Should().Be(Light.Red);
         }
 
@@ -352,7 +354,7 @@ namespace StateMachine.Tests
 
             machine.Transitioned += args => transitions.Add(args);
 
-            machine.TryHandle(hold, out _).Should().BeTrue();
+            hold();
 
             transitions.Should().HaveCount(1);
             transitions[0].FromState.Should().Be(Light.Red);
@@ -398,7 +400,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Off)
                 .Build(Light.Green);
 
-            machine.TryHandle(shutdown, out _).Should().BeTrue();
+            shutdown();
             machine.State.Should().Be(Light.Off);
         }
 
@@ -411,8 +413,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Green)
                 .Build(Light.Red);
 
-            machine.CanHandle(next, out var state, out _).Should().BeTrue();
-            state.Should().Be(Light.Green);
+            machine.Should().Accept(next).WithState(Light.Green);
 
             machine.State.Should().Be(Light.Red);
         }
@@ -471,37 +472,37 @@ namespace StateMachine.Tests
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
 
             // Power on — light comes up red, data unchanged
-            machine.TryHandle(powerOn, out _).Should().BeTrue();
+            powerOn();
             machine.State.Should().Be(Light.Red);
             machine.Data.PedestrianWaiting.Should().BeTrue();
 
             // Red → Green: walk signal granted, vehicle sensor cleared
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.Green);
             machine.Data.PedestrianWaiting.Should().BeFalse();
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
 
             // Green → Yellow
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.Yellow);
 
             // Yellow → Red
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.Red);
 
             // Second green phase — no pedestrian waiting, no queued vehicles
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.Green);
             machine.Data.PedestrianWaiting.Should().BeFalse();
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
 
             // Emergency override — first responder requested flashing red
-            machine.TryHandle(emergency, new EmergencyOverride("Officer Smith", "Accident at intersection"), out _).Should().BeTrue();
+            emergency(new EmergencyOverride("Officer Smith", "Accident at intersection"));
             machine.State.Should().Be(Light.FlashingRed);
             machine.Data.LastTransitionAt.Should().NotBeNull();
 
             // Shutdown
-            machine.TryHandle(shutdown, out _).Should().BeTrue();
+            shutdown();
             machine.State.Should().Be(Light.Off);
         }
 
@@ -536,7 +537,7 @@ namespace StateMachine.Tests
                     .KeepSameState()
                 .Build(initialData);
 
-            machine.TryHandle(hold, out _).Should().BeTrue();
+            hold();
             machine.State.Should().Be(Light.Red);
             machine.Data.PedestrianWaiting.Should().BeTrue();
             machine.Data.SecondsInCurrentPhase.Should().Be(3);
@@ -556,7 +557,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.Green)
                 .Build(initialData);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.Green);
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
         }
@@ -576,12 +577,12 @@ namespace StateMachine.Tests
                 .Build(initialData);
 
             // First button press — light stays red, walk request registered
-            machine.TryHandle(pedestrianRequest, out _).Should().BeTrue();
+            pedestrianRequest();
             machine.State.Should().Be(Light.Red);
             machine.Data.PedestrianWaiting.Should().BeTrue();
 
             // Second press — light still red, request already set
-            machine.TryHandle(pedestrianRequest, out _).Should().BeTrue();
+            pedestrianRequest();
             machine.State.Should().Be(Light.Red);
             machine.Data.PedestrianWaiting.Should().BeTrue();
         }
@@ -600,7 +601,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Green)
                 .Build(initialData);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.Green);
         }
 
@@ -638,7 +639,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.Green)
                 .Build(initialData);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.Green);
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
         }
@@ -659,7 +660,7 @@ namespace StateMachine.Tests
                     .KeepSameState()
                 .Build(initialData);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.Red);
         }
 
@@ -679,7 +680,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.FlashingRed);
         }
 
@@ -701,7 +702,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.FlashingRed);
         }
 
@@ -723,7 +724,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.FlashingRed);
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
         }
@@ -748,7 +749,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.FlashingRed);
             machine.Data.SecondsInCurrentPhase.Should().Be(999);
             machine.Data.LastTransitionAt.Should().NotBeNull();
@@ -855,7 +856,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.Green)
                 .Build(initialData);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
 
             // The original record is untouched — records are immutable
             initialData.Light.Should().Be(Light.Red);
@@ -904,14 +905,11 @@ namespace StateMachine.Tests
                 .Build(initialData);
 
             // Test with missing badge ID — guard should reject without changing state
-            machine.CanHandle(emergency, new EmergencyOverride("", "Unauthorized"), out _, out var invalidReasons).Should().BeFalse();
-            invalidReasons.Should().Contain("Emergency override requires authorization");
+            machine.Should().NotAccept(emergency, new EmergencyOverride("", "Unauthorized")).WithReason("Emergency override requires authorization");
             machine.State.Should().Be(Light.Red);
 
             // Test with valid override — guard should accept
-            machine.CanHandle(emergency, new EmergencyOverride("Officer Smith", "Accident"), out var state, out var validReasons).Should().BeTrue();
-            state.Should().Be(Light.FlashingRed);
-            validReasons.Should().BeEmpty();
+            machine.Should().Accept(emergency, new EmergencyOverride("Officer Smith", "Accident")).WithState(Light.FlashingRed);
 
             // State should still not have changed
             machine.State.Should().Be(Light.Red);
@@ -934,7 +932,7 @@ namespace StateMachine.Tests
 
             machine.DataTransitioned += args => transitions.Add(args);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
 
             transitions.Should().HaveCount(1);
             transitions[0].OldData.SecondsInCurrentPhase.Should().Be(12);
@@ -963,7 +961,7 @@ namespace StateMachine.Tests
                     .AndKeepSameState()
                 .Build(initialData);
 
-            machine.TryHandle(elapse, 6, out _).Should().BeTrue();
+            elapse(6);
             machine.State.Should().Be(Light.Green);
             machine.Data.SecondsInCurrentPhase.Should().Be(11);
         }
@@ -1008,7 +1006,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.Green)
                 .Build(initialData);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.Green);           // Machine wins — declared transition target
             machine.Data.Light.Should().Be(Light.Green);      // Data agrees with machine state
             machine.Data.SecondsInCurrentPhase.Should().Be(123);   // Transform side-effect preserved
@@ -1027,7 +1025,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Green)
                 .Build(initialData);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.Green);
             machine.Data.Light.Should().Be(Light.Green);
             machine.Data.PedestrianWaiting.Should().BeTrue();   // unchanged — no Execute to clear it
@@ -1052,7 +1050,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
-            machine.TryHandle(next, out _).Should().BeTrue();
+            next();
             machine.State.Should().Be(Light.FlashingRed);
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
         }
@@ -1071,7 +1069,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.Off)
                 .Build(initialData);
 
-            machine.TryHandle(shutdown, out _).Should().BeTrue();
+            shutdown();
             machine.State.Should().Be(Light.Off);
             machine.Data.PedestrianWaiting.Should().BeFalse();
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
@@ -1089,12 +1087,154 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Green)
                 .Build(initialData);
 
-            machine.TryHandle(next, out _).Should().BeTrue(); // Red → Green
+            next(); // Red → Green
 
             // Now in Green — next only handles Red
             machine.TryHandle(next, out _).Should().BeFalse();
             var act = () => next();
             act.Should().Throw<InvalidTransitionException>();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Custom FluentAssertions extensions for IStateMachine<TState>
+    // ═══════════════════════════════════════════════════════════════════
+
+    public static class StateMachineAssertionsExtensions
+    {
+        public static StateMachineAssertions<TState> Should<TState>(this IStateMachine<TState> machine)
+            where TState : notnull, Enum
+            => new StateMachineAssertions<TState>(machine);
+
+        public static DatafulStateMachineAssertions<TState, TData> Should<TState, TData>(this IStateMachine<TState, TData> machine)
+            where TState : notnull, Enum
+            => new DatafulStateMachineAssertions<TState, TData>(machine);
+    }
+
+    /// <summary>Fluent result returned by <see cref="StateMachineAssertions{TState}.Accept"/>.</summary>
+    public sealed class AcceptedAssertions<TState>
+        where TState : notnull, Enum
+    {
+        private readonly TState _resolvedState;
+        private readonly AssertionChain _chain;
+
+        internal AcceptedAssertions(TState resolvedState, AssertionChain chain)
+        {
+            _resolvedState = resolvedState;
+            _chain = chain;
+        }
+
+        public AcceptedAssertions<TState> WithState(TState expected, string because = "", params object[] becauseArgs)
+        {
+            _chain
+                .BecauseOf(because, becauseArgs)
+                .ForCondition(_resolvedState.Equals(expected))
+                .FailWith("Expected {{context}} to resolve to state {0}{reason}, but resolved to {1}", expected, _resolvedState);
+            return this;
+        }
+    }
+
+    /// <summary>Fluent result returned by <see cref="StateMachineAssertions{TState}.NotAccept"/>.</summary>
+    public sealed class RejectedAssertions<TState>
+        where TState : notnull, Enum
+    {
+        private readonly IReadOnlyList<string> _reasons;
+        private readonly AssertionChain _chain;
+
+        internal RejectedAssertions(IReadOnlyList<string> reasons, AssertionChain chain)
+        {
+            _reasons = reasons;
+            _chain = chain;
+        }
+
+        public RejectedAssertions<TState> WithReason(string expected, string because = "", params object[] becauseArgs)
+        {
+            _chain
+                .BecauseOf(because, becauseArgs)
+                .ForCondition(_reasons.Contains(expected))
+                .FailWith("Expected {{context}} rejection reasons to contain {0}{reason}, but got: [{1}]", expected, string.Join(", ", _reasons));
+            return this;
+        }
+    }
+
+    /// <summary>Custom assertions for <see cref="IStateMachine{TState}"/>.</summary>
+    public class StateMachineAssertions<TState>
+        : ReferenceTypeAssertions<IStateMachine<TState>, StateMachineAssertions<TState>>
+        where TState : notnull, Enum
+    {
+        public StateMachineAssertions(IStateMachine<TState> subject)
+            : base(subject, AssertionChain.GetOrCreate()) { }
+
+        protected override string Identifier => "state machine";
+
+        /// <summary>Assert that <paramref name="trigger"/> would be accepted (dry-run via CanHandle).</summary>
+        public AcceptedAssertions<TState> Accept(Action trigger, string because = "", params object[] becauseArgs)
+        {
+            var accepted = Subject.CanHandle(trigger, out var state, out _);
+            var chain = AssertionChain.GetOrCreate();
+            chain.BecauseOf(because, becauseArgs)
+                .ForCondition(accepted)
+                .FailWith("Expected {context} to accept trigger{reason}, but it was rejected");
+            return new AcceptedAssertions<TState>(state, chain);
+        }
+
+        /// <summary>Assert that <paramref name="trigger"/> would be rejected (dry-run via CanHandle).</summary>
+        public RejectedAssertions<TState> NotAccept(Action trigger, string because = "", params object[] becauseArgs)
+        {
+            var accepted = Subject.CanHandle(trigger, out _, out var reasons);
+            var chain = AssertionChain.GetOrCreate();
+            chain.BecauseOf(because, becauseArgs)
+                .ForCondition(!accepted)
+                .FailWith("Expected {context} to not accept trigger{reason}, but it was accepted");
+            return new RejectedAssertions<TState>(reasons, chain);
+        }
+
+        /// <summary>Assert that <paramref name="trigger"/> with <paramref name="arg"/> would be accepted (dry-run via CanHandle).</summary>
+        public AcceptedAssertions<TState> Accept<TArg>(Action<TArg> trigger, TArg arg, string because = "", params object[] becauseArgs)
+        {
+            var accepted = Subject.CanHandle(trigger, arg, out var state, out _);
+            var chain = AssertionChain.GetOrCreate();
+            chain.BecauseOf(because, becauseArgs)
+                .ForCondition(accepted)
+                .FailWith("Expected {context} to accept trigger{reason}, but it was rejected");
+            return new AcceptedAssertions<TState>(state, chain);
+        }
+
+        /// <summary>Assert that <paramref name="trigger"/> with <paramref name="arg"/> would be rejected (dry-run via CanHandle).</summary>
+        public RejectedAssertions<TState> NotAccept<TArg>(Action<TArg> trigger, TArg arg, string because = "", params object[] becauseArgs)
+        {
+            var accepted = Subject.CanHandle(trigger, arg, out _, out var reasons);
+            var chain = AssertionChain.GetOrCreate();
+            chain.BecauseOf(because, becauseArgs)
+                .ForCondition(!accepted)
+                .FailWith("Expected {context} to not accept trigger{reason}, but it was accepted");
+            return new RejectedAssertions<TState>(reasons, chain);
+        }
+
+    }
+
+    /// <summary>Custom assertions for <see cref="IStateMachine{TState, TData}"/>, adding <see cref="HaveData"/>.</summary>
+    public sealed class DatafulStateMachineAssertions<TState, TData>
+        : StateMachineAssertions<TState>
+        where TState : notnull, Enum
+    {
+        private readonly IStateMachine<TState, TData> _dataSubject;
+
+        public DatafulStateMachineAssertions(IStateMachine<TState, TData> subject)
+            : base(subject)
+        {
+            _dataSubject = subject;
+        }
+
+        /// <summary>Assert that the current data record satisfies <paramref name="predicate"/>.</summary>
+        public AndConstraint<DatafulStateMachineAssertions<TState, TData>> HaveData(
+            Func<TData, bool> predicate, string because = "", params object[] becauseArgs)
+        {
+            AssertionChain.GetOrCreate()
+                .BecauseOf(because, becauseArgs)
+                .ForCondition(predicate(_dataSubject.Data))
+                .FailWith("Expected {context} data to satisfy the predicate{reason}, but it did not");
+            return new AndConstraint<DatafulStateMachineAssertions<TState, TData>>(this);
         }
     }
 }
