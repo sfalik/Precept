@@ -13,7 +13,7 @@ This library takes a different approach: **the state machine owns the data**. Bu
 ### What This Enables
 
 - **Business objects as state machines**: A work order, insurance claim, or loan application can be fully represented as a state machine with co-located data. The machine enforces what can happen, when, and how data changes as a result.
-- **Deterministic transitions**: The outcome of any event can be evaluated before firing it (via `Test()`). Guards are pure functions of the current data and event arguments — no hidden external state.
+- **Deterministic transitions**: The outcome of any event can be evaluated before firing it (via `CanHandle()`). Guards are pure functions of the current data and event arguments — no hidden external state.
 - **Trivial persistence**: Since the entire machine state is one record, saving and restoring is just serializing/deserializing a single object. No separate "state" column plus "data" blob.
 - **Audit trail by design**: Because each transition produces a new immutable record, keeping a history of transitions (with before/after snapshots) is trivial. Subscribe to `DataTransitioned` and you get full replay capability.
 - **Testable business logic**: Guard conditions and data transforms are pure functions — they can be unit tested in isolation without constructing a state machine.
@@ -26,13 +26,13 @@ This library treats a state machine as a **typed reducer** — each transition p
 
 - **Immutable data**: Business data is stored as C# records. Transitions produce new records via `with` expressions — the original is never mutated.
 - **State on the record**: The state enum is a property on the data record, identified via an expression selector (`d => d.State`). This makes serialization and snapshotting trivial — one object = full machine state.
-- **Pure transforms**: The `Execute()` method accepts a pure function `(TData) => TData` or `(TData, TArg) => TData`. Side effects (email, logging) are handled externally by subscribing to the `Transitioned` / `DataTransitioned` observation events.
+- **Pure transforms**: The `Transform()` method accepts a pure function `(TData) => TData` or `(TData, TArg) => TData`. Side effects (email, logging) are handled externally by subscribing to the `Transitioned` / `DataTransitioned` observation events.
 - **Fluent builder**: The builder API uses interface narrowing so that only valid next steps are available at each point in the chain. The compiler enforces correct construction — you cannot define an incomplete or structurally invalid state machine.
 - **Sequential enum constraint**: The `TState` enum must be contiguous and zero-based (e.g., `Off, Red, Green, Yellow` → 0, 1, 2, 3). This is validated once at build time, and enum values are then cast directly to `int` for O(1) array indexing with no boxing or lookup. Sparse or `[Flags]` enums are rejected immediately with a clear error message.
 - **Sealed after build**: States and events cannot be added after construction. This enables a lightweight array-based transition table using enum ordinals for O(1) transition lookup — the same efficient data structure used in classical finite state machine implementations.
 - **Thread-safe after build**: The built machine uses `lock` to ensure transitions are atomic (read state → evaluate guards → run transform → set new data). The builder itself is not thread-safe and is discarded after `Build()`.
-- **Fail-fast**: Triggering an event in an undefined state throws `InvalidTransitionException`. Guards that all fail throw `GuardFailedException` with aggregated reason strings. Use `Test()` for safe pre-checks.
-- **Live event objects**: `DefineEvent(out var approve)` returns the live event object via an `out` parameter. These objects are bound to the machine instance and provide both `Trigger()` and `Test()` methods — no string-based lookup, no descriptors, fully typed.
+- **Fail-fast**: Calling a trigger delegate in an undefined state throws `InvalidTransitionException`. Guards that all fail throw `GuardFailedException` with aggregated reason strings. Use `CanHandle()` for safe pre-checks.
+- **Live delegate events**: `On(out var approve)` captures the event name via `CallerArgumentExpression` and returns a live `Action` (or `Action<TArg>`) delegate bound to the machine. Call it directly — `approve()` / `approve(arg)` — no string-based lookup, no descriptors, fully typed.
 
 ### What the Machine Can Answer
 
@@ -52,7 +52,7 @@ For simple workflows that only need to track state transitions with no associate
 enum TrafficLight { Red, Green, Yellow }
 
 var machine = StateMachine.CreateBuilder<TrafficLight>()
-    .DefineEvent(out var next)
+    .On(out var next)
         .WhenStateIs(TrafficLight.Red)
         .TransitionTo(TrafficLight.Green)
         .WhenStateIs(TrafficLight.Green)
@@ -61,7 +61,7 @@ var machine = StateMachine.CreateBuilder<TrafficLight>()
         .TransitionTo(TrafficLight.Red)
     .Build(TrafficLight.Red);
 
-next.Trigger();
+next();
 // machine.State == TrafficLight.Green
 ```
 
@@ -85,30 +85,30 @@ record WorkOrderData(
 var machine = StateMachine.CreateBuilder<Status>()
     .WithData<WorkOrderData>(d => d.State)
 
-    .DefineEvent(out var markAsPlanned)
+    .On(out var markAsPlanned)
         .WhenStateIs(Status.New)
         .TransitionTo(Status.Planned)
 
-    .DefineEvent<Approval>(out var approve)
+    .On<Approval>(out var approve)
         .WhenStateIs(Status.Planned)
         .If((data, a) => a.ApprovedBy != data.CreatedBy,
             "Cannot approve your own work orders")
-        .Execute((data, a) => data with { Approval = a })
+        .Transform((data, a) => data with { Approval = a })
         .ThenTransitionTo(Status.Approved)
 
-    .DefineEvent(out var complete)
+    .On(out var complete)
         .WhenStateIs(Status.Approved)
-        .Execute(data => data with { CompletedOn = DateTime.Now })
+        .Transform(data => data with { CompletedOn = DateTime.Now })
         .ThenTransitionTo(Status.Completed)
 
-    .DefineEvent(out var cancel)
+    .On(out var cancel)
         .RegardlessOfState()
         .TransitionTo(Status.Cancelled)
 
     .Build(new WorkOrderData(Status.New, "Shane Falik", DateTime.Now));
 
-// Use the live event objects returned via 'out'
-markAsPlanned.Trigger();
+// Invoke the Action delegates returned via 'out' directly
+markAsPlanned();
 // machine.State == Status.Planned
 // machine.Data == WorkOrderData { State = Planned, ... }
 ```
@@ -127,32 +127,46 @@ Alternative branches can be defined with `.Else`:
 
 ```csharp
 .If((data, time) => time > DateTime.Now, "Cannot start in the past")
-    .Execute((data, time) => data with { ... })
+    .Transform((data, time) => data with { ... })
     .ThenTransitionTo(Status.WorkStarted)
 .Else
     .KeepSameState()
 ```
 
-Every guard requires a reason string — this ensures that when `Test()` reports a rejected event, the caller always receives an explanation.
+Every guard requires a reason string — this ensures that when a trigger is rejected, the caller always receives an explanation via the `out` reasons list.
 
-### Pre-Check with Test()
+### Pre-Check with CanHandle / TryHandle
 
-Every event exposes a `Test()` method that evaluates guards without triggering the transition. This makes the state machine **deterministic** — the outcome of any event can be evaluated ahead of time:
+`CanHandle` evaluates guards without firing the transition (dry-run), making the state machine **deterministic** — the outcome of any event can be inspected ahead of time:
 
 ```csharp
-var result = approve.Test(new Approval("Manager", DateTime.Now));
-if (result.IsAccepted)
+var arg = new Approval("Manager", DateTime.Now);
+if (machine.CanHandle(approve, arg, out var nextState, out var reasons))
 {
-    approve.Trigger(new Approval("Manager", DateTime.Now));
+    approve(arg);
+    // machine.State == nextState
 }
 else
 {
-    Console.WriteLine(result.Reason);
+    Console.WriteLine(string.Join(", ", reasons));
     // "Cannot approve your own work orders"
 }
 ```
 
-`Test()` is a best-effort check — state could change between `Test` and `Trigger` in concurrent scenarios. For safety-critical paths, `Trigger()` performs its own atomic evaluation inside the lock.
+`CanHandle` is a best-effort check — state could change between the check and the invocation in concurrent scenarios. For atomic check-and-fire in concurrent code, use `TryHandle`:
+
+```csharp
+if (machine.TryHandle(approve, arg, out var reasons))
+{
+    // transition fired atomically — guards were evaluated inside the lock
+}
+else
+{
+    Console.WriteLine(string.Join(", ", reasons));
+}
+```
+
+Both methods always assign their `out` parameters. `CanHandle` assigns the resolved target state on acceptance, or the current state on rejection. `TryHandle` assigns an empty list on success, or guard failure messages on rejection.
 
 ### Transition Observation
 
@@ -200,31 +214,31 @@ record WorkOrder(Status Status, string Description, string? ValidationResult = n
 
 var machine = StateMachine.CreateBuilder<Status>()
     .WithData<WorkOrder>(d => d.Status)
-    .DefineEvent(out var submit)
-    .DefineEvent<string>(out var validationSucceeded)
-    .DefineEvent<string>(out var validationFailed)
-    .DefineEvent<string>(out var approve)
-    .DefineEvent(out var reject)
 
     // Synchronous: move to a "waiting" state
-    .On(submit)
-        .From(Status.Draft).To(Status.PendingValidation)
+    .On(out var submit)
+        .WhenStateIs(Status.Draft)
+        .TransitionTo(Status.PendingValidation)
 
     // Async result arrives later as a separate event
-    .On(validationSucceeded)
-        .From(Status.PendingValidation).To(Status.Validated)
-        .Execute((data, result) => data with { ValidationResult = result })
+    .On<string>(out var validationSucceeded)
+        .WhenStateIs(Status.PendingValidation)
+        .Transform((data, result) => data with { ValidationResult = result })
+        .ThenTransitionTo(Status.Validated)
 
-    .On(validationFailed)
-        .From(Status.PendingValidation).To(Status.Draft)
-        .Execute((data, reason) => data with { ValidationResult = reason })
+    .On<string>(out var validationFailed)
+        .WhenStateIs(Status.PendingValidation)
+        .Transform((data, reason) => data with { ValidationResult = reason })
+        .ThenTransitionTo(Status.Draft)
 
-    .On(approve)
-        .From(Status.Validated).To(Status.Approved)
-        .Execute((data, approver) => data with { Approver = approver })
+    .On<string>(out var approve)
+        .WhenStateIs(Status.Validated)
+        .Transform((data, approver) => data with { Approver = approver })
+        .ThenTransitionTo(Status.Approved)
 
-    .On(reject)
-        .From(Status.Validated).To(Status.Rejected)
+    .On(out var reject)
+        .WhenStateIs(Status.Validated)
+        .TransitionTo(Status.Rejected)
 
     .Build(new WorkOrder(Status.Draft, "Install HVAC"));
 ```
@@ -232,25 +246,28 @@ var machine = StateMachine.CreateBuilder<Status>()
 The orchestrator (a background service, message handler, or saga coordinator) drives the workflow by subscribing to observation events and firing the next event when the async work completes:
 
 ```csharp
-machine.DataTransitioned += async (sender, args) =>
+machine.DataTransitioned += args =>
 {
     if (args.NewData.Status == Status.PendingValidation)
     {
         // Kick off async work outside the machine
-        try
+        Task.Run(async () =>
         {
-            var result = await externalValidator.ValidateAsync(args.NewData);
-            validationSucceeded.Trigger(result);
-        }
-        catch (Exception ex)
-        {
-            validationFailed.Trigger(ex.Message);
-        }
+            try
+            {
+                var result = await externalValidator.ValidateAsync(args.NewData);
+                validationSucceeded(result);
+            }
+            catch (Exception ex)
+            {
+                validationFailed(ex.Message);
+            }
+        });
     }
 };
 
 // Start the workflow
-submit.Trigger();
+submit();
 ```
 
 This keeps the state machine purely synchronous while the saga layer handles async coordination. Each pending state is explicitly visible in the state enum, making it easy to query, persist, and resume workflows.
@@ -263,7 +280,7 @@ This keeps the state machine purely synchronous while the saga layer handles asy
 | Data ownership | Machine owns immutable `TData` record | Prevents external mutation, trivial serialization |
 | State location | Property on `TData`, identified by expression selector | Single source of truth |
 | Undefined transition | Throw `InvalidTransitionException` | Silent no-ops hide bugs |
-| All guards fail | Throw `GuardFailedException` with reasons | Provides actionable feedback |
+| All guards fail without Else | Throw `GuardFailedException` with reasons | Provides actionable feedback |
 | Build-time validation | Error on empty events and duplicate transitions | Catch construction mistakes early |
 | Enum constraint | `TState` must be contiguous and zero-based | Enables direct cast to `int` for O(1) array indexing — no `Array.IndexOf`, no boxing |
 | Transform semantics | Pure: `(TData) => TData` | Testable, no hidden dependencies |
