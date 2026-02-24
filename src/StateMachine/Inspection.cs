@@ -12,9 +12,9 @@ namespace StateMachine
     /// Guards have already been evaluated. Use IfAccepted/IfRejected to branch,
     /// then reach Fire() via IfAccepted to commit the transition.
     /// </summary>
-    public sealed class EventInspection<TState> where TState : notnull, System.Enum
+    public readonly struct EventInspection<TState> where TState : notnull, System.Enum
     {
-        private readonly Action _fireAction;
+        internal readonly Action? FireAction;
 
         /// <summary>Whether the event has a transition rule defined for the current state (regardless of guards).</summary>
         public bool IsDefined { get; }
@@ -28,27 +28,27 @@ namespace StateMachine
         /// <summary>Guard failure reasons. Empty when accepted.</summary>
         public IReadOnlyList<string> Reasons { get; }
 
-        internal EventInspection(bool isDefined, bool isAccepted, TState targetState, IReadOnlyList<string> reasons, Action fireAction)
+        internal EventInspection(bool isDefined, bool isAccepted, TState targetState, IReadOnlyList<string> reasons, Action? fireAction)
         {
             IsDefined = isDefined;
             IsAccepted = isAccepted;
             TargetState = targetState;
             Reasons = reasons;
-            _fireAction = fireAction;
+            FireAction = fireAction;
         }
 
         /// <summary>Register a callback to run if the event was accepted. Enables Fire() on the returned chain.</summary>
         public AcceptedChain<TState> IfAccepted(Action<TState> handler)
         {
             if (IsAccepted) handler(TargetState);
-            return new AcceptedChain<TState>(this, _fireAction);
+            return new AcceptedChain<TState>(this);
         }
 
         /// <summary>Register a callback to run if the event was accepted. Enables Fire() on the returned chain.</summary>
         public AcceptedChain<TState> IfAccepted(Action handler)
         {
             if (IsAccepted) handler();
-            return new AcceptedChain<TState>(this, _fireAction);
+            return new AcceptedChain<TState>(this);
         }
 
         /// <summary>Register a callback to run if the event was rejected.</summary>
@@ -70,15 +70,13 @@ namespace StateMachine
     /// Chain produced after <see cref="EventInspection{TState}.IfAccepted"/>.
     /// Call Fire() to commit the transition, or Else() to handle the rejection case without firing.
     /// </summary>
-    public sealed class AcceptedChain<TState> where TState : notnull, System.Enum
+    public readonly struct AcceptedChain<TState> where TState : notnull, System.Enum
     {
         private readonly EventInspection<TState> _inspection;
-        private readonly Action _fireAction;
 
-        internal AcceptedChain(EventInspection<TState> inspection, Action fireAction)
+        internal AcceptedChain(EventInspection<TState> inspection)
         {
             _inspection = inspection;
-            _fireAction = fireAction;
         }
 
         /// <summary>
@@ -89,7 +87,7 @@ namespace StateMachine
         public FiredChain<TState> Fire()
         {
             if (_inspection.IsAccepted)
-                _fireAction();
+                _inspection.FireAction?.Invoke();
             return new FiredChain<TState>(_inspection);
         }
 
@@ -110,7 +108,7 @@ namespace StateMachine
     /// Chain produced after <see cref="AcceptedChain{TState}.Fire"/>.
     /// Allows an optional Else() to handle the rejection case after the fire attempt.
     /// </summary>
-    public sealed class FiredChain<TState> where TState : notnull, System.Enum
+    public readonly struct FiredChain<TState> where TState : notnull, System.Enum
     {
         private readonly EventInspection<TState> _inspection;
 
@@ -136,7 +134,7 @@ namespace StateMachine
     /// Chain produced after <see cref="EventInspection{TState}.IfRejected"/>.
     /// Else() provides the accepted handler. No Fire() available — accepted path not registered.
     /// </summary>
-    public sealed class RejectedChain<TState> where TState : notnull, System.Enum
+    public readonly struct RejectedChain<TState> where TState : notnull, System.Enum
     {
         private readonly EventInspection<TState> _inspection;
 
@@ -163,15 +161,15 @@ namespace StateMachine
     /// Only definition can be checked — guards require the argument.
     /// Call IfDefined/IfNotDefined to branch on definition, then WithArg to evaluate guards.
     /// </summary>
-    public sealed class PartialEventInspection<TState, TArg>
+    public readonly struct PartialEventInspection<TState, TArg>
         where TState : notnull, System.Enum
     {
-        private readonly Func<TArg, EventInspection<TState>> _withArg;
+        private readonly Func<TArg, EventInspection<TState>>? _withArg;
 
         /// <summary>Whether the event has a transition rule defined for the current state.</summary>
         public bool IsDefined { get; }
 
-        internal PartialEventInspection(bool isDefined, Func<TArg, EventInspection<TState>> withArg)
+        internal PartialEventInspection(bool isDefined, Func<TArg, EventInspection<TState>>? withArg)
         {
             IsDefined = isDefined;
             _withArg = withArg;
@@ -192,20 +190,20 @@ namespace StateMachine
         }
 
         /// <summary>Provide the argument and evaluate guards, returning a full <see cref="EventInspection{TState}"/>.</summary>
-        public EventInspection<TState> WithArg(TArg arg) => _withArg(arg);
+        public EventInspection<TState> WithArg(TArg arg) => _withArg?.Invoke(arg) ?? default;
     }
 
     /// <summary>
     /// Chain produced after <see cref="PartialEventInspection{TState,TArg}.IfDefined"/> or IfNotDefined.
     /// Else() handles the opposite branch; WithArg() progresses to full guard evaluation.
     /// </summary>
-    public sealed class PartialChain<TState, TArg>
+    public readonly struct PartialChain<TState, TArg>
         where TState : notnull, System.Enum
     {
         private readonly bool _runElse;
-        private readonly Func<TArg, EventInspection<TState>> _withArg;
+        private readonly Func<TArg, EventInspection<TState>>? _withArg;
 
-        internal PartialChain(bool runElse, Func<TArg, EventInspection<TState>> withArg)
+        internal PartialChain(bool runElse, Func<TArg, EventInspection<TState>>? withArg)
         {
             _runElse = runElse;
             _withArg = withArg;
@@ -219,6 +217,6 @@ namespace StateMachine
         }
 
         /// <summary>Provide the argument and evaluate guards, returning a full <see cref="EventInspection{TState}"/>.</summary>
-        public EventInspection<TState> WithArg(TArg arg) => _withArg(arg);
+        public EventInspection<TState> WithArg(TArg arg) => _withArg?.Invoke(arg) ?? default;
     }
 }
