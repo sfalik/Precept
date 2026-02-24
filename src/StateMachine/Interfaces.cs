@@ -57,6 +57,25 @@ namespace StateMachine
         bool TryHandle<TArg>(Action<TArg> trigger, TArg arg, out IReadOnlyList<string> reasons);
 
         /// <summary>
+        /// Returns all events that have a transition defined for the current state.
+        /// Does not evaluate guards — an event may be defined but still rejected by guards.
+        /// For parameterized events, does not require an argument to check.
+        /// </summary>
+        IReadOnlyList<IEvent> GetEventsForCurrentState();
+
+        /// <summary>
+        /// Check whether the trigger has a transition defined for the current state.
+        /// Does not evaluate guards — returns true even if guards would reject.
+        /// </summary>
+        bool IsDefinedForCurrentState(Action trigger);
+
+        /// <summary>
+        /// Check whether the parameterized trigger has a transition defined for the current state.
+        /// Does not evaluate guards or require the argument.
+        /// </summary>
+        bool IsDefinedForCurrentState<TArg>(Action<TArg> trigger);
+
+        /// <summary>
         /// Raised after every successful state transition.
         /// Fires inside the transition lock — handlers should be fast and non-blocking.
         /// </summary>

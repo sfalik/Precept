@@ -112,6 +112,21 @@ namespace StateMachine
             throw new NotImplementedException();
         }
 
+        public IReadOnlyList<IEvent> GetEventsForCurrentState()
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool IsDefinedForCurrentState(Action trigger)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool IsDefinedForCurrentState<TArg>(Action<TArg> trigger)
+        {
+            throw new NotImplementedException();
+        }
+
         public StateMachine(TState initialState)
         {
             // Touching EnumOrdinal<TState>.Count forces the static constructor
@@ -185,6 +200,21 @@ namespace StateMachine
         }
 
         public bool TryHandle<TArg>(Action<TArg> trigger, TArg arg, out IReadOnlyList<string> reasons)
+        {
+            throw new NotImplementedException();
+        }
+
+        public IReadOnlyList<IEvent> GetEventsForCurrentState()
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool IsDefinedForCurrentState(Action trigger)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool IsDefinedForCurrentState<TArg>(Action<TArg> trigger)
         {
             throw new NotImplementedException();
         }
