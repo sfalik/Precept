@@ -5,6 +5,47 @@ using System.Runtime.CompilerServices;
 
 namespace StateMachine
 {
+    // ═══════════════════════════════════════════════════════════════════
+    // Enum Ordinal Helper
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Provides O(1) enum-to-index conversion by assuming the enum values form a
+    /// contiguous range starting at 0.  Validated once at type-initialization time;
+    /// if the enum is sparse or starts at a non-zero value, an
+    /// <see cref="InvalidOperationException"/> is thrown immediately.
+    /// </summary>
+    internal static class EnumOrdinal<TState> where TState : notnull, System.Enum
+    {
+        /// <summary>All enum values in declaration order</summary>
+        internal static readonly TState[] Values = (TState[])Enum.GetValues(typeof(TState));
+
+        /// <summary>Number of enum members</summary>
+        internal static readonly int Count = Values.Length;
+
+        static EnumOrdinal()
+        {
+            // Validate that the enum forms a contiguous 0-based sequence
+            for (int i = 0; i < Values.Length; i++)
+            {
+                int v = Convert.ToInt32(Values[i]);
+                if (v != i)
+                {
+                    throw new InvalidOperationException(
+                        $"Enum '{typeof(TState).Name}' is not a contiguous zero-based sequence. " +
+                        $"Value '{Values[i]}' has underlying value {v} but expected {i}. " +
+                        $"StateMachine requires sequential enums for O(1) array indexing.");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Convert an enum value to its array index.  O(1) — no boxing, no lookup.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static int ToIndex(TState state) => Unsafe.As<TState, int>(ref state);
+    }
+
     /// <summary>
     /// A typed state machine with co-located immutable data, combining finite state machine 
     /// constraints with a reducer pattern. Supports both data-less (state-only) and data-ful 
@@ -44,8 +85,7 @@ namespace StateMachine
             get { lock (_lock) { return _state; } }
         }
 
-        private static readonly TState[] _states = (TState[])Enum.GetValues(typeof(TState));
-        public IReadOnlyList<TState> States => _states;
+        public IReadOnlyList<TState> States => EnumOrdinal<TState>.Values;
 
         private readonly List<IEvent> _events = new();
         public IReadOnlyList<IEvent> Events => _events;
@@ -54,6 +94,9 @@ namespace StateMachine
 
         public StateMachine(TState initialState)
         {
+            // Touching EnumOrdinal<TState>.Count forces the static constructor
+            // to run, validating the enum is contiguous and zero-based.
+            _ = EnumOrdinal<TState>.Count;
             _state = initialState;
         }
 
@@ -98,8 +141,7 @@ namespace StateMachine
             get { lock (_lock) { return _data; } }
         }
 
-        private static readonly TState[] _states = (TState[])Enum.GetValues(typeof(TState));
-        public IReadOnlyList<TState> States => _states;
+        public IReadOnlyList<TState> States => EnumOrdinal<TState>.Values;
 
         private readonly List<IEvent> _events = new();
         public IReadOnlyList<IEvent> Events => _events;
@@ -112,6 +154,7 @@ namespace StateMachine
             Func<TData, TState> getState,
             Func<TData, TState, TData> setState)
         {
+            _ = EnumOrdinal<TState>.Count;
             _data = initialData;
             _getState = getState;
             _setState = setState;

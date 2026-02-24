@@ -28,6 +28,7 @@ This library treats a state machine as a **typed reducer** — each transition p
 - **State on the record**: The state enum is a property on the data record, identified via an expression selector (`d => d.State`). This makes serialization and snapshotting trivial — one object = full machine state.
 - **Pure transforms**: The `Execute()` method accepts a pure function `(TData) => TData` or `(TData, TArg) => TData`. Side effects (email, logging) are handled externally by subscribing to the `Transitioned` / `DataTransitioned` observation events.
 - **Fluent builder**: The builder API uses interface narrowing so that only valid next steps are available at each point in the chain. The compiler enforces correct construction — you cannot define an incomplete or structurally invalid state machine.
+- **Sequential enum constraint**: The `TState` enum must be contiguous and zero-based (e.g., `Off, Red, Green, Yellow` → 0, 1, 2, 3). This is validated once at build time, and enum values are then cast directly to `int` for O(1) array indexing with no boxing or lookup. Sparse or `[Flags]` enums are rejected immediately with a clear error message.
 - **Sealed after build**: States and events cannot be added after construction. This enables a lightweight array-based transition table using enum ordinals for O(1) transition lookup — the same efficient data structure used in classical finite state machine implementations.
 - **Thread-safe after build**: The built machine uses `lock` to ensure transitions are atomic (read state → evaluate guards → run transform → set new data). The builder itself is not thread-safe and is discarded after `Build()`.
 - **Fail-fast**: Triggering an event in an undefined state throws `InvalidTransitionException`. Guards that all fail throw `GuardFailedException` with aggregated reason strings. Use `Test()` for safe pre-checks.
@@ -264,6 +265,7 @@ This keeps the state machine purely synchronous while the saga layer handles asy
 | Undefined transition | Throw `InvalidTransitionException` | Silent no-ops hide bugs |
 | All guards fail | Throw `GuardFailedException` with reasons | Provides actionable feedback |
 | Build-time validation | Error on empty events and duplicate transitions | Catch construction mistakes early |
+| Enum constraint | `TState` must be contiguous and zero-based | Enables direct cast to `int` for O(1) array indexing — no `Array.IndexOf`, no boxing |
 | Transform semantics | Pure: `(TData) => TData` | Testable, no hidden dependencies |
 | Transform vs state order | Transform first, then state change | If transform throws, nothing changes |
 | Thread safety | `lock` around full transition; sealed after build | Sync transforms keep it simple; O(1) array lookup |
