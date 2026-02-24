@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using FluentAssertions;
@@ -110,9 +110,11 @@ namespace StateMachine.Tests
 
             machine.State.Should().Be(Light.Off);
 
+            machine.Should().Accept(powerOn).WithState(Light.Red);
             powerOn();
             machine.State.Should().Be(Light.Red);
 
+            machine.Should().Accept(requestWalk).WithState(Light.Red);
             requestWalk();
             machine.State.Should().Be(Light.Red);
             machine.Data.PedestrianWaiting.Should().BeTrue();
@@ -122,6 +124,7 @@ namespace StateMachine.Tests
             machine.Data.SecondsInCurrentPhase.Should().Be(7);
 
             // Not enough time yet — stays Red
+            machine.Should().Accept(advance).WithState(Light.Red);
             advance();
             machine.State.Should().Be(Light.Red);
 
@@ -129,27 +132,33 @@ namespace StateMachine.Tests
             machine.Data.SecondsInCurrentPhase.Should().Be(10);
 
             // Meets guard — transitions Red -> Green and clears the request
+            machine.Should().Accept(advance).WithState(Light.Green);
             advance();
             machine.State.Should().Be(Light.Green);
             machine.Data.PedestrianWaiting.Should().BeFalse();
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
 
             elapse(20);
+            machine.Should().Accept(advance).WithState(Light.Yellow);
             advance();
             machine.State.Should().Be(Light.Yellow);
 
             elapse(3);
+            machine.Should().Accept(advance).WithState(Light.Red);
             advance();
             machine.State.Should().Be(Light.Red);
 
             // Emergency can be triggered from any state
+            machine.Should().Accept(emergency).WithState(Light.FlashingRed);
             emergency();
             machine.State.Should().Be(Light.FlashingRed);
 
             elapse(30);
+            machine.Should().Accept(advance).WithState(Light.Red);
             advance();
             machine.State.Should().Be(Light.Red);
 
+            machine.Should().Accept(shutdown).WithState(Light.Off);
             shutdown();
             machine.State.Should().Be(Light.Off);
 
@@ -214,6 +223,7 @@ namespace StateMachine.Tests
                     .KeepSameState()
                 .Build(Light.Red);
 
+            machine.Should().Accept(hold).WithState(Light.Red);
             hold();
             machine.State.Should().Be(Light.Red);
         }
@@ -230,12 +240,15 @@ namespace StateMachine.Tests
 
             machine.State.Should().Be(Light.Red);
 
+            machine.Should().Accept(next).WithState(Light.Green);
             next();
             machine.State.Should().Be(Light.Green);
 
+            machine.Should().Accept(next).WithState(Light.Yellow);
             next();
             machine.State.Should().Be(Light.Yellow);
 
+            machine.Should().Accept(next).WithState(Light.Red);
             next();
             machine.State.Should().Be(Light.Red);
         }
@@ -254,7 +267,9 @@ namespace StateMachine.Tests
 
             machine.Transitioned += args => transitions.Add(args);
 
+            machine.Should().Accept(next).WithState(Light.Green);
             next();
+            machine.Should().Accept(next).WithState(Light.Yellow);
             next();
 
             transitions.Should().HaveCount(2);
@@ -276,6 +291,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Off)
                 .Build(Light.Red);
 
+            machine.Should().Accept(shutdown).WithState(Light.Off);
             shutdown();
             machine.State.Should().Be(Light.Off);
         }
@@ -289,11 +305,12 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Green)
                 .Build(Light.Red);
 
+            machine.Should().Accept(next).WithState(Light.Green);
             next();
             machine.State.Should().Be(Light.Green);
 
             // Triggering again from Green — not defined for this event
-            machine.TryHandle(next, out _).Should().BeFalse();
+            machine.Should().NotAccept(next);
             var act = () => next();
             act.Should().Throw<InvalidTransitionException>();
         }
@@ -322,9 +339,11 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Red)
                 .Build(Light.Red);
 
+            machine.Should().Accept(next).WithState(Light.Green);
             next();
             machine.State.Should().Be(Light.Green);
 
+            machine.Should().Accept(back).WithState(Light.Red);
             back();
             machine.State.Should().Be(Light.Red);
         }
@@ -354,6 +373,7 @@ namespace StateMachine.Tests
 
             machine.Transitioned += args => transitions.Add(args);
 
+            machine.Should().Accept(hold).WithState(Light.Red);
             hold();
 
             transitions.Should().HaveCount(1);
@@ -400,6 +420,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Off)
                 .Build(Light.Green);
 
+            machine.Should().Accept(shutdown).WithState(Light.Off);
             shutdown();
             machine.State.Should().Be(Light.Off);
         }
@@ -472,36 +493,43 @@ namespace StateMachine.Tests
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
 
             // Power on — light comes up red, data unchanged
+            machine.Should().Accept(powerOn).WithState(Light.Red);
             powerOn();
             machine.State.Should().Be(Light.Red);
             machine.Data.PedestrianWaiting.Should().BeTrue();
 
             // Red → Green: walk signal granted, vehicle sensor cleared
+            machine.Should().Accept(next).WithState(Light.Green);
             next();
             machine.State.Should().Be(Light.Green);
             machine.Data.PedestrianWaiting.Should().BeFalse();
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
 
             // Green → Yellow
+            machine.Should().Accept(next).WithState(Light.Yellow);
             next();
             machine.State.Should().Be(Light.Yellow);
 
             // Yellow → Red
+            machine.Should().Accept(next).WithState(Light.Red);
             next();
             machine.State.Should().Be(Light.Red);
 
             // Second green phase — no pedestrian waiting, no queued vehicles
+            machine.Should().Accept(next).WithState(Light.Green);
             next();
             machine.State.Should().Be(Light.Green);
             machine.Data.PedestrianWaiting.Should().BeFalse();
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
 
             // Emergency override — first responder requested flashing red
+            machine.Should().Accept(emergency, new EmergencyOverride("Officer Smith", "Accident at intersection")).WithState(Light.FlashingRed);
             emergency(new EmergencyOverride("Officer Smith", "Accident at intersection"));
             machine.State.Should().Be(Light.FlashingRed);
             machine.Data.LastTransitionAt.Should().NotBeNull();
 
             // Shutdown
+            machine.Should().Accept(shutdown).WithState(Light.Off);
             shutdown();
             machine.State.Should().Be(Light.Off);
         }
@@ -537,6 +565,7 @@ namespace StateMachine.Tests
                     .KeepSameState()
                 .Build(initialData);
 
+            machine.Should().Accept(hold).WithState(Light.Red);
             hold();
             machine.State.Should().Be(Light.Red);
             machine.Data.PedestrianWaiting.Should().BeTrue();
@@ -557,6 +586,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.Green)
                 .Build(initialData);
 
+            machine.Should().Accept(next).WithState(Light.Green);
             next();
             machine.State.Should().Be(Light.Green);
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
@@ -577,11 +607,13 @@ namespace StateMachine.Tests
                 .Build(initialData);
 
             // First button press — light stays red, walk request registered
+            machine.Should().Accept(pedestrianRequest).WithState(Light.Red);
             pedestrianRequest();
             machine.State.Should().Be(Light.Red);
             machine.Data.PedestrianWaiting.Should().BeTrue();
 
             // Second press — light still red, request already set
+            machine.Should().Accept(pedestrianRequest).WithState(Light.Red);
             pedestrianRequest();
             machine.State.Should().Be(Light.Red);
             machine.Data.PedestrianWaiting.Should().BeTrue();
@@ -601,6 +633,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Green)
                 .Build(initialData);
 
+            machine.Should().Accept(next).WithState(Light.Green);
             next();
             machine.State.Should().Be(Light.Green);
         }
@@ -619,8 +652,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Green)
                 .Build(initialData);
 
-            machine.TryHandle(next, out var reasons).Should().BeFalse();
-            reasons.Should().Contain("Minimum red time (10s) not reached");
+            machine.Should().NotAccept(next).WithReason("Minimum red time (10s) not reached");
             machine.State.Should().Be(Light.Red);
         }
 
@@ -639,6 +671,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.Green)
                 .Build(initialData);
 
+            machine.Should().Accept(next).WithState(Light.Green);
             next();
             machine.State.Should().Be(Light.Green);
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
@@ -660,6 +693,7 @@ namespace StateMachine.Tests
                     .KeepSameState()
                 .Build(initialData);
 
+            machine.Should().Accept(next).WithState(Light.Red);
             next();
             machine.State.Should().Be(Light.Red);
         }
@@ -680,6 +714,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
+            machine.Should().Accept(next).WithState(Light.FlashingRed);
             next();
             machine.State.Should().Be(Light.FlashingRed);
         }
@@ -702,6 +737,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
+            machine.Should().Accept(next).WithState(Light.FlashingRed);
             next();
             machine.State.Should().Be(Light.FlashingRed);
         }
@@ -724,6 +760,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
+            machine.Should().Accept(next).WithState(Light.FlashingRed);
             next();
             machine.State.Should().Be(Light.FlashingRed);
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
@@ -749,6 +786,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
+            machine.Should().Accept(next).WithState(Light.FlashingRed);
             next();
             machine.State.Should().Be(Light.FlashingRed);
             machine.Data.SecondsInCurrentPhase.Should().Be(999);
@@ -775,11 +813,10 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
-            machine.TryHandle(next, out var reasons).Should().BeFalse();
-            reasons.Should().HaveCount(3)
-                .And.Contain("Minimum red time (60s) not reached")
-                .And.Contain("Minimum red time (30s) not reached")
-                .And.Contain("Minimum red time (10s) not reached");
+            machine.Should().NotAccept(next)
+                .WithReason("Minimum red time (60s) not reached")
+                .WithReason("Minimum red time (30s) not reached")
+                .WithReason("Minimum red time (10s) not reached");
             machine.State.Should().Be(Light.Red);
         }
 
@@ -856,6 +893,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.Green)
                 .Build(initialData);
 
+            machine.Should().Accept(next).WithState(Light.Green);
             next();
 
             // The original record is untouched — records are immutable
@@ -885,8 +923,7 @@ namespace StateMachine.Tests
                 .Build(initialData);
 
             // Missing badge ID — override should be rejected
-            machine.TryHandle(emergency, new EmergencyOverride("", "Unauthorized"), out var reasons).Should().BeFalse();
-            reasons.Should().Contain("Emergency override requires authorization");
+            machine.Should().NotAccept(emergency, new EmergencyOverride("", "Unauthorized")).WithReason("Emergency override requires authorization");
         }
 
         [Fact(Skip = "Implementation not ready")]
@@ -932,6 +969,7 @@ namespace StateMachine.Tests
 
             machine.DataTransitioned += args => transitions.Add(args);
 
+            machine.Should().Accept(next).WithState(Light.Green);
             next();
 
             transitions.Should().HaveCount(1);
@@ -961,6 +999,7 @@ namespace StateMachine.Tests
                     .AndKeepSameState()
                 .Build(initialData);
 
+            machine.Should().Accept(elapse, 6).WithState(Light.Green);
             elapse(6);
             machine.State.Should().Be(Light.Green);
             machine.Data.SecondsInCurrentPhase.Should().Be(11);
@@ -986,8 +1025,7 @@ namespace StateMachine.Tests
                 .Build(initialData);
 
             // Negative time delta is invalid
-            machine.TryHandle(elapse, -3, out var reasons).Should().BeFalse();
-            reasons.Should().Contain("Elapsed seconds must be positive");
+            machine.Should().NotAccept(elapse, -3).WithReason("Elapsed seconds must be positive");
             machine.State.Should().Be(Light.Red);
             machine.Data.SecondsInCurrentPhase.Should().Be(5);
         }
@@ -1006,6 +1044,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.Green)
                 .Build(initialData);
 
+            machine.Should().Accept(next).WithState(Light.Green);
             next();
             machine.State.Should().Be(Light.Green);           // Machine wins — declared transition target
             machine.Data.Light.Should().Be(Light.Green);      // Data agrees with machine state
@@ -1025,6 +1064,7 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Green)
                 .Build(initialData);
 
+            machine.Should().Accept(next).WithState(Light.Green);
             next();
             machine.State.Should().Be(Light.Green);
             machine.Data.Light.Should().Be(Light.Green);
@@ -1050,6 +1090,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
+            machine.Should().Accept(next).WithState(Light.FlashingRed);
             next();
             machine.State.Should().Be(Light.FlashingRed);
             machine.Data.SecondsInCurrentPhase.Should().Be(0);
@@ -1069,6 +1110,7 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.Off)
                 .Build(initialData);
 
+            machine.Should().Accept(shutdown).WithState(Light.Off);
             shutdown();
             machine.State.Should().Be(Light.Off);
             machine.Data.PedestrianWaiting.Should().BeFalse();
@@ -1090,7 +1132,7 @@ namespace StateMachine.Tests
             next(); // Red → Green
 
             // Now in Green — next only handles Red
-            machine.TryHandle(next, out _).Should().BeFalse();
+            machine.Should().NotAccept(next);
             var act = () => next();
             act.Should().Throw<InvalidTransitionException>();
         }
