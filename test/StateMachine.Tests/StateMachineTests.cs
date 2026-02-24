@@ -13,12 +13,152 @@ namespace StateMachine.Tests
 
     internal record TrafficLightData(
         Light Light,
-        int CycleCount = 0,
+        bool PedestrianWaiting = false,
+        int SecondsInCurrentPhase = 0,
         string? Intersection = null,
         DateTime? LastTransitionAt = null
     );
 
     internal record EmergencyOverride(string AuthorizedBy, string Reason);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Comprehensive Scenario Example
+    // ═══════════════════════════════════════════════════════════════════
+
+    public class ComprehensiveScenarioTests
+    {
+        [Fact(Skip = "Implementation not ready")]
+        public void ComprehensiveScenario_CoversAllStatesAndCommonBranches()
+        {
+            var observedTransitions = new List<TransitionedEventArgs<Light>>();
+            var observedDataTransitions = new List<DataTransitionedEventArgs<Light, TrafficLightData>>();
+
+            var initialData = new TrafficLightData(
+                Light.Off,
+                PedestrianWaiting: false,
+                SecondsInCurrentPhase: 0,
+                Intersection: "Main St & 1st Ave");
+
+            var machine = StateMachine.CreateBuilder<Light>()
+                .WithData<TrafficLightData>(d => d.Light)
+
+                // Power on: controller comes online into Red
+                .DefineEvent(out var powerOn)
+                    .WhenStateIs(Light.Off)
+                    .Execute(d => d with { SecondsInCurrentPhase = 0, PedestrianWaiting = false })
+                    .ThenTransitionTo(Light.Red)
+
+                // Tick: time passes in the current phase (data update only)
+                .DefineEvent<int>(out var elapse)
+                    .WhenStateIs(Light.Red, Light.Green, Light.Yellow, Light.FlashingRed)
+                    .If((d, seconds) => seconds > 0, "Elapsed seconds must be positive")
+                    .Execute((d, seconds) => d with { SecondsInCurrentPhase = d.SecondsInCurrentPhase + seconds })
+                    .AndKeepSameState()
+
+                // Request: pedestrian presses the button (state unchanged)
+                .DefineEvent(out var requestWalk)
+                    .WhenStateIs(Light.Red)
+                    .Execute(d => d with { PedestrianWaiting = true })
+                    .AndKeepSameState()
+
+                // Advance: controller evaluates whether to move to the next phase
+                .DefineEvent(out var advance)
+                    .WhenStateIs(Light.Red)
+                    .If(d => d.SecondsInCurrentPhase >= 10 && d.PedestrianWaiting, "Not ready to advance from red")
+                    .Execute(d => d with { SecondsInCurrentPhase = 0, PedestrianWaiting = false })
+                    .ThenTransitionTo(Light.Green)
+                    .Else
+                    .KeepSameState()
+                    .WhenStateIs(Light.Green)
+                    .If(d => d.SecondsInCurrentPhase >= 20, "Minimum green time (20s) not reached")
+                    .Execute(d => d with { SecondsInCurrentPhase = 0 })
+                    .ThenTransitionTo(Light.Yellow)
+                    .Else
+                    .KeepSameState()
+                    .WhenStateIs(Light.Yellow)
+                    .If(d => d.SecondsInCurrentPhase >= 3, "Minimum yellow time (3s) not reached")
+                    .Execute(d => d with { SecondsInCurrentPhase = 0 })
+                    .ThenTransitionTo(Light.Red)
+                    .Else
+                    .KeepSameState()
+                    .WhenStateIs(Light.FlashingRed)
+                    .If(d => d.SecondsInCurrentPhase >= 30, "Hold in flashing-red for 30s before resuming")
+                    .Execute(d => d with { SecondsInCurrentPhase = 0, PedestrianWaiting = false })
+                    .ThenTransitionTo(Light.Red)
+                    .Else
+                    .KeepSameState()
+
+                // Emergency: can be invoked from any state
+                .DefineEvent(out var emergency)
+                    .RegardlessOfState()
+                    .Execute(d => d with { SecondsInCurrentPhase = 0 })
+                    .ThenTransitionTo(Light.FlashingRed)
+
+                // Shutdown: can be invoked from any state
+                .DefineEvent(out var shutdown)
+                    .RegardlessOfState()
+                    .Execute(d => d with { SecondsInCurrentPhase = 0, PedestrianWaiting = false })
+                    .ThenTransitionTo(Light.Off)
+
+                .Build(initialData);
+
+            machine.Transitioned += args => observedTransitions.Add(args);
+            machine.DataTransitioned += args => observedDataTransitions.Add(args);
+
+            machine.State.Should().Be(Light.Off);
+
+            powerOn.Trigger();
+            machine.State.Should().Be(Light.Red);
+
+            requestWalk.Trigger();
+            machine.State.Should().Be(Light.Red);
+            machine.Data.PedestrianWaiting.Should().BeTrue();
+
+            elapse.Trigger(7);
+            machine.State.Should().Be(Light.Red);
+            machine.Data.SecondsInCurrentPhase.Should().Be(7);
+
+            // Not enough time yet — stays Red
+            advance.Trigger();
+            machine.State.Should().Be(Light.Red);
+
+            elapse.Trigger(3);
+            machine.Data.SecondsInCurrentPhase.Should().Be(10);
+
+            // Meets guard — transitions Red -> Green and clears the request
+            advance.Trigger();
+            machine.State.Should().Be(Light.Green);
+            machine.Data.PedestrianWaiting.Should().BeFalse();
+            machine.Data.SecondsInCurrentPhase.Should().Be(0);
+
+            elapse.Trigger(20);
+            advance.Trigger();
+            machine.State.Should().Be(Light.Yellow);
+
+            elapse.Trigger(3);
+            advance.Trigger();
+            machine.State.Should().Be(Light.Red);
+
+            // Emergency can be triggered from any state
+            emergency.Trigger();
+            machine.State.Should().Be(Light.FlashingRed);
+
+            elapse.Trigger(30);
+            advance.Trigger();
+            machine.State.Should().Be(Light.Red);
+
+            shutdown.Trigger();
+            machine.State.Should().Be(Light.Off);
+
+            // Includes every state at least once in the observed transitions
+            observedTransitions.Should().Contain(t => t.ToState == Light.Red);
+            observedTransitions.Should().Contain(t => t.ToState == Light.Green);
+            observedTransitions.Should().Contain(t => t.ToState == Light.Yellow);
+            observedTransitions.Should().Contain(t => t.ToState == Light.FlashingRed);
+            observedTransitions.Should().Contain(t => t.ToState == Light.Off);
+            observedDataTransitions.Should().HaveSameCount(observedTransitions);
+        }
+    }
 
     // ═══════════════════════════════════════════════════════════════════
     // Data-Less State Machine Tests
@@ -289,7 +429,12 @@ namespace StateMachine.Tests
         [Fact(Skip = "Implementation not ready")]
         public void TrafficLightLifecycle()
         {
-            var initialData = new TrafficLightData(Light.Off, Intersection: "Main St & 1st Ave");
+            // A pedestrian has pressed the walk button; controller is powered off.
+            var initialData = new TrafficLightData(
+                Light.Off,
+                PedestrianWaiting: true,
+                SecondsInCurrentPhase: 0,
+                Intersection: "Main St & 1st Ave");
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
@@ -299,8 +444,9 @@ namespace StateMachine.Tests
                     .TransitionTo(Light.Red)
 
                 .DefineEvent(out var next)
+                    // Red → Green: clear the walk request and reset the phase timer
                     .WhenStateIs(Light.Red)
-                    .Execute(data => data with { CycleCount = data.CycleCount + 1 })
+                    .Execute(data => data with { PedestrianWaiting = false, SecondsInCurrentPhase = 0 })
                     .ThenTransitionTo(Light.Green)
                     .WhenStateIs(Light.Green)
                     .TransitionTo(Light.Yellow)
@@ -320,18 +466,22 @@ namespace StateMachine.Tests
 
                 .Build(initialData);
 
-            // Starts off
+            // Starts off; pedestrian button is set from initial data
             machine.State.Should().Be(Light.Off);
             machine.Data.Intersection.Should().Be("Main St & 1st Ave");
+            machine.Data.PedestrianWaiting.Should().BeTrue();
+            machine.Data.SecondsInCurrentPhase.Should().Be(0);
 
-            // Power on
+            // Power on — light comes up red, data unchanged
             powerOn.Trigger();
             machine.State.Should().Be(Light.Red);
+            machine.Data.PedestrianWaiting.Should().BeTrue();
 
-            // Red → Green (CycleCount increments)
+            // Red → Green: walk signal granted, vehicle sensor cleared
             next.Trigger();
             machine.State.Should().Be(Light.Green);
-            machine.Data.CycleCount.Should().Be(1);
+            machine.Data.PedestrianWaiting.Should().BeFalse();
+            machine.Data.SecondsInCurrentPhase.Should().Be(0);
 
             // Green → Yellow
             next.Trigger();
@@ -341,13 +491,14 @@ namespace StateMachine.Tests
             next.Trigger();
             machine.State.Should().Be(Light.Red);
 
-            // Second cycle
+            // Second green phase — no pedestrian waiting, no queued vehicles
             next.Trigger();
             machine.State.Should().Be(Light.Green);
-            machine.Data.CycleCount.Should().Be(2);
+            machine.Data.PedestrianWaiting.Should().BeFalse();
+            machine.Data.SecondsInCurrentPhase.Should().Be(0);
 
-            // Emergency override
-            emergency.Trigger(new EmergencyOverride("Officer Smith", "Accident"));
+            // Emergency override — first responder requested flashing red
+            emergency.Trigger(new EmergencyOverride("Officer Smith", "Accident at intersection"));
             machine.State.Should().Be(Light.FlashingRed);
             machine.Data.LastTransitionAt.Should().NotBeNull();
 
@@ -359,7 +510,8 @@ namespace StateMachine.Tests
         [Fact(Skip = "Implementation not ready")]
         public void InitialState_And_InitialData()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 42);
+            // Light has been red for 25 seconds; pedestrian has pressed the button
+            var initialData = new TrafficLightData(Light.Red, PedestrianWaiting: true, SecondsInCurrentPhase: 25);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
@@ -369,13 +521,15 @@ namespace StateMachine.Tests
                 .Build(initialData);
 
             machine.State.Should().Be(Light.Red);
-            machine.Data.CycleCount.Should().Be(42);
+            machine.Data.PedestrianWaiting.Should().BeTrue();
+            machine.Data.SecondsInCurrentPhase.Should().Be(25);
         }
 
         [Fact(Skip = "Implementation not ready")]
         public void KeepSameState_DataUnchanged()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 5);
+            // Pedestrian has pressed the walk button; holding red does not clear requests or timers
+            var initialData = new TrafficLightData(Light.Red, PedestrianWaiting: true, SecondsInCurrentPhase: 3);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
@@ -386,58 +540,65 @@ namespace StateMachine.Tests
 
             hold.Trigger();
             machine.State.Should().Be(Light.Red);
-            machine.Data.CycleCount.Should().Be(5);
+            machine.Data.PedestrianWaiting.Should().BeTrue();
+            machine.Data.SecondsInCurrentPhase.Should().Be(3);
         }
 
         [Fact(Skip = "Implementation not ready")]
         public void SimpleTransition_WithExecute()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 0);
+            // Light has been red long enough; advancing to green resets the phase timer
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 30);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    .Execute(data => data with { CycleCount = data.CycleCount + 1 })
+                    .Execute(data => data with { SecondsInCurrentPhase = 0 })
                     .ThenTransitionTo(Light.Green)
                 .Build(initialData);
 
             next.Trigger();
             machine.State.Should().Be(Light.Green);
-            machine.Data.CycleCount.Should().Be(1);
+            machine.Data.SecondsInCurrentPhase.Should().Be(0);
         }
 
         [Fact(Skip = "Implementation not ready")]
         public void KeepSameState_WithExecute()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 0);
+            // Pedestrian button presses accumulate while the light is red
+            var initialData = new TrafficLightData(Light.Red, PedestrianWaiting: false);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
-                .DefineEvent(out var tick)
+                .DefineEvent(out var pedestrianRequest)
                     .WhenStateIs(Light.Red)
-                    .Execute(data => data with { CycleCount = data.CycleCount + 1 })
+                    .Execute(data => data with { PedestrianWaiting = true }) // button pressed
                     .AndKeepSameState()
                 .Build(initialData);
 
-            tick.Trigger();
+            // First button press — light stays red, walk request registered
+            pedestrianRequest.Trigger();
             machine.State.Should().Be(Light.Red);
-            machine.Data.CycleCount.Should().Be(1);
+            machine.Data.PedestrianWaiting.Should().BeTrue();
 
-            tick.Trigger();
-            machine.Data.CycleCount.Should().Be(2);
+            // Second press — light still red, request already set
+            pedestrianRequest.Trigger();
+            machine.State.Should().Be(Light.Red);
+            machine.Data.PedestrianWaiting.Should().BeTrue();
         }
 
         [Fact(Skip = "Implementation not ready")]
         public void Guard_Passes_TransitionsState()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 10);
+            // Minimum red time satisfied — controller may advance to green
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 12);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    .If(data => data.CycleCount > 5, "Must complete at least 5 cycles")
+                    .If(data => data.SecondsInCurrentPhase >= 10, "Minimum red time (10s) not reached")
                     .TransitionTo(Light.Green)
                 .Build(initialData);
 
@@ -448,19 +609,20 @@ namespace StateMachine.Tests
         [Fact(Skip = "Implementation not ready")]
         public void Guard_Fails_NoElse_ThrowsGuardFailedException()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 1);
+            // Red has not been active long enough — should not advance
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 3);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    .If(data => data.CycleCount > 5, "Must complete at least 5 cycles")
+                    .If(data => data.SecondsInCurrentPhase >= 10, "Minimum red time (10s) not reached")
                     .TransitionTo(Light.Green)
                 .Build(initialData);
 
             var act = () => next.Trigger();
             act.Should().Throw<GuardFailedException>()
-                .Which.Reasons.Should().Contain("Must complete at least 5 cycles");
+                .Which.Reasons.Should().Contain("Minimum red time (10s) not reached");
 
             machine.State.Should().Be(Light.Red);
         }
@@ -468,32 +630,34 @@ namespace StateMachine.Tests
         [Fact(Skip = "Implementation not ready")]
         public void Guard_Passes_ExecuteAndTransition()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 10);
+            // Minimum red time satisfied; advancing to green also resets phase timer
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 15);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    .If(data => data.CycleCount > 5, "Must complete at least 5 cycles")
-                    .Execute(data => data with { CycleCount = data.CycleCount + 100 })
+                    .If(data => data.SecondsInCurrentPhase >= 10, "Minimum red time (10s) not reached")
+                    .Execute(data => data with { SecondsInCurrentPhase = 0 })
                     .ThenTransitionTo(Light.Green)
                 .Build(initialData);
 
             next.Trigger();
             machine.State.Should().Be(Light.Green);
-            machine.Data.CycleCount.Should().Be(110);
+            machine.Data.SecondsInCurrentPhase.Should().Be(0);
         }
 
         [Fact(Skip = "Implementation not ready")]
         public void Guard_Fails_Else_KeepsSameState()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 1);
+            // Too early to change; Else branch keeps the light red
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 3);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    .If(data => data.CycleCount > 5, "Must complete at least 5 cycles")
+                    .If(data => data.SecondsInCurrentPhase >= 10, "Minimum red time (10s) not reached")
                     .TransitionTo(Light.Green)
                     .Else
                     .KeepSameState()
@@ -506,13 +670,14 @@ namespace StateMachine.Tests
         [Fact(Skip = "Implementation not ready")]
         public void Guard_Fails_Else_TransitionsToAlternate()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 1);
+            // If red has been active far too long, fail-safe enters flashing-red mode
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 999);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    .If(data => data.CycleCount > 5, "Must complete at least 5 cycles")
+                    .If(data => data.SecondsInCurrentPhase <= 120, "Red phase exceeded maximum duration")
                     .TransitionTo(Light.Green)
                     .Else
                     .TransitionTo(Light.FlashingRed)
@@ -525,92 +690,100 @@ namespace StateMachine.Tests
         [Fact(Skip = "Implementation not ready")]
         public void Guard_Fails_ElseIf_Passes_Transitions()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 3);
+            // Red is stuck beyond the normal operating window; Else.If routes to fail-safe flashing-red
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 999);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    .If(data => data.CycleCount > 5, "Must complete at least 5 cycles")
+                    .If(data => data.SecondsInCurrentPhase >= 10 && data.SecondsInCurrentPhase <= 120,
+                        "Red phase not within normal operating window")
                     .TransitionTo(Light.Green)
                     .Else
-                    .If(data => data.CycleCount > 1, "Must complete at least 1 cycle")
-                    .TransitionTo(Light.Yellow)
+                    .If(data => data.SecondsInCurrentPhase > 120, "Red phase exceeded maximum duration")
+                    .TransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
             next.Trigger();
-            machine.State.Should().Be(Light.Yellow);
+            machine.State.Should().Be(Light.FlashingRed);
         }
 
         [Fact(Skip = "Implementation not ready")]
         public void Guard_Fails_Else_ExecuteAndTransition()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 1);
+            // Red has been active far too long; Else branch enters flashing-red and resets timer
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 999);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    .If(data => data.CycleCount > 5, "Must complete at least 5 cycles")
-                    .Execute(data => data with { CycleCount = 999 })
+                    .If(data => data.SecondsInCurrentPhase <= 120, "Red phase exceeded maximum duration")
+                    .Execute(data => data with { SecondsInCurrentPhase = 0 })
                     .ThenTransitionTo(Light.Green)
                     .Else
-                    .Execute(data => data with { CycleCount = -1 })
+                    .Execute(data => data with { SecondsInCurrentPhase = 0 })
                     .ThenTransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
             next.Trigger();
             machine.State.Should().Be(Light.FlashingRed);
-            machine.Data.CycleCount.Should().Be(-1);
+            machine.Data.SecondsInCurrentPhase.Should().Be(0);
         }
 
         [Fact(Skip = "Implementation not ready")]
         public void Guard_Fails_ElseIf_Passes_ExecuteAndTransition()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 3);
+            // Red has exceeded maximum duration; Else.If records a timestamp and enters flashing-red
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 999, LastTransitionAt: null);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    .If(data => data.CycleCount > 5, "Must complete at least 5 cycles")
-                    .TransitionTo(Light.Green)
+                    .If(data => data.SecondsInCurrentPhase >= 10 && data.SecondsInCurrentPhase <= 120,
+                        "Red phase not within normal operating window")
+                    .Execute(data => data with { SecondsInCurrentPhase = 0 })
+                    .ThenTransitionTo(Light.Green)
                     .Else
-                    .If(data => data.CycleCount > 1, "Must complete at least 1 cycle")
-                    .Execute(data => data with { CycleCount = data.CycleCount * 10 })
-                    .ThenTransitionTo(Light.Yellow)
+                    .If(data => data.SecondsInCurrentPhase > 120, "Red phase exceeded maximum duration")
+                    .Execute(data => data with { LastTransitionAt = DateTime.UtcNow })
+                    .ThenTransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
             next.Trigger();
-            machine.State.Should().Be(Light.Yellow);
-            machine.Data.CycleCount.Should().Be(30);
+            machine.State.Should().Be(Light.FlashingRed);
+            machine.Data.SecondsInCurrentPhase.Should().Be(999);
+            machine.Data.LastTransitionAt.Should().NotBeNull();
         }
 
         [Fact(Skip = "Implementation not ready")]
         public void AllGuards_Fail_ThrowsGuardFailedWithAllReasons()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 0);
+            // Red just started; all minimum-time guards fail
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 0);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    .If(data => data.CycleCount > 100, "Must complete at least 100 cycles")
+                    .If(data => data.SecondsInCurrentPhase >= 60, "Minimum red time (60s) not reached")
                     .TransitionTo(Light.Green)
                     .Else
-                    .If(data => data.CycleCount > 50, "Must complete at least 50 cycles")
-                    .TransitionTo(Light.Yellow)
+                    .If(data => data.SecondsInCurrentPhase >= 30, "Minimum red time (30s) not reached")
+                    .TransitionTo(Light.Green)
                     .Else
-                    .If(data => data.CycleCount > 10, "Must complete at least 10 cycles")
+                    .If(data => data.SecondsInCurrentPhase >= 10, "Minimum red time (10s) not reached")
                     .TransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
             var act = () => next.Trigger();
             act.Should().Throw<GuardFailedException>()
                 .Which.Reasons.Should().HaveCount(3)
-                .And.Contain("Must complete at least 100 cycles")
-                .And.Contain("Must complete at least 50 cycles")
-                .And.Contain("Must complete at least 10 cycles");
+                .And.Contain("Minimum red time (60s) not reached")
+                .And.Contain("Minimum red time (30s) not reached")
+                .And.Contain("Minimum red time (10s) not reached");
 
             machine.State.Should().Be(Light.Red);
         }
@@ -618,44 +791,46 @@ namespace StateMachine.Tests
         [Fact(Skip = "Implementation not ready")]
         public void ExecuteTransform_Throws_StateAndDataUnchanged()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 5);
+            // If a timing update transform throws, state and timer should be unchanged
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 15);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    .Execute(data => throw new InvalidOperationException("transform failed"))
+                    .Execute(data => throw new InvalidOperationException("timer update failed"))
                     .ThenTransitionTo(Light.Green)
                 .Build(initialData);
 
             var act = () => next.Trigger();
             act.Should().Throw<InvalidOperationException>()
-                .WithMessage("transform failed");
+                .WithMessage("timer update failed");
 
             machine.State.Should().Be(Light.Red);
-            machine.Data.CycleCount.Should().Be(5);
+            machine.Data.SecondsInCurrentPhase.Should().Be(15);
         }
 
         [Fact(Skip = "Implementation not ready")]
         public void GuardedExecuteTransform_Throws_StateAndDataUnchanged()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 10);
+            // Guard passes, but the timing transform throws
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 12);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    .If(data => data.CycleCount > 5, "Must complete at least 5 cycles")
-                    .Execute(data => throw new InvalidOperationException("guarded transform failed"))
+                    .If(data => data.SecondsInCurrentPhase >= 10, "Minimum red time (10s) not reached")
+                    .Execute(data => throw new InvalidOperationException("timer hardware fault"))
                     .ThenTransitionTo(Light.Green)
                 .Build(initialData);
 
             var act = () => next.Trigger();
             act.Should().Throw<InvalidOperationException>()
-                .WithMessage("guarded transform failed");
+                .WithMessage("timer hardware fault");
 
             machine.State.Should().Be(Light.Red);
-            machine.Data.CycleCount.Should().Be(10);
+            machine.Data.SecondsInCurrentPhase.Should().Be(12);
         }
 
         [Fact(Skip = "Implementation not ready")]
@@ -674,31 +849,35 @@ namespace StateMachine.Tests
         [Fact(Skip = "Implementation not ready")]
         public void ImmutableData_OriginalRecordUnchanged()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 0);
+            // Pedestrian button was pressed (latched). When the controller grants a green phase,
+            // it clears the pedestrian request in the machine's data snapshot.
+            var initialData = new TrafficLightData(Light.Red, PedestrianWaiting: true, SecondsInCurrentPhase: 0);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    .Execute(data => data with { CycleCount = data.CycleCount + 1 })
+                    .Execute(data => data with { PedestrianWaiting = false })
                     .ThenTransitionTo(Light.Green)
                 .Build(initialData);
 
             next.Trigger();
 
-            // The original record is untouched
+            // The original record is untouched — records are immutable
             initialData.Light.Should().Be(Light.Red);
-            initialData.CycleCount.Should().Be(0);
+            initialData.PedestrianWaiting.Should().BeTrue();
+            initialData.SecondsInCurrentPhase.Should().Be(0);
 
-            // The machine has the new data
+            // The machine holds the updated snapshot
             machine.Data.Light.Should().Be(Light.Green);
-            machine.Data.CycleCount.Should().Be(1);
+            machine.Data.PedestrianWaiting.Should().BeFalse();
+            machine.Data.SecondsInCurrentPhase.Should().Be(0);
         }
 
         [Fact(Skip = "Implementation not ready")]
         public void GuardFails_ThrowsGuardFailedException()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 0);
+            var initialData = new TrafficLightData(Light.Red);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
@@ -710,8 +889,8 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
-            // Empty authorization should fail
-            var act = () => emergency.Trigger(new EmergencyOverride("", "No auth"));
+            // Missing badge ID — override should be rejected
+            var act = () => emergency.Trigger(new EmergencyOverride("", "Unauthorized"));
             act.Should().Throw<GuardFailedException>()
                 .Which.Reasons.Should().Contain("Emergency override requires authorization");
         }
@@ -719,7 +898,7 @@ namespace StateMachine.Tests
         [Fact(Skip = "Implementation not ready")]
         public void Test_ReturnsExpectedOutcomeWithoutFiring()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 0);
+            var initialData = new TrafficLightData(Light.Red);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
@@ -731,18 +910,19 @@ namespace StateMachine.Tests
                     .ThenTransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
-            // Test with valid override
+            // Test with missing badge ID — guard should reject without changing state
+            var invalidResult = emergency.Test(new EmergencyOverride("", "Unauthorized"));
+            invalidResult.IsAccepted.Should().BeFalse();
+            invalidResult.Reason.Should().Contain("Emergency override requires authorization");
+            machine.State.Should().Be(Light.Red);
+
+            // Test with valid override — guard should accept
             var validResult = emergency.Test(new EmergencyOverride("Officer Smith", "Accident"));
             validResult.IsAccepted.Should().BeTrue();
             validResult.NewState.Should().Be(Light.FlashingRed);
             validResult.Reason.Should().BeNull();
 
-            // Test with empty authorization
-            var invalidResult = emergency.Test(new EmergencyOverride("", "No auth"));
-            invalidResult.IsAccepted.Should().BeFalse();
-            invalidResult.Reason.Should().Contain("Emergency override requires authorization");
-
-            // State should not have changed
+            // State should still not have changed
             machine.State.Should().Be(Light.Red);
         }
 
@@ -750,13 +930,14 @@ namespace StateMachine.Tests
         public void DataTransitioned_ProvidesOldAndNewData()
         {
             var transitions = new List<DataTransitionedEventArgs<Light, TrafficLightData>>();
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 0);
+            // Red has been active for 12 seconds; going green resets timer
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 12);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    .Execute(data => data with { CycleCount = data.CycleCount + 1 })
+                    .Execute(data => data with { SecondsInCurrentPhase = 0 })
                     .ThenTransitionTo(Light.Green)
                 .Build(initialData);
 
@@ -765,8 +946,8 @@ namespace StateMachine.Tests
             next.Trigger();
 
             transitions.Should().HaveCount(1);
-            transitions[0].OldData.CycleCount.Should().Be(0);
-            transitions[0].NewData.CycleCount.Should().Be(1);
+            transitions[0].OldData.SecondsInCurrentPhase.Should().Be(12);
+            transitions[0].NewData.SecondsInCurrentPhase.Should().Be(0);
             transitions[0].FromState.Should().Be(Light.Red);
             transitions[0].ToState.Should().Be(Light.Green);
         }
@@ -774,68 +955,81 @@ namespace StateMachine.Tests
         [Fact(Skip = "Implementation not ready")]
         public void ParameterizedEvent_PassesArgToGuardAndTransform()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 0);
+            // Simulate time elapsing; transition only if the minimum red time will be satisfied
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 5);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
-                .DefineEvent<int>(out var addCycles)
+                .DefineEvent<int>(out var elapse)
                     .WhenStateIs(Light.Red)
-                    .If((data, count) => count > 0, "Cycle count must be positive")
-                    .Execute((data, count) => data with { CycleCount = data.CycleCount + count })
+                    .If((data, seconds) => seconds > 0 && data.SecondsInCurrentPhase + seconds >= 10,
+                        "Minimum red time (10s) not reached")
+                    .Execute((data, seconds) => data with { SecondsInCurrentPhase = data.SecondsInCurrentPhase + seconds })
                     .ThenTransitionTo(Light.Green)
+                    .Else
+                    .If((data, seconds) => seconds > 0, "Elapsed seconds must be positive")
+                    .Execute((data, seconds) => data with { SecondsInCurrentPhase = data.SecondsInCurrentPhase + seconds })
+                    .AndKeepSameState()
                 .Build(initialData);
 
-            addCycles.Trigger(42);
+            elapse.Trigger(6);
             machine.State.Should().Be(Light.Green);
-            machine.Data.CycleCount.Should().Be(42);
+            machine.Data.SecondsInCurrentPhase.Should().Be(11);
         }
 
         [Fact(Skip = "Implementation not ready")]
         public void ParameterizedEvent_GuardRejectsInvalidArg()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 0);
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 5);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
-                .DefineEvent<int>(out var addCycles)
+                .DefineEvent<int>(out var elapse)
                     .WhenStateIs(Light.Red)
-                    .If((data, count) => count > 0, "Cycle count must be positive")
-                    .Execute((data, count) => data with { CycleCount = data.CycleCount + count })
+                    .If((data, seconds) => seconds > 0 && data.SecondsInCurrentPhase + seconds >= 10,
+                        "Minimum red time (10s) not reached")
+                    .Execute((data, seconds) => data with { SecondsInCurrentPhase = data.SecondsInCurrentPhase + seconds })
                     .ThenTransitionTo(Light.Green)
+                    .Else
+                    .If((data, seconds) => seconds > 0, "Elapsed seconds must be positive")
+                    .Execute((data, seconds) => data with { SecondsInCurrentPhase = data.SecondsInCurrentPhase + seconds })
+                    .AndKeepSameState()
                 .Build(initialData);
 
-            var act = () => addCycles.Trigger(-5);
+            // Negative time delta is invalid
+            var act = () => elapse.Trigger(-3);
             act.Should().Throw<GuardFailedException>()
-                .Which.Reasons.Should().Contain("Cycle count must be positive");
+                .Which.Reasons.Should().Contain("Elapsed seconds must be positive");
 
             machine.State.Should().Be(Light.Red);
-            machine.Data.CycleCount.Should().Be(0);
+            machine.Data.SecondsInCurrentPhase.Should().Be(5);
         }
 
         [Fact(Skip = "Implementation not ready")]
         public void Machine_StampsState_OverridingTransform()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 0);
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 0);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    // User sets Light to FlashingRed — machine should overwrite with Green
-                    .Execute(data => data with { Light = Light.FlashingRed, CycleCount = 1 })
+                    // Transform tries to set Light to FlashingRed — machine must overwrite with the declared target (Green)
+                    .Execute(data => data with { Light = Light.FlashingRed, SecondsInCurrentPhase = 123 })
                     .ThenTransitionTo(Light.Green)
                 .Build(initialData);
 
             next.Trigger();
-            machine.State.Should().Be(Light.Green);         // Machine wins
-            machine.Data.Light.Should().Be(Light.Green);    // Data agrees
-            machine.Data.CycleCount.Should().Be(1);         // Transform ran
+            machine.State.Should().Be(Light.Green);           // Machine wins — declared transition target
+            machine.Data.Light.Should().Be(Light.Green);      // Data agrees with machine state
+            machine.Data.SecondsInCurrentPhase.Should().Be(123);   // Transform side-effect preserved
         }
 
         [Fact(Skip = "Implementation not ready")]
         public void TransitionWithoutExecute_OnlyStateChanges()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 42);
+            // Plain transition must not touch data fields
+            var initialData = new TrafficLightData(Light.Red, PedestrianWaiting: true, SecondsInCurrentPhase: 42);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
@@ -847,47 +1041,51 @@ namespace StateMachine.Tests
             next.Trigger();
             machine.State.Should().Be(Light.Green);
             machine.Data.Light.Should().Be(Light.Green);
-            machine.Data.CycleCount.Should().Be(42); // unchanged
+            machine.Data.PedestrianWaiting.Should().BeTrue();   // unchanged — no Execute to clear it
+            machine.Data.SecondsInCurrentPhase.Should().Be(42);  // unchanged
         }
 
         [Fact(Skip = "Implementation not ready")]
         public void Else_ExecutesBranch_WhenAllGuardsFail()
         {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 0);
+            // If the controller can't satisfy the minimum-time guard, it can fall back to flashing-red
+            var initialData = new TrafficLightData(Light.Red, SecondsInCurrentPhase: 0);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var next)
                     .WhenStateIs(Light.Red)
-                    .If(data => data.CycleCount > 100, "Must complete at least 100 cycles")
-                    .Execute(data => data with { CycleCount = 999 })
+                    .If(data => data.SecondsInCurrentPhase >= 10, "Minimum red time (10s) not reached")
+                    .Execute(data => data with { SecondsInCurrentPhase = 0 })
                     .ThenTransitionTo(Light.Green)
                     .Else
-                    .Execute(data => data with { CycleCount = -1 })
-                    .ThenTransitionTo(Light.Off)
+                    .Execute(data => data with { SecondsInCurrentPhase = 0 })
+                    .ThenTransitionTo(Light.FlashingRed)
                 .Build(initialData);
 
             next.Trigger();
-            machine.State.Should().Be(Light.Off);
-            machine.Data.CycleCount.Should().Be(-1);
+            machine.State.Should().Be(Light.FlashingRed);
+            machine.Data.SecondsInCurrentPhase.Should().Be(0);
         }
 
         [Fact(Skip = "Implementation not ready")]
         public void RegardlessOfState_DataFul()
         {
-            var initialData = new TrafficLightData(Light.Green, CycleCount: 50);
+            // Emergency shutdown clears pending requests and resets timer
+            var initialData = new TrafficLightData(Light.Green, PedestrianWaiting: true, SecondsInCurrentPhase: 17);
 
             var machine = StateMachine.CreateBuilder<Light>()
                 .WithData<TrafficLightData>(d => d.Light)
                 .DefineEvent(out var shutdown)
                     .RegardlessOfState()
-                    .Execute(data => data with { CycleCount = 0 })
+                    .Execute(data => data with { PedestrianWaiting = false, SecondsInCurrentPhase = 0 })
                     .ThenTransitionTo(Light.Off)
                 .Build(initialData);
 
             shutdown.Trigger();
             machine.State.Should().Be(Light.Off);
-            machine.Data.CycleCount.Should().Be(0);
+            machine.Data.PedestrianWaiting.Should().BeFalse();
+            machine.Data.SecondsInCurrentPhase.Should().Be(0);
         }
 
         [Fact(Skip = "Implementation not ready")]
