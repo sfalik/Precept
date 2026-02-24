@@ -772,65 +772,6 @@ namespace StateMachine.Tests
         }
 
         [Fact(Skip = "Implementation not ready")]
-        public void ConditionalEvent_WithElseChain()
-        {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 0);
-
-            var machine = StateMachine.CreateBuilder<Light>()
-                .WithData<TrafficLightData>(d => d.Light)
-                .DefineEvent<int>(out var addCycles)
-                    .WhenStateIs(Light.Red)
-                    .If((data, count) => count > 0, "Cycle count must be positive")
-                    .And((data, count) => count < 100, "Cannot add more than 99 cycles at once")
-                        .Execute((data, count) => data with { CycleCount = data.CycleCount + count })
-                        .ThenTransitionTo(Light.Green)
-                    .Else
-                        .KeepSameState()
-                .Build(initialData);
-
-            addCycles.Trigger(10);
-            machine.State.Should().Be(Light.Green);
-            machine.Data.CycleCount.Should().Be(10);
-        }
-
-        [Fact(Skip = "Implementation not ready")]
-        public void And_CombinesMultipleGuards()
-        {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 10);
-
-            var machine = StateMachine.CreateBuilder<Light>()
-                .WithData<TrafficLightData>(d => d.Light)
-                .DefineEvent(out var next)
-                    .WhenStateIs(Light.Red)
-                    .If(data => data.CycleCount > 5, "Must complete at least 5 cycles")
-                    .And(data => data.CycleCount < 20, "Must have fewer than 20 cycles")
-                    .TransitionTo(Light.Green)
-                .Build(initialData);
-
-            next.Trigger();
-            machine.State.Should().Be(Light.Green);
-        }
-
-        [Fact(Skip = "Implementation not ready")]
-        public void And_SecondGuardFails_BranchFails()
-        {
-            var initialData = new TrafficLightData(Light.Red, CycleCount: 25);
-
-            var machine = StateMachine.CreateBuilder<Light>()
-                .WithData<TrafficLightData>(d => d.Light)
-                .DefineEvent(out var next)
-                    .WhenStateIs(Light.Red)
-                    .If(data => data.CycleCount > 5, "Must complete at least 5 cycles")
-                    .And(data => data.CycleCount < 20, "Must have fewer than 20 cycles")
-                    .TransitionTo(Light.Green)
-                .Build(initialData);
-
-            var act = () => next.Trigger();
-            act.Should().Throw<GuardFailedException>()
-                .Which.Reasons.Should().Contain("Must have fewer than 20 cycles");
-        }
-
-        [Fact(Skip = "Implementation not ready")]
         public void ParameterizedEvent_PassesArgToGuardAndTransform()
         {
             var initialData = new TrafficLightData(Light.Red, CycleCount: 0);

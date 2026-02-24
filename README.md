@@ -122,11 +122,10 @@ Events can have guard conditions that must pass before a transition is allowed. 
 .If((data, approval) => approval.ApprovedBy != data.CreatedBy, "Cannot self-approve")
 ```
 
-Multiple guards can be chained with `.And()`, and alternative branches with `.Else`:
+Alternative branches can be defined with `.Else`:
 
 ```csharp
 .If((data, time) => time > DateTime.Now, "Cannot start in the past")
-.And((data, time) => time.Year < 2040, "Cannot plan that far ahead")
     .Execute((data, time) => data with { ... })
     .ThenTransitionTo(Status.WorkStarted)
 .Else

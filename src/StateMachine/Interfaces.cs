@@ -273,13 +273,12 @@ namespace StateMachine
         ITransitionClause<TState, TData> AndKeepSameState();
     }
 
-    /// <summary>A guard condition is active — choose the guarded action or add more conditions</summary>
+    /// <summary>A guard condition is active — choose the guarded action</summary>
     public interface IIfClause<TState, TData>
         where TState : notnull, System.Enum
     {
         IIfTransitionClause<TState, TData> TransitionTo(TState state);
         IIfExecuteClause<TState, TData> Execute(Func<TData, TData> transform);
-        IIfClause<TState, TData> And(Func<TData, bool> guard, string reason);
     }
 
     /// <summary>
@@ -344,13 +343,12 @@ namespace StateMachine
         ITransitionClause<TState, TData, TArg> AndKeepSameState();
     }
 
-    /// <summary>A guard is active on a parameterized event — choose action or add more conditions</summary>
+    /// <summary>A guard is active on a parameterized event — choose action</summary>
     public interface IIfClause<TState, TData, TArg>
         where TState : notnull, System.Enum
     {
         IIfTransitionClause<TState, TData, TArg> TransitionTo(TState state);
         IIfExecuteClause<TState, TData, TArg> Execute(Func<TData, TArg, TData> transform);
-        IIfClause<TState, TData, TArg> And(Func<TData, TArg, bool> guard, string reason);
     }
 
     /// <summary>
