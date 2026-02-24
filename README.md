@@ -13,7 +13,7 @@ This library takes a different approach: **the state machine owns the data**. Bu
 ### What This Enables
 
 - **Business objects as state machines**: A work order, insurance claim, or loan application can be fully represented as a state machine with co-located data. The machine enforces what can happen, when, and how data changes as a result.
-- **Deterministic transitions**: The outcome of any event can be evaluated before firing it (via `CanHandle()`). Guards are pure functions of the current data and event arguments — no hidden external state.
+- **Deterministic transitions**: The outcome of any event can be evaluated before firing it (via `Inspect(...)`). Guards are pure functions of the current data and event arguments — no hidden external state.
 - **Trivial persistence**: Since the entire machine state is one record, saving and restoring is just serializing/deserializing a single object. No separate "state" column plus "data" blob.
 - **Audit trail by design**: Because each transition produces a new immutable record, keeping a history of transitions (with before/after snapshots) is trivial. Subscribe to `DataTransitioned` and you get full replay capability.
 - **Testable business logic**: Guard conditions and data transforms are pure functions — they can be unit tested in isolation without constructing a state machine.
@@ -31,7 +31,7 @@ This library treats a state machine as a **typed reducer** — each transition p
 - **Sequential enum constraint**: The `TState` enum must be contiguous and zero-based (e.g., `Off, Red, Green, Yellow` → 0, 1, 2, 3). This is validated once at build time, and enum values are then cast directly to `int` for O(1) array indexing with no boxing or lookup. Sparse or `[Flags]` enums are rejected immediately with a clear error message.
 - **Sealed after build**: States and events cannot be added after construction. This enables a lightweight array-based transition table using enum ordinals for O(1) transition lookup — the same efficient data structure used in classical finite state machine implementations.
 - **Thread-safe after build**: The built machine uses `lock` to ensure transitions are atomic (read state → evaluate guards → run transform → set new data). The builder itself is not thread-safe and is discarded after `Build()`.
-- **Fail-fast**: Calling a trigger delegate in an undefined state throws `InvalidTransitionException`. Guards that all fail throw `GuardFailedException` with aggregated reason strings. Use `CanHandle()` for safe pre-checks.
+- **Fail-fast**: Calling a trigger delegate in an undefined state throws `InvalidTransitionException`. Guards that all fail throw `GuardFailedException` with aggregated reason strings. Use `Inspect(...)` for safe pre-checks.
 - **Live delegate events**: `On(out var approve)` captures the event name via `CallerArgumentExpression` and returns a live `Action` (or `Action<TArg>`) delegate bound to the machine. Call it directly — `approve()` / `approve(arg)` — no string-based lookup, no descriptors, fully typed.
 
 ### What the Machine Can Answer
@@ -133,40 +133,72 @@ Alternative branches can be defined with `.Else`:
     .KeepSameState()
 ```
 
-Every guard requires a reason string — this ensures that when a trigger is rejected, the caller always receives an explanation via the `out` reasons list.
+Every guard requires a reason string — this ensures that when a trigger is rejected, the caller always receives an explanation via `inspection.Reasons`.
 
-### Pre-Check with CanHandle / TryHandle
+### Pre-Check with Inspect (Fluent)
 
-`CanHandle` evaluates guards without firing the transition (dry-run), making the state machine **deterministic** — the outcome of any event can be inspected ahead of time:
+`Inspect` evaluates definition + guards without firing the transition (dry-run), making the state machine **deterministic** — the outcome of any event can be inspected ahead of time:
 
 ```csharp
 var arg = new Approval("Manager", DateTime.Now);
-if (machine.CanHandle(approve, arg, out var nextState, out var reasons))
-{
-    approve(arg);
-    // machine.State == nextState
-}
-else
-{
-    Console.WriteLine(string.Join(", ", reasons));
-    // "Cannot approve your own work orders"
-}
+machine.Inspect(approve, arg)
+    .IfAccepted(nextState => Console.WriteLine($"Will transition to {nextState}"))
+    .Fire()
+    .Else(reasons => Console.WriteLine(string.Join(", ", reasons)));
 ```
 
-`CanHandle` is a best-effort check — state could change between the check and the invocation in concurrent scenarios. For atomic check-and-fire in concurrent code, use `TryHandle`:
+`Inspect(trigger, arg)` evaluates both definition and guards in one call. Use it whenever the argument is already available.
+
+Use `Inspect(trigger)` (no argument) when you need to **branch on definition before building the argument** — for example when the argument is expensive to construct:
 
 ```csharp
-if (machine.TryHandle(approve, arg, out var reasons))
-{
-    // transition fired atomically — guards were evaluated inside the lock
-}
-else
-{
-    Console.WriteLine(string.Join(", ", reasons));
-}
+machine.Inspect(approve)
+    .IfDefined(() => Console.WriteLine("approve is valid in current state"))
+    .Else(() => Console.WriteLine("approve is not valid in current state"))
+    .WithArg(BuildExpensiveApproval()) // only evaluated if IsDefined is true
+        .IfAccepted(() => Audit("approved"))
+        .Fire()
+        .Else(reasons => Console.WriteLine(string.Join(", ", reasons)));
 ```
 
-Both methods always assign their `out` parameters. `CanHandle` assigns the resolved target state on acceptance, or the current state on rejection. `TryHandle` assigns an empty list on success, or guard failure messages on rejection.
+`WithArg(...)` is the bridge from definition-only inspection to full guard evaluation — it transitions the chain from `PartialEventInspection` to `EventInspection`. Without `IfDefined`/`IfNotDefined` branching before it, prefer `Inspect(trigger, arg)` directly.
+
+`Inspect` is still a pre-check. In concurrent scenarios, state may change between `Inspect()` and `Fire()`. In that case `Fire()` throws `StaleStateException`.
+
+### When to Use Fluent Inspect vs Direct Trigger
+
+Use **fluent `Inspect(...)`** when your caller needs explicit accepted/rejected handling, rejection reasons, or definition checks before providing a parameterized argument.
+
+Use **direct trigger invocation** (`approve(arg)`, `submit()`) when your flow already assumes success and should fail fast via exceptions (`InvalidTransitionException`, `GuardFailedException`).
+
+Practical rule of thumb:
+
+- **Use `Inspect(...).IfAccepted(...).Fire().Else(...)`** in API endpoints, UI command handlers, or orchestration code where rejected transitions are part of normal control flow.
+- **Use direct trigger calls** in internal application paths where a rejected transition is considered a bug or invariant violation.
+- **Use `Inspect(trigger, arg)`** when the argument is already available — this evaluates both definition and guards in one call.
+- **Use `Inspect(trigger).IfDefined(...).Else(...).WithArg(arg)`** only when argument construction is expensive and you want to gate it behind the definition check.
+
+Example comparison:
+
+```csharp
+// Fluent inspect (expected rejection path — argument already available)
+machine.Inspect(approve, approval)
+    .IfAccepted(() => Audit("approved"))
+    .Fire()
+    .Else(reasons => Audit($"rejected: {string.Join(", ", reasons)}"));
+
+// Fluent inspect with definition check first (argument expensive to build)
+machine.Inspect(approve)
+    .IfDefined(() => { /* e.g. log or update UI */ })
+    .Else(() => return Results.Conflict("approve not available in current state"))
+    .WithArg(BuildExpensiveApproval())
+        .IfAccepted(() => Audit("approved"))
+        .Fire()
+        .Else(reasons => Audit($"rejected: {string.Join(", ", reasons)}"));
+
+// Direct trigger (fail-fast invariant)
+approve(approval);
+```
 
 ### Transition Observation
 
@@ -286,6 +318,7 @@ This keeps the state machine purely synchronous while the saga layer handles asy
 | Transform semantics | Pure: `(TData) => TData` | Testable, no hidden dependencies |
 | Transform vs state order | Transform first, then state change | If transform throws, nothing changes |
 | Thread safety | `lock` around full transition; sealed after build | Sync transforms keep it simple; O(1) array lookup |
+| Pre-check API | `Inspect(...)` fluent chain | Clear accepted/rejected flow, explicit reasons, optional `Fire()` |
 | Async events | Not supported | Pure transforms are synchronous; async side effects go in observers |
 | Side effects | Via `Transitioned` / `DataTransitioned` observation events | Keeps transforms pure, decouples concerns |
 | Guard reasons | Required on every guard | Ensures rejected events always explain why |
@@ -306,6 +339,7 @@ The closest analogue is **XState** in the JavaScript ecosystem. This library bri
 ```
 src/StateMachine/
     Interfaces.cs          — Public interfaces, event types, exceptions, fluent builder contracts
+    Inspection.cs          — Inspect API chain types (`EventInspection`, `AcceptedChain`, etc.)
     StateMachine.cs        — Entry point, machine implementations, builder stubs
     FiniteStateMachine.cs  — Legacy implementation (two type parameters: TState + TEvent)
     IStateful.cs           — Legacy interface
