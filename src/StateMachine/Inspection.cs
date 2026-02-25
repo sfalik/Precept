@@ -37,6 +37,12 @@ namespace StateMachine
             FireAction = fireAction;
         }
 
+        /// <summary>
+        /// Proceed down the accepted branch without registering a callback.
+        /// Enables Fire() on the returned chain.
+        /// </summary>
+        public AcceptedChain<TState> IfAccepted() => new AcceptedChain<TState>(this);
+
         /// <summary>Register a callback to run if the event was accepted. Enables Fire() on the returned chain.</summary>
         public AcceptedChain<TState> IfAccepted(Action<TState> handler)
         {

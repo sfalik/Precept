@@ -92,17 +92,17 @@ namespace StateMachine
 
         public event Action<TransitionedEventArgs<TState>>? Transitioned;
 
-        public EventInspection<TState> Inspect(Action trigger)
+        public EventInspection<TState> Inspect(Event<TState> trigger)
         {
             throw new NotImplementedException();
         }
 
-        public EventInspection<TState> Inspect<TArg>(Action<TArg> trigger, TArg arg)
+        public EventInspection<TState> Inspect<TArg>(Event<TState, TArg> trigger, TArg arg)
         {
             throw new NotImplementedException();
         }
 
-        public PartialEventInspection<TState, TArg> Inspect<TArg>(Action<TArg> trigger)
+        public PartialEventInspection<TState, TArg> Inspect<TArg>(Event<TState, TArg> trigger)
         {
             throw new NotImplementedException();
         }
@@ -164,17 +164,17 @@ namespace StateMachine
         public event Action<TransitionedEventArgs<TState>>? Transitioned;
         public event Action<DataTransitionedEventArgs<TState, TData>>? DataTransitioned;
 
-        public EventInspection<TState> Inspect(Action trigger)
+        public EventInspection<TState> Inspect(Event<TState> trigger)
         {
             throw new NotImplementedException();
         }
 
-        public EventInspection<TState> Inspect<TArg>(Action<TArg> trigger, TArg arg)
+        public EventInspection<TState> Inspect<TArg>(Event<TState, TArg> trigger, TArg arg)
         {
             throw new NotImplementedException();
         }
 
-        public PartialEventInspection<TState, TArg> Inspect<TArg>(Action<TArg> trigger)
+        public PartialEventInspection<TState, TArg> Inspect<TArg>(Event<TState, TArg> trigger)
         {
             throw new NotImplementedException();
         }
@@ -219,13 +219,13 @@ namespace StateMachine
     internal class StateMachineBuilder<TState> : IStateMachineBuilder<TState>
         where TState : notnull, System.Enum
     {
-        public IStateMachine<TState> Build(TState initialState)
+        public IStateMachineTemplate<TState> Build()
         {
             throw new NotImplementedException();
         }
 
         public IEventBuilder<TState> On(
-            out Action trigger,
+            out Event<TState> trigger,
             [CallerArgumentExpression("trigger")] string? name = null)
         {
             throw new NotImplementedException();
@@ -252,20 +252,20 @@ namespace StateMachine
             _stateSelector = stateSelector;
         }
 
-        public IStateMachine<TState, TData> Build(TData initialData)
+        public IStateMachineTemplate<TState, TData> Build()
         {
             throw new NotImplementedException();
         }
 
         public IEventBuilder<TState, TData> On(
-            out Action trigger,
+            out Event<TState> trigger,
             [CallerArgumentExpression("trigger")] string? name = null)
         {
             throw new NotImplementedException();
         }
 
         public IEventBuilder<TState, TData, TArg> On<TArg>(
-            out Action<TArg> trigger,
+            out Event<TState, TArg> trigger,
             [CallerArgumentExpression("trigger")] string? name = null)
         {
             throw new NotImplementedException();

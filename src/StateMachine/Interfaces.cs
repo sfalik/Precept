@@ -6,6 +6,32 @@ using System.Runtime.CompilerServices;
 namespace StateMachine
 {
     // ═══════════════════════════════════════════════════════════════════
+    // Event Tokens (new API)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// A strongly-typed, template-owned event token (no arguments).
+    /// Use it with <see cref="IStateMachine{TState}.Inspect(Event{TState})"/>.
+    /// </summary>
+    public sealed class Event<TState> : IEvent where TState : notnull, System.Enum
+    {
+        internal Event(string name) => Name = name;
+        public string Name { get; }
+        public override string ToString() => Name;
+    }
+
+    /// <summary>
+    /// A strongly-typed, template-owned event token (with an argument).
+    /// Use it with <see cref="IStateMachine{TState}.Inspect(Event{TState, TArg})"/>.
+    /// </summary>
+    public sealed class Event<TState, TArg> : IEvent where TState : notnull, System.Enum
+    {
+        internal Event(string name) => Name = name;
+        public string Name { get; }
+        public override string ToString() => Name;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // State Machine Interfaces (the built result)
     // ═══════════════════════════════════════════════════════════════════
 
@@ -25,24 +51,24 @@ namespace StateMachine
         IReadOnlyList<IEvent> Events { get; }
 
         /// <summary>
-        /// Evaluate a trigger against the current state — definition check and guard evaluation —
+        /// Evaluate an event against the current state — definition check and guard evaluation —
         /// without committing a transition.
         /// Returns an <see cref="EventInspection{TState}"/> whose fluent chain leads to Fire().
         /// </summary>
-        EventInspection<TState> Inspect(Action trigger);
+        EventInspection<TState> Inspect(Event<TState> trigger);
 
         /// <summary>
-        /// Evaluate a parameterized trigger with a known argument against the current state.
+        /// Evaluate a parameterized event with a known argument against the current state.
         /// Returns an <see cref="EventInspection{TState}"/> whose fluent chain leads to Fire().
         /// </summary>
-        EventInspection<TState> Inspect<TArg>(Action<TArg> trigger, TArg arg);
+        EventInspection<TState> Inspect<TArg>(Event<TState, TArg> trigger, TArg arg);
 
         /// <summary>
-        /// Inspect a parameterized trigger without providing an argument — definition check only,
+        /// Inspect a parameterized event without providing an argument — definition check only,
         /// no guard evaluation. Call <see cref="PartialEventInspection{TState, TArg}.WithArg"/> to
         /// progress to full guard evaluation.
         /// </summary>
-        PartialEventInspection<TState, TArg> Inspect<TArg>(Action<TArg> trigger);
+        PartialEventInspection<TState, TArg> Inspect<TArg>(Event<TState, TArg> trigger);
 
         /// <summary>
         /// Raised after every successful state transition.
@@ -179,15 +205,31 @@ namespace StateMachine
 
     #region Data-Less Builder
 
+    /// <summary>
+    /// Immutable, built template for a data-less state machine.
+    /// Create many instances from the same template.
+    /// </summary>
+    public interface IStateMachineTemplate<TState> where TState : notnull, System.Enum
+    {
+        IReadOnlyList<TState> States { get; }
+        IReadOnlyList<IEvent> Events { get; }
+        IStateMachine<TState> CreateInstance(TState initialState);
+    }
+
     /// <summary>Builder for a data-less state machine that only tracks state transitions</summary>
     public interface IStateMachineBuilder<TState> where TState : notnull, System.Enum
     {
-        /// <summary>Build the state machine with the given initial state</summary>
-        IStateMachine<TState> Build(TState initialState);
+        /// <summary>
+        /// Build an immutable template. Use <see cref="IStateMachineTemplate{TState}.CreateInstance"/>
+        /// to create one or more runtime instances.
+        /// </summary>
+        IStateMachineTemplate<TState> Build();
 
-        /// <summary>Define a new event with no arguments. The out Action delegate can be invoked directly to fire the event.</summary>
+        /// <summary>
+        /// Define a new event token (no arguments). The out value is used with Inspect().
+        /// </summary>
         IEventBuilder<TState> On(
-            out Action trigger,
+            out Event<TState> trigger,
             [CallerArgumentExpression("trigger")] string? name = null);
 
         /// <summary>
@@ -228,20 +270,33 @@ namespace StateMachine
 
     #region Data-Ful Builder — Simple Events (no TArg)
 
+    /// <summary>
+    /// Immutable, built template for a data-ful state machine.
+    /// Create many instances from the same template.
+    /// </summary>
+    public interface IStateMachineTemplate<TState, TData> : IStateMachineTemplate<TState>
+        where TState : notnull, System.Enum
+    {
+        IStateMachine<TState, TData> CreateInstance(TData initialData);
+    }
+
     /// <summary>Builder for a data-ful state machine that manages both state and immutable data</summary>
     public interface IStateMachineBuilder<TState, TData> where TState : notnull, System.Enum
     {
-        /// <summary>Build the state machine with the given initial data (which includes the initial state)</summary>
-        IStateMachine<TState, TData> Build(TData initialData);
+        /// <summary>
+        /// Build an immutable template. Use <see cref="IStateMachineTemplate{TState, TData}.CreateInstance"/>
+        /// to create one or more runtime instances.
+        /// </summary>
+        IStateMachineTemplate<TState, TData> Build();
 
-        /// <summary>Define a synchronous event with no arguments. The out Action delegate can be invoked directly to fire the event.</summary>
+        /// <summary>Define an event token with no arguments.</summary>
         IEventBuilder<TState, TData> On(
-            out Action trigger,
+            out Event<TState> trigger,
             [CallerArgumentExpression("trigger")] string? name = null);
 
-        /// <summary>Define a synchronous event with a typed argument. The out Action&lt;TArg&gt; delegate can be invoked directly to fire the event.</summary>
+        /// <summary>Define an event token with a typed argument.</summary>
         IEventBuilder<TState, TData, TArg> On<TArg>(
-            out Action<TArg> trigger,
+            out Event<TState, TArg> trigger,
             [CallerArgumentExpression("trigger")] string? name = null);
     }
 

@@ -31,8 +31,8 @@ This library treats a state machine as a **typed reducer** — each transition p
 - **Sequential enum constraint**: The `TState` enum must be contiguous and zero-based (e.g., `Off, Red, Green, Yellow` → 0, 1, 2, 3). This is validated once at build time, and enum values are then cast directly to `int` for O(1) array indexing with no boxing or lookup. Sparse or `[Flags]` enums are rejected immediately with a clear error message.
 - **Sealed after build**: States and events cannot be added after construction. This enables a lightweight array-based transition table using enum ordinals for O(1) transition lookup — the same efficient data structure used in classical finite state machine implementations.
 - **Thread-safe after build**: The built machine uses `lock` to ensure transitions are atomic (read state → evaluate guards → run transform → set new data). The builder itself is not thread-safe and is discarded after `Build()`.
-- **Fail-fast**: Calling a trigger delegate in an undefined state throws `InvalidTransitionException`. Guards that all fail throw `GuardFailedException` with aggregated reason strings. Use `Inspect(...)` for safe pre-checks.
-- **Live delegate events**: `On(out var approve)` captures the event name via `CallerArgumentExpression` and returns a live `Action` (or `Action<TArg>`) delegate bound to the machine. Call it directly — `approve()` / `approve(arg)` — no string-based lookup, no descriptors, fully typed.
+- **Template-first model**: `Build()` produces an immutable template that can stamp out many instances via `CreateInstance(...)`.
+- **Event tokens**: `On(out var approve)` captures the event name via `CallerArgumentExpression` and returns a strongly-typed event token that you pass to `Inspect(...)`.
 
 ### What the Machine Can Answer
 
@@ -59,9 +59,10 @@ var machine = StateMachine.CreateBuilder<TrafficLight>()
         .TransitionTo(TrafficLight.Yellow)
         .WhenStateIs(TrafficLight.Yellow)
         .TransitionTo(TrafficLight.Red)
-    .Build(TrafficLight.Red);
+    .Build()
+    .CreateInstance(TrafficLight.Red);
 
-next();
+machine.Inspect(next).IfAccepted().Fire();
 // machine.State == TrafficLight.Green
 ```
 
@@ -105,10 +106,11 @@ var machine = StateMachine.CreateBuilder<Status>()
         .RegardlessOfState()
         .TransitionTo(Status.Cancelled)
 
-    .Build(new WorkOrderData(Status.New, "Shane Falik", DateTime.Now));
+    .Build()
+    .CreateInstance(new WorkOrderData(Status.New, "Shane Falik", DateTime.Now));
 
-// Invoke the Action delegates returned via 'out' directly
-markAsPlanned();
+// Use the event tokens returned via 'out' with Inspect(...)
+machine.Inspect(markAsPlanned).IfAccepted().Fire();
 // machine.State == Status.Planned
 // machine.Data == WorkOrderData { State = Planned, ... }
 ```
@@ -165,40 +167,15 @@ machine.Inspect(approve)
 
 `Inspect` is still a pre-check. In concurrent scenarios, state may change between `Inspect()` and `Fire()`. In that case `Fire()` throws `StaleStateException`.
 
-### When to Use Fluent Inspect vs Direct Trigger
+### When to Use Inspect
 
 Use **fluent `Inspect(...)`** when your caller needs explicit accepted/rejected handling, rejection reasons, or definition checks before providing a parameterized argument.
-
-Use **direct trigger invocation** (`approve(arg)`, `submit()`) when your flow already assumes success and should fail fast via exceptions (`InvalidTransitionException`, `GuardFailedException`).
 
 Practical rule of thumb:
 
 - **Use `Inspect(...).IfAccepted(...).Fire().Else(...)`** in API endpoints, UI command handlers, or orchestration code where rejected transitions are part of normal control flow.
-- **Use direct trigger calls** in internal application paths where a rejected transition is considered a bug or invariant violation.
 - **Use `Inspect(trigger, arg)`** when the argument is already available — this evaluates both definition and guards in one call.
 - **Use `Inspect(trigger).IfDefined(...).Else(...).WithArg(arg)`** only when argument construction is expensive and you want to gate it behind the definition check.
-
-Example comparison:
-
-```csharp
-// Fluent inspect (expected rejection path — argument already available)
-machine.Inspect(approve, approval)
-    .IfAccepted(() => Audit("approved"))
-    .Fire()
-    .Else(reasons => Audit($"rejected: {string.Join(", ", reasons)}"));
-
-// Fluent inspect with definition check first (argument expensive to build)
-machine.Inspect(approve)
-    .IfDefined(() => { /* e.g. log or update UI */ })
-    .Else(() => return Results.Conflict("approve not available in current state"))
-    .WithArg(BuildExpensiveApproval())
-        .IfAccepted(() => Audit("approved"))
-        .Fire()
-        .Else(reasons => Audit($"rejected: {string.Join(", ", reasons)}"));
-
-// Direct trigger (fail-fast invariant)
-approve(approval);
-```
 
 ### Transition Observation
 
@@ -220,7 +197,7 @@ machine.DataTransitioned += args =>
 };
 ```
 
-Callbacks fire inside the transition lock, so they see consistent state but should be fast and non-blocking. Long-running work (sending emails, calling APIs) should be queued from the callback, not performed inline.
+Callbacks fire after the transition commits. Treat the event args as the authoritative snapshot; handlers should be fast and non-blocking. Long-running work (sending emails, calling APIs) should be queued from the callback, not performed inline.
 
 ### Immutability Guarantees
 
@@ -272,7 +249,8 @@ var machine = StateMachine.CreateBuilder<Status>()
         .WhenStateIs(Status.Validated)
         .TransitionTo(Status.Rejected)
 
-    .Build(new WorkOrder(Status.Draft, "Install HVAC"));
+    .Build()
+    .CreateInstance(new WorkOrder(Status.Draft, "Install HVAC"));
 ```
 
 The orchestrator (a background service, message handler, or saga coordinator) drives the workflow by subscribing to observation events and firing the next event when the async work completes:
@@ -288,18 +266,18 @@ machine.DataTransitioned += args =>
             try
             {
                 var result = await externalValidator.ValidateAsync(args.NewData);
-                validationSucceeded(result);
+                machine.Inspect(validationSucceeded, result).IfAccepted().Fire();
             }
             catch (Exception ex)
             {
-                validationFailed(ex.Message);
+                machine.Inspect(validationFailed, ex.Message).IfAccepted().Fire();
             }
         });
     }
 };
 
 // Start the workflow
-submit();
+machine.Inspect(submit).IfAccepted().Fire();
 ```
 
 This keeps the state machine purely synchronous while the saga layer handles async coordination. Each pending state is explicitly visible in the state enum, making it easy to query, persist, and resume workflows.
@@ -308,11 +286,11 @@ This keeps the state machine purely synchronous while the saga layer handles asy
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Instance model | Per-instance build with live `out` parameters | Simple, no descriptors or indirection |
+| Instance model | Build immutable template, then stamp instances | Define once; create many identical machines |
 | Data ownership | Machine owns immutable `TData` record | Prevents external mutation, trivial serialization |
 | State location | Property on `TData`, identified by expression selector | Single source of truth |
-| Undefined transition | Throw `InvalidTransitionException` | Silent no-ops hide bugs |
-| All guards fail without Else | Throw `GuardFailedException` with reasons | Provides actionable feedback |
+| Undefined transition | `Inspect(...)` rejects (`IsDefined == false`) | Lets callers handle invalid events as control flow |
+| All guards fail without Else | `Inspect(...)` rejects with aggregated reasons | Provides actionable feedback |
 | Build-time validation | Error on empty events and duplicate transitions | Catch construction mistakes early |
 | Enum constraint | `TState` must be contiguous and zero-based | Enables direct cast to `int` for O(1) array indexing — no `Array.IndexOf`, no boxing |
 | Transform semantics | Pure: `(TData) => TData` | Testable, no hidden dependencies |
