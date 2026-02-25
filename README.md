@@ -150,19 +150,32 @@ machine.Inspect(approve)
     .Else(reasons => Console.WriteLine(string.Join(", ", reasons)));
 ```
 
-Use `Inspect(trigger)` (no argument) when you need to **branch on definition before building the argument** — for example when the argument is expensive to construct:
+Use `Inspect(trigger)` (no argument) when you need to **branch on definition** to run side effects before providing the argument:
 
 ```csharp
 machine.Inspect(approve)
     .IfDefined(() => Console.WriteLine("approve is valid in current state"))
     .Else(() => Console.WriteLine("approve is not valid in current state"))
-    .WithArg(BuildExpensiveApproval()) // only evaluated if IsDefined is true
+    .WithArg(approval)
         .IfAccepted(() => Audit("approved"))
         .Fire()
         .Else(reasons => Console.WriteLine(string.Join(", ", reasons)));
 ```
 
-    `WithArg(...)` is the bridge from definition-only inspection to full guard evaluation — it transitions the chain from `PartialEventInspection` to `EventInspection`.
+`WithArg(...)` is the bridge from definition-only inspection to full guard evaluation — it transitions the chain from `PartialEventInspection` to `EventInspection`. Note that `WithArg(TArg)` takes an already-evaluated value; C# evaluates method arguments eagerly, so the argument is always constructed before `WithArg` is called.
+
+When argument construction is expensive, check `IsDefined` directly and build the argument only if needed:
+
+```csharp
+var partial = machine.Inspect(approve);
+if (partial.IsDefined)
+{
+    partial.WithArg(BuildExpensiveApproval())
+        .IfAccepted(() => Audit("approved"))
+        .Fire()
+        .Else(reasons => Console.WriteLine(string.Join(", ", reasons)));
+}
+```
 
 `Inspect` is still a pre-check. In concurrent scenarios, state may change between `Inspect()` and `Fire()`. In that case `Fire()` throws `StaleStateException`.
 
@@ -174,7 +187,7 @@ Practical rule of thumb:
 
 - **Use `Inspect(...).IfAccepted(...).Fire().Else(...)`** in API endpoints, UI command handlers, or orchestration code where rejected transitions are part of normal control flow.
 - **Use `Inspect(trigger).WithArg(arg)`** when the argument is already available — this evaluates definition then guards in a single fluent flow.
-- **Use `Inspect(trigger).IfDefined(...).Else(...).WithArg(arg)`** when argument construction is expensive and you want to gate it behind the definition check.
+- **Check `Inspect(trigger).IsDefined` directly** when argument construction is expensive — build the argument only if `IsDefined` is true, then call `WithArg(...)`. `WithArg(TArg)` is an eager parameter and does not defer construction.
 
 ### Transition Observation
 
