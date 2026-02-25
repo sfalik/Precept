@@ -1392,7 +1392,7 @@ namespace StateMachine.Tests
                 throw new NullReferenceException("Subject should not be null");
             }
 
-            return Subject.Inspect(trigger, arg);
+            return Subject.Inspect(trigger).WithArg(arg);
         }
     }
 

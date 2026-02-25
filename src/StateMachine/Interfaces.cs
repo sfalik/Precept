@@ -22,7 +22,8 @@ namespace StateMachine
 
     /// <summary>
     /// A strongly-typed, template-owned event token (with an argument).
-    /// Use it with <see cref="IStateMachine{TState}.Inspect(Event{TState, TArg})"/>.
+    /// Use it with <see cref="IStateMachine{TState}.Inspect{TArg}(Event{TState, TArg})"/>
+    /// and then <c>WithArg(...)</c>.
     /// </summary>
     public sealed class Event<TState, TArg> : IEvent where TState : notnull, System.Enum
     {
@@ -56,12 +57,6 @@ namespace StateMachine
         /// Returns an <see cref="EventInspection{TState}"/> whose fluent chain leads to Fire().
         /// </summary>
         EventInspection<TState> Inspect(Event<TState> trigger);
-
-        /// <summary>
-        /// Evaluate a parameterized event with a known argument against the current state.
-        /// Returns an <see cref="EventInspection{TState}"/> whose fluent chain leads to Fire().
-        /// </summary>
-        EventInspection<TState> Inspect<TArg>(Event<TState, TArg> trigger, TArg arg);
 
         /// <summary>
         /// Inspect a parameterized event without providing an argument — definition check only,

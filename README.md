@@ -143,13 +143,12 @@ Every guard requires a reason string — this ensures that when a trigger is rej
 
 ```csharp
 var arg = new Approval("Manager", DateTime.Now);
-machine.Inspect(approve, arg)
+machine.Inspect(approve)
+    .WithArg(arg)
     .IfAccepted(nextState => Console.WriteLine($"Will transition to {nextState}"))
     .Fire()
     .Else(reasons => Console.WriteLine(string.Join(", ", reasons)));
 ```
-
-`Inspect(trigger, arg)` evaluates both definition and guards in one call. Use it whenever the argument is already available.
 
 Use `Inspect(trigger)` (no argument) when you need to **branch on definition before building the argument** — for example when the argument is expensive to construct:
 
@@ -163,7 +162,7 @@ machine.Inspect(approve)
         .Else(reasons => Console.WriteLine(string.Join(", ", reasons)));
 ```
 
-`WithArg(...)` is the bridge from definition-only inspection to full guard evaluation — it transitions the chain from `PartialEventInspection` to `EventInspection`. Without `IfDefined`/`IfNotDefined` branching before it, prefer `Inspect(trigger, arg)` directly.
+    `WithArg(...)` is the bridge from definition-only inspection to full guard evaluation — it transitions the chain from `PartialEventInspection` to `EventInspection`.
 
 `Inspect` is still a pre-check. In concurrent scenarios, state may change between `Inspect()` and `Fire()`. In that case `Fire()` throws `StaleStateException`.
 
@@ -174,8 +173,8 @@ Use **fluent `Inspect(...)`** when your caller needs explicit accepted/rejected 
 Practical rule of thumb:
 
 - **Use `Inspect(...).IfAccepted(...).Fire().Else(...)`** in API endpoints, UI command handlers, or orchestration code where rejected transitions are part of normal control flow.
-- **Use `Inspect(trigger, arg)`** when the argument is already available — this evaluates both definition and guards in one call.
-- **Use `Inspect(trigger).IfDefined(...).Else(...).WithArg(arg)`** only when argument construction is expensive and you want to gate it behind the definition check.
+- **Use `Inspect(trigger).WithArg(arg)`** when the argument is already available — this evaluates definition then guards in a single fluent flow.
+- **Use `Inspect(trigger).IfDefined(...).Else(...).WithArg(arg)`** when argument construction is expensive and you want to gate it behind the definition check.
 
 ### Transition Observation
 
@@ -266,11 +265,11 @@ machine.DataTransitioned += args =>
             try
             {
                 var result = await externalValidator.ValidateAsync(args.NewData);
-                machine.Inspect(validationSucceeded, result).IfAccepted().Fire();
+                machine.Inspect(validationSucceeded).WithArg(result).IfAccepted().Fire();
             }
             catch (Exception ex)
             {
-                machine.Inspect(validationFailed, ex.Message).IfAccepted().Fire();
+                machine.Inspect(validationFailed).WithArg(ex.Message).IfAccepted().Fire();
             }
         });
     }

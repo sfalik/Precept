@@ -97,11 +97,6 @@ namespace StateMachine
             throw new NotImplementedException();
         }
 
-        public EventInspection<TState> Inspect<TArg>(Event<TState, TArg> trigger, TArg arg)
-        {
-            throw new NotImplementedException();
-        }
-
         public PartialEventInspection<TState, TArg> Inspect<TArg>(Event<TState, TArg> trigger)
         {
             throw new NotImplementedException();
@@ -165,11 +160,6 @@ namespace StateMachine
         public event Action<DataTransitionedEventArgs<TState, TData>>? DataTransitioned;
 
         public EventInspection<TState> Inspect(Event<TState> trigger)
-        {
-            throw new NotImplementedException();
-        }
-
-        public EventInspection<TState> Inspect<TArg>(Event<TState, TArg> trigger, TArg arg)
         {
             throw new NotImplementedException();
         }
