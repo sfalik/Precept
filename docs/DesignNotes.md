@@ -4,11 +4,13 @@ Date: 2026-02-24
 
 This document captures architecture decisions agreed during design review, to guide upcoming implementation work.
 
-## 1) Legacy Removal
+## 1) Legacy FSM Status (Design Phase)
 
-- Remove legacy finite-state implementation and tests.
-- No compatibility window is required.
-- Maintain one canonical architecture only.
+- `FiniteStateMachine` is intentionally retained during design and implementation of the new fluent `StateMachine` API.
+- Purpose: provide a working reference implementation while building the new runtime.
+- Scope: internal development aid only (not public, not used by external consumers).
+- Policy: do not remove legacy code until the new implementation is functionally complete and validated by tests.
+- Compatibility and migration concerns are out of scope for this phase.
 
 ## 2) Template / Instance Split
 
@@ -25,9 +27,9 @@ This document captures architecture decisions agreed during design review, to gu
 
 ## 4) Event Definitions
 
-- Use typed event definitions captured in `On(...)`:
-  - `EventDef`
-  - `EventDef<TArg>`
+- Use typed event tokens captured in `On(...)`:
+  - `Event<TState>`
+  - `Event<TState, TArg>`
 - Do not capture instance-bound delegates at build time.
 
 ## 5) Fluent Inspect / Fire Contract
@@ -41,26 +43,35 @@ Preserve current chain semantics:
 
 Guard-validation gate remains mandatory before `Fire()`.
 
-## 6) Stale Detection
+## 6) Concurrency Model
 
-- Data-ful inspections capture both:
-  - observed data record reference
-  - observed state
-- Data-less inspections capture:
-  - observed state
-- `Fire()` validates against current instance snapshot and throws `StaleStateException` on mismatch.
+- The new fluent `StateMachine` runtime is non-thread-safe per instance.
+- Concurrent calls against the same machine instance are not supported.
+- Callers must provide external synchronization or serialization if cross-thread use is required.
+- Transition semantics are defined for single-threaded access only.
+- No stale-state revalidation contract is required in fluent APIs for this phase.
 
-## 7) Inspection Chain Types
+TODO: Revisit an optional thread-safe mode only after core runtime behavior is complete.
 
-- Use classes, not structs.
-- Avoid default-value silent behavior.
-- Fail fast on invalid chain usage.
+## 7) Inspection Chain Representation
 
-## 8) Locking + Event Dispatch
+- Current design uses lightweight `readonly struct` wrappers for the fluent inspection chain.
+- This matches the current scaffold in `Inspection.cs` and keeps design and implementation aligned during development.
 
-- Perform transition state/data mutation under lock.
-- Build transition event args under lock.
-- Release lock before invoking observers.
+Planned chain forms include:
+
+- `Inspection<TState>` / `Inspection<TState, TArg>`
+- `Defined<TState>` / `Defined<TState, TArg>`
+- `Accepted<TState>` / `Accepted<TState, TArg>`
+- `Rejected<TState>` / `Rejected<TState, TArg>`
+
+TODO: Re-evaluate whether class-based chain nodes would be safer or clearer than structs. Compare copy semantics, default-value hazards, API misuse resistance, and allocation/perf impact before finalizing runtime implementation.
+
+## 8) Event Dispatch (Current Model)
+
+- With single-threaded per-instance semantics, runtime does not require internal locking for correctness in this phase.
+- Transition observers are invoked after transition logic is resolved for the current call.
+- If a thread-safe mode is introduced later, locking/dispatch guarantees will be specified then.
 
 ## 9) Exception Model
 
@@ -68,7 +79,6 @@ Use a focused exception set:
 
 - `InvalidTransitionException`
 - `GuardFailedException`
-- `StaleStateException`
 
 Remove legacy condition-failure exception path.
 
@@ -82,7 +92,7 @@ Remove legacy condition-failure exception path.
 1. Implement template compilation of transition graph.
 2. Implement CreateInstance runtime shells.
 3. Implement Inspect logic (defined/accepted/reasons/target).
-4. Implement Fire with stale validation.
+4. Implement Fire using single-threaded per-instance semantics (no stale validation in this phase).
 5. Implement dataful transforms and guard chain semantics.
-6. Implement callback dispatch outside lock.
+6. Implement callback dispatch semantics for the single-threaded per-instance model.
 7. Unskip and expand tests incrementally.

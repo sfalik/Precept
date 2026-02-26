@@ -1231,7 +1231,7 @@ namespace StateMachine.Tests
         }
     }
 
-    /// <summary>Fluent result returned by <see cref="StateMachineAssertions{TState}.NotAccept"/>.</summary>
+    /// <summary>Fluent result returned by <see cref="StateMachineAssertions{TState}.Reject(StateMachine.Event{TState}, string, object[])"/> and <see cref="StateMachineAssertions{TState}.Reject{TArg}(StateMachine.Event{TState, TArg}, TArg, string, object[])"/>.</summary>
     public sealed class RejectedAssertions<TState>
         where TState : notnull, Enum
     {

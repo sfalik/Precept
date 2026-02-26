@@ -4,12 +4,46 @@ A modern, fluent .NET state machine library that finally bridges the gap between
 
 Traditional state machines track *what state you're in*, but leave you to manage the data yourself. StateMachine enforces that **state and data change together, as a single atomic operation**.
 
+## Current Status (Design / Build Transition)
+
+This project is currently in a design-guided implementation phase. The fluent API shape is established, while parts of runtime execution are intentionally scaffolded.
+
+### What is established
+
+- Public fluent shape and core contracts for defining transitions and inspect/fire flows.
+- Template/instance architecture direction (`Build()` + `CreateInstance(...)` model).
+- Typed event token model using `Event<TState>` and `Event<TState, TArg>`.
+- Inspection chain shape and naming (`Inspection`, `Defined`, `Accepted`, `Rejected`) with `readonly struct` wrappers.
+- Design baseline and open decisions tracked in `docs/DesignNotes.md`.
+
+### What is intentionally incomplete
+
+- Some runtime execution paths are still stubs/placeholders.
+- Not all design-intended behaviors are fully wired end-to-end yet.
+- A subset of tests remains skipped until runtime implementation reaches those contracts.
+
+### Legacy implementation status
+
+- `FiniteStateMachine` is intentionally retained as an internal reference during the new runtime build-out.
+- Legacy cleanup/removal is deferred until the new runtime is functionally complete and validated.
+
+### Concurrency model (current phase)
+
+- New fluent runtime is non-thread-safe per instance.
+- Concurrent access to the same machine instance is out of scope in this phase.
+- Cross-thread use requires external serialization by the caller.
+
+### Source of truth
+
+- `docs/DesignNotes.md` is canonical for design decisions.
+- This README reflects current implementation status and may include forward-looking examples.
+
 ## ✨ Why choose StateMachine?
 
 - **🛡️ Type-safe & Immutable** — States and data records are part of the generic contract. The compiler has your back.
 - **🏗️ Fluent Builder** — Declare your states, events, guards, and data transforms in one clean, readable expression.
 - **🔍 Inspect Before Firing** — Safely evaluate transitions ahead of time. Check validity, collect rejection reasons, or preview outcomes without side effects.
-- **⚡ Built for Performance** — Templates are compiled once and thread-safe. Instances are cheap to create. Zero heap allocations on the hot path using `readonly struct` types.
+- **⚡ Built for Performance** — Template/instance architecture is in place and optimized runtime paths are being implemented. Inspection-chain hot paths use `readonly struct` types.
 - **✌️ Two Modes** — Keep it simple with state-only workflows, or attach immutable data records for rich domain models.
 
 ## 📦 Installation
@@ -205,7 +239,7 @@ Inspection<TState, TArg> step1 = light.Inspect(emergency);
 
 No-arg events (`Inspection<TState>`) skip `WithArg` entirely, going straight from `IfDefined()` to `IfAccepted(...)`.
 
-`Inspect` is a pre-check. In concurrent scenarios, state may change between `Inspect()` and `Fire()`. `Fire()` always re-validates atomically under a lock before committing — if state has changed, it routes to `IfRejected` or `IfNotDefined` rather than committing a stale transition.
+`Inspect` is a pre-check that lets callers evaluate definition and guard outcomes before attempting to commit. In this design phase, the runtime contract is single-threaded per instance, and `IfRejected` / `IfNotDefined` remain the explicit branch points for non-happy paths.
 
 ### 🎭 Building UIs with Staged Inspection
 
@@ -248,12 +282,12 @@ void OnConfirmClicked()
 {
     _accepted
         .Fire()
-        .IfRejected(reasons => ShowValidationErrors(reasons)) // concurrent invalidation guard
+        .IfRejected(reasons => ShowValidationErrors(reasons)) // guard/validation branch
         .IfNotDefined(() => ShowError("No longer available"));
 }
 ```
 
-The `IfRejected` and `IfNotDefined` handlers in Step 4 guard against concurrent transitions that may have invalidated the event between Step 3 and Step 4 — `Fire()` always re-validates atomically.
+    The `IfRejected` and `IfNotDefined` handlers in Step 4 provide explicit handling for non-happy paths when committing.
 
 ### 🤔 Choosing the Right Pattern
 
@@ -399,7 +433,7 @@ Business data is stored as an immutable C# record. Every transition produces a n
 
 ## ⚙️ Under the Hood
 
-This library treats a state machine as a **typed reducer** — each transition produces a new immutable data record, ensuring correctness, testability, and thread safety by design.
+This library treats a state machine as a **typed reducer** — each transition produces a new immutable data record, emphasizing correctness and testability.
 
 ### 📐 Core Principles
 
@@ -409,9 +443,9 @@ This library treats a state machine as a **typed reducer** — each transition p
 - **Fluent Builder**: The builder API uses interface narrowing so that only valid next steps are available at each point in the chain. The compiler enforces correct construction — you cannot define an incomplete or structurally invalid state machine.
 - **Sequential Enum Constraint**: The `TState` enum must be contiguous and zero-based (e.g., `Off, Red, Green, Yellow` → 0, 1, 2, 3). This is validated once at build time, and enum values are then cast directly to `int` for O(1) array indexing with no boxing or lookup. Sparse or `[Flags]` enums are rejected immediately with a clear error message.
 - **Sealed After Build**: States and events cannot be added after construction. This enables a lightweight array-based transition table using enum ordinals for O(1) transition lookup — the same efficient data structure used in classical finite state machine implementations.
-- **Thread-Safe After Build**: The built machine uses `lock` to ensure transitions are atomic (read state → evaluate guards → run transform → set new data). The builder itself is not thread-safe and is discarded after `Build()`.
+- **Single-Threaded Per Instance (Current Design Phase)**: The new fluent runtime is currently non-thread-safe per instance. Callers must externally serialize cross-thread access to the same instance.
 - **Template-First Model**: `Build()` returns an immutable template. Call `CreateInstance(...)` once per entity — useful in server apps where hundreds of independent instances (one per work order, claim, loan) share the same machine definition.
-- **Event Tokens**: `On(out var approve)` captures the event name via `CallerArgumentExpression` and returns a strongly-typed event token that you pass to `Inspect(...)`.
+- **Event Tokens**: `On(out var approve)` captures the event name via `CallerArgumentExpression` and returns a strongly-typed event token (`Event<TState>` or `Event<TState, TArg>`) that you pass to `Inspect(...)`.
 - **Multi-State Source**: `WhenStateIs(params TState[] states)` lets one event clause cover multiple originating states without repetition.
 
 ### 🔮 What the Machine Can Answer
@@ -428,9 +462,8 @@ The built machine is designed to answer these questions at runtime:
 |---|---|
 | `InvalidTransitionException` | An event is fired in a state where it has no defined transition rule. |
 | `GuardFailedException` | All guard conditions on a conditional event fail (no `Else` branch); aggregates reasons from every failing guard. |
-| `StaleStateException` | `Fire()` is called on a captured `Accepted<TState>`, but the machine state changed concurrently since `Inspect()` ran. |
 
-> **Note:** When using the full fluent `Inspect` chain, concurrent state changes are surfaced as control flow — `Fire()` routes to `IfRejected(...)` or `IfNotDefined(...)` on the returned value rather than throwing. These exceptions apply only to direct trigger calls made outside the `Inspect` chain.
+> **Note:** `StaleStateException` and concurrent stale-detection semantics are out of scope for the current design phase because the runtime contract is non-thread-safe per instance.
 
 ## 🧠 Design Decisions
 
@@ -445,7 +478,7 @@ The built machine is designed to answer these questions at runtime:
 | **Enum constraint** | `TState` must be contiguous and zero-based | Enables direct cast to `int` for O(1) array indexing — no `Array.IndexOf`, no boxing |
 | **Transform semantics** | Pure: `(TData) => TData` | Testable, no hidden dependencies |
 | **Transform vs state order** | Transform first, then state change | If transform throws, nothing changes |
-| **Thread safety** | `lock` around full transition; sealed after build | Sync transforms keep it simple; O(1) array lookup |
+| **Thread safety (current phase)** | Non-thread-safe per instance; caller-serialized access for cross-thread use | Simplifies runtime while core behavior is implemented |
 | **Pre-check API** | `Inspect(...)` staged fluent chain | Enforced decision tree: `IfDefined → WithArg → IfAccepted → Fire`; each gate is a required acknowledgement; intermediate types are capturable for multi-step UI workflows |
 | **Async events** | Not supported | Pure transforms are synchronous; async side effects go in observers |
 | **Side effects** | Via `Transitioned` / `DataTransitioned` observation events | Keeps transforms pure, decouples concerns |
