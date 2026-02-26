@@ -112,57 +112,57 @@ namespace StateMachine.Tests
             machine.Should().BeInState(Light.Off);
 
             machine.Should().Accept(powerOn).WithState(Light.Red);
-            machine.Inspect(powerOn).IfAccepted().Fire();
+            machine.Inspect(powerOn).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Red);
 
             machine.Should().Accept(requestWalk).WithState(Light.Red);
-            machine.Inspect(requestWalk).IfAccepted().Fire();
+            machine.Inspect(requestWalk).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.Red).And
                 .HaveData(d => d.PedestrianWaiting);
 
-            machine.Inspect(elapse).WithArg(7).IfAccepted().Fire();
+            machine.Inspect(elapse).IfDefined().WithArg(7).IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.Red).And
                 .HaveData(d => d.SecondsInCurrentPhase == 7);
 
             // Not enough time yet — stays Red
             machine.Should().Accept(advance).WithState(Light.Red);
-            machine.Inspect(advance).IfAccepted().Fire();
+            machine.Inspect(advance).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Red);
 
-            machine.Inspect(elapse).WithArg(3).IfAccepted().Fire();
+            machine.Inspect(elapse).IfDefined().WithArg(3).IfAccepted().Fire();
             machine.Should().HaveData(d => d.SecondsInCurrentPhase == 10);
 
             // Meets guard — transitions Red -> Green and clears the request
             machine.Should().Accept(advance).WithState(Light.Green);
-            machine.Inspect(advance).IfAccepted().Fire();
+            machine.Inspect(advance).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.Green).And
                 .HaveData(d => !d.PedestrianWaiting && d.SecondsInCurrentPhase == 0);
 
-            machine.Inspect(elapse).WithArg(20).IfAccepted().Fire();
+            machine.Inspect(elapse).IfDefined().WithArg(20).IfAccepted().Fire();
             machine.Should().Accept(advance).WithState(Light.Yellow);
-            machine.Inspect(advance).IfAccepted().Fire();
+            machine.Inspect(advance).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Yellow);
 
-            machine.Inspect(elapse).WithArg(3).IfAccepted().Fire();
+            machine.Inspect(elapse).IfDefined().WithArg(3).IfAccepted().Fire();
             machine.Should().Accept(advance).WithState(Light.Red);
-            machine.Inspect(advance).IfAccepted().Fire();
+            machine.Inspect(advance).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Red);
 
             // Emergency can be triggered from any state
             machine.Should().Accept(emergency).WithState(Light.FlashingRed);
-            machine.Inspect(emergency).IfAccepted().Fire();
+            machine.Inspect(emergency).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.FlashingRed);
 
-            machine.Inspect(elapse).WithArg(30).IfAccepted().Fire();
+            machine.Inspect(elapse).IfDefined().WithArg(30).IfAccepted().Fire();
             machine.Should().Accept(advance).WithState(Light.Red);
-            machine.Inspect(advance).IfAccepted().Fire();
+            machine.Inspect(advance).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Red);
 
             machine.Should().Accept(shutdown).WithState(Light.Off);
-            machine.Inspect(shutdown).IfAccepted().Fire();
+            machine.Inspect(shutdown).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Off);
 
             // Includes every state at least once in the observed transitions
@@ -231,7 +231,7 @@ namespace StateMachine.Tests
                 .CreateInstance(Light.Red);
 
             machine.Should().Accept(hold).WithState(Light.Red);
-            machine.Inspect(hold).IfAccepted().Fire();
+            machine.Inspect(hold).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Red);
         }
 
@@ -249,15 +249,15 @@ namespace StateMachine.Tests
             machine.Should().BeInState(Light.Red);
 
             machine.Should().Accept(next).WithState(Light.Green);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Green);
 
             machine.Should().Accept(next).WithState(Light.Yellow);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Yellow);
 
             machine.Should().Accept(next).WithState(Light.Red);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Red);
         }
 
@@ -277,9 +277,9 @@ namespace StateMachine.Tests
             machine.Transitioned += args => transitions.Add(args);
 
             machine.Should().Accept(next).WithState(Light.Green);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should().Accept(next).WithState(Light.Yellow);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
 
             transitions.Should().HaveCount(2);
             transitions[0].FromState.Should().Be(Light.Red);
@@ -302,7 +302,7 @@ namespace StateMachine.Tests
                 .CreateInstance(Light.Red);
 
             machine.Should().Accept(shutdown).WithState(Light.Off);
-            machine.Inspect(shutdown).IfAccepted().Fire();
+            machine.Inspect(shutdown).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Off);
         }
 
@@ -317,12 +317,12 @@ namespace StateMachine.Tests
                 .CreateInstance(Light.Red);
 
             machine.Should().Accept(next).WithState(Light.Green);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Green);
 
             // Triggering again from Green — not defined for this event
             machine.Should().Reject(next);
-            var act = () => machine.Inspect(next).IfAccepted().Fire();
+            var act = () => machine.Inspect(next).IfDefined().IfAccepted().Fire();
             act.Should().NotThrow();
         }
 
@@ -352,11 +352,11 @@ namespace StateMachine.Tests
                 .CreateInstance(Light.Red);
 
             machine.Should().Accept(next).WithState(Light.Green);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Green);
 
             machine.Should().Accept(back).WithState(Light.Red);
-            machine.Inspect(back).IfAccepted().Fire();
+            machine.Inspect(back).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Red);
         }
 
@@ -388,7 +388,7 @@ namespace StateMachine.Tests
             machine.Transitioned += args => transitions.Add(args);
 
             machine.Should().Accept(hold).WithState(Light.Red);
-            machine.Inspect(hold).IfAccepted().Fire();
+            machine.Inspect(hold).IfDefined().IfAccepted().Fire();
 
             transitions.Should().HaveCount(1);
             transitions[0].FromState.Should().Be(Light.Red);
@@ -438,7 +438,7 @@ namespace StateMachine.Tests
                 .CreateInstance(Light.Green);
 
             machine.Should().Accept(shutdown).WithState(Light.Off);
-            machine.Inspect(shutdown).IfAccepted().Fire();
+            machine.Inspect(shutdown).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Off);
         }
 
@@ -511,45 +511,45 @@ namespace StateMachine.Tests
 
             // Power on — light comes up red, data unchanged
             machine.Should().Accept(powerOn).WithState(Light.Red);
-            machine.Inspect(powerOn).IfAccepted().Fire();
+            machine.Inspect(powerOn).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.Red).And
                 .HaveData(d => d.PedestrianWaiting);
 
             // Red → Green: walk signal granted, vehicle sensor cleared
             machine.Should().Accept(next).WithState(Light.Green);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.Green).And
                 .HaveData(d => !d.PedestrianWaiting && d.SecondsInCurrentPhase == 0);
 
             // Green → Yellow
             machine.Should().Accept(next).WithState(Light.Yellow);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Yellow);
 
             // Yellow → Red
             machine.Should().Accept(next).WithState(Light.Red);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Red);
 
             // Second green phase — no pedestrian waiting, no queued vehicles
             machine.Should().Accept(next).WithState(Light.Green);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.Green).And
                 .HaveData(d => !d.PedestrianWaiting && d.SecondsInCurrentPhase == 0);
 
             // Emergency override — first responder requested flashing red
             machine.Should().Accept(emergency, new EmergencyOverride("Officer Smith", "Accident at intersection")).WithState(Light.FlashingRed);
-            machine.Inspect(emergency).WithArg(new EmergencyOverride("Officer Smith", "Accident at intersection")).IfAccepted().Fire();
+            machine.Inspect(emergency).IfDefined().WithArg(new EmergencyOverride("Officer Smith", "Accident at intersection")).IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.FlashingRed).And
                 .HaveData(d => d.LastTransitionAt != null);
 
             // Shutdown
             machine.Should().Accept(shutdown).WithState(Light.Off);
-            machine.Inspect(shutdown).IfAccepted().Fire();
+            machine.Inspect(shutdown).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Off);
         }
 
@@ -587,7 +587,7 @@ namespace StateMachine.Tests
                 .CreateInstance(initialData);
 
             machine.Should().Accept(hold).WithState(Light.Red);
-            machine.Inspect(hold).IfAccepted().Fire();
+            machine.Inspect(hold).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.Red).And
                 .HaveData(d => d.PedestrianWaiting && d.SecondsInCurrentPhase == 3);
@@ -609,7 +609,7 @@ namespace StateMachine.Tests
                 .CreateInstance(initialData);
 
             machine.Should().Accept(next).WithState(Light.Green);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.Green).And
                 .HaveData(d => d.SecondsInCurrentPhase == 0);
@@ -632,14 +632,14 @@ namespace StateMachine.Tests
 
             // First button press — light stays red, walk request registered
             machine.Should().Accept(pedestrianRequest).WithState(Light.Red);
-            machine.Inspect(pedestrianRequest).IfAccepted().Fire();
+            machine.Inspect(pedestrianRequest).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.Red).And
                 .HaveData(d => d.PedestrianWaiting);
 
             // Second press — light still red, request already set
             machine.Should().Accept(pedestrianRequest).WithState(Light.Red);
-            machine.Inspect(pedestrianRequest).IfAccepted().Fire();
+            machine.Inspect(pedestrianRequest).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.Red).And
                 .HaveData(d => d.PedestrianWaiting);
@@ -661,7 +661,7 @@ namespace StateMachine.Tests
                 .CreateInstance(initialData);
 
             machine.Should().Accept(next).WithState(Light.Green);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Green);
         }
 
@@ -701,7 +701,7 @@ namespace StateMachine.Tests
                 .CreateInstance(initialData);
 
             machine.Should().Accept(next).WithState(Light.Green);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.Green).And
                 .HaveData(d => d.SecondsInCurrentPhase == 0);
@@ -725,7 +725,7 @@ namespace StateMachine.Tests
                 .CreateInstance(initialData);
 
             machine.Should().Accept(next).WithState(Light.Red);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.Red);
         }
 
@@ -747,7 +747,7 @@ namespace StateMachine.Tests
                 .CreateInstance(initialData);
 
             machine.Should().Accept(next).WithState(Light.FlashingRed);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.FlashingRed);
         }
 
@@ -771,7 +771,7 @@ namespace StateMachine.Tests
                 .CreateInstance(initialData);
 
             machine.Should().Accept(next).WithState(Light.FlashingRed);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should().BeInState(Light.FlashingRed);
         }
 
@@ -795,7 +795,7 @@ namespace StateMachine.Tests
                 .CreateInstance(initialData);
 
             machine.Should().Accept(next).WithState(Light.FlashingRed);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.FlashingRed).And
                 .HaveData(d => d.SecondsInCurrentPhase == 0);
@@ -823,7 +823,7 @@ namespace StateMachine.Tests
                 .CreateInstance(initialData);
 
             machine.Should().Accept(next).WithState(Light.FlashingRed);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.FlashingRed).And
                 .HaveData(d => d.SecondsInCurrentPhase == 999 && d.LastTransitionAt != null);
@@ -872,7 +872,7 @@ namespace StateMachine.Tests
                 .Build()
                 .CreateInstance(initialData);
 
-            var act = () => machine.Inspect(next).IfAccepted().Fire();
+            var act = () => machine.Inspect(next).IfDefined().IfAccepted().Fire();
             act.Should().Throw<InvalidOperationException>()
                 .WithMessage("timer update failed");
 
@@ -897,7 +897,7 @@ namespace StateMachine.Tests
                 .Build()
                 .CreateInstance(initialData);
 
-            var act = () => machine.Inspect(next).IfAccepted().Fire();
+            var act = () => machine.Inspect(next).IfDefined().IfAccepted().Fire();
             act.Should().Throw<InvalidOperationException>()
                 .WithMessage("timer hardware fault");
 
@@ -936,7 +936,7 @@ namespace StateMachine.Tests
                 .CreateInstance(initialData);
 
             machine.Should().Accept(next).WithState(Light.Green);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
 
             // The original record is untouched — records are immutable
             initialData.Light.Should().Be(Light.Red);
@@ -1016,7 +1016,7 @@ namespace StateMachine.Tests
             machine.DataTransitioned += args => transitions.Add(args);
 
             machine.Should().Accept(next).WithState(Light.Green);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
 
             transitions.Should().HaveCount(1);
             transitions[0].OldData.SecondsInCurrentPhase.Should().Be(12);
@@ -1047,7 +1047,7 @@ namespace StateMachine.Tests
                 .CreateInstance(initialData);
 
             machine.Should().Accept(elapse, 6).WithState(Light.Green);
-            machine.Inspect(elapse).WithArg(6).IfAccepted().Fire();
+            machine.Inspect(elapse).IfDefined().WithArg(6).IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.Green).And
                 .HaveData(d => d.SecondsInCurrentPhase == 11);
@@ -1096,7 +1096,7 @@ namespace StateMachine.Tests
                 .CreateInstance(initialData);
 
             machine.Should().Accept(next).WithState(Light.Green);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.Green).And // Machine wins — declared transition target
                 .HaveData(d => d.Light == Light.Green && d.SecondsInCurrentPhase == 123); // Data agrees with machine state; transform side-effect preserved
@@ -1117,7 +1117,7 @@ namespace StateMachine.Tests
                 .CreateInstance(initialData);
 
             machine.Should().Accept(next).WithState(Light.Green);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.Green).And
                 .HaveData(d => d.Light == Light.Green && d.PedestrianWaiting && d.SecondsInCurrentPhase == 42); // unchanged — no Execute to clear it
@@ -1143,7 +1143,7 @@ namespace StateMachine.Tests
                 .CreateInstance(initialData);
 
             machine.Should().Accept(next).WithState(Light.FlashingRed);
-            machine.Inspect(next).IfAccepted().Fire();
+            machine.Inspect(next).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.FlashingRed).And
                 .HaveData(d => d.SecondsInCurrentPhase == 0);
@@ -1165,7 +1165,7 @@ namespace StateMachine.Tests
                 .CreateInstance(initialData);
 
             machine.Should().Accept(shutdown).WithState(Light.Off);
-            machine.Inspect(shutdown).IfAccepted().Fire();
+            machine.Inspect(shutdown).IfDefined().IfAccepted().Fire();
             machine.Should()
                 .BeInState(Light.Off).And
                 .HaveData(d => !d.PedestrianWaiting && d.SecondsInCurrentPhase == 0);
@@ -1184,11 +1184,11 @@ namespace StateMachine.Tests
                 .Build()
                 .CreateInstance(initialData);
 
-            machine.Inspect(next).IfAccepted().Fire(); // Red → Green
+            machine.Inspect(next).IfDefined().IfAccepted().Fire(); // Red → Green
 
             // Now in Green — next only handles Red
             machine.Should().Reject(next);
-            var act = () => machine.Inspect(next).IfAccepted().Fire();
+            var act = () => machine.Inspect(next).IfDefined().IfAccepted().Fire();
             act.Should().NotThrow();
         }
     }
@@ -1340,7 +1340,7 @@ namespace StateMachine.Tests
             return new RejectedAssertions<TState>(inspection.Reasons, chain);
         }
 
-        private EventInspection<TState> Inspect(Event<TState> trigger)
+        private Inspection<TState> Inspect(Event<TState> trigger)
         {
             if (Subject is null)
             {
@@ -1350,14 +1350,14 @@ namespace StateMachine.Tests
             return Subject.Inspect(trigger);
         }
 
-        private EventInspection<TState> Inspect<TArg>(Event<TState, TArg> trigger, TArg arg)
+        private Evaluated<TState> Inspect<TArg>(Event<TState, TArg> trigger, TArg arg)
         {
             if (Subject is null)
             {
                 throw new NullReferenceException("Subject should not be null");
             }
 
-            return Subject.Inspect(trigger).WithArg(arg);
+            return Subject.Inspect(trigger).IfDefined().WithArg(arg);
         }
     }
 

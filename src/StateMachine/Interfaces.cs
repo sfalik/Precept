@@ -52,18 +52,16 @@ namespace StateMachine
         IReadOnlyList<IEvent> Events { get; }
 
         /// <summary>
-        /// Evaluate an event against the current state — definition check and guard evaluation —
-        /// without committing a transition.
-        /// Returns an <see cref="EventInspection{TState}"/> whose fluent chain leads to Fire().
+        /// Start inspection of a no-arg event against the current state.
+        /// Call <c>IfDefined()</c> to acknowledge definition before proceeding.
         /// </summary>
-        EventInspection<TState> Inspect(Event<TState> trigger);
+        Inspection<TState> Inspect(Event<TState> trigger);
 
         /// <summary>
-        /// Inspect a parameterized event without providing an argument — definition check only,
-        /// no guard evaluation. Call <see cref="PartialEventInspection{TState, TArg}.WithArg"/> to
-        /// progress to full guard evaluation.
+        /// Start inspection of a parameterized event against the current state.
+        /// Call <c>IfDefined()</c>, then <c>WithArg(...)</c> to evaluate guards.
         /// </summary>
-        PartialEventInspection<TState, TArg> Inspect<TArg>(Event<TState, TArg> trigger);
+        Inspection<TState, TArg> Inspect<TArg>(Event<TState, TArg> trigger);
 
         /// <summary>
         /// Raised after every successful state transition.
@@ -183,9 +181,10 @@ namespace StateMachine
     }
 
     /// <summary>
-    /// Thrown by <see cref="AcceptedChain{TState}.Fire"/> when the machine's state changed
+    /// Thrown when <see cref="Accepted{TState}.Fire"/> detects that the machine's state changed
     /// between <c>Inspect()</c> and <c>Fire()</c>, indicating a concurrent modification
-    /// invalidated the pre-evaluated inspection result.
+    /// invalidated the pre-evaluated inspection result. When using the full fluent chain,
+    /// this is surfaced via <c>IfRejected</c> / <c>IfNotDefined</c> rather than thrown.
     /// </summary>
     public class StaleStateException : Exception
     {

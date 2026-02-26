@@ -92,12 +92,12 @@ namespace StateMachine
 
         public event Action<TransitionedEventArgs<TState>>? Transitioned;
 
-        public EventInspection<TState> Inspect(Event<TState> trigger)
+        public Inspection<TState> Inspect(Event<TState> trigger)
         {
             throw new NotImplementedException();
         }
 
-        public PartialEventInspection<TState, TArg> Inspect<TArg>(Event<TState, TArg> trigger)
+        public Inspection<TState, TArg> Inspect<TArg>(Event<TState, TArg> trigger)
         {
             throw new NotImplementedException();
         }
@@ -159,12 +159,12 @@ namespace StateMachine
         public event Action<TransitionedEventArgs<TState>>? Transitioned;
         public event Action<DataTransitionedEventArgs<TState, TData>>? DataTransitioned;
 
-        public EventInspection<TState> Inspect(Event<TState> trigger)
+        public Inspection<TState> Inspect(Event<TState> trigger)
         {
             throw new NotImplementedException();
         }
 
-        public PartialEventInspection<TState, TArg> Inspect<TArg>(Event<TState, TArg> trigger)
+        public Inspection<TState, TArg> Inspect<TArg>(Event<TState, TArg> trigger)
         {
             throw new NotImplementedException();
         }
