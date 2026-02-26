@@ -20,8 +20,7 @@ On every meaningful change, review `README.md` and update impacted sections, inc
 - Examples/snippets that reference changed APIs
 - Feature claims that no longer match current code
 
-Do not leave aspirational claims as if implemented.
-If behavior is planned but not implemented, mark it clearly as design-phase or pending.
+Do not leave aspirational claims as if implemented. If behavior is planned but not implemented, mark it clearly as design-phase or pending.
 
 ## Required Sync Checklist (Run Before Final Response)
 
@@ -50,6 +49,10 @@ Update this section whenever those facts change.
 - Keep doc updates focused and factual.
 - Prefer minimal, accurate wording over broad marketing language.
 - If uncertain whether a claim is implemented, verify from code/tests first.
+
+## Design Option Responses
+
+When providing design-option responses, include concrete usage examples to illustrate the implementation and clarify the context of the options presented.
 
 ## Deliverable Expectation
 
