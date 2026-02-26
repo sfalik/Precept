@@ -1,184 +1,163 @@
-# StateMachine
+# StateMachine 🚦
 
-A .NET state machine library that eliminates the split between domain state and domain data — transitions are the only way to change either.
+A modern, fluent .NET state machine library that finally bridges the gap between your domain state and your domain data. 
 
-- **Typed and immutable** — states and data records are part of the generic contract; the compiler enforces correctness
-- **Builder pattern** — declare all valid states, events, guards, and transforms in one fluent expression; `Build()` returns a reusable, thread-safe template
-- **Two modes** — state-only (track transitions, no data) or state+data (enforce that data and state change together, through transitions only)
-- **Guards and transforms** — each event can validate pre-conditions and update the data record in one atomic operation
-- **Inspect before firing** — evaluate transitions ahead of time to check validity, collect rejection reasons, or preview outcomes without side effects
-- **Performance-conscious** — `Build()` compiles all transition logic once into a thread-safe template; `CreateInstance` is cheap enough to call per-entity or per-request; the inspect chain uses `readonly struct` types to avoid heap allocations on the hot path
+Traditional state machines track *what state you're in*, but leave you to manage the data yourself. StateMachine enforces that **state and data change together, as a single atomic operation**.
 
-## Installation
+## ✨ Why choose StateMachine?
+
+- **🛡️ Type-safe & Immutable** — States and data records are part of the generic contract. The compiler has your back.
+- **🏗️ Fluent Builder** — Declare your states, events, guards, and data transforms in one clean, readable expression.
+- **🔍 Inspect Before Firing** — Safely evaluate transitions ahead of time. Check validity, collect rejection reasons, or preview outcomes without side effects.
+- **⚡ Built for Performance** — Templates are compiled once and thread-safe. Instances are cheap to create. Zero heap allocations on the hot path using `readonly struct` types.
+- **✌️ Two Modes** — Keep it simple with state-only workflows, or attach immutable data records for rich domain models.
+
+## 📦 Installation
 
 ```sh
 dotnet add package StateMachine
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
-**State-only** — track state transitions with no data:
+State and data change together, atomically, through a valid transition. `.WithData<TData>(d => d.State)` binds an immutable C# record to the machine — state is a property on the record, owned by the machine. The original record is never mutated; every transition produces a new one.
 
 ```csharp
-enum TrafficLight { Red, Green, Yellow }
+enum TrafficLight { Red, Green, Yellow, FlashingRed }
 
-// Build() returns an immutable template — stamp out independent instances from it
+record LightData(TrafficLight Light, int CarsWaiting = 0, string? EmergencyReason = null);
+
+// Define the machine once, create many independent instances from the template
 var template = StateMachine.CreateBuilder<TrafficLight>()
-    .On(out var next)
-        .WhenStateIs(TrafficLight.Red).TransitionTo(TrafficLight.Green)
-        .WhenStateIs(TrafficLight.Green).TransitionTo(TrafficLight.Yellow)
-        .WhenStateIs(TrafficLight.Yellow).TransitionTo(TrafficLight.Red)
-    .Build();
+    .WithData<LightData>(d => d.Light)       // state lives on the record
 
-var machine = template.CreateInstance(TrafficLight.Red);
-
-machine.Inspect(next)
-    .IfDefined()
-        .IfAccepted()
-            .Fire();
-// machine.State == TrafficLight.Green
-```
-
-## State + Data
-
-Adding `.WithData<TData>(d => d.State)` to the builder attaches an immutable record — both state and data can only be changed together through a transition:
-
-```csharp
-enum Light { Off, Red, Green, Yellow, FlashingRed }
-
-record EmergencyOverride(string AuthorizedBy, string Reason);
-
-record TrafficLightData(
-    Light Light,
-    bool PedestrianWaiting = false,
-    string? Intersection = null,
-    DateTime? LastEmergencyAt = null
-);
-
-var machine = StateMachine.CreateBuilder<Light>()
-    .WithData<TrafficLightData>(d => d.Light)
-
-    .On(out var powerOn)
-        .WhenStateIs(Light.Off)
-        .Transform(d => d with { PedestrianWaiting = false })
-        .ThenTransitionTo(Light.Red)
-
-    .On(out var requestWalk)                              // data update, state unchanged
-        .WhenStateIs(Light.Red)
-        .Transform(d => d with { PedestrianWaiting = true })
+    .On(out var carArrived)                  // updates data, state stays the same
+        .WhenStateIs(TrafficLight.Red)
+        .Transform(d => d with { CarsWaiting = d.CarsWaiting + 1 })
         .AndKeepSameState()
 
-    .On(out var advance)                                  // multi-state: one event, three clauses
-        .WhenStateIs(Light.Red)
-        .If(d => d.PedestrianWaiting, "No pedestrian waiting")
-        .Transform(d => d with { PedestrianWaiting = false })
-        .ThenTransitionTo(Light.Green)
-        .Else.KeepSameState()
-        .WhenStateIs(Light.Green).TransitionTo(Light.Yellow)
-        .WhenStateIs(Light.Yellow).TransitionTo(Light.Red)
+    .On(out var advance)                     // one event, three state clauses
+        .WhenStateIs(TrafficLight.Green).TransitionTo(TrafficLight.Yellow)
+        .WhenStateIs(TrafficLight.Yellow).TransitionTo(TrafficLight.Red)
+        .WhenStateIs(TrafficLight.Red)
+            .If(d => d.CarsWaiting > 0, "No cars waiting")
+            .Transform(d => d with { CarsWaiting = 0 })
+            .ThenTransitionTo(TrafficLight.Green)
+            .Else.KeepSameState()
 
-    .On<EmergencyOverride>(out var emergency)             // guard uses both data and arg
-        .WhenStateIs(Light.Red, Light.Green, Light.Yellow)
-        .If((d, e) => !string.IsNullOrEmpty(e.AuthorizedBy), "Authorization required")
-        .Transform((d, e) => d with { LastEmergencyAt = DateTime.Now })
-        .ThenTransitionTo(Light.FlashingRed)
+    .On<string>(out var emergency)           // parameterized event
+        .WhenStateIs(TrafficLight.Red, TrafficLight.Green, TrafficLight.Yellow)
+        .Transform((d, reason) => d with { EmergencyReason = reason })
+        .ThenTransitionTo(TrafficLight.FlashingRed)
 
-    .On(out var shutdown)                                 // RegardlessOfState — always defined
-        .RegardlessOfState()
-        .Transform(d => d with { PedestrianWaiting = false })
-        .ThenTransitionTo(Light.Off)
+    .On(out var reset)                       // exit emergency mode
+        .WhenStateIs(TrafficLight.FlashingRed)
+        .Transform(d => d with { EmergencyReason = null })
+        .ThenTransitionTo(TrafficLight.Red)
 
-    .Build()
-    .CreateInstance(new TrafficLightData(Light.Off, Intersection: "Main St & 1st Ave"));
+    .Build();
 
-// Use the event tokens returned via 'out' with Inspect(...)
-machine.Inspect(powerOn)
+var light = template.CreateInstance(new LightData(TrafficLight.Red));
+
+// 1. Car arrives at the red light
+light.Inspect(carArrived).IfDefined().IfAccepted().Fire();
+// light.Data.CarsWaiting == 1
+
+// 2. Advance the light (guard passes because a car is waiting)
+light.Inspect(advance)
     .IfDefined()
-        .IfAccepted()
-            .Fire();
-// machine.Data.Light == Light.Red
+        .IfAccepted(next => Console.WriteLine($"Moving to {next}"))
+            .Fire()
+        .IfRejected(reasons => Console.WriteLine(string.Join(", ", reasons)));
+// light.Data.Light == TrafficLight.Green
+// light.Data.CarsWaiting == 0
+
+// 3. Emergency override
+light.Inspect(emergency)
+    .IfDefined()
+        .WithArg("Ambulance approaching")
+            .IfAccepted()
+                .Fire();
+// light.Data.Light == TrafficLight.FlashingRed
+// light.Data.EmergencyReason == "Ambulance approaching"
+
+// 4. Clear emergency
+light.Inspect(reset).IfDefined().IfAccepted().Fire();
+// light.Data.Light == TrafficLight.Red
+// light.Data.EmergencyReason == null
 ```
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Off
-    Off --> Red : powerOn
-    Red --> Green : advance\n[pedestrian waiting]
+    [*] --> Red
+    Red --> Green : advance [cars waiting > 0]
     Green --> Yellow : advance
     Yellow --> Red : advance
-    Red --> FlashingRed : emergency\n[authorized]
-    Green --> FlashingRed : emergency\n[authorized]
-    Yellow --> FlashingRed : emergency\n[authorized]
-    Red --> Off : shutdown
-    Green --> Off : shutdown
-    Yellow --> Off : shutdown
-    FlashingRed --> Off : shutdown
-    Off --> [*]
+    Red --> FlashingRed : emergency
+    Green --> FlashingRed : emergency
+    Yellow --> FlashingRed : emergency
+    FlashingRed --> Red : reset
 ```
 
-Note: `requestWalk` is a self-transition (`AndKeepSameState`) — it updates data without advancing state, so it is omitted from the diagram.
+## 🛠️ Deep Dive
 
-## Key Features
+### 🛡️ Guards
 
-### Guards
-
-Guards are pure functions — they may read the current data (and the event argument), but have no side effects or external dependencies. Both forms are shown here:
+Guards let you block transitions based on your data. They are pure functions — they can read the current data (and the event argument), but have no side effects or external dependencies. Both forms are shown here:
 
 ```csharp
 // No-arg event — decision is made from current data alone
-.If(d => d.PedestrianWaiting, "No pedestrian waiting")
+.If(d => d.CarsWaiting > 0, "No cars waiting")
 
 // Parameterized event — decision uses both current data and the event argument
-.If((d, e) => !string.IsNullOrEmpty(e.AuthorizedBy), "Authorization required")
+.If((d, reason) => !string.IsNullOrEmpty(reason), "Reason required")
 ```
 
 A failing guard doesn't have to reject — `.Else` can route to an alternate state:
 
 ```csharp
-.WhenStateIs(Light.Red)
-.If(d => d.PedestrianWaiting, "No pedestrian waiting")
-    .Transform(d => d with { PedestrianWaiting = false })
-    .ThenTransitionTo(Light.Green)
+.WhenStateIs(TrafficLight.Red)
+.If(d => d.CarsWaiting > 0, "No cars waiting")
+    .Transform(d => d with { CarsWaiting = 0 })
+    .ThenTransitionTo(TrafficLight.Green)
 .Else
-    .TransitionTo(Light.FlashingRed)         // no activity — enter fail-safe mode
+    .KeepSameState()                         // no cars — stay red
 ```
 
-Guards chain with `Else.If(...)` for multi-branch routing. When all branches fail, reasons from every failing guard are aggregated and returned together:
+Every guard requires a reason string. An unconditional `Else` branch has no reason because it always fires.
 
-```csharp
-.If(condition1, "reason 1").TransitionTo(A).Else
-.If(condition2, "reason 2").TransitionTo(B).Else
-.TransitionTo(C)                             // unconditional fallback — always accepted
-```
+### 🔍 Look Before You Leap: The `Inspect` API
 
-Every guarded branch requires a reason string. Unconditional `Else` has no reason because it always fires.
+`Inspect` allows you to evaluate potential state transitions in context of the current state without actually committing them. This makes the state machine **deterministic** — you can always ask "is this event valid right now, and what would the new state be if I fired it?" ahead of time. 
 
-### Pre-Check with Inspect (Fluent)
-
-`Inspect` evaluates definition and guards without firing the transition (dry-run), making the state machine **deterministic** — the outcome of any event can be inspected ahead of time. The chain enforces a deliberate decision tree: you must acknowledge each gate (`IfDefined`, `IfAccepted`) before the next step becomes available, and `Fire()` is only reachable after `IfAccepted`.
+The fluent api enforces a deliberate, step-by-step decision tree at compile time. You must explicitly check that an event is valid (`IfDefined`) and that its guards pass (`IfAccepted`) before the compiler will allow you to call `Fire()`. This eliminates runtime exceptions.
 
 ```mermaid
-flowchart TD
-    A["machine.Inspect(event)"] --> B{"IfDefined()"}
-    B -->|"defined (with arg)"| C["WithArg(arg)"]
-    B -->|"defined (no arg)"| E
-    B -->|"not defined"| D["IfNotDefined()\noptional"]
-    C --> E{"guards"}
-    E -->|"pass"| F["IfAccepted(nextState =&gt;)\nobserve next state"]
-    E -->|"fail"| G["IfRejected(reasons =&gt;)\noptional"]
-    F --> H["Fire()\ncommit"]
-    style B fill:#2d6a4f,color:#fff
-    style E fill:#2d6a4f,color:#fff
-    style H fill:#155724,color:#fff
-    style G fill:#7b2d00,color:#fff
-    style D fill:#7b2d00,color:#fff
+flowchart LR
+    Inspect([Inspect]) --> IfDefined([IfDefined])
+    
+    IfDefined -->|parameterized| WithArg([WithArg])
+    IfDefined -->|no-arg| IfAccepted([IfAccepted])
+    WithArg --> IfAccepted
+    IfAccepted --> Fire([Fire])
+    
+    IfDefined -.->|optional| IfNotDefined([IfNotDefined])
+    IfAccepted -.->|optional| IfRejected([IfRejected])
+    
+    style Inspect fill:#f8f9fa,stroke:#dee2e6,stroke-width:2px
+    style IfDefined fill:#e2e3e5,stroke:#adb5bd,stroke-width:2px
+    style WithArg fill:#e2e3e5,stroke:#adb5bd,stroke-width:2px
+    style IfAccepted fill:#e2e3e5,stroke:#adb5bd,stroke-width:2px
+    style Fire fill:#d1e7dd,stroke:#a3cfbb,stroke-width:2px
+    style IfNotDefined fill:#fff3cd,stroke:#ffecb5,stroke-width:2px,stroke-dasharray: 5 5
+    style IfRejected fill:#fff3cd,stroke:#ffecb5,stroke-width:2px,stroke-dasharray: 5 5
 ```
 
 **No-arg event — the simple case:**
 
 ```csharp
 // Full paths
-machine.Inspect(advance)
+light.Inspect(advance)
     .IfDefined()
         .IfAccepted(nextState => Console.WriteLine($"Will transition to {nextState}"))
             .Fire()
@@ -186,7 +165,7 @@ machine.Inspect(advance)
     .IfNotDefined(() => Console.WriteLine("advance is not valid here"));
 
 // Minimal happy path
-machine.Inspect(advance)
+light.Inspect(advance)
     .IfDefined()
         .IfAccepted()
             .Fire();
@@ -196,19 +175,18 @@ machine.Inspect(advance)
 
 ```csharp
 // Full paths
-var override = new EmergencyOverride("Officer Smith", "Accident at intersection");
-machine.Inspect(emergency)
+light.Inspect(emergency)
     .IfDefined()
-        .WithArg(override)
+        .WithArg("Ambulance approaching")
             .IfAccepted(nextState => Console.WriteLine($"Will transition to {nextState}"))
                 .Fire()
             .IfRejected(reasons => Console.WriteLine(string.Join(", ", reasons)))
     .IfNotDefined(() => Console.WriteLine("emergency override not valid from current state"));
 
 // Minimal happy path
-machine.Inspect(emergency)
+light.Inspect(emergency)
     .IfDefined()
-        .WithArg(override)
+        .WithArg("Ambulance approaching")
             .IfAccepted()
                 .Fire();
 ```
@@ -217,62 +195,47 @@ machine.Inspect(emergency)
 
 The return type narrows at each step, exposing only the methods valid at that point:
 
-```mermaid
-flowchart LR
-    A["Inspection#lt;TState,TArg#gt;"] -->|"IfDefined()"| B["Defined#lt;TState,TArg#gt;"]
-    B -->|"WithArg(arg)"| C["Evaluated#lt;TState#gt;"]
-    C -->|"IfAccepted(...)"| D["Accepted#lt;TState#gt;"]
-    D -->|"IfRejected(...) — preview,\nbefore committing"| D
-    D -->|"Fire()"| E["Rejected#lt;TState#gt;"]
-    E -->|"IfRejected(...) — post-Fire,\nconcurrency guard"| F["Undefined#lt;TState#gt;"]
-    F -->|"IfNotDefined(...)"| G["void"]
-
-    A2["Inspection#lt;TState#gt;"] -->|"IfDefined()"| B2["Defined#lt;TState#gt;"]
-    B2 -->|"IfAccepted(...)"| D
-    style A fill:#1e3a5f,color:#fff
-    style A2 fill:#1e3a5f,color:#fff
-    style B fill:#0d6efd,color:#fff
-    style B2 fill:#0d6efd,color:#fff
-    style C fill:#0d6efd,color:#fff
-    style D fill:#198754,color:#fff
-    style E fill:#dc3545,color:#fff
-    style F fill:#6c757d,color:#fff
-    style G fill:#343a40,color:#fff
+```csharp
+Inspection<TState, TArg> step1 = light.Inspect(emergency);
+   Defined<TState, TArg> step2 = step1.IfDefined();
+       Evaluated<TState> step3 = step2.WithArg("reason");
+        Accepted<TState> step4 = step3.IfAccepted();
+        Rejected<TState> step5 = step4.Fire();
 ```
 
 No-arg events (`Inspection<TState>`) skip `WithArg` entirely, going straight from `IfDefined()` to `IfAccepted(...)`.
 
 `Inspect` is a pre-check. In concurrent scenarios, state may change between `Inspect()` and `Fire()`. `Fire()` always re-validates atomically under a lock before committing — if state has changed, it routes to `IfRejected` or `IfNotDefined` rather than committing a stale transition.
 
-### Staged Inspection
+### 🎭 Building UIs with Staged Inspection
 
-The intermediate types returned by each step (`Defined<TState, TArg>`, `Accepted<TState>`, etc.) are plain objects that can be captured and reused across multiple call sites. This is useful in workflow UI scenarios where inspection happens in stages:
+The intermediate types returned by each step (`Defined<TState, TArg>`, `Accepted<TState>`, etc.) are plain objects that can be captured and reused across multiple call sites. This is perfect for UI workflows where inspection happens in stages:
 
 ```csharp
 // Step 1 — enable/disable toolbar buttons: definition check only (no guard evaluation)
 void RenderToolbar()
 {
-    machine.Inspect(advance).IfDefined(ShowAdvanceButton);
-    machine.Inspect(shutdown).IfDefined(ShowShutdownButton);
-    machine.Inspect(emergency).IfDefined(ShowEmergencyButton); // only defined for Red/Green/Yellow
+    light.Inspect(advance).IfDefined(ShowAdvanceButton);
+    light.Inspect(emergency).IfDefined(ShowEmergencyButton); // only defined for Red/Green/Yellow
+    light.Inspect(reset).IfDefined(ShowResetButton);         // only defined for FlashingRed
 }
 
 // Step 2 — operator clicks Emergency Override: capture the defined check, show the form
-Defined<Light, EmergencyOverride> _defined;
+Defined<TrafficLight, string> _defined;
 
 void OnEmergencyClicked()
 {
-    _defined = machine.Inspect(emergency).IfDefined();
+    _defined = light.Inspect(emergency).IfDefined();
     ShowEmergencyForm();
 }
 
 // Step 3 — operator types into the form: evaluate guard live and preview next state
-Accepted<Light> _accepted;
+Accepted<TrafficLight> _accepted;
 
-void OnFormChanged(EmergencyOverride args)
+void OnFormChanged(string reason)
 {
     _accepted = _defined
-        .WithArg(args)
+        .WithArg(reason)
             .IfAccepted(nextState => ShowNextStatePreview(nextState));
 
     // IfRejected on Accepted (before Fire) — shows validation errors without committing
@@ -292,7 +255,7 @@ void OnConfirmClicked()
 
 The `IfRejected` and `IfNotDefined` handlers in Step 4 guard against concurrent transitions that may have invalidated the event between Step 3 and Step 4 — `Fire()` always re-validates atomically.
 
-### When to Use Inspect
+### 🤔 Choosing the Right Pattern
 
 Practical rule of thumb:
 
@@ -300,39 +263,39 @@ Practical rule of thumb:
 - **Use staged capture** in UI or workflow engines where inspection happens across multiple user interactions — show available actions, preview outcomes, then commit.
 - **Omit `IfRejected` and `IfNotDefined`** when you only care about the happy path and are comfortable silently ignoring failures.
 
-### Transition Observation
+### 📡 Reacting to Transitions
 
-Subscribe to state changes for side effects like logging, notifications, or persistence. This is the intended mechanism for side effects — keeping transforms pure while allowing external reactions:
+Subscribe to state changes for side effects like logging, notifications, or persistence. This is the intended mechanism for side effects — keeping your transforms pure while allowing external reactions:
 
 ```csharp
 // State-level observation (available on all machines)
-machine.Transitioned += args =>
+light.Transitioned += args =>
 {
     Console.WriteLine($"{args.EventName}: {args.FromState} → {args.ToState}");
 };
 
 // Data-level observation (available on data-ful machines)
-machine.DataTransitioned += args =>
+light.DataTransitioned += args =>
 {
     SaveToDatabase(args.NewData);
-    if (args.NewData.Light == Light.FlashingRed && args.OldData.Light != Light.FlashingRed)
-        AlertTrafficControlCenter(args.NewData.Intersection, triggeredBy: args.EventName);
+    if (args.NewData.Light == TrafficLight.FlashingRed && args.OldData.Light != TrafficLight.FlashingRed)
+        AlertTrafficControlCenter(reason: args.NewData.EmergencyReason);
 };
 ```
 
 Callbacks fire after the transition commits. Treat the event args as the authoritative snapshot; handlers should be fast and non-blocking. Long-running work (sending emails, calling APIs) should be queued from the callback, not performed inline.
 
-### Immutability Guarantees
+### 🔒 Why Immutability?
 
-Since `TData` is a C# record, the machine enforces immutability structurally:
+Because `TData` is a C# record, the machine enforces immutability structurally:
 
-- The user's `Transform()` function receives the current data and returns a new record
-- The machine then stamps the new state onto the record (overwriting any state the user may have set in their transform)
-- The old record is untouched — consumers holding a reference to previous data see no changes
+- Your `Transform()` function receives the current data and returns a *new* record.
+- The machine stamps the new state onto the record (overwriting any state you may have set in your transform).
+- The old record is untouched — consumers holding a reference to previous data see no changes.
 
 This means **there is no way to modify the machine's data except through a transition**.
 
-### Async Workflows (Saga Pattern)
+### ⏳ What about Async and Sagas?
 
 This library intentionally does not support `async` transitions. Because transforms are pure functions (`(TData) => TData`), they are inherently synchronous — there is nothing to `await`.
 
@@ -416,13 +379,15 @@ machine.Inspect(submit)
 
 This keeps the state machine purely synchronous while the saga layer handles async coordination. Each pending state is explicitly visible in the state enum, making it easy to query, persist, and resume workflows.
 
-## Design Intent
+## 💡 Why We Built This
 
 The goal is to provide a **single, self-contained object** that encapsulates both workflow state and business data for a domain entity — eliminating the common disconnect between "what state is this thing in?" and "what data does it carry?"
 
-Traditional state machine libraries (like Stateless) manage state transitions but leave data management to the consumer. This creates a split where the domain object mutates freely outside the state machine's control, and the machine only governs which transitions are legal. That split is a source of bugs: data can be modified without going through a transition, and transitions can fire without updating data consistently.
+Traditional state machine libraries (like Stateless) manage state transitions but leave data management to you. This creates a split where your domain object mutates freely outside the state machine's control, and the machine only governs which transitions are legal. That split is a source of bugs: data can be modified without going through a transition, and transitions can fire without updating data consistently.
 
-This library takes a different approach: **the state machine owns the data**. Business data is stored as an immutable C# record. Every transition produces a new record — the original is never mutated. The state and data are always consistent, always serializable as a single unit, and always under the machine's control.
+This library takes a different approach: **the state machine owns the data**. 
+
+Business data is stored as an immutable C# record. Every transition produces a new record — the original is never mutated. The state and data are always consistent, always serializable as a single unit, and always under the machine's control.
 
 ### What This Enables
 
@@ -432,24 +397,24 @@ This library takes a different approach: **the state machine owns the data**. Bu
 - **Audit trail by design**: Because each transition produces a new immutable record, keeping a history of transitions (with before/after snapshots) is trivial. Subscribe to `DataTransitioned` and you get full replay capability.
 - **Testable business logic**: Guard conditions and data transforms are pure functions — they can be unit tested in isolation without constructing a state machine.
 
-## Design Philosophy
+## ⚙️ Under the Hood
 
 This library treats a state machine as a **typed reducer** — each transition produces a new immutable data record, ensuring correctness, testability, and thread safety by design.
 
-### Core Principles
+### 📐 Core Principles
 
-- **Immutable data**: Business data is stored as C# records. Transitions produce new records via `with` expressions — the original is never mutated.
-- **State on the record**: The state enum is a property on the data record, identified via an expression selector (`d => d.State`). This makes serialization and snapshotting trivial — one object = full machine state.
-- **Pure transforms**: The `Transform()` method accepts a pure function `(TData) => TData` or `(TData, TArg) => TData`. Side effects (email, logging) are handled externally by subscribing to the `Transitioned` / `DataTransitioned` observation events.
-- **Fluent builder**: The builder API uses interface narrowing so that only valid next steps are available at each point in the chain. The compiler enforces correct construction — you cannot define an incomplete or structurally invalid state machine.
-- **Sequential enum constraint**: The `TState` enum must be contiguous and zero-based (e.g., `Off, Red, Green, Yellow` → 0, 1, 2, 3). This is validated once at build time, and enum values are then cast directly to `int` for O(1) array indexing with no boxing or lookup. Sparse or `[Flags]` enums are rejected immediately with a clear error message.
-- **Sealed after build**: States and events cannot be added after construction. This enables a lightweight array-based transition table using enum ordinals for O(1) transition lookup — the same efficient data structure used in classical finite state machine implementations.
-- **Thread-safe after build**: The built machine uses `lock` to ensure transitions are atomic (read state → evaluate guards → run transform → set new data). The builder itself is not thread-safe and is discarded after `Build()`.
-- **Template-first model**: `Build()` returns an immutable template. Call `CreateInstance(...)` once per entity — useful in server apps where hundreds of independent instances (one per work order, claim, loan) share the same machine definition.
-- **Event tokens**: `On(out var approve)` captures the event name via `CallerArgumentExpression` and returns a strongly-typed event token that you pass to `Inspect(...)`.
-- **Multi-state source**: `WhenStateIs(params TState[] states)` lets one event clause cover multiple originating states without repetition.
+- **Immutable Data**: Business data is stored as C# records. Transitions produce new records via `with` expressions — the original is never mutated.
+- **State on the Record**: The state enum is a property on the data record, identified via an expression selector (`d => d.State`). This makes serialization and snapshotting trivial — one object = full machine state.
+- **Pure Transforms**: The `Transform()` method accepts a pure function `(TData) => TData` or `(TData, TArg) => TData`. Side effects (email, logging) are handled externally by subscribing to the `Transitioned` / `DataTransitioned` observation events.
+- **Fluent Builder**: The builder API uses interface narrowing so that only valid next steps are available at each point in the chain. The compiler enforces correct construction — you cannot define an incomplete or structurally invalid state machine.
+- **Sequential Enum Constraint**: The `TState` enum must be contiguous and zero-based (e.g., `Off, Red, Green, Yellow` → 0, 1, 2, 3). This is validated once at build time, and enum values are then cast directly to `int` for O(1) array indexing with no boxing or lookup. Sparse or `[Flags]` enums are rejected immediately with a clear error message.
+- **Sealed After Build**: States and events cannot be added after construction. This enables a lightweight array-based transition table using enum ordinals for O(1) transition lookup — the same efficient data structure used in classical finite state machine implementations.
+- **Thread-Safe After Build**: The built machine uses `lock` to ensure transitions are atomic (read state → evaluate guards → run transform → set new data). The builder itself is not thread-safe and is discarded after `Build()`.
+- **Template-First Model**: `Build()` returns an immutable template. Call `CreateInstance(...)` once per entity — useful in server apps where hundreds of independent instances (one per work order, claim, loan) share the same machine definition.
+- **Event Tokens**: `On(out var approve)` captures the event name via `CallerArgumentExpression` and returns a strongly-typed event token that you pass to `Inspect(...)`.
+- **Multi-State Source**: `WhenStateIs(params TState[] states)` lets one event clause cover multiple originating states without repetition.
 
-### What the Machine Can Answer
+### 🔮 What the Machine Can Answer
 
 The built machine is designed to answer these questions at runtime:
 
@@ -457,58 +422,58 @@ The built machine is designed to answer these questions at runtime:
 2. If an event cannot be triggered, why not — is it not defined for the current state, or is a guard failing (and which one)?
 3. What are all the valid states and events, regardless of current state — enabling visualization of the full workflow graph?
 
-## Exception Reference
+## 💥 Exception Reference
 
 | Exception | When thrown |
 |---|---|
-| `InvalidTransitionException` | An event is fired in a state where it has no defined transition rule |
-| `GuardFailedException` | All guard conditions on a conditional event fail (no `Else` branch); aggregates reasons from every failing guard |
-| `StaleStateException` | `Fire()` is called on a captured `Accepted<TState>`, but the machine state changed concurrently since `Inspect()` ran |
+| `InvalidTransitionException` | An event is fired in a state where it has no defined transition rule. |
+| `GuardFailedException` | All guard conditions on a conditional event fail (no `Else` branch); aggregates reasons from every failing guard. |
+| `StaleStateException` | `Fire()` is called on a captured `Accepted<TState>`, but the machine state changed concurrently since `Inspect()` ran. |
 
-When using the full fluent Inspect chain, concurrent state changes are surfaced as control flow — `Fire()` routes to `IfRejected(...)` or `IfNotDefined(...)` on the returned value rather than throwing. These exceptions apply only to direct trigger calls made outside the Inspect chain.
+> **Note:** When using the full fluent `Inspect` chain, concurrent state changes are surfaced as control flow — `Fire()` routes to `IfRejected(...)` or `IfNotDefined(...)` on the returned value rather than throwing. These exceptions apply only to direct trigger calls made outside the `Inspect` chain.
 
-## Design Decisions
+## 🧠 Design Decisions
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Instance model | Build immutable template, then stamp instances | Define once; create many identical machines |
-| Data ownership | Machine owns immutable `TData` record | Prevents external mutation, trivial serialization |
-| State location | Property on `TData`, identified by expression selector | Single source of truth |
-| Undefined transition | `Inspect(...)` rejects (`IsDefined == false`) | Lets callers handle invalid events as control flow |
-| All guards fail without Else | `Inspect(...)` rejects with aggregated reasons | Provides actionable feedback |
-| Build-time validation | Error on empty events and duplicate transitions | Catch construction mistakes early |
-| Enum constraint | `TState` must be contiguous and zero-based | Enables direct cast to `int` for O(1) array indexing — no `Array.IndexOf`, no boxing |
-| Transform semantics | Pure: `(TData) => TData` | Testable, no hidden dependencies |
-| Transform vs state order | Transform first, then state change | If transform throws, nothing changes |
-| Thread safety | `lock` around full transition; sealed after build | Sync transforms keep it simple; O(1) array lookup |
-| Pre-check API | `Inspect(...)` staged fluent chain | Enforced decision tree: `IfDefined → WithArg → IfAccepted → Fire`; each gate is a required acknowledgement; intermediate types are capturable for multi-step UI workflows |
-| Async events | Not supported | Pure transforms are synchronous; async side effects go in observers |
-| Side effects | Via `Transitioned` / `DataTransitioned` observation events | Keeps transforms pure, decouples concerns |
-| Guard reasons | Required on every guard | Ensures rejected events always explain why |
+| **Instance model** | Build immutable template, then stamp instances | Define once; create many identical machines |
+| **Data ownership** | Machine owns immutable `TData` record | Prevents external mutation, trivial serialization |
+| **State location** | Property on `TData`, identified by expression selector | Single source of truth |
+| **Undefined transition** | `Inspect(...)` rejects (`IsDefined == false`) | Lets callers handle invalid events as control flow |
+| **All guards fail without Else** | `Inspect(...)` rejects with aggregated reasons | Provides actionable feedback |
+| **Build-time validation** | Error on empty events and duplicate transitions | Catch construction mistakes early |
+| **Enum constraint** | `TState` must be contiguous and zero-based | Enables direct cast to `int` for O(1) array indexing — no `Array.IndexOf`, no boxing |
+| **Transform semantics** | Pure: `(TData) => TData` | Testable, no hidden dependencies |
+| **Transform vs state order** | Transform first, then state change | If transform throws, nothing changes |
+| **Thread safety** | `lock` around full transition; sealed after build | Sync transforms keep it simple; O(1) array lookup |
+| **Pre-check API** | `Inspect(...)` staged fluent chain | Enforced decision tree: `IfDefined → WithArg → IfAccepted → Fire`; each gate is a required acknowledgement; intermediate types are capturable for multi-step UI workflows |
+| **Async events** | Not supported | Pure transforms are synchronous; async side effects go in observers |
+| **Side effects** | Via `Transitioned` / `DataTransitioned` observation events | Keeps transforms pure, decouples concerns |
+| **Guard reasons** | Required on every guard | Ensures rejected events always explain why |
 
-## Comparison with Existing Libraries
+## 🥊 Comparison with Existing Libraries
 
 | Library | State Machine | Immutable Data | Guards | Fluent Builder | Pure Transforms |
-|---|---|---|---|---|---|
-| **Stateless** (C#) | Yes | No | Yes | Yes | No |
-| **MassTransit Automatonymous** | Yes | No | Yes | Yes | No |
-| **XState** (JS) | Yes | Yes (context) | Yes | No (JSON config) | Yes (assign) |
-| **This library** | Yes | Yes | Yes | Yes | Yes |
+|---|:---:|:---:|:---:|:---:|:---:|
+| **Stateless** (C#) | ✅ | ❌ | ✅ | ✅ | ❌ |
+| **MassTransit Automatonymous** | ✅ | ❌ | ✅ | ✅ | ❌ |
+| **XState** (JS) | ✅ | ✅ (context) | ✅ | ❌ (JSON config) | ✅ (assign) |
+| **StateMachine** (This library) | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 The closest analogue is **XState** in the JavaScript ecosystem. This library brings that concept to .NET with compile-time type safety and a fluent construction API. The key differentiator is the combination of **immutable records as the data model** with **a fluent builder that enforces correct construction at compile time**.
 
-**When to choose this library:**
+### When to choose this library:
 
 - **Over Stateless**: When you need business data co-located and owned by the state machine, not just transition rules. Stateless manages state; this library manages state *and* data together, with immutability guarantees. Also when you want `Inspect`-before-fire (dry-run) as a first-class API contract.
 - **Over MassTransit Saga**: When you don't need a distributed messaging infrastructure. Sagas are the right tool for durable, cross-service workflows; this library is better suited to in-process domain objects (work orders, approvals, claims) where persistence is a single serialized record.
 - **Over XState**: When you want compile-time type safety and a C# fluent API rather than JSON/JavaScript configuration. XState's `context` model directly inspired this library's data ownership design — XState is still the better choice if you need visual editor tooling or cross-platform portability.
 
-## Project Structure
+## 📁 Project Structure
 
-```
+```text
 src/StateMachine/
     Interfaces.cs          — Public interfaces, event types, exceptions, fluent builder contracts
-    Inspection.cs          — Inspect API types (`Inspection`, `Defined`, `Evaluated`, `Accepted`, `Rejected`, `Undefined`)
+    Inspection.cs          — Inspect API types (Inspection, Defined, Evaluated, Accepted, Rejected, Undefined)
     StateMachine.cs        — Entry point, machine implementations, builder stubs
     FiniteStateMachine.cs  — Legacy implementation (two type parameters: TState + TEvent)
     IStateful.cs           — Legacy interface
