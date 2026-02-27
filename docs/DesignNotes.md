@@ -25,6 +25,7 @@ Implementation focus is the DSL runtime path:
   - `list`
   - `inspect`
   - `fire`
+  - `repl`
 
 ## Current Runtime Semantics
 
@@ -34,7 +35,6 @@ Implementation focus is the DSL runtime path:
 - If one guarded transition evaluates `true`, inspection/fire is accepted and returns target/new state
 - If all guarded transitions evaluate `false`, inspection/fire is rejected with aggregated guard-failure reasons
 - Instance-based inspect/fire validates workflow name compatibility before evaluating transitions
-- Migration-aware inspect/fire can optionally use an instance migrator before compatibility rejection
 
 ## Concurrency Model (Current)
 
@@ -67,6 +67,8 @@ Implementation focus is the DSL runtime path:
 - Runtime supports persisted instance creation and instance-based `Inspect(...)` / `Fire(...)`.
 - CLI supports `--instance` and `--out-instance` for loading/saving workflow instances.
 - CLI requires either `--state` or `--instance` for `inspect`/`fire`.
+- Repository root includes runnable examples: `trafficlight.sm`, `traffic.instance.json`, `context.json`.
+- CLI includes an interactive `repl` mode for iterative inspect/fire, context edits, and instance load/save.
 
 Supported default guard forms:
 

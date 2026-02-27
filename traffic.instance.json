@@ -1,0 +1,9 @@
+{
+  "workflowName": "TrafficLight",
+  "currentState": "Red",
+  "lastEvent": null,
+  "updatedAt": "2026-02-27T00:00:00+00:00",
+  "contextSnapshot": {
+    "CarsWaiting": 2
+  }
+}

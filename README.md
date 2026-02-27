@@ -2,6 +2,40 @@
 
 A .NET state/workflow engine project currently focused on an experimental runtime DSL.
 
+## Quick Start (REPL)
+
+Use the included sample files to start an interactive session immediately:
+
+```sh
+dotnet run --project tools/StateMachine.Dsl.Cli -- repl ./trafficlight.sm --state Red --context-file ./context.json
+```
+
+Then run a few commands in the prompt:
+
+```text
+sm> events
+Advance
+
+sm> inspect Advance
+Defined: True
+Accepted: True
+Target: Green
+
+sm> fire Advance
+Defined: True
+Accepted: True
+NewState: Green
+
+sm> state
+Green
+```
+
+You can also start from a persisted instance:
+
+```sh
+dotnet run --project tools/StateMachine.Dsl.Cli -- repl ./trafficlight.sm --instance ./traffic.instance.json
+```
+
 ## Current Status
 
 ### Implemented now
@@ -14,6 +48,7 @@ A .NET state/workflow engine project currently focused on an experimental runtim
   - `list`
   - `inspect`
   - `fire`
+  - `repl`
 - Active tests for DSL parsing/runtime behavior in `test/StateMachine.Tests/DslWorkflowTests.cs`
 
 ### Concurrency model (current)
@@ -59,6 +94,57 @@ dotnet run --project tools/StateMachine.Dsl.Cli -- inspect ./trafficlight.sm --i
 dotnet run --project tools/StateMachine.Dsl.Cli -- fire ./trafficlight.sm --instance ./traffic.instance.json --event Advance --out-instance ./traffic.instance.json
 dotnet run --project tools/StateMachine.Dsl.Cli -- inspect ./trafficlight.sm --state Red --event Advance --context "{\"CarsWaiting\": 2}"
 dotnet run --project tools/StateMachine.Dsl.Cli -- fire ./trafficlight.sm --state Red --event Advance --context-file ./context.json
+dotnet run --project tools/StateMachine.Dsl.Cli -- repl ./trafficlight.sm --state Red --context-file ./context.json
+```
+
+The repository includes ready-to-run examples:
+
+- `./trafficlight.sm`
+- `./traffic.instance.json`
+- `./context.json`
+
+### Quick verify
+
+Accept path (guard passes):
+
+```sh
+dotnet run --project tools/StateMachine.Dsl.Cli -- inspect ./trafficlight.sm --state Red --event Advance --context-file ./context.json
+```
+
+Expected key output:
+
+```text
+Defined: True
+Accepted: True
+Target: Green
+```
+
+Reject path (guard fails):
+
+```sh
+dotnet run --project tools/StateMachine.Dsl.Cli -- inspect ./trafficlight.sm --state Red --event Advance --context "{\"CarsWaiting\": 0}"
+```
+
+Expected key output:
+
+```text
+Defined: True
+Accepted: False
+Outcome: Rejected
+```
+
+Fire via instance and persist updated state:
+
+```sh
+dotnet run --project tools/StateMachine.Dsl.Cli -- fire ./trafficlight.sm --instance ./traffic.instance.json --event Advance --out-instance ./traffic.instance.json
+```
+
+Expected key output:
+
+```text
+Accepted: True
+NewState: Green
+Instance saved: ./traffic.instance.json
 ```
 
 `inspect` / `fire` context options:
@@ -67,6 +153,12 @@ dotnet run --project tools/StateMachine.Dsl.Cli -- fire ./trafficlight.sm --stat
 - `--context-file <path.json>` for JSON from file
 - `--instance <path.json>` to load state/context from a persisted instance
 - `--out-instance <path.json>` (fire only) to save updated instance; defaults to `--instance` path when omitted
+
+`repl` startup options:
+
+- `--state <StateName>` optional initial state (defaults to first declared state)
+- `--instance <path.json>` optional persisted instance to load as session state
+- `--context <json>` / `--context-file <path.json>` optional initial session context
 
 Result exit codes are outcome-specific:
 
@@ -91,6 +183,28 @@ state Red
 state Green
 event Advance
 transition Red -> Green on Advance when CarsWaiting > 0
+```
+
+## Sample `traffic.instance.json`
+
+```json
+{
+  "workflowName": "TrafficLight",
+  "currentState": "Red",
+  "lastEvent": null,
+  "updatedAt": "2026-02-27T00:00:00+00:00",
+  "contextSnapshot": {
+    "CarsWaiting": 2
+  }
+}
+```
+
+## Sample `context.json`
+
+```json
+{
+  "CarsWaiting": 2
+}
 ```
 
 ## Project Structure

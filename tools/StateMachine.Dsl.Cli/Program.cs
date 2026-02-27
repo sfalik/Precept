@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Text.Json;
 using StateMachine.Dsl;
 
@@ -138,6 +140,270 @@ try
         return result.IsDefined ? ExitFireRejected : ExitFireNotDefined;
     }
 
+    if (command.Equals("repl", StringComparison.OrdinalIgnoreCase))
+    {
+        string? instancePath = GetOption(args, "--instance");
+        string? stateOption = GetOption(args, "--state");
+        var startupContext = ParseContext(GetOption(args, "--context"), GetOption(args, "--context-file"));
+
+        bool hasState = !string.IsNullOrWhiteSpace(stateOption);
+        bool hasInstance = !string.IsNullOrWhiteSpace(instancePath);
+        if (hasState && hasInstance)
+            throw new InvalidOperationException("Use either --state or --instance for repl, not both.");
+
+        DslWorkflowInstance? sessionInstance = null;
+        string? sessionInstancePath = instancePath;
+        if (hasInstance)
+        {
+            sessionInstance = LoadInstance(instancePath!);
+            var compatibility = workflow.CheckCompatibility(sessionInstance);
+            if (!compatibility.IsCompatible)
+                throw new InvalidOperationException(compatibility.Reason ?? "Instance is not compatible with this workflow.");
+        }
+
+        string currentState = hasState
+            ? stateOption!
+            : sessionInstance?.CurrentState ?? machine.States[0];
+
+        if (!machine.States.Contains(currentState, StringComparer.Ordinal))
+            throw new InvalidOperationException($"State '{currentState}' is not defined in machine '{machine.Name}'.");
+
+        var sessionContext = new Dictionary<string, object?>(StringComparer.Ordinal);
+        if (sessionInstance is not null)
+        {
+            foreach (var kvp in sessionInstance.ContextSnapshot)
+                sessionContext[kvp.Key] = kvp.Value;
+        }
+        foreach (var kvp in startupContext)
+            sessionContext[kvp.Key] = kvp.Value;
+
+        Console.WriteLine($"Machine: {machine.Name}");
+        Console.WriteLine($"State: {currentState}");
+        Console.WriteLine("Type 'help' for commands, 'exit' to quit.");
+
+        while (true)
+        {
+            Console.Write("sm> ");
+            var input = Console.ReadLine();
+            if (string.IsNullOrWhiteSpace(input))
+                continue;
+
+            var tokens = Tokenize(input);
+            if (tokens.Count == 0)
+                continue;
+
+            var replCommand = tokens[0].ToLowerInvariant();
+
+            if (replCommand is "exit" or "quit")
+                return ExitSuccess;
+
+            if (replCommand == "help")
+            {
+                PrintReplHelp();
+                continue;
+            }
+
+            if (replCommand == "state")
+            {
+                Console.WriteLine(currentState);
+                continue;
+            }
+
+            if (replCommand == "events")
+            {
+                foreach (var evt in machine.Events)
+                    Console.WriteLine(evt.Name);
+                continue;
+            }
+
+            if (replCommand == "context")
+            {
+                Console.WriteLine(ToJson(sessionContext));
+                continue;
+            }
+
+            if (replCommand == "set-context")
+            {
+                if (tokens.Count < 2)
+                {
+                    Console.WriteLine("Usage: set-context <json-object>");
+                    continue;
+                }
+
+                var parsed = ParseContext(tokens[1], null);
+                sessionContext = new Dictionary<string, object?>(parsed, StringComparer.Ordinal);
+                Console.WriteLine("Context updated.");
+                continue;
+            }
+
+            if (replCommand == "clear-context")
+            {
+                sessionContext.Clear();
+                Console.WriteLine("Context cleared.");
+                continue;
+            }
+
+            if (replCommand == "reset-state")
+            {
+                if (tokens.Count < 2)
+                {
+                    Console.WriteLine("Usage: reset-state <StateName>");
+                    continue;
+                }
+
+                var nextState = tokens[1];
+                if (!machine.States.Contains(nextState, StringComparer.Ordinal))
+                {
+                    Console.WriteLine($"Unknown state '{nextState}'.");
+                    continue;
+                }
+
+                currentState = nextState;
+                if (sessionInstance is not null)
+                {
+                    sessionInstance = sessionInstance with
+                    {
+                        CurrentState = currentState,
+                        UpdatedAt = DateTimeOffset.UtcNow
+                    };
+                }
+
+                Console.WriteLine($"State set to {currentState}.");
+                continue;
+            }
+
+            if (replCommand == "load-instance")
+            {
+                if (tokens.Count < 2)
+                {
+                    Console.WriteLine("Usage: load-instance <path>");
+                    continue;
+                }
+
+                var loaded = LoadInstance(tokens[1]);
+                var compatibility = workflow.CheckCompatibility(loaded);
+                if (!compatibility.IsCompatible)
+                {
+                    Console.WriteLine(compatibility.Reason ?? "Instance is not compatible with this workflow.");
+                    continue;
+                }
+
+                sessionInstance = loaded;
+                sessionInstancePath = tokens[1];
+                currentState = loaded.CurrentState;
+                sessionContext = new Dictionary<string, object?>(loaded.ContextSnapshot, StringComparer.Ordinal);
+                Console.WriteLine($"Instance loaded: {sessionInstancePath}");
+                continue;
+            }
+
+            if (replCommand == "save-instance")
+            {
+                var path = tokens.Count > 1 ? tokens[1] : sessionInstancePath;
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    Console.WriteLine("Usage: save-instance <path> (or load with load-instance first)");
+                    continue;
+                }
+
+                var toSave = sessionInstance ?? workflow.CreateInstance(currentState, sessionContext);
+                toSave = toSave with
+                {
+                    CurrentState = currentState,
+                    ContextSnapshot = new Dictionary<string, object?>(sessionContext, StringComparer.Ordinal),
+                    UpdatedAt = DateTimeOffset.UtcNow
+                };
+
+                SaveInstance(path, toSave);
+                sessionInstance = toSave;
+                sessionInstancePath = path;
+                Console.WriteLine($"Instance saved: {path}");
+                continue;
+            }
+
+            if (replCommand is "inspect" or "fire")
+            {
+                if (tokens.Count < 2)
+                {
+                    Console.WriteLine($"Usage: {replCommand} <EventName> [json-context]");
+                    continue;
+                }
+
+                var eventName = tokens[1];
+                var commandContext = tokens.Count > 2
+                    ? ParseContext(tokens[2], null)
+                    : new Dictionary<string, object?>(StringComparer.Ordinal);
+
+                var effectiveContext = MergeContext(sessionContext, commandContext);
+
+                if (replCommand == "inspect")
+                {
+                    var inspect = workflow.Inspect(currentState, eventName, effectiveContext);
+                    Console.WriteLine($"Defined: {inspect.IsDefined}");
+                    Console.WriteLine($"Accepted: {inspect.IsAccepted}");
+                    Console.WriteLine($"Target: {inspect.TargetState ?? "<none>"}");
+                    if (inspect.Reasons.Count > 0)
+                    {
+                        Console.WriteLine("Reasons:");
+                        foreach (var reason in inspect.Reasons)
+                            Console.WriteLine($" - {reason}");
+                    }
+
+                    if (!inspect.IsDefined)
+                        Console.WriteLine("Outcome: NotDefined");
+                    else if (!inspect.IsAccepted)
+                        Console.WriteLine("Outcome: Rejected");
+                }
+                else
+                {
+                    DslFireResult fireResult;
+                    if (sessionInstance is null)
+                    {
+                        fireResult = workflow.Fire(currentState, eventName, effectiveContext);
+                        if (fireResult.IsAccepted && fireResult.NewState is not null)
+                            currentState = fireResult.NewState;
+                    }
+                    else
+                    {
+                        var instanceResult = workflow.Fire(sessionInstance, eventName, effectiveContext);
+                        fireResult = new DslFireResult(
+                            instanceResult.IsDefined,
+                            instanceResult.IsAccepted,
+                            instanceResult.PreviousState,
+                            instanceResult.EventName,
+                            instanceResult.NewState,
+                            instanceResult.Reasons);
+
+                        if (instanceResult.IsAccepted && instanceResult.UpdatedInstance is not null)
+                        {
+                            sessionInstance = instanceResult.UpdatedInstance;
+                            currentState = sessionInstance.CurrentState;
+                        }
+                    }
+
+                    Console.WriteLine($"Defined: {fireResult.IsDefined}");
+                    Console.WriteLine($"Accepted: {fireResult.IsAccepted}");
+                    Console.WriteLine($"NewState: {fireResult.NewState ?? "<none>"}");
+                    if (fireResult.Reasons.Count > 0)
+                    {
+                        Console.WriteLine("Reasons:");
+                        foreach (var reason in fireResult.Reasons)
+                            Console.WriteLine($" - {reason}");
+                    }
+
+                    if (!fireResult.IsDefined)
+                        Console.WriteLine("Outcome: NotDefined");
+                    else if (!fireResult.IsAccepted)
+                        Console.WriteLine("Outcome: Rejected");
+                }
+
+                sessionContext = new Dictionary<string, object?>(effectiveContext, StringComparer.Ordinal);
+                continue;
+            }
+
+            Console.WriteLine($"Unknown REPL command '{tokens[0]}'. Type 'help' for options.");
+        }
+    }
+
     if (command.Equals("list", StringComparison.OrdinalIgnoreCase))
     {
         Console.WriteLine($"Machine: {machine.Name}");
@@ -188,6 +454,7 @@ static void PrintUsage()
     Console.WriteLine("  dsl list <file.sm>");
     Console.WriteLine("  dsl inspect <file.sm> (--state <StateName> | --instance <instance.json>) --event <EventName> [--context <json>] [--context-file <path.json>]");
     Console.WriteLine("  dsl fire <file.sm> (--state <StateName> | --instance <instance.json>) --event <EventName> [--context <json>] [--context-file <path.json>] [--out-instance <path.json>]");
+    Console.WriteLine("  dsl repl <file.sm> [--state <StateName>] [--instance <instance.json>] [--context <json>] [--context-file <path.json>]");
     Console.WriteLine("Exit codes:");
     Console.WriteLine($"  {ExitSuccess}: success");
     Console.WriteLine($"  {ExitInvalidUsage}: invalid usage");
@@ -198,6 +465,23 @@ static void PrintUsage()
     Console.WriteLine($"  {ExitInspectRejected}: inspect rejected");
     Console.WriteLine($"  {ExitFireNotDefined}: fire not defined");
     Console.WriteLine($"  {ExitFireRejected}: fire rejected");
+}
+
+static void PrintReplHelp()
+{
+    Console.WriteLine("REPL commands:");
+    Console.WriteLine("  help");
+    Console.WriteLine("  state");
+    Console.WriteLine("  events");
+    Console.WriteLine("  context");
+    Console.WriteLine("  set-context <json-object>");
+    Console.WriteLine("  clear-context");
+    Console.WriteLine("  inspect <EventName> [json-context]");
+    Console.WriteLine("  fire <EventName> [json-context]");
+    Console.WriteLine("  reset-state <StateName>");
+    Console.WriteLine("  load-instance <path>");
+    Console.WriteLine("  save-instance [path]");
+    Console.WriteLine("  exit | quit");
 }
 
 static string ResolveStateForCommand(
@@ -308,4 +592,64 @@ static object? ToDotNetValue(JsonElement value)
         JsonValueKind.Array => value.GetRawText(),
         _ => value.GetRawText()
     };
+}
+
+static List<string> Tokenize(string input)
+{
+    var result = new List<string>();
+    var sb = new StringBuilder();
+    bool inQuotes = false;
+    char quoteChar = '\0';
+
+    foreach (var ch in input)
+    {
+        if ((ch == '"' || ch == '\'') && (!inQuotes || ch == quoteChar))
+        {
+            if (!inQuotes)
+            {
+                inQuotes = true;
+                quoteChar = ch;
+            }
+            else
+            {
+                inQuotes = false;
+                quoteChar = '\0';
+            }
+
+            continue;
+        }
+
+        if (char.IsWhiteSpace(ch) && !inQuotes)
+        {
+            if (sb.Length > 0)
+            {
+                result.Add(sb.ToString());
+                sb.Clear();
+            }
+
+            continue;
+        }
+
+        sb.Append(ch);
+    }
+
+    if (sb.Length > 0)
+        result.Add(sb.ToString());
+
+    return result;
+}
+
+static Dictionary<string, object?> MergeContext(
+    IReadOnlyDictionary<string, object?> baseContext,
+    IReadOnlyDictionary<string, object?> overlay)
+{
+    var merged = new Dictionary<string, object?>(baseContext, StringComparer.Ordinal);
+    foreach (var kvp in overlay)
+        merged[kvp.Key] = kvp.Value;
+    return merged;
+}
+
+static string ToJson(IReadOnlyDictionary<string, object?> context)
+{
+    return JsonSerializer.Serialize(context, new JsonSerializerOptions { WriteIndented = true });
 }
