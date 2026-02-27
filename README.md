@@ -101,6 +101,11 @@ This workspace is configured for Microsoft's official .NET tooling:
 When opened in VS Code, the workspace recommends these extensions via `.vscode/extensions.json`.
 The default solution is preconfigured in `.vscode/settings.json` as `dotnet.defaultSolution = "StateMachine.slnx"`.
 
+Press `F5` and choose `REPL (traffic sample)` to build and launch the CLI in REPL mode with:
+
+- `./trafficlight.sm`
+- `--instance ./traffic.instance.json`
+
 ## Experimental DSL CLI
 
 Launch REPL with an instance:

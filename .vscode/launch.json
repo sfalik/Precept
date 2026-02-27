@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "REPL (traffic sample)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/tools/StateMachine.Dsl.Cli/bin/Debug/net10.0/StateMachine.Dsl.Cli.dll",
+      "args": [
+        "./trafficlight.sm",
+        "--instance",
+        "./traffic.instance.json"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    }
+  ]
+}
