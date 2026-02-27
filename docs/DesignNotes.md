@@ -36,6 +36,12 @@ Implementation focus is the DSL runtime path:
 - Compiled workflow definitions expose deterministic `Version` values
 - Instance-based inspect/fire validates workflow name + version compatibility before evaluating transitions
 
+## Concurrency Model (Current)
+
+- `DslWorkflowDefinition` is immutable after compile.
+- Runtime does not maintain hidden mutable process state; state progresses through returned `DslWorkflowInstance` values.
+- Any coordination for concurrently reading/writing persisted instance files is outside runtime scope and must be handled by the caller.
+
 ## Known Gaps
 
 - Guard language is intentionally minimal in this phase (`Identifier`, `!Identifier`, and simple comparisons)

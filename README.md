@@ -16,6 +16,17 @@ A .NET state/workflow engine project currently focused on an experimental runtim
   - `fire`
 - Active tests for DSL parsing/runtime behavior in `test/StateMachine.Tests/DslWorkflowTests.cs`
 
+### Concurrency model (current)
+
+- `DslWorkflowDefinition` is immutable after compile and can be reused across calls.
+- Instance state is modeled as data (`DslWorkflowInstance`) and updated by returning a new instance from `Fire(...)`.
+- Persistence/write coordination (for instance JSON files) is caller-managed.
+
+### Legacy runtime status
+
+- The active implementation is the DSL runtime path only.
+- Legacy fluent/runtime artifacts are not part of the current public/runtime contract.
+
 ### Not implemented yet
 
 - DSL editor tooling (LSP / IntelliSense for VS Code / Visual Studio)
@@ -38,17 +49,17 @@ dotnet add package StateMachine
 
 ## Experimental DSL CLI
 
-Example DSL file: `docs/examples/trafficlight.sm`
+Example DSL file: `./trafficlight.sm`
 
 ```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- validate docs/examples/trafficlight.sm
-dotnet run --project tools/StateMachine.Dsl.Cli -- list docs/examples/trafficlight.sm
-dotnet run --project tools/StateMachine.Dsl.Cli -- inspect docs/examples/trafficlight.sm --state Red --event Advance
-dotnet run --project tools/StateMachine.Dsl.Cli -- fire docs/examples/trafficlight.sm --state Green --event Advance
-dotnet run --project tools/StateMachine.Dsl.Cli -- inspect docs/examples/trafficlight.sm --instance ./traffic.instance.json --event Advance
-dotnet run --project tools/StateMachine.Dsl.Cli -- fire docs/examples/trafficlight.sm --instance ./traffic.instance.json --event Advance --out-instance ./traffic.instance.json
-dotnet run --project tools/StateMachine.Dsl.Cli -- inspect docs/examples/trafficlight.sm --state Red --event Advance --context "{\"CarsWaiting\": 2}"
-dotnet run --project tools/StateMachine.Dsl.Cli -- fire docs/examples/trafficlight.sm --state Red --event Advance --context-file ./context.json
+dotnet run --project tools/StateMachine.Dsl.Cli -- validate ./trafficlight.sm
+dotnet run --project tools/StateMachine.Dsl.Cli -- list ./trafficlight.sm
+dotnet run --project tools/StateMachine.Dsl.Cli -- inspect ./trafficlight.sm --state Red --event Advance
+dotnet run --project tools/StateMachine.Dsl.Cli -- fire ./trafficlight.sm --state Green --event Advance
+dotnet run --project tools/StateMachine.Dsl.Cli -- inspect ./trafficlight.sm --instance ./traffic.instance.json --event Advance
+dotnet run --project tools/StateMachine.Dsl.Cli -- fire ./trafficlight.sm --instance ./traffic.instance.json --event Advance --out-instance ./traffic.instance.json
+dotnet run --project tools/StateMachine.Dsl.Cli -- inspect ./trafficlight.sm --state Red --event Advance --context "{\"CarsWaiting\": 2}"
+dotnet run --project tools/StateMachine.Dsl.Cli -- fire ./trafficlight.sm --state Red --event Advance --context-file ./context.json
 ```
 
 `inspect` / `fire` context options:
