@@ -28,7 +28,7 @@ Implementation focus is the DSL runtime path:
 
 - Undefined state/event/transition resolves to `IsDefined = false`
 - Unguarded transitions are accepted and return a target/new state
-- Guarded transitions are evaluated at runtime against an optional context payload
+- Guarded transitions are evaluated at runtime against optional event arguments (merged with instance snapshot data)
 - If one guarded transition evaluates `true`, inspection/fire is accepted and returns target/new state
 - If all guarded transitions evaluate `false`, inspection/fire is rejected with aggregated guard-failure reasons
 - Instance-based inspect/fire validates workflow name compatibility before evaluating transitions
@@ -55,12 +55,12 @@ Implementation focus is the DSL runtime path:
 1. Expand guard language/features or swap in a richer evaluator implementation.
 2. Implement LSP-backed diagnostics/completion for `.sm` files.
 
-## Guard Evaluation + Context Model (Current)
+## Guard Evaluation + Event-Argument Model (Current)
 
 - Runtime uses `IGuardEvaluator` with a default implementation (`DefaultGuardEvaluator`).
 - `DslWorkflowCompiler.Compile(...)` accepts an optional custom evaluator.
-- `Inspect(...)` and `Fire(...)` accept optional context (`IReadOnlyDictionary<string, object?>`).
-- REPL commands support transient per-command JSON context overrides.
+- `Inspect(...)` and `Fire(...)` accept optional event arguments (`IReadOnlyDictionary<string, object?>`).
+- REPL commands support transient per-command JSON event-argument overrides.
 - CLI emits non-zero exit codes for incompatible instances and script command failures.
 - Runtime supports persisted instance creation and instance-based `Inspect(...)` / `Fire(...)`.
 - CLI supports `--instance` at startup and REPL-level `load`/`save` for instance file management.

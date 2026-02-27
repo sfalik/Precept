@@ -10,40 +10,37 @@ Use the included sample files to start an interactive session immediately:
 dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json
 ```
 
+Note: when passing inline event arguments in REPL commands, wrap the JSON with single quotes (for example: `fire PedestrianRequest '{"PedestrianWaiting":true}'`).
+
 Then run a few commands in the prompt:
 
 ```text
 sm> events
 Advance
+PedestrianRequest
+Emergency
+ClearEmergency
 
-sm> inspect Advance
+sm> inspect PedestrianRequest
 Defined: True
-Accepted: True
-Target: Green
+Accepted: False
+Target: <none>
+Reasons:
+ - Guard 'PedestrianWaiting' failed.
+Outcome: Rejected
 
-sm> fire Advance
-Defined: True
-Accepted: True
-NewState: Green
-
-sm> state
-Green
-
-sm> fire Advance
+sm> fire PedestrianRequest '{"PedestrianWaiting":true}'
 Defined: True
 Accepted: True
 NewState: Yellow
 
-sm> state
-Yellow
-
-sm> fire Advance
+sm> fire Emergency
 Defined: True
 Accepted: True
-NewState: Red
+NewState: FlashingRed
 
 sm> state
-Red
+FlashingRed
 ```
 
 This startup mode always begins from a persisted instance.
@@ -79,7 +76,7 @@ This startup mode always begins from a persisted instance.
 
 - Unknown state/event/transition returns `IsDefined = false`
 - Unguarded transitions are accepted immediately
-- Guarded transitions are evaluated against optional runtime context
+- Guarded transitions are evaluated against optional event arguments (merged with instance snapshot data)
 - If all guarded candidates fail, result is rejected with aggregated reasons
 - Instance-based inspect/fire validates workflow name compatibility before evaluating transitions
 - CLI startup is instance-first: `--instance` is required
@@ -136,17 +133,15 @@ dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance 
 Run commands:
 
 ```text
-sm> inspect Advance
+sm> inspect PedestrianRequest
 Defined: True
-Accepted: True
-Target: Green
+Accepted: False
+Target: <none>
+Reasons:
+ - Guard 'PedestrianWaiting' failed.
+Outcome: Rejected
 
-sm> fire Advance
-Defined: True
-Accepted: True
-NewState: Green
-
-sm> fire Advance
+sm> fire PedestrianRequest '{"PedestrianWaiting":true}'
 Defined: True
 Accepted: True
 NewState: Yellow
@@ -156,8 +151,15 @@ Defined: True
 Accepted: True
 NewState: Red
 
-sm> save
-Instance saved: ./traffic.instance.json
+sm> fire Emergency
+Defined: True
+Accepted: True
+NewState: FlashingRed
+
+sm> fire ClearEmergency
+Defined: True
+Accepted: True
+NewState: Red
 ```
 
 Result exit codes are outcome-specific:
@@ -167,25 +169,32 @@ Result exit codes are outcome-specific:
 
 ## Sample `.sm`
 
+This sample demonstrates:
+
+- Guarded transitions using numeric and boolean event-argument checks
+- Multiple events (`Advance`, `PedestrianRequest`, `Emergency`, `ClearEmergency`)
+- An emergency override state (`FlashingRed`) reachable from normal flow states
+- Event-argument-aware behavior that can be inspected/fired from REPL or script mode
+
 ```text
 machine TrafficLight
 state Red
 state Green
 state Yellow
+state FlashingRed
 event Advance
-transition Red -> Green on Advance
+event PedestrianRequest
+event Emergency
+event ClearEmergency
+transition Red -> Green on Advance when CarsWaiting > 0
+transition Red -> Red on Advance when CarsWaiting == 0
 transition Green -> Yellow on Advance
 transition Yellow -> Red on Advance
-```
-
-Guarded variant:
-
-```text
-machine TrafficLight
-state Red
-state Green
-event Advance
-transition Red -> Green on Advance when CarsWaiting > 0
+transition Green -> Yellow on PedestrianRequest when PedestrianWaiting
+transition Red -> FlashingRed on Emergency
+transition Green -> FlashingRed on Emergency
+transition Yellow -> FlashingRed on Emergency
+transition FlashingRed -> Red on ClearEmergency
 ```
 
 ## Sample `traffic.instance.json`
@@ -197,7 +206,8 @@ transition Red -> Green on Advance when CarsWaiting > 0
   "lastEvent": null,
   "updatedAt": "2026-02-27T00:00:00+00:00",
   "contextSnapshot": {
-    "CarsWaiting": 2
+    "CarsWaiting": 2,
+    "PedestrianWaiting": false
   }
 }
 ```

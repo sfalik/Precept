@@ -1,5 +1,11 @@
 # inspect and fire from current instance state
+context
 inspect Advance
 fire Advance
-save
+inspect PedestrianRequest
+fire PedestrianRequest '{"PedestrianWaiting":true}'
+fire Advance
+fire Emergency
+state
+fire ClearEmergency
 exit

@@ -2,7 +2,17 @@ machine TrafficLight
 state Red
 state Green
 state Yellow
+state FlashingRed
 event Advance
-transition Red -> Green on Advance
+event PedestrianRequest
+event Emergency
+event ClearEmergency
+transition Red -> Green on Advance when CarsWaiting > 0
+transition Red -> Red on Advance when CarsWaiting == 0
 transition Green -> Yellow on Advance
 transition Yellow -> Red on Advance
+transition Green -> Yellow on PedestrianRequest when PedestrianWaiting
+transition Red -> FlashingRed on Emergency
+transition Green -> FlashingRed on Emergency
+transition Yellow -> FlashingRed on Emergency
+transition FlashingRed -> Red on ClearEmergency

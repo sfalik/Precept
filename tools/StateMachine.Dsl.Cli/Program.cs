@@ -259,35 +259,6 @@ static ReplExecutionResult ExecuteReplCommand(
         return ReplExecutionResult.Success();
     }
 
-    if (command == "set-context")
-    {
-        if (tokens.Count < 2)
-        {
-            Console.WriteLine("Usage: set-context <json-object>");
-            return ReplExecutionResult.Failed();
-        }
-
-        var parsed = ParseContext(tokens[1], null);
-        sessionInstance = sessionInstance with
-        {
-            ContextSnapshot = new Dictionary<string, object?>(parsed, StringComparer.Ordinal),
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        Console.WriteLine("Context updated.");
-        return ReplExecutionResult.Success();
-    }
-
-    if (command == "clear-context")
-    {
-        sessionInstance = sessionInstance with
-        {
-            ContextSnapshot = new Dictionary<string, object?>(StringComparer.Ordinal),
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        Console.WriteLine("Context cleared.");
-        return ReplExecutionResult.Success();
-    }
-
     if (command == "load")
     {
         if (tokens.Count < 2)
@@ -329,7 +300,7 @@ static ReplExecutionResult ExecuteReplCommand(
     {
         if (tokens.Count < 2)
         {
-            Console.WriteLine($"Usage: {command} <EventName> [json-context]");
+            Console.WriteLine($"Usage: {command} <EventName> [event-args-json]");
             return ReplExecutionResult.Failed();
         }
 
@@ -404,10 +375,9 @@ static void PrintReplHelp()
     Console.WriteLine("  state");
     Console.WriteLine("  events");
     Console.WriteLine("  context");
-    Console.WriteLine("  set-context <json-object>");
-    Console.WriteLine("  clear-context");
-    Console.WriteLine("  inspect <EventName> [json-context]");
-    Console.WriteLine("  fire <EventName> [json-context]");
+    Console.WriteLine("  inspect <EventName> [event-args-json]");
+    Console.WriteLine("  fire <EventName> [event-args-json]");
+    Console.WriteLine("    event-args-json is merged with the current instance snapshot for that command");
     Console.WriteLine("  load <path>");
     Console.WriteLine("  save [path]");
     Console.WriteLine("  exit | quit");
