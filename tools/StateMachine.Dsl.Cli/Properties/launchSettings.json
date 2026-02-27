@@ -1,9 +1,9 @@
 {
   "profiles": {
-    "StateMachine.Dsl.Cli (REPL)": {
+    "StateMachine.Dsl.Cli (Quick Start)": {
       "commandName": "Project",
       "workingDirectory": "$(SolutionDir)",
-      "commandLineArgs": "repl trafficlight.sm --state Red --context-file context.json"
+      "commandLineArgs": "./trafficlight.sm --instance ./traffic.instance.json"
     }
   }
 }

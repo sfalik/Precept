@@ -7,7 +7,7 @@ A .NET state/workflow engine project currently focused on an experimental runtim
 Use the included sample files to start an interactive session immediately:
 
 ```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- repl ./trafficlight.sm --state Red --context-file ./context.json
+dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json
 ```
 
 Then run a few commands in the prompt:
@@ -28,13 +28,25 @@ NewState: Green
 
 sm> state
 Green
+
+sm> fire Advance
+Defined: True
+Accepted: True
+NewState: Yellow
+
+sm> state
+Yellow
+
+sm> fire Advance
+Defined: True
+Accepted: True
+NewState: Red
+
+sm> state
+Red
 ```
 
-You can also start from a persisted instance:
-
-```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- repl ./trafficlight.sm --instance ./traffic.instance.json
-```
+This startup mode always begins from a persisted instance.
 
 ## Current Status
 
@@ -44,11 +56,8 @@ dotnet run --project tools/StateMachine.Dsl.Cli -- repl ./trafficlight.sm --inst
 - Persistable workflow instance model (`DslWorkflowInstance`) with workflow-name compatibility checks
 - Instance APIs in runtime (`CreateInstance`, instance-based `Inspect`, instance-based `Fire`)
 - CLI tooling in `tools/StateMachine.Dsl.Cli`:
-  - `validate`
-  - `list`
-  - `inspect`
-  - `fire`
-  - `repl`
+  - `repl` (interactive)
+  - `script` mode (`--script`) for non-interactive command files
 - Active tests for DSL parsing/runtime behavior in `test/StateMachine.Tests/DslWorkflowTests.cs`
 
 ### Concurrency model (current)
@@ -73,7 +82,7 @@ dotnet run --project tools/StateMachine.Dsl.Cli -- repl ./trafficlight.sm --inst
 - Guarded transitions are evaluated against optional runtime context
 - If all guarded candidates fail, result is rejected with aggregated reasons
 - Instance-based inspect/fire validates workflow name compatibility before evaluating transitions
-- CLI `inspect`/`fire` requires one of `--state` or `--instance`
+- CLI startup is instance-first: `--instance` is required
 
 ## Installation
 
@@ -83,87 +92,62 @@ dotnet add package StateMachine
 
 ## Experimental DSL CLI
 
-Example DSL file: `./trafficlight.sm`
+Launch REPL with an instance:
 
 ```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- validate ./trafficlight.sm
-dotnet run --project tools/StateMachine.Dsl.Cli -- list ./trafficlight.sm
-dotnet run --project tools/StateMachine.Dsl.Cli -- inspect ./trafficlight.sm --state Red --event Advance
-dotnet run --project tools/StateMachine.Dsl.Cli -- fire ./trafficlight.sm --state Green --event Advance
-dotnet run --project tools/StateMachine.Dsl.Cli -- inspect ./trafficlight.sm --instance ./traffic.instance.json --event Advance
-dotnet run --project tools/StateMachine.Dsl.Cli -- fire ./trafficlight.sm --instance ./traffic.instance.json --event Advance --out-instance ./traffic.instance.json
-dotnet run --project tools/StateMachine.Dsl.Cli -- inspect ./trafficlight.sm --state Red --event Advance --context "{\"CarsWaiting\": 2}"
-dotnet run --project tools/StateMachine.Dsl.Cli -- fire ./trafficlight.sm --state Red --event Advance --context-file ./context.json
-dotnet run --project tools/StateMachine.Dsl.Cli -- repl ./trafficlight.sm --state Red --context-file ./context.json
+dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json
+```
+
+Run a script (file of REPL commands):
+
+```sh
+dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json --script ./traffic.script.txt
 ```
 
 The repository includes ready-to-run examples:
 
 - `./trafficlight.sm`
 - `./traffic.instance.json`
-- `./context.json`
 
 ### Quick verify
 
-Accept path (guard passes):
+Start REPL:
 
 ```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- inspect ./trafficlight.sm --state Red --event Advance --context-file ./context.json
+dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json
 ```
 
-Expected key output:
+Run commands:
 
 ```text
+sm> inspect Advance
 Defined: True
 Accepted: True
 Target: Green
-```
 
-Reject path (guard fails):
-
-```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- inspect ./trafficlight.sm --state Red --event Advance --context "{\"CarsWaiting\": 0}"
-```
-
-Expected key output:
-
-```text
+sm> fire Advance
 Defined: True
-Accepted: False
-Outcome: Rejected
-```
-
-Fire via instance and persist updated state:
-
-```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- fire ./trafficlight.sm --instance ./traffic.instance.json --event Advance --out-instance ./traffic.instance.json
-```
-
-Expected key output:
-
-```text
 Accepted: True
 NewState: Green
+
+sm> fire Advance
+Defined: True
+Accepted: True
+NewState: Yellow
+
+sm> fire Advance
+Defined: True
+Accepted: True
+NewState: Red
+
+sm> save
 Instance saved: ./traffic.instance.json
 ```
 
-`inspect` / `fire` context options:
-
-- `--context <json>` for inline JSON object
-- `--context-file <path.json>` for JSON from file
-- `--instance <path.json>` to load state/context from a persisted instance
-- `--out-instance <path.json>` (fire only) to save updated instance; defaults to `--instance` path when omitted
-
-`repl` startup options:
-
-- `--state <StateName>` optional initial state (defaults to first declared state)
-- `--instance <path.json>` optional persisted instance to load as session state
-- `--context <json>` / `--context-file <path.json>` optional initial session context
-
 Result exit codes are outcome-specific:
 
-- `inspect`: `5` = not defined, `6` = rejected
-- `fire`: `7` = not defined, `8` = rejected
+- `5`: incompatible instance/workflow
+- `6`: script command failed
 
 ## Sample `.sm`
 
@@ -171,8 +155,11 @@ Result exit codes are outcome-specific:
 machine TrafficLight
 state Red
 state Green
+state Yellow
 event Advance
 transition Red -> Green on Advance
+transition Green -> Yellow on Advance
+transition Yellow -> Red on Advance
 ```
 
 Guarded variant:
@@ -196,14 +183,6 @@ transition Red -> Green on Advance when CarsWaiting > 0
   "contextSnapshot": {
     "CarsWaiting": 2
   }
-}
-```
-
-## Sample `context.json`
-
-```json
-{
-  "CarsWaiting": 2
 }
 ```
 

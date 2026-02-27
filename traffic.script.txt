@@ -1,0 +1,5 @@
+# inspect and fire from current instance state
+inspect Advance
+fire Advance
+save
+exit

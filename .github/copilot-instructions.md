@@ -19,6 +19,7 @@ On every meaningful change, review `README.md` and update impacted sections, inc
 - Thread-safety/concurrency statements
 - Examples/snippets that reference changed APIs
 - Feature claims that no longer match current code
+- Sample files that are affected by changes
 
 Do not leave aspirational claims as if implemented. If behavior is planned but not implemented, mark it clearly as design-phase or pending.
 
@@ -32,6 +33,8 @@ Do not leave aspirational claims as if implemented. If behavior is planned but n
    - If yes, update README current-status wording.
 4. Did any design decision change?
    - If yes, update `docs/DesignNotes.md` and any corresponding README section.
+5. Did sample files change?
+   - If yes, ensure `README.md` is updated accordingly.
 
 ## Current-Status Hygiene
 

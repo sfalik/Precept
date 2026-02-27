@@ -21,11 +21,8 @@ Implementation focus is the DSL runtime path:
 - `StateMachine.Dsl.DslWorkflowInstance` persisted instance model
 - Instance result/compatibility types: `DslInstanceCompatibilityResult`, `DslInstanceFireResult`
 - CLI commands in `tools/StateMachine.Dsl.Cli`:
-  - `validate`
-  - `list`
-  - `inspect`
-  - `fire`
-  - `repl`
+  - instance-first `repl`
+  - script execution mode via `--script`
 
 ## Current Runtime Semantics
 
@@ -35,6 +32,7 @@ Implementation focus is the DSL runtime path:
 - If one guarded transition evaluates `true`, inspection/fire is accepted and returns target/new state
 - If all guarded transitions evaluate `false`, inspection/fire is rejected with aggregated guard-failure reasons
 - Instance-based inspect/fire validates workflow name compatibility before evaluating transitions
+- CLI is instance-first; startup requires loading a persisted instance file
 
 ## Concurrency Model (Current)
 
@@ -62,13 +60,12 @@ Implementation focus is the DSL runtime path:
 - Runtime uses `IGuardEvaluator` with a default implementation (`DefaultGuardEvaluator`).
 - `DslWorkflowCompiler.Compile(...)` accepts an optional custom evaluator.
 - `Inspect(...)` and `Fire(...)` accept optional context (`IReadOnlyDictionary<string, object?>`).
-- CLI supports `--context` (inline JSON) and `--context-file` (JSON file path).
-- CLI emits distinct non-zero exit codes for `inspect`/`fire` not-defined vs rejected outcomes.
+- REPL commands support transient per-command JSON context overrides.
+- CLI emits non-zero exit codes for incompatible instances and script command failures.
 - Runtime supports persisted instance creation and instance-based `Inspect(...)` / `Fire(...)`.
-- CLI supports `--instance` and `--out-instance` for loading/saving workflow instances.
-- CLI requires either `--state` or `--instance` for `inspect`/`fire`.
-- Repository root includes runnable examples: `trafficlight.sm`, `traffic.instance.json`, `context.json`.
-- CLI includes an interactive `repl` mode for iterative inspect/fire, context edits, and instance load/save.
+- CLI supports `--instance` at startup and REPL-level `load`/`save` for instance file management.
+- Repository root includes runnable examples: `trafficlight.sm`, `traffic.instance.json`, `traffic.script.txt`.
+- CLI includes interactive REPL and non-interactive script execution using the same command set.
 
 Supported default guard forms:
 

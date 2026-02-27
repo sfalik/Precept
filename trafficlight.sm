@@ -1,5 +1,8 @@
 machine TrafficLight
 state Red
 state Green
+state Yellow
 event Advance
-transition Red -> Green on Advance when CarsWaiting > 0
+transition Red -> Green on Advance
+transition Green -> Yellow on Advance
+transition Yellow -> Red on Advance
