@@ -3,7 +3,18 @@ data
 inspect Advance
 fire Advance
 fire Advance
+fire Advance
+
+# Red with CarsWaiting=0 now rejects
+inspect Advance
+fire Advance
+
+# Emergency requires Reason argument
+fire Emergency
 fire Emergency '{"Reason":"Accident"}'
+
+# FlashingRed has no Advance transition
+fire Advance
 state
 data
 fire ClearEmergency

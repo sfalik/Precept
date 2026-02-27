@@ -171,6 +171,7 @@ internal sealed class DefaultGuardEvaluator : IGuardEvaluator
 public sealed class DslWorkflowDefinition
 {
     private readonly Dictionary<(string State, string Event), List<DslTransition>> _transitionMap;
+    private readonly Dictionary<(string State, string Event), DslTerminalRule> _terminalRuleMap;
     private readonly IGuardEvaluator _guardEvaluator;
     private static readonly Regex IdentifierRegex = new("^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
 
@@ -190,6 +191,12 @@ public sealed class DslWorkflowDefinition
             .ToDictionary(
                 g => (g.Key.FromState, g.Key.EventName),
                 g => g.ToList(),
+                EqualityComparer<(string State, string Event)>.Default);
+
+        _terminalRuleMap = machine.TerminalRules
+            .ToDictionary(
+                rule => (rule.FromState, rule.EventName),
+                rule => rule,
                 EqualityComparer<(string State, string Event)>.Default);
     }
 
@@ -336,8 +343,15 @@ public sealed class DslWorkflowDefinition
         if (!Events.Any(e => e.Name.Equals(eventName, StringComparison.Ordinal)))
             return TransitionResolution.NotDefined($"Unknown event '{eventName}'.");
 
+        _terminalRuleMap.TryGetValue((currentState, eventName), out var terminalRule);
+
         if (!_transitionMap.TryGetValue((currentState, eventName), out var transitions) || transitions.Count == 0)
-            return TransitionResolution.NotDefined($"No transition defined for event '{eventName}' in state '{currentState}'.");
+        {
+            if (terminalRule is not null)
+                return ResolveTerminal(currentState, eventName, terminalRule, Array.Empty<string>());
+
+            return TransitionResolution.NotDefined($"No transition for '{eventName}' from '{currentState}'.");
+        }
 
         var reasons = new List<string>();
         foreach (var transition in transitions)
@@ -349,10 +363,35 @@ public sealed class DslWorkflowDefinition
             if (evaluation.IsPassed)
                 return TransitionResolution.Accepted(transition);
 
-            reasons.Add(evaluation.FailureReason ?? $"Guard '{transition.GuardExpression}' failed.");
+            reasons.Add(
+                transition.GuardFailureReason
+                ?? evaluation.FailureReason
+                ?? $"Guard '{transition.GuardExpression}' failed.");
         }
 
+        if (terminalRule is not null)
+            return ResolveTerminal(currentState, eventName, terminalRule, reasons);
+
         return TransitionResolution.Rejected(reasons);
+    }
+
+    private static TransitionResolution ResolveTerminal(
+        string currentState,
+        string eventName,
+        DslTerminalRule terminalRule,
+        IReadOnlyList<string> guardFailureReasons)
+    {
+        return terminalRule.Kind switch
+        {
+            DslTerminalKind.NoTransition => TransitionResolution.NotDefined($"No transition for '{eventName}' from '{currentState}'."),
+            DslTerminalKind.Reject => TransitionResolution.Rejected(new[]
+            {
+                string.IsNullOrWhiteSpace(terminalRule.Reason)
+                    ? (guardFailureReasons.FirstOrDefault() ?? $"No transition for '{eventName}' from '{currentState}'.")
+                    : terminalRule.Reason!
+            }),
+            _ => TransitionResolution.Rejected(guardFailureReasons)
+        };
     }
 
     private static bool TryResolveAssignmentValue(
@@ -528,6 +567,7 @@ internal sealed class EmptyInstanceData : IReadOnlyDictionary<string, object?>
 }
 
 public sealed record DslInspectionResult(
+    DslOutcomeKind Outcome,
     bool IsDefined,
     bool IsAccepted,
     string CurrentState,
@@ -537,16 +577,17 @@ public sealed record DslInspectionResult(
     IReadOnlyList<string> Reasons)
 {
     internal static DslInspectionResult Accepted(string state, string evt, string target, IReadOnlyList<string> requiredEventArgumentKeys) =>
-        new(true, true, state, evt, target, requiredEventArgumentKeys, Array.Empty<string>());
+        new(DslOutcomeKind.Enabled, true, true, state, evt, target, requiredEventArgumentKeys, Array.Empty<string>());
 
     internal static DslInspectionResult NotDefined(string state, string evt, string reason) =>
-        new(false, false, state, evt, null, Array.Empty<string>(), new[] { reason });
+        new(DslOutcomeKind.Undefined, false, false, state, evt, null, Array.Empty<string>(), new[] { reason });
 
     internal static DslInspectionResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(true, false, state, evt, null, Array.Empty<string>(), reasons);
+        new(DslOutcomeKind.Blocked, true, false, state, evt, null, Array.Empty<string>(), reasons);
 }
 
 public sealed record DslFireResult(
+    DslOutcomeKind Outcome,
     bool IsDefined,
     bool IsAccepted,
     string CurrentState,
@@ -555,16 +596,17 @@ public sealed record DslFireResult(
     IReadOnlyList<string> Reasons)
 {
     internal static DslFireResult Accepted(string state, string evt, string newState) =>
-        new(true, true, state, evt, newState, Array.Empty<string>());
+        new(DslOutcomeKind.Enabled, true, true, state, evt, newState, Array.Empty<string>());
 
     internal static DslFireResult NotDefined(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(false, false, state, evt, null, reasons);
+        new(DslOutcomeKind.Undefined, false, false, state, evt, null, reasons);
 
     internal static DslFireResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(true, false, state, evt, null, reasons);
+        new(DslOutcomeKind.Blocked, true, false, state, evt, null, reasons);
 }
 
 public sealed record DslInstanceFireResult(
+    DslOutcomeKind Outcome,
     bool IsDefined,
     bool IsAccepted,
     string PreviousState,
@@ -574,11 +616,18 @@ public sealed record DslInstanceFireResult(
     DslWorkflowInstance? UpdatedInstance)
 {
     internal static DslInstanceFireResult Accepted(string state, string evt, string newState, DslWorkflowInstance updated) =>
-        new(true, true, state, evt, newState, Array.Empty<string>(), updated);
+        new(DslOutcomeKind.Enabled, true, true, state, evt, newState, Array.Empty<string>(), updated);
 
     internal static DslInstanceFireResult NotDefined(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(false, false, state, evt, null, reasons, null);
+        new(DslOutcomeKind.Undefined, false, false, state, evt, null, reasons, null);
 
     internal static DslInstanceFireResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(true, false, state, evt, null, reasons, null);
+        new(DslOutcomeKind.Blocked, true, false, state, evt, null, reasons, null);
+}
+
+public enum DslOutcomeKind
+{
+    Undefined,
+    Blocked,
+    Enabled
 }

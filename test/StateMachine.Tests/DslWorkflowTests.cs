@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using FluentAssertions;
 using StateMachine.Dsl;
@@ -26,8 +26,34 @@ public class DslWorkflowTests
 
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeTrue();
+        inspection.Outcome.Should().Be(DslOutcomeKind.Enabled);
         inspection.TargetState.Should().Be("Green");
         inspection.Reasons.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Inspect_Outcome_Maps_To_Undefined_Blocked_Enabled()
+    {
+        const string dsl = """
+            machine TrafficLight
+            state Red
+            state Green
+            event Advance
+            from Red on Advance
+                if CarsWaiting > 0 reason "Cars waiting required"
+                    transition Green
+                reject "Cars waiting required"
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+
+        var undefined = workflow.Inspect("Red", "MissingEvent");
+        var blocked = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["CarsWaiting"] = 0 });
+        var enabled = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["CarsWaiting"] = 2 });
+
+        undefined.Outcome.Should().Be(DslOutcomeKind.Undefined);
+        blocked.Outcome.Should().Be(DslOutcomeKind.Blocked);
+        enabled.Outcome.Should().Be(DslOutcomeKind.Enabled);
     }
 
     [Fact]
@@ -38,7 +64,10 @@ public class DslWorkflowTests
             state Red
             state Green
             event Advance
-            transition Red -> Green on Advance when CarsWaiting > 0
+            from Red on Advance
+                if CarsWaiting > 0 reason "Cars waiting required"
+                    transition Green
+                reject "Cars waiting required"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -60,7 +89,10 @@ public class DslWorkflowTests
             state Red
             state Green
             event Advance
-            transition Red -> Green on Advance when CarsWaiting > 0
+            from Red on Advance
+                if CarsWaiting > 0 reason "Cars waiting required"
+                    transition Green
+                reject "Cars waiting required"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -71,7 +103,7 @@ public class DslWorkflowTests
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeFalse();
         inspection.TargetState.Should().BeNull();
-        inspection.Reasons.Should().ContainSingle(r => r.Contains("CarsWaiting > 0", StringComparison.Ordinal));
+        inspection.Reasons.Should().ContainSingle("Cars waiting required");
     }
 
     [Fact]
@@ -82,7 +114,10 @@ public class DslWorkflowTests
             state Red
             state Green
             event Advance
-            transition Red -> Green on Advance when CarsWaiting > 0
+            from Red on Advance
+                if CarsWaiting > 0 reason "Cars waiting required"
+                    transition Green
+                reject "Cars waiting required"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -91,7 +126,7 @@ public class DslWorkflowTests
 
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeFalse();
-        inspection.Reasons.Should().ContainSingle(r => r.Contains("data key 'CarsWaiting'", StringComparison.Ordinal));
+        inspection.Reasons.Should().ContainSingle("Cars waiting required");
     }
 
     [Fact]
@@ -102,7 +137,10 @@ public class DslWorkflowTests
             state Disabled
             state Enabled
             event Evaluate
-            transition Disabled -> Enabled on Evaluate when IsEnabled
+            from Disabled on Evaluate
+                if IsEnabled reason "Feature must be enabled"
+                    transition Enabled
+                reject "Feature must be enabled"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -112,7 +150,7 @@ public class DslWorkflowTests
 
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeFalse();
-        inspection.Reasons.Should().ContainSingle(r => r.Contains("not a boolean", StringComparison.Ordinal));
+        inspection.Reasons.Should().ContainSingle("Feature must be enabled");
     }
 
     [Fact]
@@ -124,8 +162,12 @@ public class DslWorkflowTests
             state Green
             state Yellow
             event Advance
-            transition Red -> Green on Advance when CarsWaiting > 0
-            transition Red -> Yellow on Advance when IsManualOverride
+            from Red on Advance
+                if CarsWaiting > 0 reason "Cars waiting required"
+                    transition Green
+                else if IsManualOverride reason "Manual override required"
+                    transition Yellow
+                reject "No eligible transition"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -139,7 +181,7 @@ public class DslWorkflowTests
 
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeFalse();
-        inspection.Reasons.Should().HaveCount(2);
+        inspection.Reasons.Should().ContainSingle("No eligible transition");
     }
 
     [Fact]
@@ -150,7 +192,10 @@ public class DslWorkflowTests
             state Draft
             state Live
             event Publish
-            transition Draft -> Live on Publish when Mode == "Manual"
+            from Draft on Publish
+                if Mode == "Manual" reason "Manual mode required"
+                    transition Live
+                reject "Manual mode required"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -171,7 +216,10 @@ public class DslWorkflowTests
             state Open
             state Pending
             event Escalate
-            transition Open -> Pending on Escalate when Assignee == null
+            from Open on Escalate
+                if Assignee == null reason "Assignee must be empty"
+                    transition Pending
+                reject "Assignee must be empty"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -192,7 +240,10 @@ public class DslWorkflowTests
             state Low
             state High
             event Scale
-            transition Low -> High on Scale when Qps >= 100
+            from Low on Scale
+                if Qps >= 100 reason "Qps threshold not met"
+                    transition High
+                reject "Qps threshold not met"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -206,14 +257,17 @@ public class DslWorkflowTests
     }
 
     [Fact]
-    public void Inspect_UnsupportedGuardExpression_IsRejectedWithNotSupportedReason()
+    public void Inspect_UnsupportedGuardExpression_UsesConfiguredReason()
     {
         const string dsl = """
             machine Workflow
             state A
             state B
             event Go
-            transition A -> B on Go when Flag && OtherFlag
+            from A on Go
+                if Flag && OtherFlag reason "Both flags must be true"
+                    transition B
+                reject "Both flags must be true"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -227,7 +281,7 @@ public class DslWorkflowTests
 
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeFalse();
-        inspection.Reasons.Should().ContainSingle(r => r.Contains("not supported", StringComparison.Ordinal));
+        inspection.Reasons.Should().ContainSingle("Both flags must be true");
     }
 
     [Fact]
@@ -238,7 +292,10 @@ public class DslWorkflowTests
             state Red
             state Green
             event Advance
-            transition Red -> Green on Advance when CarsWaiting > 0
+            from Red on Advance
+                if CarsWaiting > 0 reason "Cars waiting required"
+                    transition Green
+                reject "Cars waiting required"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -260,7 +317,10 @@ public class DslWorkflowTests
             state Red
             state Green
             event Advance
-            transition Red -> Green on Advance when CarsWaiting > 0
+            from Red on Advance
+                if CarsWaiting > 0 reason "Cars waiting required"
+                    transition Green
+                reject "Cars waiting required"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -490,7 +550,10 @@ public class DslWorkflowTests
             state Disabled
             state Enabled
             event Evaluate
-            transition Disabled -> Enabled on Evaluate when IsEnabled
+            from Disabled on Evaluate
+                if IsEnabled reason "Feature must be enabled"
+                    transition Enabled
+                reject "Feature must be enabled"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -507,7 +570,7 @@ public class DslWorkflowTests
         accepted.TargetState.Should().Be("Enabled");
         rejectedWithUnrelatedArgs.IsDefined.Should().BeTrue();
         rejectedWithUnrelatedArgs.IsAccepted.Should().BeFalse();
-        rejectedWithUnrelatedArgs.Reasons.Should().ContainSingle(r => r.Contains("IsEnabled", StringComparison.Ordinal));
+        rejectedWithUnrelatedArgs.Reasons.Should().ContainSingle("Feature must be enabled");
     }
 
     [Fact]
@@ -603,14 +666,236 @@ public class DslWorkflowTests
             state Red
             state Green
             event Advance
-            transition Red -> Green on Advance when CarsWaiting > 0 set CarsWaiting = 0
+            from Red on Advance
+                if CarsWaiting > 0 reason "Cars waiting required"
+                    transform CarsWaiting = 0
+                    transition Green
+                reject "Cars waiting required"
             """;
 
         var machine = StateMachineDslParser.Parse(dsl);
 
         machine.Transitions.Should().ContainSingle();
         machine.Transitions[0].GuardExpression.Should().Be("CarsWaiting > 0");
+        machine.Transitions[0].GuardFailureReason.Should().Be("Cars waiting required");
         machine.Transitions[0].DataAssignmentKey.Should().Be("CarsWaiting");
         machine.Transitions[0].DataAssignmentExpression.Should().Be("0");
     }
+
+    [Fact]
+    public void Parse_GuardedTransition_WithoutReason_IsRejected()
+    {
+        const string dsl = """
+            machine TrafficLight
+            state Red
+            state Green
+            event Advance
+            transition Red -> Green on Advance reason "Cars waiting required"
+            """;
+
+        var act = () => StateMachineDslParser.Parse(dsl);
+
+        act.Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*inline transition reasons are not supported*block outcome statement*");
+    }
+
+        [Fact]
+        public void Parse_FromOnBlock_WithReject_ParsesOutcomeRule()
+        {
+                const string dsl = """
+                        machine TrafficLight
+                        states Red, Green
+                        events Advance
+                        from Red on Advance
+                            if CarsWaiting > 0
+                                transition Green
+                            reject "No cars waiting"
+                        """;
+
+                var machine = StateMachineDslParser.Parse(dsl);
+
+                machine.Transitions.Should().ContainSingle();
+                machine.Transitions[0].FromState.Should().Be("Red");
+                machine.Transitions[0].ToState.Should().Be("Green");
+                machine.TerminalRules.Should().ContainSingle();
+                machine.TerminalRules[0].Kind.Should().Be(DslTerminalKind.Reject);
+                machine.TerminalRules[0].Reason.Should().Be("No cars waiting");
+        }
+
+        [Fact]
+        public void Inspect_FromOnBlock_AllGuardsFail_UsesOutcomeRejectReason()
+        {
+                const string dsl = """
+                        machine TrafficLight
+                        states Red, Green
+                        events Advance
+                        from Red on Advance
+                            if CarsWaiting > 0
+                                transition Green
+                            reject "No cars waiting"
+                        """;
+
+                var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+
+                var inspection = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["CarsWaiting"] = 0 });
+
+                inspection.IsDefined.Should().BeTrue();
+                inspection.IsAccepted.Should().BeFalse();
+                inspection.Outcome.Should().Be(DslOutcomeKind.Blocked);
+                inspection.Reasons.Should().ContainSingle("No cars waiting");
+        }
+
+        [Fact]
+        public void Inspect_FromOnBlock_NoTransitionOutcome_IsUndefined()
+        {
+                const string dsl = """
+                        machine TrafficLight
+                        states Red, Green
+                        events Advance
+                        from Red on Advance
+                            if CarsWaiting > 0
+                                transition Green
+                            no transition
+                        """;
+
+                var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+
+                var inspection = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["CarsWaiting"] = 0 });
+
+                inspection.IsDefined.Should().BeFalse();
+                inspection.IsAccepted.Should().BeFalse();
+                inspection.Outcome.Should().Be(DslOutcomeKind.Undefined);
+                inspection.Reasons.Should().ContainSingle(r => r.Contains("No transition", StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void Parse_FromAny_ExpandsToAllStates()
+        {
+                const string dsl = """
+                        machine TrafficLight
+                        states Red, Green, Yellow, FlashingRed
+                        events Emergency
+                        from any on Emergency
+                            if Reason != ""
+                                transition FlashingRed
+                            reject "Emergency reason is required"
+                        """;
+
+                var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+                var data = new Dictionary<string, object?> { ["Reason"] = "Accident" };
+
+                workflow.Inspect("Red", "Emergency", data).IsAccepted.Should().BeTrue();
+                workflow.Inspect("Green", "Emergency", data).IsAccepted.Should().BeTrue();
+                workflow.Inspect("Yellow", "Emergency", data).IsAccepted.Should().BeTrue();
+        }
+
+        [Fact]
+        public void Parse_FromOnBlock_WithoutOutcome_IsRejected()
+        {
+                const string dsl = """
+                        machine TrafficLight
+                        states Red, Green
+                        events Advance
+                        from Red on Advance
+                        if CarsWaiting > 0
+                                transition Green
+                        """;
+
+                var act = () => StateMachineDslParser.Parse(dsl);
+
+                act.Should()
+                        .Throw<InvalidOperationException>()
+                    .WithMessage("*must end with an outcome statement*");
+        }
+
+            [Fact]
+            public void Parse_DuplicateOutcomeRule_ForSameFromOn_IsRejected()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    states Red, Green
+                    events Advance
+
+                    from Red on Advance
+                                reject "First"
+
+                    from Red on Advance
+                                reject "Second"
+                    """;
+
+                var act = () => StateMachineDslParser.Parse(dsl);
+
+                act.Should()
+                    .Throw<InvalidOperationException>()
+                    .WithMessage("*Duplicate outcome rule for state 'Red' and event 'Advance'*");
+            }
+
+            [Fact]
+            public void Parse_FromOnBlock_StatementAfterOutcomeTransition_IsRejected()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    states Yellow, Red
+                    events Advance
+
+                    from Yellow on Advance
+                        transition Red
+                        no transition
+                    """;
+
+                var act = () => StateMachineDslParser.Parse(dsl);
+
+                act.Should()
+                    .Throw<InvalidOperationException>()
+                    .WithMessage("*no statements are allowed after an outcome statement*");
+            }
+
+            [Fact]
+            public void Inspect_FromOnBlock_ElseIfChain_SelectsFirstMatchingBranch()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    states Red, Green, Yellow
+                    events Advance
+
+                    from Red on Advance
+                        if CarsWaiting > 3
+                            transition Green
+                        else if CarsWaiting > 0
+                            transition Yellow
+                        else
+                            reject "No cars waiting"
+                    """;
+
+                var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+
+                workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["CarsWaiting"] = 5 }).TargetState.Should().Be("Green");
+                workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["CarsWaiting"] = 1 }).TargetState.Should().Be("Yellow");
+
+                var rejected = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["CarsWaiting"] = 0 });
+                rejected.Outcome.Should().Be(DslOutcomeKind.Blocked);
+                rejected.Reasons.Should().ContainSingle("No cars waiting");
+            }
+
+            [Fact]
+            public void Parse_FromOnBlock_UnknownBranchKeyword_IsRejected()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    states Red, Green
+                    events Advance
+
+                    from Red on Advance
+                        unless CarsWaiting > 0
+                            transition Green
+                        reject "No cars waiting"
+                    """;
+
+                var act = () => StateMachineDslParser.Parse(dsl);
+
+                act.Should()
+                    .Throw<InvalidOperationException>()
+                    .WithMessage("*unrecognized statement 'unless CarsWaiting > 0' inside from/on block.*");
+            }
 }

@@ -12,6 +12,32 @@ Implementation focus is the DSL runtime path:
 - validate semantic correctness
 - execute inspection/fire against a compiled in-memory workflow definition
 
+### Design-Phase Compatibility Policy
+
+- Backwards compatibility is not required at this time.
+- The DSL is in active design phase; syntax and behavior may change to improve clarity and consistency.
+- The current canonical guarded-branch syntax is `from ... on ...` with `if` / `else if` / `else`.
+- Legacy guard keywords are removed from the DSL syntax surface.
+
+### DSL Syntax Contract (Current)
+
+- Block header: `from <State|State,State|any> on <Event>`
+- Guarded branch header: `if <Guard> [reason "<message>"]`
+- Additional guarded branch headers: `else if <Guard> [reason "<message>"]`
+- Optional fallback header: `else`
+- Allowed branch body statements:
+  - `transform <Key> = <Expr>` (optional)
+  - `transition <State>` (required for `if`/`else if` branch bodies)
+- Allowed block outcome statements:
+  - `transition <State>`
+  - `reject "<message>"`
+  - `no transition`
+- Validation rules:
+  - Every `from ... on ...` block must end with an outcome statement.
+  - No statements are allowed after an outcome statement.
+  - `else if` and `else` require a preceding `if` in the same block.
+  - Inline guarded transitions (`transition A -> B on E` with trailing guard clauses) are invalid.
+
 ## Implemented Components
 
 - `StateMachine.Dsl.DslMachine` model
@@ -26,12 +52,15 @@ Implementation focus is the DSL runtime path:
 
 ## Current Runtime Semantics
 
-- Undefined state/event/transition resolves to `IsDefined = false`
-- Unguarded transitions are accepted and return a target/new state
-- Guarded transitions are evaluated at runtime against optional event arguments; when provided, they are used for that call without mutating persisted instance data
-- Transition data assignments are evaluated/applied only during accepted `Fire(...)` calls
-- If one guarded transition evaluates `true`, inspection/fire is accepted and returns target/new state
-- If all guarded transitions evaluate `false`, inspection/fire is rejected with aggregated guard-failure reasons
+- Undefined state/event/transition resolves to outcome `Undefined`
+- CLI display for `Undefined` distinguishes unknown event (`unknown event`) from no available edge on a known event (`no transition from <State>`).
+- Unguarded transitions resolve to outcome `Enabled` and return a target/new state
+- Guarded transitions are evaluated at runtime against optional event arguments; if provided, they are used for that call without mutating persisted instance data
+- `from ... on ...` blocks support ordered `if`/`else if`/`else` branches and end with an outcome statement: `transition <State>`, `reject "<message>"`, or `no transition`.
+- Statements are not allowed after an outcome statement in a block.
+- Transition data assignments are evaluated/applied only during `Enabled` `Fire(...)` calls
+- If one guarded transition evaluates `true`, inspection/fire is `Enabled` and returns target/new state
+- If all guarded transitions evaluate `false`, terminal `reject` returns `Blocked` with the configured reason; terminal `no transition` returns `Undefined`
 - Instance-based inspect/fire validates workflow name compatibility before evaluating transitions
 - CLI is instance-first; startup requires loading a persisted instance file
 
@@ -63,10 +92,27 @@ Implementation focus is the DSL runtime path:
 - `Inspect(...)` and `Fire(...)` accept optional event arguments (`IReadOnlyDictionary<string, object?>`).
 - REPL commands support transient per-command JSON event-argument overrides.
 - REPL supports `symbols test` to print an ASCII/Unicode compatibility matrix for terminal/font diagnostics.
+- REPL supports `style preview` (current theme) and `style preview all` (all themes) using compact timeline styling.
+- Style preview samples use a realistic traffic-light transcript (`Red`, `Advance`, `Green`, etc.) and include preview/success/error/warning outcomes so branch alignment and status styling can be judged visually.
+- REPL supports `style theme <name|list>` to switch among built-in palettes during a session.
+- REPL default startup theme is `github-dark`.
 - REPL `inspect` supports optional event name; without one it inspects all events and reports callable transitions for the current state.
-- REPL `fire` prompts for each required event key when no inline arguments are supplied and the selected transition transform infers required event keys.
+- REPL `fire` prompts for each required event key directly if no inline arguments are supplied and the selected transition transform infers required event keys.
 - REPL `data` renders readable key-value output in interactive mode unless output mode is json.
-- Symbol rendering supports `auto|ascii|unicode`; auto mode prefers Unicode only when runtime terminal heuristics indicate support.
+- Interactive REPL uses `compact` only.
+- Script/non-interactive output is log-oriented (`INFO`/`WARN`/`ERROR`) for command traceability.
+- REPL compact output in interactive mode omits repeated command/event labels to reduce noise.
+- REPL compact mode uses a timeline-style prompt (`Red ›`) with branch prefixes (`├─`/`└─`) and semantic transition arrows: preview (`inspect`) uses `──▷` (ASCII fallback: `-->`), and committed success (`fire`) uses `──▶` (ASCII fallback: `==>`).
+- Single-event `inspect <EventName>` preview output is visually differentiated from inspect-all rows to make direct command results stand out.
+- Interactive compact `inspect`/`fire` result lines include the event name before the status marker (for example, `NotAnEvent ✖ | unknown event`, `Advance ⚠ | No cars waiting`, `Advance ✔ ──▶ Green`, `ClearEmergency ✖ | no transition from Red`).
+- Interactive argument prompts in compact mode follow the same style (for example, `│  Reason: value`).
+- Interactive commands that display events/states use the same timeline rendering, including `events`, `state`, and inspect callable lines.
+- Compact inspect callable lists align event-name columns for improved readability.
+- Compact `events` output also aligns event-name columns to match inspect-list rhythm.
+- Compact interactive non-prompt lines (including argument prompts) are rendered as timeline children beneath each prompt.
+- Interactive inspect callable output lists only event/state lines (no separate "callable events" banner).
+- REPL verbose mode renders structured table/panel views for inspect/fire details and callable-event listings.
+- Symbol rendering supports `auto|ascii|unicode`; auto mode prefers Unicode only if runtime terminal heuristics indicate support.
 - Transition DSL supports `set <Key> = <expr>` where `<expr>` can be a literal or a bare event-argument key (for example, `Reason`).
 - Typed event arguments (`event Name(Type)`) are deprecated and rejected during parse.
 - Prefixed transform references (`arg.<Key>` / `data.<Key>`) are rejected during parse.

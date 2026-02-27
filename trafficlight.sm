@@ -1,16 +1,25 @@
 machine TrafficLight
-state Red
-state Green
-state Yellow
-state FlashingRed
-event Advance
-event Emergency
-event ClearEmergency
-transition Red -> Green on Advance when CarsWaiting > 0
-transition Red -> Red on Advance when CarsWaiting == 0
-transition Green -> Yellow on Advance
-transition Yellow -> Red on Advance
-transition Red -> FlashingRed on Emergency set EmergencyReason = Reason
-transition Green -> FlashingRed on Emergency set EmergencyReason = Reason
-transition Yellow -> FlashingRed on Emergency set EmergencyReason = Reason
-transition FlashingRed -> Red on ClearEmergency
+states Red, Green, Yellow, FlashingRed
+events Advance, Emergency, ClearEmergency
+
+from Red on Advance
+	if CarsWaiting > 0
+		transform CarsWaiting = 0
+		transition Green
+	reject "No cars waiting"
+
+from Green on Advance
+	transition Yellow
+
+from Yellow on Advance
+	transition Red
+
+from Red, Green, Yellow on Emergency
+	if Reason != ""
+		transform EmergencyReason = Reason
+		transition FlashingRed
+	reject "Emergency reason is required"
+
+from FlashingRed on ClearEmergency
+	transform EmergencyReason = null
+	transition Red
