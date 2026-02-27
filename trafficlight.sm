@@ -1,12 +1,20 @@
 machine TrafficLight
-states Red, Green, Yellow, FlashingRed
+states Red, Green, Yellow, FlashingGreen, FlashingRed
 events Advance, Emergency, ClearEmergency
 
+# Red: priority to left-turn queue, then general demand, else hold
 from Red on Advance
-	if CarsWaiting > 0
-		transform CarsWaiting = 0
+	if LeftTurnQueued
+		transform LeftTurnQueued = false
+		transition FlashingGreen
+	else if VehiclesWaiting > 0
 		transition Green
-	reject "No cars waiting"
+	else
+		reject "No demand detected at red"
+
+# Protected left-turn phase rejoins normal cycle at Green
+from FlashingGreen on Advance
+	transition Green
 
 from Green on Advance
 	transition Yellow
@@ -14,11 +22,16 @@ from Green on Advance
 from Yellow on Advance
 	transition Red
 
-from Red, Green, Yellow on Emergency
+# Emergency preemption: requires a reason to record why it was activated
+from any on Emergency
 	if Reason != ""
 		transform EmergencyReason = Reason
 		transition FlashingRed
-	reject "Emergency reason is required"
+	reject "A reason is required to activate emergency mode"
+
+# Signal cycle is suspended during emergency; Advance does nothing
+from FlashingRed on Advance
+	no transition
 
 from FlashingRed on ClearEmergency
 	transform EmergencyReason = null

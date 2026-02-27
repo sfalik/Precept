@@ -4,7 +4,8 @@
   "lastEvent": null,
   "updatedAt": "2026-02-27T00:00:00+00:00",
   "instanceData": {
-    "CarsWaiting": 2,
+    "VehiclesWaiting": 0,
+    "LeftTurnQueued": true,
     "EmergencyReason": null
   }
 }

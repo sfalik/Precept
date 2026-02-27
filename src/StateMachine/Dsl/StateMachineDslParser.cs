@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -151,7 +151,6 @@ public static class StateMachineDslParser
                     transitionMatch.Groups["to"].Value,
                     transitionMatch.Groups["event"].Value,
                     null,
-                    null,
                     transitionMatch.Groups["setKey"].Success ? transitionMatch.Groups["setKey"].Value.Trim() : null,
                     transitionMatch.Groups["setExpr"].Success ? transitionMatch.Groups["setExpr"].Value.Trim() : null));
                 i++;
@@ -230,6 +229,9 @@ public static class StateMachineDslParser
             var ifMatch = IfRegex.Match(line);
             if (ifMatch.Success)
             {
+                if (ifMatch.Groups["reason"].Success)
+                    throw new InvalidOperationException($"Line {index + 1}: 'reason' is not allowed on 'if' branches. Provide a reason only on 'reject' statements.");
+
                 if (hasIfChain)
                     throw new InvalidOperationException($"Line {index + 1}: use 'else if' to continue an existing if-chain.");
 
@@ -241,14 +243,16 @@ public static class StateMachineDslParser
                     sourceStates,
                     eventName,
                     blockBranches,
-                    ifMatch.Groups["guard"].Value.Trim(),
-                    ifMatch.Groups["reason"].Success ? ifMatch.Groups["reason"].Value.Trim() : null);
+                    ifMatch.Groups["guard"].Value.Trim());
                 continue;
             }
 
             var elseIfMatch = ElseIfRegex.Match(line);
             if (elseIfMatch.Success)
             {
+                if (elseIfMatch.Groups["reason"].Success)
+                    throw new InvalidOperationException($"Line {index + 1}: 'reason' is not allowed on 'else if' branches. Provide a reason only on 'reject' statements.");
+
                 if (!hasIfChain)
                     throw new InvalidOperationException($"Line {index + 1}: 'else if' requires a preceding 'if'.");
 
@@ -262,8 +266,7 @@ public static class StateMachineDslParser
                     sourceStates,
                     eventName,
                     blockBranches,
-                    elseIfMatch.Groups["guard"].Value.Trim(),
-                    elseIfMatch.Groups["reason"].Success ? elseIfMatch.Groups["reason"].Value.Trim() : null);
+                    elseIfMatch.Groups["guard"].Value.Trim());
                 continue;
             }
 
@@ -310,7 +313,6 @@ public static class StateMachineDslParser
                         sourceState,
                         targetState,
                         eventName,
-                        null,
                         null,
                         pendingSetKey,
                         pendingSetExpr));
@@ -372,8 +374,7 @@ public static class StateMachineDslParser
         IReadOnlyList<string> sourceStates,
         string eventName,
         ICollection<DslTransition> blockBranches,
-        string guardExpression,
-        string? guardReason)
+        string guardExpression)
     {
         string? branchSetKey = null;
         string? branchSetExpr = null;
@@ -430,7 +431,6 @@ public static class StateMachineDslParser
                 branchTargetState,
                 eventName,
                 guardExpression,
-                guardReason,
                 branchSetKey,
                 branchSetExpr));
         }
@@ -524,7 +524,6 @@ public static class StateMachineDslParser
                     sourceState,
                     branchTargetState,
                     eventName,
-                    null,
                     null,
                     branchSetKey,
                     branchSetExpr));

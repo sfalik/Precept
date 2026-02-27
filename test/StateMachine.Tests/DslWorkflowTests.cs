@@ -40,7 +40,7 @@ public class DslWorkflowTests
             state Green
             event Advance
             from Red on Advance
-                if CarsWaiting > 0 reason "Cars waiting required"
+                if CarsWaiting > 0
                     transition Green
                 reject "Cars waiting required"
             """;
@@ -65,7 +65,7 @@ public class DslWorkflowTests
             state Green
             event Advance
             from Red on Advance
-                if CarsWaiting > 0 reason "Cars waiting required"
+                if CarsWaiting > 0
                     transition Green
                 reject "Cars waiting required"
             """;
@@ -90,7 +90,7 @@ public class DslWorkflowTests
             state Green
             event Advance
             from Red on Advance
-                if CarsWaiting > 0 reason "Cars waiting required"
+                if CarsWaiting > 0
                     transition Green
                 reject "Cars waiting required"
             """;
@@ -115,7 +115,7 @@ public class DslWorkflowTests
             state Green
             event Advance
             from Red on Advance
-                if CarsWaiting > 0 reason "Cars waiting required"
+                if CarsWaiting > 0
                     transition Green
                 reject "Cars waiting required"
             """;
@@ -138,7 +138,7 @@ public class DslWorkflowTests
             state Enabled
             event Evaluate
             from Disabled on Evaluate
-                if IsEnabled reason "Feature must be enabled"
+                if IsEnabled
                     transition Enabled
                 reject "Feature must be enabled"
             """;
@@ -163,9 +163,9 @@ public class DslWorkflowTests
             state Yellow
             event Advance
             from Red on Advance
-                if CarsWaiting > 0 reason "Cars waiting required"
+                if CarsWaiting > 0
                     transition Green
-                else if IsManualOverride reason "Manual override required"
+                else if IsManualOverride
                     transition Yellow
                 reject "No eligible transition"
             """;
@@ -193,7 +193,7 @@ public class DslWorkflowTests
             state Live
             event Publish
             from Draft on Publish
-                if Mode == "Manual" reason "Manual mode required"
+                if Mode == "Manual"
                     transition Live
                 reject "Manual mode required"
             """;
@@ -217,7 +217,7 @@ public class DslWorkflowTests
             state Pending
             event Escalate
             from Open on Escalate
-                if Assignee == null reason "Assignee must be empty"
+                if Assignee == null
                     transition Pending
                 reject "Assignee must be empty"
             """;
@@ -241,7 +241,7 @@ public class DslWorkflowTests
             state High
             event Scale
             from Low on Scale
-                if Qps >= 100 reason "Qps threshold not met"
+                if Qps >= 100
                     transition High
                 reject "Qps threshold not met"
             """;
@@ -265,7 +265,7 @@ public class DslWorkflowTests
             state B
             event Go
             from A on Go
-                if Flag && OtherFlag reason "Both flags must be true"
+                if Flag && OtherFlag
                     transition B
                 reject "Both flags must be true"
             """;
@@ -293,7 +293,7 @@ public class DslWorkflowTests
             state Green
             event Advance
             from Red on Advance
-                if CarsWaiting > 0 reason "Cars waiting required"
+                if CarsWaiting > 0
                     transition Green
                 reject "Cars waiting required"
             """;
@@ -318,7 +318,7 @@ public class DslWorkflowTests
             state Green
             event Advance
             from Red on Advance
-                if CarsWaiting > 0 reason "Cars waiting required"
+                if CarsWaiting > 0
                     transition Green
                 reject "Cars waiting required"
             """;
@@ -551,7 +551,7 @@ public class DslWorkflowTests
             state Enabled
             event Evaluate
             from Disabled on Evaluate
-                if IsEnabled reason "Feature must be enabled"
+                if IsEnabled
                     transition Enabled
                 reject "Feature must be enabled"
             """;
@@ -667,7 +667,7 @@ public class DslWorkflowTests
             state Green
             event Advance
             from Red on Advance
-                if CarsWaiting > 0 reason "Cars waiting required"
+                if CarsWaiting > 0
                     transform CarsWaiting = 0
                     transition Green
                 reject "Cars waiting required"
@@ -677,9 +677,10 @@ public class DslWorkflowTests
 
         machine.Transitions.Should().ContainSingle();
         machine.Transitions[0].GuardExpression.Should().Be("CarsWaiting > 0");
-        machine.Transitions[0].GuardFailureReason.Should().Be("Cars waiting required");
         machine.Transitions[0].DataAssignmentKey.Should().Be("CarsWaiting");
         machine.Transitions[0].DataAssignmentExpression.Should().Be("0");
+        machine.TerminalRules.Should().ContainSingle();
+        machine.TerminalRules[0].Reason.Should().Be("Cars waiting required");
     }
 
     [Fact]
@@ -897,5 +898,26 @@ public class DslWorkflowTests
                 act.Should()
                     .Throw<InvalidOperationException>()
                     .WithMessage("*unrecognized statement 'unless CarsWaiting > 0' inside from/on block.*");
+            }
+
+            [Fact]
+            public void Parse_IfBlock_WithReason_IsRejected()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    states Red, Green
+                    events Advance
+
+                    from Red on Advance
+                        if CarsWaiting > 0 reason "No demand"
+                            transition Green
+                        reject "No cars waiting"
+                    """;
+
+                var act = () => StateMachineDslParser.Parse(dsl);
+
+                act.Should()
+                    .Throw<InvalidOperationException>()
+                    .WithMessage("*'reason' is not allowed on 'if' branches*");
             }
 }

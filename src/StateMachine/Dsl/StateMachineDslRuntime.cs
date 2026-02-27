@@ -364,8 +364,7 @@ public sealed class DslWorkflowDefinition
                 return TransitionResolution.Accepted(transition);
 
             reasons.Add(
-                transition.GuardFailureReason
-                ?? evaluation.FailureReason
+                evaluation.FailureReason
                 ?? $"Guard '{transition.GuardExpression}' failed.");
         }
 

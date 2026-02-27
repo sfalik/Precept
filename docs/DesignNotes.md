@@ -19,11 +19,20 @@ Implementation focus is the DSL runtime path:
 - The current canonical guarded-branch syntax is `from ... on ...` with `if` / `else if` / `else`.
 - Legacy guard keywords are removed from the DSL syntax surface.
 
+### DSL Design Intent
+
+- Readability-first: rules should read top-to-bottom as a deterministic decision flow.
+- Single obvious style: one canonical guarded-branch form for authoring and tooling.
+- Deterministic outcomes: each `from ... on ...` block resolves to exactly one result (`Enabled`, `Blocked`, or `Undefined`).
+- Strict structure over permissiveness: parser rejects ambiguous or mixed-shape statements early with explicit errors.
+- Outcome-first clarity: fallback behavior is explicit (`reject` or `no transition`) rather than implicit failure.
+- Tooling-friendly grammar: indentation + fixed keywords provide stable anchors for completion, diagnostics, and formatting.
+
 ### DSL Syntax Contract (Current)
 
 - Block header: `from <State|State,State|any> on <Event>`
-- Guarded branch header: `if <Guard> [reason "<message>"]`
-- Additional guarded branch headers: `else if <Guard> [reason "<message>"]`
+- Guarded branch header: `if <Guard>`
+- Additional guarded branch headers: `else if <Guard>`
 - Optional fallback header: `else`
 - Allowed branch body statements:
   - `transform <Key> = <Expr>` (optional)
@@ -36,7 +45,25 @@ Implementation focus is the DSL runtime path:
   - Every `from ... on ...` block must end with an outcome statement.
   - No statements are allowed after an outcome statement.
   - `else if` and `else` require a preceding `if` in the same block.
+  - `reason "<message>"` is valid **only** on `reject` statements; writing it on `if` or `else if` is a parse error.
   - Inline guarded transitions (`transition A -> B on E` with trailing guard clauses) are invalid.
+
+#### Branch/body constraints
+
+- `if` and `else if` branch bodies:
+  - allow optional `transform <Key> = <Expr>`
+  - require exactly one `transition <State>`
+  - do not allow `reject` or `no transition`
+- `else` branch body:
+  - may include optional `transform` only if outcome is `transition <State>`
+  - must end in exactly one outcome statement: `transition <State>`, `reject "<message>"`, or `no transition`
+
+#### Evaluation model
+
+- Branches are evaluated in declaration order.
+- First matching guarded branch wins.
+- If no guard matches, configured block outcome is applied.
+- Transition transforms execute only on accepted fire-path transitions.
 
 ## Implemented Components
 

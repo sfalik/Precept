@@ -1,21 +1,30 @@
-# inspect and fire from current instance state
+# Show available events and callable transitions from starting state
 data
-inspect Advance
+inspect
+
+# LeftTurnQueued=true: Red advances to protected left-turn phase (FlashingGreen)
+fire Advance
+
+# Normal cycle continues from FlashingGreen (Green -> Yellow -> Red)
 fire Advance
 fire Advance
 fire Advance
 
-# Red with CarsWaiting=0 now rejects
+# Back at Red - no left-turn queue and no vehicle demand
 inspect Advance
 fire Advance
 
-# Emergency requires Reason argument
+# Emergency without reason is rejected
 fire Emergency
+
+# Emergency with reason activates flashing red
 fire Emergency '{"Reason":"Accident"}'
 
-# FlashingRed has no Advance transition
+# Advance has no transition while in emergency mode
 fire Advance
 state
 data
+
+# Clear the emergency to return to normal cycle
 fire ClearEmergency
 exit

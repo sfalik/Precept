@@ -26,34 +26,45 @@ Red › events
   ├─ Emergency
   └─ ClearEmergency
 
+Red › data
+  ├─ EmergencyReason: <null>
+  ├─ LeftTurnQueued: true
+  └─ VehiclesWaiting: 0
+
 Red › inspect
-  ├─ Advance   ──▷ Green
-  └─ Emergency ──▷ FlashingRed
-
-Red › fire ClearEmergency
-  └─ ClearEmergency ✖ | no transition from Red
-
-Red › inspect NotAnEvent
-  └─ NotAnEvent ✖ | unknown event
-
-Red › inspect Advance   # (with CarsWaiting = 0)
-  └─ Advance ⚠ | No cars waiting
+  └─ Advance ──▷ FlashingGreen
 
 Red › fire Advance
+  └─ Advance ✔ ──▶ FlashingGreen
+
+FlashingGreen › fire Advance
   └─ Advance ✔ ──▶ Green
 
-Green › fire Emergency
-  │  Reason: Accident
+Green › fire Advance
+  └─ Advance ✔ ──▶ Yellow
+
+Yellow › fire Advance
+  └─ Advance ✔ ──▶ Red
+
+Red › inspect Advance
+  └─ Advance ⚠ | No demand detected at red
+
+Red › fire Emergency
+  └─ Emergency ⚠ | A reason is required to activate emergency mode
+
+Red › fire Emergency '{"Reason":"Accident"}'
   └─ Emergency ✔ ──▶ FlashingRed
 
-FlashingRed › data
-  ├─ CarsWaiting: 2
-  └─ EmergencyReason: Accident
+FlashingRed › fire Advance
+  └─ Advance ✖ | no transition from FlashingRed
+
+FlashingRed › fire ClearEmergency
+  └─ ClearEmergency ✔ ──▶ Red
 ```
 
-Note: you can still pass inline JSON event arguments (for example `fire Emergency '{"Reason":"Accident"}'`).
+Note: you can also pass inline JSON event arguments (for example `fire Emergency '{"Reason":"Accident"}'`).
 Note: output is colorized by default (success/warning/error); use `--no-color` to disable.
-Note: the blocked example above uses an instance where `CarsWaiting` is `0`.
+Note: `inspect` after the fourth `fire Advance` shows blocked because `LeftTurnQueued` was cleared and `VehiclesWaiting` is 0.
 
 Quick script run (non-interactive):
 
@@ -64,10 +75,10 @@ dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance 
 Expected compact output shape:
 
 ```text
-sm> inspect
-✔ inspect: callable events from Red
-Advance → Green
-Emergency → FlashingRed
+sm> fire Advance
+[INFO] Advance: Red → FlashingGreen
+sm> fire Emergency '{"Reason":"Accident"}'
+[INFO] Emergency: Red → FlashingRed
 ```
 
 ## Core Concepts
@@ -82,16 +93,53 @@ Emergency → FlashingRed
 
 ## DSL Example
 
+The DSL is built up in stages. Each stage introduces new constructs on top of the previous one.
+
+### Stage 1 — One-line transitions
+
+The simplest form: a machine with three states cycling on a single event.
+
+```text
+machine TrafficLight
+states Red, Green, Yellow
+events Advance
+
+from Red on Advance
+  transition Green
+
+from Green on Advance
+  transition Yellow
+
+from Yellow on Advance
+  transition Red
+```
+
+### Stage 2 — Guarded transition with reject
+
+Add an `if` guard that blocks the transition when demand is absent. The `reject` statement is the fallback if no guard passes.
+
+```text
+from Red on Advance
+  if VehiclesWaiting > 0
+    transition Green
+  reject "No demand detected at red"
+```
+
+`if` branches allow an optional `transform` before `transition`. Guards do not carry `reason` — that belongs on `reject` only.
+
+### Stage 3 — Event arguments, transform, `from any`, `no transition`
+
+Add an emergency event that requires a payload, records data on transition, suspends the cycle, and can be cleared.
+
 ```text
 machine TrafficLight
 states Red, Green, Yellow, FlashingRed
 events Advance, Emergency, ClearEmergency
 
 from Red on Advance
-  if CarsWaiting > 0
-    transform CarsWaiting = 0
+  if VehiclesWaiting > 0
     transition Green
-  reject "No cars waiting"
+  reject "No demand detected at red"
 
 from Green on Advance
   transition Yellow
@@ -99,20 +147,72 @@ from Green on Advance
 from Yellow on Advance
   transition Red
 
-from Red, Green, Yellow on Emergency
+from any on Emergency
   if Reason != ""
     transform EmergencyReason = Reason
     transition FlashingRed
-  reject "Emergency reason is required"
+  reject "A reason is required to activate emergency mode"
+
+from FlashingRed on Advance
+  no transition
 
 from FlashingRed on ClearEmergency
   transform EmergencyReason = null
   transition Red
 ```
 
-Supported assignment forms today:
+- `from any` matches every state; specific `from` headers take priority.
+- `transform Key = Expr` runs only on accepted `fire`, never on `inspect`.
+- `no transition` makes the outcome explicitly undefined — reported as `no transition from <State>`.
+- Event-argument keys (`Reason`) are accessed directly in guards and transform expressions.
 
-- Literal: `transform CarsWaiting = 0`
+### Stage 4 — `else if` / `else` (full sample)
+
+Add a protected left-turn phase (`FlashingGreen`) served ahead of general demand, cleared in one step.
+
+```text
+machine TrafficLight
+states Red, Green, Yellow, FlashingGreen, FlashingRed
+events Advance, Emergency, ClearEmergency
+
+from Red on Advance
+  if LeftTurnQueued
+    transform LeftTurnQueued = false
+    transition FlashingGreen
+  else if VehiclesWaiting > 0
+    transition Green
+  else
+    reject "No demand detected at red"
+
+from FlashingGreen on Advance
+  transition Green
+
+from Green on Advance
+  transition Yellow
+
+from Yellow on Advance
+  transition Red
+
+from any on Emergency
+  if Reason != ""
+    transform EmergencyReason = Reason
+    transition FlashingRed
+  reject "A reason is required to activate emergency mode"
+
+from FlashingRed on Advance
+  no transition
+
+from FlashingRed on ClearEmergency
+  transform EmergencyReason = null
+  transition Red
+```
+
+The full file (with block comments) is at [`trafficlight.sm`](trafficlight.sm).
+
+Supported assignment forms:
+
+- Literal: `transform VehiclesWaiting = 0`
+- Null literal: `transform EmergencyReason = null`
 - Copy from event arguments: `transform EmergencyReason = Reason`
 
 Each `from ... on ...` block must end with an outcome statement: `transition <State>`, `reject "<message>"`, or `no transition`.
@@ -122,16 +222,37 @@ Guarded transitions are expressed only with `if` / `else if` / `else` inside `fr
 Current DSL syntax contract:
 
 - Block header: `from <State|State,State|any> on <Event>`
-- Guarded branch: `if <Guard> [reason "<message>"]` followed by an indented `transition <State>` (optional `transform` line before transition)
-- Additional guarded branches: `else if <Guard> [reason "<message>"]`
+- Guarded branch: `if <Guard>` followed by an indented `transition <State>` (optional `transform` line before transition)
+- Additional guarded branches: `else if <Guard>`
 - Fallback branch: `else` followed by exactly one outcome path
 - Outcome statements:
   - `transition <State>`
   - `reject "<message>"`
   - `no transition`
 - `else if` and `else` require a preceding `if`
+- `reason` is valid **only** on `reject` statements; writing `reason "..."` on an `if` or `else if` branch is a parse error
 - Guarded logic belongs in branch headers (`if` / `else if`) inside `from ... on ...` blocks
 - Inline guarded transitions (for example `transition A -> B on E` with trailing guard clauses) are not supported
+
+Authoring rules (detailed):
+
+- Indentation is structural; nested statements must be indented deeper than their parent header.
+- `if` and `else if` branch bodies allow:
+  - zero or one `transform <Key> = <Expr>`
+  - exactly one `transition <State>`
+- `if` and `else if` branches cannot end with `reject` or `no transition`; fallback outcomes belong in block-level `else` or final block outcome lines.
+- `else` is optional; if present, it must be last and contain exactly one outcome path (`transition`, `reject`, or `no transition`, with optional leading `transform` for transition outcomes).
+- A block may end directly with `transition <State>`, `reject "<message>"`, or `no transition` without an `else` branch.
+- After the first outcome statement in a block, no further statements are valid.
+
+Resolution semantics:
+
+- Branches are evaluated in source order.
+- The first guard that evaluates `true` is selected and its transition is applied.
+- If no guarded branch is selected, the block outcome decides behavior:
+  - `reject` => inspect/fire result is blocked with the configured reason
+  - `no transition` => result is undefined
+  - terminal `transition` => unconditional enabled transition
 
 Unsupported in transforms:
 
@@ -149,7 +270,8 @@ Event-arg keys with those exact names are reserved and cannot be referenced as t
   "lastEvent": null,
   "updatedAt": "2026-02-27T00:00:00+00:00",
   "instanceData": {
-    "CarsWaiting": 2,
+    "VehiclesWaiting": 0,
+    "LeftTurnQueued": true,
     "EmergencyReason": null
   }
 }
