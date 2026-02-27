@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace StateMachine.Dsl;
@@ -176,14 +174,12 @@ public sealed class DslWorkflowDefinition
     private readonly IGuardEvaluator _guardEvaluator;
 
     public string Name { get; }
-    public string Version { get; }
     public IReadOnlyList<string> States { get; }
     public IReadOnlyList<DslEvent> Events { get; }
 
     internal DslWorkflowDefinition(DslMachine machine, IGuardEvaluator guardEvaluator)
     {
         Name = machine.Name;
-        Version = ComputeVersion(machine);
         States = machine.States;
         Events = machine.Events;
         _guardEvaluator = guardEvaluator;
@@ -208,7 +204,6 @@ public sealed class DslWorkflowDefinition
 
         return new DslWorkflowInstance(
             Name,
-            Version,
             initialState,
             null,
             DateTimeOffset.UtcNow,
@@ -221,12 +216,6 @@ public sealed class DslWorkflowDefinition
         {
             return DslInstanceCompatibilityResult.NotCompatible(
                 $"Instance workflow '{instance.WorkflowName}' does not match compiled workflow '{Name}'.");
-        }
-
-        if (!instance.WorkflowVersion.Equals(Version, StringComparison.Ordinal))
-        {
-            return DslInstanceCompatibilityResult.NotCompatible(
-                $"Instance workflow version '{instance.WorkflowVersion}' does not match compiled workflow version '{Version}'.");
         }
 
         if (!States.Contains(instance.CurrentState, StringComparer.Ordinal))
@@ -354,30 +343,6 @@ public sealed class DslWorkflowDefinition
         return merged;
     }
 
-    private static string ComputeVersion(DslMachine machine)
-    {
-        var sb = new StringBuilder();
-        sb.Append(machine.Name).Append('|');
-        foreach (var state in machine.States)
-            sb.Append("S:").Append(state).Append('|');
-        foreach (var evt in machine.Events)
-            sb.Append("E:").Append(evt.Name).Append(':').Append(evt.ArgumentType).Append('|');
-        foreach (var transition in machine.Transitions)
-        {
-            sb.Append("T:")
-              .Append(transition.FromState)
-              .Append("->")
-              .Append(transition.ToState)
-              .Append('@')
-              .Append(transition.EventName)
-              .Append('?')
-              .Append(transition.GuardExpression)
-              .Append('|');
-        }
-
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()));
-        return Convert.ToHexString(bytes).Substring(0, 12);
-    }
 }
 
 public static class DslWorkflowCompiler
@@ -393,7 +358,6 @@ public static class DslWorkflowCompiler
 
 public sealed record DslWorkflowInstance(
     string WorkflowName,
-    string WorkflowVersion,
     string CurrentState,
     string? LastEvent,
     DateTimeOffset UpdatedAt,

@@ -33,8 +33,8 @@ Implementation focus is the DSL runtime path:
 - Guarded transitions are evaluated at runtime against an optional context payload
 - If one guarded transition evaluates `true`, inspection/fire is accepted and returns target/new state
 - If all guarded transitions evaluate `false`, inspection/fire is rejected with aggregated guard-failure reasons
-- Compiled workflow definitions expose deterministic `Version` values
-- Instance-based inspect/fire validates workflow name + version compatibility before evaluating transitions
+- Instance-based inspect/fire validates workflow name compatibility before evaluating transitions
+- Migration-aware inspect/fire can optionally use an instance migrator before compatibility rejection
 
 ## Concurrency Model (Current)
 
@@ -45,7 +45,6 @@ Implementation focus is the DSL runtime path:
 ## Known Gaps
 
 - Guard language is intentionally minimal in this phase (`Identifier`, `!Identifier`, and simple comparisons)
-- Version migration strategy for persisted instances across evolved `.sm` definitions
 - Editor tooling (LSP and IntelliSense integration)
 
 ## Test Status
@@ -56,8 +55,7 @@ Implementation focus is the DSL runtime path:
 ## Next Steps
 
 1. Expand guard language/features or swap in a richer evaluator implementation.
-2. Add explicit migration hooks/policies for incompatible persisted instance versions.
-3. Implement LSP-backed diagnostics/completion for `.sm` files.
+2. Implement LSP-backed diagnostics/completion for `.sm` files.
 
 ## Guard Evaluation + Context Model (Current)
 

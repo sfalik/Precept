@@ -7,7 +7,7 @@ A .NET state/workflow engine project currently focused on an experimental runtim
 ### Implemented now
 
 - Line-based DSL model/parser/runtime in `src/StateMachine/Dsl/*`
-- Persistable workflow instance model (`DslWorkflowInstance`) with workflow compatibility checks
+- Persistable workflow instance model (`DslWorkflowInstance`) with workflow-name compatibility checks
 - Instance APIs in runtime (`CreateInstance`, instance-based `Inspect`, instance-based `Fire`)
 - CLI tooling in `tools/StateMachine.Dsl.Cli`:
   - `validate`
@@ -30,7 +30,6 @@ A .NET state/workflow engine project currently focused on an experimental runtim
 ### Not implemented yet
 
 - DSL editor tooling (LSP / IntelliSense for VS Code / Visual Studio)
-- Full workflow migration strategy between changed `.sm` definitions
 
 ### Runtime semantics (current)
 
@@ -38,7 +37,7 @@ A .NET state/workflow engine project currently focused on an experimental runtim
 - Unguarded transitions are accepted immediately
 - Guarded transitions are evaluated against optional runtime context
 - If all guarded candidates fail, result is rejected with aggregated reasons
-- Compiled workflow has deterministic `Version`; instance workflow name/version must match for instance-based inspect/fire
+- Instance-based inspect/fire validates workflow name compatibility before evaluating transitions
 - CLI `inspect`/`fire` requires one of `--state` or `--instance`
 
 ## Installation

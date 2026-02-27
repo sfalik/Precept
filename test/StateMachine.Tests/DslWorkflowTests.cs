@@ -301,7 +301,7 @@ public class DslWorkflowTests
     }
 
     [Fact]
-    public void Inspect_Instance_WithVersionMismatch_IsNotDefinedWithReason()
+    public void Inspect_Instance_WithWorkflowMismatch_IsNotDefinedWithReason()
     {
         const string dsl = """
             machine TrafficLight
@@ -313,8 +313,7 @@ public class DslWorkflowTests
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
         var incompatible = new DslWorkflowInstance(
-            workflow.Name,
-            "OLDVERSION",
+            "OtherWorkflow",
             "Red",
             null,
             DateTimeOffset.UtcNow,
@@ -324,7 +323,7 @@ public class DslWorkflowTests
 
         inspection.IsDefined.Should().BeFalse();
         inspection.IsAccepted.Should().BeFalse();
-        inspection.Reasons.Should().ContainSingle(r => r.Contains("version", StringComparison.Ordinal));
+        inspection.Reasons.Should().ContainSingle(r => r.Contains("workflow", StringComparison.Ordinal));
     }
 
     [Fact]

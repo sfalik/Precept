@@ -231,7 +231,6 @@ static DslWorkflowInstance LoadInstance(string path)
         throw new InvalidOperationException("Instance JSON must be an object.");
 
     string workflowName = root.GetProperty("workflowName").GetString() ?? string.Empty;
-    string workflowVersion = root.GetProperty("workflowVersion").GetString() ?? string.Empty;
     string currentState = root.GetProperty("currentState").GetString() ?? string.Empty;
     string? lastEvent = root.TryGetProperty("lastEvent", out var lastEventElement) && lastEventElement.ValueKind != JsonValueKind.Null
         ? lastEventElement.GetString()
@@ -248,7 +247,7 @@ static DslWorkflowInstance LoadInstance(string path)
             context[property.Name] = ToDotNetValue(property.Value);
     }
 
-    return new DslWorkflowInstance(workflowName, workflowVersion, currentState, lastEvent, updatedAt, context);
+    return new DslWorkflowInstance(workflowName, currentState, lastEvent, updatedAt, context);
 }
 
 static void SaveInstance(string path, DslWorkflowInstance instance)
@@ -256,7 +255,6 @@ static void SaveInstance(string path, DslWorkflowInstance instance)
     var envelope = new Dictionary<string, object?>
     {
         ["workflowName"] = instance.WorkflowName,
-        ["workflowVersion"] = instance.WorkflowVersion,
         ["currentState"] = instance.CurrentState,
         ["lastEvent"] = instance.LastEvent,
         ["updatedAt"] = instance.UpdatedAt,
