@@ -1,18 +1,23 @@
 # StateMachine 🚦
 
-A .NET state/workflow engine project currently focused on an experimental runtime DSL.
+StateMachine is a .NET DSL-driven state/workflow engine focused on deterministic transition evaluation and persisted instance state.
 
-## Quick Start
+## Why this project
 
-Use the included sample files to start an interactive session immediately:
+- **Inspect before fire**: evaluate whether an event is defined/accepted before mutating state.
+- **Persistable runtime instances**: load/save a JSON instance with current state and instance data.
+- **Explicit event arguments**: per-call arguments are separate from persisted instance data.
+- **Transition-scoped data updates**: `set Key = ...` assignments run only on accepted `fire`.
+
+## Quick Start (2 minutes)
+
+Run the included traffic-light sample in REPL mode:
 
 ```sh
 dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json
 ```
 
-Note: when passing inline event arguments in REPL commands, wrap the JSON with single quotes (for example: `fire Emergency '{"Reason":"Accident"}'`).
-
-Then run a few commands in the prompt:
+Then try:
 
 ```text
 sm> events
@@ -35,104 +40,25 @@ Defined: True
 Accepted: True
 NewState: FlashingRed
 
-sm> state
-FlashingRed
+sm> data
+{
+  "CarsWaiting": 2,
+  "EmergencyReason": "Accident"
+}
 ```
 
-This startup mode always begins from a persisted instance.
+Note: inline JSON event arguments should be wrapped in single quotes.
 
-## Current Status
+## Core Concepts
 
-### Implemented now
+- **Workflow definition**: immutable compiled DSL (`DslWorkflowDefinition`).
+- **Instance**: persisted runtime state + data (`DslWorkflowInstance`).
+- **Inspect**: side-effect free transition check.
+- **Fire**: applies state change and transition data assignments.
+- **Event arguments**: optional per-call JSON object for inspect/fire.
+- **Instance data**: persisted data loaded from/saved to instance JSON.
 
-- Line-based DSL model/parser/runtime in `src/StateMachine/Dsl/*`
-- Persistable workflow instance model (`DslWorkflowInstance`) with workflow-name compatibility checks
-- Instance APIs in runtime (`CreateInstance`, instance-based `Inspect`, instance-based `Fire`)
-- CLI tooling in `tools/StateMachine.Dsl.Cli`:
-  - `repl` (interactive)
-  - `script` mode (`--script`) for non-interactive command files
-- Active tests for DSL parsing/runtime behavior in `test/StateMachine.Tests/DslWorkflowTests.cs`
-
-### Concurrency model (current)
-
-- `DslWorkflowDefinition` is immutable after compile and can be reused across calls.
-- Instance state is modeled as data (`DslWorkflowInstance`) and updated by returning a new instance from `Fire(...)`.
-- Persistence/write coordination (for instance JSON files) is caller-managed.
-
-### Legacy runtime status
-
-- The active implementation is the DSL runtime path only.
-- Legacy fluent/runtime artifacts are not part of the current public/runtime contract.
-
-### Not implemented yet
-
-- DSL editor tooling (LSP / IntelliSense for VS Code / Visual Studio)
-
-### Runtime semantics (current)
-
-- Unknown state/event/transition returns `IsDefined = false`
-- Unguarded transitions are accepted immediately
-- Guarded transitions are evaluated against optional event arguments; when provided, they are used for that call without mutating persisted instance data
-- Transition data assignments (`set Key = ...`) are applied only on accepted `fire` calls
-- If all guarded candidates fail, result is rejected with aggregated reasons
-- Instance-based inspect/fire validates workflow name compatibility before evaluating transitions
-- CLI startup is instance-first: `--instance` is required
-
-## Installation
-
-```sh
-dotnet add package StateMachine
-```
-
-## VS Code (official extensions)
-
-This workspace is configured for Microsoft's official .NET tooling:
-
-- `ms-dotnettools.csdevkit`
-- `ms-dotnettools.csharp`
-- `ms-dotnettools.vscode-dotnet-runtime`
-
-When opened in VS Code, the workspace recommends these extensions via `.vscode/extensions.json`.
-The default solution is preconfigured in `.vscode/settings.json` as `dotnet.defaultSolution = "StateMachine.slnx"`.
-
-Press `F5` and choose `REPL (traffic sample)` to build and launch the CLI in REPL mode with:
-
-- `./trafficlight.sm`
-- `--instance ./traffic.instance.json`
-
-## Experimental DSL CLI
-
-Launch REPL with an instance:
-
-```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json
-```
-
-Run a script (file of REPL commands):
-
-```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json --script ./traffic.script.txt
-```
-
-The repository includes ready-to-run examples:
-
-- `./trafficlight.sm`
-- `./traffic.instance.json`
-
-Result exit codes are outcome-specific:
-
-- `5`: incompatible instance/workflow
-- `6`: script command failed
-
-## Sample `.sm`
-
-This sample demonstrates:
-
-- Guarded transitions using numeric event-argument/data checks
-- Multiple events (`Advance`, `Emergency`, `ClearEmergency`)
-- An emergency override state (`FlashingRed`) reachable from normal flow states
-- Transition data updates using `set <Key> = <expr>` during `fire`
-- Event-argument-aware behavior that can be inspected/fired from REPL or script mode
+## DSL Example
 
 ```text
 machine TrafficLight
@@ -153,7 +79,13 @@ transition Yellow -> FlashingRed on Emergency set EmergencyReason = arg.Reason
 transition FlashingRed -> Red on ClearEmergency
 ```
 
-## Sample `traffic.instance.json`
+Supported assignment forms today:
+
+- Literal: `set CarsWaiting = 0`
+- Copy from instance data: `set LastCarsWaiting = data.CarsWaiting`
+- Copy from event arguments: `set EmergencyReason = arg.Reason`
+
+## Instance JSON Example
 
 ```json
 {
@@ -168,7 +100,78 @@ transition FlashingRed -> Red on ClearEmergency
 }
 ```
 
-## Project Structure
+## CLI Usage
+
+Launch REPL:
+
+```sh
+dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json
+```
+
+Run script mode:
+
+```sh
+dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json --script ./traffic.script.txt
+```
+
+REPL commands:
+
+- `help`
+- `state`
+- `events`
+- `data`
+- `inspect <EventName> [event-args-json]`
+- `fire <EventName> [event-args-json]`
+- `load <path>`
+- `save [path]`
+- `exit | quit`
+
+Exit codes:
+
+- `0`: success
+- `1`: invalid usage
+- `2`: input file not found
+- `4`: unhandled error
+- `5`: incompatible instance/workflow
+- `6`: script command failed
+
+## Current Status
+
+Implemented now:
+
+- Line-based DSL parser/runtime in `src/StateMachine/Dsl/*`
+- Instance-first runtime APIs (`CreateInstance`, `Inspect`, `Fire`)
+- Guard evaluation with rejection reasons
+- Transition data assignments (`set Key = ...`) on accepted `fire`
+- CLI REPL + script execution
+- Active test coverage in `test/StateMachine.Tests/DslWorkflowTests.cs`
+
+Pending:
+
+- Editor tooling (LSP/IntelliSense)
+
+Concurrency model (current):
+
+- Definition is immutable and reusable.
+- Instance updates are caller-managed values.
+- Persistence/write coordination is caller-managed.
+
+Legacy runtime status:
+
+- Active public/runtime path is DSL runtime only.
+- Legacy fluent/runtime artifacts are not part of the current contract.
+
+## VS Code Setup
+
+This workspace recommends official .NET extensions via `.vscode/extensions.json`:
+
+- `ms-dotnettools.csdevkit`
+- `ms-dotnettools.csharp`
+- `ms-dotnettools.vscode-dotnet-runtime`
+
+Press `F5` and choose `REPL (traffic sample)` to run the sample directly.
+
+## Repository Layout
 
 ```text
 src/StateMachine/
@@ -182,3 +185,4 @@ tools/StateMachine.Dsl.Cli/
 
 test/StateMachine.Tests/
     DslWorkflowTests.cs
+```
