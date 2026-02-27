@@ -9,7 +9,8 @@ public static class StateMachineDslParser
 {
     private static readonly Regex MachineRegex = new("^machine\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
     private static readonly Regex StateRegex = new("^state\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
-    private static readonly Regex EventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\((?<arg>[A-Za-z_][A-Za-z0-9_<>., ]*)\\))?$", RegexOptions.Compiled);
+    private static readonly Regex EventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
+    private static readonly Regex TypedEventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*\\((?<arg>[A-Za-z_][A-Za-z0-9_<>., ]*)\\)$", RegexOptions.Compiled);
     private static readonly Regex TransitionRegex = new(
         "^transition\\s+(?<from>[A-Za-z_][A-Za-z0-9_]*)\\s*->\\s*(?<to>[A-Za-z_][A-Za-z0-9_]*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+when\\s+(?<guard>.*?))?(?:\\s+set\\s+(?<setKey>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<setExpr>.+))?$",
         RegexOptions.Compiled);
@@ -56,13 +57,19 @@ public static class StateMachineDslParser
             if (eventMatch.Success)
             {
                 string eventName = eventMatch.Groups["name"].Value;
-                string? arg = eventMatch.Groups["arg"].Success ? eventMatch.Groups["arg"].Value.Trim() : null;
 
                 if (events.Any(e => e.Name.Equals(eventName, StringComparison.Ordinal)))
                     throw new InvalidOperationException($"Line {i + 1}: duplicate event '{eventName}'.");
 
-                events.Add(new DslEvent(eventName, arg));
+                events.Add(new DslEvent(eventName));
                 continue;
+            }
+
+            var typedEventMatch = TypedEventRegex.Match(line);
+            if (typedEventMatch.Success)
+            {
+                var eventName = typedEventMatch.Groups["name"].Value;
+                throw new InvalidOperationException($"Line {i + 1}: typed event arguments are deprecated. Use 'event {eventName}' and infer required keys from transition transforms.");
             }
 
             var transitionMatch = TransitionRegex.Match(line);
@@ -113,6 +120,20 @@ public static class StateMachineDslParser
 
             if (!eventSet.Contains(transition.EventName))
                 throw new InvalidOperationException($"Transition references unknown event '{transition.EventName}'.");
+
+            if (!string.IsNullOrWhiteSpace(transition.DataAssignmentExpression) &&
+                transition.DataAssignmentExpression.StartsWith("data.", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Transition '{transition.FromState} -> {transition.ToState}' on '{transition.EventName}' uses unsupported transform expression '{transition.DataAssignmentExpression}'. Use a bare event-argument key (for example, 'Reason') or a literal.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(transition.DataAssignmentExpression) &&
+                transition.DataAssignmentExpression.StartsWith("arg.", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Transition '{transition.FromState} -> {transition.ToState}' on '{transition.EventName}' uses deprecated transform expression '{transition.DataAssignmentExpression}'. Use a bare event-argument key (for example, 'Reason').");
+            }
         }
     }
 }

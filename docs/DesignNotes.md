@@ -62,7 +62,14 @@ Implementation focus is the DSL runtime path:
 - `DslWorkflowCompiler.Compile(...)` accepts an optional custom evaluator.
 - `Inspect(...)` and `Fire(...)` accept optional event arguments (`IReadOnlyDictionary<string, object?>`).
 - REPL commands support transient per-command JSON event-argument overrides.
-- Transition DSL supports `set <Key> = <expr>` where `<expr>` can be a literal, `data.<Key>`, or `arg.<Key>`.
+- REPL supports `symbols test` to print an ASCII/Unicode compatibility matrix for terminal/font diagnostics.
+- REPL `inspect` supports optional event name; without one it inspects all events and reports callable transitions for the current state.
+- REPL `fire` prompts for each required event key when no inline arguments are supplied and the selected transition transform infers required event keys.
+- REPL `data` renders readable key-value output in interactive mode unless output mode is json.
+- Symbol rendering supports `auto|ascii|unicode`; auto mode prefers Unicode only when runtime terminal heuristics indicate support.
+- Transition DSL supports `set <Key> = <expr>` where `<expr>` can be a literal or a bare event-argument key (for example, `Reason`).
+- Typed event arguments (`event Name(Type)`) are deprecated and rejected during parse.
+- Prefixed transform references (`arg.<Key>` / `data.<Key>`) are rejected during parse.
 - CLI emits non-zero exit codes for incompatible instances and script command failures.
 - Runtime supports persisted instance creation and instance-based `Inspect(...)` / `Fire(...)`.
 - CLI supports `--instance` at startup and REPL-level `load`/`save` for instance file management.

@@ -10,7 +10,7 @@ transition Red -> Green on Advance when CarsWaiting > 0
 transition Red -> Red on Advance when CarsWaiting == 0
 transition Green -> Yellow on Advance
 transition Yellow -> Red on Advance
-transition Red -> FlashingRed on Emergency set EmergencyReason = arg.Reason
-transition Green -> FlashingRed on Emergency set EmergencyReason = arg.Reason
-transition Yellow -> FlashingRed on Emergency set EmergencyReason = arg.Reason
+transition Red -> FlashingRed on Emergency set EmergencyReason = Reason
+transition Green -> FlashingRed on Emergency set EmergencyReason = Reason
+transition Yellow -> FlashingRed on Emergency set EmergencyReason = Reason
 transition FlashingRed -> Red on ClearEmergency

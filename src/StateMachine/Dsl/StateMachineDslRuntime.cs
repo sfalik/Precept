@@ -172,6 +172,7 @@ public sealed class DslWorkflowDefinition
 {
     private readonly Dictionary<(string State, string Event), List<DslTransition>> _transitionMap;
     private readonly IGuardEvaluator _guardEvaluator;
+    private static readonly Regex IdentifierRegex = new("^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
 
     public string Name { get; }
     public IReadOnlyList<string> States { get; }
@@ -234,7 +235,11 @@ public sealed class DslWorkflowDefinition
 
         return resolution.Kind switch
         {
-            TransitionResolutionKind.Accepted => DslInspectionResult.Accepted(currentState, eventName, resolution.Transition!.ToState),
+            TransitionResolutionKind.Accepted => DslInspectionResult.Accepted(
+                currentState,
+                eventName,
+                resolution.Transition!.ToState,
+                ExtractRequiredEventArgumentKeys(resolution.Transition.DataAssignmentExpression)),
             TransitionResolutionKind.NotDefined => DslInspectionResult.NotDefined(currentState, eventName, resolution.NotDefinedReason!),
             _ => DslInspectionResult.Rejected(currentState, eventName, resolution.Reasons)
         };
@@ -294,7 +299,6 @@ public sealed class DslWorkflowDefinition
         {
             if (!TryResolveAssignmentValue(
                 resolution.Transition.DataAssignmentExpression,
-                instance.InstanceData,
                 eventArguments ?? EmptyInstanceData.Instance,
                 out var assignedValue,
                 out var assignmentError))
@@ -353,7 +357,6 @@ public sealed class DslWorkflowDefinition
 
     private static bool TryResolveAssignmentValue(
         string assignmentExpression,
-        IReadOnlyDictionary<string, object?> instanceData,
         IReadOnlyDictionary<string, object?> eventArguments,
         out object? assignedValue,
         out string? error)
@@ -367,22 +370,29 @@ public sealed class DslWorkflowDefinition
 
         var expression = assignmentExpression.Trim();
 
-        if (expression.StartsWith("data.", StringComparison.Ordinal))
+        if (TryParseLiteral(expression, out assignedValue))
         {
-            var key = expression[5..].Trim();
-            if (!instanceData.TryGetValue(key, out assignedValue))
-            {
-                error = $"Data assignment failed: instance data key '{key}' was not provided.";
-                return false;
-            }
-
             error = null;
             return true;
         }
 
+        if (expression.StartsWith("data.", StringComparison.Ordinal))
+        {
+            assignedValue = null;
+            error = "Data assignment failed: 'data.' references are not allowed in transforms; use a bare event-argument key or a literal.";
+            return false;
+        }
+
         if (expression.StartsWith("arg.", StringComparison.Ordinal))
         {
-            var key = expression[4..].Trim();
+            assignedValue = null;
+            error = "Data assignment failed: 'arg.' prefix is deprecated; use a bare event-argument key (for example, 'Reason').";
+            return false;
+        }
+
+        if (IdentifierRegex.IsMatch(expression))
+        {
+            var key = expression;
             if (!eventArguments.TryGetValue(key, out assignedValue))
             {
                 error = $"Data assignment failed: event argument '{key}' was not provided.";
@@ -393,14 +403,23 @@ public sealed class DslWorkflowDefinition
             return true;
         }
 
-        if (TryParseLiteral(expression, out assignedValue))
-        {
-            error = null;
-            return true;
-        }
-
         error = $"Data assignment failed: expression '{expression}' is not supported.";
         return false;
+    }
+
+    private static IReadOnlyList<string> ExtractRequiredEventArgumentKeys(string? assignmentExpression)
+    {
+        if (string.IsNullOrWhiteSpace(assignmentExpression))
+            return Array.Empty<string>();
+
+        var expression = assignmentExpression.Trim();
+        if (TryParseLiteral(expression, out _))
+            return Array.Empty<string>();
+
+        if (IdentifierRegex.IsMatch(expression))
+            return new[] { expression };
+
+        return Array.Empty<string>();
     }
 
     private static bool TryParseLiteral(string text, out object? value)
@@ -514,16 +533,17 @@ public sealed record DslInspectionResult(
     string CurrentState,
     string EventName,
     string? TargetState,
+    IReadOnlyList<string> RequiredEventArgumentKeys,
     IReadOnlyList<string> Reasons)
 {
-    internal static DslInspectionResult Accepted(string state, string evt, string target) =>
-        new(true, true, state, evt, target, Array.Empty<string>());
+    internal static DslInspectionResult Accepted(string state, string evt, string target, IReadOnlyList<string> requiredEventArgumentKeys) =>
+        new(true, true, state, evt, target, requiredEventArgumentKeys, Array.Empty<string>());
 
     internal static DslInspectionResult NotDefined(string state, string evt, string reason) =>
-        new(false, false, state, evt, null, new[] { reason });
+        new(false, false, state, evt, null, Array.Empty<string>(), new[] { reason });
 
     internal static DslInspectionResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(true, false, state, evt, null, reasons);
+        new(true, false, state, evt, null, Array.Empty<string>(), reasons);
 }
 
 public sealed record DslFireResult(

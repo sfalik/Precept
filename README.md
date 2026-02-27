@@ -14,7 +14,7 @@ StateMachine is a .NET DSL-driven state/workflow engine focused on deterministic
 Run the included traffic-light sample in REPL mode:
 
 ```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json
+dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json --unicode
 ```
 
 Then try:
@@ -26,19 +26,13 @@ Emergency
 ClearEmergency
 
 sm> inspect Advance
-Defined: True
-Accepted: True
-Target: Green
+✔ inspect Advance → Green
 
 sm> fire Advance
-Defined: True
-Accepted: True
-NewState: Green
+✔ fire Advance: Red → Green
 
 sm> fire Emergency '{"Reason":"Accident"}'
-Defined: True
-Accepted: True
-NewState: FlashingRed
+✔ fire Emergency: Green → FlashingRed
 
 sm> data
 {
@@ -48,6 +42,7 @@ sm> data
 ```
 
 Note: inline JSON event arguments should be wrapped in single quotes.
+Note: output is colorized by default (success/warning/error); use `--no-color` to disable.
 
 ## Core Concepts
 
@@ -73,17 +68,23 @@ transition Red -> Green on Advance when CarsWaiting > 0
 transition Red -> Red on Advance when CarsWaiting == 0
 transition Green -> Yellow on Advance
 transition Yellow -> Red on Advance
-transition Red -> FlashingRed on Emergency set EmergencyReason = arg.Reason
-transition Green -> FlashingRed on Emergency set EmergencyReason = arg.Reason
-transition Yellow -> FlashingRed on Emergency set EmergencyReason = arg.Reason
+transition Red -> FlashingRed on Emergency set EmergencyReason = Reason
+transition Green -> FlashingRed on Emergency set EmergencyReason = Reason
+transition Yellow -> FlashingRed on Emergency set EmergencyReason = Reason
 transition FlashingRed -> Red on ClearEmergency
 ```
 
 Supported assignment forms today:
 
 - Literal: `set CarsWaiting = 0`
-- Copy from instance data: `set LastCarsWaiting = data.CarsWaiting`
-- Copy from event arguments: `set EmergencyReason = arg.Reason`
+- Copy from event arguments: `set EmergencyReason = Reason`
+
+Unsupported in transforms:
+
+- `arg.<Key>` and `data.<Key>` references are rejected during parse/compile.
+
+Reserved literals in transform expressions: `true`, `false`, and `null`.
+Event-arg keys with those exact names are reserved and cannot be referenced as transform identifiers.
 
 ## Instance JSON Example
 
@@ -105,26 +106,42 @@ Supported assignment forms today:
 Launch REPL:
 
 ```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json
+dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json --unicode
 ```
 
 Run script mode:
 
 ```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json --script ./traffic.script.txt
+dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json --script ./traffic.script.txt --unicode
 ```
+
+CLI output options:
+
+- `--output compact|verbose|json` (default: `compact`)
+- `--echo` (echo script commands in script mode)
+- `--no-color` (disable ANSI coloring)
+- symbols default to `auto` detection (uses Unicode when terminal signals support; otherwise ASCII)
+- `--unicode` (force Unicode symbols in compact mode)
+- `--ascii` (force ASCII symbols in compact mode)
 
 REPL commands:
 
 - `help`
+- `output [compact|verbose|json]`
+- `symbols [auto|ascii|unicode|test]`
 - `state`
 - `events`
 - `data`
-- `inspect <EventName> [event-args-json]`
+- `inspect [EventName] [event-args-json]`
 - `fire <EventName> [event-args-json]`
 - `load <path>`
 - `save [path]`
 - `exit | quit`
+
+`symbols test` prints a compact ASCII/Unicode compatibility matrix so you can choose the best symbol mode for your current terminal/font.
+`inspect` without an event name evaluates all workflow events and lists only those callable from the current state.
+In interactive REPL mode, `fire <EventName>` prompts for each required event key individually when no inline event arguments are provided.
+In interactive REPL mode, `data` renders a readable key-value list by default; use output json to emit JSON.
 
 Exit codes:
 

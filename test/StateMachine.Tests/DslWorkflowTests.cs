@@ -306,7 +306,7 @@ public class DslWorkflowTests
             state Red
             state FlashingRed
             event Emergency
-            transition Red -> FlashingRed on Emergency set EmergencyReason = arg.Reason
+            transition Red -> FlashingRed on Emergency set EmergencyReason = Reason
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -328,7 +328,7 @@ public class DslWorkflowTests
             state Red
             state FlashingRed
             event Emergency
-            transition Red -> FlashingRed on Emergency set EmergencyReason = arg.Reason
+            transition Red -> FlashingRed on Emergency set EmergencyReason = Reason
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -339,6 +339,126 @@ public class DslWorkflowTests
         fire.IsDefined.Should().BeTrue();
         fire.IsAccepted.Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains("event argument 'Reason'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Parse_TransitionDataAssignment_FromInstanceDataReference_IsRejected()
+    {
+        const string dsl = """
+            machine TrafficLight
+            state Red
+            state Green
+            event Advance
+            transition Red -> Green on Advance set LastCarsWaiting = data.CarsWaiting
+            """;
+
+        var act = () => StateMachineDslParser.Parse(dsl);
+
+        act.Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*unsupported transform expression*data.CarsWaiting*");
+    }
+
+    [Fact]
+    public void Parse_TypedEventArguments_AreRejected()
+    {
+        const string dsl = """
+            machine TrafficLight
+            state Red
+            state Green
+            event Advance(AdvanceArgs)
+            transition Red -> Green on Advance
+            """;
+
+        var act = () => StateMachineDslParser.Parse(dsl);
+
+        act.Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*typed event arguments are deprecated*");
+    }
+
+    [Fact]
+    public void Parse_TransitionDataAssignment_WithArgPrefix_IsRejected()
+    {
+        const string dsl = """
+            machine TrafficLight
+            state Red
+            state FlashingRed
+            event Emergency
+            transition Red -> FlashingRed on Emergency set EmergencyReason = arg.Reason
+            """;
+
+        var act = () => StateMachineDslParser.Parse(dsl);
+
+        act.Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*deprecated transform expression*arg.Reason*");
+    }
+
+    [Fact]
+    public void Inspect_AcceptedTransition_InfersRequiredEventArgumentKeys()
+    {
+        const string dsl = """
+            machine TrafficLight
+            state Red
+            state FlashingRed
+            event Emergency
+            transition Red -> FlashingRed on Emergency set EmergencyReason = Reason
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>());
+
+        var inspect = workflow.Inspect(instance, "Emergency");
+
+        inspect.IsDefined.Should().BeTrue();
+        inspect.IsAccepted.Should().BeTrue();
+        inspect.RequiredEventArgumentKeys.Should().ContainSingle().Which.Should().Be("Reason");
+    }
+
+    [Fact]
+    public void Fire_Instance_DataAssignment_ReservedBooleanLiterals_AreAppliedAsLiterals()
+    {
+        const string dsl = """
+            machine Flags
+            state Off
+            state On
+            event Enable
+            event Disable
+            transition Off -> On on Enable set IsEnabled = true
+            transition On -> Off on Disable set IsEnabled = false
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var start = workflow.CreateInstance("Off", new Dictionary<string, object?>());
+
+        var enabled = workflow.Fire(start, "Enable", new Dictionary<string, object?> { ["true"] = "not-used" });
+        enabled.IsAccepted.Should().BeTrue();
+        enabled.UpdatedInstance!.InstanceData["IsEnabled"].Should().Be(true);
+
+        var disabled = workflow.Fire(enabled.UpdatedInstance!, "Disable", new Dictionary<string, object?> { ["false"] = "not-used" });
+        disabled.IsAccepted.Should().BeTrue();
+        disabled.UpdatedInstance!.InstanceData["IsEnabled"].Should().Be(false);
+    }
+
+    [Fact]
+    public void Fire_Instance_DataAssignment_ReservedNullLiteral_IsAppliedAsLiteral()
+    {
+        const string dsl = """
+            machine Notes
+            state Open
+            state Cleared
+            event Clear
+            transition Open -> Cleared on Clear set Note = null
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("Open", new Dictionary<string, object?> { ["Note"] = "Active" });
+
+        var cleared = workflow.Fire(instance, "Clear", new Dictionary<string, object?> { ["null"] = "not-used" });
+
+        cleared.IsAccepted.Should().BeTrue();
+        cleared.UpdatedInstance!.InstanceData["Note"].Should().BeNull();
     }
 
     [Fact]

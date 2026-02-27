@@ -8,7 +8,7 @@ public sealed record DslMachine(
     IReadOnlyList<DslEvent> Events,
     IReadOnlyList<DslTransition> Transitions);
 
-public sealed record DslEvent(string Name, string? ArgumentType);
+public sealed record DslEvent(string Name);
 
 public sealed record DslTransition(
     string FromState,
