@@ -2,118 +2,74 @@
 
 Date: 2026-02-24
 
-This document captures architecture decisions agreed during design review, to guide upcoming implementation work.
+This document tracks current design decisions for the active implementation on this branch.
 
-## Legacy FSM Status (Design Phase)
+## Current Scope
 
-- `FiniteStateMachine` is intentionally retained during design and implementation of the new fluent `StateMachine` API.
-- Purpose: provide a working reference implementation while building the new runtime.
-- Scope: internal development aid only (not public, not used by external consumers).
-- Policy: do not remove legacy code until the new implementation is functionally complete and validated by tests.
-- Compatibility and migration concerns are out of scope for this phase.
+Implementation focus is the DSL runtime path:
 
-## Template / Instance Split
+- parse `.sm` definitions
+- validate semantic correctness
+- execute inspection/fire against a compiled in-memory workflow definition
 
-- Builder stays mutable while authoring.
-- `Build()` finalizes to immutable template.
-- Template exposes `CreateInstance(...)`.
-- Instances hold runtime mutable state/data and transition behavior.
+## Implemented Components
 
-## Builder Freeze Contract
+- `StateMachine.Dsl.DslMachine` model
+- `StateMachine.Dsl.StateMachineDslParser`
+- `StateMachine.Dsl.DslWorkflowCompiler`
+- `StateMachine.Dsl.DslWorkflowDefinition`
+- `StateMachine.Dsl.DslWorkflowInstance` persisted instance model
+- Instance result/compatibility types: `DslInstanceCompatibilityResult`, `DslInstanceFireResult`
+- CLI commands in `tools/StateMachine.Dsl.Cli`:
+  - `validate`
+  - `list`
+  - `inspect`
+  - `fire`
 
-- `Build()` may be called once per builder instance.
-- Builder is frozen after `Build()`.
-- Any post-build mutating fluent call throws.
+## Current Runtime Semantics
 
-## Ability to manage data along with state
-- data should be immutable -- use records to enforce this
-- transforms should be pure functions that take the current state and arg and return a new state and new data (if needed)
-- transforms are used in the transition definition to specify how state and data should change when a transition occurs
+- Undefined state/event/transition resolves to `IsDefined = false`
+- Unguarded transitions are accepted and return a target/new state
+- Guarded transitions are evaluated at runtime against an optional context payload
+- If one guarded transition evaluates `true`, inspection/fire is accepted and returns target/new state
+- If all guarded transitions evaluate `false`, inspection/fire is rejected with aggregated guard-failure reasons
+- Compiled workflow definitions expose deterministic `Version` values
+- Instance-based inspect/fire validates workflow name + version compatibility before evaluating transitions
 
-## Rules Engine
-TODO:  incorporate a mechnism for defining invariant rules that must hold true for the data and state of the machine.  
-these rules should be evaluated after each transition to ensure that the machine remains in a valid state.  
-if a rule is violated, the transition should be rejected and an appropriate exception should be thrown.
+## Known Gaps
 
-## Event Definitions
+- Guard language is intentionally minimal in this phase (`Identifier`, `!Identifier`, and simple comparisons)
+- Version migration strategy for persisted instances across evolved `.sm` definitions
+- Editor tooling (LSP and IntelliSense integration)
 
-- Use typed event tokens captured in `On(...)`:
-  - `Event<TState>`
-  - `Event<TState, TArg>`
-- Do not capture instance-bound delegates at build time.
+## Test Status
 
-## Concurrency Model
+- Active tests: `test/StateMachine.Tests/DslWorkflowTests.cs`
+- Guard test coverage includes: boolean guards, comparisons, string/null equality, numeric runtime type coercion, unsupported-expression rejection, and reason aggregation.
 
-- The new fluent `StateMachine` runtime is non-thread-safe per instance.
-- Concurrent calls against the same machine instance are not supported.
-- Callers must provide external synchronization or serialization if cross-thread use is required.
-- Transition semantics are defined for single-threaded access only.
-- No stale-state revalidation contract is required in fluent APIs for this phase.
+## Next Steps
 
-TODO: Revisit an optional thread-safe mode only after core runtime behavior is complete.
+1. Expand guard language/features or swap in a richer evaluator implementation.
+2. Add explicit migration hooks/policies for incompatible persisted instance versions.
+3. Implement LSP-backed diagnostics/completion for `.sm` files.
 
-## Fluent Inspect / Fire Pattern
+## Guard Evaluation + Context Model (Current)
 
-goals for this API:
-- provide an api that leverages the deterministic nature of the statemachine for interrogating events and potential transitions before they are fired
-- guide users through the correct sequence of inspection steps with a fluent API that makes it difficult to misuse or skip steps
-- happy paths should be concise and readable, and error paths should provide clear information about why a transition was rejected
-- for happy paths, it is ok to throw.  but for branching, the api should guide the developer to handle the various outcomes of the inspection process without needing to throw for control flow
+- Runtime uses `IGuardEvaluator` with a default implementation (`DefaultGuardEvaluator`).
+- `DslWorkflowCompiler.Compile(...)` accepts an optional custom evaluator.
+- `Inspect(...)` and `Fire(...)` accept optional context (`IReadOnlyDictionary<string, object?>`).
+- CLI supports `--context` (inline JSON) and `--context-file` (JSON file path).
+- CLI emits distinct non-zero exit codes for `inspect`/`fire` not-defined vs rejected outcomes.
+- Runtime supports persisted instance creation and instance-based `Inspect(...)` / `Fire(...)`.
+- CLI supports `--instance` and `--out-instance` for loading/saving workflow instances.
+- CLI requires either `--state` or `--instance` for `inspect`/`fire`.
 
+Supported default guard forms:
 
-Preserve current chain semantics:
+- `IsEnabled`
+- `!IsEnabled`
+- `CarsWaiting > 0`
+- `CarsWaiting >= 3`
+- `Mode == "Manual"`
 
-- `Inspect(...)`
-- `WithArg(...)`
-- `IfAccepted(...)`
-- `Fire()`
-- `Else(...)`
-
-Guard-validation gate remains mandatory before `Fire()`.
-
-TODO: this needs to be redesigned, i'm not sold on this whole fluent inspection API
-TODO: consider the use of proof tokens / receipts as a pattern to go through the steps
-
-## Inspection Chain Representation
-
-- Current design uses lightweight `readonly struct` wrappers for the fluent inspection chain.
-- This matches the current scaffold in `Inspection.cs` and keeps design and implementation aligned during development.
-
-Planned chain forms include:
-
-- `Inspection<TState>` / `Inspection<TState, TArg>`
-- `Defined<TState>` / `Defined<TState, TArg>`
-- `Accepted<TState>` / `Accepted<TState, TArg>`
-- `Rejected<TState>` / `Rejected<TState, TArg>`
-
-TODO: Re-evaluate whether class-based chain nodes would be safer or clearer than structs. Compare copy semantics, default-value hazards, API misuse resistance, and allocation/perf impact before finalizing runtime implementation.
-
-## Event Dispatch (Current Model)
-
-- With single-threaded per-instance semantics, runtime does not require internal locking for correctness in this phase.
-- Transition observers are invoked after transition logic is resolved for the current call.
-- If a thread-safe mode is introduced later, locking/dispatch guarantees will be specified then.
-
-## Exception Model
-
-Use a focused exception set:
-
-- `InvalidTransitionException`
-- `GuardFailedException`
-
-Remove legacy condition-failure exception path.
-
-## Documentation + Tests First
-
-- Contracts/stubs/tests/readme updated before deep implementation.
-- Runtime implementation phase follows this design baseline.
-
-## Implementation Checklist (Next)
-
-- Implement template compilation of transition graph.
-- Implement CreateInstance runtime shells.
-- Implement Inspect logic (defined/accepted/reasons/target).
-- Implement Fire using single-threaded per-instance semantics (no stale validation in this phase).
-- Implement dataful transforms and guard chain semantics.
-- Implement callback dispatch semantics for the single-threaded per-instance model.
-- Unskip and expand tests incrementally.
+Unsupported/invalid guards are treated as failed with descriptive reasons.

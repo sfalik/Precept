@@ -1,0 +1,19 @@
+# Minimal DSL sample
+machine TrafficLight
+
+state Red
+state Green
+state Yellow
+state FlashingRed
+
+event Advance
+event Emergency(string)
+event Reset
+
+transition Green -> Yellow on Advance
+transition Yellow -> Red on Advance
+transition Red -> Green on Advance when CarsWaiting > 0
+transition Red -> FlashingRed on Emergency when reason is not empty
+transition Green -> FlashingRed on Emergency when reason is not empty
+transition Yellow -> FlashingRed on Emergency when reason is not empty
+transition FlashingRed -> Red on Reset
