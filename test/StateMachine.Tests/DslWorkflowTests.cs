@@ -31,7 +31,7 @@ public class DslWorkflowTests
     }
 
     [Fact]
-    public void Inspect_GuardedTransition_WithMatchingContext_IsAccepted()
+    public void Inspect_GuardedTransition_WithMatchingData_IsAccepted()
     {
         const string dsl = """
             machine TrafficLight
@@ -42,9 +42,9 @@ public class DslWorkflowTests
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
-        var context = new Dictionary<string, object?> { ["CarsWaiting"] = 2 };
+        var data = new Dictionary<string, object?> { ["CarsWaiting"] = 2 };
 
-        var inspection = workflow.Inspect("Red", "Advance", context);
+        var inspection = workflow.Inspect("Red", "Advance", data);
 
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeTrue();
@@ -53,7 +53,7 @@ public class DslWorkflowTests
     }
 
     [Fact]
-    public void Inspect_GuardedTransition_WithNonMatchingContext_IsRejected()
+    public void Inspect_GuardedTransition_WithNonMatchingData_IsRejected()
     {
         const string dsl = """
             machine TrafficLight
@@ -64,9 +64,9 @@ public class DslWorkflowTests
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
-        var context = new Dictionary<string, object?> { ["CarsWaiting"] = 0 };
+        var data = new Dictionary<string, object?> { ["CarsWaiting"] = 0 };
 
-        var inspection = workflow.Inspect("Red", "Advance", context);
+        var inspection = workflow.Inspect("Red", "Advance", data);
 
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeFalse();
@@ -75,7 +75,7 @@ public class DslWorkflowTests
     }
 
     [Fact]
-    public void Inspect_GuardedTransition_WithoutRequiredContextKey_IsRejectedWithReason()
+    public void Inspect_GuardedTransition_WithoutRequiredDataKey_IsRejectedWithReason()
     {
         const string dsl = """
             machine TrafficLight
@@ -91,11 +91,11 @@ public class DslWorkflowTests
 
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeFalse();
-        inspection.Reasons.Should().ContainSingle(r => r.Contains("context key 'CarsWaiting'", StringComparison.Ordinal));
+        inspection.Reasons.Should().ContainSingle(r => r.Contains("data key 'CarsWaiting'", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void Inspect_GuardedTransition_WithWrongContextType_IsRejectedWithReason()
+    public void Inspect_GuardedTransition_WithWrongDataType_IsRejectedWithReason()
     {
         const string dsl = """
             machine FeatureFlag
@@ -106,9 +106,9 @@ public class DslWorkflowTests
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
-        var context = new Dictionary<string, object?> { ["IsEnabled"] = "yes" };
+        var data = new Dictionary<string, object?> { ["IsEnabled"] = "yes" };
 
-        var inspection = workflow.Inspect("Disabled", "Evaluate", context);
+        var inspection = workflow.Inspect("Disabled", "Evaluate", data);
 
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeFalse();
@@ -129,13 +129,13 @@ public class DslWorkflowTests
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
-        var context = new Dictionary<string, object?>
+        var data = new Dictionary<string, object?>
         {
             ["CarsWaiting"] = 0,
             ["IsManualOverride"] = false
         };
 
-        var inspection = workflow.Inspect("Red", "Advance", context);
+        var inspection = workflow.Inspect("Red", "Advance", data);
 
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeFalse();
@@ -154,9 +154,9 @@ public class DslWorkflowTests
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
-        var context = new Dictionary<string, object?> { ["Mode"] = "Manual" };
+        var data = new Dictionary<string, object?> { ["Mode"] = "Manual" };
 
-        var inspection = workflow.Inspect("Draft", "Publish", context);
+        var inspection = workflow.Inspect("Draft", "Publish", data);
 
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeTrue();
@@ -164,7 +164,7 @@ public class DslWorkflowTests
     }
 
     [Fact]
-    public void Inspect_NullEqualityGuard_IsAccepted_WhenContextValueIsNull()
+    public void Inspect_NullEqualityGuard_IsAccepted_WhenDataValueIsNull()
     {
         const string dsl = """
             machine Tickets
@@ -175,9 +175,9 @@ public class DslWorkflowTests
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
-        var context = new Dictionary<string, object?> { ["Assignee"] = null };
+        var data = new Dictionary<string, object?> { ["Assignee"] = null };
 
-        var inspection = workflow.Inspect("Open", "Escalate", context);
+        var inspection = workflow.Inspect("Open", "Escalate", data);
 
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeTrue();
@@ -196,9 +196,9 @@ public class DslWorkflowTests
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
-        var context = new Dictionary<string, object?> { ["Qps"] = 100m };
+        var data = new Dictionary<string, object?> { ["Qps"] = 100m };
 
-        var inspection = workflow.Inspect("Low", "Scale", context);
+        var inspection = workflow.Inspect("Low", "Scale", data);
 
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeTrue();
@@ -217,13 +217,13 @@ public class DslWorkflowTests
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
-        var context = new Dictionary<string, object?>
+        var data = new Dictionary<string, object?>
         {
             ["Flag"] = true,
             ["OtherFlag"] = true
         };
 
-        var inspection = workflow.Inspect("A", "Go", context);
+        var inspection = workflow.Inspect("A", "Go", data);
 
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeFalse();
@@ -231,7 +231,7 @@ public class DslWorkflowTests
     }
 
     [Fact]
-    public void Fire_GuardedTransition_WithContext_AcceptsAndReturnsNewState()
+    public void Fire_GuardedTransition_WithData_AcceptsAndReturnsNewState()
     {
         const string dsl = """
             machine TrafficLight
@@ -242,9 +242,9 @@ public class DslWorkflowTests
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
-        var context = new Dictionary<string, object?> { ["CarsWaiting"] = 3 };
+        var data = new Dictionary<string, object?> { ["CarsWaiting"] = 3 };
 
-        var fire = workflow.Fire("Red", "Advance", context);
+        var fire = workflow.Fire("Red", "Advance", data);
 
         fire.IsDefined.Should().BeTrue();
         fire.IsAccepted.Should().BeTrue();
@@ -277,7 +277,93 @@ public class DslWorkflowTests
     }
 
     [Fact]
-    public void Inspect_Instance_Context_UsesSnapshotAndOverlayContext()
+    public void Fire_Instance_AppliesTransitionDataAssignment_Literal()
+    {
+        const string dsl = """
+            machine TrafficLight
+            state Red
+            state Green
+            event Advance
+            transition Red -> Green on Advance set CarsWaiting = 0
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 3 });
+
+        var fire = workflow.Fire(instance, "Advance");
+
+        fire.IsDefined.Should().BeTrue();
+        fire.IsAccepted.Should().BeTrue();
+        fire.UpdatedInstance.Should().NotBeNull();
+        fire.UpdatedInstance!.InstanceData["CarsWaiting"].Should().Be(0d);
+    }
+
+    [Fact]
+    public void Fire_Instance_AppliesTransitionDataAssignment_FromEventArgument()
+    {
+        const string dsl = """
+            machine TrafficLight
+            state Red
+            state FlashingRed
+            event Emergency
+            transition Red -> FlashingRed on Emergency set EmergencyReason = arg.Reason
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>());
+
+        var fire = workflow.Fire(instance, "Emergency", new Dictionary<string, object?> { ["Reason"] = "Accident" });
+
+        fire.IsDefined.Should().BeTrue();
+        fire.IsAccepted.Should().BeTrue();
+        fire.UpdatedInstance.Should().NotBeNull();
+        fire.UpdatedInstance!.InstanceData["EmergencyReason"].Should().Be("Accident");
+    }
+
+    [Fact]
+    public void Fire_Instance_DataAssignment_FromMissingEventArgument_IsRejected()
+    {
+        const string dsl = """
+            machine TrafficLight
+            state Red
+            state FlashingRed
+            event Emergency
+            transition Red -> FlashingRed on Emergency set EmergencyReason = arg.Reason
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>());
+
+        var fire = workflow.Fire(instance, "Emergency");
+
+        fire.IsDefined.Should().BeTrue();
+        fire.IsAccepted.Should().BeFalse();
+        fire.Reasons.Should().ContainSingle(r => r.Contains("event argument 'Reason'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Inspect_Instance_DoesNotApplyTransitionDataAssignment()
+    {
+        const string dsl = """
+            machine TrafficLight
+            state Red
+            state Green
+            event Advance
+            transition Red -> Green on Advance set CarsWaiting = 0
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 3 });
+
+        var inspect = workflow.Inspect(instance, "Advance");
+
+        inspect.IsDefined.Should().BeTrue();
+        inspect.IsAccepted.Should().BeTrue();
+        instance.InstanceData["CarsWaiting"].Should().Be(3);
+    }
+
+    [Fact]
+    public void Inspect_Instance_EventArgs_DoNotMergeWithSnapshot()
     {
         const string dsl = """
             machine FeatureFlag
@@ -292,12 +378,16 @@ public class DslWorkflowTests
 
         var rejected = workflow.Inspect(instance, "Evaluate");
         var accepted = workflow.Inspect(instance, "Evaluate", new Dictionary<string, object?> { ["IsEnabled"] = true });
+        var rejectedWithUnrelatedArgs = workflow.Inspect(instance, "Evaluate", new Dictionary<string, object?> { ["Other"] = true });
 
         rejected.IsDefined.Should().BeTrue();
         rejected.IsAccepted.Should().BeFalse();
         accepted.IsDefined.Should().BeTrue();
         accepted.IsAccepted.Should().BeTrue();
         accepted.TargetState.Should().Be("Enabled");
+        rejectedWithUnrelatedArgs.IsDefined.Should().BeTrue();
+        rejectedWithUnrelatedArgs.IsAccepted.Should().BeFalse();
+        rejectedWithUnrelatedArgs.Reasons.Should().ContainSingle(r => r.Contains("IsEnabled", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -383,5 +473,24 @@ public class DslWorkflowTests
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*duplicate state*");
+    }
+
+    [Fact]
+    public void Parse_Transition_WithGuardAndDataAssignment_IsAccepted()
+    {
+        const string dsl = """
+            machine TrafficLight
+            state Red
+            state Green
+            event Advance
+            transition Red -> Green on Advance when CarsWaiting > 0 set CarsWaiting = 0
+            """;
+
+        var machine = StateMachineDslParser.Parse(dsl);
+
+        machine.Transitions.Should().ContainSingle();
+        machine.Transitions[0].GuardExpression.Should().Be("CarsWaiting > 0");
+        machine.Transitions[0].DataAssignmentKey.Should().Be("CarsWaiting");
+        machine.Transitions[0].DataAssignmentExpression.Should().Be("0");
     }
 }

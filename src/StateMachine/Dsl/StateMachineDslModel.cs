@@ -14,4 +14,6 @@ public sealed record DslTransition(
     string FromState,
     string ToState,
     string EventName,
-    string? GuardExpression);
+    string? GuardExpression,
+    string? DataAssignmentKey,
+    string? DataAssignmentExpression);

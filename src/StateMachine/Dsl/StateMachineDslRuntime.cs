@@ -8,7 +8,7 @@ namespace StateMachine.Dsl;
 
 public interface IGuardEvaluator
 {
-    GuardEvaluationResult Evaluate(string expression, IReadOnlyDictionary<string, object?> context);
+    GuardEvaluationResult Evaluate(string expression, IReadOnlyDictionary<string, object?> data);
 }
 
 public sealed record GuardEvaluationResult(bool IsPassed, string? FailureReason)
@@ -27,7 +27,7 @@ internal sealed class DefaultGuardEvaluator : IGuardEvaluator
         "^(?<not>!)?(?<left>[A-Za-z_][A-Za-z0-9_]*)$",
         RegexOptions.Compiled);
 
-    public GuardEvaluationResult Evaluate(string expression, IReadOnlyDictionary<string, object?> context)
+    public GuardEvaluationResult Evaluate(string expression, IReadOnlyDictionary<string, object?> data)
     {
         if (string.IsNullOrWhiteSpace(expression))
             return GuardEvaluationResult.Passed();
@@ -36,11 +36,11 @@ internal sealed class DefaultGuardEvaluator : IGuardEvaluator
 
         var comparison = ComparisonRegex.Match(trimmed);
         if (comparison.Success)
-            return EvaluateComparison(trimmed, comparison, context);
+            return EvaluateComparison(trimmed, comparison, data);
 
         var boolean = BooleanRegex.Match(trimmed);
         if (boolean.Success)
-            return EvaluateBoolean(trimmed, boolean, context);
+            return EvaluateBoolean(trimmed, boolean, data);
 
         return GuardEvaluationResult.Failed($"Guard '{trimmed}' is not supported by the default evaluator.");
     }
@@ -48,14 +48,14 @@ internal sealed class DefaultGuardEvaluator : IGuardEvaluator
     private static GuardEvaluationResult EvaluateComparison(
         string originalExpression,
         Match comparison,
-        IReadOnlyDictionary<string, object?> context)
+        IReadOnlyDictionary<string, object?> data)
     {
         string variable = comparison.Groups["left"].Value;
         string op = comparison.Groups["op"].Value;
         string literalText = comparison.Groups["right"].Value.Trim();
 
-        if (!context.TryGetValue(variable, out var currentValue))
-            return GuardEvaluationResult.Failed($"Guard '{originalExpression}' failed: context key '{variable}' was not provided.");
+        if (!data.TryGetValue(variable, out var currentValue))
+            return GuardEvaluationResult.Failed($"Guard '{originalExpression}' failed: data key '{variable}' was not provided.");
 
         if (!TryParseLiteral(literalText, out var literal))
             return GuardEvaluationResult.Failed($"Guard '{originalExpression}' failed: literal '{literalText}' is not supported.");
@@ -92,16 +92,16 @@ internal sealed class DefaultGuardEvaluator : IGuardEvaluator
     private static GuardEvaluationResult EvaluateBoolean(
         string originalExpression,
         Match boolean,
-        IReadOnlyDictionary<string, object?> context)
+        IReadOnlyDictionary<string, object?> data)
     {
         string variable = boolean.Groups["left"].Value;
         bool negate = boolean.Groups["not"].Success;
 
-        if (!context.TryGetValue(variable, out var value))
-            return GuardEvaluationResult.Failed($"Guard '{originalExpression}' failed: context key '{variable}' was not provided.");
+        if (!data.TryGetValue(variable, out var value))
+            return GuardEvaluationResult.Failed($"Guard '{originalExpression}' failed: data key '{variable}' was not provided.");
 
         if (value is not bool b)
-            return GuardEvaluationResult.Failed($"Guard '{originalExpression}' failed: context key '{variable}' is not a boolean.");
+            return GuardEvaluationResult.Failed($"Guard '{originalExpression}' failed: data key '{variable}' is not a boolean.");
 
         bool result = negate ? !b : b;
         return result
@@ -194,7 +194,7 @@ public sealed class DslWorkflowDefinition
 
     public DslWorkflowInstance CreateInstance(
         string initialState,
-        IReadOnlyDictionary<string, object?>? contextSnapshot = null)
+        IReadOnlyDictionary<string, object?>? instanceData = null)
     {
         if (string.IsNullOrWhiteSpace(initialState))
             throw new ArgumentException("Initial state is required.", nameof(initialState));
@@ -207,7 +207,7 @@ public sealed class DslWorkflowDefinition
             initialState,
             null,
             DateTimeOffset.UtcNow,
-            contextSnapshot ?? EmptyContext.Instance);
+            instanceData ?? EmptyInstanceData.Instance);
     }
 
     public DslInstanceCompatibilityResult CheckCompatibility(DslWorkflowInstance instance)
@@ -227,59 +227,38 @@ public sealed class DslWorkflowDefinition
     public DslInspectionResult Inspect(
         string currentState,
         string eventName,
-        IReadOnlyDictionary<string, object?>? context = null)
+        IReadOnlyDictionary<string, object?>? eventArguments = null)
     {
-        if (string.IsNullOrWhiteSpace(currentState))
-            throw new ArgumentException("Current state is required.", nameof(currentState));
-        if (string.IsNullOrWhiteSpace(eventName))
-            throw new ArgumentException("Event name is required.", nameof(eventName));
+        var evaluationData = eventArguments ?? EmptyInstanceData.Instance;
+        var resolution = ResolveTransition(currentState, eventName, evaluationData);
 
-        if (!States.Contains(currentState, StringComparer.Ordinal))
-            return DslInspectionResult.NotDefined(currentState, eventName, $"Unknown state '{currentState}'.");
-
-        if (!Events.Any(e => e.Name.Equals(eventName, StringComparison.Ordinal)))
-            return DslInspectionResult.NotDefined(currentState, eventName, $"Unknown event '{eventName}'.");
-
-        if (!_transitionMap.TryGetValue((currentState, eventName), out var transitions) || transitions.Count == 0)
-            return DslInspectionResult.NotDefined(currentState, eventName, $"No transition defined for event '{eventName}' in state '{currentState}'.");
-
-        var runtimeContext = context ?? EmptyContext.Instance;
-        var reasons = new List<string>();
-
-        foreach (var transition in transitions)
+        return resolution.Kind switch
         {
-            if (string.IsNullOrWhiteSpace(transition.GuardExpression))
-                return DslInspectionResult.Accepted(currentState, eventName, transition.ToState);
-
-            var evaluation = _guardEvaluator.Evaluate(transition.GuardExpression, runtimeContext);
-            if (evaluation.IsPassed)
-                return DslInspectionResult.Accepted(currentState, eventName, transition.ToState);
-
-            reasons.Add(evaluation.FailureReason ?? $"Guard '{transition.GuardExpression}' failed.");
-        }
-
-        return DslInspectionResult.Rejected(currentState, eventName, reasons);
+            TransitionResolutionKind.Accepted => DslInspectionResult.Accepted(currentState, eventName, resolution.Transition!.ToState),
+            TransitionResolutionKind.NotDefined => DslInspectionResult.NotDefined(currentState, eventName, resolution.NotDefinedReason!),
+            _ => DslInspectionResult.Rejected(currentState, eventName, resolution.Reasons)
+        };
     }
 
     public DslInspectionResult Inspect(
         DslWorkflowInstance instance,
         string eventName,
-        IReadOnlyDictionary<string, object?>? context = null)
+        IReadOnlyDictionary<string, object?>? eventArguments = null)
     {
         var compatibility = CheckCompatibility(instance);
         if (!compatibility.IsCompatible)
             return DslInspectionResult.NotDefined(instance.CurrentState, eventName, compatibility.Reason!);
 
-        var mergedContext = MergeContexts(instance.ContextSnapshot, context);
-        return Inspect(instance.CurrentState, eventName, mergedContext);
+        var evaluationArguments = eventArguments ?? instance.InstanceData;
+        return Inspect(instance.CurrentState, eventName, evaluationArguments);
     }
 
     public DslFireResult Fire(
         string currentState,
         string eventName,
-        IReadOnlyDictionary<string, object?>? context = null)
+        IReadOnlyDictionary<string, object?>? eventArguments = null)
     {
-        var inspection = Inspect(currentState, eventName, context);
+        var inspection = Inspect(currentState, eventName, eventArguments);
         if (!inspection.IsDefined)
             return DslFireResult.NotDefined(currentState, eventName, inspection.Reasons);
 
@@ -292,7 +271,7 @@ public sealed class DslWorkflowDefinition
     public DslInstanceFireResult Fire(
         DslWorkflowInstance instance,
         string eventName,
-        IReadOnlyDictionary<string, object?>? context = null)
+        IReadOnlyDictionary<string, object?>? eventArguments = null)
     {
         var compatibility = CheckCompatibility(instance);
         if (!compatibility.IsCompatible)
@@ -301,46 +280,187 @@ public sealed class DslWorkflowDefinition
             return DslInstanceFireResult.NotDefined(instance.CurrentState, eventName, reasons);
         }
 
-        var mergedContext = MergeContexts(instance.ContextSnapshot, context);
-        var fire = Fire(instance.CurrentState, eventName, mergedContext);
-        if (!fire.IsDefined)
-            return DslInstanceFireResult.NotDefined(instance.CurrentState, eventName, fire.Reasons);
+        var evaluationArguments = eventArguments ?? instance.InstanceData;
+        var resolution = ResolveTransition(instance.CurrentState, eventName, evaluationArguments);
+        if (resolution.Kind == TransitionResolutionKind.NotDefined)
+            return DslInstanceFireResult.NotDefined(instance.CurrentState, eventName, new[] { resolution.NotDefinedReason! });
 
-        if (!fire.IsAccepted || fire.NewState is null)
-            return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, fire.Reasons);
+        if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.Transition is null)
+            return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
+
+        var updatedData = new Dictionary<string, object?>(instance.InstanceData, StringComparer.Ordinal);
+        if (!string.IsNullOrWhiteSpace(resolution.Transition.DataAssignmentKey) &&
+            !string.IsNullOrWhiteSpace(resolution.Transition.DataAssignmentExpression))
+        {
+            if (!TryResolveAssignmentValue(
+                resolution.Transition.DataAssignmentExpression,
+                instance.InstanceData,
+                eventArguments ?? EmptyInstanceData.Instance,
+                out var assignedValue,
+                out var assignmentError))
+            {
+                return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { assignmentError! });
+            }
+
+            updatedData[resolution.Transition.DataAssignmentKey!] = assignedValue;
+        }
 
         var updated = instance with
         {
-            CurrentState = fire.NewState,
+            CurrentState = resolution.Transition.ToState,
             LastEvent = eventName,
             UpdatedAt = DateTimeOffset.UtcNow,
-            ContextSnapshot = mergedContext
+            InstanceData = updatedData
         };
 
-        return DslInstanceFireResult.Accepted(instance.CurrentState, eventName, fire.NewState, updated);
+        return DslInstanceFireResult.Accepted(instance.CurrentState, eventName, resolution.Transition.ToState, updated);
     }
 
-    private static IReadOnlyDictionary<string, object?> MergeContexts(
-        IReadOnlyDictionary<string, object?>? baseContext,
-        IReadOnlyDictionary<string, object?>? overlayContext)
+    private TransitionResolution ResolveTransition(
+        string currentState,
+        string eventName,
+        IReadOnlyDictionary<string, object?> evaluationData)
     {
-        if ((baseContext is null || baseContext.Count == 0) && (overlayContext is null || overlayContext.Count == 0))
-            return EmptyContext.Instance;
+        if (string.IsNullOrWhiteSpace(currentState))
+            throw new ArgumentException("Current state is required.", nameof(currentState));
+        if (string.IsNullOrWhiteSpace(eventName))
+            throw new ArgumentException("Event name is required.", nameof(eventName));
 
-        var merged = new Dictionary<string, object?>(StringComparer.Ordinal);
-        if (baseContext is not null)
+        if (!States.Contains(currentState, StringComparer.Ordinal))
+            return TransitionResolution.NotDefined($"Unknown state '{currentState}'.");
+
+        if (!Events.Any(e => e.Name.Equals(eventName, StringComparison.Ordinal)))
+            return TransitionResolution.NotDefined($"Unknown event '{eventName}'.");
+
+        if (!_transitionMap.TryGetValue((currentState, eventName), out var transitions) || transitions.Count == 0)
+            return TransitionResolution.NotDefined($"No transition defined for event '{eventName}' in state '{currentState}'.");
+
+        var reasons = new List<string>();
+        foreach (var transition in transitions)
         {
-            foreach (var kvp in baseContext)
-                merged[kvp.Key] = kvp.Value;
+            if (string.IsNullOrWhiteSpace(transition.GuardExpression))
+                return TransitionResolution.Accepted(transition);
+
+            var evaluation = _guardEvaluator.Evaluate(transition.GuardExpression, evaluationData);
+            if (evaluation.IsPassed)
+                return TransitionResolution.Accepted(transition);
+
+            reasons.Add(evaluation.FailureReason ?? $"Guard '{transition.GuardExpression}' failed.");
         }
 
-        if (overlayContext is not null)
+        return TransitionResolution.Rejected(reasons);
+    }
+
+    private static bool TryResolveAssignmentValue(
+        string assignmentExpression,
+        IReadOnlyDictionary<string, object?> instanceData,
+        IReadOnlyDictionary<string, object?> eventArguments,
+        out object? assignedValue,
+        out string? error)
+    {
+        if (string.IsNullOrWhiteSpace(assignmentExpression))
         {
-            foreach (var kvp in overlayContext)
-                merged[kvp.Key] = kvp.Value;
+            assignedValue = null;
+            error = "Data assignment expression is empty.";
+            return false;
         }
 
-        return merged;
+        var expression = assignmentExpression.Trim();
+
+        if (expression.StartsWith("data.", StringComparison.Ordinal))
+        {
+            var key = expression[5..].Trim();
+            if (!instanceData.TryGetValue(key, out assignedValue))
+            {
+                error = $"Data assignment failed: instance data key '{key}' was not provided.";
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+
+        if (expression.StartsWith("arg.", StringComparison.Ordinal))
+        {
+            var key = expression[4..].Trim();
+            if (!eventArguments.TryGetValue(key, out assignedValue))
+            {
+                error = $"Data assignment failed: event argument '{key}' was not provided.";
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+
+        if (TryParseLiteral(expression, out assignedValue))
+        {
+            error = null;
+            return true;
+        }
+
+        error = $"Data assignment failed: expression '{expression}' is not supported.";
+        return false;
+    }
+
+    private static bool TryParseLiteral(string text, out object? value)
+    {
+        if (text.Equals("null", StringComparison.OrdinalIgnoreCase))
+        {
+            value = null;
+            return true;
+        }
+
+        if (text.Equals("true", StringComparison.OrdinalIgnoreCase))
+        {
+            value = true;
+            return true;
+        }
+
+        if (text.Equals("false", StringComparison.OrdinalIgnoreCase))
+        {
+            value = false;
+            return true;
+        }
+
+        if ((text.Length >= 2 && text[0] == '\'' && text[^1] == '\'') ||
+            (text.Length >= 2 && text[0] == '"' && text[^1] == '"'))
+        {
+            value = text.Substring(1, text.Length - 2);
+            return true;
+        }
+
+        if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
+        {
+            value = number;
+            return true;
+        }
+
+        value = null;
+        return false;
+    }
+
+    private enum TransitionResolutionKind
+    {
+        Accepted,
+        Rejected,
+        NotDefined
+    }
+
+    private sealed record TransitionResolution(
+        TransitionResolutionKind Kind,
+        DslTransition? Transition,
+        string? NotDefinedReason,
+        IReadOnlyList<string> Reasons)
+    {
+        internal static TransitionResolution Accepted(DslTransition transition) =>
+            new(TransitionResolutionKind.Accepted, transition, null, Array.Empty<string>());
+
+        internal static TransitionResolution Rejected(IReadOnlyList<string> reasons) =>
+            new(TransitionResolutionKind.Rejected, null, null, reasons);
+
+        internal static TransitionResolution NotDefined(string reason) =>
+            new(TransitionResolutionKind.NotDefined, null, reason, new[] { reason });
     }
 
 }
@@ -361,7 +481,7 @@ public sealed record DslWorkflowInstance(
     string CurrentState,
     string? LastEvent,
     DateTimeOffset UpdatedAt,
-    IReadOnlyDictionary<string, object?> ContextSnapshot);
+    IReadOnlyDictionary<string, object?> InstanceData);
 
 public sealed record DslInstanceCompatibilityResult(bool IsCompatible, string? Reason)
 {
@@ -369,9 +489,9 @@ public sealed record DslInstanceCompatibilityResult(bool IsCompatible, string? R
     internal static DslInstanceCompatibilityResult NotCompatible(string reason) => new(false, reason);
 }
 
-internal sealed class EmptyContext : IReadOnlyDictionary<string, object?>
+internal sealed class EmptyInstanceData : IReadOnlyDictionary<string, object?>
 {
-    internal static readonly EmptyContext Instance = new();
+    internal static readonly EmptyInstanceData Instance = new();
 
     public IEnumerable<string> Keys => Array.Empty<string>();
     public IEnumerable<object?> Values => Array.Empty<object?>();

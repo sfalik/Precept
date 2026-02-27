@@ -4,15 +4,13 @@ state Green
 state Yellow
 state FlashingRed
 event Advance
-event PedestrianRequest
 event Emergency
 event ClearEmergency
 transition Red -> Green on Advance when CarsWaiting > 0
 transition Red -> Red on Advance when CarsWaiting == 0
 transition Green -> Yellow on Advance
 transition Yellow -> Red on Advance
-transition Green -> Yellow on PedestrianRequest when PedestrianWaiting
-transition Red -> FlashingRed on Emergency
-transition Green -> FlashingRed on Emergency
-transition Yellow -> FlashingRed on Emergency
+transition Red -> FlashingRed on Emergency set EmergencyReason = arg.Reason
+transition Green -> FlashingRed on Emergency set EmergencyReason = arg.Reason
+transition Yellow -> FlashingRed on Emergency set EmergencyReason = arg.Reason
 transition FlashingRed -> Red on ClearEmergency

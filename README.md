@@ -2,7 +2,7 @@
 
 A .NET state/workflow engine project currently focused on an experimental runtime DSL.
 
-## Quick Start (REPL)
+## Quick Start
 
 Use the included sample files to start an interactive session immediately:
 
@@ -10,31 +10,27 @@ Use the included sample files to start an interactive session immediately:
 dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json
 ```
 
-Note: when passing inline event arguments in REPL commands, wrap the JSON with single quotes (for example: `fire PedestrianRequest '{"PedestrianWaiting":true}'`).
+Note: when passing inline event arguments in REPL commands, wrap the JSON with single quotes (for example: `fire Emergency '{"Reason":"Accident"}'`).
 
 Then run a few commands in the prompt:
 
 ```text
 sm> events
 Advance
-PedestrianRequest
 Emergency
 ClearEmergency
 
-sm> inspect PedestrianRequest
-Defined: True
-Accepted: False
-Target: <none>
-Reasons:
- - Guard 'PedestrianWaiting' failed.
-Outcome: Rejected
-
-sm> fire PedestrianRequest '{"PedestrianWaiting":true}'
+sm> inspect Advance
 Defined: True
 Accepted: True
-NewState: Yellow
+Target: Green
 
-sm> fire Emergency
+sm> fire Advance
+Defined: True
+Accepted: True
+NewState: Green
+
+sm> fire Emergency '{"Reason":"Accident"}'
 Defined: True
 Accepted: True
 NewState: FlashingRed
@@ -76,7 +72,8 @@ This startup mode always begins from a persisted instance.
 
 - Unknown state/event/transition returns `IsDefined = false`
 - Unguarded transitions are accepted immediately
-- Guarded transitions are evaluated against optional event arguments (merged with instance snapshot data)
+- Guarded transitions are evaluated against optional event arguments; when provided, they are used for that call without mutating persisted instance data
+- Transition data assignments (`set Key = ...`) are applied only on accepted `fire` calls
 - If all guarded candidates fail, result is rejected with aggregated reasons
 - Instance-based inspect/fire validates workflow name compatibility before evaluating transitions
 - CLI startup is instance-first: `--instance` is required
@@ -122,46 +119,6 @@ The repository includes ready-to-run examples:
 - `./trafficlight.sm`
 - `./traffic.instance.json`
 
-### Quick verify
-
-Start REPL:
-
-```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json
-```
-
-Run commands:
-
-```text
-sm> inspect PedestrianRequest
-Defined: True
-Accepted: False
-Target: <none>
-Reasons:
- - Guard 'PedestrianWaiting' failed.
-Outcome: Rejected
-
-sm> fire PedestrianRequest '{"PedestrianWaiting":true}'
-Defined: True
-Accepted: True
-NewState: Yellow
-
-sm> fire Advance
-Defined: True
-Accepted: True
-NewState: Red
-
-sm> fire Emergency
-Defined: True
-Accepted: True
-NewState: FlashingRed
-
-sm> fire ClearEmergency
-Defined: True
-Accepted: True
-NewState: Red
-```
-
 Result exit codes are outcome-specific:
 
 - `5`: incompatible instance/workflow
@@ -171,9 +128,10 @@ Result exit codes are outcome-specific:
 
 This sample demonstrates:
 
-- Guarded transitions using numeric and boolean event-argument checks
-- Multiple events (`Advance`, `PedestrianRequest`, `Emergency`, `ClearEmergency`)
+- Guarded transitions using numeric event-argument/data checks
+- Multiple events (`Advance`, `Emergency`, `ClearEmergency`)
 - An emergency override state (`FlashingRed`) reachable from normal flow states
+- Transition data updates using `set <Key> = <expr>` during `fire`
 - Event-argument-aware behavior that can be inspected/fired from REPL or script mode
 
 ```text
@@ -183,17 +141,15 @@ state Green
 state Yellow
 state FlashingRed
 event Advance
-event PedestrianRequest
 event Emergency
 event ClearEmergency
 transition Red -> Green on Advance when CarsWaiting > 0
 transition Red -> Red on Advance when CarsWaiting == 0
 transition Green -> Yellow on Advance
 transition Yellow -> Red on Advance
-transition Green -> Yellow on PedestrianRequest when PedestrianWaiting
-transition Red -> FlashingRed on Emergency
-transition Green -> FlashingRed on Emergency
-transition Yellow -> FlashingRed on Emergency
+transition Red -> FlashingRed on Emergency set EmergencyReason = arg.Reason
+transition Green -> FlashingRed on Emergency set EmergencyReason = arg.Reason
+transition Yellow -> FlashingRed on Emergency set EmergencyReason = arg.Reason
 transition FlashingRed -> Red on ClearEmergency
 ```
 
@@ -205,9 +161,9 @@ transition FlashingRed -> Red on ClearEmergency
   "currentState": "Red",
   "lastEvent": null,
   "updatedAt": "2026-02-27T00:00:00+00:00",
-  "contextSnapshot": {
+  "instanceData": {
     "CarsWaiting": 2,
-    "PedestrianWaiting": false
+    "EmergencyReason": null
   }
 }
 ```

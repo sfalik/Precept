@@ -10,7 +10,9 @@ public static class StateMachineDslParser
     private static readonly Regex MachineRegex = new("^machine\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
     private static readonly Regex StateRegex = new("^state\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
     private static readonly Regex EventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\((?<arg>[A-Za-z_][A-Za-z0-9_<>., ]*)\\))?$", RegexOptions.Compiled);
-    private static readonly Regex TransitionRegex = new("^transition\\s+(?<from>[A-Za-z_][A-Za-z0-9_]*)\\s*->\\s*(?<to>[A-Za-z_][A-Za-z0-9_]*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+when\\s+(?<guard>.+))?$", RegexOptions.Compiled);
+    private static readonly Regex TransitionRegex = new(
+        "^transition\\s+(?<from>[A-Za-z_][A-Za-z0-9_]*)\\s*->\\s*(?<to>[A-Za-z_][A-Za-z0-9_]*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+when\\s+(?<guard>.*?))?(?:\\s+set\\s+(?<setKey>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<setExpr>.+))?$",
+        RegexOptions.Compiled);
 
     public static DslMachine Parse(string text)
     {
@@ -70,7 +72,9 @@ public static class StateMachineDslParser
                     transitionMatch.Groups["from"].Value,
                     transitionMatch.Groups["to"].Value,
                     transitionMatch.Groups["event"].Value,
-                    transitionMatch.Groups["guard"].Success ? transitionMatch.Groups["guard"].Value.Trim() : null));
+                    transitionMatch.Groups["guard"].Success ? transitionMatch.Groups["guard"].Value.Trim() : null,
+                    transitionMatch.Groups["setKey"].Success ? transitionMatch.Groups["setKey"].Value.Trim() : null,
+                    transitionMatch.Groups["setExpr"].Success ? transitionMatch.Groups["setExpr"].Value.Trim() : null));
                 continue;
             }
 

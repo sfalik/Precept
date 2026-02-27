@@ -149,14 +149,14 @@ static DslWorkflowInstance LoadInstance(string path)
         ? updatedAtElement.GetDateTimeOffset()
         : DateTimeOffset.UtcNow;
 
-    var context = new Dictionary<string, object?>(StringComparer.Ordinal);
-    if (root.TryGetProperty("contextSnapshot", out var contextElement) && contextElement.ValueKind == JsonValueKind.Object)
+    var instanceData = new Dictionary<string, object?>(StringComparer.Ordinal);
+    if (root.TryGetProperty("instanceData", out var instanceDataElement) && instanceDataElement.ValueKind == JsonValueKind.Object)
     {
-        foreach (var property in contextElement.EnumerateObject())
-            context[property.Name] = ToDotNetValue(property.Value);
+        foreach (var property in instanceDataElement.EnumerateObject())
+            instanceData[property.Name] = ToDotNetValue(property.Value);
     }
 
-    return new DslWorkflowInstance(workflowName, currentState, lastEvent, updatedAt, context);
+    return new DslWorkflowInstance(workflowName, currentState, lastEvent, updatedAt, instanceData);
 }
 
 static void SaveInstance(string path, DslWorkflowInstance instance)
@@ -167,7 +167,7 @@ static void SaveInstance(string path, DslWorkflowInstance instance)
         ["currentState"] = instance.CurrentState,
         ["lastEvent"] = instance.LastEvent,
         ["updatedAt"] = instance.UpdatedAt,
-        ["contextSnapshot"] = instance.ContextSnapshot
+        ["instanceData"] = instance.InstanceData
     };
 
     var json = JsonSerializer.Serialize(envelope, new JsonSerializerOptions
@@ -178,24 +178,24 @@ static void SaveInstance(string path, DslWorkflowInstance instance)
     File.WriteAllText(path, json);
 }
 
-static IReadOnlyDictionary<string, object?> ParseContext(string? contextOption, string? contextFileOption)
+static IReadOnlyDictionary<string, object?> ParseEventArguments(string? eventArgsOption, string? eventArgsFileOption)
 {
-    bool hasInlineContext = !string.IsNullOrWhiteSpace(contextOption);
-    bool hasContextFile = !string.IsNullOrWhiteSpace(contextFileOption);
+    bool hasInlineEventArgs = !string.IsNullOrWhiteSpace(eventArgsOption);
+    bool hasEventArgsFile = !string.IsNullOrWhiteSpace(eventArgsFileOption);
 
-    if (hasInlineContext && hasContextFile)
-        throw new InvalidOperationException("Use either --context or --context-file, not both.");
+    if (hasInlineEventArgs && hasEventArgsFile)
+        throw new InvalidOperationException("Use either inline event arguments or an event-args file, not both.");
 
-    if (!hasInlineContext && !hasContextFile)
+    if (!hasInlineEventArgs && !hasEventArgsFile)
         return new Dictionary<string, object?>(StringComparer.Ordinal);
 
-    var contextText = hasContextFile
-        ? File.ReadAllText(contextFileOption!)
-        : contextOption!;
+    var eventArgsText = hasEventArgsFile
+        ? File.ReadAllText(eventArgsFileOption!)
+        : eventArgsOption!;
 
-    using var doc = JsonDocument.Parse(contextText);
+    using var doc = JsonDocument.Parse(eventArgsText);
     if (doc.RootElement.ValueKind != JsonValueKind.Object)
-        throw new InvalidOperationException("--context must be a JSON object or a file containing a JSON object.");
+        throw new InvalidOperationException("Event arguments must be a JSON object.");
 
     var dictionary = new Dictionary<string, object?>(StringComparer.Ordinal);
     foreach (var property in doc.RootElement.EnumerateObject())
@@ -253,9 +253,9 @@ static ReplExecutionResult ExecuteReplCommand(
         return ReplExecutionResult.Success();
     }
 
-    if (command == "context")
+    if (command == "data")
     {
-        Console.WriteLine(ToJson(sessionInstance.ContextSnapshot));
+        Console.WriteLine(ToJson(sessionInstance.InstanceData));
         return ReplExecutionResult.Success();
     }
 
@@ -305,15 +305,13 @@ static ReplExecutionResult ExecuteReplCommand(
         }
 
         var eventName = tokens[1];
-        var commandContext = tokens.Count > 2
-            ? ParseContext(tokens[2], null)
-            : new Dictionary<string, object?>(StringComparer.Ordinal);
-
-        var effectiveContext = MergeContext(sessionInstance.ContextSnapshot, commandContext);
+        var eventArgs = tokens.Count > 2
+            ? ParseEventArguments(tokens[2], null)
+            : null;
 
         if (command == "inspect")
         {
-            var inspect = workflow.Inspect(sessionInstance.CurrentState, eventName, effectiveContext);
+            var inspect = workflow.Inspect(sessionInstance, eventName, eventArgs);
             Console.WriteLine($"Defined: {inspect.IsDefined}");
             Console.WriteLine($"Accepted: {inspect.IsAccepted}");
             Console.WriteLine($"Target: {inspect.TargetState ?? "<none>"}");
@@ -331,10 +329,7 @@ static ReplExecutionResult ExecuteReplCommand(
         }
         else
         {
-            var instanceResult = workflow.Fire(
-                sessionInstance with { ContextSnapshot = effectiveContext },
-                eventName,
-                null);
+            var instanceResult = workflow.Fire(sessionInstance, eventName, eventArgs);
 
             Console.WriteLine($"Defined: {instanceResult.IsDefined}");
             Console.WriteLine($"Accepted: {instanceResult.IsAccepted}");
@@ -355,12 +350,6 @@ static ReplExecutionResult ExecuteReplCommand(
                 sessionInstance = instanceResult.UpdatedInstance;
         }
 
-        sessionInstance = sessionInstance with
-        {
-            ContextSnapshot = new Dictionary<string, object?>(effectiveContext, StringComparer.Ordinal),
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-
         return ReplExecutionResult.Success();
     }
 
@@ -374,10 +363,10 @@ static void PrintReplHelp()
     Console.WriteLine("  help");
     Console.WriteLine("  state");
     Console.WriteLine("  events");
-    Console.WriteLine("  context");
+    Console.WriteLine("  data");
     Console.WriteLine("  inspect <EventName> [event-args-json]");
     Console.WriteLine("  fire <EventName> [event-args-json]");
-    Console.WriteLine("    event-args-json is merged with the current instance snapshot for that command");
+    Console.WriteLine("    event-args-json is evaluated only for that command and does not mutate instance data");
     Console.WriteLine("  load <path>");
     Console.WriteLine("  save [path]");
     Console.WriteLine("  exit | quit");
@@ -428,19 +417,9 @@ static List<string> Tokenize(string input)
     return result;
 }
 
-static Dictionary<string, object?> MergeContext(
-    IReadOnlyDictionary<string, object?> baseContext,
-    IReadOnlyDictionary<string, object?> overlay)
+static string ToJson(IReadOnlyDictionary<string, object?> data)
 {
-    var merged = new Dictionary<string, object?>(baseContext, StringComparer.Ordinal);
-    foreach (var kvp in overlay)
-        merged[kvp.Key] = kvp.Value;
-    return merged;
-}
-
-static string ToJson(IReadOnlyDictionary<string, object?> context)
-{
-    return JsonSerializer.Serialize(context, new JsonSerializerOptions { WriteIndented = true });
+    return JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
 }
 
 readonly record struct ReplExecutionResult(bool IsSuccess, bool ShouldExit)
