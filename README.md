@@ -90,6 +90,17 @@ This startup mode always begins from a persisted instance.
 dotnet add package StateMachine
 ```
 
+## VS Code (official extensions)
+
+This workspace is configured for Microsoft's official .NET tooling:
+
+- `ms-dotnettools.csdevkit`
+- `ms-dotnettools.csharp`
+- `ms-dotnettools.vscode-dotnet-runtime`
+
+When opened in VS Code, the workspace recommends these extensions via `.vscode/extensions.json`.
+The default solution is preconfigured in `.vscode/settings.json` as `dotnet.defaultSolution = "StateMachine.slnx"`.
+
 ## Experimental DSL CLI
 
 Launch REPL with an instance:
