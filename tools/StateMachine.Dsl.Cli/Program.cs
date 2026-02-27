@@ -254,9 +254,9 @@ static object? ToDotNetValue(JsonElement value)
         JsonValueKind.False => false,
         JsonValueKind.Number => value.TryGetInt64(out var i) ? i : value.GetDouble(),
         JsonValueKind.String => value.GetString(),
-        JsonValueKind.Object => value.GetRawText(),
-        JsonValueKind.Array => value.GetRawText(),
-        _ => value.GetRawText()
+        JsonValueKind.Object => throw new InvalidOperationException("Only scalar JSON values are supported for instance data and event arguments (object is not supported)."),
+        JsonValueKind.Array => throw new InvalidOperationException("Only scalar JSON values are supported for instance data and event arguments (array is not supported)."),
+        _ => throw new InvalidOperationException($"Unsupported JSON value kind '{value.ValueKind}' for scalar contract.")
     };
 }
 
@@ -468,10 +468,18 @@ static ReplExecutionResult ExecuteReplCommand(
         }
         else if (command == "fire" && isInteractive)
         {
+            var requiredEventKeys = workflow.Events
+                .FirstOrDefault(e => string.Equals(e.Name, eventName, StringComparison.Ordinal))?
+                .Args
+                .Where(a => !a.IsNullable)
+                .Select(a => a.Name)
+                .ToArray()
+                ?? Array.Empty<string>();
+
             var inspectForPrompt = workflow.Inspect(sessionInstance, eventName);
-            if (inspectForPrompt.Outcome == DslOutcomeKind.Enabled && inspectForPrompt.RequiredEventArgumentKeys.Count > 0)
+            if (inspectForPrompt.Outcome != DslOutcomeKind.Undefined && requiredEventKeys.Length > 0)
             {
-                if (!TryPromptForEventArguments(eventName, inspectForPrompt.RequiredEventArgumentKeys, renderer, symbolMode, out eventArgs))
+                if (!TryPromptForEventArguments(eventName, requiredEventKeys, renderer, symbolMode, out eventArgs))
                     return ReplExecutionResult.Failed();
             }
         }
@@ -761,7 +769,7 @@ static void PrintReplHelp(CliRenderer renderer)
     renderer.Info("  inspect [EventName] [event-args-json]");
     renderer.Info("    without EventName, inspects all events and lists callable ones");
     renderer.Info("  fire <EventName> [event-args-json]");
-    renderer.Info("    when a selected transition transform requires event keys and no event-args-json is provided, REPL prompts per key");
+    renderer.Info("    when EventName has required args and no event-args-json is provided, REPL prompts per key");
     renderer.Info("    event-args-json is evaluated only for that command and does not mutate instance data");
     renderer.Info("  load <path>");
     renderer.Info("  save [path]");

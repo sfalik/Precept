@@ -2,7 +2,7 @@
 data
 inspect
 
-# LeftTurnQueued=true: Red advances to protected left-turn phase (FlashingGreen)
+# data.LeftTurnQueued=true: Red advances to protected left-turn phase (FlashingGreen)
 fire Advance
 
 # Normal cycle continues from FlashingGreen (Green -> Yellow -> Red)
@@ -14,11 +14,11 @@ fire Advance
 inspect Advance
 fire Advance
 
-# Emergency without reason is rejected
+# Emergency without required args is rejected
 fire Emergency
 
-# Emergency with reason activates flashing red
-fire Emergency '{"Reason":"Accident"}'
+# Emergency with arg.AuthorizedBy and arg.Reason activates flashing red
+fire Emergency '{"AuthorizedBy":"Dispatcher","Reason":"Accident"}'
 
 # Advance has no transition while in emergency mode
 fire Advance

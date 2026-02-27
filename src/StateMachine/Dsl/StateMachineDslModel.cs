@@ -7,9 +7,25 @@ public sealed record DslMachine(
     IReadOnlyList<string> States,
     IReadOnlyList<DslEvent> Events,
     IReadOnlyList<DslTransition> Transitions,
-    IReadOnlyList<DslTerminalRule> TerminalRules);
+    IReadOnlyList<DslTerminalRule> TerminalRules,
+    IReadOnlyList<DslFieldContract> DataFields);
 
-public sealed record DslEvent(string Name);
+public sealed record DslEvent(
+    string Name,
+    IReadOnlyList<DslFieldContract> Args);
+
+public sealed record DslFieldContract(
+    string Name,
+    DslScalarType Type,
+    bool IsNullable);
+
+public enum DslScalarType
+{
+    String,
+    Number,
+    Boolean,
+    Null
+}
 
 public sealed record DslTransition(
     string FromState,

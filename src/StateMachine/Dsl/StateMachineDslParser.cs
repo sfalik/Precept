@@ -9,12 +9,14 @@ public static class StateMachineDslParser
 {
     private static readonly Regex MachineRegex = new("^machine\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
     private static readonly Regex StateRegex = new("^state\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
-    private static readonly Regex StatesRegex = new("^states\\s+(?<list>.+)$", RegexOptions.Compiled);
     private static readonly Regex EventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
-    private static readonly Regex EventsRegex = new("^events\\s+(?<list>.+)$", RegexOptions.Compiled);
     private static readonly Regex TypedEventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*\\((?<arg>[A-Za-z_][A-Za-z0-9_<>., ]*)\\)$", RegexOptions.Compiled);
+    private static readonly Regex DataHeaderRegex = new("^data$", RegexOptions.Compiled);
+    private static readonly Regex ContractFieldRegex = new(
+        "^(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*:\\s*(?<type>string|number|boolean|null)(?<nullable>\\?)?$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex TransitionRegex = new(
-        "^transition\\s+(?<from>[A-Za-z_][A-Za-z0-9_]*)\\s*->\\s*(?<to>[A-Za-z_][A-Za-z0-9_]*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+set\\s+(?<setKey>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<setExpr>.+))?$",
+        "^transition\\s+(?<from>[A-Za-z_][A-Za-z0-9_]*)\\s*->\\s*(?<to>[A-Za-z_][A-Za-z0-9_]*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+set\\s+(?<setKey>(?:data\\.)?[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<setExpr>.+))?$",
         RegexOptions.Compiled);
     private static readonly Regex FromOnRegex = new(
         "^from\\s+(?<from>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)$",
@@ -27,7 +29,7 @@ public static class StateMachineDslParser
         RegexOptions.Compiled);
     private static readonly Regex ElseRegex = new("^else$", RegexOptions.Compiled);
     private static readonly Regex TransformRegex = new(
-        "^(?:transform|set)\\s+(?<setKey>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<setExpr>.+)$",
+        "^transform\\s+(?<setKey>(?:data\\.)?[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<setExpr>.+)$",
         RegexOptions.Compiled);
     private static readonly Regex SimpleTransitionRegex = new(
         "^transition\\s+(?<to>[A-Za-z_][A-Za-z0-9_]*)$",
@@ -44,6 +46,7 @@ public static class StateMachineDslParser
         var events = new List<DslEvent>();
         var transitions = new List<DslTransition>();
         var terminalRules = new List<DslTerminalRule>();
+        var dataFields = new List<DslFieldContract>();
 
         var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
         int i = 0;
@@ -68,21 +71,6 @@ public static class StateMachineDslParser
                 continue;
             }
 
-            var statesMatch = StatesRegex.Match(line);
-            if (statesMatch.Success)
-            {
-                foreach (var stateName in ParseIdentifierList(statesMatch.Groups["list"].Value, i + 1, "state"))
-                {
-                    if (states.Contains(stateName, StringComparer.Ordinal))
-                        throw new InvalidOperationException($"Line {i + 1}: duplicate state '{stateName}'.");
-
-                    states.Add(stateName);
-                }
-
-                i++;
-                continue;
-            }
-
             var stateMatch = StateRegex.Match(line);
             if (stateMatch.Success)
             {
@@ -95,39 +83,33 @@ public static class StateMachineDslParser
                 continue;
             }
 
-            var eventsMatch = EventsRegex.Match(line);
-            if (eventsMatch.Success)
-            {
-                foreach (var eventName in ParseIdentifierList(eventsMatch.Groups["list"].Value, i + 1, "event"))
-                {
-                    if (events.Any(e => string.Equals(e.Name, eventName, StringComparison.Ordinal)))
-                        throw new InvalidOperationException($"Line {i + 1}: duplicate event '{eventName}'.");
-
-                    events.Add(new DslEvent(eventName));
-                }
-
-                i++;
-                continue;
-            }
-
             var eventMatch = EventRegex.Match(line);
             if (eventMatch.Success)
             {
                 string eventName = eventMatch.Groups["name"].Value;
 
-                if (events.Any(e => string.Equals(e.Name, eventName, StringComparison.Ordinal)))
-                    throw new InvalidOperationException($"Line {i + 1}: duplicate event '{eventName}'.");
-
-                events.Add(new DslEvent(eventName));
-                i++;
+                ParseEventDeclaration(lines, ref i, eventName, events);
                 continue;
             }
+
+            if (line.StartsWith("states ", StringComparison.Ordinal))
+                throw new InvalidOperationException($"Line {i + 1}: 'states' declaration is not supported. Declare each state with 'state <Name>'.");
+
+            if (line.StartsWith("events ", StringComparison.Ordinal))
+                throw new InvalidOperationException($"Line {i + 1}: 'events' declaration is not supported. Declare each event with 'event <Name>'.");
 
             var typedEventMatch = TypedEventRegex.Match(line);
             if (typedEventMatch.Success)
             {
                 var eventName = typedEventMatch.Groups["name"].Value;
-                throw new InvalidOperationException($"Line {i + 1}: typed event arguments are deprecated. Use 'event {eventName}' and infer required keys from transition transforms.");
+                throw new InvalidOperationException($"Line {i + 1}: inline typed event arguments are not supported. Use 'event {eventName}' with an optional indented 'args' block.");
+            }
+
+            var dataHeaderMatch = DataHeaderRegex.Match(line);
+            if (dataHeaderMatch.Success)
+            {
+                ParseDataBlock(lines, ref i, dataFields);
+                continue;
             }
 
             var fromOnMatch = FromOnRegex.Match(line);
@@ -145,20 +127,10 @@ public static class StateMachineDslParser
 
             var transitionMatch = TransitionRegex.Match(line);
             if (transitionMatch.Success)
-            {
-                transitions.Add(new DslTransition(
-                    transitionMatch.Groups["from"].Value,
-                    transitionMatch.Groups["to"].Value,
-                    transitionMatch.Groups["event"].Value,
-                    null,
-                    transitionMatch.Groups["setKey"].Success ? transitionMatch.Groups["setKey"].Value.Trim() : null,
-                    transitionMatch.Groups["setExpr"].Success ? transitionMatch.Groups["setExpr"].Value.Trim() : null));
-                i++;
-                continue;
-            }
+                throw new InvalidOperationException($"Line {i + 1}: inline 'transition <From> -> <To> on <Event>' declarations are not supported. Use a 'from <State> on <Event>' block instead.");
 
             if (line.StartsWith("transition", StringComparison.Ordinal) && line.Contains(" reason ", StringComparison.Ordinal))
-                throw new InvalidOperationException($"Line {i + 1}: inline transition reasons are not supported. Use a block outcome statement, for example reject \"<message>\".");
+                throw new InvalidOperationException($"Line {i + 1}: inline transition declarations are not supported. Use a 'from <State> on <Event>' block and place reasons on 'reject' statements.");
 
             throw new InvalidOperationException($"Line {i + 1}: unrecognized statement '{line}'.");
         }
@@ -172,9 +144,116 @@ public static class StateMachineDslParser
         if (events.Count == 0)
             throw new InvalidOperationException("At least one event must be declared.");
 
-        ValidateReferences(states, events, transitions, terminalRules);
+        ValidateReferences(states, events, transitions, terminalRules, dataFields);
 
-        return new DslMachine(name, states, events, transitions, terminalRules);
+        return new DslMachine(name, states, events, transitions, terminalRules, dataFields);
+    }
+
+    private static void ParseEventDeclaration(
+        string[] lines,
+        ref int index,
+        string eventName,
+        ICollection<DslEvent> events)
+    {
+        if (events.Any(e => string.Equals(e.Name, eventName, StringComparison.Ordinal)))
+            throw new InvalidOperationException($"Line {index + 1}: duplicate event '{eventName}'.");
+
+        var headerIndent = GetIndentation(lines[index]);
+        var args = new List<DslFieldContract>();
+        var argsHeaderSeen = false;
+        var argsHeaderIndent = -1;
+
+        index++;
+        while (index < lines.Length)
+        {
+            var raw = lines[index];
+            var line = raw.Trim();
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
+            {
+                index++;
+                continue;
+            }
+
+            var indent = GetIndentation(raw);
+            if (indent <= headerIndent)
+                break;
+
+            if (line.Equals("args", StringComparison.Ordinal))
+            {
+                if (argsHeaderSeen)
+                    throw new InvalidOperationException($"Line {index + 1}: duplicate 'args' section for event '{eventName}'.");
+
+                argsHeaderSeen = true;
+                argsHeaderIndent = indent;
+                index++;
+                continue;
+            }
+
+            if (!argsHeaderSeen)
+                throw new InvalidOperationException($"Line {index + 1}: unrecognized statement '{line}' inside event declaration. Expected 'args'.");
+
+            if (indent <= argsHeaderIndent)
+                throw new InvalidOperationException($"Line {index + 1}: event argument declarations must be indented under 'args'.");
+
+            var fieldMatch = ContractFieldRegex.Match(line);
+            if (!fieldMatch.Success)
+                throw new InvalidOperationException($"Line {index + 1}: invalid argument declaration '{line}'. Expected '<Name>: <string|number|boolean|null>[?]'.");
+
+            var fieldName = fieldMatch.Groups["name"].Value;
+            if (args.Any(a => string.Equals(a.Name, fieldName, StringComparison.Ordinal)))
+                throw new InvalidOperationException($"Line {index + 1}: duplicate argument '{fieldName}' for event '{eventName}'.");
+
+            args.Add(new DslFieldContract(
+                fieldName,
+                ParseScalarType(fieldMatch.Groups["type"].Value),
+                fieldMatch.Groups["nullable"].Success));
+            index++;
+        }
+
+        events.Add(new DslEvent(eventName, args));
+    }
+
+    private static void ParseDataBlock(
+        string[] lines,
+        ref int index,
+        ICollection<DslFieldContract> dataFields)
+    {
+        var headerIndent = GetIndentation(lines[index]);
+        var sawField = false;
+
+        index++;
+        while (index < lines.Length)
+        {
+            var raw = lines[index];
+            var line = raw.Trim();
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
+            {
+                index++;
+                continue;
+            }
+
+            var indent = GetIndentation(raw);
+            if (indent <= headerIndent)
+                break;
+
+            var fieldMatch = ContractFieldRegex.Match(line);
+            if (!fieldMatch.Success)
+                throw new InvalidOperationException($"Line {index + 1}: invalid data declaration '{line}'. Expected '<Name>: <string|number|boolean|null>[?]'.");
+
+            var fieldName = fieldMatch.Groups["name"].Value;
+            if (dataFields.Any(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal)))
+                throw new InvalidOperationException($"Line {index + 1}: duplicate data field '{fieldName}'.");
+
+            dataFields.Add(new DslFieldContract(
+                fieldName,
+                ParseScalarType(fieldMatch.Groups["type"].Value),
+                fieldMatch.Groups["nullable"].Success));
+            sawField = true;
+            index++;
+        }
+
+        if (!sawField)
+            throw new InvalidOperationException($"Line {index}: 'data' block requires at least one field declaration.");
     }
 
     private static void ParseFromOnBlock(
@@ -297,7 +376,7 @@ public static class StateMachineDslParser
             var transformAtBlock = TransformRegex.Match(line);
             if (transformAtBlock.Success)
             {
-                pendingSetKey = transformAtBlock.Groups["setKey"].Value.Trim();
+                pendingSetKey = NormalizeDataAssignmentKey(transformAtBlock.Groups["setKey"].Value.Trim());
                 pendingSetExpr = transformAtBlock.Groups["setExpr"].Value.Trim();
                 index++;
                 continue;
@@ -398,7 +477,7 @@ public static class StateMachineDslParser
             var transformMatch = TransformRegex.Match(nestedLine);
             if (transformMatch.Success)
             {
-                branchSetKey = transformMatch.Groups["setKey"].Value.Trim();
+                branchSetKey = NormalizeDataAssignmentKey(transformMatch.Groups["setKey"].Value.Trim());
                 branchSetExpr = transformMatch.Groups["setExpr"].Value.Trim();
                 index++;
                 continue;
@@ -475,7 +554,7 @@ public static class StateMachineDslParser
             var transformMatch = TransformRegex.Match(nestedLine);
             if (transformMatch.Success)
             {
-                branchSetKey = transformMatch.Groups["setKey"].Value.Trim();
+                branchSetKey = NormalizeDataAssignmentKey(transformMatch.Groups["setKey"].Value.Trim());
                 branchSetExpr = transformMatch.Groups["setExpr"].Value.Trim();
                 index++;
                 continue;
@@ -585,11 +664,27 @@ public static class StateMachineDslParser
         return results;
     }
 
+    private static DslScalarType ParseScalarType(string token)
+        => token.Trim().ToLowerInvariant() switch
+        {
+            "string" => DslScalarType.String,
+            "number" => DslScalarType.Number,
+            "boolean" => DslScalarType.Boolean,
+            "null" => DslScalarType.Null,
+            _ => throw new InvalidOperationException($"Unsupported scalar type '{token}'.")
+        };
+
+    private static string NormalizeDataAssignmentKey(string setKey)
+        => setKey.StartsWith("data.", StringComparison.Ordinal)
+            ? setKey.Substring("data.".Length)
+            : setKey;
+
     private static void ValidateReferences(
         IReadOnlyCollection<string> states,
         IReadOnlyCollection<DslEvent> events,
         IReadOnlyCollection<DslTransition> transitions,
-        IReadOnlyCollection<DslTerminalRule> terminalRules)
+        IReadOnlyCollection<DslTerminalRule> terminalRules,
+        IReadOnlyCollection<DslFieldContract> dataFields)
     {
         var stateSet = new HashSet<string>(states, StringComparer.Ordinal);
         var eventSet = new HashSet<string>(events.Select(e => e.Name), StringComparer.Ordinal);
@@ -605,18 +700,11 @@ public static class StateMachineDslParser
             if (!eventSet.Contains(transition.EventName))
                 throw new InvalidOperationException($"Transition references unknown event '{transition.EventName}'.");
 
-            if (!string.IsNullOrWhiteSpace(transition.DataAssignmentExpression) &&
-                transition.DataAssignmentExpression.StartsWith("data.", StringComparison.Ordinal))
+            if (!string.IsNullOrWhiteSpace(transition.DataAssignmentKey) && dataFields.Count > 0)
             {
-                throw new InvalidOperationException(
-                    $"Transition '{transition.FromState} -> {transition.ToState}' on '{transition.EventName}' uses unsupported transform expression '{transition.DataAssignmentExpression}'. Use a bare event-argument key (for example, 'Reason') or a literal.");
-            }
-
-            if (!string.IsNullOrWhiteSpace(transition.DataAssignmentExpression) &&
-                transition.DataAssignmentExpression.StartsWith("arg.", StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    $"Transition '{transition.FromState} -> {transition.ToState}' on '{transition.EventName}' uses deprecated transform expression '{transition.DataAssignmentExpression}'. Use a bare event-argument key (for example, 'Reason').");
+                var knownDataField = dataFields.Any(f => string.Equals(f.Name, transition.DataAssignmentKey, StringComparison.Ordinal));
+                if (!knownDataField)
+                    throw new InvalidOperationException($"Transition '{transition.FromState} -> {transition.ToState}' on '{transition.EventName}' assigns unknown data field '{transition.DataAssignmentKey}'.");
             }
         }
 

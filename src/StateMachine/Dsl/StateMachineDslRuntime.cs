@@ -20,11 +20,11 @@ public sealed record GuardEvaluationResult(bool IsPassed, string? FailureReason)
 internal sealed class DefaultGuardEvaluator : IGuardEvaluator
 {
     private static readonly Regex ComparisonRegex = new(
-        "^(?<left>[A-Za-z_][A-Za-z0-9_]*)\\s*(?<op>==|!=|>=|<=|>|<)\\s*(?<right>.+)$",
+        "^(?<left>[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)?)\\s*(?<op>==|!=|>=|<=|>|<)\\s*(?<right>.+)$",
         RegexOptions.Compiled);
 
     private static readonly Regex BooleanRegex = new(
-        "^(?<not>!)?(?<left>[A-Za-z_][A-Za-z0-9_]*)$",
+        "^(?<not>!)?(?<left>[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)?)$",
         RegexOptions.Compiled);
 
     public GuardEvaluationResult Evaluate(string expression, IReadOnlyDictionary<string, object?> data)
@@ -172,18 +172,22 @@ public sealed class DslWorkflowDefinition
 {
     private readonly Dictionary<(string State, string Event), List<DslTransition>> _transitionMap;
     private readonly Dictionary<(string State, string Event), DslTerminalRule> _terminalRuleMap;
+    private readonly Dictionary<string, DslFieldContract> _dataContractMap;
+    private readonly Dictionary<string, Dictionary<string, DslFieldContract>> _eventArgContractMap;
     private readonly IGuardEvaluator _guardEvaluator;
     private static readonly Regex IdentifierRegex = new("^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
 
     public string Name { get; }
     public IReadOnlyList<string> States { get; }
     public IReadOnlyList<DslEvent> Events { get; }
+    public IReadOnlyList<DslFieldContract> DataFields { get; }
 
     internal DslWorkflowDefinition(DslMachine machine, IGuardEvaluator guardEvaluator)
     {
         Name = machine.Name;
         States = machine.States;
         Events = machine.Events;
+        DataFields = machine.DataFields;
         _guardEvaluator = guardEvaluator;
 
         _transitionMap = machine.Transitions
@@ -198,6 +202,15 @@ public sealed class DslWorkflowDefinition
                 rule => (rule.FromState, rule.EventName),
                 rule => rule,
                 EqualityComparer<(string State, string Event)>.Default);
+
+        _dataContractMap = machine.DataFields
+            .ToDictionary(f => f.Name, f => f, StringComparer.Ordinal);
+
+        _eventArgContractMap = machine.Events
+            .ToDictionary(
+                evt => evt.Name,
+                evt => evt.Args.ToDictionary(a => a.Name, a => a, StringComparer.Ordinal),
+                StringComparer.Ordinal);
     }
 
     public DslWorkflowInstance CreateInstance(
@@ -210,12 +223,16 @@ public sealed class DslWorkflowDefinition
         if (!States.Contains(initialState, StringComparer.Ordinal))
             throw new InvalidOperationException($"State '{initialState}' is not defined in workflow '{Name}'.");
 
+        var data = instanceData ?? EmptyInstanceData.Instance;
+        if (!TryValidateDataContract(data, out var dataError))
+            throw new InvalidOperationException(dataError);
+
         return new DslWorkflowInstance(
             Name,
             initialState,
             null,
             DateTimeOffset.UtcNow,
-            instanceData ?? EmptyInstanceData.Instance);
+            data);
     }
 
     public DslInstanceCompatibilityResult CheckCompatibility(DslWorkflowInstance instance)
@@ -228,6 +245,9 @@ public sealed class DslWorkflowDefinition
 
         if (!States.Contains(instance.CurrentState, StringComparer.Ordinal))
             return DslInstanceCompatibilityResult.NotCompatible($"Instance state '{instance.CurrentState}' is not defined in workflow '{Name}'.");
+
+        if (!TryValidateDataContract(instance.InstanceData, out var dataError))
+            return DslInstanceCompatibilityResult.NotCompatible(dataError);
 
         return DslInstanceCompatibilityResult.Compatible();
     }
@@ -246,7 +266,7 @@ public sealed class DslWorkflowDefinition
                 currentState,
                 eventName,
                 resolution.Transition!.ToState,
-                ExtractRequiredEventArgumentKeys(resolution.Transition.DataAssignmentExpression)),
+                GetRequiredEventArgumentKeys(eventName)),
             TransitionResolutionKind.NotDefined => DslInspectionResult.NotDefined(currentState, eventName, resolution.NotDefinedReason!),
             _ => DslInspectionResult.Rejected(currentState, eventName, resolution.Reasons)
         };
@@ -261,7 +281,10 @@ public sealed class DslWorkflowDefinition
         if (!compatibility.IsCompatible)
             return DslInspectionResult.NotDefined(instance.CurrentState, eventName, compatibility.Reason!);
 
-        var evaluationArguments = eventArguments ?? instance.InstanceData;
+        if (eventArguments is not null && !TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
+            return DslInspectionResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
+
+        var evaluationArguments = BuildEvaluationData(instance.InstanceData, eventArguments);
         return Inspect(instance.CurrentState, eventName, evaluationArguments);
     }
 
@@ -292,7 +315,10 @@ public sealed class DslWorkflowDefinition
             return DslInstanceFireResult.NotDefined(instance.CurrentState, eventName, reasons);
         }
 
-        var evaluationArguments = eventArguments ?? instance.InstanceData;
+        if (!TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
+            return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
+
+        var evaluationArguments = BuildEvaluationData(instance.InstanceData, eventArguments);
         var resolution = ResolveTransition(instance.CurrentState, eventName, evaluationArguments);
         if (resolution.Kind == TransitionResolutionKind.NotDefined)
             return DslInstanceFireResult.NotDefined(instance.CurrentState, eventName, new[] { resolution.NotDefinedReason! });
@@ -306,12 +332,16 @@ public sealed class DslWorkflowDefinition
         {
             if (!TryResolveAssignmentValue(
                 resolution.Transition.DataAssignmentExpression,
+                instance.InstanceData,
                 eventArguments ?? EmptyInstanceData.Instance,
                 out var assignedValue,
                 out var assignmentError))
             {
                 return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { assignmentError! });
             }
+
+            if (!TryValidateAssignedValue(resolution.Transition.DataAssignmentKey!, assignedValue, out var contractError))
+                return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { contractError! });
 
             updatedData[resolution.Transition.DataAssignmentKey!] = assignedValue;
         }
@@ -393,8 +423,9 @@ public sealed class DslWorkflowDefinition
         };
     }
 
-    private static bool TryResolveAssignmentValue(
+    private bool TryResolveAssignmentValue(
         string assignmentExpression,
+        IReadOnlyDictionary<string, object?> instanceData,
         IReadOnlyDictionary<string, object?> eventArguments,
         out object? assignedValue,
         out string? error)
@@ -416,16 +447,28 @@ public sealed class DslWorkflowDefinition
 
         if (expression.StartsWith("data.", StringComparison.Ordinal))
         {
-            assignedValue = null;
-            error = "Data assignment failed: 'data.' references are not allowed in transforms; use a bare event-argument key or a literal.";
-            return false;
+            var dataKey = expression.Substring("data.".Length);
+            if (!instanceData.TryGetValue(dataKey, out assignedValue))
+            {
+                error = $"Data assignment failed: data field '{dataKey}' was not provided.";
+                return false;
+            }
+
+            error = null;
+            return true;
         }
 
         if (expression.StartsWith("arg.", StringComparison.Ordinal))
         {
-            assignedValue = null;
-            error = "Data assignment failed: 'arg.' prefix is deprecated; use a bare event-argument key (for example, 'Reason').";
-            return false;
+            var argKey = expression.Substring("arg.".Length);
+            if (!eventArguments.TryGetValue(argKey, out assignedValue))
+            {
+                error = $"Data assignment failed: event argument '{argKey}' was not provided.";
+                return false;
+            }
+
+            error = null;
+            return true;
         }
 
         if (IdentifierRegex.IsMatch(expression))
@@ -445,19 +488,169 @@ public sealed class DslWorkflowDefinition
         return false;
     }
 
-    private static IReadOnlyList<string> ExtractRequiredEventArgumentKeys(string? assignmentExpression)
+    private IReadOnlyList<string> GetRequiredEventArgumentKeys(string eventName)
     {
-        if (string.IsNullOrWhiteSpace(assignmentExpression))
+        if (!_eventArgContractMap.TryGetValue(eventName, out var argContract) || argContract.Count == 0)
             return Array.Empty<string>();
 
-        var expression = assignmentExpression.Trim();
-        if (TryParseLiteral(expression, out _))
-            return Array.Empty<string>();
+        return argContract.Values
+            .Where(a => !a.IsNullable)
+            .Select(a => a.Name)
+            .ToArray();
+    }
 
-        if (IdentifierRegex.IsMatch(expression))
-            return new[] { expression };
+    private IReadOnlyDictionary<string, object?> BuildEvaluationData(
+        IReadOnlyDictionary<string, object?> instanceData,
+        IReadOnlyDictionary<string, object?>? eventArguments)
+    {
+        var evaluation = new Dictionary<string, object?>(StringComparer.Ordinal);
 
-        return Array.Empty<string>();
+        foreach (var kvp in instanceData)
+        {
+            evaluation[$"data.{kvp.Key}"] = kvp.Value;
+            if (!evaluation.ContainsKey(kvp.Key))
+                evaluation[kvp.Key] = kvp.Value;
+        }
+
+        if (eventArguments is not null)
+        {
+            foreach (var kvp in eventArguments)
+            {
+                evaluation[$"arg.{kvp.Key}"] = kvp.Value;
+                evaluation[kvp.Key] = kvp.Value;
+            }
+        }
+
+        return evaluation;
+    }
+
+    private bool TryValidateDataContract(IReadOnlyDictionary<string, object?> data, out string error)
+    {
+        if (_dataContractMap.Count == 0)
+        {
+            error = string.Empty;
+            return true;
+        }
+
+        foreach (var key in data.Keys)
+        {
+            if (!_dataContractMap.ContainsKey(key))
+            {
+                error = $"Data validation failed: unknown data field '{key}'.";
+                return false;
+            }
+        }
+
+        foreach (var field in _dataContractMap.Values)
+        {
+            if (!data.TryGetValue(field.Name, out var value))
+            {
+                if (!field.IsNullable)
+                {
+                    error = $"Data validation failed: required data field '{field.Name}' is missing.";
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (!TryValidateScalarValue(field, value, out error))
+                return false;
+        }
+
+        error = string.Empty;
+        return true;
+    }
+
+    private bool TryValidateEventArguments(string eventName, IReadOnlyDictionary<string, object?>? eventArguments, out string? error)
+    {
+        if (!_eventArgContractMap.TryGetValue(eventName, out var eventContract) || eventContract.Count == 0)
+        {
+            error = null;
+            return true;
+        }
+
+        var args = eventArguments ?? EmptyInstanceData.Instance;
+
+        foreach (var key in args.Keys)
+        {
+            if (!eventContract.ContainsKey(key))
+            {
+                error = $"Event argument validation failed: unknown argument '{key}' for event '{eventName}'.";
+                return false;
+            }
+        }
+
+        foreach (var arg in eventContract.Values)
+        {
+            if (!args.TryGetValue(arg.Name, out var value))
+            {
+                if (!arg.IsNullable)
+                {
+                    error = $"Event argument validation failed: required argument '{arg.Name}' for event '{eventName}' is missing.";
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (!TryValidateScalarValue(arg, value, out error))
+            {
+                error = $"Event argument validation failed: {error}";
+                return false;
+            }
+        }
+
+        error = null;
+        return true;
+    }
+
+    private bool TryValidateAssignedValue(string dataFieldName, object? value, out string error)
+    {
+        if (!_dataContractMap.TryGetValue(dataFieldName, out var contract))
+        {
+            error = string.Empty;
+            return true;
+        }
+
+        if (TryValidateScalarValue(contract, value, out error))
+            return true;
+
+        error = $"Data assignment failed: {error}";
+        return false;
+    }
+
+    private static bool TryValidateScalarValue(DslFieldContract contract, object? value, out string error)
+    {
+        if (value is null)
+        {
+            if (!contract.IsNullable)
+            {
+                error = $"'{contract.Name}' does not allow null values.";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        bool typeMatches = contract.Type switch
+        {
+            DslScalarType.String => value is string,
+            DslScalarType.Boolean => value is bool,
+            DslScalarType.Number => value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal,
+            DslScalarType.Null => false,
+            _ => false
+        };
+
+        if (!typeMatches)
+        {
+            error = $"'{contract.Name}' expects {contract.Type.ToString().ToLowerInvariant()} value.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
     }
 
     private static bool TryParseLiteral(string text, out object? value)

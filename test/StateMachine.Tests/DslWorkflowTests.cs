@@ -16,7 +16,8 @@ public class DslWorkflowTests
             state Red
             state Green
             event Advance
-            transition Red -> Green on Advance
+            from Red on Advance
+                transition Green
             """;
 
         var machine = StateMachineDslParser.Parse(dsl);
@@ -344,7 +345,9 @@ public class DslWorkflowTests
             state Red
             state Green
             event Advance
-            transition Red -> Green on Advance set CarsWaiting = 0
+            from Red on Advance
+                transform CarsWaiting = 0
+                transition Green
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -366,7 +369,9 @@ public class DslWorkflowTests
             state Red
             state FlashingRed
             event Emergency
-            transition Red -> FlashingRed on Emergency set EmergencyReason = Reason
+            from Red on Emergency
+                transform EmergencyReason = Reason
+                transition FlashingRed
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -388,7 +393,11 @@ public class DslWorkflowTests
             state Red
             state FlashingRed
             event Emergency
-            transition Red -> FlashingRed on Emergency set EmergencyReason = Reason
+                args
+                    Reason: string
+            from Red on Emergency
+                transform EmergencyReason = Reason
+                transition FlashingRed
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -398,25 +407,36 @@ public class DslWorkflowTests
 
         fire.IsDefined.Should().BeTrue();
         fire.IsAccepted.Should().BeFalse();
-        fire.Reasons.Should().ContainSingle(r => r.Contains("event argument 'Reason'", StringComparison.Ordinal));
+        fire.Reasons.Should().ContainSingle(r => r.Contains("required argument 'Reason'", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void Parse_TransitionDataAssignment_FromInstanceDataReference_IsRejected()
+    public void Fire_Instance_DataAssignment_FromInstanceDataReference_IsAccepted()
     {
         const string dsl = """
             machine TrafficLight
             state Red
             state Green
+            data
+                CarsWaiting: number
+                LastCarsWaiting: number
             event Advance
-            transition Red -> Green on Advance set LastCarsWaiting = data.CarsWaiting
+            from Red on Advance
+                transform LastCarsWaiting = data.CarsWaiting
+                transition Green
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
+        {
+            ["CarsWaiting"] = 3d,
+            ["LastCarsWaiting"] = 0d
+        });
 
-        act.Should()
-            .Throw<InvalidOperationException>()
-            .WithMessage("*unsupported transform expression*data.CarsWaiting*");
+        var fire = workflow.Fire(instance, "Advance");
+
+        fire.IsAccepted.Should().BeTrue();
+        fire.UpdatedInstance!.InstanceData["LastCarsWaiting"].Should().Be(3d);
     }
 
     [Fact]
@@ -427,32 +447,43 @@ public class DslWorkflowTests
             state Red
             state Green
             event Advance(AdvanceArgs)
-            transition Red -> Green on Advance
+            from Red on Advance
+                transition Green
             """;
 
         var act = () => StateMachineDslParser.Parse(dsl);
 
         act.Should()
             .Throw<InvalidOperationException>()
-            .WithMessage("*typed event arguments are deprecated*");
+            .WithMessage("*inline typed event arguments are not supported*");
     }
 
     [Fact]
-    public void Parse_TransitionDataAssignment_WithArgPrefix_IsRejected()
+    public void Fire_Instance_DataAssignment_WithArgPrefix_IsAccepted()
     {
         const string dsl = """
             machine TrafficLight
             state Red
             state FlashingRed
             event Emergency
-            transition Red -> FlashingRed on Emergency set EmergencyReason = arg.Reason
+                args
+                    Reason: string
+            data
+                EmergencyReason: string?
+            from Red on Emergency
+                transform EmergencyReason = arg.Reason
+                transition FlashingRed
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
+        {
+            ["EmergencyReason"] = null
+        });
+        var fire = workflow.Fire(instance, "Emergency", new Dictionary<string, object?> { ["Reason"] = "Accident" });
 
-        act.Should()
-            .Throw<InvalidOperationException>()
-            .WithMessage("*deprecated transform expression*arg.Reason*");
+        fire.IsAccepted.Should().BeTrue();
+        fire.UpdatedInstance!.InstanceData["EmergencyReason"].Should().Be("Accident");
     }
 
     [Fact]
@@ -463,7 +494,11 @@ public class DslWorkflowTests
             state Red
             state FlashingRed
             event Emergency
-            transition Red -> FlashingRed on Emergency set EmergencyReason = Reason
+                args
+                    Reason: string
+            from Red on Emergency
+                transform EmergencyReason = Reason
+                transition FlashingRed
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -485,8 +520,12 @@ public class DslWorkflowTests
             state On
             event Enable
             event Disable
-            transition Off -> On on Enable set IsEnabled = true
-            transition On -> Off on Disable set IsEnabled = false
+            from Off on Enable
+                transform IsEnabled = true
+                transition On
+            from On on Disable
+                transform IsEnabled = false
+                transition Off
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -509,7 +548,9 @@ public class DslWorkflowTests
             state Open
             state Cleared
             event Clear
-            transition Open -> Cleared on Clear set Note = null
+            from Open on Clear
+                transform Note = null
+                transition Cleared
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -529,7 +570,9 @@ public class DslWorkflowTests
             state Red
             state Green
             event Advance
-            transition Red -> Green on Advance set CarsWaiting = 0
+            from Red on Advance
+                transform CarsWaiting = 0
+                transition Green
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -581,7 +624,8 @@ public class DslWorkflowTests
             state Red
             state Green
             event Advance
-            transition Red -> Green on Advance
+            from Red on Advance
+                transition Green
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -607,7 +651,8 @@ public class DslWorkflowTests
             state Green
             state Yellow
             event Advance
-            transition Green -> Yellow on Advance
+            from Green on Advance
+                transition Yellow
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -628,7 +673,8 @@ public class DslWorkflowTests
             state Red
             state Green
             event Advance
-            transition Red -> Green on Advance
+            from Red on Advance
+                transition Green
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -649,7 +695,8 @@ public class DslWorkflowTests
             state Red
             state Red
             event Advance
-            transition Red -> Red on Advance
+            from Red on Advance
+                transition Red
             """;
 
         var act = () => StateMachineDslParser.Parse(dsl);
@@ -698,7 +745,7 @@ public class DslWorkflowTests
 
         act.Should()
             .Throw<InvalidOperationException>()
-            .WithMessage("*inline transition reasons are not supported*block outcome statement*");
+            .WithMessage("*inline transition declarations are not supported*from <State> on <Event>*");
     }
 
         [Fact]
@@ -706,8 +753,9 @@ public class DslWorkflowTests
         {
                 const string dsl = """
                         machine TrafficLight
-                        states Red, Green
-                        events Advance
+                        state Red
+                        state Green
+                        event Advance
                         from Red on Advance
                             if CarsWaiting > 0
                                 transition Green
@@ -729,8 +777,9 @@ public class DslWorkflowTests
         {
                 const string dsl = """
                         machine TrafficLight
-                        states Red, Green
-                        events Advance
+                        state Red
+                        state Green
+                        event Advance
                         from Red on Advance
                             if CarsWaiting > 0
                                 transition Green
@@ -752,8 +801,9 @@ public class DslWorkflowTests
         {
                 const string dsl = """
                         machine TrafficLight
-                        states Red, Green
-                        events Advance
+                        state Red
+                        state Green
+                        event Advance
                         from Red on Advance
                             if CarsWaiting > 0
                                 transition Green
@@ -775,8 +825,11 @@ public class DslWorkflowTests
         {
                 const string dsl = """
                         machine TrafficLight
-                        states Red, Green, Yellow, FlashingRed
-                        events Emergency
+                        state Red
+                        state Green
+                        state Yellow
+                        state FlashingRed
+                        event Emergency
                         from any on Emergency
                             if Reason != ""
                                 transition FlashingRed
@@ -794,14 +847,13 @@ public class DslWorkflowTests
         [Fact]
         public void Parse_FromOnBlock_WithoutOutcome_IsRejected()
         {
-                const string dsl = """
-                        machine TrafficLight
-                        states Red, Green
-                        events Advance
-                        from Red on Advance
-                        if CarsWaiting > 0
-                                transition Green
-                        """;
+            const string dsl = """
+                machine TrafficLight
+                state Red
+                state Green
+                event Advance
+                from Red on Advance
+                """;
 
                 var act = () => StateMachineDslParser.Parse(dsl);
 
@@ -815,8 +867,9 @@ public class DslWorkflowTests
             {
                 const string dsl = """
                     machine TrafficLight
-                    states Red, Green
-                    events Advance
+                    state Red
+                    state Green
+                    event Advance
 
                     from Red on Advance
                                 reject "First"
@@ -837,8 +890,9 @@ public class DslWorkflowTests
             {
                 const string dsl = """
                     machine TrafficLight
-                    states Yellow, Red
-                    events Advance
+                    state Yellow
+                    state Red
+                    event Advance
 
                     from Yellow on Advance
                         transition Red
@@ -857,8 +911,10 @@ public class DslWorkflowTests
             {
                 const string dsl = """
                     machine TrafficLight
-                    states Red, Green, Yellow
-                    events Advance
+                    state Red
+                    state Green
+                    state Yellow
+                    event Advance
 
                     from Red on Advance
                         if CarsWaiting > 3
@@ -884,8 +940,9 @@ public class DslWorkflowTests
             {
                 const string dsl = """
                     machine TrafficLight
-                    states Red, Green
-                    events Advance
+                    state Red
+                    state Green
+                    event Advance
 
                     from Red on Advance
                         unless CarsWaiting > 0
@@ -905,8 +962,9 @@ public class DslWorkflowTests
             {
                 const string dsl = """
                     machine TrafficLight
-                    states Red, Green
-                    events Advance
+                    state Red
+                    state Green
+                    event Advance
 
                     from Red on Advance
                         if CarsWaiting > 0 reason "No demand"
@@ -919,5 +977,63 @@ public class DslWorkflowTests
                 act.Should()
                     .Throw<InvalidOperationException>()
                     .WithMessage("*'reason' is not allowed on 'if' branches*");
+            }
+
+            [Fact]
+            public void Parse_SetAlias_IsRejected()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    state Red
+                    state Green
+                    event Advance
+
+                    from Red on Advance
+                        set CarsWaiting = 0
+                        transition Green
+                    """;
+
+                var act = () => StateMachineDslParser.Parse(dsl);
+
+                act.Should()
+                    .Throw<InvalidOperationException>()
+                    .WithMessage("*unrecognized statement 'set CarsWaiting = 0' inside from/on block*");
+            }
+
+            [Fact]
+            public void Parse_StatesPluralDeclaration_IsRejected()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    states Red, Green
+                    event Advance
+                    from Red on Advance
+                        transition Green
+                    """;
+
+                var act = () => StateMachineDslParser.Parse(dsl);
+
+                act.Should()
+                    .Throw<InvalidOperationException>()
+                    .WithMessage("*'states' declaration is not supported*");
+            }
+
+            [Fact]
+            public void Parse_EventsPluralDeclaration_IsRejected()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    state Red
+                    state Green
+                    events Advance
+                    from Red on Advance
+                        transition Green
+                    """;
+
+                var act = () => StateMachineDslParser.Parse(dsl);
+
+                act.Should()
+                    .Throw<InvalidOperationException>()
+                    .WithMessage("*'events' declaration is not supported*");
             }
 }

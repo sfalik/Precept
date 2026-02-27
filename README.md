@@ -8,7 +8,7 @@ StateMachine is a .NET DSL-driven state/workflow engine focused on deterministic
 - **Inspect before fire**: evaluate whether a transition is not available from the current state, blocked, or enabled before mutating state.
 - **Persistable runtime instances**: load/save a JSON instance with current state and instance data.
 - **Explicit event arguments**: per-call arguments are separate from persisted instance data.
-- **Transition-scoped data updates**: `set Key = ...` assignments run only on accepted `fire`.
+- **Transition-scoped data updates**: `transform data.<Key> = ...` assignments run only on accepted `fire`.
 
 ## Quick Start (2 minutes)
 
@@ -50,9 +50,11 @@ Red › inspect Advance
   └─ Advance ⚠ | No demand detected at red
 
 Red › fire Emergency
-  └─ Emergency ⚠ | A reason is required to activate emergency mode
+  └─ Emergency ⚠ | Event argument validation failed: required argument 'AuthorizedBy' for event 'Emergency' is missing.
 
-Red › fire Emergency '{"Reason":"Accident"}'
+Red › fire Emergency
+  │ AuthorizedBy: Dispatcher
+  │ Reason: Accident
   └─ Emergency ✔ ──▶ FlashingRed
 
 FlashingRed › fire Advance
@@ -62,9 +64,9 @@ FlashingRed › fire ClearEmergency
   └─ ClearEmergency ✔ ──▶ Red
 ```
 
-Note: you can also pass inline JSON event arguments (for example `fire Emergency '{"Reason":"Accident"}'`).
+Note: you can also pass inline JSON event arguments (for example `fire Emergency '{"AuthorizedBy":"Dispatcher","Reason":"Accident"}'`).
 Note: output is colorized by default (success/warning/error); use `--no-color` to disable.
-Note: `inspect` after the fourth `fire Advance` shows blocked because `LeftTurnQueued` was cleared and `VehiclesWaiting` is 0.
+Note: `inspect` after the fourth `fire Advance` shows blocked because `data.LeftTurnQueued` was cleared and `data.VehiclesWaiting` is 0.
 
 Quick script run (non-interactive):
 
@@ -77,7 +79,7 @@ Expected compact output shape:
 ```text
 sm> fire Advance
 [INFO] Advance: Red → FlashingGreen
-sm> fire Emergency '{"Reason":"Accident"}'
+sm> fire Emergency '{"AuthorizedBy":"Dispatcher","Reason":"Accident"}'
 [INFO] Emergency: Red → FlashingRed
 ```
 
@@ -93,93 +95,32 @@ sm> fire Emergency '{"Reason":"Accident"}'
 
 ## DSL Example
 
-The DSL is built up in stages. Each stage introduces new constructs on top of the previous one.
-
-### Stage 1 — One-line transitions
-
-The simplest form: a machine with three states cycling on a single event.
-
 ```text
 machine TrafficLight
-states Red, Green, Yellow
-events Advance
+
+state Red
+state Green
+state Yellow
+state FlashingGreen
+state FlashingRed
+
+event Advance
+event Emergency
+  args
+    AuthorizedBy: string
+    Reason: string
+event ClearEmergency
+
+data
+  VehiclesWaiting: number
+  LeftTurnQueued: boolean
+  EmergencyReason: string?
 
 from Red on Advance
-  transition Green
-
-from Green on Advance
-  transition Yellow
-
-from Yellow on Advance
-  transition Red
-```
-
-### Stage 2 — Guarded transition with reject
-
-Add an `if` guard that blocks the transition when demand is absent. The `reject` statement is the fallback if no guard passes.
-
-```text
-from Red on Advance
-  if VehiclesWaiting > 0
-    transition Green
-  reject "No demand detected at red"
-```
-
-`if` branches allow an optional `transform` before `transition`. Guards do not carry `reason` — that belongs on `reject` only.
-
-### Stage 3 — Event arguments, transform, `from any`, `no transition`
-
-Add an emergency event that requires a payload, records data on transition, suspends the cycle, and can be cleared.
-
-```text
-machine TrafficLight
-states Red, Green, Yellow, FlashingRed
-events Advance, Emergency, ClearEmergency
-
-from Red on Advance
-  if VehiclesWaiting > 0
-    transition Green
-  reject "No demand detected at red"
-
-from Green on Advance
-  transition Yellow
-
-from Yellow on Advance
-  transition Red
-
-from any on Emergency
-  if Reason != ""
-    transform EmergencyReason = Reason
-    transition FlashingRed
-  reject "A reason is required to activate emergency mode"
-
-from FlashingRed on Advance
-  no transition
-
-from FlashingRed on ClearEmergency
-  transform EmergencyReason = null
-  transition Red
-```
-
-- `from any` matches every state; specific `from` headers take priority.
-- `transform Key = Expr` runs only on accepted `fire`, never on `inspect`.
-- `no transition` makes the outcome explicitly undefined — reported as `no transition from <State>`.
-- Event-argument keys (`Reason`) are accessed directly in guards and transform expressions.
-
-### Stage 4 — `else if` / `else` (full sample)
-
-Add a protected left-turn phase (`FlashingGreen`) served ahead of general demand, cleared in one step.
-
-```text
-machine TrafficLight
-states Red, Green, Yellow, FlashingGreen, FlashingRed
-events Advance, Emergency, ClearEmergency
-
-from Red on Advance
-  if LeftTurnQueued
-    transform LeftTurnQueued = false
+  if data.LeftTurnQueued
+    transform data.LeftTurnQueued = false
     transition FlashingGreen
-  else if VehiclesWaiting > 0
+  else if data.VehiclesWaiting > 0
     transition Green
   else
     reject "No demand detected at red"
@@ -194,72 +135,113 @@ from Yellow on Advance
   transition Red
 
 from any on Emergency
-  if Reason != ""
-    transform EmergencyReason = Reason
+  if arg.AuthorizedBy != "" && arg.Reason != ""
+    transform data.EmergencyReason = arg.Reason
     transition FlashingRed
-  reject "A reason is required to activate emergency mode"
+  else
+    reject "AuthorizedBy and Reason are required to activate emergency mode"
 
 from FlashingRed on Advance
   no transition
 
 from FlashingRed on ClearEmergency
-  transform EmergencyReason = null
+  transform data.EmergencyReason = null
   transition Red
 ```
 
 The full file (with block comments) is at [`trafficlight.sm`](trafficlight.sm).
 
-Supported assignment forms:
+## DSL Syntax Reference (Linear)
 
-- Literal: `transform VehiclesWaiting = 0`
-- Null literal: `transform EmergencyReason = null`
-- Copy from event arguments: `transform EmergencyReason = Reason`
+```text
+machine <Name>
+state <StateName>
 
-Each `from ... on ...` block must end with an outcome statement: `transition <State>`, `reject "<message>"`, or `no transition`.
-No additional statements are allowed after an outcome statement within the block.
-Guarded transitions are expressed only with `if` / `else if` / `else` inside `from ... on ...` blocks.
+event <EventName>
+[ args <ArgName>: <string|number|boolean|null>[?] { <ArgDecl> } ]
 
-Current DSL syntax contract:
+data
+<FieldName>: <string|number|boolean|null>[?] { <FieldDecl> }
 
-- Block header: `from <State|State,State|any> on <Event>`
-- Guarded branch: `if <Guard>` followed by an indented `transition <State>` (optional `transform` line before transition)
-- Additional guarded branches: `else if <Guard>`
-- Fallback branch: `else` followed by exactly one outcome path
-- Outcome statements:
-  - `transition <State>`
-  - `reject "<message>"`
-  - `no transition`
-- `else if` and `else` require a preceding `if`
-- `reason` is valid **only** on `reject` statements; writing `reason "..."` on an `if` or `else if` branch is a parse error
-- Guarded logic belongs in branch headers (`if` / `else if`) inside `from ... on ...` blocks
-- Inline guarded transitions (for example `transition A -> B on E` with trailing guard clauses) are not supported
+from <any|StateA[,StateB...]> on <EventName>
+(
+    if <Guard> [ transform <Field|data.Field> = <Expr> ] transition <ToState>
+  | else if <Guard> [ transform <Field|data.Field> = <Expr> ] transition <ToState>
+  | else [ transform <Field|data.Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
+  | [ transform <Field|data.Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
+)+
 
-Authoring rules (detailed):
+<Expr> := <Literal|Identifier|arg.<ArgName>|data.<FieldName>>
+<Literal> := <null|true|false|number|string>
+```
 
-- Indentation is structural; nested statements must be indented deeper than their parent header.
-- `if` and `else if` branch bodies allow:
-  - zero or one `transform <Key> = <Expr>`
-  - exactly one `transition <State>`
-- `if` and `else if` branches cannot end with `reject` or `no transition`; fallback outcomes belong in block-level `else` or final block outcome lines.
-- `else` is optional; if present, it must be last and contain exactly one outcome path (`transition`, `reject`, or `no transition`, with optional leading `transform` for transition outcomes).
-- A block may end directly with `transition <State>`, `reject "<message>"`, or `no transition` without an `else` branch.
-- After the first outcome statement in a block, no further statements are valid.
+Constraints:
 
-Resolution semantics:
+- `()+` means one-or-more branch lines in the `from ... on ...` body.
+- `if` and `else if` branches must end in `transition <ToState>`.
+- `else` may end in `transition`, `reject`, or `no transition`.
+- `reason "..."` is valid only on `reject`.
+- Unsupported syntax: `states ...`, `events ...`, `transition A -> B on E ...`, `set ...`.
 
-- Branches are evaluated in source order.
-- The first guard that evaluates `true` is selected and its transition is applied.
-- If no guarded branch is selected, the block outcome decides behavior:
-  - `reject` => inspect/fire result is blocked with the configured reason
-  - `no transition` => result is undefined
-  - terminal `transition` => unconditional enabled transition
+## DSL Cookbook
 
-Unsupported in transforms:
+Practical patterns that map directly to the syntax:
 
-- `arg.<Key>` and `data.<Key>` references are rejected during parse/compile.
+1) Unconditional transition
 
-Reserved literals in transform expressions: `true`, `false`, and `null`.
-Event-arg keys with those exact names are reserved and cannot be referenced as transform identifiers.
+```text
+from Draft on Submit
+  transition PendingReview
+```
+
+2) Transition with data update
+
+```text
+from Draft on Submit
+  transform data.SubmittedAt = "2026-02-27T00:00:00Z"
+  transition PendingReview
+```
+
+3) Guarded routing with fallback reject
+
+```text
+from PendingReview on Approve
+  if data.Score >= 80
+    transition Approved
+  else
+    reject "Score below approval threshold"
+```
+
+4) Event args copied into persisted data
+
+```text
+event Escalate
+  args
+    Reason: string
+
+from PendingReview on Escalate
+  if arg.Reason != ""
+    transform data.EscalationReason = arg.Reason
+    transition Escalated
+  else
+    reject "Reason is required"
+```
+
+5) Multi-source handler with `from any`
+
+```text
+event Archive
+
+from any on Archive
+  transition Archived
+```
+
+6) Explicitly disable an event in a state
+
+```text
+from Archived on Submit
+  no transition
+```
 
 ## Instance JSON Example
 
@@ -347,14 +329,15 @@ Exit codes:
 - `5`: incompatible instance/workflow
 - `6`: script command failed
 
-## Current Status
+## Status
 
 Implemented now:
 
 - Line-based DSL parser/runtime in `src/StateMachine/Dsl/*`
+- Explicit `data` contracts and event `args` contracts (scalar-only)
 - Instance-first runtime APIs (`CreateInstance`, `Inspect`, `Fire`)
 - Guard evaluation with rejection reasons
-- Transition data assignments (`set Key = ...`) on accepted `fire`
+- Transition data assignments (`transform data.<Key> = ...`) on accepted `fire`
 - CLI REPL + script execution
 - Active test coverage in `test/StateMachine.Tests/DslWorkflowTests.cs`
 
@@ -362,12 +345,12 @@ Pending:
 
 - Editor tooling (LSP/IntelliSense)
 
-Design-phase compatibility policy (current):
+Design-phase compatibility policy:
 
 - Backward compatibility is not required at this time while DSL design is still actively evolving.
 - Syntax-level breaking changes are expected during this phase if they improve language clarity.
 
-Concurrency model (current):
+Concurrency model:
 
 - Definition is immutable and reusable.
 - Instance updates are caller-managed values.
@@ -376,7 +359,7 @@ Concurrency model (current):
 Legacy runtime status:
 
 - Active public/runtime path is DSL runtime only.
-- Legacy fluent/runtime artifacts are not part of the current contract.
+- Legacy fluent/runtime artifacts are not part of the active contract.
 
 ## VS Code Setup
 

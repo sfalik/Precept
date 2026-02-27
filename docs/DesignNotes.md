@@ -30,6 +30,40 @@ Implementation focus is the DSL runtime path:
 
 ### DSL Syntax Contract (Current)
 
+Canonical linear form:
+
+```text
+machine <Name>
+state <StateName>
+
+event <EventName>
+[ args <ArgName>: <string|number|boolean|null>[?] { <ArgDecl> } ]
+
+data
+<FieldName>: <string|number|boolean|null>[?] { <FieldDecl> }
+
+from <any|StateA[,StateB...]> on <EventName>
+(
+    if <Guard> [ transform <Field|data.Field> = <Expr> ] transition <ToState>
+  | else if <Guard> [ transform <Field|data.Field> = <Expr> ] transition <ToState>
+  | else [ transform <Field|data.Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
+  | [ transform <Field|data.Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
+)+
+
+<Expr> := <Literal|Identifier|arg.<ArgName>|data.<FieldName>>
+<Literal> := <null|true|false|number|string>
+```
+
+Canonical constraints:
+
+- `()+` means one-or-more lines in a `from ... on ...` body.
+- `if` and `else if` must end with `transition <State>`.
+- `else` may end with `transition`, `reject`, or `no transition`.
+- `reason "..."` is valid only on `reject`.
+- Unsupported syntax: `states ...`, `events ...`, `transition A -> B on E ...`, `set ...`.
+
+Block-authoring equivalent (same semantics):
+
 - Block header: `from <State|State,State|any> on <Event>`
 - Guarded branch header: `if <Guard>`
 - Additional guarded branch headers: `else if <Guard>`
@@ -55,7 +89,7 @@ Implementation focus is the DSL runtime path:
   - require exactly one `transition <State>`
   - do not allow `reject` or `no transition`
 - `else` branch body:
-  - may include optional `transform` only if outcome is `transition <State>`
+  - may include optional `transform <Key> = <Expr>`
   - must end in exactly one outcome statement: `transition <State>`, `reject "<message>"`, or `no transition`
 
 #### Evaluation model
@@ -64,6 +98,45 @@ Implementation focus is the DSL runtime path:
 - First matching guarded branch wins.
 - If no guard matches, configured block outcome is applied.
 - Transition transforms execute only on accepted fire-path transitions.
+
+### Explicit Declarations (Current)
+
+The DSL supports explicit contracts while keeping declaration style consistent:
+
+- `state <Name>` remains one declaration per line.
+- `event <Name>` remains one declaration per line, with optional indented `args` body.
+- `data` block declares persisted instance-data fields.
+
+Form:
+
+```text
+machine <MachineName>
+
+state <StateName>
+state <StateName>
+
+event <EventName>
+event <EventName>
+  args
+    <ArgName>: <ScalarType>[?]
+
+data
+  <FieldName>: <ScalarType>[?]
+```
+
+Scalar-only type set (flat model):
+
+- `string`
+- `number`
+- `boolean`
+- `null`
+
+Validation constraints:
+
+- Event args and data fields are scalar-only; nested object/array values are invalid.
+- Unknown event-arg keys and unknown data keys are rejected.
+- `Type?` means nullable; non-nullable values reject `null`.
+- Guards/transforms support explicit references (`arg.<Key>`, `data.<Key>`).
 
 ## Implemented Components
 
@@ -124,7 +197,7 @@ Implementation focus is the DSL runtime path:
 - REPL supports `style theme <name|list>` to switch among built-in palettes during a session.
 - REPL default startup theme is `github-dark`.
 - REPL `inspect` supports optional event name; without one it inspects all events and reports callable transitions for the current state.
-- REPL `fire` prompts for each required event key directly if no inline arguments are supplied and the selected transition transform infers required event keys.
+- REPL `fire` prompts for each required event arg key directly if no inline JSON args are supplied and the event is defined from the current state.
 - REPL `data` renders readable key-value output in interactive mode unless output mode is json.
 - Interactive REPL uses `compact` only.
 - Script/non-interactive output is log-oriented (`INFO`/`WARN`/`ERROR`) for command traceability.
@@ -140,9 +213,11 @@ Implementation focus is the DSL runtime path:
 - Interactive inspect callable output lists only event/state lines (no separate "callable events" banner).
 - REPL verbose mode renders structured table/panel views for inspect/fire details and callable-event listings.
 - Symbol rendering supports `auto|ascii|unicode`; auto mode prefers Unicode only if runtime terminal heuristics indicate support.
-- Transition DSL supports `set <Key> = <expr>` where `<expr>` can be a literal or a bare event-argument key (for example, `Reason`).
-- Typed event arguments (`event Name(Type)`) are deprecated and rejected during parse.
-- Prefixed transform references (`arg.<Key>` / `data.<Key>`) are rejected during parse.
+- Transition DSL supports `transform <Key> = <expr>` where `<Key>` may be bare or `data.<Key>`.
+- Assignment expressions support literals, bare event-argument keys, and scoped references (`arg.<Key>`, `data.<Key>`).
+- Event declarations support optional indented `args` blocks with scalar type contracts.
+- `data` block declarations define persisted instance-data scalar contracts.
+- Inline typed event arguments (`event Name(Type)`) are rejected; use event `args` blocks instead.
 - CLI emits non-zero exit codes for incompatible instances and script command failures.
 - Runtime supports persisted instance creation and instance-based `Inspect(...)` / `Fire(...)`.
 - CLI supports `--instance` at startup and REPL-level `load`/`save` for instance file management.
