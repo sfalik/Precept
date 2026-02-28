@@ -290,6 +290,12 @@ static ReplExecutionResult ExecuteReplCommand(
         return ReplExecutionResult.Success();
     }
 
+    if (command is "cls" or "clear")
+    {
+        renderer.ClearScreen();
+        return ReplExecutionResult.Success();
+    }
+
     if (command == "symbols")
     {
         if (tokens.Count < 2)
@@ -1192,6 +1198,8 @@ static void PrintReplHelp(CliRenderer renderer)
 {
     renderer.Info("REPL commands:");
     renderer.Info("  help");
+    renderer.Info("  cls | clear");
+    renderer.Info("    clear the terminal screen");
     renderer.Info("  symbols [auto|ascii|unicode|test]");
     renderer.Info("    test prints a symbol compatibility matrix for your terminal/font");
     renderer.Info("  style preview [all]");
@@ -1782,6 +1790,20 @@ sealed class CliRenderer
     public void Success(string text) => WriteStyled(text, _palette.Success);
     public void Warning(string text) => WriteStyled(text, _palette.Warning);
     public void Error(string text) => WriteStyled(text, _palette.Error);
+
+    public void ClearScreen()
+    {
+        try
+        {
+            Console.Clear();
+        }
+        catch (IOException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
 
     public void Json(object value)
     {

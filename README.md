@@ -295,6 +295,7 @@ Notes:
 REPL commands:
 
 - `help`
+- `cls | clear`
 - `symbols [auto|ascii|unicode|test]`
 - `style preview [all]`
 - `style theme <name|list>`

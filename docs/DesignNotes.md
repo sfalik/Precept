@@ -192,6 +192,7 @@ Validation constraints:
 - `Inspect(...)` and `Fire(...)` accept optional event arguments (`IReadOnlyDictionary<string, object?>`).
 - REPL commands support transient per-command JSON event-argument overrides.
 - REPL supports `symbols test` to print an ASCII/Unicode compatibility matrix for terminal/font diagnostics.
+- REPL supports `cls` / `clear` to clear the terminal screen.
 - REPL supports `style preview` (current theme) and `style preview all` (all themes) using compact timeline styling.
 - Style preview samples use a realistic traffic-light transcript (`Red`, `Advance`, `Green`, etc.) and now reuse current compact inspect/fire line structures (including child branches, reachable/unreachable arrows, and truncation) so branch alignment and status styling can be judged visually.
 - REPL supports `style theme <name|list>` to switch among built-in palettes during a session.
