@@ -326,7 +326,7 @@ Interactive REPL uses compact output only.
 Interactive REPL exits cleanly on stdin EOF (for example, after piped input completes).
 Interactive compact output is intentionally concise and omits repeated command/event labels.
 Interactive compact mode uses a timeline-style prompt (`Red ›`) and branch prefixes (`├─`/`└─`) with semantic transition arrows: preview uses `──▷` (ASCII: `-->`) and committed success uses `──▶` (ASCII: `==>`).
-Compact color roles are consistent across inspect/fire/style-preview: events use event color, states use state color, status markers (`✔`/`⚠`/`✖`) use success/warn/error colors, reachable preview arrows (`──▷`/`-->`) and committed fire arrows (`──▶`/`==>`) use success color, and unreachable child arrows (`──✕`/`--X`) use error color while their target state remains visually de-emphasized.
+Compact color roles are consistent across inspect/fire/style-preview: events use event color, states use state color, status markers (`✔`/`⚠`/`✖`) use success/warn/error colors, reachable preview arrows (`──▷`/`-->`) and committed fire arrows (`──▶`/`==>`) use success color, and unreachable child arrows (`──✕`/`--X`) use error color while target state labels remain state-colored.
 Structural timeline glyphs and indentation (`├─`, `└─`, `│`) are rendered in neutral/meta color so only semantic tokens carry status/event/state coloring.
 When a guarded event is blocked but still lists candidate targets, those child preview arrows (`──▷`/`-->`) use warning color to indicate guard-linked conditional reachability.
 Single-event `inspect <EventName>` preview output is visually highlighted from inspect-all rows to emphasize direct command results.

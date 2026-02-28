@@ -1674,7 +1674,7 @@ sealed class CliRenderer
                 : highlightArrowAsWarning
                     ? _palette.Warning
                     : _palette.Success;
-            var stateColor = isUnreachable ? _palette.Meta : _palette.State;
+            var stateColor = _palette.State;
 
             AnsiConsole.MarkupLine(
                 $"[{_palette.Meta}]{Markup.Escape(connector + prefix)} [/][{arrowColor}]{Markup.Escape(arrowText)} [/][{stateColor}]{Markup.Escape(TagState(stateName))}[/]");
