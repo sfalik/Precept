@@ -1501,47 +1501,65 @@ sealed class CliRenderer
     {
         var paddedEvent = eventColumnWidth > 0 ? eventName.PadRight(eventColumnWidth) : eventName;
         var prefix = isLast ? CompactSymbols.BranchEnd(symbolMode) : CompactSymbols.BranchMid(symbolMode);
-        WriteStyled($"{CompactIndent}{prefix} {TagEvent(paddedEvent)}", _palette.Event);
+
+        if (_useColor)
+        {
+            AnsiConsole.MarkupLine(
+                $"[{_palette.Meta}]{Markup.Escape(CompactIndent + prefix + " ")}[/][{_palette.Event}]{Markup.Escape(TagEvent(paddedEvent))}[/]");
+            return;
+        }
+
+        Console.WriteLine($"{CompactIndent}{prefix} {TagEvent(paddedEvent)}");
     }
 
     public void StateValue(string stateName, SymbolMode symbolMode, bool isLast = true)
     {
         var prefix = isLast ? CompactSymbols.BranchEnd(symbolMode) : CompactSymbols.BranchMid(symbolMode);
-        WriteStyled($"{CompactIndent}{prefix} {TagState(stateName)}", _palette.State);
+
+        if (_useColor)
+        {
+            AnsiConsole.MarkupLine(
+                $"[{_palette.Meta}]{Markup.Escape(CompactIndent + prefix + " ")}[/][{_palette.State}]{Markup.Escape(TagState(stateName))}[/]");
+            return;
+        }
+
+        Console.WriteLine($"{CompactIndent}{prefix} {TagState(stateName)}");
     }
 
     public void EventStateLine(string eventName, string stateName, string connector, SymbolMode symbolMode, int eventColumnWidth = 0, bool isLast = false)
     {
         var paddedEvent = eventColumnWidth > 0 ? eventName.PadRight(eventColumnWidth) : eventName;
         var prefix = isLast ? CompactSymbols.BranchEnd(symbolMode) : CompactSymbols.BranchMid(symbolMode);
-        var eventLabel = $"{CompactIndent}{prefix} {TagEvent(paddedEvent)}";
+        var structuralPrefix = $"{CompactIndent}{prefix} ";
+        var eventLabel = TagEvent(paddedEvent);
 
         if (_useColor)
         {
             AnsiConsole.MarkupLine(
-                $"[{_palette.Event}]{Markup.Escape(eventLabel)}[/][{ResolveArrowColor(connector, symbolMode)}] {Markup.Escape(connector)} [/][{_palette.State}]{Markup.Escape(TagState(stateName))}[/]");
+                $"[{_palette.Meta}]{Markup.Escape(structuralPrefix)}[/][{_palette.Event}]{Markup.Escape(eventLabel)}[/][{ResolveArrowColor(connector, symbolMode)}] {Markup.Escape(connector)} [/][{_palette.State}]{Markup.Escape(TagState(stateName))}[/]");
             return;
         }
 
-        Console.WriteLine($"{eventLabel} {connector} {TagState(stateName)}");
+        Console.WriteLine($"{structuralPrefix}{eventLabel} {connector} {TagState(stateName)}");
     }
 
     public void EventSuccessStateLine(string eventName, string stateName, SymbolMode symbolMode, int eventColumnWidth = 0, bool isLast = false)
     {
         var paddedEvent = eventColumnWidth > 0 ? eventName.PadRight(eventColumnWidth) : eventName;
         var prefix = isLast ? CompactSymbols.BranchEnd(symbolMode) : CompactSymbols.BranchMid(symbolMode);
-        var eventLabel = $"{CompactIndent}{prefix} {TagEvent(paddedEvent)}";
+        var structuralPrefix = $"{CompactIndent}{prefix} ";
+        var eventLabel = TagEvent(paddedEvent);
         var ok = CompactSymbols.Ok(symbolMode);
         var connector = CompactSymbols.Arrow(symbolMode);
 
         if (_useColor)
         {
             AnsiConsole.MarkupLine(
-                $"[{_palette.Event}]{Markup.Escape(eventLabel)}[/][{_palette.Success}] {Markup.Escape(ok)} {Markup.Escape(connector)} [/][{_palette.State}]{Markup.Escape(TagState(stateName))}[/]");
+                $"[{_palette.Meta}]{Markup.Escape(structuralPrefix)}[/][{_palette.Event}]{Markup.Escape(eventLabel)}[/][{_palette.Success}] {Markup.Escape(ok)} {Markup.Escape(connector)} [/][{_palette.State}]{Markup.Escape(TagState(stateName))}[/]");
             return;
         }
 
-        Console.WriteLine($"{eventLabel} {ok} {connector} {TagState(stateName)}");
+        Console.WriteLine($"{structuralPrefix}{eventLabel} {ok} {connector} {TagState(stateName)}");
     }
 
     public void EventOutcomeLine(string eventName, string outcomeText, SymbolMode symbolMode, int eventColumnWidth = 0, bool isLast = false)
@@ -1549,20 +1567,21 @@ sealed class CliRenderer
         const int promptReserve = 12;
         var paddedEvent = eventColumnWidth > 0 ? eventName.PadRight(eventColumnWidth) : eventName;
         var prefix = isLast ? CompactSymbols.BranchEnd(symbolMode) : CompactSymbols.BranchMid(symbolMode);
-        var eventLabel = $"{CompactIndent}{prefix} {TagEvent(paddedEvent)}";
+        var structuralPrefix = $"{CompactIndent}{prefix} ";
+        var eventLabel = TagEvent(paddedEvent);
 
         var consoleWidth = GetRenderWidth();
-        var availableWidth = Math.Max(1, consoleWidth - eventLabel.Length - 1 - promptReserve);
+        var availableWidth = Math.Max(1, consoleWidth - structuralPrefix.Length - eventLabel.Length - 1 - promptReserve);
         var renderedOutcome = TruncateWithEllipsis(outcomeText, availableWidth);
 
         if (_useColor)
         {
             AnsiConsole.MarkupLine(
-                $"[{_palette.Event}]{Markup.Escape(eventLabel)}[/][{_palette.Warning}] {Markup.Escape(renderedOutcome)}[/]");
+                $"[{_palette.Meta}]{Markup.Escape(structuralPrefix)}[/][{_palette.Event}]{Markup.Escape(eventLabel)}[/][{_palette.Warning}] {Markup.Escape(renderedOutcome)}[/]");
             return;
         }
 
-        Console.WriteLine($"{eventLabel} {renderedOutcome}");
+        Console.WriteLine($"{structuralPrefix}{eventLabel} {renderedOutcome}");
     }
 
     public void EventErrorLine(string eventName, string outcomeText, SymbolMode symbolMode, int eventColumnWidth = 0, bool isLast = false)
@@ -1570,20 +1589,21 @@ sealed class CliRenderer
         const int promptReserve = 12;
         var paddedEvent = eventColumnWidth > 0 ? eventName.PadRight(eventColumnWidth) : eventName;
         var prefix = isLast ? CompactSymbols.BranchEnd(symbolMode) : CompactSymbols.BranchMid(symbolMode);
-        var eventLabel = $"{CompactIndent}{prefix} {TagEvent(paddedEvent)}";
+        var structuralPrefix = $"{CompactIndent}{prefix} ";
+        var eventLabel = TagEvent(paddedEvent);
 
         var consoleWidth = GetRenderWidth();
-        var availableWidth = Math.Max(1, consoleWidth - eventLabel.Length - 1 - promptReserve);
+        var availableWidth = Math.Max(1, consoleWidth - structuralPrefix.Length - eventLabel.Length - 1 - promptReserve);
         var renderedOutcome = TruncateWithEllipsis(outcomeText, availableWidth);
 
         if (_useColor)
         {
             AnsiConsole.MarkupLine(
-                $"[{_palette.Event}]{Markup.Escape(eventLabel)}[/][{_palette.Error}] {Markup.Escape(renderedOutcome)}[/]");
+                $"[{_palette.Meta}]{Markup.Escape(structuralPrefix)}[/][{_palette.Event}]{Markup.Escape(eventLabel)}[/][{_palette.Error}] {Markup.Escape(renderedOutcome)}[/]");
             return;
         }
 
-        Console.WriteLine($"{eventLabel} {renderedOutcome}");
+        Console.WriteLine($"{structuralPrefix}{eventLabel} {renderedOutcome}");
     }
 
     private static string TruncateWithEllipsis(string text, int maxWidth)
@@ -1668,16 +1688,17 @@ sealed class CliRenderer
     {
         var connector = CompactSymbols.PreviewArrow(symbolMode);
         var prefix = isLast ? CompactSymbols.BranchEnd(symbolMode) : CompactSymbols.BranchMid(symbolMode);
-        var eventLabel = $"{CompactIndent}{prefix} {eventName}";
+        var structuralPrefix = $"{CompactIndent}{prefix} ";
+        var eventLabel = eventName;
 
         if (_useColor)
         {
             AnsiConsole.MarkupLine(
-                $"[{_palette.Event}]{Markup.Escape(eventLabel)}[/][{ResolveArrowColor(connector, symbolMode)}] {Markup.Escape(connector)} [/][{_palette.State}]{Markup.Escape(TagState(stateName))}[/]");
+                $"[{_palette.Meta}]{Markup.Escape(structuralPrefix)}[/][{_palette.Event}]{Markup.Escape(eventLabel)}[/][{ResolveArrowColor(connector, symbolMode)}] {Markup.Escape(connector)} [/][{_palette.State}]{Markup.Escape(TagState(stateName))}[/]");
             return;
         }
 
-        Console.WriteLine($"{eventLabel} {connector} {TagState(stateName)}");
+        Console.WriteLine($"{structuralPrefix}{eventLabel} {connector} {TagState(stateName)}");
     }
 
     private string ResolveArrowColor(string connector, SymbolMode symbolMode)

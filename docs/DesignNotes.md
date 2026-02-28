@@ -211,6 +211,7 @@ Validation constraints:
 - REPL compact output in interactive mode omits repeated command/event labels to reduce noise.
 - REPL compact mode uses a timeline-style prompt (`Red ›`) with branch prefixes (`├─`/`└─`) and semantic transition arrows: preview (`inspect`) uses `──▷` (ASCII fallback: `-->`), and committed success (`fire`) uses `──▶` (ASCII fallback: `==>`).
 - Compact color semantics are role-based: event labels use event color; state labels use state color; status markers use success/warn/error colors; reachable preview arrows (`──▷`/`-->`) are success-colored; committed fire arrows are success-colored; unreachable child arrows (`──✕`/`--X`) are error-colored and their target state is visually de-emphasized.
+- Structural timeline glyphs/indentation (`├─`, `└─`, `│`) are rendered in neutral/meta color rather than event/state colors.
 - For blocked guard outcomes that still show candidate child targets, child preview arrows (`──▷`/`-->`) use warning color to indicate conditionally reachable paths gated by guard data/args.
 - Single-event `inspect <EventName>` preview output is visually differentiated from inspect-all rows to make direct command results stand out.
 - Interactive compact `inspect`/`fire` result lines include the event name before the status marker (for example, `NotAnEvent ✖ | unknown event`, `Advance ⚠ | No cars waiting`, `Advance ✔ ──▶ Green`, `ClearEmergency ✖ | no transition from Red`).
