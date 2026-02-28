@@ -16,6 +16,39 @@ const int ExitUnhandledError = 4;
 const int ExitIncompatibleInstance = 5;
 const int ExitScriptFailed = 6;
 
+string[] replTopLevelCommands =
+[
+    "help",
+    "clear",
+    "symbols",
+    "style",
+    "state",
+    "events",
+    "data",
+    "inspect",
+    "fire",
+    "load",
+    "save",
+    "exit",
+    "quit"
+];
+
+string[] replSymbolsSubcommands =
+[
+    "auto",
+    "ascii",
+    "unicode",
+    "test"
+];
+
+string[] replStyleSubcommands =
+[
+    "preview",
+    "theme"
+];
+
+var replHistory = new List<string>();
+
 if (args.Length < 1)
 {
     PrintUsage();
@@ -115,7 +148,7 @@ try
     while (true)
     {
         renderer.StatePrompt(sessionInstance.CurrentState, symbolMode);
-        var input = Console.ReadLine();
+        var input = ReadReplInput(renderer, sessionInstance.CurrentState, symbolMode, workflow, replTopLevelCommands, replSymbolsSubcommands, replStyleSubcommands, replHistory);
         if (input is null)
             return ExitSuccess;
         if (string.IsNullOrWhiteSpace(input))
@@ -1206,6 +1239,12 @@ static void PrintReplHelp(CliRenderer renderer)
     renderer.Info("    prints a terminal style sample using current output mode (compact/verbose), or all themes");
     renderer.Info("  style theme <name|list>");
     renderer.Info("    set or list available color themes");
+    renderer.Info("  tab-completion");
+    renderer.Info("    tab suggests commands/events/style themes/symbol modes in interactive REPL");
+    renderer.Info("  history navigation");
+    renderer.Info("    Up/Down arrows browse command history; Right Arrow accepts inline completion");
+    renderer.Info("  type-ahead");
+    renderer.Info("    while typing, REPL shows inline completion hints for current token");
     renderer.Info("  state");
     renderer.Info("  events");
     renderer.Info("  data");
@@ -1262,6 +1301,436 @@ static List<string> Tokenize(string input)
         result.Add(sb.ToString());
 
     return result;
+}
+
+static string? ReadReplInput(
+    CliRenderer renderer,
+    string currentState,
+    SymbolMode symbolMode,
+    DslWorkflowDefinition workflow,
+    IReadOnlyList<string> topLevelCommands,
+    IReadOnlyList<string> symbolsSubcommands,
+    IReadOnlyList<string> styleSubcommands,
+    List<string> history)
+{
+    if (Console.IsInputRedirected)
+        return Console.ReadLine();
+
+    var buffer = new StringBuilder();
+    int? historyIndex = null;
+    string draftInput = string.Empty;
+
+    RefreshInputLine(renderer, currentState, symbolMode, buffer, workflow, topLevelCommands, symbolsSubcommands, styleSubcommands, showTypeAhead: true);
+
+    while (true)
+    {
+        var key = Console.ReadKey(intercept: true);
+
+        if (key.Key == ConsoleKey.Enter)
+        {
+            Console.WriteLine();
+            var result = buffer.ToString();
+            if (!string.IsNullOrWhiteSpace(result))
+            {
+                history.Add(result);
+                if (history.Count > 200)
+                    history.RemoveAt(0);
+            }
+
+            return result;
+        }
+
+        if (key.Key == ConsoleKey.Backspace)
+        {
+            if (buffer.Length == 0)
+                continue;
+
+            buffer.Length--;
+            RefreshInputLine(renderer, currentState, symbolMode, buffer, workflow, topLevelCommands, symbolsSubcommands, styleSubcommands, showTypeAhead: true);
+            continue;
+        }
+
+        if (key.Key == ConsoleKey.UpArrow)
+        {
+            if (history.Count == 0)
+                continue;
+
+            if (historyIndex is null)
+            {
+                draftInput = buffer.ToString();
+                historyIndex = history.Count - 1;
+            }
+            else if (historyIndex > 0)
+            {
+                historyIndex--;
+            }
+
+            ReplaceInputBuffer(buffer, history[historyIndex.Value], renderer, currentState, symbolMode, workflow, topLevelCommands, symbolsSubcommands, styleSubcommands);
+            continue;
+        }
+
+        if (key.Key == ConsoleKey.DownArrow)
+        {
+            if (historyIndex is null)
+                continue;
+
+            if (historyIndex < history.Count - 1)
+            {
+                historyIndex++;
+                ReplaceInputBuffer(buffer, history[historyIndex.Value], renderer, currentState, symbolMode, workflow, topLevelCommands, symbolsSubcommands, styleSubcommands);
+            }
+            else
+            {
+                historyIndex = null;
+                ReplaceInputBuffer(buffer, draftInput, renderer, currentState, symbolMode, workflow, topLevelCommands, symbolsSubcommands, styleSubcommands);
+            }
+
+            continue;
+        }
+
+        if (key.Key == ConsoleKey.Tab)
+        {
+            ApplyTabCompletion(buffer, renderer, currentState, symbolMode, workflow, topLevelCommands, symbolsSubcommands, styleSubcommands);
+            RefreshInputLine(renderer, currentState, symbolMode, buffer, workflow, topLevelCommands, symbolsSubcommands, styleSubcommands, showTypeAhead: true);
+            continue;
+        }
+
+        if (key.Key == ConsoleKey.RightArrow)
+        {
+            TryAcceptInlineSuggestion(buffer, workflow, topLevelCommands, symbolsSubcommands, styleSubcommands);
+            RefreshInputLine(renderer, currentState, symbolMode, buffer, workflow, topLevelCommands, symbolsSubcommands, styleSubcommands, showTypeAhead: true);
+            continue;
+        }
+
+        if (key.Key == ConsoleKey.C && key.Modifiers.HasFlag(ConsoleModifiers.Control))
+        {
+            Console.WriteLine();
+            return null;
+        }
+
+        var ch = key.KeyChar;
+        if (char.IsControl(ch))
+            continue;
+
+        buffer.Append(ch);
+        RefreshInputLine(renderer, currentState, symbolMode, buffer, workflow, topLevelCommands, symbolsSubcommands, styleSubcommands, showTypeAhead: true);
+        historyIndex = null;
+    }
+}
+
+static void ReplaceInputBuffer(
+    StringBuilder buffer,
+    string value,
+    CliRenderer renderer,
+    string currentState,
+    SymbolMode symbolMode,
+    DslWorkflowDefinition workflow,
+    IReadOnlyList<string> topLevelCommands,
+    IReadOnlyList<string> symbolsSubcommands,
+    IReadOnlyList<string> styleSubcommands)
+{
+    buffer.Clear();
+    buffer.Append(value);
+
+    RefreshInputLine(renderer, currentState, symbolMode, buffer, workflow, topLevelCommands, symbolsSubcommands, styleSubcommands, showTypeAhead: true);
+}
+
+static void RefreshInputLine(
+    CliRenderer renderer,
+    string currentState,
+    SymbolMode symbolMode,
+    StringBuilder buffer,
+    DslWorkflowDefinition workflow,
+    IReadOnlyList<string> topLevelCommands,
+    IReadOnlyList<string> symbolsSubcommands,
+    IReadOnlyList<string> styleSubcommands,
+    bool showTypeAhead)
+{
+    var value = buffer.ToString();
+
+    Console.Write('\r');
+    var width = TryGetConsoleWidth();
+    if (width > 0)
+        Console.Write(new string(' ', width - 1));
+    Console.Write('\r');
+
+    renderer.StatePrompt(currentState, symbolMode);
+    Console.Write(value);
+
+    if (!showTypeAhead)
+        return;
+
+    var suggestionSuffix = GetTypeAheadSuffix(value, workflow, topLevelCommands, symbolsSubcommands, styleSubcommands);
+    if (string.IsNullOrEmpty(suggestionSuffix))
+        return;
+
+    renderer.Prompt(suggestionSuffix);
+    Console.Write(new string('\b', suggestionSuffix.Length));
+}
+
+static int TryGetConsoleWidth()
+{
+    try
+    {
+        return Console.BufferWidth;
+    }
+    catch
+    {
+        return 120;
+    }
+}
+
+static void TryAcceptInlineSuggestion(
+    StringBuilder buffer,
+    DslWorkflowDefinition workflow,
+    IReadOnlyList<string> topLevelCommands,
+    IReadOnlyList<string> symbolsSubcommands,
+    IReadOnlyList<string> styleSubcommands)
+{
+    var input = buffer.ToString();
+    var completions = GetTabCompletions(input, workflow, topLevelCommands, symbolsSubcommands, styleSubcommands)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    if (completions.Length == 0)
+        return;
+
+    var endsWithWhitespace = input.Length > 0 && char.IsWhiteSpace(input[^1]);
+    var fragment = endsWithWhitespace ? string.Empty : GetLastTokenFragment(input);
+
+    if (completions.Length == 1)
+    {
+        var completion = completions[0];
+        if (fragment.Length == 0)
+        {
+            var appendWhole = completion + " ";
+            buffer.Append(appendWhole);
+            Console.Write(appendWhole);
+            return;
+        }
+
+        if (completion.StartsWith(fragment, StringComparison.OrdinalIgnoreCase))
+            ReplaceTrailingFragment(buffer, fragment, completion);
+
+        return;
+    }
+
+    if (fragment.Length == 0)
+        return;
+
+    var commonPrefix = GetCommonPrefix(completions);
+    if (commonPrefix.Length <= fragment.Length)
+        return;
+
+    if (!commonPrefix.StartsWith(fragment, StringComparison.OrdinalIgnoreCase))
+        return;
+
+    ReplaceTrailingFragment(buffer, fragment, commonPrefix);
+}
+
+static string GetTypeAheadSuffix(
+    string input,
+    DslWorkflowDefinition workflow,
+    IReadOnlyList<string> topLevelCommands,
+    IReadOnlyList<string> symbolsSubcommands,
+    IReadOnlyList<string> styleSubcommands)
+{
+    if (string.IsNullOrWhiteSpace(input))
+        return string.Empty;
+
+    var endsWithWhitespace = input.Length > 0 && char.IsWhiteSpace(input[^1]);
+    if (endsWithWhitespace)
+        return string.Empty;
+
+    var fragment = GetLastTokenFragment(input);
+    if (string.IsNullOrEmpty(fragment))
+        return string.Empty;
+
+    var completions = GetTabCompletions(input, workflow, topLevelCommands, symbolsSubcommands, styleSubcommands)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    if (completions.Length == 0)
+        return string.Empty;
+
+    if (completions.Length == 1)
+    {
+        var completion = completions[0];
+        if (!completion.StartsWith(fragment, StringComparison.OrdinalIgnoreCase))
+            return string.Empty;
+
+        return completion.Length > fragment.Length
+            ? completion.Substring(fragment.Length)
+            : string.Empty;
+    }
+
+    var commonPrefix = GetCommonPrefix(completions);
+    if (!commonPrefix.StartsWith(fragment, StringComparison.OrdinalIgnoreCase))
+        return string.Empty;
+
+    return commonPrefix.Length > fragment.Length
+        ? commonPrefix.Substring(fragment.Length)
+        : string.Empty;
+}
+
+static void ReplaceTrailingFragment(StringBuilder buffer, string fragment, string replacement)
+{
+    if (fragment.Length > 0)
+    {
+        for (var index = 0; index < fragment.Length; index++)
+            Console.Write("\b");
+
+        Console.Write(new string(' ', fragment.Length));
+
+        for (var index = 0; index < fragment.Length; index++)
+            Console.Write("\b");
+
+        buffer.Length -= fragment.Length;
+    }
+
+    buffer.Append(replacement);
+    Console.Write(replacement);
+}
+
+static string GetCommonPrefix(IReadOnlyList<string> values)
+{
+    if (values.Count == 0)
+        return string.Empty;
+
+    var prefix = values[0];
+    for (var index = 1; index < values.Count; index++)
+    {
+        var candidate = values[index];
+        var length = Math.Min(prefix.Length, candidate.Length);
+        var match = 0;
+        while (match < length && char.ToLowerInvariant(prefix[match]) == char.ToLowerInvariant(candidate[match]))
+            match++;
+
+        prefix = prefix[..match];
+        if (prefix.Length == 0)
+            break;
+    }
+
+    return prefix;
+}
+
+static void ApplyTabCompletion(
+    StringBuilder buffer,
+    CliRenderer renderer,
+    string currentState,
+    SymbolMode symbolMode,
+    DslWorkflowDefinition workflow,
+    IReadOnlyList<string> topLevelCommands,
+    IReadOnlyList<string> symbolsSubcommands,
+    IReadOnlyList<string> styleSubcommands)
+{
+    var input = buffer.ToString();
+    var completions = GetTabCompletions(input, workflow, topLevelCommands, symbolsSubcommands, styleSubcommands)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    if (completions.Length == 0)
+        return;
+
+    var endsWithWhitespace = input.Length > 0 && char.IsWhiteSpace(input[^1]);
+    var fragment = endsWithWhitespace ? string.Empty : GetLastTokenFragment(input);
+
+    if (completions.Length == 1)
+    {
+        var completion = completions[0];
+
+        if (fragment.Length == 0)
+        {
+            var append = completion + " ";
+            buffer.Append(append);
+            Console.Write(append);
+            return;
+        }
+
+        if (completion.StartsWith(fragment, StringComparison.OrdinalIgnoreCase))
+            ReplaceTrailingFragment(buffer, fragment, completion);
+
+        if (buffer.Length == 0 || !char.IsWhiteSpace(buffer[^1]))
+        {
+            buffer.Append(' ');
+            Console.Write(' ');
+        }
+
+        return;
+    }
+
+    Console.WriteLine();
+    renderer.Meta($"suggestions: {string.Join(", ", completions)}");
+    renderer.StatePrompt(currentState, symbolMode);
+    Console.Write(input);
+}
+
+static IEnumerable<string> GetTabCompletions(
+    string input,
+    DslWorkflowDefinition workflow,
+    IReadOnlyList<string> topLevelCommands,
+    IReadOnlyList<string> symbolsSubcommands,
+    IReadOnlyList<string> styleSubcommands)
+{
+    var endsWithWhitespace = input.Length > 0 && char.IsWhiteSpace(input[^1]);
+    var tokens = SplitCompletionTokens(input);
+
+    var activeTokenIndex = endsWithWhitespace
+        ? tokens.Count
+        : Math.Max(0, tokens.Count - 1);
+
+    var fragment = endsWithWhitespace
+        ? string.Empty
+        : tokens.Count == 0
+            ? string.Empty
+            : tokens[^1];
+
+    IEnumerable<string> candidates;
+
+    if (activeTokenIndex == 0)
+    {
+        candidates = topLevelCommands;
+        return candidates.Where(c => c.StartsWith(fragment, StringComparison.OrdinalIgnoreCase));
+    }
+
+    var command = tokens[0].ToLowerInvariant();
+
+    candidates = command switch
+    {
+        "symbols" when activeTokenIndex == 1 => symbolsSubcommands,
+        "style" when activeTokenIndex == 1 => styleSubcommands,
+        "style" when activeTokenIndex == 2 && tokens.Count > 1 && tokens[1].Equals("preview", StringComparison.OrdinalIgnoreCase)
+            => new[] { "all" },
+        "style" when activeTokenIndex == 2 && tokens.Count > 1 && tokens[1].Equals("theme", StringComparison.OrdinalIgnoreCase)
+            => CliColorThemes.Tokens,
+        "inspect" when activeTokenIndex == 1 => workflow.Events.Select(e => e.Name),
+        "fire" when activeTokenIndex == 1 => workflow.Events.Select(e => e.Name),
+        _ => Array.Empty<string>()
+    };
+
+    return candidates.Where(c => c.StartsWith(fragment, StringComparison.OrdinalIgnoreCase));
+}
+
+static List<string> SplitCompletionTokens(string input)
+{
+    return input
+        .Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries)
+        .ToList();
+}
+
+static string GetLastTokenFragment(string input)
+{
+    if (string.IsNullOrEmpty(input))
+        return string.Empty;
+
+    var index = input.Length - 1;
+    while (index >= 0 && !char.IsWhiteSpace(input[index]))
+        index--;
+
+    return input[(index + 1)..];
 }
 
 static bool TryPromptForEventArguments(

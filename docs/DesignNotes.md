@@ -193,6 +193,9 @@ Validation constraints:
 - REPL commands support transient per-command JSON event-argument overrides.
 - REPL supports `symbols test` to print an ASCII/Unicode compatibility matrix for terminal/font diagnostics.
 - REPL supports `clear` to clear the terminal screen.
+- REPL supports interactive `Tab` completion for top-level commands, event names (`inspect`/`fire`), `style theme` names, and `symbols` subcommands.
+- REPL supports `Up`/`Down` command history navigation and `Right Arrow` inline completion acceptance in interactive mode.
+- REPL supports inline type-ahead hints while typing (current-token completion preview).
 - REPL supports `style preview` (current theme) and `style preview all` (all themes) using compact timeline styling.
 - Style preview samples use a realistic traffic-light transcript (`Red`, `Advance`, `Green`, etc.) and now cover the full compact scenario matrix: inspect-all and inspect-single rows, multi-target reachable/unreachable child arrows, blocked guard-linked child previews, fire success, undefined unknown-event/no-transition rows, argument prompts, and truncation.
 - REPL supports `style theme <name|list>` to switch among built-in palettes during a session.
