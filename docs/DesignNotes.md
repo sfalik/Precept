@@ -190,7 +190,7 @@ Validation constraints:
 - Runtime uses `IGuardEvaluator` with a default implementation (`DefaultGuardEvaluator`).
 - `DslWorkflowCompiler.Compile(...)` accepts an optional custom evaluator.
 - `Inspect(...)` and `Fire(...)` accept optional event arguments (`IReadOnlyDictionary<string, object?>`).
-- REPL commands support transient per-command JSON event-argument overrides.
+- Interactive REPL `inspect`/`fire` do not accept inline JSON event-argument payloads.
 - REPL supports `symbols test` to print an ASCII/Unicode compatibility matrix for terminal/font diagnostics.
 - REPL supports `clear` to clear the terminal screen.
 - REPL supports interactive `Tab` completion for top-level commands, event names (`inspect`/`fire`), `style theme` names, and `symbols` subcommands.
@@ -207,7 +207,8 @@ Validation constraints:
 - Missing required args only force ambiguous preview when guard logic references the missing arg(s).
 - Ambiguous inspect rendering uses timeline rows: the event prints once and possible targets are rendered underneath as child lines using `├─`/`└─` with hollow preview arrows (`──▷` / `-->`).
 - If an ambiguous inspect result has a terminal `reject`, warning/reason remains on the event line.
-- REPL `fire` prompts for each required event arg key directly if no inline JSON args are supplied and the event is defined from the current state.
+- REPL `fire` prompts for each required event arg with type-aware labels when the event is defined from the current state.
+- Interactive fire prompting performs scalar type coercion/validation against arg contracts and re-prompts on invalid input.
 - REPL `data` renders readable key-value output in interactive mode unless output mode is json.
 - Interactive REPL uses `compact` only.
 - Interactive REPL exits cleanly on stdin EOF (for example, when piped input is exhausted).

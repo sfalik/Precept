@@ -43,6 +43,40 @@ public sealed class CliRenderingTests
     }
 
     [Fact]
+    public void Fire_With_Inline_Json_EventArgs_Is_Rejected_In_Repl()
+    {
+        var dsl = """
+            machine Sample
+            state Red
+            state FlashingRed
+            event Emergency
+                args
+                    AuthorizedBy: string
+                    Reason: string
+            from Red on Emergency
+                if arg.AuthorizedBy != "" && arg.Reason != ""
+                    transition FlashingRed
+                reject "AuthorizedBy and Reason are required"
+            """;
+
+        var instance = """
+            {
+              "workflowName": "Sample",
+              "currentState": "Red",
+              "lastEvent": null,
+              "updatedAt": "2026-02-27T00:00:00+00:00",
+              "instanceData": {}
+            }
+            """;
+
+        var result = RunCli(dsl, instance, new[] { "fire Emergency {\"AuthorizedBy\":\"Dispatcher\",\"Reason\":\"Accident\"}", "exit" }, "--unicode");
+
+        AssertSucceeded(result);
+        result.Output.Should().Contain("inline event-args JSON is not supported in REPL");
+        result.Output.Should().NotContain("FlashingRed");
+    }
+
+    [Fact]
     public void Fire_Blocked_Renders_Warning_Status_Line()
     {
         var dsl = """

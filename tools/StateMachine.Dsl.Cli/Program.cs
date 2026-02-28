@@ -270,7 +270,15 @@ static IReadOnlyDictionary<string, object?> ParseEventArguments(string? eventArg
         ? File.ReadAllText(eventArgsFileOption!)
         : eventArgsOption!;
 
-    using var doc = JsonDocument.Parse(eventArgsText);
+    var normalizedEventArgsText = eventArgsText.Trim();
+    if (normalizedEventArgsText.Length >= 2 &&
+        ((normalizedEventArgsText[0] == '"' && normalizedEventArgsText[^1] == '"') ||
+         (normalizedEventArgsText[0] == '\'' && normalizedEventArgsText[^1] == '\'')))
+    {
+        normalizedEventArgsText = normalizedEventArgsText[1..^1];
+    }
+
+    using var doc = JsonDocument.Parse(normalizedEventArgsText);
     if (doc.RootElement.ValueKind != JsonValueKind.Object)
         throw new InvalidOperationException("Event arguments must be a JSON object.");
 
@@ -504,7 +512,7 @@ static ReplExecutionResult ExecuteReplCommand(
 
         if (tokens.Count < 2)
         {
-            renderer.Warning($"Usage: {command} <EventName> [event-args-json]");
+            renderer.Warning($"Usage: {command} <EventName>");
             return ReplExecutionResult.Failed();
         }
 
@@ -513,22 +521,28 @@ static ReplExecutionResult ExecuteReplCommand(
 
         if (tokens.Count > 2)
         {
-            eventArgs = ParseEventArguments(tokens[2], null);
+            if (isInteractive)
+            {
+                renderer.Warning($"Usage: {command} <EventName> (inline event-args JSON is not supported in REPL)");
+                return ReplExecutionResult.Failed();
+            }
+
+            var rawEventArgs = GetTokenRemainder(input, 2) ?? tokens[2];
+            eventArgs = ParseEventArguments(rawEventArgs, null);
         }
         else if (command == "fire" && isInteractive)
         {
-            var requiredEventKeys = workflow.Events
+            var requiredEventArgs = workflow.Events
                 .FirstOrDefault(e => string.Equals(e.Name, eventName, StringComparison.Ordinal))?
                 .Args
                 .Where(a => !a.IsNullable)
-                .Select(a => a.Name)
                 .ToArray()
-                ?? Array.Empty<string>();
+                ?? Array.Empty<DslFieldContract>();
 
             var inspectForPrompt = workflow.Inspect(sessionInstance, eventName);
-            if (inspectForPrompt.Outcome != DslOutcomeKind.Undefined && requiredEventKeys.Length > 0)
+            if (inspectForPrompt.Outcome != DslOutcomeKind.Undefined && requiredEventArgs.Length > 0)
             {
-                if (!TryPromptForEventArguments(eventName, requiredEventKeys, renderer, symbolMode, out eventArgs))
+                if (!TryPromptForEventArguments(eventName, requiredEventArgs, renderer, symbolMode, out eventArgs))
                     return ReplExecutionResult.Failed();
             }
         }
@@ -1248,11 +1262,10 @@ static void PrintReplHelp(CliRenderer renderer)
     renderer.Info("  state");
     renderer.Info("  events");
     renderer.Info("  data");
-    renderer.Info("  inspect [EventName] [event-args-json]");
+    renderer.Info("  inspect [EventName]");
     renderer.Info("    without EventName, inspects all events and lists callable plus guarded ones");
-    renderer.Info("  fire <EventName> [event-args-json]");
-    renderer.Info("    when EventName has required args and no event-args-json is provided, REPL prompts per key");
-    renderer.Info("    event-args-json is evaluated only for that command and does not mutate instance data");
+    renderer.Info("  fire <EventName>");
+    renderer.Info("    when EventName has required args, REPL prompts for required values");
     renderer.Info("  load <path>");
     renderer.Info("  save [path]");
     renderer.Info("  exit | quit");
@@ -1301,6 +1314,66 @@ static List<string> Tokenize(string input)
         result.Add(sb.ToString());
 
     return result;
+}
+
+static string? GetTokenRemainder(string input, int tokenCountToSkip)
+{
+    if (tokenCountToSkip <= 0)
+        return input.Trim();
+
+    int index = 0;
+    int tokensSeen = 0;
+
+    while (index < input.Length)
+    {
+        while (index < input.Length && char.IsWhiteSpace(input[index]))
+            index++;
+
+        if (index >= input.Length)
+            break;
+
+        bool inQuotes = false;
+        char quoteChar = '\0';
+
+        while (index < input.Length)
+        {
+            var ch = input[index];
+            if ((ch == '"' || ch == '\'') && (!inQuotes || ch == quoteChar))
+            {
+                if (!inQuotes)
+                {
+                    inQuotes = true;
+                    quoteChar = ch;
+                }
+                else
+                {
+                    inQuotes = false;
+                    quoteChar = '\0';
+                }
+
+                index++;
+                continue;
+            }
+
+            if (!inQuotes && char.IsWhiteSpace(ch))
+                break;
+
+            index++;
+        }
+
+        tokensSeen++;
+        if (tokensSeen == tokenCountToSkip)
+        {
+            while (index < input.Length && char.IsWhiteSpace(input[index]))
+                index++;
+
+            return index < input.Length
+                ? input[index..].Trim()
+                : null;
+        }
+    }
+
+    return null;
 }
 
 static string? ReadReplInput(
@@ -1735,29 +1808,103 @@ static string GetLastTokenFragment(string input)
 
 static bool TryPromptForEventArguments(
     string eventName,
-    IReadOnlyList<string> requiredKeys,
+    IReadOnlyList<DslFieldContract> requiredArgs,
     CliRenderer renderer,
     SymbolMode symbolMode,
     out IReadOnlyDictionary<string, object?>? eventArguments)
 {
     var values = new Dictionary<string, object?>(StringComparer.Ordinal);
 
-    foreach (var key in requiredKeys)
+    foreach (var arg in requiredArgs)
     {
-        renderer.ArgumentPrompt(key, symbolMode);
-        var raw = Console.ReadLine();
-        if (string.IsNullOrWhiteSpace(raw))
+        while (true)
         {
-            renderer.Warning($"fire cancelled: value for '{key}' is required.");
-            eventArguments = null;
-            return false;
-        }
+            renderer.ArgumentPrompt(BuildPromptLabel(arg), symbolMode);
+            var raw = Console.ReadLine();
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                renderer.Warning($"Invalid value for '{arg.Name}'. Expected {BuildPromptHint(arg)}.");
+                continue;
+            }
 
-        values[key] = ParseInteractiveArgumentValue(raw);
+            if (!TryParsePromptValue(arg, raw, out var parsed))
+            {
+                renderer.Warning($"Invalid value for '{arg.Name}'. Expected {BuildPromptHint(arg)}.");
+                continue;
+            }
+
+            values[arg.Name] = parsed;
+            break;
+        }
     }
 
     eventArguments = values;
     return true;
+}
+
+static string BuildPromptLabel(DslFieldContract arg)
+{
+    var hint = BuildPromptHint(arg);
+    return string.IsNullOrWhiteSpace(hint)
+        ? arg.Name
+        : $"{arg.Name} [{hint}]";
+}
+
+static string BuildPromptHint(DslFieldContract arg)
+{
+    return arg.Type switch
+    {
+        DslScalarType.String => "string",
+        DslScalarType.Number => "number",
+        DslScalarType.Boolean => "boolean",
+        DslScalarType.Null => "null",
+        _ => "string"
+    };
+}
+
+static bool TryParsePromptValue(DslFieldContract arg, string raw, out object? value)
+{
+    var text = raw.Trim();
+    switch (arg.Type)
+    {
+        case DslScalarType.String:
+            value = ParseInteractiveArgumentValue(text)?.ToString();
+            return true;
+
+        case DslScalarType.Boolean:
+            if (bool.TryParse(text, out var boolValue))
+            {
+                value = boolValue;
+                return true;
+            }
+
+            value = null;
+            return false;
+
+        case DslScalarType.Number:
+            if (decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var decimalValue))
+            {
+                value = decimalValue;
+                return true;
+            }
+
+            value = null;
+            return false;
+
+        case DslScalarType.Null:
+            if (text.Equals("null", StringComparison.OrdinalIgnoreCase))
+            {
+                value = null;
+                return true;
+            }
+
+            value = null;
+            return false;
+
+        default:
+            value = ParseInteractiveArgumentValue(text);
+            return true;
+    }
 }
 
 static object? ParseInteractiveArgumentValue(string raw)

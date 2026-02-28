@@ -39,7 +39,7 @@ from Yellow on Advance
 	transition Red
 
 # Emergency preemption: requires a reason to record why it was activated
-from any on Emergency
+from Red, Green, FlashingGreen, Yellow on Emergency
 	if arg.AuthorizedBy != "" && arg.Reason != ""
 		transform data.EmergencyReason = arg.Reason
 		transition FlashingRed

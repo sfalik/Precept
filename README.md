@@ -70,7 +70,7 @@ FlashingRed › fire ClearEmergency
   └─ ClearEmergency ✔ ──▶ Red
 ```
 
-Note: you can also pass inline JSON event arguments (for example `fire Emergency '{"AuthorizedBy":"Dispatcher","Reason":"Accident"}'`).
+Note: interactive REPL does not accept inline JSON event arguments for `inspect`/`fire`; use prompted values for required args.
 Note: output is colorized by default (success/warning/error); use `--no-color` to disable.
 Note: `inspect` after the fourth `fire Advance` shows blocked because `data.LeftTurnQueued` was cleared and `data.VehiclesWaiting` is 0.
 
@@ -157,7 +157,7 @@ from FlashingRed on ClearEmergency
 
 The full file (with block comments) is at [`trafficlight.sm`](trafficlight.sm).
 
-## DSL Syntax Reference (Linear)
+## DSL Syntax Reference
 
 ```text
 machine <Name>
@@ -304,8 +304,8 @@ REPL commands:
 - `state`
 - `events`
 - `data`
-- `inspect [EventName] [event-args-json]`
-- `fire <EventName> [event-args-json]`
+- `inspect [EventName]`
+- `fire <EventName>`
 - `load <path>`
 - `save [path]`
 - `exit | quit`
@@ -325,7 +325,8 @@ Inspect preview is eager: if current data (and any provided args) is sufficient 
 When more than one transition target is defined for an event from the current state, inspect keeps the resolved target on the event line and renders alternate targets as child lines with an unreachable marker (`──✕`, ASCII: `--X`).
 When required args are missing and guard logic depends on those missing args, inspect treats the outcome as ambiguous and renders child target lines (`├─`/`└─`) with hollow preview arrows (`──▷`) for possible transition targets.
 For ambiguous inspect results with a terminal `reject`, the reject reason is shown on the event line.
-In interactive REPL mode, `fire <EventName>` prompts for each required event key individually if no inline event arguments are provided.
+In interactive REPL mode, `fire <EventName>` prompts for each required event arg (with type hints like `[string]`, `[number]`, `[boolean]`).
+Interactive fire prompts apply input coercion for declared scalar arg types and re-prompt until a valid value is entered.
 In interactive REPL mode, `data` renders a readable key-value list by default; use output json to emit JSON.
 Interactive REPL uses compact output only.
 Interactive REPL exits cleanly on stdin EOF (for example, after piped input completes).
