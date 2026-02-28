@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\StateMachine\StateMachine.csproj" />
+    <ProjectReference Include="..\..\tools\StateMachine.Dsl.Cli\StateMachine.Dsl.Cli.csproj" />
   </ItemGroup>
 
 </Project>

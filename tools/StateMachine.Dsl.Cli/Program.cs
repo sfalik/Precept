@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Spectre.Console;
 using StateMachine.Dsl;
 
@@ -91,7 +92,7 @@ try
             if (scriptEcho)
                 renderer.Meta($"sm> {line}");
 
-            var exec = ExecuteReplCommand(line, workflow, ref sessionInstance, ref instancePath, renderer, ref outputMode, ref symbolMode, ref colorTheme, isInteractive: false);
+            var exec = ExecuteReplCommand(line, machine, workflow, ref sessionInstance, ref instancePath, renderer, ref outputMode, ref symbolMode, ref colorTheme, isInteractive: false);
             if (!exec.IsSuccess)
                 return ExitScriptFailed;
             if (exec.ShouldExit)
@@ -115,10 +116,12 @@ try
     {
         renderer.StatePrompt(sessionInstance.CurrentState, symbolMode);
         var input = Console.ReadLine();
+        if (input is null)
+            return ExitSuccess;
         if (string.IsNullOrWhiteSpace(input))
             continue;
 
-        var exec = ExecuteReplCommand(input, workflow, ref sessionInstance, ref instancePath, renderer, ref outputMode, ref symbolMode, ref colorTheme, isInteractive: true);
+        var exec = ExecuteReplCommand(input, machine, workflow, ref sessionInstance, ref instancePath, renderer, ref outputMode, ref symbolMode, ref colorTheme, isInteractive: true);
         if (!exec.IsSuccess)
             renderer.Warning("Command failed.");
         if (exec.ShouldExit)
@@ -262,6 +265,7 @@ static object? ToDotNetValue(JsonElement value)
 
 static ReplExecutionResult ExecuteReplCommand(
     string input,
+    DslMachine machine,
     DslWorkflowDefinition workflow,
     ref DslWorkflowInstance sessionInstance,
     ref string? sessionInstancePath,
@@ -445,11 +449,17 @@ static ReplExecutionResult ExecuteReplCommand(
     {
         if (command == "inspect" && tokens.Count < 2)
         {
+            if (isInteractive)
+            {
+                RenderInspectAllInteractive(sessionInstance, machine, workflow, symbolMode, renderer);
+                return ReplExecutionResult.Success();
+            }
+
             var inspections = new List<DslInspectionResult>();
             foreach (var evt in workflow.Events)
                 inspections.Add(workflow.Inspect(sessionInstance, evt.Name, null));
 
-            RenderInspectAll(sessionInstance.CurrentState, inspections, outputMode, symbolMode, renderer, isInteractive);
+            RenderInspectAll(sessionInstance, machine, workflow, inspections, outputMode, symbolMode, renderer, isInteractive);
             return ReplExecutionResult.Success();
         }
 
@@ -486,8 +496,14 @@ static ReplExecutionResult ExecuteReplCommand(
 
         if (command == "inspect")
         {
+            if (isInteractive)
+            {
+                RenderInspectInteractive(sessionInstance, machine, workflow, eventName, eventArgs, symbolMode, renderer);
+                return ReplExecutionResult.Success();
+            }
+
             var inspect = workflow.Inspect(sessionInstance, eventName, eventArgs);
-            RenderInspect(inspect, outputMode, symbolMode, renderer, isInteractive);
+            RenderInspect(inspect, machine, workflow, outputMode, symbolMode, renderer, isInteractive);
             return ReplExecutionResult.Success();
         }
 
@@ -504,7 +520,14 @@ static ReplExecutionResult ExecuteReplCommand(
     return ReplExecutionResult.Failed();
 }
 
-static void RenderInspect(DslInspectionResult inspect, OutputMode mode, SymbolMode symbolMode, CliRenderer renderer, bool isInteractive)
+static void RenderInspect(
+    DslInspectionResult inspect,
+    DslMachine machine,
+    DslWorkflowDefinition workflow,
+    OutputMode mode,
+    SymbolMode symbolMode,
+    CliRenderer renderer,
+    bool isInteractive)
 {
     if (!isInteractive)
     {
@@ -560,32 +583,193 @@ static void RenderInspect(DslInspectionResult inspect, OutputMode mode, SymbolMo
         return;
     }
 
+    var displayEvent = BuildInspectEventLabel(workflow, inspect.EventName);
+    var possibleTargets = GetPossibleTargetStates(machine, inspect.CurrentState, inspect.EventName);
+    var hasMultipleTargets = possibleTargets.Count > 1;
+
     if (inspect.Outcome == DslOutcomeKind.Blocked)
     {
         var reason = inspect.Reasons.FirstOrDefault() ?? "Rejected.";
         if (isInteractive)
-            renderer.Warning(renderer.CompactResult(symbolMode, $"{inspect.EventName} {CompactSymbols.Warn(symbolMode)} {CompactSymbols.Pipe(symbolMode)} {reason}"));
+            renderer.Warning(renderer.CompactResult(symbolMode, $"{displayEvent} {CompactSymbols.Warn(symbolMode)} {CompactSymbols.Pipe(symbolMode)} {reason}"));
         else
             renderer.Warning($"{CompactSymbols.Warn(symbolMode)} inspect {inspect.EventName}: {reason}");
+
+        if (isInteractive && hasMultipleTargets)
+        {
+            for (int i = 0; i < possibleTargets.Count; i++)
+                renderer.ChildTargetLine(possibleTargets[i], symbolMode, parentIsLast: true, isLastChild: i == possibleTargets.Count - 1, highlightArrowAsWarning: true);
+        }
+
         return;
     }
 
     if (isInteractive)
-        renderer.PreviewEventStateLine(inspect.EventName, inspect.TargetState ?? "<none>", symbolMode, isLast: true);
+    {
+        if (hasMultipleTargets)
+        {
+            renderer.EventValue(displayEvent, symbolMode, isLast: true);
+            for (int i = 0; i < possibleTargets.Count; i++)
+                renderer.ChildTargetLine(possibleTargets[i], symbolMode, parentIsLast: true, isLastChild: i == possibleTargets.Count - 1);
+        }
+        else
+        {
+            renderer.PreviewEventStateLine(displayEvent, inspect.TargetState ?? "<none>", symbolMode, isLast: true);
+        }
+    }
     else
         renderer.Success($"{CompactSymbols.Ok(symbolMode)} inspect {inspect.EventName} {CompactSymbols.Arrow(symbolMode)} {inspect.TargetState}");
 }
 
+static void RenderInspectInteractive(
+    DslWorkflowInstance instance,
+    DslMachine machine,
+    DslWorkflowDefinition workflow,
+    string eventName,
+    IReadOnlyDictionary<string, object?>? eventArgs,
+    SymbolMode symbolMode,
+    CliRenderer renderer)
+{
+    var preview = AnalyzeInspectPreview(instance, machine, workflow, eventName, eventArgs);
+
+    if (preview.Outcome == DslOutcomeKind.Undefined)
+    {
+        var undefinedMessage = DescribeUndefinedOutcome(eventName, instance.CurrentState, preview.Reason ?? "Not defined.");
+        renderer.EventErrorLine(
+            BuildInspectEventLabel(workflow, eventName),
+            $"{CompactSymbols.Err(symbolMode)} {CompactSymbols.Pipe(symbolMode)} {undefinedMessage}",
+            symbolMode,
+            isLast: true);
+        return;
+    }
+
+    if (preview.Outcome == DslOutcomeKind.Blocked)
+    {
+        var reason = preview.Reason ?? "Rejected.";
+        renderer.EventOutcomeLine(
+            preview.DisplayEvent,
+            $"{CompactSymbols.Warn(symbolMode)} {CompactSymbols.Pipe(symbolMode)} {reason}",
+            symbolMode,
+            isLast: true);
+
+        if (preview.PossibleTargets.Count > 0)
+        {
+            for (int i = 0; i < preview.PossibleTargets.Count; i++)
+                renderer.ChildTargetLine(preview.PossibleTargets[i], symbolMode, parentIsLast: true, isLastChild: i == preview.PossibleTargets.Count - 1, highlightArrowAsWarning: true);
+        }
+
+        return;
+    }
+
+    if (preview.PossibleTargets.Count > 1)
+    {
+        renderer.EventValue(preview.DisplayEvent, symbolMode, isLast: true);
+
+        for (int i = 0; i < preview.PossibleTargets.Count; i++)
+            renderer.ChildTargetLine(
+                preview.PossibleTargets[i],
+                symbolMode,
+                parentIsLast: true,
+                isLastChild: i == preview.PossibleTargets.Count - 1,
+                arrow: string.Equals(preview.PossibleTargets[i], preview.TargetState, StringComparison.Ordinal)
+                    ? CompactSymbols.PreviewArrow(symbolMode)
+                    : CompactSymbols.UnreachableArrow(symbolMode));
+        return;
+    }
+
+    renderer.PreviewEventStateLine(preview.DisplayEvent, preview.TargetState ?? "<none>", symbolMode, isLast: true);
+}
+
+static void RenderInspectAllInteractive(
+    DslWorkflowInstance instance,
+    DslMachine machine,
+    DslWorkflowDefinition workflow,
+    SymbolMode symbolMode,
+    CliRenderer renderer)
+{
+    var previews = workflow.Events
+        .Select(evt => AnalyzeInspectPreview(instance, machine, workflow, evt.Name, null))
+        .Where(p => p.Outcome != DslOutcomeKind.Undefined)
+        .OrderBy(p => p.DisplayEvent, StringComparer.Ordinal)
+        .ToList();
+
+    if (previews.Count == 0)
+    {
+        renderer.Warning(renderer.CompactResult(symbolMode, $"{CompactSymbols.Warn(symbolMode)} {CompactSymbols.Pipe(symbolMode)} no callable events from {instance.CurrentState}"));
+        return;
+    }
+
+    const int eventColumnWidth = 0;
+
+    for (int index = 0; index < previews.Count; index++)
+    {
+        var preview = previews[index];
+        var isLast = index == previews.Count - 1;
+
+        if (preview.Outcome == DslOutcomeKind.Blocked)
+        {
+            var reason = preview.Reason ?? "Rejected.";
+            var outcome = $"{CompactSymbols.Warn(symbolMode)} {CompactSymbols.Pipe(symbolMode)} {reason}";
+            renderer.EventOutcomeLine(preview.DisplayEvent, outcome, symbolMode, eventColumnWidth, isLast);
+        }
+        else if (preview.PossibleTargets.Count > 1)
+        {
+            renderer.EventValue(preview.DisplayEvent, symbolMode, eventColumnWidth, isLast);
+        }
+        else
+        {
+            renderer.EventStateLine(
+                preview.DisplayEvent,
+                preview.TargetState ?? "<none>",
+                CompactSymbols.PreviewArrow(symbolMode),
+                symbolMode,
+                eventColumnWidth,
+                isLast);
+        }
+
+        var shouldRenderChildTargets =
+            preview.Outcome == DslOutcomeKind.Blocked ||
+            preview.PossibleTargets.Count > 1;
+
+        if (shouldRenderChildTargets && preview.PossibleTargets.Count > 0)
+        {
+            var childTargets = preview.PossibleTargets.ToArray();
+
+            for (int childIndex = 0; childIndex < childTargets.Length; childIndex++)
+                renderer.ChildTargetLine(
+                    childTargets[childIndex],
+                    symbolMode,
+                    parentIsLast: isLast,
+                    isLastChild: childIndex == childTargets.Length - 1,
+                    highlightArrowAsWarning: preview.Outcome == DslOutcomeKind.Blocked,
+                    arrow: preview.Outcome == DslOutcomeKind.Enabled && preview.PossibleTargets.Count > 1
+                        ? (string.Equals(childTargets[childIndex], preview.TargetState, StringComparison.Ordinal)
+                            ? CompactSymbols.PreviewArrow(symbolMode)
+                            : CompactSymbols.UnreachableArrow(symbolMode))
+                        : CompactSymbols.PreviewArrow(symbolMode));
+        }
+    }
+}
+
 static void RenderInspectAll(
-    string currentState,
+    DslWorkflowInstance instance,
+    DslMachine machine,
+    DslWorkflowDefinition workflow,
     IReadOnlyCollection<DslInspectionResult> inspections,
     OutputMode mode,
     SymbolMode symbolMode,
     CliRenderer renderer,
     bool isInteractive)
 {
+    var currentState = instance.CurrentState;
+
     var callable = inspections
         .Where(i => i.Outcome == DslOutcomeKind.Enabled)
+        .OrderBy(i => i.EventName, StringComparer.Ordinal)
+        .ToArray();
+
+    var guarded = inspections
+        .Where(i => i.Outcome == DslOutcomeKind.Blocked)
         .OrderBy(i => i.EventName, StringComparer.Ordinal)
         .ToArray();
 
@@ -615,7 +799,7 @@ static void RenderInspectAll(
         return;
     }
 
-    if (callable.Length == 0)
+    if (callable.Length == 0 && guarded.Length == 0)
     {
         if (isInteractive)
             renderer.Warning(renderer.CompactResult(symbolMode, $"{CompactSymbols.Warn(symbolMode)} {CompactSymbols.Pipe(symbolMode)} no callable events from {currentState}"));
@@ -626,22 +810,261 @@ static void RenderInspectAll(
 
     if (!isInteractive)
         renderer.Success($"{CompactSymbols.Ok(symbolMode)} inspect: callable events from {currentState}");
-    var eventColumnWidth = callable.Length == 0
+    var enabledRows = callable
+        .Select(i => new
+        {
+            DisplayEvent = BuildInspectEventLabel(workflow, i.EventName),
+            EventName = i.EventName,
+            TargetState = i.TargetState ?? "<none>"
+        })
+        .ToList();
+
+    var guardedRows = guarded
+        .Select(i => new
+        {
+            DisplayEvent = BuildInspectEventLabel(workflow, i.EventName),
+            EventName = i.EventName,
+            Reason = i.Reasons.FirstOrDefault() ?? "Rejected."
+        })
+        .ToList();
+
+    var totalRows = enabledRows.Count + guardedRows.Count;
+    var eventColumnWidth = totalRows == 0
         ? 0
-        : callable.Max(i => i.EventName.Length);
-    foreach (var inspect in callable)
+        : enabledRows.Select(r => r.DisplayEvent)
+            .Concat(guardedRows.Select(r => r.DisplayEvent))
+            .Max(name => name.Length);
+
+    var rowIndex = 0;
+    foreach (var row in enabledRows)
     {
+        var possibleTargets = GetPossibleTargetStates(machine, currentState, row.EventName);
+        var hasMultipleTargets = possibleTargets.Count > 1;
+
         if (isInteractive)
-            renderer.EventStateLine(
-                inspect.EventName,
-                inspect.TargetState ?? "<none>",
-                CompactSymbols.PreviewArrow(symbolMode),
+        {
+            if (hasMultipleTargets)
+            {
+                var parentIsLast = rowIndex == totalRows - 1;
+                renderer.EventValue(
+                    row.DisplayEvent,
+                    symbolMode,
+                    eventColumnWidth,
+                    isLast: parentIsLast);
+
+                for (int i = 0; i < possibleTargets.Count; i++)
+                    renderer.ChildTargetLine(
+                        possibleTargets[i],
+                        symbolMode,
+                        parentIsLast,
+                        isLastChild: i == possibleTargets.Count - 1);
+            }
+            else
+            {
+                renderer.EventStateLine(
+                    row.DisplayEvent,
+                    row.TargetState,
+                    CompactSymbols.PreviewArrow(symbolMode),
+                    symbolMode,
+                    eventColumnWidth,
+                    isLast: rowIndex == totalRows - 1);
+            }
+        }
+        else
+            renderer.Info($"{row.DisplayEvent} {CompactSymbols.Arrow(symbolMode)} {row.TargetState}");
+
+        rowIndex++;
+    }
+
+    foreach (var row in guardedRows)
+    {
+        var possibleTargets = GetPossibleTargetStates(machine, currentState, row.EventName);
+        var hasMultipleTargets = possibleTargets.Count > 1;
+        var outcome = $"{CompactSymbols.Warn(symbolMode)} {CompactSymbols.Pipe(symbolMode)} {row.Reason}";
+
+        if (isInteractive)
+        {
+            renderer.EventOutcomeLine(
+                row.DisplayEvent,
+                outcome,
                 symbolMode,
                 eventColumnWidth,
-                isLast: inspect == callable[^1]);
+                isLast: rowIndex == totalRows - 1);
+
+            if (hasMultipleTargets)
+            {
+                var parentIsLast = rowIndex == totalRows - 1;
+                for (int i = 0; i < possibleTargets.Count; i++)
+                    renderer.ChildTargetLine(
+                        possibleTargets[i],
+                        symbolMode,
+                        parentIsLast,
+                        isLastChild: i == possibleTargets.Count - 1);
+            }
+        }
         else
-            renderer.Info($"{inspect.EventName} {CompactSymbols.Arrow(symbolMode)} {inspect.TargetState}");
+            renderer.Warning($"{row.DisplayEvent} {outcome}");
+
+        rowIndex++;
     }
+}
+
+static string BuildInspectEventLabel(
+    DslWorkflowDefinition workflow,
+    string eventName)
+{
+    var eventDefinition = workflow.Events.FirstOrDefault(e => string.Equals(e.Name, eventName, StringComparison.Ordinal));
+    if (eventDefinition is null)
+        return eventName;
+
+    var argNames = eventDefinition.Args
+        .Select(a => a.Name)
+        .ToArray();
+
+    var label = argNames.Length > 0
+        ? $"{eventDefinition.Name}({string.Join(",", argNames)})"
+        : eventDefinition.Name;
+
+    return label;
+}
+
+static (DslOutcomeKind Outcome, string DisplayEvent, string? TargetState, string? Reason, IReadOnlyList<string> PossibleTargets) AnalyzeInspectPreview(
+    DslWorkflowInstance instance,
+    DslMachine machine,
+    DslWorkflowDefinition workflow,
+    string eventName,
+    IReadOnlyDictionary<string, object?>? eventArgs)
+{
+    var displayEvent = BuildInspectEventLabel(workflow, eventName);
+    var requiredArgs = GetRequiredEventArgumentKeys(machine, eventName);
+    var missingRequiredArgs = requiredArgs
+        .Where(arg => eventArgs is null || !eventArgs.ContainsKey(arg))
+        .ToArray();
+
+    var usesMissingArgsInGuards = missingRequiredArgs.Any(arg => EventGuardsReferenceArg(machine, instance.CurrentState, eventName, arg));
+
+    if (!usesMissingArgsInGuards)
+    {
+        var evaluationData = BuildInspectEvaluationData(instance.InstanceData, eventArgs);
+        var eagerInspect = workflow.Inspect(instance.CurrentState, eventName, evaluationData);
+        var eagerReason = eagerInspect.Reasons.FirstOrDefault();
+        var eagerPossibleTargets = GetPossibleTargetStates(machine, instance.CurrentState, eventName);
+
+        return (
+            eagerInspect.Outcome,
+            displayEvent,
+            eagerInspect.TargetState,
+            eagerReason,
+            eagerPossibleTargets);
+    }
+
+    var terminalRule = machine.TerminalRules.FirstOrDefault(r =>
+        string.Equals(r.FromState, instance.CurrentState, StringComparison.Ordinal)
+        && string.Equals(r.EventName, eventName, StringComparison.Ordinal));
+
+    var possibleTargets = GetPossibleTargetStates(machine, instance.CurrentState, eventName, includeNoTransitionAsCurrent: terminalRule?.Kind == DslTerminalKind.NoTransition);
+    var reason = terminalRule?.Kind == DslTerminalKind.Reject
+        ? terminalRule.Reason
+        : null;
+
+    if (!string.IsNullOrWhiteSpace(reason))
+    {
+        return (
+            DslOutcomeKind.Blocked,
+            displayEvent,
+            null,
+            reason,
+            possibleTargets);
+    }
+
+    if (possibleTargets.Count == 1)
+    {
+        return (
+            DslOutcomeKind.Enabled,
+            displayEvent,
+            possibleTargets[0],
+            null,
+            possibleTargets);
+    }
+
+    return (
+        DslOutcomeKind.Enabled,
+        displayEvent,
+        null,
+        null,
+        possibleTargets);
+}
+
+static IReadOnlyList<string> GetRequiredEventArgumentKeys(DslMachine machine, string eventName)
+{
+    var eventDefinition = machine.Events.FirstOrDefault(e => string.Equals(e.Name, eventName, StringComparison.Ordinal));
+    if (eventDefinition is null)
+        return Array.Empty<string>();
+
+    return eventDefinition.Args
+        .Where(a => !a.IsNullable)
+        .Select(a => a.Name)
+        .ToArray();
+}
+
+static bool EventGuardsReferenceArg(DslMachine machine, string currentState, string eventName, string argName)
+{
+    var explicitScoped = $"arg.{argName}";
+    var bareIdentifierRegex = new Regex($@"\b{Regex.Escape(argName)}\b", RegexOptions.Compiled);
+
+    return machine.Transitions
+        .Where(t => string.Equals(t.FromState, currentState, StringComparison.Ordinal)
+            && string.Equals(t.EventName, eventName, StringComparison.Ordinal)
+            && !string.IsNullOrWhiteSpace(t.GuardExpression))
+        .Any(t =>
+        {
+            var guard = t.GuardExpression!;
+            return guard.Contains(explicitScoped, StringComparison.Ordinal) || bareIdentifierRegex.IsMatch(guard);
+        });
+}
+
+static IReadOnlyDictionary<string, object?> BuildInspectEvaluationData(
+    IReadOnlyDictionary<string, object?> instanceData,
+    IReadOnlyDictionary<string, object?>? eventArguments)
+{
+    var evaluation = new Dictionary<string, object?>(StringComparer.Ordinal);
+
+    foreach (var kvp in instanceData)
+    {
+        evaluation[$"data.{kvp.Key}"] = kvp.Value;
+        if (!evaluation.ContainsKey(kvp.Key))
+            evaluation[kvp.Key] = kvp.Value;
+    }
+
+    if (eventArguments is not null)
+    {
+        foreach (var kvp in eventArguments)
+        {
+            evaluation[$"arg.{kvp.Key}"] = kvp.Value;
+            evaluation[kvp.Key] = kvp.Value;
+        }
+    }
+
+    return evaluation;
+}
+
+static IReadOnlyList<string> GetPossibleTargetStates(
+    DslMachine machine,
+    string currentState,
+    string eventName,
+    bool includeNoTransitionAsCurrent = false)
+{
+    var targets = machine.Transitions
+        .Where(t => string.Equals(t.FromState, currentState, StringComparison.Ordinal)
+            && string.Equals(t.EventName, eventName, StringComparison.Ordinal))
+        .Select(t => t.ToState)
+        .Distinct(StringComparer.Ordinal)
+        .ToList();
+
+    if (includeNoTransitionAsCurrent && !targets.Contains(currentState, StringComparer.Ordinal))
+        targets.Add(currentState);
+
+    return targets.ToArray();
 }
 
 static void RenderFire(DslInstanceFireResult fire, OutputMode mode, SymbolMode symbolMode, CliRenderer renderer, bool isInteractive)
@@ -694,7 +1117,11 @@ static void RenderFire(DslInstanceFireResult fire, OutputMode mode, SymbolMode s
         var reason = fire.Reasons.FirstOrDefault() ?? "Not defined.";
         var undefinedMessage = DescribeUndefinedOutcome(fire.EventName, fire.PreviousState, reason);
         if (isInteractive)
-            renderer.Error(renderer.CompactResult(symbolMode, $"{fire.EventName} {CompactSymbols.Err(symbolMode)} {CompactSymbols.Pipe(symbolMode)} {undefinedMessage}"));
+            renderer.EventErrorLine(
+                fire.EventName,
+                $"{CompactSymbols.Err(symbolMode)} {CompactSymbols.Pipe(symbolMode)} {undefinedMessage}",
+                symbolMode,
+                isLast: true);
         else
             renderer.Error($"{CompactSymbols.Err(symbolMode)} fire {fire.EventName}: {undefinedMessage} ({reason})");
         return;
@@ -704,14 +1131,22 @@ static void RenderFire(DslInstanceFireResult fire, OutputMode mode, SymbolMode s
     {
         var reason = fire.Reasons.FirstOrDefault() ?? "Rejected.";
         if (isInteractive)
-            renderer.Warning(renderer.CompactResult(symbolMode, $"{fire.EventName} {CompactSymbols.Warn(symbolMode)} {CompactSymbols.Pipe(symbolMode)} {reason}"));
+            renderer.EventOutcomeLine(
+                fire.EventName,
+                $"{CompactSymbols.Warn(symbolMode)} {CompactSymbols.Pipe(symbolMode)} {reason}",
+                symbolMode,
+                isLast: true);
         else
             renderer.Warning($"{CompactSymbols.Warn(symbolMode)} fire {fire.EventName}: blocked ({reason})");
         return;
     }
 
     if (isInteractive)
-        renderer.Success(renderer.CompactResult(symbolMode, $"{fire.EventName} {CompactSymbols.Ok(symbolMode)} {CompactSymbols.Arrow(symbolMode)} {fire.NewState ?? "<none>"}"));
+        renderer.EventSuccessStateLine(
+            fire.EventName,
+            fire.NewState ?? "<none>",
+            symbolMode,
+            isLast: true);
     else
         renderer.Success($"{CompactSymbols.Ok(symbolMode)} fire {fire.EventName}: {fire.PreviousState} {CompactSymbols.Arrow(symbolMode)} {fire.NewState}");
 }
@@ -767,7 +1202,7 @@ static void PrintReplHelp(CliRenderer renderer)
     renderer.Info("  events");
     renderer.Info("  data");
     renderer.Info("  inspect [EventName] [event-args-json]");
-    renderer.Info("    without EventName, inspects all events and lists callable ones");
+    renderer.Info("    without EventName, inspects all events and lists callable plus guarded ones");
     renderer.Info("  fire <EventName> [event-args-json]");
     renderer.Info("    when EventName has required args and no event-args-json is provided, REPL prompts per key");
     renderer.Info("    event-args-json is evaluated only for that command and does not mutate instance data");
@@ -1076,11 +1511,149 @@ sealed class CliRenderer
         if (_useColor)
         {
             AnsiConsole.MarkupLine(
-                $"[{_palette.Event}]{Markup.Escape(eventLabel)}[/][{_palette.Meta}] {Markup.Escape(connector)} [/][{_palette.State}]{Markup.Escape(TagState(stateName))}[/]");
+                $"[{_palette.Event}]{Markup.Escape(eventLabel)}[/][{ResolveArrowColor(connector, symbolMode)}] {Markup.Escape(connector)} [/][{_palette.State}]{Markup.Escape(TagState(stateName))}[/]");
             return;
         }
 
         Console.WriteLine($"{eventLabel} {connector} {TagState(stateName)}");
+    }
+
+    public void EventSuccessStateLine(string eventName, string stateName, SymbolMode symbolMode, int eventColumnWidth = 0, bool isLast = false)
+    {
+        var paddedEvent = eventColumnWidth > 0 ? eventName.PadRight(eventColumnWidth) : eventName;
+        var prefix = isLast ? CompactSymbols.BranchEnd(symbolMode) : CompactSymbols.BranchMid(symbolMode);
+        var eventLabel = $"{CompactIndent}{prefix} {TagEvent(paddedEvent)}";
+        var ok = CompactSymbols.Ok(symbolMode);
+        var connector = CompactSymbols.Arrow(symbolMode);
+
+        if (_useColor)
+        {
+            AnsiConsole.MarkupLine(
+                $"[{_palette.Event}]{Markup.Escape(eventLabel)}[/][{_palette.Success}] {Markup.Escape(ok)} {Markup.Escape(connector)} [/][{_palette.State}]{Markup.Escape(TagState(stateName))}[/]");
+            return;
+        }
+
+        Console.WriteLine($"{eventLabel} {ok} {connector} {TagState(stateName)}");
+    }
+
+    public void EventOutcomeLine(string eventName, string outcomeText, SymbolMode symbolMode, int eventColumnWidth = 0, bool isLast = false)
+    {
+        const int promptReserve = 12;
+        var paddedEvent = eventColumnWidth > 0 ? eventName.PadRight(eventColumnWidth) : eventName;
+        var prefix = isLast ? CompactSymbols.BranchEnd(symbolMode) : CompactSymbols.BranchMid(symbolMode);
+        var eventLabel = $"{CompactIndent}{prefix} {TagEvent(paddedEvent)}";
+
+        var consoleWidth = GetRenderWidth();
+        var availableWidth = Math.Max(1, consoleWidth - eventLabel.Length - 1 - promptReserve);
+        var renderedOutcome = TruncateWithEllipsis(outcomeText, availableWidth);
+
+        if (_useColor)
+        {
+            AnsiConsole.MarkupLine(
+                $"[{_palette.Event}]{Markup.Escape(eventLabel)}[/][{_palette.Warning}] {Markup.Escape(renderedOutcome)}[/]");
+            return;
+        }
+
+        Console.WriteLine($"{eventLabel} {renderedOutcome}");
+    }
+
+    public void EventErrorLine(string eventName, string outcomeText, SymbolMode symbolMode, int eventColumnWidth = 0, bool isLast = false)
+    {
+        const int promptReserve = 12;
+        var paddedEvent = eventColumnWidth > 0 ? eventName.PadRight(eventColumnWidth) : eventName;
+        var prefix = isLast ? CompactSymbols.BranchEnd(symbolMode) : CompactSymbols.BranchMid(symbolMode);
+        var eventLabel = $"{CompactIndent}{prefix} {TagEvent(paddedEvent)}";
+
+        var consoleWidth = GetRenderWidth();
+        var availableWidth = Math.Max(1, consoleWidth - eventLabel.Length - 1 - promptReserve);
+        var renderedOutcome = TruncateWithEllipsis(outcomeText, availableWidth);
+
+        if (_useColor)
+        {
+            AnsiConsole.MarkupLine(
+                $"[{_palette.Event}]{Markup.Escape(eventLabel)}[/][{_palette.Error}] {Markup.Escape(renderedOutcome)}[/]");
+            return;
+        }
+
+        Console.WriteLine($"{eventLabel} {renderedOutcome}");
+    }
+
+    private static string TruncateWithEllipsis(string text, int maxWidth)
+    {
+        var value = text ?? string.Empty;
+
+        if (maxWidth <= 0 || value.Length <= maxWidth)
+            return value;
+
+        if (maxWidth <= 3)
+            return new string('.', maxWidth);
+
+        return value.Substring(0, maxWidth - 3) + "...";
+    }
+
+    private static int GetRenderWidth()
+    {
+        var candidates = new List<int>(3);
+
+        if (AnsiConsole.Profile.Width > 0)
+            candidates.Add(AnsiConsole.Profile.Width);
+
+        var windowWidth = TryGetConsoleWidth(() => Console.WindowWidth);
+        if (windowWidth > 0)
+            candidates.Add(windowWidth);
+
+        var bufferWidth = TryGetConsoleWidth(() => Console.BufferWidth);
+        if (bufferWidth > 0)
+            candidates.Add(bufferWidth);
+
+        if (candidates.Count == 0)
+            return 120;
+
+        return Math.Max(40, candidates.Min());
+    }
+
+    private static int TryGetConsoleWidth(Func<int> getWidth)
+    {
+        try
+        {
+            return getWidth();
+        }
+        catch (IOException)
+        {
+            return 0;
+        }
+        catch (InvalidOperationException)
+        {
+            return 0;
+        }
+    }
+
+    public void ChildTargetLine(string stateName, SymbolMode symbolMode, bool parentIsLast, bool isLastChild, string? arrow = null, bool highlightArrowAsWarning = false)
+    {
+        var connector = parentIsLast
+            ? $"{CompactIndent}    "
+            : $"{CompactIndent}{CompactSymbols.BranchStem(symbolMode)}   ";
+        var prefix = isLastChild ? CompactSymbols.BranchEnd(symbolMode) : CompactSymbols.BranchMid(symbolMode);
+        var arrowText = arrow ?? CompactSymbols.PreviewArrow(symbolMode);
+        var line = $"{connector}{prefix} {arrowText} {TagState(stateName)}";
+
+        if (_useColor)
+        {
+            var unreachableArrow = CompactSymbols.UnreachableArrow(symbolMode);
+            var isUnreachable = string.Equals(arrowText, unreachableArrow, StringComparison.Ordinal);
+            var arrowColor = isUnreachable
+                ? _palette.Error
+                : highlightArrowAsWarning
+                    ? _palette.Warning
+                    : _palette.Success;
+            var stateColor = isUnreachable ? _palette.Meta : _palette.State;
+
+            AnsiConsole.MarkupLine(
+                $"[{_palette.Meta}]{Markup.Escape(connector + prefix)} [/][{arrowColor}]{Markup.Escape(arrowText)} [/][{stateColor}]{Markup.Escape(TagState(stateName))}[/]");
+            return;
+        }
+
+        Console.WriteLine(line);
     }
 
     public void PreviewEventStateLine(string eventName, string stateName, SymbolMode symbolMode, bool isLast = true)
@@ -1092,11 +1665,25 @@ sealed class CliRenderer
         if (_useColor)
         {
             AnsiConsole.MarkupLine(
-                $"[{_palette.PreviewEvent}]{Markup.Escape(eventLabel)}[/][{_palette.Meta}] {Markup.Escape(connector)} [/][{_palette.PreviewState}]{Markup.Escape(TagState(stateName))}[/]");
+                $"[{_palette.Event}]{Markup.Escape(eventLabel)}[/][{ResolveArrowColor(connector, symbolMode)}] {Markup.Escape(connector)} [/][{_palette.State}]{Markup.Escape(TagState(stateName))}[/]");
             return;
         }
 
         Console.WriteLine($"{eventLabel} {connector} {TagState(stateName)}");
+    }
+
+    private string ResolveArrowColor(string connector, SymbolMode symbolMode)
+    {
+        if (string.Equals(connector, CompactSymbols.Arrow(symbolMode), StringComparison.Ordinal))
+            return _palette.Success;
+
+        if (string.Equals(connector, CompactSymbols.PreviewArrow(symbolMode), StringComparison.Ordinal))
+            return _palette.Success;
+
+        if (string.Equals(connector, CompactSymbols.UnreachableArrow(symbolMode), StringComparison.Ordinal))
+            return _palette.Error;
+
+        return _palette.Meta;
     }
 
     public void VerboseInspect(DslInspectionResult inspect)
@@ -1240,47 +1827,66 @@ sealed class CliRenderer
 
     private void StylePreviewCompact(SymbolMode symbolMode)
     {
-        var ok = CompactSymbols.Ok(symbolMode);
         var warn = CompactSymbols.Warn(symbolMode);
         var err = CompactSymbols.Err(symbolMode);
         var pipe = CompactSymbols.Pipe(symbolMode);
         var promptArrow = CompactSymbols.Prompt(symbolMode);
-        var previewArrow = CompactSymbols.PreviewArrow(symbolMode);
-        var commitArrow = CompactSymbols.Arrow(symbolMode);
-        var branchMid = CompactSymbols.BranchMid(symbolMode);
-        var branchEnd = CompactSymbols.BranchEnd(symbolMode);
         var branchStem = CompactSymbols.BranchStem(symbolMode);
 
-        Meta("Style preview transcript:");
-        if (_useColor)
+        void CommandPrompt(string stateName, string command)
         {
-            AnsiConsole.MarkupLine($"[{_palette.State}]Red[/][{_palette.Meta}] {Markup.Escape(promptArrow)}[/] inspect");
-            AnsiConsole.MarkupLine($"[{_palette.PreviewEvent}]{Markup.Escape(CompactIndent)}{Markup.Escape(branchMid)} Advance[/][{_palette.Meta}] {Markup.Escape(previewArrow)} [/][{_palette.PreviewState}]Green[/]");
-            AnsiConsole.MarkupLine($"[{_palette.PreviewEvent}]{Markup.Escape(CompactIndent)}{Markup.Escape(branchEnd)} Emergency[/][{_palette.Meta}] {Markup.Escape(previewArrow)} [/][{_palette.PreviewState}]FlashingRed[/]");
-            AnsiConsole.MarkupLine($"[{_palette.State}]Red[/][{_palette.Meta}] {Markup.Escape(promptArrow)}[/] fire Advance");
-            AnsiConsole.MarkupLine($"[{_palette.Success}]{Markup.Escape(CompactIndent)}{Markup.Escape(branchEnd)} Advance {Markup.Escape(ok)} {Markup.Escape(commitArrow)} Green[/]");
-            AnsiConsole.MarkupLine($"[{_palette.State}]Green[/][{_palette.Meta}] {Markup.Escape(promptArrow)}[/] fire Emergency");
-            AnsiConsole.MarkupLine($"[{_palette.Meta}]{Markup.Escape(CompactIndent)}{Markup.Escape(branchStem)} [/][{_palette.Event}]Reason[/][{_palette.Meta}]: Accident[/]");
-            AnsiConsole.MarkupLine($"[{_palette.Success}]{Markup.Escape(CompactIndent)}{Markup.Escape(branchEnd)} Emergency {Markup.Escape(ok)} {Markup.Escape(commitArrow)} FlashingRed[/]");
-            AnsiConsole.MarkupLine($"[{_palette.State}]Red[/][{_palette.Meta}] {Markup.Escape(promptArrow)}[/] fire ClearEmergency");
-            AnsiConsole.MarkupLine($"[{_palette.Error}]{Markup.Escape(CompactIndent)}{Markup.Escape(branchEnd)} ClearEmergency {Markup.Escape(err)} {Markup.Escape(pipe)} no transition from Red[/]");
-            AnsiConsole.MarkupLine($"[{_palette.State}]Red[/][{_palette.Meta}] {Markup.Escape(promptArrow)}[/] inspect Advance");
-            AnsiConsole.MarkupLine($"[{_palette.Warning}]{Markup.Escape(CompactIndent)}{Markup.Escape(branchEnd)} Advance {Markup.Escape(warn)} {Markup.Escape(pipe)} Cars waiting required[/]");
-            return;
+            if (_useColor)
+            {
+                AnsiConsole.MarkupLine(
+                    $"[{_palette.State}]{Markup.Escape(stateName)}[/][{_palette.Meta}] {Markup.Escape(promptArrow)}[/] {Markup.Escape(command)}");
+                return;
+            }
+
+            Console.WriteLine($"{stateName} {promptArrow} {command}");
         }
 
-        Info($"Red {promptArrow} inspect");
-        Info($"{CompactIndent}{branchMid} Advance {previewArrow} Green");
-        Info($"{CompactIndent}{branchEnd} Emergency {previewArrow} FlashingRed");
-        Info($"Red {promptArrow} fire Advance");
-        Info($"{CompactIndent}{branchEnd} Advance {ok} {commitArrow} Green");
-        Info($"Green {promptArrow} fire Emergency");
-        Info($"{CompactIndent}{branchStem} Reason: Accident");
-        Info($"{CompactIndent}{branchEnd} Emergency {ok} {commitArrow} FlashingRed");
-        Info($"Red {promptArrow} fire ClearEmergency");
-        Info($"{CompactIndent}{branchEnd} ClearEmergency {err} {pipe} no transition from Red");
-        Info($"Red {promptArrow} inspect Advance");
-        Info($"{CompactIndent}{branchEnd} Advance {warn} {pipe} Cars waiting required");
+        void ArgumentLine(string key, string value)
+        {
+            if (_useColor)
+            {
+                AnsiConsole.MarkupLine(
+                    $"[{_palette.Meta}]{Markup.Escape(CompactIndent)}{Markup.Escape(branchStem)} [/][{_palette.Event}]{Markup.Escape(key)}[/][{_palette.Meta}]: {Markup.Escape(value)}[/]");
+                return;
+            }
+
+            Console.WriteLine($"{CompactIndent}{branchStem} {key}: {value}");
+        }
+
+        Meta("Style preview transcript:");
+
+        CommandPrompt("Red", "inspect");
+        EventValue("Advance", symbolMode, isLast: false);
+        ChildTargetLine("FlashingGreen", symbolMode, parentIsLast: false, isLastChild: false, arrow: CompactSymbols.PreviewArrow(symbolMode));
+        ChildTargetLine("Green", symbolMode, parentIsLast: false, isLastChild: true, arrow: CompactSymbols.UnreachableArrow(symbolMode));
+        EventOutcomeLine(
+            "Emergency(AuthorizedBy,Reason)",
+            $"{warn} {pipe} AuthorizedBy and Reason are required to activate emergency mode",
+            symbolMode,
+            isLast: true);
+        ChildTargetLine("FlashingRed", symbolMode, parentIsLast: true, isLastChild: true, arrow: CompactSymbols.PreviewArrow(symbolMode), highlightArrowAsWarning: true);
+
+        CommandPrompt("Red", "fire Advance");
+        EventSuccessStateLine("Advance", "FlashingGreen", symbolMode, isLast: true);
+
+        CommandPrompt("FlashingGreen", "fire Emergency");
+        ArgumentLine("AuthorizedBy", "Dispatcher");
+        ArgumentLine("Reason", "Accident");
+        EventSuccessStateLine("Emergency", "FlashingRed", symbolMode, isLast: true);
+
+        CommandPrompt("FlashingRed", "fire ClearEmergency");
+        EventSuccessStateLine("ClearEmergency", "Red", symbolMode, isLast: true);
+
+        CommandPrompt("Red", "inspect ClearEmergency");
+        EventErrorLine(
+            "ClearEmergency",
+            $"{err} {pipe} no transition from Red",
+            symbolMode,
+            isLast: true);
     }
 
     private void StylePreviewVerbose()
@@ -1369,6 +1975,7 @@ static class CompactSymbols
     public static string Err(SymbolMode mode) => Resolve(mode) == SymbolMode.Unicode ? "✖" : "ERR";
     public static string Arrow(SymbolMode mode) => Resolve(mode) == SymbolMode.Unicode ? "──▶" : "==>";
     public static string PreviewArrow(SymbolMode mode) => Resolve(mode) == SymbolMode.Unicode ? "──▷" : "-->";
+    public static string UnreachableArrow(SymbolMode mode) => Resolve(mode) == SymbolMode.Unicode ? "──✕" : "--X";
 
     private static SymbolMode Resolve(SymbolMode mode) => SymbolSupport.ResolveSymbolMode(mode);
 }

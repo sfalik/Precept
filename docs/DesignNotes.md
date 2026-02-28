@@ -193,21 +193,30 @@ Validation constraints:
 - REPL commands support transient per-command JSON event-argument overrides.
 - REPL supports `symbols test` to print an ASCII/Unicode compatibility matrix for terminal/font diagnostics.
 - REPL supports `style preview` (current theme) and `style preview all` (all themes) using compact timeline styling.
-- Style preview samples use a realistic traffic-light transcript (`Red`, `Advance`, `Green`, etc.) and include preview/success/error/warning outcomes so branch alignment and status styling can be judged visually.
+- Style preview samples use a realistic traffic-light transcript (`Red`, `Advance`, `Green`, etc.) and now reuse current compact inspect/fire line structures (including child branches, reachable/unreachable arrows, and truncation) so branch alignment and status styling can be judged visually.
 - REPL supports `style theme <name|list>` to switch among built-in palettes during a session.
 - REPL default startup theme is `github-dark`.
-- REPL `inspect` supports optional event name; without one it inspects all events and reports callable transitions for the current state.
+- REPL `inspect` supports optional event name; without one it inspects all events and reports callable plus guarded transitions for the current state.
+- Inspect preview is eager: if available instance data (plus supplied event args, if any) is sufficient to resolve a concrete branch, preview shows that concrete target.
+- When multiple targets are defined for an event, inspect shows the event on the parent line and renders all possible targets on child lines; the currently reachable target uses preview arrow (`──▷`) and alternates use unreachable marker (`──✕`, ASCII: `--X`).
+- Missing required args only force ambiguous preview when guard logic references the missing arg(s).
+- Ambiguous inspect rendering uses timeline rows: the event prints once and possible targets are rendered underneath as child lines using `├─`/`└─` with hollow preview arrows (`──▷` / `-->`).
+- If an ambiguous inspect result has a terminal `reject`, warning/reason remains on the event line.
 - REPL `fire` prompts for each required event arg key directly if no inline JSON args are supplied and the event is defined from the current state.
 - REPL `data` renders readable key-value output in interactive mode unless output mode is json.
 - Interactive REPL uses `compact` only.
+- Interactive REPL exits cleanly on stdin EOF (for example, when piped input is exhausted).
 - Script/non-interactive output is log-oriented (`INFO`/`WARN`/`ERROR`) for command traceability.
 - REPL compact output in interactive mode omits repeated command/event labels to reduce noise.
 - REPL compact mode uses a timeline-style prompt (`Red ›`) with branch prefixes (`├─`/`└─`) and semantic transition arrows: preview (`inspect`) uses `──▷` (ASCII fallback: `-->`), and committed success (`fire`) uses `──▶` (ASCII fallback: `==>`).
+- Compact color semantics are role-based: event labels use event color; state labels use state color; status markers use success/warn/error colors; reachable preview arrows (`──▷`/`-->`) are success-colored; committed fire arrows are success-colored; unreachable child arrows (`──✕`/`--X`) are error-colored and their target state is visually de-emphasized.
+- For blocked guard outcomes that still show candidate child targets, child preview arrows (`──▷`/`-->`) use warning color to indicate conditionally reachable paths gated by guard data/args.
 - Single-event `inspect <EventName>` preview output is visually differentiated from inspect-all rows to make direct command results stand out.
 - Interactive compact `inspect`/`fire` result lines include the event name before the status marker (for example, `NotAnEvent ✖ | unknown event`, `Advance ⚠ | No cars waiting`, `Advance ✔ ──▶ Green`, `ClearEmergency ✖ | no transition from Red`).
 - Interactive argument prompts in compact mode follow the same style (for example, `│  Reason: value`).
 - Interactive commands that display events/states use the same timeline rendering, including `events`, `state`, and inspect callable lines.
-- Compact inspect callable lists align event-name columns for improved readability.
+- Compact inspect callable lists use natural spacing (no fixed event-column padding) to avoid wide gaps with long event signatures.
+- Compact interactive inspect/fire outcome rows are single-line; long status text is truncated with `...` to preserve timeline arrow alignment.
 - Compact `events` output also aligns event-name columns to match inspect-list rhythm.
 - Compact interactive non-prompt lines (including argument prompts) are rendered as timeline children beneath each prompt.
 - Interactive inspect callable output lists only event/state lines (no separate "callable events" banner).
@@ -223,6 +232,7 @@ Validation constraints:
 - CLI supports `--instance` at startup and REPL-level `load`/`save` for instance file management.
 - Repository root includes runnable examples: `trafficlight.sm`, `traffic.instance.json`, `traffic.script.txt`.
 - CLI includes interactive REPL and non-interactive script execution using the same command set.
+- Test suite includes CLI transcript rendering regression coverage for compact inspect/fire timeline scenarios (Unicode and ASCII symbol modes).
 
 Supported default guard forms:
 

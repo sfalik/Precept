@@ -32,7 +32,11 @@ Red › data
   └─ VehiclesWaiting: 0
 
 Red › inspect
-  └─ Advance ──▷ FlashingGreen
+  ├─ Advance
+  │ ├─ ──▷ FlashingGreen
+  │ └─ ──✕ Green
+  └─ Emergency(AuthorizedBy,Reason) ⚠ | AuthorizedBy and Reason are required to activate emergency mode
+    └─ ──▷ FlashingRed
 
 Red › fire Advance
   └─ Advance ✔ ──▶ FlashingGreen
@@ -47,7 +51,9 @@ Yellow › fire Advance
   └─ Advance ✔ ──▶ Red
 
 Red › inspect Advance
-  └─ Advance ⚠ | No demand detected at red
+  └─ Advance
+    ├─ ──▷ FlashingGreen
+    └─ ──✕ Green
 
 Red › fire Emergency
   └─ Emergency ⚠ | Event argument validation failed: required argument 'AuthorizedBy' for event 'Emergency' is missing.
@@ -304,18 +310,26 @@ REPL commands:
 `symbols test` prints a compact ASCII/Unicode compatibility matrix so you can choose the best symbol mode for your current terminal/font.
 `style preview` prints a style sample in your terminal using compact styling and the current theme.
 `style preview all` prints the same compact sample for all built-in themes in one run.
-Style previews render a realistic timeline transcript using traffic-light labels (for example, `Red`, `Advance`, `Green`) and include preview/success/error/warning paths so branch alignment and transition flow are easy to evaluate.
+Style previews render a realistic timeline transcript using the same compact line structures as live REPL output (including parent/child inspect branches, multi-target arrows, success/error/warning rows, and truncation behavior) so alignment and flow are easy to evaluate.
 `style theme list` shows available themes: `muted`, `nord-crisp`, `tokyo-night`, `github-dark`, `solarized-modern`, and `mono-accent`.
 `style theme <name>` applies a theme immediately for the current REPL session.
 Default theme at startup is `github-dark`.
-`inspect` without an event name evaluates all workflow events and lists only those callable from the current state.
+`inspect` without an event name evaluates all workflow events and lists callable plus guarded events from the current state.
+Inspect preview is eager: if current data (and any provided args) is sufficient to resolve a concrete transition, inspect shows the concrete preview target.
+When more than one transition target is defined for an event from the current state, inspect keeps the resolved target on the event line and renders alternate targets as child lines with an unreachable marker (`──✕`, ASCII: `--X`).
+When required args are missing and guard logic depends on those missing args, inspect treats the outcome as ambiguous and renders child target lines (`├─`/`└─`) with hollow preview arrows (`──▷`) for possible transition targets.
+For ambiguous inspect results with a terminal `reject`, the reject reason is shown on the event line.
 In interactive REPL mode, `fire <EventName>` prompts for each required event key individually if no inline event arguments are provided.
 In interactive REPL mode, `data` renders a readable key-value list by default; use output json to emit JSON.
 Interactive REPL uses compact output only.
+Interactive REPL exits cleanly on stdin EOF (for example, after piped input completes).
 Interactive compact output is intentionally concise and omits repeated command/event labels.
 Interactive compact mode uses a timeline-style prompt (`Red ›`) and branch prefixes (`├─`/`└─`) with semantic transition arrows: preview uses `──▷` (ASCII: `-->`) and committed success uses `──▶` (ASCII: `==>`).
+Compact color roles are consistent across inspect/fire/style-preview: events use event color, states use state color, status markers (`✔`/`⚠`/`✖`) use success/warn/error colors, reachable preview arrows (`──▷`/`-->`) and committed fire arrows (`──▶`/`==>`) use success color, and unreachable child arrows (`──✕`/`--X`) use error color while their target state remains visually de-emphasized.
+When a guarded event is blocked but still lists candidate targets, those child preview arrows (`──▷`/`-->`) use warning color to indicate guard-linked conditional reachability.
 Single-event `inspect <EventName>` preview output is visually highlighted from inspect-all rows to emphasize direct command results.
-Interactive compact inspect lists align event names for faster visual scanning.
+Interactive compact inspect lists use natural spacing (no fixed event-column padding) to avoid wide gaps with long event signatures.
+Interactive compact inspect/fire outcome rows stay on one line; long status text is truncated with `...` to preserve timeline/arrow alignment.
 Interactive compact `events` output aligns event-name columns for visual consistency.
 Interactive compact non-prompt lines (including argument prompts like `│  Reason: value`) are rendered as timeline children beneath each prompt.
 Verbose mode renders structured table/panel output for inspect/fire details and callable-event listings.
@@ -339,7 +353,7 @@ Implemented now:
 - Guard evaluation with rejection reasons
 - Transition data assignments (`transform data.<Key> = ...`) on accepted `fire`
 - CLI REPL + script execution
-- Active test coverage in `test/StateMachine.Tests/DslWorkflowTests.cs`
+- Active test coverage in `test/StateMachine.Tests/DslWorkflowTests.cs` and `test/StateMachine.Tests/CliRenderingTests.cs`
 
 Pending:
 
@@ -384,5 +398,6 @@ tools/StateMachine.Dsl.Cli/
     Program.cs
 
 test/StateMachine.Tests/
+  CliRenderingTests.cs
     DslWorkflowTests.cs
 ```
