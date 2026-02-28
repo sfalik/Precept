@@ -295,7 +295,7 @@ Notes:
 REPL commands:
 
 - `help`
-- `cls | clear`
+- `clear`
 - `symbols [auto|ascii|unicode|test]`
 - `style preview [all]`
 - `style theme <name|list>`
@@ -309,12 +309,12 @@ REPL commands:
 - `exit | quit`
 
 `symbols test` prints a compact ASCII/Unicode compatibility matrix so you can choose the best symbol mode for your current terminal/font.
-`style preview` prints a style sample in your terminal using compact styling and the current theme.
-`style preview all` prints the same compact sample for all built-in themes in one run.
-Style previews render a realistic timeline transcript using the same compact line structures as live REPL output (including parent/child inspect branches, multi-target arrows, success/error/warning rows, and truncation behavior) so alignment and flow are easy to evaluate.
-`style theme list` shows available themes: `muted`, `nord-crisp`, `tokyo-night`, `github-dark`, `solarized-modern`, and `mono-accent`.
+`style preview` prints a compact scenario matrix in your terminal using the current theme.
+`style preview all` prints the same compact scenario matrix for all built-in themes in one run.
+Style previews render a realistic timeline transcript using the same compact line structures as live REPL output and now exercise the full compact outcome surface (inspect-all/single, multi-target reachable/unreachable child arrows, blocked guard-linked child previews, fire success, undefined unknown-event and no-transition cases, argument prompts, and truncation behavior).
+`style theme list` shows available themes: `mono-accent`, `muted`, `nord-crisp`, `tokyo-night`, `github-dark`, `solarized-modern`, `dracula`, `rose-pine`, and `everforest`.
 `style theme <name>` applies a theme immediately for the current REPL session.
-Default theme at startup is `github-dark`.
+Default theme at startup is `mono-accent`.
 `inspect` without an event name evaluates all workflow events and lists callable plus guarded events from the current state.
 Inspect preview is eager: if current data (and any provided args) is sufficient to resolve a concrete transition, inspect shows the concrete preview target.
 When more than one transition target is defined for an event from the current state, inspect keeps the resolved target on the event line and renders alternate targets as child lines with an unreachable marker (`──✕`, ASCII: `--X`).

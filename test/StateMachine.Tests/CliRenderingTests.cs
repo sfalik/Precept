@@ -347,6 +347,76 @@ public sealed class CliRenderingTests
         result.Output.Should().Contain("Green");
     }
 
+    [Fact]
+    public void StylePreview_Renders_Full_Compact_Scenario_Matrix()
+    {
+        var dsl = """
+            machine Sample
+            state Red
+            event Advance
+            from Red on Advance
+                transition Red
+            """;
+
+        var instance = """
+            {
+              "workflowName": "Sample",
+              "currentState": "Red",
+              "lastEvent": null,
+              "updatedAt": "2026-02-27T00:00:00+00:00",
+              "instanceData": {}
+            }
+            """;
+
+        var result = RunCli(dsl, instance, new[] { "style preview", "exit" }, "--unicode");
+
+        AssertSucceeded(result);
+        result.Output.Should().Contain("Style preview transcript (compact matrix):");
+        result.Output.Should().Contain("Route(Decision)");
+        result.Output.Should().Contain("Alpha");
+        result.Output.Should().Contain("Beta");
+        result.Output.Should().Contain("UnknownEvent");
+        result.Output.Should().Contain("no transition from Red");
+        result.Output.Should().Contain("AuthorizedBy: Dispatcher");
+        result.Output.Should().Contain("...");
+    }
+
+    [Fact]
+    public void StylePreviewAll_Renders_All_Theme_Headers_And_Matrix_Content()
+    {
+        var dsl = """
+            machine Sample
+            state Red
+            event Advance
+            from Red on Advance
+                transition Red
+            """;
+
+        var instance = """
+            {
+              "workflowName": "Sample",
+              "currentState": "Red",
+              "lastEvent": null,
+              "updatedAt": "2026-02-27T00:00:00+00:00",
+              "instanceData": {}
+            }
+            """;
+
+        var result = RunCli(dsl, instance, new[] { "style preview all", "exit" }, "--unicode");
+
+        AssertSucceeded(result);
+        result.Output.Should().Contain("Theme: muted");
+        result.Output.Should().Contain("Theme: nord-crisp");
+        result.Output.Should().Contain("Theme: tokyo-night");
+        result.Output.Should().Contain("Theme: github-dark");
+        result.Output.Should().Contain("Theme: solarized-modern");
+        result.Output.Should().Contain("Theme: mono-accent");
+        result.Output.Should().Contain("Theme: dracula");
+        result.Output.Should().Contain("Theme: rose-pine");
+        result.Output.Should().Contain("Theme: everforest");
+        result.Output.Should().Contain("Style preview transcript (compact matrix):");
+    }
+
     private static CliRunResult RunCli(string dsl, string instanceJson, IReadOnlyList<string> commands, string symbolFlag)
     {
         var tempDir = Path.Combine(Path.GetTempPath(), "StateMachine.CliRenderingTests", Guid.NewGuid().ToString("N"));

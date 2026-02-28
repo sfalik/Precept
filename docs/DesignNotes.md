@@ -192,11 +192,12 @@ Validation constraints:
 - `Inspect(...)` and `Fire(...)` accept optional event arguments (`IReadOnlyDictionary<string, object?>`).
 - REPL commands support transient per-command JSON event-argument overrides.
 - REPL supports `symbols test` to print an ASCII/Unicode compatibility matrix for terminal/font diagnostics.
-- REPL supports `cls` / `clear` to clear the terminal screen.
+- REPL supports `clear` to clear the terminal screen.
 - REPL supports `style preview` (current theme) and `style preview all` (all themes) using compact timeline styling.
-- Style preview samples use a realistic traffic-light transcript (`Red`, `Advance`, `Green`, etc.) and now reuse current compact inspect/fire line structures (including child branches, reachable/unreachable arrows, and truncation) so branch alignment and status styling can be judged visually.
+- Style preview samples use a realistic traffic-light transcript (`Red`, `Advance`, `Green`, etc.) and now cover the full compact scenario matrix: inspect-all and inspect-single rows, multi-target reachable/unreachable child arrows, blocked guard-linked child previews, fire success, undefined unknown-event/no-transition rows, argument prompts, and truncation.
 - REPL supports `style theme <name|list>` to switch among built-in palettes during a session.
-- REPL default startup theme is `github-dark`.
+- Built-in palettes now include `mono-accent`, `muted`, `nord-crisp`, `tokyo-night`, `github-dark`, `solarized-modern`, `dracula`, `rose-pine`, and `everforest`.
+- REPL default startup theme is `mono-accent`.
 - REPL `inspect` supports optional event name; without one it inspects all events and reports callable plus guarded transitions for the current state.
 - Inspect preview is eager: if available instance data (plus supplied event args, if any) is sufficient to resolve a concrete branch, preview shows that concrete target.
 - When multiple targets are defined for an event, inspect shows the event on the parent line and renders all possible targets on child lines; the currently reachable target uses preview arrow (`──▷`) and alternates use unreachable marker (`──✕`, ASCII: `--X`).

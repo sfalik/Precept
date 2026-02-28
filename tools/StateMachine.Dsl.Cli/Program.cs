@@ -47,7 +47,7 @@ var symbolMode = forceUnicode
     : forceAscii
         ? SymbolMode.Ascii
         : SymbolMode.Auto;
-var colorTheme = CliColorTheme.GithubDark;
+var colorTheme = CliColorTheme.MonoAccent;
 var renderer = new CliRenderer(!noColor && !Console.IsOutputRedirected, colorTheme);
 
 string text = File.ReadAllText(inputPath);
@@ -290,7 +290,7 @@ static ReplExecutionResult ExecuteReplCommand(
         return ReplExecutionResult.Success();
     }
 
-    if (command is "cls" or "clear")
+    if (command == "clear")
     {
         renderer.ClearScreen();
         return ReplExecutionResult.Success();
@@ -353,7 +353,7 @@ static ReplExecutionResult ExecuteReplCommand(
 
             if (!CliColorThemes.TryParse(tokens[2], out var parsedTheme))
             {
-                renderer.Warning("Usage: style theme <muted|nord-crisp|tokyo-night|github-dark|solarized-modern|mono-accent|list>");
+                renderer.Warning("Usage: style theme <mono-accent|muted|nord-crisp|tokyo-night|github-dark|solarized-modern|dracula|rose-pine|everforest|list>");
                 return ReplExecutionResult.Failed();
             }
 
@@ -1198,7 +1198,7 @@ static void PrintReplHelp(CliRenderer renderer)
 {
     renderer.Info("REPL commands:");
     renderer.Info("  help");
-    renderer.Info("  cls | clear");
+    renderer.Info("  clear");
     renderer.Info("    clear the terminal screen");
     renderer.Info("  symbols [auto|ascii|unicode|test]");
     renderer.Info("    test prints a symbol compatibility matrix for your terminal/font");
@@ -1364,7 +1364,10 @@ enum CliColorTheme
     TokyoNight,
     GithubDark,
     SolarizedModern,
-    MonoAccent
+    MonoAccent,
+    Dracula,
+    RosePine,
+    Everforest
 }
 
 readonly record struct CliPalette(
@@ -1383,12 +1386,15 @@ static class CliColorThemes
 {
     public static IReadOnlyList<string> Tokens { get; } = new[]
     {
+        "mono-accent",
         "muted",
         "nord-crisp",
         "tokyo-night",
         "github-dark",
         "solarized-modern",
-        "mono-accent"
+        "dracula",
+        "rose-pine",
+        "everforest"
     };
 
     public static bool TryParse(string value, out CliColorTheme theme)
@@ -1402,10 +1408,13 @@ static class CliColorThemes
             "github-dark" or "github" => CliColorTheme.GithubDark,
             "solarized-modern" or "solarized" => CliColorTheme.SolarizedModern,
             "mono-accent" or "mono" => CliColorTheme.MonoAccent,
+            "dracula" => CliColorTheme.Dracula,
+            "rose-pine" or "rosepine" => CliColorTheme.RosePine,
+            "everforest" => CliColorTheme.Everforest,
             _ => default
         };
 
-        return normalized is "muted" or "nord-crisp" or "nord" or "tokyo-night" or "tokyo" or "github-dark" or "github" or "solarized-modern" or "solarized" or "mono-accent" or "mono";
+        return normalized is "muted" or "nord-crisp" or "nord" or "tokyo-night" or "tokyo" or "github-dark" or "github" or "solarized-modern" or "solarized" or "mono-accent" or "mono" or "dracula" or "rose-pine" or "rosepine" or "everforest";
     }
 
     public static string ToToken(CliColorTheme theme) => theme switch
@@ -1416,6 +1425,9 @@ static class CliColorThemes
         CliColorTheme.GithubDark => "github-dark",
         CliColorTheme.SolarizedModern => "solarized-modern",
         CliColorTheme.MonoAccent => "mono-accent",
+        CliColorTheme.Dracula => "dracula",
+        CliColorTheme.RosePine => "rose-pine",
+        CliColorTheme.Everforest => "everforest",
         _ => "muted"
     };
 
@@ -1425,7 +1437,10 @@ static class CliColorThemes
         CliColorTheme.TokyoNight => new CliPalette("#A9B1D6", "white", "#9ECE6A", "#E0AF68", "#F7768E", "#7DCFFF", "#BB9AF7", "#9ECE6A", "#73DACA", "#7DCFFF"),
         CliColorTheme.GithubDark => new CliPalette("#8B949E", "white", "#56D364", "#F2CC60", "#F85149", "#79C0FF", "#D2A8FF", "#56D364", "#7EE787", "#79C0FF"),
         CliColorTheme.SolarizedModern => new CliPalette("#657B83", "white", "#859900", "#B58900", "#DC322F", "#268BD2", "#D33682", "#2AA198", "#6C71C4", "#268BD2"),
-        CliColorTheme.MonoAccent => new CliPalette("#6B7280", "#E5E7EB", "#22C55E", "#F59E0B", "#EF4444", "#D1D5DB", "#9CA3AF", "#D1D5DB", "#E5E7EB", "#D1D5DB"),
+        CliColorTheme.MonoAccent => new CliPalette("#6B7280", "#E5E7EB", "#22C55E", "#EAB308", "#EF4444", "#D1D5DB", "#9CA3AF", "#D1D5DB", "#E5E7EB", "#D1D5DB"),
+        CliColorTheme.Dracula => new CliPalette("#6272A4", "#F8F8F2", "#50FA7B", "#F1FA8C", "#FF5555", "#8BE9FD", "#FF79C6", "#50FA7B", "#BD93F9", "#8BE9FD"),
+        CliColorTheme.RosePine => new CliPalette("#6E6A86", "#E0DEF4", "#9CCFD8", "#F6C177", "#EB6F92", "#C4A7E7", "#EBBCBA", "#9CCFD8", "#31748F", "#C4A7E7"),
+        CliColorTheme.Everforest => new CliPalette("#7A8478", "#D3C6AA", "#A7C080", "#DBBC7F", "#E67E80", "#7FBBB3", "#D699B6", "#A7C080", "#83C092", "#7FBBB3"),
         _ => new CliPalette("#7A8394", "white", "#A3BE8C", "#EBCB8B", "#BF616A", "#81A1C1", "#B48EAD", "#A38DBE", "#88AFC8", "#81A1C1")
     };
 }
@@ -1900,12 +1915,13 @@ sealed class CliRenderer
             Console.WriteLine($"{CompactIndent}{branchStem} {key}: {value}");
         }
 
-        Meta("Style preview transcript:");
+        Meta("Style preview transcript (compact matrix):");
 
         CommandPrompt("Red", "inspect");
-        EventValue("Advance", symbolMode, isLast: false);
-        ChildTargetLine("FlashingGreen", symbolMode, parentIsLast: false, isLastChild: false, arrow: CompactSymbols.PreviewArrow(symbolMode));
-        ChildTargetLine("Green", symbolMode, parentIsLast: false, isLastChild: true, arrow: CompactSymbols.UnreachableArrow(symbolMode));
+        EventStateLine("Advance", "Green", CompactSymbols.PreviewArrow(symbolMode), symbolMode, isLast: false);
+        EventValue("Route(Decision)", symbolMode, isLast: false);
+        ChildTargetLine("Alpha", symbolMode, parentIsLast: false, isLastChild: false, arrow: CompactSymbols.PreviewArrow(symbolMode));
+        ChildTargetLine("Beta", symbolMode, parentIsLast: false, isLastChild: true, arrow: CompactSymbols.UnreachableArrow(symbolMode));
         EventOutcomeLine(
             "Emergency(AuthorizedBy,Reason)",
             $"{warn} {pipe} AuthorizedBy and Reason are required to activate emergency mode",
@@ -1913,16 +1929,12 @@ sealed class CliRenderer
             isLast: true);
         ChildTargetLine("FlashingRed", symbolMode, parentIsLast: true, isLastChild: true, arrow: CompactSymbols.PreviewArrow(symbolMode), highlightArrowAsWarning: true);
 
-        CommandPrompt("Red", "fire Advance");
-        EventSuccessStateLine("Advance", "FlashingGreen", symbolMode, isLast: true);
-
-        CommandPrompt("FlashingGreen", "fire Emergency");
-        ArgumentLine("AuthorizedBy", "Dispatcher");
-        ArgumentLine("Reason", "Accident");
-        EventSuccessStateLine("Emergency", "FlashingRed", symbolMode, isLast: true);
-
-        CommandPrompt("FlashingRed", "fire ClearEmergency");
-        EventSuccessStateLine("ClearEmergency", "Red", symbolMode, isLast: true);
+        CommandPrompt("Red", "inspect UnknownEvent");
+        EventErrorLine(
+            "UnknownEvent",
+            $"{err} {pipe} unknown event",
+            symbolMode,
+            isLast: true);
 
         CommandPrompt("Red", "inspect ClearEmergency");
         EventErrorLine(
@@ -1930,6 +1942,35 @@ sealed class CliRenderer
             $"{err} {pipe} no transition from Red",
             symbolMode,
             isLast: true);
+
+        CommandPrompt("Red", "fire Advance");
+        EventSuccessStateLine("Advance", "Green", symbolMode, isLast: true);
+
+        CommandPrompt("Green", "fire Advance");
+        EventOutcomeLine(
+            "Advance",
+            $"{warn} {pipe} Operator confirmation is required before advancing from Green while maintenance override is active and pending supervisory review for safety compliance.",
+            symbolMode,
+            isLast: true);
+
+        CommandPrompt("Green", "fire ClearEmergency");
+        EventErrorLine(
+            "ClearEmergency",
+            $"{err} {pipe} no transition from Green",
+            symbolMode,
+            isLast: true);
+
+        CommandPrompt("Green", "fire UnknownEvent");
+        EventErrorLine(
+            "UnknownEvent",
+            $"{err} {pipe} unknown event",
+            symbolMode,
+            isLast: true);
+
+        CommandPrompt("Red", "fire Emergency");
+        ArgumentLine("AuthorizedBy", "Dispatcher");
+        ArgumentLine("Reason", "Accident");
+        EventSuccessStateLine("Emergency", "FlashingRed", symbolMode, isLast: true);
     }
 
     private void StylePreviewVerbose()
