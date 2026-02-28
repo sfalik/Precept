@@ -47,7 +47,7 @@ var symbolMode = forceUnicode
     : forceAscii
         ? SymbolMode.Ascii
         : SymbolMode.Auto;
-var colorTheme = CliColorTheme.MonoAccent;
+var colorTheme = CliColorTheme.SlateBlueVivid;
 var renderer = new CliRenderer(!noColor && !Console.IsOutputRedirected, colorTheme);
 
 string text = File.ReadAllText(inputPath);
@@ -353,7 +353,7 @@ static ReplExecutionResult ExecuteReplCommand(
 
             if (!CliColorThemes.TryParse(tokens[2], out var parsedTheme))
             {
-                renderer.Warning("Usage: style theme <mono-accent|muted|nord-crisp|tokyo-night|github-dark|solarized-modern|dracula|rose-pine|everforest|list>");
+                renderer.Warning("Usage: style theme <name|list>");
                 return ReplExecutionResult.Failed();
             }
 
@@ -1367,7 +1367,28 @@ enum CliColorTheme
     MonoAccent,
     Dracula,
     RosePine,
-    Everforest
+    Everforest,
+    CatppuccinMocha,
+    OneDarkPro,
+    GruvboxDark,
+    MaterialOcean,
+    NightOwl,
+    Palenight,
+    Cobalt2,
+    AyuMirage,
+    HorizonDark,
+    KanagawaWave,
+    Synthwave84,
+    MonokaiPro,
+    SepiaSoft,
+    ForestNight,
+    Iceberg,
+    Carbon,
+    NeonMint,
+    Ember,
+    LavenderMist,
+    SlateBlue,
+    SlateBlueVivid
 }
 
 readonly record struct CliPalette(
@@ -1394,7 +1415,28 @@ static class CliColorThemes
         "solarized-modern",
         "dracula",
         "rose-pine",
-        "everforest"
+        "everforest",
+        "catppuccin-mocha",
+        "one-dark-pro",
+        "gruvbox-dark",
+        "material-ocean",
+        "night-owl",
+        "palenight",
+        "cobalt2",
+        "ayu-mirage",
+        "horizon-dark",
+        "kanagawa-wave",
+        "synthwave-84",
+        "monokai-pro",
+        "sepia-soft",
+        "forest-night",
+        "iceberg",
+        "carbon",
+        "neon-mint",
+        "ember",
+        "lavender-mist",
+        "slate-blue",
+        "slate-blue-vivid"
     };
 
     public static bool TryParse(string value, out CliColorTheme theme)
@@ -1411,10 +1453,61 @@ static class CliColorThemes
             "dracula" => CliColorTheme.Dracula,
             "rose-pine" or "rosepine" => CliColorTheme.RosePine,
             "everforest" => CliColorTheme.Everforest,
+            "catppuccin-mocha" or "catppuccin" => CliColorTheme.CatppuccinMocha,
+            "one-dark-pro" or "onedark" => CliColorTheme.OneDarkPro,
+            "gruvbox-dark" or "gruvbox" => CliColorTheme.GruvboxDark,
+            "material-ocean" or "material" => CliColorTheme.MaterialOcean,
+            "night-owl" => CliColorTheme.NightOwl,
+            "palenight" => CliColorTheme.Palenight,
+            "cobalt2" => CliColorTheme.Cobalt2,
+            "ayu-mirage" or "ayu" => CliColorTheme.AyuMirage,
+            "horizon-dark" or "horizon" => CliColorTheme.HorizonDark,
+            "kanagawa-wave" or "kanagawa" => CliColorTheme.KanagawaWave,
+            "synthwave-84" or "synthwave" => CliColorTheme.Synthwave84,
+            "monokai-pro" or "monokai" => CliColorTheme.MonokaiPro,
+            "sepia-soft" or "sepia" => CliColorTheme.SepiaSoft,
+            "forest-night" => CliColorTheme.ForestNight,
+            "iceberg" => CliColorTheme.Iceberg,
+            "carbon" => CliColorTheme.Carbon,
+            "neon-mint" => CliColorTheme.NeonMint,
+            "ember" => CliColorTheme.Ember,
+            "lavender-mist" or "lavender" => CliColorTheme.LavenderMist,
+            "slate-blue" or "slate" => CliColorTheme.SlateBlue,
+            "slate-blue-vivid" or "slate-vivid" => CliColorTheme.SlateBlueVivid,
             _ => default
         };
 
-        return normalized is "muted" or "nord-crisp" or "nord" or "tokyo-night" or "tokyo" or "github-dark" or "github" or "solarized-modern" or "solarized" or "mono-accent" or "mono" or "dracula" or "rose-pine" or "rosepine" or "everforest";
+        return normalized is
+            "muted" or
+            "nord-crisp" or "nord" or
+            "tokyo-night" or "tokyo" or
+            "github-dark" or "github" or
+            "solarized-modern" or "solarized" or
+            "mono-accent" or "mono" or
+            "dracula" or
+            "rose-pine" or "rosepine" or
+            "everforest" or
+            "catppuccin-mocha" or "catppuccin" or
+            "one-dark-pro" or "onedark" or
+            "gruvbox-dark" or "gruvbox" or
+            "material-ocean" or "material" or
+            "night-owl" or
+            "palenight" or
+            "cobalt2" or
+            "ayu-mirage" or "ayu" or
+            "horizon-dark" or "horizon" or
+            "kanagawa-wave" or "kanagawa" or
+            "synthwave-84" or "synthwave" or
+            "monokai-pro" or "monokai" or
+            "sepia-soft" or "sepia" or
+            "forest-night" or
+            "iceberg" or
+            "carbon" or
+            "neon-mint" or
+            "ember" or
+            "lavender-mist" or "lavender" or
+                "slate-blue" or "slate" or
+                "slate-blue-vivid" or "slate-vivid";
     }
 
     public static string ToToken(CliColorTheme theme) => theme switch
@@ -1428,6 +1521,27 @@ static class CliColorThemes
         CliColorTheme.Dracula => "dracula",
         CliColorTheme.RosePine => "rose-pine",
         CliColorTheme.Everforest => "everforest",
+        CliColorTheme.CatppuccinMocha => "catppuccin-mocha",
+        CliColorTheme.OneDarkPro => "one-dark-pro",
+        CliColorTheme.GruvboxDark => "gruvbox-dark",
+        CliColorTheme.MaterialOcean => "material-ocean",
+        CliColorTheme.NightOwl => "night-owl",
+        CliColorTheme.Palenight => "palenight",
+        CliColorTheme.Cobalt2 => "cobalt2",
+        CliColorTheme.AyuMirage => "ayu-mirage",
+        CliColorTheme.HorizonDark => "horizon-dark",
+        CliColorTheme.KanagawaWave => "kanagawa-wave",
+        CliColorTheme.Synthwave84 => "synthwave-84",
+        CliColorTheme.MonokaiPro => "monokai-pro",
+        CliColorTheme.SepiaSoft => "sepia-soft",
+        CliColorTheme.ForestNight => "forest-night",
+        CliColorTheme.Iceberg => "iceberg",
+        CliColorTheme.Carbon => "carbon",
+        CliColorTheme.NeonMint => "neon-mint",
+        CliColorTheme.Ember => "ember",
+        CliColorTheme.LavenderMist => "lavender-mist",
+        CliColorTheme.SlateBlue => "slate-blue",
+        CliColorTheme.SlateBlueVivid => "slate-blue-vivid",
         _ => "muted"
     };
 
@@ -1441,6 +1555,27 @@ static class CliColorThemes
         CliColorTheme.Dracula => new CliPalette("#6272A4", "#F8F8F2", "#50FA7B", "#F1FA8C", "#FF5555", "#8BE9FD", "#FF79C6", "#50FA7B", "#BD93F9", "#8BE9FD"),
         CliColorTheme.RosePine => new CliPalette("#6E6A86", "#E0DEF4", "#9CCFD8", "#F6C177", "#EB6F92", "#C4A7E7", "#EBBCBA", "#9CCFD8", "#31748F", "#C4A7E7"),
         CliColorTheme.Everforest => new CliPalette("#7A8478", "#D3C6AA", "#A7C080", "#DBBC7F", "#E67E80", "#7FBBB3", "#D699B6", "#A7C080", "#83C092", "#7FBBB3"),
+        CliColorTheme.CatppuccinMocha => new CliPalette("#6C7086", "#CDD6F4", "#A6E3A1", "#F9E2AF", "#F38BA8", "#89B4FA", "#CBA6F7", "#A6E3A1", "#94E2D5", "#89B4FA"),
+        CliColorTheme.OneDarkPro => new CliPalette("#5C6370", "#ABB2BF", "#98C379", "#E5C07B", "#E06C75", "#61AFEF", "#C678DD", "#98C379", "#56B6C2", "#61AFEF"),
+        CliColorTheme.GruvboxDark => new CliPalette("#7C6F64", "#EBDBB2", "#B8BB26", "#FABD2F", "#FB4934", "#83A598", "#D3869B", "#B8BB26", "#8EC07C", "#83A598"),
+        CliColorTheme.MaterialOcean => new CliPalette("#717CB4", "#C8D3F5", "#C3E88D", "#FFCB6B", "#F07178", "#82AAFF", "#C792EA", "#C3E88D", "#89DDFF", "#82AAFF"),
+        CliColorTheme.NightOwl => new CliPalette("#637777", "#D6DEEB", "#22DA6E", "#E3D18A", "#EF5350", "#82AAFF", "#C792EA", "#22DA6E", "#7FDBCA", "#82AAFF"),
+        CliColorTheme.Palenight => new CliPalette("#676E95", "#A6ACCD", "#C3E88D", "#FFCB6B", "#F07178", "#82AAFF", "#C792EA", "#C3E88D", "#89DDFF", "#82AAFF"),
+        CliColorTheme.Cobalt2 => new CliPalette("#6F93C6", "#FFFFFF", "#3AD900", "#FFC600", "#FF628C", "#9EFFFF", "#FF9D00", "#3AD900", "#80FFBB", "#9EFFFF"),
+        CliColorTheme.AyuMirage => new CliPalette("#5C6773", "#CBCCC6", "#AAD94C", "#FFCC66", "#F28779", "#73D0FF", "#D4BFFF", "#AAD94C", "#95E6CB", "#73D0FF"),
+        CliColorTheme.HorizonDark => new CliPalette("#6C6F93", "#D5C1A9", "#29D398", "#FAB795", "#E95678", "#26BBD9", "#EE64AE", "#29D398", "#59E3E3", "#26BBD9"),
+        CliColorTheme.KanagawaWave => new CliPalette("#727169", "#DCD7BA", "#98BB6C", "#E6C384", "#E46876", "#7FB4CA", "#957FB8", "#98BB6C", "#7AA89F", "#7FB4CA"),
+        CliColorTheme.Synthwave84 => new CliPalette("#7D77A8", "#F4EEE4", "#72F1B8", "#F2E863", "#FE4450", "#36F9F6", "#FF7EDB", "#72F1B8", "#9AE9FF", "#36F9F6"),
+        CliColorTheme.MonokaiPro => new CliPalette("#727072", "#FCFCFA", "#A9DC76", "#FFD866", "#FF6188", "#78DCE8", "#AB9DF2", "#A9DC76", "#FC9867", "#78DCE8"),
+        CliColorTheme.SepiaSoft => new CliPalette("#8B7E74", "#F2E7D5", "#95B46A", "#D9B86A", "#C26E5A", "#8FAFC7", "#B58FB6", "#95B46A", "#9BC1AA", "#8FAFC7"),
+        CliColorTheme.ForestNight => new CliPalette("#6B7A6A", "#D8E2C8", "#8BCF7A", "#DCCB6A", "#E07070", "#7BB6B0", "#A58FD6", "#8BCF7A", "#9ED89C", "#7BB6B0"),
+        CliColorTheme.Iceberg => new CliPalette("#6B7089", "#C6C8D1", "#B4BE82", "#E2A478", "#E27878", "#84A0C6", "#A093C7", "#B4BE82", "#89B8C2", "#84A0C6"),
+        CliColorTheme.Carbon => new CliPalette("#6F7680", "#E6E8EB", "#42BE65", "#F1C21B", "#FA4D56", "#78A9FF", "#BE95FF", "#42BE65", "#3DDBD9", "#78A9FF"),
+        CliColorTheme.NeonMint => new CliPalette("#7B7F8F", "#E8FFF7", "#5CFFB2", "#F7F779", "#FF6B8A", "#7BDFFF", "#D28CFF", "#5CFFB2", "#9CFFD9", "#7BDFFF"),
+        CliColorTheme.Ember => new CliPalette("#8A6D5C", "#F5E9DE", "#9FD67A", "#F3C97A", "#FF7A5C", "#8FBCE6", "#C9A0DC", "#9FD67A", "#E9B872", "#8FBCE6"),
+        CliColorTheme.LavenderMist => new CliPalette("#7A7891", "#EFEAFF", "#9ED89C", "#F3DE7A", "#F08AA8", "#9CB8FF", "#C9A7FF", "#9ED89C", "#BBD4FF", "#9CB8FF"),
+        CliColorTheme.SlateBlue => new CliPalette("#6A7895", "#E3EAF8", "#8CCF9A", "#E7D37A", "#E5858A", "#7EA7E0", "#9F8FD6", "#8CCF9A", "#96C2F2", "#7EA7E0"),
+        CliColorTheme.SlateBlueVivid => new CliPalette("#6A7895", "white bold", "#1FFF7A", "#FFF12A", "#FF2A57", "#7EA7E0", "#9F8FD6", "#1FFF7A", "#96C2F2", "#7EA7E0"),
         _ => new CliPalette("#7A8394", "white", "#A3BE8C", "#EBCB8B", "#BF616A", "#81A1C1", "#B48EAD", "#A38DBE", "#88AFC8", "#81A1C1")
     };
 }

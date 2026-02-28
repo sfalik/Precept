@@ -196,8 +196,8 @@ Validation constraints:
 - REPL supports `style preview` (current theme) and `style preview all` (all themes) using compact timeline styling.
 - Style preview samples use a realistic traffic-light transcript (`Red`, `Advance`, `Green`, etc.) and now cover the full compact scenario matrix: inspect-all and inspect-single rows, multi-target reachable/unreachable child arrows, blocked guard-linked child previews, fire success, undefined unknown-event/no-transition rows, argument prompts, and truncation.
 - REPL supports `style theme <name|list>` to switch among built-in palettes during a session.
-- Built-in palettes now include `mono-accent`, `muted`, `nord-crisp`, `tokyo-night`, `github-dark`, `solarized-modern`, `dracula`, `rose-pine`, and `everforest`.
-- REPL default startup theme is `mono-accent`.
+- Built-in palettes now include `mono-accent`, `muted`, `nord-crisp`, `tokyo-night`, `github-dark`, `solarized-modern`, `dracula`, `rose-pine`, `everforest`, `catppuccin-mocha`, `one-dark-pro`, `gruvbox-dark`, `material-ocean`, `night-owl`, `palenight`, `cobalt2`, `ayu-mirage`, `horizon-dark`, `kanagawa-wave`, `synthwave-84`, `monokai-pro`, `sepia-soft`, `forest-night`, `iceberg`, `carbon`, `neon-mint`, `ember`, `lavender-mist`, `slate-blue`, and `slate-blue-vivid`.
+- REPL default startup theme is `slate-blue-vivid`.
 - REPL `inspect` supports optional event name; without one it inspects all events and reports callable plus guarded transitions for the current state.
 - Inspect preview is eager: if available instance data (plus supplied event args, if any) is sufficient to resolve a concrete branch, preview shows that concrete target.
 - When multiple targets are defined for an event, inspect shows the event on the parent line and renders all possible targets on child lines; the currently reachable target uses preview arrow (`──▷`) and alternates use unreachable marker (`──✕`, ASCII: `--X`).

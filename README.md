@@ -312,9 +312,9 @@ REPL commands:
 `style preview` prints a compact scenario matrix in your terminal using the current theme.
 `style preview all` prints the same compact scenario matrix for all built-in themes in one run.
 Style previews render a realistic timeline transcript using the same compact line structures as live REPL output and now exercise the full compact outcome surface (inspect-all/single, multi-target reachable/unreachable child arrows, blocked guard-linked child previews, fire success, undefined unknown-event and no-transition cases, argument prompts, and truncation behavior).
-`style theme list` shows available themes: `mono-accent`, `muted`, `nord-crisp`, `tokyo-night`, `github-dark`, `solarized-modern`, `dracula`, `rose-pine`, and `everforest`.
+`style theme list` shows available themes: `mono-accent`, `muted`, `nord-crisp`, `tokyo-night`, `github-dark`, `solarized-modern`, `dracula`, `rose-pine`, `everforest`, `catppuccin-mocha`, `one-dark-pro`, `gruvbox-dark`, `material-ocean`, `night-owl`, `palenight`, `cobalt2`, `ayu-mirage`, `horizon-dark`, `kanagawa-wave`, `synthwave-84`, `monokai-pro`, `sepia-soft`, `forest-night`, `iceberg`, `carbon`, `neon-mint`, `ember`, `lavender-mist`, `slate-blue`, and `slate-blue-vivid`.
 `style theme <name>` applies a theme immediately for the current REPL session.
-Default theme at startup is `mono-accent`.
+Default theme at startup is `slate-blue-vivid`.
 `inspect` without an event name evaluates all workflow events and lists callable plus guarded events from the current state.
 Inspect preview is eager: if current data (and any provided args) is sufficient to resolve a concrete transition, inspect shows the concrete preview target.
 When more than one transition target is defined for an event from the current state, inspect keeps the resolved target on the event line and renders alternate targets as child lines with an unreachable marker (`──✕`, ASCII: `--X`).

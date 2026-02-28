@@ -414,6 +414,27 @@ public sealed class CliRenderingTests
         result.Output.Should().Contain("Theme: dracula");
         result.Output.Should().Contain("Theme: rose-pine");
         result.Output.Should().Contain("Theme: everforest");
+        result.Output.Should().Contain("Theme: catppuccin-mocha");
+        result.Output.Should().Contain("Theme: one-dark-pro");
+        result.Output.Should().Contain("Theme: gruvbox-dark");
+        result.Output.Should().Contain("Theme: material-ocean");
+        result.Output.Should().Contain("Theme: night-owl");
+        result.Output.Should().Contain("Theme: palenight");
+        result.Output.Should().Contain("Theme: cobalt2");
+        result.Output.Should().Contain("Theme: ayu-mirage");
+        result.Output.Should().Contain("Theme: horizon-dark");
+        result.Output.Should().Contain("Theme: kanagawa-wave");
+        result.Output.Should().Contain("Theme: synthwave-84");
+        result.Output.Should().Contain("Theme: monokai-pro");
+        result.Output.Should().Contain("Theme: sepia-soft");
+        result.Output.Should().Contain("Theme: forest-night");
+        result.Output.Should().Contain("Theme: iceberg");
+        result.Output.Should().Contain("Theme: carbon");
+        result.Output.Should().Contain("Theme: neon-mint");
+        result.Output.Should().Contain("Theme: ember");
+        result.Output.Should().Contain("Theme: lavender-mist");
+        result.Output.Should().Contain("Theme: slate-blue");
+        result.Output.Should().Contain("Theme: slate-blue-vivid");
         result.Output.Should().Contain("Style preview transcript (compact matrix):");
     }
 
