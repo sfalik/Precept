@@ -2044,7 +2044,7 @@ static class CliColorThemes
         CliColorTheme.Ember => new CliPalette("#8A6D5C", "#F5E9DE", "#9FD67A", "#F3C97A", "#FF7A5C", "#8FBCE6", "#C9A0DC", "#9FD67A", "#E9B872", "#8FBCE6"),
         CliColorTheme.LavenderMist => new CliPalette("#7A7891", "#EFEAFF", "#9ED89C", "#F3DE7A", "#F08AA8", "#9CB8FF", "#C9A7FF", "#9ED89C", "#BBD4FF", "#9CB8FF"),
         CliColorTheme.SlateBlue => new CliPalette("#6A7895", "#E3EAF8", "#8CCF9A", "#E7D37A", "#E5858A", "#7EA7E0", "#9F8FD6", "#8CCF9A", "#96C2F2", "#7EA7E0"),
-        CliColorTheme.SlateBlueVivid => new CliPalette("#6A7895", "white bold", "#1FFF7A", "#FFF12A", "#FF2A57", "#7EA7E0", "#9F8FD6", "#1FFF7A", "#96C2F2", "#7EA7E0"),
+        CliColorTheme.SlateBlueVivid => new CliPalette("#59657A", "white bold", "#1FFF7A", "#FFF12A", "#FF2A57", "#6D7F9B", "#8573A8", "#1FFF7A", "#7F92AF", "#6D7F9B"),
         _ => new CliPalette("#7A8394", "white", "#A3BE8C", "#EBCB8B", "#BF616A", "#81A1C1", "#B48EAD", "#A38DBE", "#88AFC8", "#81A1C1")
     };
 }
