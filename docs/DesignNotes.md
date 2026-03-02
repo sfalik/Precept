@@ -236,12 +236,19 @@ Validation constraints:
 - `tools/StateMachine.Dsl.LanguageServer` provides LSP stdio diagnostics/completion MVP for `.sm` files.
 - LSP diagnostics run parser/compiler validation on document open/change/save and map parser `Line N:` failures to line-scoped diagnostics.
 - LSP completion includes DSL keywords plus contextual state/event suggestions (`from`, `transition`, `on`).
+- LSP completion includes contextual guard suggestions for `if`/`else if` (data fields, operators/literals, and current-event argument references).
+- LSP completion includes contextual transform suggestions (data-field target names before `=`, expression suggestions after `=`).
+- LSP completion includes event-argument member suggestions after `<EventName>.` in guard/transform expressions.
+- LSP completion includes snippet-style templates for common branch/outcome patterns (`from ... on ...`, `if/else if/else`, `transition`, `reject`, `no transition`, and `transform`).
 - LSP semantic tokens provide role-aware highlighting for keywords, state/event symbols, variable identifiers, strings, numbers, operators, and comments.
 - `tools/StateMachine.Dsl.VsCode` provides a VS Code client MVP that auto-starts the language server for `.sm` files.
 - VS Code client startup resolves the language-server project relative to extension location and does not require a workspace folder in Extension Development Host.
+- VS Code client startup for locally installed VSIX resolves the language-server project from current workspace folder paths (repo root or `tools/StateMachine.Dsl.VsCode`) with extension-path fallback for Extension Development Host.
 - VS Code client contributes TextMate grammar-based syntax highlighting for `.sm` files.
 - VS Code client supports local-only VSIX packaging via `npm run package:local` in `tools/StateMachine.Dsl.VsCode`.
+- Local VSIX packaging includes language-client runtime dependencies so activation works after install.
 - VS Code client supports a local package+install loop via `npm run loop:local` in `tools/StateMachine.Dsl.VsCode`.
+- VS Code client activates from `workspaceContains:**/*.sm` plus language contribution activation and writes startup diagnostics to the `StateMachine DSL` output channel.
 - CLI supports `--instance` at startup and REPL-level `load`/`save` for instance file management.
 - Repository root includes runnable examples: `trafficlight.sm`, `traffic.instance.json`, `traffic.script.txt`.
 - CLI includes interactive REPL and non-interactive script execution using the same command set.

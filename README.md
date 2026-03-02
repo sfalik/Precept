@@ -354,6 +354,10 @@ Current MVP capabilities:
 - Converts parser `Line N:` failures into line-scoped LSP error diagnostics.
 - Provides completion items for DSL keywords.
 - Provides contextual completion for known `state` names (`from`, `transition`) and known `event` names (`on`).
+- Provides contextual guard completion for `if`/`else if` lines (data fields, operators/literals, and current-event argument references).
+- Provides contextual transform completion for `transform` lines (data-field targets before `=`, expression suggestions after `=`).
+- Provides event-argument member completion after `<EventName>.` in guard and transform expressions.
+- Provides snippet-style completions for common branch/outcome patterns (`from ... on ...`, `if/else if/else`, `transition`, `reject`, `no transition`, and `transform`).
 - Provides semantic token highlighting for declarations/usages (keywords, state/event symbols, variables, strings, numbers, operators, comments).
 
 Notes:
@@ -401,10 +405,16 @@ Run/debug in VS Code:
 - Press `F5` and select `Extension (StateMachine DSL)`.
 - Open a `.sm` file in the Extension Development Host to auto-start the language server client.
 - Client startup in Extension Development Host does not require opening a workspace folder first.
+- For locally installed VSIX testing, open either the repository root (`StateMachine`) or `tools/StateMachine.Dsl.VsCode` so the extension can resolve `tools/StateMachine.Dsl.LanguageServer/StateMachine.Dsl.LanguageServer.csproj`.
 - `.sm` files include TextMate syntax highlighting (keywords, declarations, strings, numbers, operators, comments).
 - Semantic highlighting is enabled (`semanticHighlighting`) and enriched by language-server semantic tokens.
 - Local packaging uses `npm run package:local` and emits a `.vsix` in `tools/StateMachine.Dsl.VsCode`.
 - Fast local iteration uses `npm run loop:local` to package and force-install the latest VSIX.
+- Local VSIX packaging includes language-client runtime dependencies (`node_modules`) required for extension activation.
+
+Troubleshooting completion/diagnostics:
+
+- Open `View: Output` and select `StateMachine DSL` to inspect language-client startup logs and server path resolution.
 
 Exit codes:
 

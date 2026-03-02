@@ -4,3 +4,4 @@
 !language-configuration.json
 !out/**
 !syntaxes/**
+!node_modules/**
