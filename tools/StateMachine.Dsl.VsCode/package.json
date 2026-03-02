@@ -41,6 +41,8 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "package:local": "npm run compile && npx @vscode/vsce package --allow-missing-repository",
+    "loop:local": "powershell -ExecutionPolicy Bypass -File ./scripts/install-local.ps1",
     "vscode:prepublish": "npm run compile"
   },
   "devDependencies": {

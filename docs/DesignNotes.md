@@ -240,6 +240,8 @@ Validation constraints:
 - `tools/StateMachine.Dsl.VsCode` provides a VS Code client MVP that auto-starts the language server for `.sm` files.
 - VS Code client startup resolves the language-server project relative to extension location and does not require a workspace folder in Extension Development Host.
 - VS Code client contributes TextMate grammar-based syntax highlighting for `.sm` files.
+- VS Code client supports local-only VSIX packaging via `npm run package:local` in `tools/StateMachine.Dsl.VsCode`.
+- VS Code client supports a local package+install loop via `npm run loop:local` in `tools/StateMachine.Dsl.VsCode`.
 - CLI supports `--instance` at startup and REPL-level `load`/`save` for instance file management.
 - Repository root includes runnable examples: `trafficlight.sm`, `traffic.instance.json`, `traffic.script.txt`.
 - CLI includes interactive REPL and non-interactive script execution using the same command set.

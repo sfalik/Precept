@@ -17,6 +17,19 @@
                 "_id": "build",
                 "isDefault": false
             }
+        },
+        {
+            "label": "extension: loop local install",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "run",
+                "loop:local"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/tools/StateMachine.Dsl.VsCode"
+            },
+            "problemMatcher": []
         }
     ]
 }

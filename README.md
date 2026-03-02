@@ -375,6 +375,27 @@ npm install
 npm run compile
 ```
 
+Local package (no publishing/CI):
+
+```sh
+cd tools/StateMachine.Dsl.VsCode
+npm run package:local
+code --install-extension .\state-machine-dsl-vscode-0.0.1.vsix
+```
+
+One-command local update loop (package + install):
+
+```sh
+cd tools/StateMachine.Dsl.VsCode
+npm run loop:local
+```
+
+Then in VS Code run: `Developer: Reload Window`.
+
+In-IDE trigger (no terminal typing):
+
+- `Terminal: Run Task` → `extension: loop local install`
+
 Run/debug in VS Code:
 
 - Press `F5` and select `Extension (StateMachine DSL)`.
@@ -382,6 +403,8 @@ Run/debug in VS Code:
 - Client startup in Extension Development Host does not require opening a workspace folder first.
 - `.sm` files include TextMate syntax highlighting (keywords, declarations, strings, numbers, operators, comments).
 - Semantic highlighting is enabled (`semanticHighlighting`) and enriched by language-server semantic tokens.
+- Local packaging uses `npm run package:local` and emits a `.vsix` in `tools/StateMachine.Dsl.VsCode`.
+- Fast local iteration uses `npm run loop:local` to package and force-install the latest VSIX.
 
 Exit codes:
 
