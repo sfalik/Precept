@@ -98,6 +98,76 @@ Block-authoring equivalent (same semantics):
 - If no guard matches, configured block outcome is applied.
 - Transition transforms execute only on accepted fire-path transitions.
 
+### Transform/Expression Design Decisions (Locked, Pending Implementation)
+
+Status:
+
+- The following choices are design-locked for the next transform/expression expansion.
+- These semantics are not fully implemented yet; current runtime behavior remains the source of truth until implementation lands.
+
+Locked choices:
+
+- Execution model is atomic batch per selected branch: all transform assignments in that branch must succeed or none are committed.
+- Branches support multiple `transform` statements; each `transform` remains single-assignment (`transform <Key> = <Expr>`).
+- In-branch evaluation is read-your-writes using a working copy in declaration order.
+- Assignment typing is strict fail-fast with no implicit coercion.
+- Guard and transform expressions use one shared expression semantics model; only expected result type differs (guard => `boolean`, transform => assigned field contract type).
+
+Expression scope (B-v1):
+
+- Operands: literals, data fields, event args (`<EventName>.<ArgName>`), and parentheses.
+- Operators: `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `<=`, `>`, `>=`, `&&`, `||`, `!`.
+- String concatenation is strong concat only: `+` is valid for strings only when both operands are strings.
+
+Null handling (B-v1):
+
+- `==`/`!=` support explicit null checks.
+- `<`, `<=`, `>`, `>=` with null are invalid.
+- Arithmetic (`+`, `-`, `*`, `/`, `%`) with null is invalid.
+- Boolean operators with null operands are invalid.
+- String concat with null operand is invalid.
+- Any invalid expression evaluation fails the fire path for that branch and, due to atomic batch semantics, commits no transform assignments.
+
+Examples:
+
+```text
+# valid (guard + arithmetic + modulo + concat)
+if RetryCount != null && RetryCount % 2 == 0
+  transform RetryCount = RetryCount + 1
+  transform AuditMessage = "Retry #" + RetryCount
+  transition Retrying
+
+# invalid (strict typing / null handling)
+transform RetryCount = "1"           # string -> number (type mismatch)
+transform AuditMessage = "Reason: " + Emergency.Reason   # invalid when Emergency.Reason is null
+```
+
+Implementation checklist (B-v1):
+
+- Parser/model
+  - Replace single assignment storage (`DataAssignmentKey`/`DataAssignmentExpression`) with ordered transform-assignment list per transition outcome.
+  - Parse multiple `transform` lines per branch and preserve declaration order.
+  - Extend expression grammar to support `()`, `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `<=`, `>`, `>=`, `&&`, `||`, `!`.
+- Runtime
+  - Implement one shared expression evaluator used by both guards and transforms.
+  - Implement strict type matrix and null rules from this document (no implicit coercion).
+  - Implement strong string concat (`+`) only for string+string.
+  - Implement short-circuit evaluation for `&&` and `||`.
+  - Evaluate transform assignments in branch order on a working copy (read-your-writes), then commit atomically.
+- Inspect/fire behavior
+  - Ensure inspect uses the same guard semantics as fire.
+  - Ensure transform evaluation errors reject fire and commit no transform assignments.
+- LSP/editor tooling
+  - Update diagnostics for operator/type/null violations.
+  - Update completion/snippets to include new operator-aware expression authoring patterns.
+- Tests
+  - Add parser tests for operator precedence/associativity and multi-transform parsing.
+  - Add runtime tests for atomic batch rollback, read-your-writes, strict typing, strong concat, null-handling failures, and short-circuit behavior.
+  - Add inspect/fire parity tests for shared guard semantics.
+- Documentation
+  - Move this section from "pending" to "implemented" once runtime/parser/test coverage lands.
+  - Update README examples to include at least one valid modulo/concat expression and one null-safe guard pattern.
+
 ### Explicit Declarations (Current)
 
 The DSL supports explicit contracts while keeping declaration style consistent:

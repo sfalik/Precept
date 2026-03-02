@@ -444,6 +444,40 @@ Implemented now:
 Pending:
 
 - Extension packaging/publishing workflow
+- Transform/expression expansion (B-v1) is design-locked but not yet implemented in runtime/parser.
+
+## Transform/Expression Roadmap (Design-Locked, Pending)
+
+The following decisions are locked for the next transform/expression iteration and are documented here for clarity. Current runtime behavior remains the source of truth until this work is implemented.
+
+- Atomic batch per selected branch: all transform assignments in a branch commit together or none commit.
+- Multiple `transform` lines per branch are supported; each `transform` remains a single assignment.
+- In-branch transform evaluation is read-your-writes in declaration order.
+- Strict fail-fast typing (no implicit coercion).
+- Guard/transform consistency: shared expression semantics; guards must evaluate to `boolean`, transforms must match target field contract type.
+- Planned B-v1 expression scope includes operators `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `<=`, `>`, `>=`, `&&`, `||`, `!`.
+- Planned B-v1 string `+` is strong concat only (both operands must be strings).
+- Planned B-v1 null handling: null checks via `==`/`!=` are allowed; arithmetic/ordered comparisons/boolean ops/concat with null are invalid.
+
+Example target behavior after implementation:
+
+```text
+from Active on Retry
+  if RetryCount != null && RetryCount % 2 == 0
+    transform RetryCount = RetryCount + 1
+    transform AuditMessage = "Retry #" + RetryCount
+    transition Active
+  else
+    reject "RetryCount is unavailable"
+```
+
+  Implementation checklist (B-v1):
+
+  - Parser/model: support multiple ordered `transform` assignments per selected branch and operator-aware expression parsing.
+  - Runtime: shared guard/transform expression evaluator with strict type/null semantics, strong string concat, short-circuit boolean logic, and atomic batch commit.
+  - Inspect/fire parity: same guard evaluation semantics in inspect and fire; transform expression failures reject fire and commit no transform changes.
+  - Tooling: language-server diagnostics/completion updates for operator/type/null rules and expression authoring.
+  - Tests: precedence/associativity, read-your-writes, atomic rollback, strict typing, null behavior, strong concat, and inspect/fire parity coverage.
 
 Design-phase compatibility policy:
 
