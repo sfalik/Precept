@@ -15,6 +15,18 @@
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "stopAtEntry": false
+    },
+    {
+      "name": "Extension (StateMachine DSL)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/tools/StateMachine.Dsl.VsCode"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/tools/StateMachine.Dsl.VsCode/out/**/*.js"
+      ],
+      "preLaunchTask": "build"
     }
   ]
 }

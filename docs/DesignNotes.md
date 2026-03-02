@@ -170,7 +170,7 @@ Validation constraints:
 ## Known Gaps
 
 - Guard language is intentionally minimal in this phase (`scope.key`, `!scope.key`, and simple comparisons)
-- Editor tooling (LSP and IntelliSense integration)
+- Extension packaging/publishing workflow
 
 ## Test Status
 
@@ -180,7 +180,7 @@ Validation constraints:
 ## Next Steps
 
 1. Expand guard language/features or swap in a richer evaluator implementation.
-2. Implement LSP-backed diagnostics/completion for `.sm` files.
+2. Add packaging/publishing automation for the VS Code extension client.
 
 ## Guard Evaluation + Event-Argument Model (Current)
 
@@ -233,6 +233,13 @@ Validation constraints:
 - Inline typed event arguments (`event Name(Type)`) are rejected; use indented event argument declarations instead.
 - CLI emits non-zero exit codes for incompatible instances and script command failures.
 - Runtime supports persisted instance creation and instance-based `Inspect(...)` / `Fire(...)`.
+- `tools/StateMachine.Dsl.LanguageServer` provides LSP stdio diagnostics/completion MVP for `.sm` files.
+- LSP diagnostics run parser/compiler validation on document open/change/save and map parser `Line N:` failures to line-scoped diagnostics.
+- LSP completion includes DSL keywords plus contextual state/event suggestions (`from`, `transition`, `on`).
+- LSP semantic tokens provide role-aware highlighting for keywords, state/event symbols, variable identifiers, strings, numbers, operators, and comments.
+- `tools/StateMachine.Dsl.VsCode` provides a VS Code client MVP that auto-starts the language server for `.sm` files.
+- VS Code client startup resolves the language-server project relative to extension location and does not require a workspace folder in Extension Development Host.
+- VS Code client contributes TextMate grammar-based syntax highlighting for `.sm` files.
 - CLI supports `--instance` at startup and REPL-level `load`/`save` for instance file management.
 - Repository root includes runnable examples: `trafficlight.sm`, `traffic.instance.json`, `traffic.script.txt`.
 - CLI includes interactive REPL and non-interactive script execution using the same command set.

@@ -336,6 +336,53 @@ Interactive compact `events` output aligns event-name columns for visual consist
 Interactive compact non-prompt lines (including argument prompts like `│  Reason: value`) are rendered as timeline children beneath each prompt.
 Verbose mode renders structured table/panel output for inspect/fire details and callable-event listings.
 
+## Language Server (MVP)
+
+Project:
+
+- `tools/StateMachine.Dsl.LanguageServer`
+
+Run manually over stdio:
+
+```sh
+dotnet run --project tools/StateMachine.Dsl.LanguageServer
+```
+
+Current MVP capabilities:
+
+- Parses/compiles `.sm` documents on open/change/save and publishes diagnostics.
+- Converts parser `Line N:` failures into line-scoped LSP error diagnostics.
+- Provides completion items for DSL keywords.
+- Provides contextual completion for known `state` names (`from`, `transition`) and known `event` names (`on`).
+- Provides semantic token highlighting for declarations/usages (keywords, state/event symbols, variables, strings, numbers, operators, comments).
+
+Notes:
+
+- Server transport is stdio and is ready for editor-client wiring.
+- This repository now includes a local VS Code client extension for automatic `.sm` activation.
+
+## VS Code Client Extension (MVP)
+
+Project:
+
+- `tools/StateMachine.Dsl.VsCode`
+
+Setup:
+
+```sh
+cd tools/StateMachine.Dsl.VsCode
+npm install
+npm run compile
+```
+
+Run/debug in VS Code:
+
+- Press `F5` and select `Extension (StateMachine DSL)`.
+- Open a `.sm` file in the Extension Development Host to auto-start the language server client.
+- Client startup in Extension Development Host does not require opening a workspace folder first.
+- `.sm` files include TextMate syntax highlighting (keywords, declarations, strings, numbers, operators, comments).
+- Semantic highlighting is enabled (`semanticHighlighting`) and enriched by language-server semantic tokens.
+
 Exit codes:
 
 - `0`: success
@@ -356,10 +403,14 @@ Implemented now:
 - Transition data assignments (`transform <Key> = ...`) on accepted `fire`
 - CLI REPL + script execution
 - Active test coverage in `test/StateMachine.Tests/DslWorkflowTests.cs` and `test/StateMachine.Tests/CliRenderingTests.cs`
+- Language server MVP in `tools/StateMachine.Dsl.LanguageServer` (stdio diagnostics + completion)
+- Language server MVP in `tools/StateMachine.Dsl.LanguageServer` (stdio diagnostics + completion + semantic tokens)
+- VS Code client MVP in `tools/StateMachine.Dsl.VsCode` (auto-start for `.sm` files)
+- VS Code client contributes TextMate syntax highlighting for `.sm` files
 
 Pending:
 
-- Editor tooling (LSP/IntelliSense)
+- Extension packaging/publishing workflow
 
 Design-phase compatibility policy:
 
@@ -398,6 +449,12 @@ src/StateMachine/
 
 tools/StateMachine.Dsl.Cli/
     Program.cs
+
+tools/StateMachine.Dsl.LanguageServer/
+    Program.cs
+
+tools/StateMachine.Dsl.VsCode/
+  src/extension.ts
 
 test/StateMachine.Tests/
   CliRenderingTests.cs
