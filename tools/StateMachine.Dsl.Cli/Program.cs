@@ -998,7 +998,7 @@ static (DslOutcomeKind Outcome, string DisplayEvent, string? TargetState, string
 
     if (!usesMissingArgsInGuards)
     {
-        var evaluationData = BuildInspectEvaluationData(instance.InstanceData, eventArgs);
+        var evaluationData = BuildInspectEvaluationData(instance.InstanceData, eventName, eventArgs);
         var eagerInspect = workflow.Inspect(instance.CurrentState, eventName, evaluationData);
         var eagerReason = eagerInspect.Reasons.FirstOrDefault();
         var eagerPossibleTargets = GetPossibleTargetStates(machine, instance.CurrentState, eventName);
@@ -1062,40 +1062,29 @@ static IReadOnlyList<string> GetRequiredEventArgumentKeys(DslMachine machine, st
 
 static bool EventGuardsReferenceArg(DslMachine machine, string currentState, string eventName, string argName)
 {
-    var explicitScoped = $"arg.{argName}";
-    var bareIdentifierRegex = new Regex($@"\b{Regex.Escape(argName)}\b", RegexOptions.Compiled);
+    var explicitScoped = $"{eventName}.{argName}";
 
     return machine.Transitions
         .Where(t => string.Equals(t.FromState, currentState, StringComparison.Ordinal)
             && string.Equals(t.EventName, eventName, StringComparison.Ordinal)
             && !string.IsNullOrWhiteSpace(t.GuardExpression))
-        .Any(t =>
-        {
-            var guard = t.GuardExpression!;
-            return guard.Contains(explicitScoped, StringComparison.Ordinal) || bareIdentifierRegex.IsMatch(guard);
-        });
+        .Any(t => t.GuardExpression!.Contains(explicitScoped, StringComparison.Ordinal));
 }
 
 static IReadOnlyDictionary<string, object?> BuildInspectEvaluationData(
     IReadOnlyDictionary<string, object?> instanceData,
+    string eventName,
     IReadOnlyDictionary<string, object?>? eventArguments)
 {
     var evaluation = new Dictionary<string, object?>(StringComparer.Ordinal);
 
     foreach (var kvp in instanceData)
-    {
-        evaluation[$"data.{kvp.Key}"] = kvp.Value;
-        if (!evaluation.ContainsKey(kvp.Key))
-            evaluation[kvp.Key] = kvp.Value;
-    }
+        evaluation[kvp.Key] = kvp.Value;
 
     if (eventArguments is not null)
     {
         foreach (var kvp in eventArguments)
-        {
-            evaluation[$"arg.{kvp.Key}"] = kvp.Value;
-            evaluation[kvp.Key] = kvp.Value;
-        }
+            evaluation[$"{eventName}.{kvp.Key}"] = kvp.Value;
     }
 
     return evaluation;

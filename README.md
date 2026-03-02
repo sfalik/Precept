@@ -6,9 +6,9 @@ StateMachine is a .NET DSL-driven state/workflow engine focused on deterministic
 
 - **Inspect before fire**: evaluate whether an event is defined/accepted before mutating state.
 - **Inspect before fire**: evaluate whether a transition is not available from the current state, blocked, or enabled before mutating state.
-- **Persistable runtime instances**: load/save a JSON instance with current state and instance data.
-- **Explicit event arguments**: per-call arguments are separate from persisted instance data.
-- **Transition-scoped data updates**: `transform data.<Key> = ...` assignments run only on accepted `fire`.
+- **Persistable runtime instances**: load/save a JSON instance with current state and instance 
+- **Explicit event arguments**: per-call arguments are separate from persisted instance 
+- **Transition-scoped data updates**: `transform <Key> = ...` assignments run only on accepted `fire`.
 
 ## Quick Start (2 minutes)
 
@@ -72,7 +72,7 @@ FlashingRed › fire ClearEmergency
 
 Note: interactive REPL does not accept inline JSON event arguments for `inspect`/`fire`; use prompted values for required args.
 Note: output is colorized by default (success/warning/error); use `--no-color` to disable.
-Note: `inspect` after the fourth `fire Advance` shows blocked because `data.LeftTurnQueued` was cleared and `data.VehiclesWaiting` is 0.
+Note: `inspect` after the fourth `fire Advance` shows blocked because `LeftTurnQueued` was cleared and `VehiclesWaiting` is 0.
 
 Quick script run (non-interactive):
 
@@ -104,6 +104,10 @@ sm> fire Emergency '{"AuthorizedBy":"Dispatcher","Reason":"Accident"}'
 ```text
 machine TrafficLight
 
+number VehiclesWaiting
+boolean LeftTurnQueued
+string? EmergencyReason
+
 state Red
 state Green
 state Yellow
@@ -112,21 +116,14 @@ state FlashingRed
 
 event Advance
 event Emergency
-  args
-    AuthorizedBy: string
-    Reason: string
+  string AuthorizedBy
+  string Reason
 event ClearEmergency
-
-data
-  VehiclesWaiting: number
-  LeftTurnQueued: boolean
-  EmergencyReason: string?
-
 from Red on Advance
-  if data.LeftTurnQueued
-    transform data.LeftTurnQueued = false
+  if LeftTurnQueued
+    transform LeftTurnQueued = false
     transition FlashingGreen
-  else if data.VehiclesWaiting > 0
+  else if VehiclesWaiting > 0
     transition Green
   else
     reject "No demand detected at red"
@@ -141,8 +138,8 @@ from Yellow on Advance
   transition Red
 
 from any on Emergency
-  if arg.AuthorizedBy != "" && arg.Reason != ""
-    transform data.EmergencyReason = arg.Reason
+  if Emergency.AuthorizedBy != "" && Emergency.Reason != ""
+    transform EmergencyReason = Emergency.Reason
     transition FlashingRed
   else
     reject "AuthorizedBy and Reason are required to activate emergency mode"
@@ -151,7 +148,7 @@ from FlashingRed on Advance
   no transition
 
 from FlashingRed on ClearEmergency
-  transform data.EmergencyReason = null
+  transform EmergencyReason = null
   transition Red
 ```
 
@@ -164,27 +161,26 @@ machine <Name>
 state <StateName>
 
 event <EventName>
-[ args <ArgName>: <string|number|boolean|null>[?] { <ArgDecl> } ]
+[ <string|number|boolean|null>[?] <ArgName> { <ArgDecl> } ]
 
-data
-<FieldName>: <string|number|boolean|null>[?] { <FieldDecl> }
+<string|number|boolean|null>[?] <FieldName> { <FieldDecl> }
 
 from <any|StateA[,StateB...]> on <EventName>
 (
-    if <Guard> [ transform <Field|data.Field> = <Expr> ] transition <ToState>
-  | else if <Guard> [ transform <Field|data.Field> = <Expr> ] transition <ToState>
-  | else [ transform <Field|data.Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
-  | [ transform <Field|data.Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
+    if <Guard> [ transform <Field> = <Expr> ] ( transition <ToState> | no transition )
+  | else if <Guard> [ transform <Field> = <Expr> ] ( transition <ToState> | no transition )
+  | else [ transform <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
+  | [ transform <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
 )+
 
-<Expr> := <Literal|Identifier|arg.<ArgName>|data.<FieldName>>
+<Expr> := <Literal|<DataField>|<EventName>.<ArgName>>
 <Literal> := <null|true|false|number|string>
 ```
 
 Constraints:
 
 - `()+` means one-or-more branch lines in the `from ... on ...` body.
-- `if` and `else if` branches must end in `transition <ToState>`.
+- `if` and `else if` branches must end in either `transition <ToState>` or `no transition`.
 - `else` may end in `transition`, `reject`, or `no transition`.
 - `reason "..."` is valid only on `reject`.
 - Unsupported syntax: `states ...`, `events ...`, `transition A -> B on E ...`, `set ...`.
@@ -204,7 +200,7 @@ from Draft on Submit
 
 ```text
 from Draft on Submit
-  transform data.SubmittedAt = "2026-02-27T00:00:00Z"
+  transform SubmittedAt = "2026-02-27T00:00:00Z"
   transition PendingReview
 ```
 
@@ -212,7 +208,7 @@ from Draft on Submit
 
 ```text
 from PendingReview on Approve
-  if data.Score >= 80
+  if Score >= 80
     transition Approved
   else
     reject "Score below approval threshold"
@@ -222,12 +218,10 @@ from PendingReview on Approve
 
 ```text
 event Escalate
-  args
-    Reason: string
-
+  string Reason
 from PendingReview on Escalate
-  if arg.Reason != ""
-    transform data.EscalationReason = arg.Reason
+  if Escalate.Reason != ""
+    transform EscalationReason = Escalate.Reason
     transition Escalated
   else
     reject "Reason is required"
@@ -356,10 +350,10 @@ Exit codes:
 Implemented now:
 
 - Line-based DSL parser/runtime in `src/StateMachine/Dsl/*`
-- Explicit `data` contracts and event `args` contracts (scalar-only)
+- Explicit `data` contracts and event argument contracts (scalar-only)
 - Instance-first runtime APIs (`CreateInstance`, `Inspect`, `Fire`)
 - Guard evaluation with rejection reasons
-- Transition data assignments (`transform data.<Key> = ...`) on accepted `fire`
+- Transition data assignments (`transform <Key> = ...`) on accepted `fire`
 - CLI REPL + script execution
 - Active test coverage in `test/StateMachine.Tests/DslWorkflowTests.cs` and `test/StateMachine.Tests/CliRenderingTests.cs`
 

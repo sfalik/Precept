@@ -33,13 +33,16 @@ public sealed record DslTransition(
     string EventName,
     string? GuardExpression,
     string? DataAssignmentKey,
-    string? DataAssignmentExpression);
+    string? DataAssignmentExpression,
+    int Order = 0);
 
 public sealed record DslTerminalRule(
     string FromState,
     string EventName,
     DslTerminalKind Kind,
-    string? Reason);
+    string? Reason,
+    string? GuardExpression = null,
+    int Order = 0);
 
 public enum DslTerminalKind
 {

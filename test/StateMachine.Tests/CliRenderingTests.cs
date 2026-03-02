@@ -50,11 +50,10 @@ public sealed class CliRenderingTests
             state Red
             state FlashingRed
             event Emergency
-                args
-                    AuthorizedBy: string
-                    Reason: string
+                string AuthorizedBy
+                string Reason
             from Red on Emergency
-                if arg.AuthorizedBy != "" && arg.Reason != ""
+                if Emergency.AuthorizedBy != "" && Emergency.Reason != ""
                     transition FlashingRed
                 reject "AuthorizedBy and Reason are required"
             """;
@@ -81,13 +80,12 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
+            number Vehicles
             state Red
             state Green
             event Advance
-            data
-                Vehicles: number
             from Red on Advance
-                if data.Vehicles > 0
+                if Vehicles > 0
                     transition Green
                 reject "No vehicles waiting"
             """;
@@ -148,13 +146,12 @@ public sealed class CliRenderingTests
             state FlashingRed
             event Advance
             event Emergency
-                args
-                    AuthorizedBy: string
-                    Reason: string
+                string AuthorizedBy
+                string Reason
             from FlashingGreen on Advance
                 transition Green
             from any on Emergency
-                if arg.AuthorizedBy != "" && arg.Reason != ""
+                if Emergency.AuthorizedBy != "" && Emergency.Reason != ""
                     transition FlashingRed
                 reject "AuthorizedBy and Reason are required to activate emergency mode"
             """;
@@ -184,11 +181,10 @@ public sealed class CliRenderingTests
             state Red
             state FlashingRed
             event Emergency
-                args
-                    AuthorizedBy: string
-                    Reason: string
+                string AuthorizedBy
+                string Reason
             from any on Emergency
-                if arg.AuthorizedBy != "" && arg.Reason != ""
+                if Emergency.AuthorizedBy != "" && Emergency.Reason != ""
                     transition FlashingRed
                 reject "AuthorizedBy and Reason are required to activate emergency mode"
             """;
@@ -221,17 +217,15 @@ public sealed class CliRenderingTests
             state Beta
             state Gamma
             event Route
-                args
-                    Decision: string
-            data
-                Score: number
-                Urgency: number
+                string Decision
+                number Score
+                number Urgency
             from Source on Route
-                if arg.Decision == "A"
+                if Route.Decision == "A"
                     transition Alpha
-                else if data.Score > 70
+                else if Score > 70
                     transition Beta
-                else if data.Urgency > 5
+                else if Urgency > 5
                     transition Gamma
                 reject "No route"
             """;
@@ -259,14 +253,13 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
+            number Score
             state Paused
             state Beta
             state Gamma
             event Resume
-            data
-                Score: number
             from Paused on Resume
-                if data.Score > 70
+                if Score > 70
                     transition Beta
                 else
                     transition Gamma
@@ -295,13 +288,12 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
+            boolean IsReady
             state Idle
             state Processing
             event StartPipelineWithExtremelyDescriptiveNameAndMetadata
-            data
-                IsReady: boolean
             from Idle on StartPipelineWithExtremelyDescriptiveNameAndMetadata
-                if data.IsReady
+                if IsReady
                     transition Processing
                 reject "System prerequisites are not satisfied for startup and operator review is required before beginning processing with compliance artifacts and escalation routing"
             """;
@@ -558,3 +550,4 @@ public sealed class CliRenderingTests
 
     private sealed record CliRunResult(int ExitCode, string Output);
 }
+

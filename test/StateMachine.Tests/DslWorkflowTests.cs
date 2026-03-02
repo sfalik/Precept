@@ -135,6 +135,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine FeatureFlag
+            boolean IsEnabled
             state Disabled
             state Enabled
             event Evaluate
@@ -183,6 +184,75 @@ public class DslWorkflowTests
         inspection.IsDefined.Should().BeTrue();
         inspection.IsAccepted.Should().BeFalse();
         inspection.Reasons.Should().ContainSingle("No eligible transition");
+    }
+
+    [Fact]
+    public void Inspect_IfBranch_NoTransition_Is_Allowed_And_Produces_Undefined_When_Matched()
+    {
+        const string dsl = """
+            machine Route
+            boolean Hold
+            state Red
+            state Green
+            event Advance
+            from Red on Advance
+                if Hold
+                    no transition
+                else
+                    transition Green
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+
+        var blockedByNoTransition = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["Hold"] = true });
+        var enabled = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["Hold"] = false });
+
+        blockedByNoTransition.Outcome.Should().Be(DslOutcomeKind.Undefined);
+        blockedByNoTransition.Reasons.Should().ContainSingle("No transition for 'Advance' from 'Red'.");
+
+        enabled.Outcome.Should().Be(DslOutcomeKind.Enabled);
+        enabled.TargetState.Should().Be("Green");
+    }
+
+    [Fact]
+    public void Inspect_ElseIf_NoTransition_Is_Allowed_And_Preserves_Branch_Order()
+    {
+        const string dsl = """
+            machine Route
+            boolean PreferStop
+            boolean PreferAlpha
+            state Source
+            state Alpha
+            state Beta
+            event Route
+            from Source on Route
+                if PreferStop
+                    no transition
+                else if PreferAlpha
+                    transition Alpha
+                else
+                    transition Beta
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+
+        var firstBranchWins = workflow.Inspect("Source", "Route", new Dictionary<string, object?>
+        {
+            ["PreferStop"] = true,
+            ["PreferAlpha"] = true
+        });
+
+        var secondBranchWins = workflow.Inspect("Source", "Route", new Dictionary<string, object?>
+        {
+            ["PreferStop"] = false,
+            ["PreferAlpha"] = true
+        });
+
+        firstBranchWins.Outcome.Should().Be(DslOutcomeKind.Undefined);
+        firstBranchWins.Reasons.Should().ContainSingle("No transition for 'Route' from 'Source'.");
+
+        secondBranchWins.Outcome.Should().Be(DslOutcomeKind.Enabled);
+        secondBranchWins.TargetState.Should().Be("Alpha");
     }
 
     [Fact]
@@ -370,7 +440,7 @@ public class DslWorkflowTests
             state FlashingRed
             event Emergency
             from Red on Emergency
-                transform EmergencyReason = Reason
+                transform EmergencyReason = Emergency.Reason
                 transition FlashingRed
             """;
 
@@ -393,10 +463,9 @@ public class DslWorkflowTests
             state Red
             state FlashingRed
             event Emergency
-                args
-                    Reason: string
+                string Reason
             from Red on Emergency
-                transform EmergencyReason = Reason
+                transform EmergencyReason = Emergency.Reason
                 transition FlashingRed
             """;
 
@@ -417,12 +486,11 @@ public class DslWorkflowTests
             machine TrafficLight
             state Red
             state Green
-            data
-                CarsWaiting: number
-                LastCarsWaiting: number
+                number CarsWaiting
+                number LastCarsWaiting
             event Advance
             from Red on Advance
-                transform LastCarsWaiting = data.CarsWaiting
+                transform LastCarsWaiting = CarsWaiting
                 transition Green
             """;
 
@@ -459,19 +527,17 @@ public class DslWorkflowTests
     }
 
     [Fact]
-    public void Fire_Instance_DataAssignment_WithArgPrefix_IsAccepted()
+    public void Fire_Instance_DataAssignment_WithEventPrefix_IsAccepted()
     {
         const string dsl = """
             machine TrafficLight
             state Red
             state FlashingRed
             event Emergency
-                args
-                    Reason: string
-            data
-                EmergencyReason: string?
+                string Reason
+                string? EmergencyReason
             from Red on Emergency
-                transform EmergencyReason = arg.Reason
+                transform EmergencyReason = Emergency.Reason
                 transition FlashingRed
             """;
 
@@ -494,10 +560,9 @@ public class DslWorkflowTests
             state Red
             state FlashingRed
             event Emergency
-                args
-                    Reason: string
+                string Reason
             from Red on Emergency
-                transform EmergencyReason = Reason
+                transform EmergencyReason = Emergency.Reason
                 transition FlashingRed
             """;
 
@@ -603,17 +668,17 @@ public class DslWorkflowTests
         var instance = workflow.CreateInstance("Disabled", new Dictionary<string, object?> { ["IsEnabled"] = false });
 
         var rejected = workflow.Inspect(instance, "Evaluate");
-        var accepted = workflow.Inspect(instance, "Evaluate", new Dictionary<string, object?> { ["IsEnabled"] = true });
+        var withConflictingArg = workflow.Inspect(instance, "Evaluate", new Dictionary<string, object?> { ["IsEnabled"] = true });
         var rejectedWithUnrelatedArgs = workflow.Inspect(instance, "Evaluate", new Dictionary<string, object?> { ["Other"] = true });
 
         rejected.IsDefined.Should().BeTrue();
         rejected.IsAccepted.Should().BeFalse();
-        accepted.IsDefined.Should().BeTrue();
-        accepted.IsAccepted.Should().BeTrue();
-        accepted.TargetState.Should().Be("Enabled");
+        withConflictingArg.IsDefined.Should().BeTrue();
+        withConflictingArg.IsAccepted.Should().BeFalse();
+        withConflictingArg.Reasons.Should().ContainSingle("Feature must be enabled");
         rejectedWithUnrelatedArgs.IsDefined.Should().BeTrue();
         rejectedWithUnrelatedArgs.IsAccepted.Should().BeFalse();
-        rejectedWithUnrelatedArgs.Reasons.Should().ContainSingle("Feature must be enabled");
+        rejectedWithUnrelatedArgs.Reasons.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -831,7 +896,7 @@ public class DslWorkflowTests
                         state FlashingRed
                         event Emergency
                         from any on Emergency
-                            if Reason != ""
+                            if Emergency.Reason != ""
                                 transition FlashingRed
                             reject "Emergency reason is required"
                         """;
@@ -882,7 +947,7 @@ public class DslWorkflowTests
 
                 act.Should()
                     .Throw<InvalidOperationException>()
-                    .WithMessage("*Duplicate outcome rule for state 'Red' and event 'Advance'*");
+                    .WithMessage("*Duplicate unguarded outcome rule for state 'Red' and event 'Advance'*");
             }
 
             [Fact]
@@ -1037,3 +1102,4 @@ public class DslWorkflowTests
                     .WithMessage("*'events' declaration is not supported*");
             }
 }
+

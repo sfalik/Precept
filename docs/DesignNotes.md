@@ -37,27 +37,26 @@ machine <Name>
 state <StateName>
 
 event <EventName>
-[ args <ArgName>: <string|number|boolean|null>[?] { <ArgDecl> } ]
+[ <string|number|boolean|null>[?] <ArgName> { <ArgDecl> } ]
 
-data
-<FieldName>: <string|number|boolean|null>[?] { <FieldDecl> }
+<string|number|boolean|null>[?] <FieldName> { <FieldDecl> }
 
 from <any|StateA[,StateB...]> on <EventName>
 (
-    if <Guard> [ transform <Field|data.Field> = <Expr> ] transition <ToState>
-  | else if <Guard> [ transform <Field|data.Field> = <Expr> ] transition <ToState>
-  | else [ transform <Field|data.Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
-  | [ transform <Field|data.Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
+    if <Guard> [ transform <Field> = <Expr> ] ( transition <ToState> | no transition )
+  | else if <Guard> [ transform <Field> = <Expr> ] ( transition <ToState> | no transition )
+  | else [ transform <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
+  | [ transform <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
 )+
 
-<Expr> := <Literal|Identifier|arg.<ArgName>|data.<FieldName>>
+<Expr> := <Literal|<DataField>|<EventName>.<ArgName>>
 <Literal> := <null|true|false|number|string>
 ```
 
 Canonical constraints:
 
 - `()+` means one-or-more lines in a `from ... on ...` body.
-- `if` and `else if` must end with `transition <State>`.
+- `if` and `else if` must end with `transition <State>` or `no transition`.
 - `else` may end with `transition`, `reject`, or `no transition`.
 - `reason "..."` is valid only on `reject`.
 - Unsupported syntax: `states ...`, `events ...`, `transition A -> B on E ...`, `set ...`.
@@ -70,7 +69,7 @@ Block-authoring equivalent (same semantics):
 - Optional fallback header: `else`
 - Allowed branch body statements:
   - `transform <Key> = <Expr>` (optional)
-  - `transition <State>` (required for `if`/`else if` branch bodies)
+  - `transition <State>` or `no transition` (required for `if`/`else if` branch bodies)
 - Allowed block outcome statements:
   - `transition <State>`
   - `reject "<message>"`
@@ -86,8 +85,8 @@ Block-authoring equivalent (same semantics):
 
 - `if` and `else if` branch bodies:
   - allow optional `transform <Key> = <Expr>`
-  - require exactly one `transition <State>`
-  - do not allow `reject` or `no transition`
+  - require exactly one outcome: `transition <State>` or `no transition`
+  - do not allow `reject`
 - `else` branch body:
   - may include optional `transform <Key> = <Expr>`
   - must end in exactly one outcome statement: `transition <State>`, `reject "<message>"`, or `no transition`
@@ -104,8 +103,8 @@ Block-authoring equivalent (same semantics):
 The DSL supports explicit contracts while keeping declaration style consistent:
 
 - `state <Name>` remains one declaration per line.
-- `event <Name>` remains one declaration per line, with optional indented `args` body.
-- `data` block declares persisted instance-data fields.
+- `event <Name>` remains one declaration per line, with optional indented argument declarations.
+- Typed field declarations at top-level define persisted instance-data fields.
 
 Form:
 
@@ -117,11 +116,9 @@ state <StateName>
 
 event <EventName>
 event <EventName>
-  args
-    <ArgName>: <ScalarType>[?]
+  <ScalarType>[?] <ArgName>
 
-data
-  <FieldName>: <ScalarType>[?]
+<ScalarType>[?] <FieldName>
 ```
 
 Scalar-only type set (flat model):
@@ -136,7 +133,7 @@ Validation constraints:
 - Event args and data fields are scalar-only; nested object/array values are invalid.
 - Unknown event-arg keys and unknown data keys are rejected.
 - `Type?` means nullable; non-nullable values reject `null`.
-- Guards/transforms support explicit references (`arg.<Key>`, `data.<Key>`).
+- Guards/transforms support explicit scoped references (`<EventName>.<ArgKey>`, `<Key>`).
 
 ## Implemented Components
 
@@ -172,7 +169,7 @@ Validation constraints:
 
 ## Known Gaps
 
-- Guard language is intentionally minimal in this phase (`Identifier`, `!Identifier`, and simple comparisons)
+- Guard language is intentionally minimal in this phase (`scope.key`, `!scope.key`, and simple comparisons)
 - Editor tooling (LSP and IntelliSense integration)
 
 ## Test Status
@@ -229,11 +226,11 @@ Validation constraints:
 - Interactive inspect callable output lists only event/state lines (no separate "callable events" banner).
 - REPL verbose mode renders structured table/panel views for inspect/fire details and callable-event listings.
 - Symbol rendering supports `auto|ascii|unicode`; auto mode prefers Unicode only if runtime terminal heuristics indicate support.
-- Transition DSL supports `transform <Key> = <expr>` where `<Key>` may be bare or `data.<Key>`.
-- Assignment expressions support literals, bare event-argument keys, and scoped references (`arg.<Key>`, `data.<Key>`).
-- Event declarations support optional indented `args` blocks with scalar type contracts.
-- `data` block declarations define persisted instance-data scalar contracts.
-- Inline typed event arguments (`event Name(Type)`) are rejected; use event `args` blocks instead.
+- Transition DSL supports `transform <Key> = <expr>` where `<Key>` may be bare or `<Key>`.
+- Assignment expressions support literals and scoped references (`<EventName>.<ArgKey>`, `<Key>`).
+- Event declarations support optional indented argument declarations with scalar type contracts.
+- Top-level typed declarations define persisted instance-data scalar contracts.
+- Inline typed event arguments (`event Name(Type)`) are rejected; use indented event argument declarations instead.
 - CLI emits non-zero exit codes for incompatible instances and script command failures.
 - Runtime supports persisted instance creation and instance-based `Inspect(...)` / `Fire(...)`.
 - CLI supports `--instance` at startup and REPL-level `load`/`save` for instance file management.
@@ -250,3 +247,4 @@ Supported default guard forms:
 - `Mode == "Manual"`
 
 Unsupported/invalid guards are treated as failed with descriptive reasons.
+

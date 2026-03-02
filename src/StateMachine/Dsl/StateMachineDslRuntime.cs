@@ -171,7 +171,7 @@ internal sealed class DefaultGuardEvaluator : IGuardEvaluator
 public sealed class DslWorkflowDefinition
 {
     private readonly Dictionary<(string State, string Event), List<DslTransition>> _transitionMap;
-    private readonly Dictionary<(string State, string Event), DslTerminalRule> _terminalRuleMap;
+    private readonly Dictionary<(string State, string Event), List<DslTerminalRule>> _terminalRuleMap;
     private readonly Dictionary<string, DslFieldContract> _dataContractMap;
     private readonly Dictionary<string, Dictionary<string, DslFieldContract>> _eventArgContractMap;
     private readonly IGuardEvaluator _guardEvaluator;
@@ -198,9 +198,10 @@ public sealed class DslWorkflowDefinition
                 EqualityComparer<(string State, string Event)>.Default);
 
         _terminalRuleMap = machine.TerminalRules
+            .GroupBy(rule => (rule.FromState, rule.EventName))
             .ToDictionary(
-                rule => (rule.FromState, rule.EventName),
-                rule => rule,
+                g => (g.Key.FromState, g.Key.EventName),
+                g => g.OrderBy(r => r.Order).ToList(),
                 EqualityComparer<(string State, string Event)>.Default);
 
         _dataContractMap = machine.DataFields
@@ -257,7 +258,7 @@ public sealed class DslWorkflowDefinition
         string eventName,
         IReadOnlyDictionary<string, object?>? eventArguments = null)
     {
-        var evaluationData = eventArguments ?? EmptyInstanceData.Instance;
+        var evaluationData = BuildDirectEvaluationData(eventName, eventArguments);
         var resolution = ResolveTransition(currentState, eventName, evaluationData);
 
         return resolution.Kind switch
@@ -284,7 +285,7 @@ public sealed class DslWorkflowDefinition
         if (eventArguments is not null && !TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
             return DslInspectionResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
 
-        var evaluationArguments = BuildEvaluationData(instance.InstanceData, eventArguments);
+        var evaluationArguments = BuildEvaluationData(instance.InstanceData, eventName, eventArguments);
         return Inspect(instance.CurrentState, eventName, evaluationArguments);
     }
 
@@ -318,7 +319,7 @@ public sealed class DslWorkflowDefinition
         if (!TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
             return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
 
-        var evaluationArguments = BuildEvaluationData(instance.InstanceData, eventArguments);
+        var evaluationArguments = BuildEvaluationData(instance.InstanceData, eventName, eventArguments);
         var resolution = ResolveTransition(instance.CurrentState, eventName, evaluationArguments);
         if (resolution.Kind == TransitionResolutionKind.NotDefined)
             return DslInstanceFireResult.NotDefined(instance.CurrentState, eventName, new[] { resolution.NotDefinedReason! });
@@ -333,6 +334,7 @@ public sealed class DslWorkflowDefinition
             if (!TryResolveAssignmentValue(
                 resolution.Transition.DataAssignmentExpression,
                 instance.InstanceData,
+                eventName,
                 eventArguments ?? EmptyInstanceData.Instance,
                 out var assignedValue,
                 out var assignmentError))
@@ -373,33 +375,65 @@ public sealed class DslWorkflowDefinition
         if (!Events.Any(e => e.Name.Equals(eventName, StringComparison.Ordinal)))
             return TransitionResolution.NotDefined($"Unknown event '{eventName}'.");
 
-        _terminalRuleMap.TryGetValue((currentState, eventName), out var terminalRule);
+        _transitionMap.TryGetValue((currentState, eventName), out var transitions);
+        _terminalRuleMap.TryGetValue((currentState, eventName), out var terminalRules);
 
-        if (!_transitionMap.TryGetValue((currentState, eventName), out var transitions) || transitions.Count == 0)
-        {
-            if (terminalRule is not null)
-                return ResolveTerminal(currentState, eventName, terminalRule, Array.Empty<string>());
+        var hasTransitions = transitions is not null && transitions.Count > 0;
+        var hasTerminalRules = terminalRules is not null && terminalRules.Count > 0;
 
+        if (!hasTransitions && !hasTerminalRules)
             return TransitionResolution.NotDefined($"No transition for '{eventName}' from '{currentState}'.");
+
+        var orderedOutcomes = new List<OutcomeCandidate>();
+        if (hasTransitions)
+        {
+            foreach (var transition in transitions!)
+                orderedOutcomes.Add(OutcomeCandidate.FromTransition(transition));
         }
+
+        if (hasTerminalRules)
+        {
+            foreach (var terminalRule in terminalRules!)
+                orderedOutcomes.Add(OutcomeCandidate.FromTerminal(terminalRule));
+        }
+
+        orderedOutcomes.Sort((left, right) => left.Order.CompareTo(right.Order));
 
         var reasons = new List<string>();
-        foreach (var transition in transitions)
+        foreach (var candidate in orderedOutcomes)
         {
-            if (string.IsNullOrWhiteSpace(transition.GuardExpression))
-                return TransitionResolution.Accepted(transition);
+            if (candidate.Transition is not null)
+            {
+                var transition = candidate.Transition;
+                if (string.IsNullOrWhiteSpace(transition.GuardExpression))
+                    return TransitionResolution.Accepted(transition);
 
-            var evaluation = _guardEvaluator.Evaluate(transition.GuardExpression, evaluationData);
-            if (evaluation.IsPassed)
-                return TransitionResolution.Accepted(transition);
+                var evaluation = _guardEvaluator.Evaluate(transition.GuardExpression, evaluationData);
+                if (evaluation.IsPassed)
+                    return TransitionResolution.Accepted(transition);
+
+                reasons.Add(
+                    evaluation.FailureReason
+                    ?? $"Guard '{transition.GuardExpression}' failed.");
+
+                continue;
+            }
+
+            if (candidate.TerminalRule is null)
+                continue;
+
+            var terminalRule = candidate.TerminalRule;
+            if (string.IsNullOrWhiteSpace(terminalRule.GuardExpression))
+                return ResolveTerminal(currentState, eventName, terminalRule, reasons);
+
+            var terminalEvaluation = _guardEvaluator.Evaluate(terminalRule.GuardExpression, evaluationData);
+            if (terminalEvaluation.IsPassed)
+                return ResolveTerminal(currentState, eventName, terminalRule, reasons);
 
             reasons.Add(
-                evaluation.FailureReason
-                ?? $"Guard '{transition.GuardExpression}' failed.");
+                terminalEvaluation.FailureReason
+                ?? $"Guard '{terminalRule.GuardExpression}' failed.");
         }
-
-        if (terminalRule is not null)
-            return ResolveTerminal(currentState, eventName, terminalRule, reasons);
 
         return TransitionResolution.Rejected(reasons);
     }
@@ -426,6 +460,7 @@ public sealed class DslWorkflowDefinition
     private bool TryResolveAssignmentValue(
         string assignmentExpression,
         IReadOnlyDictionary<string, object?> instanceData,
+        string eventName,
         IReadOnlyDictionary<string, object?> eventArguments,
         out object? assignedValue,
         out string? error)
@@ -445,35 +480,21 @@ public sealed class DslWorkflowDefinition
             return true;
         }
 
-        if (expression.StartsWith("data.", StringComparison.Ordinal))
+        if (TryResolveScopedIdentifier(expression, out var scope, out var key))
         {
-            var dataKey = expression.Substring("data.".Length);
-            if (!instanceData.TryGetValue(dataKey, out assignedValue))
+            if (scope.Equals("data", StringComparison.Ordinal))
             {
-                error = $"Data assignment failed: data field '{dataKey}' was not provided.";
+                error = "Data assignment failed: 'data.' scope is no longer supported. Use bare data field names.";
+                assignedValue = null;
                 return false;
             }
 
-            error = null;
-            return true;
-        }
-
-        if (expression.StartsWith("arg.", StringComparison.Ordinal))
-        {
-            var argKey = expression.Substring("arg.".Length);
-            if (!eventArguments.TryGetValue(argKey, out assignedValue))
+            if (!scope.Equals(eventName, StringComparison.Ordinal))
             {
-                error = $"Data assignment failed: event argument '{argKey}' was not provided.";
+                error = $"Data assignment failed: event-argument scope '{scope}' does not match current event '{eventName}'.";
                 return false;
             }
 
-            error = null;
-            return true;
-        }
-
-        if (IdentifierRegex.IsMatch(expression))
-        {
-            var key = expression;
             if (!eventArguments.TryGetValue(key, out assignedValue))
             {
                 error = $"Data assignment failed: event argument '{key}' was not provided.";
@@ -484,7 +505,19 @@ public sealed class DslWorkflowDefinition
             return true;
         }
 
-        error = $"Data assignment failed: expression '{expression}' is not supported.";
+        if (IdentifierRegex.IsMatch(expression))
+        {
+            if (!instanceData.TryGetValue(expression, out assignedValue))
+            {
+                error = $"Data assignment failed: data field '{expression}' was not provided.";
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+
+        error = $"Data assignment failed: expression '{expression}' is not supported. Use literals, <DataField>, or {eventName}.<Arg>.";
         return false;
     }
 
@@ -501,27 +534,59 @@ public sealed class DslWorkflowDefinition
 
     private IReadOnlyDictionary<string, object?> BuildEvaluationData(
         IReadOnlyDictionary<string, object?> instanceData,
+        string eventName,
         IReadOnlyDictionary<string, object?>? eventArguments)
     {
         var evaluation = new Dictionary<string, object?>(StringComparer.Ordinal);
 
         foreach (var kvp in instanceData)
-        {
-            evaluation[$"data.{kvp.Key}"] = kvp.Value;
-            if (!evaluation.ContainsKey(kvp.Key))
-                evaluation[kvp.Key] = kvp.Value;
-        }
+            evaluation[kvp.Key] = kvp.Value;
 
         if (eventArguments is not null)
         {
             foreach (var kvp in eventArguments)
-            {
-                evaluation[$"arg.{kvp.Key}"] = kvp.Value;
-                evaluation[kvp.Key] = kvp.Value;
-            }
+                evaluation[$"{eventName}.{kvp.Key}"] = kvp.Value;
         }
 
         return evaluation;
+    }
+
+    private IReadOnlyDictionary<string, object?> BuildDirectEvaluationData(
+        string eventName,
+        IReadOnlyDictionary<string, object?>? values)
+    {
+        if (values is null || values.Count == 0)
+            return EmptyInstanceData.Instance;
+
+        var evaluation = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var kvp in values)
+        {
+            if (kvp.Key.Contains('.', StringComparison.Ordinal))
+                evaluation[kvp.Key] = kvp.Value;
+
+            evaluation[kvp.Key] = kvp.Value;
+            evaluation[$"{eventName}.{kvp.Key}"] = kvp.Value;
+        }
+
+        return evaluation;
+    }
+
+    private static bool TryResolveScopedIdentifier(string text, out string scope, out string key)
+    {
+        scope = string.Empty;
+        key = string.Empty;
+
+        var separatorIndex = text.IndexOf('.');
+        if (separatorIndex <= 0 || separatorIndex == text.Length - 1)
+            return false;
+
+        if (text.IndexOf('.', separatorIndex + 1) >= 0)
+            return false;
+
+        scope = text[..separatorIndex];
+        key = text[(separatorIndex + 1)..];
+
+        return IdentifierRegex.IsMatch(scope) && IdentifierRegex.IsMatch(key);
     }
 
     private bool TryValidateDataContract(IReadOnlyDictionary<string, object?> data, out string error)
@@ -711,6 +776,15 @@ public sealed class DslWorkflowDefinition
 
         internal static TransitionResolution NotDefined(string reason) =>
             new(TransitionResolutionKind.NotDefined, null, reason, new[] { reason });
+    }
+
+    private sealed record OutcomeCandidate(int Order, DslTransition? Transition, DslTerminalRule? TerminalRule)
+    {
+        internal static OutcomeCandidate FromTransition(DslTransition transition) =>
+            new(transition.Order, transition, null);
+
+        internal static OutcomeCandidate FromTerminal(DslTerminalRule terminalRule) =>
+            new(terminalRule.Order, null, terminalRule);
     }
 
 }

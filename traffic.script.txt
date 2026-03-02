@@ -17,7 +17,7 @@ fire Advance
 # Emergency without required args is rejected
 fire Emergency
 
-# Emergency with arg.AuthorizedBy and arg.Reason activates flashing red
+# Emergency with Emergency.AuthorizedBy and Emergency.Reason activates flashing red
 fire Emergency '{"AuthorizedBy":"Dispatcher","Reason":"Accident"}'
 
 # Advance has no transition while in emergency mode

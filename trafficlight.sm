@@ -1,5 +1,9 @@
 machine TrafficLight
 
+number VehiclesWaiting
+boolean LeftTurnQueued
+string? EmergencyReason
+
 state Red
 state Green
 state Yellow
@@ -8,22 +12,15 @@ state FlashingRed
 
 event Advance
 event Emergency
-	args
-		AuthorizedBy: string
-		Reason: string
+	string AuthorizedBy
+	string Reason
 event ClearEmergency
-
-data
-	VehiclesWaiting: number
-	LeftTurnQueued: boolean
-	EmergencyReason: string?
-
 # Red: priority to left-turn queue, then general demand, else hold
 from Red on Advance
-	if data.LeftTurnQueued
-		transform data.LeftTurnQueued = false
+	if LeftTurnQueued
+		transform LeftTurnQueued = false
 		transition FlashingGreen
-	else if data.VehiclesWaiting > 0
+	else if VehiclesWaiting > 0
 		transition Green
 	else
 		reject "No demand detected at red"
@@ -40,8 +37,8 @@ from Yellow on Advance
 
 # Emergency preemption: requires a reason to record why it was activated
 from Red, Green, FlashingGreen, Yellow on Emergency
-	if arg.AuthorizedBy != "" && arg.Reason != ""
-		transform data.EmergencyReason = arg.Reason
+	if Emergency.AuthorizedBy != "" && Emergency.Reason != ""
+		transform EmergencyReason = Emergency.Reason
 		transition FlashingRed
 	reject "AuthorizedBy and Reason are required to activate emergency mode"
 
@@ -50,5 +47,6 @@ from FlashingRed on Advance
 	no transition
 
 from FlashingRed on ClearEmergency
-	transform data.EmergencyReason = null
+	transform EmergencyReason = null
 	transition Red
+
