@@ -93,6 +93,7 @@ Canonical constraints:
 - `else` may end with `transition`, `reject`, or `no transition`.
 - After an `if`/`else if` chain, a fallback **must** use `else`; a bare block-level outcome after a chain is a parse error.
 - `set` is allowed with `no transition` in all branch contexts; assignments execute on fire but state does not change.
+- `no transition` without any `set` is permitted (including in unguarded block-level position), even though it is a pure no-op with no observable effect on state or data. The rationale is that `no transition` carries semantic intent — the event is explicitly *acknowledged* (`IsDefined=true`, `IsAccepted=true`) rather than undefined or rejected — and the guard-branch case (`if Hold / no transition`) is a meaningful "accept but stay" pattern that does not require data changes. **Future review candidate:** Consider warning (via the language server analyzer) when an unguarded (block-level) `no transition` has no `set` assignments, since that specific form is always a no-op and likely unintentional.
 - `reason "..."` is valid only on `reject`.
 - Top-level data fields may declare literal defaults using `<Field> = <Literal>`.
 - Defaults are applied when creating instances and can be overridden by caller-supplied instance data.
