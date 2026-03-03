@@ -186,6 +186,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
                 var outcome = inspect.Outcome switch
                 {
                     DslOutcomeKind.Enabled => "enabled",
+                    DslOutcomeKind.NoTransition => "noTransition",
                     DslOutcomeKind.Blocked => "blocked",
                     _ => "undefined"
                 };

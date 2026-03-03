@@ -382,8 +382,9 @@ public static class StateMachineDslParser
             if (line.Equals("no transition", StringComparison.Ordinal))
             {
                 foreach (var sourceState in sourceStates)
-                    blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, DslTerminalKind.NoTransition, null, null, branchOrder));
+                    blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, DslTerminalKind.NoTransition, null, null, pendingSets.Count > 0 ? pendingSets.ToArray() : null, branchOrder));
 
+                pendingSets.Clear();
                 branchOrder++;
                 reachedTerminalStatement = true;
                 index++;
@@ -395,7 +396,7 @@ public static class StateMachineDslParser
             {
                 var reason = Unquote(rejectMatch.Groups["reason"].Value.Trim());
                 foreach (var sourceState in sourceStates)
-                    blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, DslTerminalKind.Reject, reason, null, branchOrder));
+                    blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, DslTerminalKind.Reject, reason, null, null, branchOrder));
 
                 branchOrder++;
                 reachedTerminalStatement = true;
@@ -487,13 +488,10 @@ public static class StateMachineDslParser
         if (string.IsNullOrWhiteSpace(branchTargetState) && !hasNoTransitionOutcome)
             throw new InvalidOperationException($"Line {index}: if/else if branch requires 'transition <State>' or 'no transition'.");
 
-        if (hasNoTransitionOutcome && branchSets.Count > 0)
-            throw new InvalidOperationException($"Line {index}: set requires a transition outcome and cannot be used with 'no transition'.");
-
         if (hasNoTransitionOutcome)
         {
             foreach (var sourceState in sourceStates)
-                blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, DslTerminalKind.NoTransition, null, guardExpression, branchOrder));
+                blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, DslTerminalKind.NoTransition, null, guardExpression, branchSets.Count > 0 ? branchSets.ToArray() : null, branchOrder));
 
             branchOrder++;
             return;
@@ -608,7 +606,7 @@ public static class StateMachineDslParser
         }
 
         foreach (var sourceState in sourceStates)
-            blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, branchTerminalKind!.Value, branchTerminalReason, null, branchOrder));
+            blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, branchTerminalKind!.Value, branchTerminalReason, null, branchSets.Count > 0 ? branchSets.ToArray() : null, branchOrder));
 
         branchOrder++;
     }
@@ -779,6 +777,19 @@ public static class StateMachineDslParser
 
                 if (terminalRule.Order < 0)
                     throw new InvalidOperationException($"Terminal rule for state '{terminalRule.FromState}' and event '{terminalRule.EventName}' has invalid order '{terminalRule.Order}'.");
+
+                if (terminalRule.SetAssignments is not null)
+                {
+                    foreach (var assignment in terminalRule.SetAssignments)
+                    {
+                        if (dataFields.Count == 0)
+                            continue;
+
+                        var knownDataField = dataFields.Any(f => string.Equals(f.Name, assignment.Key, StringComparison.Ordinal));
+                        if (!knownDataField)
+                            throw new InvalidOperationException($"Terminal rule for state '{terminalRule.FromState}' on '{terminalRule.EventName}' assigns unknown data field '{assignment.Key}'.");
+                    }
+                }
             }
 
             if (unguardedCount > 1)

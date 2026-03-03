@@ -51,6 +51,7 @@ from any on Emergency
 
 # Signal cycle is suspended during emergency; Advance does nothing
 from FlashingRed on Advance
+	set CycleCount = CycleCount + 1
 	no transition
 
 from FlashingRed on ClearEmergency

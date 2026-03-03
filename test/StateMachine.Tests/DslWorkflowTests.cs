@@ -187,7 +187,7 @@ public class DslWorkflowTests
     }
 
     [Fact]
-    public void Inspect_IfBranch_NoTransition_Is_Allowed_And_Produces_Undefined_When_Matched()
+    public void Inspect_IfBranch_NoTransition_Is_Allowed_And_Produces_NoTransition_When_Matched()
     {
         const string dsl = """
             machine Route
@@ -204,11 +204,12 @@ public class DslWorkflowTests
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
 
-        var blockedByNoTransition = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["Hold"] = true });
+        var noTransition = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["Hold"] = true });
         var enabled = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["Hold"] = false });
 
-        blockedByNoTransition.Outcome.Should().Be(DslOutcomeKind.Undefined);
-        blockedByNoTransition.Reasons.Should().ContainSingle("No transition for 'Advance' from 'Red'.");
+        noTransition.Outcome.Should().Be(DslOutcomeKind.NoTransition);
+        noTransition.IsDefined.Should().BeTrue();
+        noTransition.TargetState.Should().Be("Red");
 
         enabled.Outcome.Should().Be(DslOutcomeKind.Enabled);
         enabled.TargetState.Should().Be("Green");
@@ -248,8 +249,9 @@ public class DslWorkflowTests
             ["PreferAlpha"] = true
         });
 
-        firstBranchWins.Outcome.Should().Be(DslOutcomeKind.Undefined);
-        firstBranchWins.Reasons.Should().ContainSingle("No transition for 'Route' from 'Source'.");
+        firstBranchWins.Outcome.Should().Be(DslOutcomeKind.NoTransition);
+        firstBranchWins.IsDefined.Should().BeTrue();
+        firstBranchWins.TargetState.Should().Be("Source");
 
         secondBranchWins.Outcome.Should().Be(DslOutcomeKind.Enabled);
         secondBranchWins.TargetState.Should().Be("Alpha");
@@ -1067,7 +1069,7 @@ public class DslWorkflowTests
         }
 
         [Fact]
-        public void Inspect_FromOnBlock_NoTransitionOutcome_IsUndefined()
+        public void Inspect_FromOnBlock_NoTransitionOutcome_IsNoTransition()
         {
                 const string dsl = """
                         machine TrafficLight
@@ -1084,10 +1086,10 @@ public class DslWorkflowTests
 
                 var inspection = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["CarsWaiting"] = 0 });
 
-                inspection.IsDefined.Should().BeFalse();
-                inspection.IsAccepted.Should().BeFalse();
-                inspection.Outcome.Should().Be(DslOutcomeKind.Undefined);
-                inspection.Reasons.Should().ContainSingle(r => r.Contains("No transition", StringComparison.Ordinal));
+                inspection.IsDefined.Should().BeTrue();
+                inspection.IsAccepted.Should().BeTrue();
+                inspection.Outcome.Should().Be(DslOutcomeKind.NoTransition);
+                inspection.TargetState.Should().Be("Red");
         }
 
         [Fact]

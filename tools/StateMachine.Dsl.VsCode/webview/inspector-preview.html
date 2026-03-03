@@ -242,6 +242,13 @@
       background: rgba(31, 255, 122, 0.14);
     }
 
+    .event-btn.noTransition {
+      border-color: var(--ok);
+      color: var(--ok);
+      background: rgba(31, 255, 122, 0.14);
+      opacity: 0.72;
+    }
+
     .event-btn.undefined {
       border-color: var(--err);
       color: var(--err);
@@ -1392,6 +1399,14 @@
             };
           }
 
+          if (liveStatus.outcome === 'noTransition') {
+            return {
+              kind: 'noTransition',
+              to: state,
+              meta: 'runtime no transition (state unchanged)'
+            };
+          }
+
           if (liveStatus.outcome === 'blocked') {
             return {
               kind: 'blocked',
@@ -1450,7 +1465,7 @@
         }
 
         if (state === 'FlashingRed') {
-          return { kind: 'undefined', reason: 'no transition from FlashingRed' };
+          return { kind: 'noTransition', to: 'FlashingRed', reason: 'no transition from FlashingRed' };
         }
       }
 
@@ -1599,7 +1614,7 @@
 
     function applyEventButtonState(button, eventName) {
       const evaluation = evaluateEvent(currentState, eventName);
-      button.classList.remove('enabled', 'blocked', 'undefined');
+      button.classList.remove('enabled', 'noTransition', 'blocked', 'undefined');
       const glyph = button.querySelector('.event-glyph');
       button.removeAttribute('title');
 
@@ -1607,6 +1622,11 @@
         button.classList.add('enabled');
         if (glyph) {
           glyph.textContent = '✔';
+        }
+      } else if (evaluation.kind === 'noTransition') {
+        button.classList.add('noTransition');
+        if (glyph) {
+          glyph.textContent = '⏸';
         }
       } else if (evaluation.kind === 'blocked') {
         button.classList.add('blocked');
@@ -2660,6 +2680,12 @@
       if (evaluation.kind === 'blocked') {
         showRowFeedback(eventName, `✖ ${failureReason}`, 'err');
 
+        renderAll();
+        return;
+      }
+
+      if (evaluation.kind === 'noTransition') {
+        showRowFeedback(eventName, `⏸ No transition (state unchanged)`, 'ok');
         renderAll();
         return;
       }

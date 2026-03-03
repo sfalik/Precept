@@ -9,7 +9,7 @@ namespace StateMachine.Tests;
 public class DslSetParsingTests
 {
     [Fact]
-    public void Parse_IfBranch_WithSetAndNoTransition_Throws()
+    public void Parse_IfBranch_WithSetAndNoTransition_PreservesAssignments()
     {
         const string dsl = """
             machine Sample
@@ -21,12 +21,18 @@ public class DslSetParsingTests
                 if Count > 0
                     set Count = Count - 1
                     no transition
+                else
+                    transition Green
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var machine = StateMachineDslParser.Parse(dsl);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*set requires a transition outcome and cannot be used with 'no transition'*");
+        machine.TerminalRules.Should().ContainSingle();
+        var rule = machine.TerminalRules[0];
+        rule.Kind.Should().Be(DslTerminalKind.NoTransition);
+        rule.SetAssignments.Should().NotBeNull();
+        rule.SetAssignments!.Should().ContainSingle();
+        rule.SetAssignments![0].Key.Should().Be("Count");
     }
 
     [Fact]

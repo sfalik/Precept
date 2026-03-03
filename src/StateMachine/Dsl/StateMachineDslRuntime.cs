@@ -169,6 +169,9 @@ public sealed class DslWorkflowDefinition
                 eventName,
                 resolution.Transition!.ToState,
                 GetRequiredEventArgumentKeys(eventName)),
+            TransitionResolutionKind.NoTransition => DslInspectionResult.NoTransition(
+                currentState,
+                eventName),
             TransitionResolutionKind.NotDefined => DslInspectionResult.NotDefined(currentState, eventName, resolution.NotDefinedReason!),
             _ => DslInspectionResult.Rejected(currentState, eventName, resolution.Reasons)
         };
@@ -199,6 +202,9 @@ public sealed class DslWorkflowDefinition
         if (!inspection.IsDefined)
             return DslFireResult.NotDefined(currentState, eventName, inspection.Reasons);
 
+        if (inspection.Outcome == DslOutcomeKind.NoTransition)
+            return DslFireResult.NoTransition(currentState, eventName);
+
         if (!inspection.IsAccepted || inspection.TargetState is null)
             return DslFireResult.Rejected(currentState, eventName, inspection.Reasons);
 
@@ -224,6 +230,35 @@ public sealed class DslWorkflowDefinition
         var resolution = ResolveTransition(instance.CurrentState, eventName, evaluationArguments);
         if (resolution.Kind == TransitionResolutionKind.NotDefined)
             return DslInstanceFireResult.NotDefined(instance.CurrentState, eventName, new[] { resolution.NotDefinedReason! });
+
+        if (resolution.Kind == TransitionResolutionKind.NoTransition)
+        {
+            var noTransitionData = new Dictionary<string, object?>(instance.InstanceData, StringComparer.Ordinal);
+            if (resolution.TerminalRule?.SetAssignments is { } noTransitionSets)
+            {
+                foreach (var assignment in noTransitionSets)
+                {
+                    var assignmentContext = BuildEvaluationData(noTransitionData, eventName, eventArguments);
+                    var assignmentEvaluation = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, assignmentContext);
+                    if (!assignmentEvaluation.Success)
+                        return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { $"Data assignment failed: {assignmentEvaluation.Error}" });
+
+                    if (!TryValidateAssignedValue(assignment.Key, assignmentEvaluation.Value, out var contractError))
+                        return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { contractError! });
+
+                    noTransitionData[assignment.Key] = assignmentEvaluation.Value;
+                }
+            }
+
+            var noTransitionUpdated = instance with
+            {
+                LastEvent = eventName,
+                UpdatedAt = DateTimeOffset.UtcNow,
+                InstanceData = noTransitionData
+            };
+
+            return DslInstanceFireResult.NoTransition(instance.CurrentState, eventName, noTransitionUpdated);
+        }
 
         if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.Transition is null)
             return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
@@ -340,7 +375,7 @@ public sealed class DslWorkflowDefinition
     {
         return terminalRule.Kind switch
         {
-            DslTerminalKind.NoTransition => TransitionResolution.NotDefined($"No transition for '{eventName}' from '{currentState}'."),
+            DslTerminalKind.NoTransition => TransitionResolution.NoTransition(terminalRule),
             DslTerminalKind.Reject => TransitionResolution.Rejected(new[]
             {
                 string.IsNullOrWhiteSpace(terminalRule.Reason)
@@ -534,23 +569,28 @@ public sealed class DslWorkflowDefinition
     {
         Accepted,
         Rejected,
-        NotDefined
+        NotDefined,
+        NoTransition
     }
 
     private sealed record TransitionResolution(
         TransitionResolutionKind Kind,
         DslTransition? Transition,
+        DslTerminalRule? TerminalRule,
         string? NotDefinedReason,
         IReadOnlyList<string> Reasons)
     {
         internal static TransitionResolution Accepted(DslTransition transition) =>
-            new(TransitionResolutionKind.Accepted, transition, null, Array.Empty<string>());
+            new(TransitionResolutionKind.Accepted, transition, null, null, Array.Empty<string>());
 
         internal static TransitionResolution Rejected(IReadOnlyList<string> reasons) =>
-            new(TransitionResolutionKind.Rejected, null, null, reasons);
+            new(TransitionResolutionKind.Rejected, null, null, null, reasons);
 
         internal static TransitionResolution NotDefined(string reason) =>
-            new(TransitionResolutionKind.NotDefined, null, reason, new[] { reason });
+            new(TransitionResolutionKind.NotDefined, null, null, reason, new[] { reason });
+
+        internal static TransitionResolution NoTransition(DslTerminalRule terminalRule) =>
+            new(TransitionResolutionKind.NoTransition, null, terminalRule, null, Array.Empty<string>());
     }
 
     private sealed record OutcomeCandidate(int Order, DslTransition? Transition, DslTerminalRule? TerminalRule)
@@ -626,6 +666,9 @@ public sealed record DslInspectionResult(
     internal static DslInspectionResult Accepted(string state, string evt, string target, IReadOnlyList<string> requiredEventArgumentKeys) =>
         new(DslOutcomeKind.Enabled, true, true, state, evt, target, requiredEventArgumentKeys, Array.Empty<string>());
 
+    internal static DslInspectionResult NoTransition(string state, string evt) =>
+        new(DslOutcomeKind.NoTransition, true, true, state, evt, state, Array.Empty<string>(), Array.Empty<string>());
+
     internal static DslInspectionResult NotDefined(string state, string evt, string reason) =>
         new(DslOutcomeKind.Undefined, false, false, state, evt, null, Array.Empty<string>(), new[] { reason });
 
@@ -644,6 +687,9 @@ public sealed record DslFireResult(
 {
     internal static DslFireResult Accepted(string state, string evt, string newState) =>
         new(DslOutcomeKind.Enabled, true, true, state, evt, newState, Array.Empty<string>());
+
+    internal static DslFireResult NoTransition(string state, string evt) =>
+        new(DslOutcomeKind.NoTransition, true, true, state, evt, state, Array.Empty<string>());
 
     internal static DslFireResult NotDefined(string state, string evt, IReadOnlyList<string> reasons) =>
         new(DslOutcomeKind.Undefined, false, false, state, evt, null, reasons);
@@ -665,6 +711,9 @@ public sealed record DslInstanceFireResult(
     internal static DslInstanceFireResult Accepted(string state, string evt, string newState, DslWorkflowInstance updated) =>
         new(DslOutcomeKind.Enabled, true, true, state, evt, newState, Array.Empty<string>(), updated);
 
+    internal static DslInstanceFireResult NoTransition(string state, string evt, DslWorkflowInstance updated) =>
+        new(DslOutcomeKind.NoTransition, true, true, state, evt, state, Array.Empty<string>(), updated);
+
     internal static DslInstanceFireResult NotDefined(string state, string evt, IReadOnlyList<string> reasons) =>
         new(DslOutcomeKind.Undefined, false, false, state, evt, null, reasons, null);
 
@@ -676,5 +725,6 @@ public enum DslOutcomeKind
 {
     Undefined,
     Blocked,
-    Enabled
+    Enabled,
+    NoTransition
 }

@@ -40,9 +40,9 @@ Then press `F5`, open a `.sm` file, and run `StateMachine DSL: Open Inspector Pr
 
 - **Workflow definition**: immutable compiled DSL (`DslWorkflowDefinition`).
 - **Instance**: persisted runtime state + data (`DslWorkflowInstance`).
-- **Inspect**: side-effect free transition preview (`──▷`, ASCII fallback: `-->`) with `Undefined | Blocked | Enabled` outcome; interactive compact output phrases `Undefined` as `no transition from <State>`.
+- **Inspect**: side-effect free transition preview (`──▷`, ASCII fallback: `-->`) with `Undefined | Blocked | NoTransition | Enabled` outcome; interactive compact output phrases `Undefined` as `no transition from <State>`.
 - Undefined display wording is FSM-oriented: unknown events are shown as `unknown event`, while known events unavailable from the current state are shown as `no transition from <State>`.
-- **Fire**: applies state change and transition data assignments.
+- **Fire**: applies state change and transition data assignments. `NoTransition` outcomes execute `set` assignments but do not change state.
 - **Event arguments**: optional per-call JSON object for inspect/fire.
 - **Instance data**: persisted data loaded from/saved to instance JSON.
 
@@ -98,6 +98,7 @@ from any on Emergency
     reject "AuthorizedBy and Reason are required to activate emergency mode"
 
 from FlashingRed on Advance
+  set CycleCount = CycleCount + 1
   no transition
 
 from FlashingRed on ClearEmergency
@@ -156,7 +157,7 @@ Constraints:
 - `else` (or unguarded body) must end in exactly one outcome: `transition`, `reject`, or `no transition`.
 - `set <Field> = <Expr>` is valid only inside a `from ... on ...` branch body.
 - Multiple `set` lines are allowed and execute in declaration order with read-your-writes on the fire path.
-- `set` is not allowed with `no transition` in `if` / `else if` branches.
+- `set` is allowed with `no transition` in all branch contexts; assignments execute on fire but state does not change.
 - `reason "..."` is valid only on `reject`.
 - Event arguments and persisted data fields are scalar-only (`string|number|boolean|null`, optional `?`).
 - Top-level data fields may declare literal defaults using `<Field> = <Literal>`.
@@ -261,14 +262,23 @@ from Active on Retry
     reject "RetryCount is unavailable"
 ```
 
-10) Guarded `no transition` (valid in `if`/`else if`)
+10) Guarded `no transition` with `set` (valid in all branch contexts)
 
 ```text
 from Active on Pause
   if HasPendingWork
+    set PauseAttempts = PauseAttempts + 1
     no transition
   else
     transition Paused
+```
+
+11) Unguarded `no transition` with `set`
+
+```text
+from FlashingRed on Advance
+  set CycleCount = CycleCount + 1
+  no transition
 ```
 
 ## Instance JSON Example

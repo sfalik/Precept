@@ -61,6 +61,7 @@ public sealed record DslTerminalRule(
     DslTerminalKind Kind,
     string? Reason,
     string? GuardExpression = null,
+    IReadOnlyList<DslSetAssignment>? SetAssignments = null,
     int Order = 0);
 
 public enum DslTerminalKind

@@ -91,6 +91,7 @@ Canonical constraints:
 - Exactly one `state` declaration must include `initial`.
 - `if` and `else if` must end with `transition <State>` or `no transition`.
 - `else` may end with `transition`, `reject`, or `no transition`.
+- `set` is allowed with `no transition` in all branch contexts; assignments execute on fire but state does not change.
 - `reason "..."` is valid only on `reject`.
 - Top-level data fields may declare literal defaults using `<Field> = <Literal>`.
 - Defaults are applied when creating instances and can be overridden by caller-supplied instance data.
@@ -260,9 +261,9 @@ Validation constraints:
 - Guarded transitions are evaluated at runtime against optional event arguments; if provided, they are used for that call without mutating persisted instance data
 - `from ... on ...` blocks support ordered `if`/`else if`/`else` branches and end with an outcome statement: `transition <State>`, `reject "<message>"`, or `no transition`.
 - Statements are not allowed after an outcome statement in a block.
-- Transition data assignments are evaluated/applied only during `Enabled` `Fire(...)` calls
+- Transition data assignments are evaluated/applied only during `Enabled` or `NoTransition` `Fire(...)` calls
 - If one guarded transition evaluates `true`, inspection/fire is `Enabled` and returns target/new state
-- If all guarded transitions evaluate `false`, terminal `reject` returns `Blocked` with the configured reason; terminal `no transition` returns `Undefined`
+- If all guarded transitions evaluate `false`, terminal `reject` returns `Blocked` with the configured reason; terminal `no transition` returns `NoTransition` (`IsDefined = true`, state unchanged, `set` assignments execute on fire)
 - Instance-based inspect/fire validates workflow name compatibility before evaluating transitions
 
 ## Concurrency Model (Current)

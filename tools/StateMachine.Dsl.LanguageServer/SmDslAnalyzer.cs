@@ -332,6 +332,47 @@ internal sealed class SmDslAnalyzer
             }
         }
 
+        foreach (var terminalRule in machine.TerminalRules)
+        {
+            var terminalSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, terminalRule.EventName);
+            IReadOnlyDictionary<string, StaticValueKind> terminalSetSymbols = terminalSymbols;
+
+            if (!string.IsNullOrWhiteSpace(terminalRule.GuardExpression))
+            {
+                var guardLine = FindGuardLine(lines, ref searchLine, terminalRule.GuardExpression!);
+                ValidateExpression(
+                    terminalRule.GuardExpression!,
+                    guardLine,
+                    terminalSymbols,
+                    expectedKind: StaticValueKind.Boolean,
+                    expectedLabel: "guard expression",
+                    diagnostics,
+                    lines);
+
+                if (TryParseExpression(terminalRule.GuardExpression!, out var parsedGuard, out _))
+                    terminalSetSymbols = ApplyNarrowing(parsedGuard!, terminalSymbols, assumeTrue: true);
+            }
+
+            if (terminalRule.SetAssignments is not null)
+            {
+                foreach (var assignment in terminalRule.SetAssignments)
+                {
+                    var assignmentLine = FindSetLine(lines, ref searchLine, assignment.Key, assignment.ExpressionText);
+                    if (!dataFieldKinds.TryGetValue(assignment.Key, out var targetKind))
+                        continue;
+
+                    ValidateExpression(
+                        assignment.ExpressionText,
+                        assignmentLine,
+                        terminalSetSymbols,
+                        expectedKind: targetKind,
+                        expectedLabel: $"set target '{assignment.Key}'",
+                        diagnostics,
+                        lines);
+                }
+            }
+        }
+
         return diagnostics;
     }
 
