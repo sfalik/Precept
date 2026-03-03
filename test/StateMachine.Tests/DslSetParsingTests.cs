@@ -14,7 +14,7 @@ public class DslSetParsingTests
         const string dsl = """
             machine Sample
             number Count
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -35,7 +35,7 @@ public class DslSetParsingTests
         const string dsl = """
             machine Sample
             number Count
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -54,7 +54,7 @@ public class DslSetParsingTests
         const string dsl = """
             machine Sample
             number Count
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -75,7 +75,7 @@ public class DslSetParsingTests
             machine Sample
             number Count
             string Label
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance

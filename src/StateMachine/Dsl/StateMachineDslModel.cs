@@ -5,6 +5,7 @@ namespace StateMachine.Dsl;
 public sealed record DslMachine(
     string Name,
     IReadOnlyList<string> States,
+    string InitialState,
     IReadOnlyList<DslEvent> Events,
     IReadOnlyList<DslTransition> Transitions,
     IReadOnlyList<DslTerminalRule> TerminalRules,

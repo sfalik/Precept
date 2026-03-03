@@ -34,7 +34,8 @@ Canonical linear form:
 
 ```text
 machine <Name>
-state <StateName>
+state <StateName> [initial]
+<StateDecl> := initial
 
 event <EventName>
 [ <string|number|boolean|null>[?] <ArgName> { <ArgDecl> } ]
@@ -49,13 +50,14 @@ from <any|StateA[,StateB...]> on <EventName>
   | [ set <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
 )+
 
-<Expr> := <Literal|<DataField>|<EventName>.<ArgName>>
+<Expr> := <Literal|<FieldName>|<EventName>.<ArgName>>
 <Literal> := <null|true|false|number|string>
 ```
 
 Canonical constraints:
 
 - `()+` means one-or-more lines in a `from ... on ...` body.
+- Exactly one `state` declaration must include `initial`.
 - `if` and `else if` must end with `transition <State>` or `no transition`.
 - `else` may end with `transition`, `reject`, or `no transition`.
 - `reason "..."` is valid only on `reject`.

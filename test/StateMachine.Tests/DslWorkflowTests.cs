@@ -13,7 +13,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -37,7 +37,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -62,7 +62,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -87,7 +87,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -112,7 +112,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -136,7 +136,7 @@ public class DslWorkflowTests
         const string dsl = """
             machine FeatureFlag
             boolean IsEnabled
-            state Disabled
+            state Disabled initial
             state Enabled
             event Evaluate
             from Disabled on Evaluate
@@ -160,7 +160,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             state Yellow
             event Advance
@@ -192,7 +192,7 @@ public class DslWorkflowTests
         const string dsl = """
             machine Route
             boolean Hold
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -221,7 +221,7 @@ public class DslWorkflowTests
             machine Route
             boolean PreferStop
             boolean PreferAlpha
-            state Source
+            state Source initial
             state Alpha
             state Beta
             event Route
@@ -260,7 +260,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine FeatureMode
-            state Draft
+            state Draft initial
             state Live
             event Publish
             from Draft on Publish
@@ -284,7 +284,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine Tickets
-            state Open
+            state Open initial
             state Pending
             event Escalate
             from Open on Escalate
@@ -308,7 +308,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine Throughput
-            state Low
+            state Low initial
             state High
             event Scale
             from Low on Scale
@@ -332,7 +332,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine Workflow
-            state A
+            state A initial
             state B
             event Go
             from A on Go
@@ -360,7 +360,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine Workflow
-            state A
+            state A initial
             state B
             event Go
             from A on Go
@@ -388,7 +388,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -413,7 +413,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -440,7 +440,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -464,7 +464,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state FlashingRed
             event Emergency
             from Red on Emergency
@@ -488,7 +488,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state FlashingRed
             event Emergency
                 string Reason
@@ -512,7 +512,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
                 number CarsWaiting
                 number LastCarsWaiting
@@ -542,7 +542,7 @@ public class DslWorkflowTests
             machine Counters
             number CarsWaiting
             number LastCarsWaiting
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -573,7 +573,7 @@ public class DslWorkflowTests
             machine Counters
             number CarsWaiting
             number LastCarsWaiting
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -606,7 +606,7 @@ public class DslWorkflowTests
             machine Counters
             number CarsWaiting
             number NextCarsWaiting
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -634,7 +634,7 @@ public class DslWorkflowTests
             machine Alerts
             string Prefix
             string Message
-            state Red
+            state Red initial
             state FlashingRed
             event Emergency
                 string Reason
@@ -664,7 +664,7 @@ public class DslWorkflowTests
             string Prefix
             string? ReasonText
             string Message
-            state Red
+            state Red initial
             state FlashingRed
             event Emergency
                 string? Reason
@@ -692,7 +692,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             event Advance(AdvanceArgs)
             from Red on Advance
@@ -711,7 +711,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state FlashingRed
             event Emergency
                 string Reason
@@ -737,7 +737,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state FlashingRed
             event Emergency
                 string Reason
@@ -761,7 +761,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine Flags
-            state Off
+            state Off initial
             state On
             event Enable
             event Disable
@@ -790,7 +790,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine Notes
-            state Open
+            state Open initial
             state Cleared
             event Clear
             from Open on Clear
@@ -812,7 +812,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -835,7 +835,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine FeatureFlag
-            state Disabled
+            state Disabled initial
             state Enabled
             event Evaluate
             from Disabled on Evaluate
@@ -866,7 +866,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -893,7 +893,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Green
+            state Green initial
             state Yellow
             event Advance
             from Green on Advance
@@ -915,7 +915,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -937,7 +937,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Red
             event Advance
             from Red on Advance
@@ -955,7 +955,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -981,7 +981,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -1005,7 +1005,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine TrafficLight
-            state Red
+            state Red initial
             state Green
             event Advance
             transition Red -> Green on Advance reason "Cars waiting required"
@@ -1023,7 +1023,7 @@ public class DslWorkflowTests
         {
                 const string dsl = """
                         machine TrafficLight
-                        state Red
+                        state Red initial
                         state Green
                         event Advance
                         from Red on Advance
@@ -1047,7 +1047,7 @@ public class DslWorkflowTests
         {
                 const string dsl = """
                         machine TrafficLight
-                        state Red
+                        state Red initial
                         state Green
                         event Advance
                         from Red on Advance
@@ -1071,7 +1071,7 @@ public class DslWorkflowTests
         {
                 const string dsl = """
                         machine TrafficLight
-                        state Red
+                        state Red initial
                         state Green
                         event Advance
                         from Red on Advance
@@ -1095,7 +1095,7 @@ public class DslWorkflowTests
         {
                 const string dsl = """
                         machine TrafficLight
-                        state Red
+                        state Red initial
                         state Green
                         state Yellow
                         state FlashingRed
@@ -1119,7 +1119,7 @@ public class DslWorkflowTests
         {
             const string dsl = """
                 machine TrafficLight
-                state Red
+                state Red initial
                 state Green
                 event Advance
                 from Red on Advance
@@ -1137,7 +1137,7 @@ public class DslWorkflowTests
             {
                 const string dsl = """
                     machine TrafficLight
-                    state Red
+                    state Red initial
                     state Green
                     event Advance
 
@@ -1160,7 +1160,7 @@ public class DslWorkflowTests
             {
                 const string dsl = """
                     machine TrafficLight
-                    state Yellow
+                    state Yellow initial
                     state Red
                     event Advance
 
@@ -1181,7 +1181,7 @@ public class DslWorkflowTests
             {
                 const string dsl = """
                     machine TrafficLight
-                    state Red
+                    state Red initial
                     state Green
                     state Yellow
                     event Advance
@@ -1210,7 +1210,7 @@ public class DslWorkflowTests
             {
                 const string dsl = """
                     machine TrafficLight
-                    state Red
+                    state Red initial
                     state Green
                     event Advance
 
@@ -1232,7 +1232,7 @@ public class DslWorkflowTests
             {
                 const string dsl = """
                     machine TrafficLight
-                    state Red
+                    state Red initial
                     state Green
                     event Advance
 
@@ -1255,7 +1255,7 @@ public class DslWorkflowTests
                 const string dsl = """
                     machine TrafficLight
                     number CarsWaiting
-                    state Red
+                    state Red initial
                     state Green
                     event Advance
 
@@ -1269,6 +1269,46 @@ public class DslWorkflowTests
                 machine.Transitions.Should().ContainSingle();
                 machine.Transitions[0].SetAssignments.Should().ContainSingle();
                 machine.Transitions[0].SetAssignments[0].Key.Should().Be("CarsWaiting");
+            }
+
+            [Fact]
+            public void Parse_MissingInitialState_IsRejected()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    state Red
+                    state Green
+                    event Advance
+
+                    from Red on Advance
+                        transition Green
+                    """;
+
+                var act = () => StateMachineDslParser.Parse(dsl);
+
+                act.Should()
+                    .Throw<InvalidOperationException>()
+                    .WithMessage("*Exactly one state must be marked initial*");
+            }
+
+            [Fact]
+            public void Parse_DuplicateInitialStateMarkers_AreRejected()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    state Red initial
+                    state Green initial
+                    event Advance
+
+                    from Red on Advance
+                        transition Green
+                    """;
+
+                var act = () => StateMachineDslParser.Parse(dsl);
+
+                act.Should()
+                    .Throw<InvalidOperationException>()
+                    .WithMessage("*duplicate initial state marker*already marked initial*");
             }
 
             [Fact]
@@ -1294,7 +1334,7 @@ public class DslWorkflowTests
             {
                 const string dsl = """
                     machine TrafficLight
-                    state Red
+                    state Red initial
                     state Green
                     events Advance
                     from Red on Advance

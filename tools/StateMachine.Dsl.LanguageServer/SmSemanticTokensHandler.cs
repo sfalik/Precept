@@ -40,7 +40,7 @@ internal sealed class SmSemanticTokensHandler : SemanticTokensHandlerBase
 
     private static readonly string[] KeywordTokens =
     [
-        "machine", "state", "event", "from", "on", "if", "else",
+        "machine", "state", "initial", "event", "from", "on", "if", "else",
         "transition", "set", "reject", "reason", "no", "any",
         "true", "false", "null", "string", "number", "boolean"
     ];

@@ -56,6 +56,7 @@ public sealed class DslWorkflowDefinition
 
     public string Name { get; }
     public IReadOnlyList<string> States { get; }
+    public string InitialState { get; }
     public IReadOnlyList<DslEvent> Events { get; }
     public IReadOnlyList<DslFieldContract> DataFields { get; }
 
@@ -63,6 +64,7 @@ public sealed class DslWorkflowDefinition
     {
         Name = machine.Name;
         States = machine.States;
+        InitialState = machine.InitialState;
         Events = machine.Events;
         DataFields = machine.DataFields;
         _guardEvaluator = guardEvaluator;
@@ -546,6 +548,12 @@ public static class DslWorkflowCompiler
     {
         if (machine is null)
             throw new ArgumentNullException(nameof(machine));
+
+        if (string.IsNullOrWhiteSpace(machine.InitialState))
+            throw new InvalidOperationException("Exactly one state must be marked initial. Use 'state <Name> initial'.");
+
+        if (!machine.States.Contains(machine.InitialState, StringComparer.Ordinal))
+            throw new InvalidOperationException($"Initial state '{machine.InitialState}' is not defined in workflow '{machine.Name}'.");
 
         return new DslWorkflowDefinition(machine, guardEvaluator ?? new DefaultGuardEvaluator());
     }

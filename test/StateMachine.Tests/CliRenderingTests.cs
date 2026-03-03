@@ -19,7 +19,7 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -47,7 +47,7 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
-            state Red
+            state Red initial
             state FlashingRed
             event Emergency
                 string AuthorizedBy
@@ -81,7 +81,7 @@ public sealed class CliRenderingTests
         var dsl = """
             machine Sample
             number Vehicles
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -112,7 +112,7 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
-            state Red
+            state Red initial
             state Flashing
             event Clear
             from Flashing on Clear
@@ -141,7 +141,7 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
-            state FlashingGreen
+            state FlashingGreen initial
             state Green
             state FlashingRed
             event Advance
@@ -178,7 +178,7 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
-            state Red
+            state Red initial
             state FlashingRed
             event Emergency
                 string AuthorizedBy
@@ -212,7 +212,7 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
-            state Source
+            state Source initial
             state Alpha
             state Beta
             state Gamma
@@ -254,7 +254,7 @@ public sealed class CliRenderingTests
         var dsl = """
             machine Sample
             number Score
-            state Paused
+            state Paused initial
             state Beta
             state Gamma
             event Resume
@@ -289,7 +289,7 @@ public sealed class CliRenderingTests
         var dsl = """
             machine Sample
             boolean IsReady
-            state Idle
+            state Idle initial
             state Processing
             event StartPipelineWithExtremelyDescriptiveNameAndMetadata
             from Idle on StartPipelineWithExtremelyDescriptiveNameAndMetadata
@@ -320,7 +320,7 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -349,7 +349,7 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
-            state Red
+            state Red initial
             state Green
             event Advance
             from Red on Advance
@@ -378,7 +378,7 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
-            state Red
+            state Red initial
             event Advance
             from Red on Advance
                 transition Red
@@ -412,7 +412,7 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
-            state Red
+            state Red initial
             event Advance
             from Red on Advance
                 transition Red

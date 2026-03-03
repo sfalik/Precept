@@ -16,7 +16,7 @@ public class SmDslAnalyzerNullNarrowingTests
         const string text = """
             machine M
             number? RetryCount
-            state A
+            state A initial
             state B
             event Go
             from A on Go
@@ -37,7 +37,7 @@ public class SmDslAnalyzerNullNarrowingTests
         const string text = """
             machine M
             number? RetryCount
-            state A
+            state A initial
             state B
             event Go
             from A on Go
@@ -58,7 +58,7 @@ public class SmDslAnalyzerNullNarrowingTests
         const string text = """
             machine M
             number? RetryCount
-            state A
+            state A initial
             state B
             event Go
             from A on Go
@@ -81,7 +81,7 @@ public class SmDslAnalyzerNullNarrowingTests
             machine M
             number Value
             number? RetryCount
-            state A
+            state A initial
             state B
             event Go
             from A on Go
@@ -102,7 +102,7 @@ public class SmDslAnalyzerNullNarrowingTests
             machine M
             number Value
             number? RetryCount
-            state A
+            state A initial
             state B
             event Go
             from A on Go

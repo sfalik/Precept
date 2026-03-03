@@ -443,7 +443,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
         var dsl = $$"""
             machine Calc
             {{declarations}}
-            state A
+            state A initial
             state B
             event Go
               number? EventNum
@@ -464,7 +464,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
             machine Guards
             boolean Flag
             boolean OtherFlag
-            state A
+            state A initial
             state B
             event Go
             from A on Go

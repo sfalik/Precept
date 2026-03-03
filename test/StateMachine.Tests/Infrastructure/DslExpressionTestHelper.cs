@@ -11,7 +11,7 @@ internal static class DslExpressionTestHelper
             machine Parser
             number Value
             event Advance
-            state Red
+            state Red initial
             state Green
             from Red on Advance
                 set Value = {{expressionText}}

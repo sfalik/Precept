@@ -36,6 +36,16 @@ Do not leave aspirational claims as if implemented. If behavior is planned but n
 5. Did sample files change?
    - If yes, ensure `README.md` is updated accordingly.
 
+## DSL Syntax Reference Sync (Non-Negotiable)
+
+When any DSL grammar, keyword, rule, or semantics change (for example: `set`, `state <Name> initial`, branch constraints, operators, null rules), update these sections in the same pass:
+
+- `README.md` → `## DSL Syntax Reference`
+- `README.md` → `## DSL Cookbook`
+- `docs/DesignNotes.md` → `### DSL Syntax Contract (Current)`
+
+These sections must not contradict each other. If one is updated, all relevant sections must be updated before final response.
+
 ## Current-Status Hygiene
 
 Maintain a concise "Current Status" section in `README.md` that reflects:

@@ -921,6 +921,7 @@ internal sealed class SmDslAnalyzer
     [
         new CompletionItem { Label = "machine", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "state", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "initial", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "event", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "from", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "on", Kind = CompletionItemKind.Keyword },

@@ -8,7 +8,7 @@ namespace StateMachine.Dsl;
 public static class StateMachineDslParser
 {
     private static readonly Regex MachineRegex = new("^machine\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
-    private static readonly Regex StateRegex = new("^state\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
+    private static readonly Regex StateRegex = new("^state\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+(?<initial>initial))?$", RegexOptions.Compiled);
     private static readonly Regex EventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
     private static readonly Regex TypedEventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*\\((?<arg>[A-Za-z_][A-Za-z0-9_<>., ]*)\\)$", RegexOptions.Compiled);
     private static readonly Regex ContractFieldRegex = new(
@@ -41,6 +41,7 @@ public static class StateMachineDslParser
             throw new InvalidOperationException("DSL input is empty.");
 
         string? name = null;
+        string? initialState = null;
         var states = new List<string>();
         var events = new List<DslEvent>();
         var transitions = new List<DslTransition>();
@@ -78,6 +79,15 @@ public static class StateMachineDslParser
                     throw new InvalidOperationException($"Line {i + 1}: duplicate state '{stateName}'.");
 
                 states.Add(stateName);
+
+                if (stateMatch.Groups["initial"].Success)
+                {
+                    if (initialState is not null)
+                        throw new InvalidOperationException($"Line {i + 1}: duplicate initial state marker. '{initialState}' is already marked initial.");
+
+                    initialState = stateName;
+                }
+
                 i++;
                 continue;
             }
@@ -149,12 +159,15 @@ public static class StateMachineDslParser
         if (states.Count == 0)
             throw new InvalidOperationException("At least one state must be declared.");
 
+        if (initialState is null)
+            throw new InvalidOperationException("Exactly one state must be marked initial. Use 'state <Name> initial'.");
+
         if (events.Count == 0)
             throw new InvalidOperationException("At least one event must be declared.");
 
         ValidateReferences(states, events, transitions, terminalRules, dataFields);
 
-        return new DslMachine(name, states, events, transitions, terminalRules, dataFields);
+        return new DslMachine(name, states, initialState, events, transitions, terminalRules, dataFields);
     }
 
     private static void ParseEventDeclaration(

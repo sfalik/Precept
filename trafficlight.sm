@@ -5,7 +5,7 @@ number CycleCount
 boolean LeftTurnQueued
 string? EmergencyReason
 
-state Red
+state Red initial
 state Green
 state Yellow
 state FlashingGreen

@@ -110,7 +110,7 @@ number CycleCount
 boolean LeftTurnQueued
 string? EmergencyReason
 
-state Red
+state Red initial
 state Green
 state Yellow
 state FlashingGreen
@@ -166,12 +166,12 @@ The full file (with block comments) is at [`trafficlight.sm`](trafficlight.sm).
 ```text
 machine <Name>
 
-state <StateName> { <StateDecl> }
+state <StateName> [initial]
 
-event <EventName> { <EventDecl> }
+event <EventName>
 [ <ScalarType>[?] <ArgName> { <ArgDecl> } ]
 
-<ScalarType>[?] <FieldName> { <FieldDecl> }
+<ScalarType>[?] <FieldName>
 
 <ScalarType> := string | number | boolean | null
 
@@ -193,14 +193,7 @@ from <any|StateA[,StateB...]> on <EventName>
     ( transition <ToState> | reject "<Reason>" | no transition )
 )+
 
-<Expr> :=
-    <Literal>
-  | <FieldName>
-  | <EventName>.<ArgName>
-  | ( <Expr> )
-  | !<Expr>
-  | -<Expr>
-  | <Expr> <BinaryOp> <Expr>
+<Expr> := <Literal> | <FieldName> | <EventName>.<ArgName> | ( <Expr> ) | !<Expr> | -<Expr> | <Expr> <BinaryOp> <Expr>
 
 <BinaryOp> := + | - | * | / | % | == | != | < | <= | > | >= | && | ||
 
@@ -210,6 +203,7 @@ from <any|StateA[,StateB...]> on <EventName>
 Constraints:
 
 - `()+` means one-or-more branch lines in a `from ... on ...` body.
+- Exactly one `state` declaration must include `initial`.
 - `if` and `else if` branches must end in exactly one outcome: `transition <ToState>` or `no transition`.
 - `else` (or unguarded body) must end in exactly one outcome: `transition`, `reject`, or `no transition`.
 - `set <Field> = <Expr>` is valid only inside a `from ... on ...` branch body.
@@ -223,14 +217,22 @@ Constraints:
 
 Practical patterns that map directly to the syntax:
 
-1) Unconditional transition
+1) Mandatory initial state declaration
+
+```text
+state Draft initial
+state PendingReview
+state Approved
+```
+
+2) Unconditional transition
 
 ```text
 from Draft on Submit
   transition PendingReview
 ```
 
-2) Transition with one field assignment (`set`)
+3) Transition with one field assignment (`set`)
 
 ```text
 from Draft on Submit
@@ -238,21 +240,21 @@ from Draft on Submit
   transition PendingReview
 ```
 
-3) Guarded routing with `else if` and fallback `reject`
+4) Guarded routing with `else if` and fallback `reject`
 
 ```text
 from PendingReview on Approve
   if Score >= 80
     set RiskTier = "Low"
     transition Approved
-  else if Score >= 80
+  else if Score >= 70
     set RiskTier = "Medium"
     transition Approved
   else
     reject "Score below approval threshold"
 ```
 
-4) Event args + expression assignment
+5) Event args + expression assignment
 
 ```text
 event Escalate
@@ -267,7 +269,7 @@ from PendingReview on Escalate
     reject "Actor and Reason are required"
 ```
 
-5) Multi-source state list (explicit sources)
+6) Multi-source state list (explicit sources)
 
 ```text
 from Draft,PendingReview on Cancel
@@ -275,7 +277,7 @@ from Draft,PendingReview on Cancel
   transition Cancelled
 ```
 
-6) Global handler with `from any`
+7) Global handler with `from any`
 
 ```text
 event Archive
@@ -284,14 +286,14 @@ from any on Archive
   transition Archived
 ```
 
-7) Explicitly disable an event in one state
+8) Explicitly disable an event in one state
 
 ```text
 from Archived on Submit
   no transition
 ```
 
-8) Null-safe numeric guard + read-your-writes multi-set
+9) Null-safe numeric guard + read-your-writes multi-set
 
 ```text
 number? RetryCount
@@ -308,7 +310,7 @@ from Active on Retry
     reject "RetryCount is unavailable"
 ```
 
-9) Guarded `no transition` (valid in `if`/`else if`)
+10) Guarded `no transition` (valid in `if`/`else if`)
 
 ```text
 from Active on Pause
