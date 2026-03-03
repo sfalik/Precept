@@ -86,7 +86,7 @@ state <StateName> [initial]
 <StateDecl> := initial
 
 event <EventName>
-[ <string|number|boolean|null>[?] <ArgName> { <ArgDecl> } ]
+[ <string|number|boolean|null>[?] <ArgName> [= <Literal>] { <ArgDecl> } ]
 
 <string|number|boolean|null>[?] <FieldName> { <FieldDecl> }
 <string|number|boolean|null>[?] <FieldName> [= <Literal>]
@@ -117,6 +117,10 @@ Canonical constraints:
 - Top-level data fields may declare literal defaults using `<Field> = <Literal>`.
 - Defaults are applied when creating instances and can be overridden by caller-supplied instance data.
 - Non-nullable top-level data fields must declare defaults.
+- Event arguments may declare literal defaults using `<ArgName> = <Literal>`.
+- Non-nullable event args without a default are required — the caller must supply them when firing.
+- Non-nullable event args with a default use the default when the caller omits them.
+- Nullable event args are always optional; if omitted, they default to `null` or the declared default.
 - Unsupported syntax: `states ...`, `events ...`, and legacy inline form `transition A -> B on E ...`.
 
 Block-authoring equivalent (same semantics):
@@ -246,7 +250,7 @@ state <StateName>
 
 event <EventName>
 event <EventName>
-  <ScalarType>[?] <ArgName>
+  <ScalarType>[?] <ArgName> [= <Literal>]
 
 <ScalarType>[?] <FieldName>
 ```

@@ -16,7 +16,8 @@ event Emergency
 	string AuthorizedBy
 	string Reason
 event LeftTurnRequest
-event VehicleArrives
+event VehiclesArrive
+	number Count = 5
 event ClearEmergency
 
 
@@ -35,8 +36,8 @@ from any on LeftTurnRequest
 	set LeftTurnQueued = true
 	no transition
 
-from any on VehicleArrives
-	set VehiclesWaiting = VehiclesWaiting + 1
+from any on VehiclesArrive
+	set VehiclesWaiting = VehiclesWaiting + VehiclesArrive.Count
 	no transition
 
 # Protected left-turn phase rejoins normal cycle at Green

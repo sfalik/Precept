@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>State Diagram Inspector</title>
+  <title>State Diagram</title>
   <style>
     :root {
       color-scheme: dark;
@@ -579,9 +579,8 @@
 <body>
   <div class="header">
     <div>
-      <strong>State Diagram Inspector</strong>
+      <strong>State Diagram</strong>
       <span class="muted"> · __FILE_NAME__</span>
-      <span id="header-state" class="status"></span>
     </div>
     <div class="actions">
       <button id="reload-btn" type="button">Reload</button>
@@ -633,10 +632,15 @@
       const argDefs = getEventArgDefinitions(eventName);
       if (argDefs.length === 0) return undefined;
       const args = {};
+      let hasAny = false;
       argDefs.forEach((arg) => {
-        args[arg.name] = eventArgValues[arg.name] ?? '';
+        const raw = eventArgValues[arg.name];
+        if (raw !== undefined && raw !== '') {
+          args[arg.name] = raw;
+          hasAny = true;
+        }
       });
-      return args;
+      return hasAny ? args : undefined;
     }
 
     function clearEventArgs() {
@@ -691,7 +695,6 @@
     }
 
     const diagram = document.getElementById('diagram');
-    const headerState = document.getElementById('header-state');
     const dataList = document.getElementById('data-list');
     const eventBar = document.getElementById('event-bar');
     const diagramToast = document.getElementById('diagram-toast');
@@ -810,10 +813,18 @@
           ? rawArgs.map((arg) => ({
             name: String(arg.name ?? arg.Name ?? ''),
             type: String(arg.type ?? arg.Type ?? 'string').toLowerCase(),
-            isNullable: Boolean(arg.isNullable ?? arg.IsNullable ?? false)
+            isNullable: Boolean(arg.isNullable ?? arg.IsNullable ?? false),
+            hasDefaultValue: Boolean(arg.hasDefaultValue ?? arg.HasDefaultValue ?? false),
+            defaultValue: arg.hasDefaultValue ?? arg.HasDefaultValue ? (arg.defaultValue ?? arg.DefaultValue ?? null) : null
           }))
           : []
       };
+    }
+
+    function formatArgDefault(value) {
+      if (value === null || value === undefined) return 'null';
+      if (typeof value === 'string') return value;
+      return String(value);
     }
 
     function parseLayoutPayload(layoutPayload, fallbackBounds) {
@@ -2080,7 +2091,16 @@
               : '∅';
           const argDefs = getEventArgDefinitions(eventName);
           const inlineArgs = argDefs.length > 0
-            ? `<span class="event-args-inline">${argDefs.map((arg) => `<input data-event="${eventName}" data-event-arg="${arg.name}" type="text" placeholder="${arg.name}" value="${(eventArgValues[arg.name] ?? '').replace(/"/g, '&quot;')}">`).join('')}</span>`
+            ? `<span class="event-args-inline">${argDefs.map((arg) => {
+                const userVal = eventArgValues[arg.name];
+                const displayVal = userVal !== undefined ? userVal : (arg.hasDefaultValue ? formatArgDefault(arg.defaultValue) : '');
+                const placeholder = arg.hasDefaultValue
+                  ? `${arg.name} (=${formatArgDefault(arg.defaultValue)})`
+                  : arg.isNullable
+                    ? `${arg.name} (optional)`
+                    : arg.name;
+                return `<input data-event="${eventName}" data-event-arg="${arg.name}" type="text" placeholder="${placeholder}" value="${displayVal.toString().replace(/"/g, '&quot;')}">`;
+              }).join('')}</span>`
             : '';
           const reasonText = getEvaluationReason(evaluation);
           const escapedReason = reasonText
@@ -2264,7 +2284,6 @@
     function renderAll() {
       syncSelectionToCurrentState();
 
-      headerState.textContent = ` · Current: ${currentState}`;
       drawDiagram();
       renderEventBar();
 

@@ -3,6 +3,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using StateMachine.Dsl;
 using System.Collections.Concurrent;
+using System.Text.Json;
 
 namespace StateMachine.Dsl.LanguageServer;
 
@@ -53,10 +54,11 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
             return new SmPreviewResponse(false, Error: sessionOrError.Error);
 
         var session = sessionOrError.Session;
-        var inspect = session.Definition.Inspect(session.Instance, request.EventName!, request.Args);
+        var coercedArgs = CoerceEventArgs(session.Machine, request.EventName!, request.Args);
+        var inspect = session.Definition.Inspect(session.Instance, request.EventName!, coercedArgs);
         var evt = session.Machine.Events.FirstOrDefault(e => string.Equals(e.Name, request.EventName, StringComparison.Ordinal));
         var args = (evt?.Args ?? Array.Empty<DslFieldContract>())
-            .Select(arg => new SmPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable))
+            .Select(arg => new SmPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable, arg.HasDefaultValue, arg.DefaultValue))
             .ToArray();
 
         var outcome = inspect.Outcome switch
@@ -87,7 +89,8 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
             return new SmPreviewResponse(false, Error: sessionOrError.Error);
 
         var session = sessionOrError.Session;
-        var fire = session.Definition.Fire(session.Instance, request.EventName!, request.Args);
+        var coercedArgs = CoerceEventArgs(session.Machine, request.EventName!, request.Args);
+        var fire = session.Definition.Fire(session.Instance, request.EventName!, coercedArgs);
         if (fire.UpdatedInstance is not null)
             session.Instance = fire.UpdatedInstance;
 
@@ -122,7 +125,8 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
 
         foreach (var step in request.Steps ?? Array.Empty<SmPreviewReplayStep>())
         {
-            var fire = session.Definition.Fire(session.Instance, step.EventName, step.Args);
+            var coercedStepArgs = CoerceEventArgs(session.Machine, step.EventName, step.Args);
+            var fire = session.Definition.Fire(session.Instance, step.EventName, coercedStepArgs);
             if (fire.IsAccepted && fire.UpdatedInstance is not null)
             {
                 session.Instance = fire.UpdatedInstance;
@@ -215,7 +219,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
                 var inspect = session.Definition.Inspect(session.Instance, eventName);
                 var evt = session.Machine.Events.FirstOrDefault(e => string.Equals(e.Name, eventName, StringComparison.Ordinal));
                 var args = (evt?.Args ?? Array.Empty<DslFieldContract>())
-                    .Select(arg => new SmPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable))
+                    .Select(arg => new SmPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable, arg.HasDefaultValue, arg.DefaultValue))
                     .ToArray();
 
                 var outcome = inspect.Outcome switch
@@ -291,5 +295,103 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
     {
         public static SessionResult Ok(PreviewSession session) => new(true, null, session);
         public static SessionResult Fail(string error) => new(false, error, null);
+    }
+
+    /// <summary>
+    /// Coerces event argument values from their JSON-deserialized form (often strings from UI text inputs
+    /// or JsonElement from System.Text.Json) to the runtime types declared in the event contract.
+    /// </summary>
+    private static IReadOnlyDictionary<string, object?>? CoerceEventArgs(
+        DslMachine machine,
+        string eventName,
+        IReadOnlyDictionary<string, object?>? args)
+    {
+        if (args is null || args.Count == 0)
+            return args;
+
+        var eventDef = machine.Events.FirstOrDefault(e => string.Equals(e.Name, eventName, StringComparison.Ordinal));
+        if (eventDef is null || eventDef.Args.Count == 0)
+            return args;
+
+        var argContracts = eventDef.Args.ToDictionary(a => a.Name, a => a, StringComparer.Ordinal);
+        var coerced = new Dictionary<string, object?>(StringComparer.Ordinal);
+
+        foreach (var kvp in args)
+        {
+            if (!argContracts.TryGetValue(kvp.Key, out var contract))
+            {
+                coerced[kvp.Key] = kvp.Value;
+                continue;
+            }
+
+            coerced[kvp.Key] = CoerceValue(kvp.Value, contract);
+        }
+
+        return coerced;
+    }
+
+    private static object? CoerceValue(object? value, DslFieldContract contract)
+    {
+        // Unwrap JsonElement from System.Text.Json deserialization.
+        if (value is JsonElement jsonElement)
+            value = UnwrapJsonElement(jsonElement);
+
+        // Already correct type or null.
+        if (value is null)
+            return null;
+
+        // Empty string from UI text input treated as "not provided".
+        if (value is string s && s.Length == 0)
+            return null;
+
+        return contract.Type switch
+        {
+            DslScalarType.Number => CoerceToNumber(value),
+            DslScalarType.Boolean => CoerceToBoolean(value),
+            DslScalarType.String => value?.ToString(),
+            DslScalarType.Null => null,
+            _ => value
+        };
+    }
+
+    private static object? CoerceToNumber(object value)
+    {
+        if (value is double or float or int or long or decimal or byte or sbyte or short or ushort or uint or ulong)
+            return Convert.ToDouble(value);
+
+        if (value is string s && double.TryParse(s, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d))
+            return d;
+
+        return value; // Let runtime validation report the error.
+    }
+
+    private static object? CoerceToBoolean(object value)
+    {
+        if (value is bool)
+            return value;
+
+        if (value is string s)
+        {
+            if (string.Equals(s, "true", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (string.Equals(s, "false", StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        return value; // Let runtime validation report the error.
+    }
+
+    private static object? UnwrapJsonElement(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number => element.GetDouble(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Null => null,
+            JsonValueKind.Undefined => null,
+            _ => element.GetRawText()
+        };
     }
 }

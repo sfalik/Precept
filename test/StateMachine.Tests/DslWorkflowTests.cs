@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using FluentAssertions;
 using StateMachine.Dsl;
 using Xunit;
@@ -1597,5 +1598,288 @@ public class DslWorkflowTests
 
                 instance.InstanceData["CarsWaiting"].Should().Be(5d);
             }
-}
 
+    [Fact]
+    public void Parse_EventArg_WithDefault_IsAccepted()
+    {
+        const string dsl = """
+            machine Workflow
+            state A initial
+            event Submit
+                string Reason = "none"
+            from A on Submit
+                no transition
+            """;
+
+        var machine = StateMachineDslParser.Parse(dsl);
+        var arg = machine.Events.Single().Args.Single();
+        arg.Name.Should().Be("Reason");
+        arg.HasDefaultValue.Should().BeTrue();
+        arg.DefaultValue.Should().Be("none");
+        arg.IsNullable.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Parse_NullableEventArg_WithDefault_IsAccepted()
+    {
+        const string dsl = """
+            machine Workflow
+            state A initial
+            event Submit
+                string? Reason = "fallback"
+            from A on Submit
+                no transition
+            """;
+
+        var machine = StateMachineDslParser.Parse(dsl);
+        var arg = machine.Events.Single().Args.Single();
+        arg.Name.Should().Be("Reason");
+        arg.HasDefaultValue.Should().BeTrue();
+        arg.DefaultValue.Should().Be("fallback");
+        arg.IsNullable.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Parse_NullableEventArg_WithNullDefault_IsAccepted()
+    {
+        const string dsl = """
+            machine Workflow
+            state A initial
+            event Submit
+                string? Reason = null
+            from A on Submit
+                no transition
+            """;
+
+        var machine = StateMachineDslParser.Parse(dsl);
+        var arg = machine.Events.Single().Args.Single();
+        arg.HasDefaultValue.Should().BeTrue();
+        arg.DefaultValue.Should().BeNull();
+    }
+
+    [Fact]
+    public void Parse_NonNullableEventArg_WithoutDefault_IsAccepted()
+    {
+        const string dsl = """
+            machine Workflow
+            state A initial
+            event Submit
+                string Reason
+            from A on Submit
+                no transition
+            """;
+
+        var machine = StateMachineDslParser.Parse(dsl);
+        var arg = machine.Events.Single().Args.Single();
+        arg.Name.Should().Be("Reason");
+        arg.HasDefaultValue.Should().BeFalse();
+        arg.IsNullable.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Parse_NullableEventArg_WithoutDefault_IsAccepted()
+    {
+        const string dsl = """
+            machine Workflow
+            state A initial
+            event Submit
+                string? Reason
+            from A on Submit
+                no transition
+            """;
+
+        var machine = StateMachineDslParser.Parse(dsl);
+        var arg = machine.Events.Single().Args.Single();
+        arg.HasDefaultValue.Should().BeFalse();
+        arg.IsNullable.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Parse_EventArg_NumberDefault_IsAccepted()
+    {
+        const string dsl = """
+            machine Workflow
+            state A initial
+            event Submit
+                number Priority = 5
+            from A on Submit
+                no transition
+            """;
+
+        var machine = StateMachineDslParser.Parse(dsl);
+        var arg = machine.Events.Single().Args.Single();
+        arg.HasDefaultValue.Should().BeTrue();
+        arg.DefaultValue.Should().Be(5d);
+    }
+
+    [Fact]
+    public void Parse_EventArg_BooleanDefault_IsAccepted()
+    {
+        const string dsl = """
+            machine Workflow
+            state A initial
+            event Submit
+                boolean Urgent = false
+            from A on Submit
+                no transition
+            """;
+
+        var machine = StateMachineDslParser.Parse(dsl);
+        var arg = machine.Events.Single().Args.Single();
+        arg.HasDefaultValue.Should().BeTrue();
+        arg.DefaultValue.Should().Be(false);
+    }
+
+    [Fact]
+    public void Parse_NonNullableEventArg_WithNullDefault_IsRejected()
+    {
+        const string dsl = """
+            machine Workflow
+            state A initial
+            event Submit
+                string Reason = null
+            from A on Submit
+                no transition
+            """;
+
+        var act = () => StateMachineDslParser.Parse(dsl);
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*default value*does not match*");
+    }
+
+    [Fact]
+    public void Fire_NonNullableEventArg_WithDefault_OmittedByCaller_UsesDefault()
+    {
+        const string dsl = """
+            machine Workflow
+            string? LastReason
+            state A initial
+            event Submit
+                string Reason = "auto"
+            from A on Submit
+                set LastReason = Submit.Reason
+                no transition
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("A", new Dictionary<string, object?>());
+
+        var fire = workflow.Fire(instance, "Submit");
+
+        fire.IsAccepted.Should().BeTrue();
+        fire.UpdatedInstance!.InstanceData["LastReason"].Should().Be("auto");
+    }
+
+    [Fact]
+    public void Fire_NonNullableEventArg_WithDefault_SuppliedByCaller_UsesSupplied()
+    {
+        const string dsl = """
+            machine Workflow
+            string? LastReason
+            state A initial
+            event Submit
+                string Reason = "auto"
+            from A on Submit
+                set LastReason = Submit.Reason
+                no transition
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("A", new Dictionary<string, object?>());
+
+        var fire = workflow.Fire(instance, "Submit", new Dictionary<string, object?> { ["Reason"] = "manual" });
+
+        fire.IsAccepted.Should().BeTrue();
+        fire.UpdatedInstance!.InstanceData["LastReason"].Should().Be("manual");
+    }
+
+    [Fact]
+    public void Fire_NullableEventArg_WithDefault_OmittedByCaller_UsesDefault()
+    {
+        const string dsl = """
+            machine Workflow
+            string? LastReason
+            state A initial
+            event Submit
+                string? Reason = "fallback"
+            from A on Submit
+                set LastReason = Submit.Reason
+                no transition
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("A", new Dictionary<string, object?>());
+
+        var fire = workflow.Fire(instance, "Submit");
+
+        fire.IsAccepted.Should().BeTrue();
+        fire.UpdatedInstance!.InstanceData["LastReason"].Should().Be("fallback");
+    }
+
+    [Fact]
+    public void Fire_NullableEventArg_WithoutDefault_OmittedByCaller_UsesNull()
+    {
+        const string dsl = """
+            machine Workflow
+            string? LastReason
+            state A initial
+            event Submit
+                string? Reason
+            from A on Submit
+                set LastReason = Submit.Reason
+                no transition
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("A", new Dictionary<string, object?>());
+
+        var fire = workflow.Fire(instance, "Submit");
+
+        fire.IsAccepted.Should().BeTrue();
+        fire.UpdatedInstance!.InstanceData["LastReason"].Should().BeNull();
+    }
+
+    [Fact]
+    public void Fire_NonNullableEventArg_WithoutDefault_OmittedByCaller_IsRejected()
+    {
+        const string dsl = """
+            machine Workflow
+            state A initial
+            event Submit
+                string Reason
+            from A on Submit
+                no transition
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("A", new Dictionary<string, object?>());
+
+        var fire = workflow.Fire(instance, "Submit");
+
+        fire.IsAccepted.Should().BeFalse();
+        fire.Reasons.Should().ContainSingle(r => r.Contains("required argument 'Reason'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Inspect_RequiredEventArgumentKeys_ExcludesArgsWithDefaults()
+    {
+        const string dsl = """
+            machine Workflow
+            state A initial
+            state B
+            event Submit
+                string Reason
+                number Priority = 1
+                string? Note
+            from A on Submit
+                transition B
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("A", new Dictionary<string, object?>());
+
+        var inspect = workflow.Inspect(instance, "Submit");
+
+        inspect.RequiredEventArgumentKeys.Should().ContainSingle().Which.Should().Be("Reason");
+    }
+}

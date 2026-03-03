@@ -392,7 +392,7 @@ public sealed class DslWorkflowDefinition
             return Array.Empty<string>();
 
         return argContract.Values
-            .Where(a => !a.IsNullable)
+            .Where(a => !a.IsNullable && !a.HasDefaultValue)
             .Select(a => a.Name)
             .ToArray();
     }
@@ -413,6 +413,22 @@ public sealed class DslWorkflowDefinition
                 evaluation[$"{eventName}.{kvp.Key}"] = kvp.Value;
         }
 
+        // Inject default values for any declared args not supplied by caller.
+        if (_eventArgContractMap.TryGetValue(eventName, out var argContract))
+        {
+            foreach (var arg in argContract.Values)
+            {
+                var key = $"{eventName}.{arg.Name}";
+                if (!evaluation.ContainsKey(key))
+                {
+                    if (arg.HasDefaultValue)
+                        evaluation[key] = arg.DefaultValue;
+                    else if (arg.IsNullable)
+                        evaluation[key] = null;
+                }
+            }
+        }
+
         return evaluation;
     }
 
@@ -420,17 +436,40 @@ public sealed class DslWorkflowDefinition
         string eventName,
         IReadOnlyDictionary<string, object?>? values)
     {
-        if (values is null || values.Count == 0)
-            return EmptyInstanceData.Instance;
-
         var evaluation = new Dictionary<string, object?>(StringComparer.Ordinal);
-        foreach (var kvp in values)
-        {
-            if (kvp.Key.Contains('.', StringComparison.Ordinal))
-                evaluation[kvp.Key] = kvp.Value;
 
-            evaluation[kvp.Key] = kvp.Value;
-            evaluation[$"{eventName}.{kvp.Key}"] = kvp.Value;
+        if (values is not null)
+        {
+            foreach (var kvp in values)
+            {
+                if (kvp.Key.Contains('.', StringComparison.Ordinal))
+                    evaluation[kvp.Key] = kvp.Value;
+
+                evaluation[kvp.Key] = kvp.Value;
+                evaluation[$"{eventName}.{kvp.Key}"] = kvp.Value;
+            }
+        }
+
+        // Inject default values for any declared args not supplied by caller.
+        if (_eventArgContractMap.TryGetValue(eventName, out var argContract))
+        {
+            foreach (var arg in argContract.Values)
+            {
+                var key = $"{eventName}.{arg.Name}";
+                if (!evaluation.ContainsKey(key))
+                {
+                    if (arg.HasDefaultValue)
+                    {
+                        evaluation[arg.Name] = arg.DefaultValue;
+                        evaluation[key] = arg.DefaultValue;
+                    }
+                    else if (arg.IsNullable)
+                    {
+                        evaluation[arg.Name] = null;
+                        evaluation[key] = null;
+                    }
+                }
+            }
         }
 
         return evaluation;
@@ -497,13 +536,11 @@ public sealed class DslWorkflowDefinition
         {
             if (!args.TryGetValue(arg.Name, out var value))
             {
-                if (!arg.IsNullable)
-                {
-                    error = $"Event argument validation failed: required argument '{arg.Name}' for event '{eventName}' is missing.";
-                    return false;
-                }
+                if (arg.HasDefaultValue || arg.IsNullable)
+                    continue;
 
-                continue;
+                error = $"Event argument validation failed: required argument '{arg.Name}' for event '{eventName}' is missing.";
+                return false;
             }
 
             if (!TryValidateScalarValue(arg, value, out error))

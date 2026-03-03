@@ -45,6 +45,6 @@ internal sealed record SmPreviewEventStatus(
     IReadOnlyList<string> Reasons,
     IReadOnlyList<SmPreviewEventArg> Args);
 
-internal sealed record SmPreviewEventArg(string Name, string Type, bool IsNullable);
+internal sealed record SmPreviewEventArg(string Name, string Type, bool IsNullable, bool HasDefaultValue, object? DefaultValue);
 
 internal sealed record SmPreviewDiagnostic(string Severity, string Message, int Line, int Character);

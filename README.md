@@ -116,7 +116,7 @@ machine <Name>
 state <StateName> [initial]
 
 event <EventName>
-[ <ScalarType>[?] <ArgName> { <ArgDecl> } ]
+[ <ScalarType>[?] <ArgName> [= <Literal>] { <ArgDecl> } ]
 
 <ScalarType>[?] <FieldName>
 
@@ -162,6 +162,10 @@ Constraints:
 - `set` is allowed with `no transition` in all branch contexts; assignments execute on fire but state does not change.
 - `reason "..."` is valid only on `reject`.
 - Event arguments and persisted data fields are scalar-only (`string|number|boolean|null`, optional `?`).
+- Event arguments may declare literal defaults using `<ArgName> = <Literal>`.
+- Non-nullable event args without a default are required — the caller must supply them when firing.
+- Non-nullable event args with a default use the default when the caller omits them.
+- Nullable event args are always optional; if omitted, they default to `null` or the declared default.
 - Top-level data fields may declare literal defaults using `<Field> = <Literal>`.
 - Defaults are applied when creating instances and can be overridden by caller-supplied instance data.
 - Non-nullable top-level data fields must declare defaults.
@@ -223,7 +227,23 @@ from PendingReview on Escalate
     reject "Actor and Reason are required"
 ```
 
-6) Multi-source state list (explicit sources)
+6) Event args with defaults
+
+```text
+event Submit
+  string Reason
+  number Priority = 1
+  string? Note
+
+from Draft on Submit
+  set LastPriority = Submit.Priority
+  set LastNote = Submit.Note
+  transition PendingReview
+```
+
+`Reason` is required (non-nullable, no default). `Priority` defaults to `1` if omitted. `Note` is nullable and defaults to `null` if omitted.
+
+7) Multi-source state list (explicit sources)
 
 ```text
 from Draft,PendingReview on Cancel
@@ -231,7 +251,7 @@ from Draft,PendingReview on Cancel
   transition Cancelled
 ```
 
-7) Global handler with `from any`
+8) Global handler with `from any`
 
 ```text
 event Archive
@@ -240,14 +260,14 @@ from any on Archive
   transition Archived
 ```
 
-8) Explicitly disable an event in one state
+9) Explicitly disable an event in one state
 
 ```text
 from Archived on Submit
   no transition
 ```
 
-9) Null-safe numeric guard + read-your-writes multi-set
+10) Null-safe numeric guard + read-your-writes multi-set
 
 ```text
 number? RetryCount
@@ -264,7 +284,7 @@ from Active on Retry
     reject "RetryCount is unavailable"
 ```
 
-10) Guarded `no transition` with `set` (valid in all branch contexts)
+11) Guarded `no transition` with `set` (valid in all branch contexts)
 
 ```text
 from Active on Pause
@@ -275,7 +295,7 @@ from Active on Pause
     transition Paused
 ```
 
-11) Unguarded `no transition` with `set`
+12) Unguarded `no transition` with `set`
 
 ```text
 from FlashingRed on Advance

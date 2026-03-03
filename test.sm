@@ -1,13 +1,26 @@
 machine Test
 
-state Idle initial
-state Active
+state Start initial
+state One
+state Two
+state Three
+state Four
+state End
 
-event Start
-event Stop
+event Next
+event Reset
 
-from Idle on Start
-    transition Active
 
-from Active on Stop
-    transition Idle
+from Start on Next
+    transition One
+from One on Next
+    transition Two
+from Two on Next
+    transition Three
+from Three on Next 
+    transition Four
+from Four on Next
+    transition End
+
+from End on Reset
+    transition Start

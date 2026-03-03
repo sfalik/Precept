@@ -12,7 +12,7 @@ public static class StateMachineDslParser
     private static readonly Regex EventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
     private static readonly Regex TypedEventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*\\((?<arg>[A-Za-z_][A-Za-z0-9_<>., ]*)\\)$", RegexOptions.Compiled);
     private static readonly Regex EventArgFieldRegex = new(
-        "^(?<type>string|number|boolean|null)(?<nullable>\\?)?\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$",
+        "^(?<type>string|number|boolean|null)(?<nullable>\\?)?\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\s*=\\s*(?<default>.+))?$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex DataFieldRegex = new(
         "^(?<type>string|number|boolean|null)(?<nullable>\\?)?\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\s*=\\s*(?<default>.+))?$",
@@ -212,16 +212,25 @@ public static class StateMachineDslParser
 
             var fieldMatch = EventArgFieldRegex.Match(line);
             if (!fieldMatch.Success)
-                throw new InvalidOperationException($"Line {index + 1}: invalid argument declaration '{line}'. Expected '<string|number|boolean|null>[?] <Name>'.");
+                throw new InvalidOperationException($"Line {index + 1}: invalid argument declaration '{line}'. Expected '<string|number|boolean|null>[?] <Name> [= <Default>]'.");
 
             var fieldName = fieldMatch.Groups["name"].Value;
             if (args.Any(a => string.Equals(a.Name, fieldName, StringComparison.Ordinal)))
                 throw new InvalidOperationException($"Line {index + 1}: duplicate argument '{fieldName}' for event '{eventName}'.");
 
+            var argType = ParseScalarType(fieldMatch.Groups["type"].Value);
+            var argIsNullable = fieldMatch.Groups["nullable"].Success;
+            var argHasDefault = fieldMatch.Groups["default"].Success;
+            var argDefaultValue = argHasDefault
+                ? ParseFieldDefaultLiteral(fieldMatch.Groups["default"].Value.Trim(), argType, argIsNullable, fieldName, index + 1)
+                : null;
+
             args.Add(new DslFieldContract(
                 fieldName,
-                ParseScalarType(fieldMatch.Groups["type"].Value),
-                fieldMatch.Groups["nullable"].Success));
+                argType,
+                argIsNullable,
+                argHasDefault,
+                argDefaultValue));
             index++;
         }
 
