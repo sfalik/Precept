@@ -30,6 +30,39 @@
                 "cwd": "${workspaceFolder}/tools/StateMachine.Dsl.VsCode"
             },
             "problemMatcher": []
+        },
+        {
+            "label": "extension: watch",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "run",
+                "dev:watch"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/tools/StateMachine.Dsl.VsCode"
+            },
+            "isBackground": true,
+            "problemMatcher": [
+                {
+                    "owner": "typescript",
+                    "fileLocation": "relative",
+                    "pattern": {
+                        "regexp": "^(.*)\\((\\d+),(\\d+)\\):\\s+(error|warning)\\s+(TS\\d+):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "code": 5,
+                        "message": 6
+                    },
+                    "background": {
+                        "activeOnStart": true,
+                        "beginsPattern": "Starting compilation in watch mode",
+                        "endsPattern": "Found\\s+\\d+\\s+errors?\\.\\s+Watching for file changes"
+                    }
+                }
+            ]
         }
     ]
 }

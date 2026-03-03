@@ -10,85 +10,31 @@ StateMachine is a .NET DSL-driven state/workflow engine focused on deterministic
 - **Explicit event arguments**: per-call arguments are separate from persisted instance 
 - **Transition-scoped data updates**: `set <Key> = ...` assignments run only on accepted `fire`.
 
+## Current Status
+
+- DSL parser/compiler/runtime is implemented and used by the language server for editor diagnostics and preview execution.
+- VS Code extension is implemented with automatic `.sm` language-client activation plus inspector preview panels per file.
+- Inspector preview now exchanges live `snapshot`/`fire`/`reset` requests through the language server (`stateMachine/preview/request`) instead of only local mock data.
+- Inspector preview layout uses ELK presets (`spacious`, `balanced`, `compact`, `orthogonal`, `top-down`) with `balanced` as default, plus stabilization/deconfliction passes to reduce edge overlap and node jumpiness between updates.
+- CLI host has been removed in this branch (hard cut); editor + language server are the active runtime surfaces.
+
 ## Quick Start (2 minutes)
 
-Run the included traffic-light sample in REPL mode:
+Run the language server:
 
 ```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json --unicode
+dotnet run --project tools/StateMachine.Dsl.LanguageServer
 ```
 
-Then try:
-
-```text
-Red › events
-  ├─ Advance
-  ├─ Emergency
-  └─ ClearEmergency
-
-Red › data
-  ├─ CycleCount: 0
-  ├─ EmergencyReason: <null>
-  ├─ LeftTurnQueued: true
-  └─ VehiclesWaiting: 0
-
-Red › inspect
-  ├─ Advance
-  │ ├─ ──▷ FlashingGreen
-  │ └─ ──✕ Green
-  └─ Emergency(AuthorizedBy,Reason) ⚠ | AuthorizedBy and Reason are required to activate emergency mode
-    └─ ──▷ FlashingRed
-
-Red › fire Advance
-  └─ Advance ✔ ──▶ FlashingGreen
-
-FlashingGreen › fire Advance
-  └─ Advance ✔ ──▶ Green
-
-Green › fire Advance
-  └─ Advance ✔ ──▶ Yellow
-
-Yellow › fire Advance
-  └─ Advance ✔ ──▶ Red
-
-Red › inspect Advance
-  └─ Advance
-    ├─ ──▷ FlashingGreen
-    └─ ──✕ Green
-
-Red › fire Emergency
-  └─ Emergency ⚠ | Event argument validation failed: required argument 'AuthorizedBy' for event 'Emergency' is missing.
-
-Red › fire Emergency
-  │ AuthorizedBy: Dispatcher
-  │ Reason: Accident
-  └─ Emergency ✔ ──▶ FlashingRed
-
-FlashingRed › fire Advance
-  └─ Advance ✖ | no transition from FlashingRed
-
-FlashingRed › fire ClearEmergency
-  └─ ClearEmergency ✔ ──▶ Red
-```
-
-Note: interactive REPL does not accept inline JSON event arguments for `inspect`/`fire`; use prompted values for required args.
-Note: output is colorized by default (success/warning/error); use `--no-color` to disable.
-Note: `inspect` after the fourth `fire Advance` shows blocked because `LeftTurnQueued` was cleared and `VehiclesWaiting` is 0.
-
-Quick script run (non-interactive):
+Run the VS Code extension locally:
 
 ```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json --script ./traffic.script.txt --echo --unicode
+cd tools/StateMachine.Dsl.VsCode
+npm install
+npm run compile
 ```
 
-Expected compact output shape:
-
-```text
-sm> fire Advance
-[INFO] Advance: Red → FlashingGreen
-sm> fire Emergency '{"AuthorizedBy":"Dispatcher","Reason":"Accident"}'
-[INFO] Emergency: Red → FlashingRed
-```
+Then press `F5`, open a `.sm` file, and run `StateMachine DSL: Open Inspector Preview`.
 
 ## Core Concepts
 
@@ -342,83 +288,6 @@ from Active on Pause
 }
 ```
 
-## CLI Usage
-
-Launch REPL:
-
-```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json --unicode
-```
-
-Run script mode:
-
-```sh
-dotnet run --project tools/StateMachine.Dsl.Cli -- ./trafficlight.sm --instance ./traffic.instance.json --script ./traffic.script.txt --unicode
-```
-
-CLI output options:
-
-- `--echo` (echo script commands in script mode)
-- `--no-color` (disable ANSI coloring)
-- symbols default to `auto` detection (uses Unicode if terminal signals support; otherwise ASCII)
-- `--unicode` (force Unicode symbols in compact mode)
-- `--ascii` (force ASCII symbols in compact mode)
-
-Notes:
-
-- Interactive REPL is compact-only.
-- Script mode emits log-style output lines (`INFO`/`WARN`/`ERROR`).
-
-REPL commands:
-
-- `help`
-- `clear`
-- `symbols [auto|ascii|unicode|test]`
-- `style preview [all]`
-- `style theme <name|list>`
-- `Tab` for command/event/theme completion
-- `Up/Down` history, `Right Arrow` accept-inline completion
-- `state`
-- `events`
-- `data`
-- `inspect [EventName]`
-- `fire <EventName>`
-- `load <path>`
-- `save [path]`
-- `exit | quit`
-
-`symbols test` prints a compact ASCII/Unicode compatibility matrix so you can choose the best symbol mode for your current terminal/font.
-`style preview` prints a compact scenario matrix in your terminal using the current theme.
-`style preview all` prints the same compact scenario matrix for all built-in themes in one run.
-Style previews render a realistic timeline transcript using the same compact line structures as live REPL output and now exercise the full compact outcome surface (inspect-all/single, multi-target reachable/unreachable child arrows, blocked guard-linked child previews, fire success, undefined unknown-event and no-transition cases, argument prompts, and truncation behavior).
-`style theme list` shows available themes: `mono-accent`, `muted`, `nord-crisp`, `tokyo-night`, `github-dark`, `solarized-modern`, `dracula`, `rose-pine`, `everforest`, `catppuccin-mocha`, `one-dark-pro`, `gruvbox-dark`, `material-ocean`, `night-owl`, `palenight`, `cobalt2`, `ayu-mirage`, `horizon-dark`, `kanagawa-wave`, `synthwave-84`, `monokai-pro`, `sepia-soft`, `forest-night`, `iceberg`, `carbon`, `neon-mint`, `ember`, `lavender-mist`, `slate-blue`, and `slate-blue-vivid`.
-`style theme <name>` applies a theme immediately for the current REPL session.
-Interactive REPL supports `Tab` completion for commands, event names (`inspect`/`fire`), `style theme` names, and `symbols` subcommands.
-Interactive REPL also supports `Up`/`Down` command history navigation and `Right Arrow` to accept the current inline completion.
-Interactive REPL type-ahead shows inline completion hints for the token you are currently typing.
-Default theme at startup is `slate-blue-vivid`.
-`inspect` without an event name evaluates all workflow events and lists callable plus guarded events from the current state.
-Inspect preview is eager: if current data (and any provided args) is sufficient to resolve a concrete transition, inspect shows the concrete preview target.
-When more than one transition target is defined for an event from the current state, inspect keeps the resolved target on the event line and renders alternate targets as child lines with an unreachable marker (`──✕`, ASCII: `--X`).
-When required args are missing and guard logic depends on those missing args, inspect treats the outcome as ambiguous and renders child target lines (`├─`/`└─`) with hollow preview arrows (`──▷`) for possible transition targets.
-For ambiguous inspect results with a terminal `reject`, the reject reason is shown on the event line.
-In interactive REPL mode, `fire <EventName>` prompts for each required event arg (with type hints like `[string]`, `[number]`, `[boolean]`).
-Interactive fire prompts apply input coercion for declared scalar arg types and re-prompt until a valid value is entered.
-In interactive REPL mode, `data` renders a readable key-value list by default; use output json to emit JSON.
-Interactive REPL uses compact output only.
-Interactive REPL exits cleanly on stdin EOF (for example, after piped input completes).
-Interactive compact output is intentionally concise and omits repeated command/event labels.
-Interactive compact mode uses a timeline-style prompt (`Red ›`) and branch prefixes (`├─`/`└─`) with semantic transition arrows: preview uses `──▷` (ASCII: `-->`) and committed success uses `──▶` (ASCII: `==>`).
-Compact color roles are consistent across inspect/fire/style-preview: events use event color, states use state color, status markers (`✔`/`⚠`/`✖`) use success/warn/error colors, reachable preview arrows (`──▷`/`-->`) and committed fire arrows (`──▶`/`==>`) use success color, and unreachable child arrows (`──✕`/`--X`) use error color while target state labels remain state-colored.
-Structural timeline glyphs and indentation (`├─`, `└─`, `│`) are rendered in neutral/meta color so only semantic tokens carry status/event/state coloring.
-When a guarded event is blocked but still lists candidate targets, those child preview arrows (`──▷`/`-->`) use warning color to indicate guard-linked conditional reachability.
-Single-event `inspect <EventName>` preview output is visually highlighted from inspect-all rows to emphasize direct command results.
-Interactive compact inspect lists use natural spacing (no fixed event-column padding) to avoid wide gaps with long event signatures.
-Interactive compact inspect/fire outcome rows stay on one line; long status text is truncated with `...` to preserve timeline/arrow alignment.
-Interactive compact `events` output aligns event-name columns for visual consistency.
-Interactive compact non-prompt lines (including argument prompts like `│  Reason: value`) are rendered as timeline children beneath each prompt.
-Verbose mode renders structured table/panel output for inspect/fire details and callable-event listings.
-
 ## Language Server (MVP)
 
 Project:
@@ -479,9 +348,22 @@ npm run loop:local
 
 Then in VS Code run: `Developer: Reload Window`.
 
+Fast inner-loop (no VSIX package/install):
+
+- Start TypeScript watch once:
+
+```sh
+cd tools/StateMachine.Dsl.VsCode
+npm run dev:watch
+```
+
+- In VS Code, press `F5` and select `Extension (StateMachine DSL) Fast Dev`.
+- Keep watch running while iterating; reload the Extension Development Host window to pick up changes quickly.
+
 In-IDE trigger (no terminal typing):
 
 - `Terminal: Run Task` → `extension: loop local install`
+- `Terminal: Run Task` → `extension: watch`
 
 Run/debug in VS Code:
 
@@ -494,46 +376,38 @@ Run/debug in VS Code:
 - Local packaging uses `npm run package:local` and emits a `.vsix` in `tools/StateMachine.Dsl.VsCode`.
 - Fast local iteration uses `npm run loop:local` to package and force-install the latest VSIX.
 - Local VSIX packaging includes language-client runtime dependencies (`node_modules`) required for extension activation.
+- Local VSIX packaging also includes webview assets under `webview/` required by inspector preview.
+- Inspector preview can be opened from command palette via `StateMachine DSL: Open Inspector Preview` while editing a `.sm` file.
+- Preview opens as dedicated webview panels per `.sm` file (independent panel/session per file URI).
+- Preview panels request live snapshots from the language server and refresh from unsaved in-memory `.sm` edits as the document changes.
+- Preview also refreshes on `.sm` save and when an existing panel is re-focused/revealed.
+- Snapshot updates are sequence-ordered so stale async responses cannot overwrite newer in-memory edits.
+- Preview webview accepts both camelCase and PascalCase snapshot payload keys for robust host/runtime compatibility.
+- `Reload` requests a fresh live snapshot (with a short retry) from the current in-memory editor buffer; it does not require saving first.
+- Preview event actions (`fire`, `reset`, `replay`) are executed via the language server runtime session for that file.
+- The language server binds preview requests with a typed JSON-RPC request handler and declares `[Method("stateMachine/preview/request")]` on `SmPreviewRequest` to ensure runtime method registration.
 
 Troubleshooting completion/diagnostics:
 
 - Open `View: Output` and select `StateMachine DSL` to inspect language-client startup logs and server path resolution.
 
-### Interactive Inspector Mockup (Current)
+### Inspector Preview UI (Current)
 
-- Reference: `docs/InteractiveInspectorMockup.md`
-- Primary UX is bottom-dock driven with a state-scoped vertical event list.
-- Event rows execute directly and use transient hover/focus selection (no sticky selection).
-- `Emergency` args are inline and re-evaluate event/diagram semantics live.
-- Data changes after a successful fire are shown as per-field transient inline `before → after` text (not a chip) that temporarily replaces current value display.
-- Red events show always-visible inline reasons; reason text clears when the event becomes green.
-- Fire feedback is row-anchored (transient result chip).
-- Successful fires trigger one coherent transition timeline (same duration as transient toasts): source-state transition semantics fade out while destination-state semantics fade in, with a runner moving along the accepted transition path.
-- Hover-driven event emphasis resumes after the transition timeline completes.
-- During the timeline, source-state active emphasis leads and destination active fill is finalized at animation completion.
-- During this timeline, non-focused/de-emphasized transitions and states stay de-emphasized; animation is limited to the accepted path and source→destination handoff.
-- Pre-click semantic highlights (including red alternatives/reject paths on the fired event) fade out smoothly across the timeline rather than disappearing instantly.
-- On hover, the actual selected destination matches current-state brightness but stays hollow; alternate/blocked destinations remain dimmer.
-- On click/transition, destination brightness is preserved from frame 0 (no instant jump), then transitions smoothly to committed current-state fill at timeline end.
-- Transition rendering is layered (halo + beam + sweep + runner trail) with subtle source-collapse and destination-arrival rings for smoother visual continuity.
-
-Simplified animation contract:
-1. Hover: emphasize selected event semantics; keep others de-emphasized.
-2. Click/transition: freeze+fade pre-click semantics, animate accepted path/runner only, keep destination dim, suppress hover.
-3. Commit: destination becomes current, then normal hover semantics resume.
-- `Reload` resets to initial sample state/data and clears transient UI state.
-- `Reload` includes event-style hover emphasis and brief pressed-state click feedback.
-- Diagram semantics are always visible from current state and use hover-scoped emphasis:
-  - hovered event paths are slightly emphasized,
-  - non-hovered paths are strongly muted,
-  - destination outlines/labels are semantic (green/red),
-  - only hovered event's actual destination becomes solid green.
-- Edge/chip/sidecar rendering follows the same semantic color + muting model with normalized arrow/stroke sizing.
-- Layout is simplified to diagram + in-canvas Data lane above the bottom Events dock.
-- Diagram and in-canvas Data no longer share an outer panel wrapper.
-- Data lane has no inner panel wrapper.
-- Resize behavior is viewport-bounded: Data stays inside the diagram canvas and moves below the diagram area on narrower widths without overlaying it.
-- Data scrolls internally.
+- Runtime preview uses `tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html`, which now hosts the mock-style visual shell while sourcing runtime state from language-server snapshots.
+- Mock reference remains intact at `tools/StateMachine.Dsl.VsCode/mockups/interactive-inspector-mockup.html` and is not used as the runtime source file.
+- State graph/events/data visuals follow the mock-style presentation while `snapshot`/`fire`/`reset`/`replay` requests execute against the real `.sm` runtime session.
+- Runtime layout is hard-cut to ELK layered graph geometry computed in the extension host and injected into snapshots (`snapshot.layout`).
+- Layout preset is configurable with `stateMachineDsl.preview.layoutMode` (`balanced` default, `spacious`, `compact`, `orthogonal`, `top-down`).
+- Webview rendering now prefers ELK-provided node coordinates and edge polyline sections, with fallback heuristics only if layout payload is absent.
+- Extension post-processing applies parallel-edge plus fan-in/fan-out lane separation and incremental smoothing to improve readability and reduce visual jitter.
+- Dense same-event fan-in transitions into one target are routed through dedicated ingress bands near the destination to reduce terminal crossings.
+- Webview annotation chips apply lane-aware placement and collision deconfliction for dense transition clusters.
+- `balanced` now uses a vertical-first layered profile to better use available pane height and reduce very wide horizontal flows.
+- Extension normalizes layout to content bounds and webview fits the SVG to the pane (no diagram scrolling) while preserving readable annotation sizing.
+- Inspector top bar includes a `Layout` switch: `Default` (raw ELK geometry from `snapshot.layoutRaw`, no post-processing) and `Optimized` (organic relaxed node layout from `snapshot.layout` with curved webview routing).
+- Supported runtime actions are `snapshot` (reload), `fire`, `reset`, and `replay` via `stateMachine/preview/request`.
+- `Reload` requests a fresh runtime snapshot from the current in-memory editor text.
+- Activity log lines are sourced from runtime responses (including replay messages and snapshot failures).
 
 Exit codes:
 
@@ -556,8 +430,7 @@ Implemented now:
 - Set parser/model foundation for B-v1: transitions now carry ordered set-assignment lists and set expressions parse into an expression AST.
 - Shared AST expression evaluator now drives guard evaluation and set expression execution.
 - Atomic ordered multi-set execution is implemented on fire-path updates with read-your-writes and all-or-nothing commit semantics.
-- CLI REPL + script execution
-- Active test coverage in `test/StateMachine.Tests/DslWorkflowTests.cs` and `test/StateMachine.Tests/CliRenderingTests.cs`
+- Active test coverage in `test/StateMachine.Tests/DslWorkflowTests.cs`
 - Active parser/runtime coverage also includes expression AST parsing/edge-case diagnostics, set parsing coverage, and runtime evaluator operator/short-circuit behavior in `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslSetParsingTests.cs`, and `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`.
 - Language-server analyzer coverage now includes null-flow narrowing diagnostics tests in `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs`.
 - Language server MVP in `tools/StateMachine.Dsl.LanguageServer` (stdio diagnostics + completion)
@@ -634,7 +507,7 @@ This workspace recommends official .NET extensions via `.vscode/extensions.json`
 - `ms-dotnettools.csharp`
 - `ms-dotnettools.vscode-dotnet-runtime`
 
-Press `F5` and choose `REPL (traffic sample)` to run the sample directly.
+Press `F5` and choose `Extension (StateMachine DSL)` to run the extension host.
 
 ## Repository Layout
 
@@ -645,9 +518,6 @@ src/StateMachine/
         StateMachineDslParser.cs
         StateMachineDslRuntime.cs
 
-tools/StateMachine.Dsl.Cli/
-    Program.cs
-
 tools/StateMachine.Dsl.LanguageServer/
     Program.cs
 
@@ -655,6 +525,5 @@ tools/StateMachine.Dsl.VsCode/
   src/extension.ts
 
 test/StateMachine.Tests/
-  CliRenderingTests.cs
     DslWorkflowTests.cs
 ```

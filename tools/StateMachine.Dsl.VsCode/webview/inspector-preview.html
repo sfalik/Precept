@@ -1,0 +1,2760 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>State Diagram Inspector Mockup</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --feedback-ms: 2200ms;
+      --bg: #1e1e1e;
+      --panel: #252526;
+      --meta: #59657A;
+      --info: #FFFFFF;
+      --success: #1FFF7A;
+      --warning: #FFF12A;
+      --error: #FF2A57;
+      --state: #6D7F9B;
+      --event: #8573A8;
+      --preview-event: #1FFF7A;
+      --preview-state: #7F92AF;
+      --border: #59657A;
+      --text: #FFFFFF;
+      --muted: #59657A;
+      --ok: #1FFF7A;
+      --warn: #FFF12A;
+      --err: #FF2A57;
+      --accent: #8573A8;
+      --node: #24262b;
+      --edge: #1FFF7A;
+      --edge-warn: #FFF12A;
+      --edge-error: #FF2A57;
+      --edge-muted: #6D7F9B;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 12px;
+      font: 13px/1.4 "Segoe UI", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header,
+    .layout {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+    }
+
+    .status {
+      color: var(--state);
+      font-weight: 600;
+    }
+
+    .muted { color: var(--muted); }
+
+    .actions button {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text);
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+
+    #reload-btn {
+      border-radius: 999px;
+      background: #242730;
+      transition: border-color 120ms ease, background 120ms ease, transform 90ms ease, box-shadow 120ms ease;
+    }
+
+    #reload-btn:hover,
+    #reload-btn:focus-visible {
+      border-color: var(--event);
+      box-shadow: 0 0 0 1px rgba(133, 115, 168, 0.26);
+      outline: none;
+    }
+
+    #reload-btn:active,
+    #reload-btn.is-clicked {
+      border-color: var(--event);
+      background: rgba(133, 115, 168, 0.22);
+      transform: translateY(1px);
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .mode-select {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: #1f2125;
+      color: var(--text);
+      padding: 4px 8px;
+      font: inherit;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+      padding: 12px;
+      overflow: hidden;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+
+    .left-stack {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      gap: 10px;
+      grid-template-rows: minmax(0, 1fr) auto;
+    }
+
+    .diagram-canvas {
+      grid-row: 1;
+      min-height: 220px;
+      overflow: hidden;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) clamp(190px, 32%, 280px);
+      grid-template-rows: minmax(0, 1fr);
+      gap: 8px;
+      padding: 0;
+      align-items: stretch;
+    }
+
+    .diagram-scroll {
+      min-width: 0;
+      min-height: 0;
+      height: 100%;
+      overflow: hidden;
+      border: 1px solid #34363a;
+      border-radius: 8px;
+      background: #1d1f23;
+      display: grid;
+      place-items: stretch;
+    }
+
+    .events-pane {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .data-overlay {
+      position: relative;
+      width: 100%;
+      max-width: 100%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      padding: 0;
+      align-self: stretch;
+    }
+
+    .data-overlay .section-label {
+      margin: 0 0 6px;
+    }
+
+    .meta-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(31, 33, 37, 0.9);
+      padding: 7px 8px;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .meta-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .meta-card .section-label {
+      margin: 0;
+    }
+
+    .event-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 2px;
+      overflow: auto;
+      max-height: clamp(120px, 30vh, 260px);
+    }
+
+    .event-btn {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #242730;
+      color: var(--text);
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 120px;
+    }
+
+    .event-btn:hover {
+      border-color: var(--event);
+    }
+
+    .event-btn.active {
+      border-color: var(--event);
+      background: rgba(133, 115, 168, 0.22);
+    }
+
+    .event-btn.enabled {
+      border-color: var(--ok);
+      color: var(--ok);
+      background: rgba(31, 255, 122, 0.14);
+    }
+
+    .event-btn.undefined {
+      border-color: var(--err);
+      color: var(--err);
+      background: rgba(255, 42, 87, 0.12);
+      opacity: 0.72;
+      cursor: not-allowed;
+    }
+
+    .event-btn.blocked {
+      border-color: var(--err);
+      color: var(--err);
+      background: rgba(255, 42, 87, 0.12);
+    }
+
+    .event-entry {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 0;
+    }
+
+    .event-reason {
+      grid-column: 1 / -1;
+      color: var(--err);
+      font-size: 11px;
+      line-height: 1.25;
+      margin-top: -1px;
+      opacity: 0.7;
+      transition: opacity 120ms ease;
+    }
+
+    .event-entry.is-selected .event-reason,
+    .event-entry:hover .event-reason {
+      opacity: 0.98;
+    }
+
+    .event-result-chip {
+      justify-self: start;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 10px;
+      line-height: 1;
+      padding: 3px 8px;
+      opacity: 0;
+      transform: translateY(2px);
+      transition: opacity 130ms ease, transform 130ms ease;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .event-result-chip.show {
+      opacity: 0.98;
+      transform: translateY(0);
+    }
+
+    .event-result-chip.ok {
+      border-color: var(--ok);
+      color: var(--ok);
+      background: rgba(31, 255, 122, 0.12);
+    }
+
+    .event-result-chip.err {
+      border-color: var(--err);
+      color: var(--err);
+      background: rgba(255, 42, 87, 0.12);
+    }
+
+    .event-label {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      opacity: 0.86;
+      transition: opacity 120ms ease;
+    }
+
+    .event-entry.is-selected .event-label,
+    .event-entry:hover .event-label {
+      opacity: 1;
+    }
+
+    .event-glyph {
+      font-size: 11px;
+      font-weight: 700;
+      min-width: 10px;
+      text-align: center;
+    }
+
+    .event-args-inline {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    .event-args-inline input {
+      width: 120px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #1f2125;
+      color: var(--text);
+      padding: 3px 10px;
+      font: inherit;
+      font-size: 11px;
+      outline: none;
+    }
+
+    .section-label {
+      margin: 0 0 8px;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+
+    #diagram {
+      width: 100%;
+      min-width: 0;
+      height: clamp(340px, 62vh, 620px);
+      display: block;
+    }
+
+    .data-list {
+      margin: 0 0 12px;
+      padding: 0;
+      list-style: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #1f2125;
+      max-height: 180px;
+      overflow: auto;
+    }
+
+    .data-overlay .data-list {
+      margin: 0;
+      max-height: clamp(84px, 20vh, 170px);
+      background: rgba(20, 21, 26, 0.85);
+      flex: 1 1 auto;
+    }
+
+    .data-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 8px;
+      border-bottom: 1px solid #3a3a3a;
+      font-size: 12px;
+    }
+
+    .data-key {
+      display: inline-flex;
+      align-items: center;
+      gap: 0;
+      min-width: 0;
+    }
+
+    .data-value-stack {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+
+    .data-list li:last-child {
+      border-bottom: none;
+    }
+
+    .data-value-toast {
+      color: var(--ok);
+      font-weight: 600;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 130ms ease, transform 130ms ease;
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: right;
+      line-height: 1.2;
+      font-size: 11px;
+      pointer-events: none;
+    }
+
+    .data-value-toast.show {
+      opacity: 0.98;
+      transform: translateY(0);
+    }
+
+    .diagram-edge {
+      cursor: default;
+      transition: opacity 120ms ease, stroke-width 120ms ease;
+    }
+
+    .edge-annotation {
+      user-select: none;
+    }
+
+    .edge-annotation.clickable {
+      pointer-events: none;
+      cursor: default;
+    }
+
+    .edge-chip {
+      font-size: 11px;
+    }
+
+    .edge-annotation.clickable:hover .edge-chip {
+      stroke-width: 1.6;
+      filter: drop-shadow(0 0 2px rgba(133,115,168,.45));
+    }
+
+    .edge-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+
+    .edge-guard {
+      font-size: 9px;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+
+
+    @media (max-width: 1180px) {
+      .diagram-canvas {
+        grid-template-columns: minmax(0, 1fr) clamp(176px, 30%, 260px);
+      }
+
+      .event-entry {
+        grid-template-columns: 146px 1fr;
+      }
+
+      .event-args-inline {
+        flex-wrap: wrap;
+        overflow: visible;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .diagram-canvas {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) auto;
+      }
+
+      .data-overlay {
+        width: 100%;
+      }
+
+      .event-bar {
+        max-height: clamp(112px, 26vh, 220px);
+      }
+    }
+
+    @media (max-height: 860px) {
+      .data-list {
+        max-height: 140px;
+      }
+
+      .diagram-canvas {
+        min-height: 200px;
+      }
+
+      #diagram {
+        height: clamp(250px, 46vh, 360px);
+      }
+
+      .data-overlay .data-list {
+        max-height: clamp(78px, 20vh, 124px);
+      }
+
+      .event-bar {
+        max-height: clamp(104px, 24vh, 192px);
+      }
+    }
+
+    @media (max-height: 740px) {
+      body {
+        font-size: 12px;
+      }
+
+      .header {
+        padding: 8px 10px;
+        margin-bottom: 8px;
+      }
+
+      .layout {
+        gap: 8px;
+        padding: 8px;
+      }
+
+      .event-btn {
+        padding: 3px 9px;
+        font-size: 11px;
+      }
+
+      .event-result-chip {
+        font-size: 9px;
+      }
+
+      .diagram-canvas {
+        min-height: 170px;
+      }
+
+      #diagram {
+        height: 200px;
+      }
+
+      .data-overlay .data-list {
+        max-height: 82px;
+      }
+
+      .event-bar {
+        max-height: clamp(96px, 22vh, 164px);
+      }
+    }
+
+    @media (max-height: 660px) {
+      .diagram-canvas {
+        min-height: 150px;
+      }
+
+      #diagram {
+        height: 170px;
+      }
+
+      .data-overlay {
+        padding: 6px 7px;
+      }
+
+      .data-overlay .data-list {
+        max-height: 68px;
+      }
+
+      .event-bar {
+        max-height: clamp(88px, 20vh, 136px);
+      }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <strong>State Diagram Inspector</strong>
+      <span class="muted"> · trafficlight.sm</span>
+      <span id="header-state" class="status"> · Current: Red</span>
+    </div>
+    <div class="actions">
+      <label for="render-mode" class="muted">Layout</label>
+      <select id="render-mode" class="mode-select" aria-label="layout mode">
+        <option value="default" selected>Default</option>
+        <option value="optimized">Optimized</option>
+      </select>
+      <button id="reload-btn" type="button">Reload</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="left-stack">
+      <div class="diagram-canvas">
+        <div class="diagram-scroll" aria-label="diagram scroll area">
+          <svg id="diagram" viewBox="0 0 920 430" aria-label="state diagram"></svg>
+        </div>
+        <div class="data-overlay" aria-label="data overlay">
+          <ul id="data-list" class="data-list"></ul>
+        </div>
+      </div>
+      <div class="meta-card events-pane" aria-label="event dock">
+        <div id="event-bar" class="event-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let stateOrder = ['Red', 'Green', 'Yellow', 'FlashingGreen', 'FlashingRed'];
+    let statePositions = {
+      Red: { x: 120, y: 80 },
+      FlashingGreen: { x: 300, y: 80 },
+      Green: { x: 480, y: 80 },
+      Yellow: { x: 660, y: 80 },
+      FlashingRed: { x: 390, y: 250 }
+    };
+    let transitions = [
+      { from: 'Red', event: 'Advance', to: 'FlashingGreen' },
+      { from: 'Red', event: 'Advance', to: 'Green' },
+      { from: 'FlashingGreen', event: 'Advance', to: 'Green' },
+      { from: 'Green', event: 'Advance', to: 'Yellow' },
+      { from: 'Yellow', event: 'Advance', to: 'Red' },
+      { from: 'FlashingRed', event: 'ClearEmergency', to: 'Red' },
+      { from: 'Red', event: 'Emergency', to: 'FlashingRed' },
+      { from: 'FlashingGreen', event: 'Emergency', to: 'FlashingRed' },
+      { from: 'Green', event: 'Emergency', to: 'FlashingRed' },
+      { from: 'Yellow', event: 'Emergency', to: 'FlashingRed' },
+      { from: 'FlashingRed', event: 'Emergency', to: 'FlashingRed' }
+    ];
+    let eventDefinitionOrder = ['Advance', 'Emergency', 'ClearEmergency'];
+    const FEEDBACK_DURATION_MS = 2200;
+
+    let initialState = 'Red';
+    let initialData = {
+      CycleCount: 0,
+      VehiclesWaiting: 0,
+      LeftTurnQueued: true,
+      EmergencyReason: null
+    };
+    let currentState = initialState;
+    const data = {
+      ...initialData
+    };
+    const mockEmergencyArgs = {
+      AuthorizedBy: '',
+      Reason: ''
+    };
+
+    const diagram = document.getElementById('diagram');
+    const headerState = document.getElementById('header-state');
+    const dataList = document.getElementById('data-list');
+    const eventBar = document.getElementById('event-bar');
+    const reloadButton = document.getElementById('reload-btn');
+    const renderModeSelect = document.getElementById('render-mode');
+    let selectedTransitionIndex = transitions.findIndex((t) => t.from === 'Red' && t.event === 'Advance' && t.to === 'FlashingGreen');
+    let hoveredEventName = null;
+    let rowFeedbackTimer = null;
+    let rowFeedback = null;
+    let dataFieldToastTimer = null;
+    let stateChangeAnimationFrame = null;
+    let pendingFocusEventName = null;
+    let dataFieldToasts = new Set();
+    let dataFieldToastDetails = new Map();
+    let stateChangeAnimation = null;
+    let suppressHoverUntilAnimationComplete = false;
+    let reloadButtonFeedbackTimer = null;
+    let currentEventStatuses = [];
+    let transitionPaths = new Map();
+    let renderLayoutMode = 'default';
+    let defaultStatePositions = { ...statePositions };
+    let defaultTransitionPaths = new Map();
+    let optimizedStatePositions = { ...statePositions };
+    let optimizedTransitionPaths = new Map();
+    let defaultDiagramBounds = { width: 920, height: 430 };
+    let optimizedDiagramBounds = { width: 920, height: 430 };
+
+    const vscodeApi = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null;
+    let previewRequestId = 1;
+    const previewPendingRequests = new Map();
+    let latestSnapshotSequence = 0;
+
+    function buildStatePositions(states) {
+      const safeStates = Array.isArray(states) && states.length > 0 ? states : ['State'];
+      const fallback = {};
+      const startX = 120;
+      const fallbackSpacing = 180;
+      safeStates.forEach((name, index) => {
+        fallback[name] = { x: startX + (index * fallbackSpacing), y: 80 };
+      });
+
+      if (transitions.length === 0) {
+        return fallback;
+      }
+
+      const orderIndex = new Map(safeStates.map((name, index) => [name, index]));
+      const outgoing = new Map();
+      const incoming = new Map();
+      safeStates.forEach((name) => {
+        outgoing.set(name, []);
+        incoming.set(name, []);
+      });
+
+      for (const transition of transitions) {
+        if (!transition || !outgoing.has(transition.from) || !incoming.has(transition.to)) {
+          continue;
+        }
+
+        outgoing.get(transition.from).push(transition.to);
+        incoming.get(transition.to).push(transition.from);
+      }
+
+      const currentRoot = safeStates.includes(currentState) ? currentState : safeStates[0];
+      const rankByState = new Map(safeStates.map((name) => [name, name === currentRoot ? 0 : Number.NEGATIVE_INFINITY]));
+
+      for (let pass = 0; pass < safeStates.length; pass += 1) {
+        for (const from of safeStates) {
+          const fromRank = rankByState.get(from);
+          if (!Number.isFinite(fromRank)) {
+            continue;
+          }
+
+          for (const to of outgoing.get(from) ?? []) {
+            const existing = rankByState.get(to) ?? Number.NEGATIVE_INFINITY;
+            if (fromRank + 1 > existing) {
+              rankByState.set(to, fromRank + 1);
+            }
+          }
+        }
+      }
+
+      for (const name of safeStates) {
+        if (!Number.isFinite(rankByState.get(name))) {
+          rankByState.set(name, 0);
+        }
+      }
+
+      const minRank = Math.min(...safeStates.map((name) => rankByState.get(name) ?? 0));
+      for (const name of safeStates) {
+        rankByState.set(name, (rankByState.get(name) ?? 0) - minRank);
+      }
+
+      const columns = new Map();
+      for (const name of safeStates) {
+        const rank = rankByState.get(name) ?? 0;
+        if (!columns.has(rank)) {
+          columns.set(rank, []);
+        }
+
+        columns.get(rank).push(name);
+      }
+
+      const orderedRanks = Array.from(columns.keys()).sort((left, right) => left - right);
+      for (const rank of orderedRanks) {
+        columns.get(rank).sort((left, right) => (orderIndex.get(left) ?? 0) - (orderIndex.get(right) ?? 0));
+      }
+
+      const barycenter = (stateName, neighbors) => {
+        const values = (neighbors.get(stateName) ?? [])
+          .map((neighbor) => columns.get(rankByState.get(neighbor) ?? 0)?.indexOf(neighbor) ?? -1)
+          .filter((value) => value >= 0);
+
+        if (values.length === 0) {
+          return Number.POSITIVE_INFINITY;
+        }
+
+        return values.reduce((sum, value) => sum + value, 0) / values.length;
+      };
+
+      for (let sweep = 0; sweep < 4; sweep += 1) {
+        for (let i = 1; i < orderedRanks.length; i += 1) {
+          const rank = orderedRanks[i];
+          const statesInRank = columns.get(rank) ?? [];
+          statesInRank.sort((left, right) => {
+            const leftB = barycenter(left, incoming);
+            const rightB = barycenter(right, incoming);
+            if (leftB !== rightB) {
+              return leftB - rightB;
+            }
+
+            return (orderIndex.get(left) ?? 0) - (orderIndex.get(right) ?? 0);
+          });
+        }
+
+        for (let i = orderedRanks.length - 2; i >= 0; i -= 1) {
+          const rank = orderedRanks[i];
+          const statesInRank = columns.get(rank) ?? [];
+          statesInRank.sort((left, right) => {
+            const leftB = barycenter(left, outgoing);
+            const rightB = barycenter(right, outgoing);
+            if (leftB !== rightB) {
+              return leftB - rightB;
+            }
+
+            return (orderIndex.get(left) ?? 0) - (orderIndex.get(right) ?? 0);
+          });
+        }
+      }
+
+      const marginX = 130;
+      const marginY = 70;
+      const xSpacing = 230;
+      const ySpacing = 90;
+      const positions = {};
+
+      for (let columnIndex = 0; columnIndex < orderedRanks.length; columnIndex += 1) {
+        const rank = orderedRanks[columnIndex];
+        const statesInRank = columns.get(rank) ?? [];
+        const totalHeight = (Math.max(1, statesInRank.length) - 1) * ySpacing;
+        const baseY = marginY + Math.max(0, (340 - totalHeight) / 2);
+
+        for (let rowIndex = 0; rowIndex < statesInRank.length; rowIndex += 1) {
+          const stateName = statesInRank[rowIndex];
+          positions[stateName] = {
+            x: marginX + (columnIndex * xSpacing),
+            y: Math.round(baseY + (rowIndex * ySpacing))
+          };
+        }
+      }
+
+      return positions;
+    }
+
+    function pointsToPath(points) {
+      if (!Array.isArray(points) || points.length < 2) {
+        return '';
+      }
+
+      const normalized = points
+        .map((point) => {
+          if (!point || typeof point !== 'object') {
+            return null;
+          }
+
+          const x = Number(point.x);
+          const y = Number(point.y);
+          if (!Number.isFinite(x) || !Number.isFinite(y)) {
+            return null;
+          }
+
+          return { x, y };
+        })
+        .filter((point) => point !== null);
+
+      if (normalized.length < 2) {
+        return '';
+      }
+
+      return normalized
+        .map((point, index) => `${index === 0 ? 'M' : 'L'} ${Math.round(point.x)} ${Math.round(point.y)}`)
+        .join(' ');
+    }
+
+    function toHostEventStatus(raw) {
+      if (!raw || typeof raw !== 'object') {
+        return null;
+      }
+
+      return {
+        name: String(raw.name ?? raw.Name ?? ''),
+        outcome: String(raw.outcome ?? raw.Outcome ?? 'undefined').toLowerCase(),
+        targetState: raw.targetState ?? raw.TargetState ?? null,
+        reasons: Array.isArray(raw.reasons ?? raw.Reasons)
+          ? (raw.reasons ?? raw.Reasons).map((reason) => String(reason))
+          : []
+      };
+    }
+
+    function parseLayoutPayload(layoutPayload, fallbackPositions, fallbackBounds) {
+      const fallback = {
+        positions: fallbackPositions,
+        paths: new Map(),
+        bounds: fallbackBounds
+      };
+
+      if (!layoutPayload || typeof layoutPayload !== 'object' || !layoutPayload.nodes || typeof layoutPayload.nodes !== 'object') {
+        return fallback;
+      }
+
+      const positions = {};
+      for (const [name, pos] of Object.entries(layoutPayload.nodes)) {
+        if (!pos || typeof pos !== 'object') {
+          continue;
+        }
+
+        const x = Number(pos.x);
+        const y = Number(pos.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          continue;
+        }
+
+        positions[String(name)] = { x, y };
+      }
+
+      const resolvedPositions = Object.keys(positions).length > 0 ? positions : fallbackPositions;
+      const paths = new Map();
+
+      if (Array.isArray(layoutPayload.edges)) {
+        for (const edge of layoutPayload.edges) {
+          if (!edge || typeof edge !== 'object') {
+            continue;
+          }
+
+          const transitionIndex = Number(edge.transitionIndex);
+          if (!Number.isFinite(transitionIndex)) {
+            continue;
+          }
+
+          const path = pointsToPath(edge.points);
+          if (path) {
+            paths.set(transitionIndex, path);
+          }
+        }
+      }
+
+      const layoutWidth = Number(layoutPayload.width);
+      const layoutHeight = Number(layoutPayload.height);
+      const bounds = {
+        width: Number.isFinite(layoutWidth) ? Math.max(920, layoutWidth) : fallbackBounds.width,
+        height: Number.isFinite(layoutHeight) ? Math.max(430, layoutHeight) : fallbackBounds.height
+      };
+
+      return {
+        positions: resolvedPositions,
+        paths,
+        bounds
+      };
+    }
+
+    function applySnapshot(snapshot) {
+      if (!snapshot || typeof snapshot !== 'object') {
+        return;
+      }
+
+      const snapshotStates = snapshot.states ?? snapshot.States;
+      const snapshotTransitions = snapshot.transitions ?? snapshot.Transitions;
+      const snapshotEvents = snapshot.events ?? snapshot.Events;
+      const snapshotData = snapshot.data ?? snapshot.Data;
+      const snapshotCurrentState = snapshot.currentState ?? snapshot.CurrentState;
+
+      transitions = Array.isArray(snapshotTransitions)
+        ? snapshotTransitions.map((transition) => ({
+          from: String(transition.from ?? transition.From ?? ''),
+          event: String(transition.event ?? transition.Event ?? ''),
+          to: String(transition.to ?? transition.To ?? '')
+        }))
+        : [];
+
+      if (Array.isArray(snapshotStates) && snapshotStates.length > 0) {
+        stateOrder = snapshotStates.map((value) => String(value));
+      }
+
+      const defaultPositions = buildStatePositions(stateOrder);
+      defaultStatePositions = defaultPositions;
+      const defaultPoints = Object.values(defaultPositions);
+      const defaultMaxX = defaultPoints.reduce((maxValue, pos) => Math.max(maxValue, pos?.x ?? 0), 0);
+      const defaultMaxY = defaultPoints.reduce((maxValue, pos) => Math.max(maxValue, pos?.y ?? 0), 0);
+      defaultDiagramBounds = {
+        width: Math.max(920, defaultMaxX + 180),
+        height: Math.max(430, defaultMaxY + 140)
+      };
+
+      const rawLayoutPayload = (snapshot.layoutRaw ?? snapshot.LayoutRaw ?? snapshot.layout ?? snapshot.Layout);
+      const optimizedLayoutPayload = (snapshot.layout ?? snapshot.Layout ?? snapshot.layoutRaw ?? snapshot.LayoutRaw);
+      const rawLayout = parseLayoutPayload(rawLayoutPayload, defaultPositions, defaultDiagramBounds);
+      const optimizedLayout = parseLayoutPayload(optimizedLayoutPayload, defaultPositions, defaultDiagramBounds);
+
+      defaultStatePositions = rawLayout.positions;
+      defaultTransitionPaths = rawLayout.paths;
+      defaultDiagramBounds = rawLayout.bounds;
+      optimizedStatePositions = optimizedLayout.positions;
+      optimizedTransitionPaths = optimizedLayout.paths;
+      optimizedDiagramBounds = optimizedLayout.bounds;
+      applyRenderLayoutMode();
+
+      eventDefinitionOrder = Array.from(new Set(
+        (Array.isArray(snapshotEvents) ? snapshotEvents : [])
+          .map((eventStatus) => String(eventStatus.name ?? eventStatus.Name ?? ''))
+          .filter((name) => name.length > 0)
+      ));
+
+      const incomingData = (snapshotData && typeof snapshotData === 'object') ? snapshotData : {};
+      initialData = { ...incomingData };
+
+      Object.keys(data).forEach((key) => {
+        delete data[key];
+      });
+      Object.entries(incomingData).forEach(([key, value]) => {
+        data[key] = value;
+      });
+
+      initialState = snapshotCurrentState ? String(snapshotCurrentState) : (stateOrder[0] ?? 'State');
+      currentState = initialState;
+
+      currentEventStatuses = (Array.isArray(snapshotEvents) ? snapshotEvents : [])
+        .map(toHostEventStatus)
+        .filter((status) => status !== null);
+
+      selectedTransitionIndex = transitions.findIndex((transition) => transition.from === currentState);
+      if (selectedTransitionIndex < 0) {
+        selectedTransitionIndex = 0;
+      }
+    }
+
+    function applyRenderLayoutMode() {
+      const useOptimized = renderLayoutMode === 'optimized';
+      statePositions = useOptimized ? optimizedStatePositions : defaultStatePositions;
+      transitionPaths = useOptimized ? new Map(optimizedTransitionPaths) : new Map(defaultTransitionPaths);
+      const bounds = useOptimized ? optimizedDiagramBounds : defaultDiagramBounds;
+      const width = Math.max(920, Number(bounds?.width ?? 920));
+      const height = Math.max(430, Number(bounds?.height ?? 430));
+      diagram.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    }
+
+    function sendHostRequest(action, payload = {}) {
+      if (!vscodeApi) {
+        return Promise.resolve({ success: false, error: 'VS Code bridge unavailable.' });
+      }
+
+      const requestId = previewRequestId++;
+      return new Promise((resolve) => {
+        previewPendingRequests.set(requestId, resolve);
+        vscodeApi.postMessage({
+          type: 'previewRequest',
+          requestId,
+          action,
+          ...payload
+        });
+      });
+    }
+
+    function snapshotData() {
+      return {
+        CycleCount: data.CycleCount,
+        VehiclesWaiting: data.VehiclesWaiting,
+        LeftTurnQueued: data.LeftTurnQueued,
+        EmergencyReason: data.EmergencyReason
+      };
+    }
+
+    function getChangedDataKeys(beforeSnapshot, afterSnapshot) {
+      return Object.keys(afterSnapshot).filter((key) => !Object.is(beforeSnapshot[key], afterSnapshot[key]));
+    }
+
+    function showDataFieldToasts(changedKeys, beforeSnapshot, afterSnapshot) {
+      dataFieldToasts = new Set(changedKeys);
+      dataFieldToastDetails = new Map(
+        changedKeys.map((key) => [
+          key,
+          {
+            before: formatValue(beforeSnapshot[key]),
+            after: formatValue(afterSnapshot[key])
+          }
+        ])
+      );
+
+      if (dataFieldToastTimer) {
+        window.clearTimeout(dataFieldToastTimer);
+      }
+
+      if (dataFieldToasts.size === 0) {
+        dataFieldToastDetails.clear();
+        return;
+      }
+
+      dataFieldToastTimer = window.setTimeout(() => {
+        dataFieldToasts.clear();
+        dataFieldToastDetails.clear();
+        renderData();
+      }, FEEDBACK_DURATION_MS);
+    }
+
+    function resetDataToInitial() {
+      Object.keys(data).forEach((key) => {
+        delete data[key];
+      });
+
+      Object.entries(initialData).forEach(([key, value]) => {
+        data[key] = value;
+      });
+    }
+
+    async function reloadMockup() {
+      if (vscodeApi) {
+        let response = await sendHostRequest('snapshot');
+        if ((!response.success || !response.snapshot) && vscodeApi) {
+          await new Promise((resolve) => window.setTimeout(resolve, 250));
+          response = await sendHostRequest('snapshot');
+        }
+
+        if (response.success && response.snapshot) {
+          applySnapshot(response.snapshot);
+          hoveredEventName = null;
+          pendingFocusEventName = null;
+          rowFeedback = null;
+          stateChangeAnimation = null;
+          suppressHoverUntilAnimationComplete = false;
+          renderAll();
+        } else {
+          showRowFeedback('Reload', `✖ ${response.error || 'Snapshot failed'}`, 'err');
+        }
+
+        return;
+      }
+
+      currentState = initialState;
+      hoveredEventName = null;
+      pendingFocusEventName = null;
+      rowFeedback = null;
+      stateChangeAnimation = null;
+      suppressHoverUntilAnimationComplete = false;
+      resetDataToInitial();
+
+      mockEmergencyArgs.AuthorizedBy = '';
+      mockEmergencyArgs.Reason = '';
+
+      dataFieldToasts.clear();
+      dataFieldToastDetails.clear();
+
+      if (rowFeedbackTimer) {
+        window.clearTimeout(rowFeedbackTimer);
+        rowFeedbackTimer = null;
+      }
+
+      if (dataFieldToastTimer) {
+        window.clearTimeout(dataFieldToastTimer);
+        dataFieldToastTimer = null;
+      }
+
+      if (stateChangeAnimationFrame !== null) {
+        window.cancelAnimationFrame(stateChangeAnimationFrame);
+        stateChangeAnimationFrame = null;
+      }
+
+      renderAll();
+    }
+
+    function stepStateChangeAnimation(timestamp) {
+      if (!stateChangeAnimation) {
+        stateChangeAnimationFrame = null;
+        return;
+      }
+
+      const elapsed = Math.max(0, timestamp - stateChangeAnimation.startedAt);
+      const progress = Math.min(1, elapsed / stateChangeAnimation.duration);
+      stateChangeAnimation.progress = progress;
+      drawDiagram();
+
+      if (progress < 1) {
+        stateChangeAnimationFrame = window.requestAnimationFrame(stepStateChangeAnimation);
+        return;
+      }
+
+      stateChangeAnimation = null;
+      suppressHoverUntilAnimationComplete = false;
+      stateChangeAnimationFrame = null;
+      drawDiagram();
+    }
+
+    function triggerStateChangeAnimation(fromState, toState, eventName, fromDataSnapshot = null, fromArgsSnapshot = null) {
+      suppressHoverUntilAnimationComplete = true;
+      hoveredEventName = null;
+      pendingFocusEventName = null;
+
+      if (stateChangeAnimationFrame !== null) {
+        window.cancelAnimationFrame(stateChangeAnimationFrame);
+        stateChangeAnimationFrame = null;
+      }
+
+      stateChangeAnimation = {
+        from: fromState,
+        to: toState,
+        eventName,
+        fromDataSnapshot: fromDataSnapshot ?? snapshotData(),
+        fromArgsSnapshot: fromArgsSnapshot ?? {
+          AuthorizedBy: mockEmergencyArgs.AuthorizedBy,
+          Reason: mockEmergencyArgs.Reason
+        },
+        startedAt: performance.now(),
+        duration: FEEDBACK_DURATION_MS,
+        progress: 0
+      };
+
+      stateChangeAnimationFrame = window.requestAnimationFrame(stepStateChangeAnimation);
+    }
+
+    function getSelectedTransition() {
+      const selectedEventName = getSelectedEventName();
+      if (!selectedEventName) {
+        return null;
+      }
+
+      const preferredIndex = getPreferredTransitionIndex(currentState, selectedEventName);
+      if (preferredIndex < 0 || preferredIndex >= transitions.length) {
+        return null;
+      }
+
+      return transitions[preferredIndex];
+    }
+
+    function getSelectedEventName() {
+      if (suppressHoverUntilAnimationComplete) {
+        return null;
+      }
+
+      return hoveredEventName;
+    }
+
+    function getStateIndex(stateName) {
+      return stateOrder.indexOf(stateName);
+    }
+
+    function getFamilyTransitions(fromState, eventName) {
+      return transitions
+        .filter((transition) => transition.from === fromState && transition.event === eventName)
+        .sort((left, right) => getStateIndex(left.to) - getStateIndex(right.to));
+    }
+
+    function getUniqueOutgoingEvents(state) {
+      return Array.from(new Set(
+        transitions
+          .filter((transition) => transition.from === state)
+          .map((transition) => transition.event)
+      ));
+    }
+
+    function getOrderedCurrentEvents() {
+      return getUniqueOutgoingEvents(currentState)
+        .sort((left, right) => {
+          const leftOrder = eventDefinitionOrder.indexOf(left);
+          const rightOrder = eventDefinitionOrder.indexOf(right);
+          const leftRank = leftOrder >= 0 ? leftOrder : Number.MAX_SAFE_INTEGER;
+          const rightRank = rightOrder >= 0 ? rightOrder : Number.MAX_SAFE_INTEGER;
+          return leftRank - rightRank || left.localeCompare(right);
+        });
+    }
+
+    function getPreferredTransitionIndex(state, eventName) {
+      const familyIndexes = transitions
+        .map((transition, index) => ({ transition, index }))
+        .filter((entry) => entry.transition.from === state && entry.transition.event === eventName)
+        .map((entry) => entry.index);
+
+      if (familyIndexes.length === 0) {
+        return -1;
+      }
+
+      const evaluation = evaluateEvent(state, eventName);
+      if (evaluation.kind === 'enabled' && evaluation.to) {
+        const matched = familyIndexes.find((index) => transitions[index].to === evaluation.to);
+        if (typeof matched === 'number') {
+          return matched;
+        }
+      }
+
+      return familyIndexes[0];
+    }
+
+    function syncSelectionToCurrentState() {
+      const selectedTransition = getSelectedTransition();
+      if (selectedTransition && selectedTransition.from === currentState) {
+        return;
+      }
+
+      const preferredBySameEvent = selectedTransition
+        ? getPreferredTransitionIndex(currentState, selectedTransition.event)
+        : -1;
+      if (preferredBySameEvent >= 0) {
+        selectedTransitionIndex = preferredBySameEvent;
+        return;
+      }
+
+      const outgoingEvents = getUniqueOutgoingEvents(currentState);
+      for (const eventName of outgoingEvents) {
+        const evaluation = evaluateEvent(currentState, eventName);
+        if (evaluation.kind === 'undefined') {
+          continue;
+        }
+
+        const preferred = getPreferredTransitionIndex(currentState, eventName);
+        if (preferred >= 0) {
+          selectedTransitionIndex = preferred;
+          return;
+        }
+      }
+
+      const firstFromState = transitions.findIndex((transition) => transition.from === currentState);
+      if (firstFromState >= 0) {
+        selectedTransitionIndex = firstFromState;
+      }
+    }
+
+    function selectEvent(eventName) {
+      const preferred = getPreferredTransitionIndex(currentState, eventName);
+      if (preferred >= 0) {
+        selectedTransitionIndex = preferred;
+      }
+    }
+
+    function evaluateEventWithContext(state, eventName, dataContext, argsContext) {
+      if (vscodeApi && state === currentState) {
+        const liveStatus = currentEventStatuses.find((status) => status.name === eventName);
+        if (liveStatus) {
+          const reason = liveStatus.reasons.length > 0 ? liveStatus.reasons[0] : undefined;
+          if (liveStatus.outcome === 'enabled') {
+            return {
+              kind: 'enabled',
+              to: liveStatus.targetState ? String(liveStatus.targetState) : null,
+              meta: liveStatus.targetState ? `runtime target: ${liveStatus.targetState}` : 'runtime enabled'
+            };
+          }
+
+          if (liveStatus.outcome === 'blocked') {
+            return {
+              kind: 'blocked',
+              reason: reason ?? 'blocked',
+              meta: 'runtime blocked'
+            };
+          }
+
+          return {
+            kind: 'undefined',
+            reason: reason ?? `no transition from ${state}`,
+            meta: 'runtime undefined'
+          };
+        }
+      }
+
+      if (!eventName) {
+        return { kind: 'undefined', reason: 'select an event' };
+      }
+
+      if (eventName === 'Advance') {
+        if (state === 'Red') {
+          if (dataContext.LeftTurnQueued) {
+            return {
+              kind: 'enabled',
+              to: 'FlashingGreen',
+              meta: 'if LeftTurnQueued (alternate: Green when VehiclesWaiting > 0)'
+            };
+          }
+
+          if (dataContext.VehiclesWaiting > 0) {
+            return {
+              kind: 'enabled',
+              to: 'Green',
+              meta: 'if VehiclesWaiting > 0'
+            };
+          }
+
+          return {
+            kind: 'blocked',
+            reason: 'No demand detected at red',
+            meta: 'else reject'
+          };
+        }
+
+        if (state === 'FlashingGreen') {
+          return { kind: 'enabled', to: 'Green', meta: 'protected left-turn rejoins cycle' };
+        }
+
+        if (state === 'Green') {
+          return { kind: 'enabled', to: 'Yellow', meta: 'standard cycle' };
+        }
+
+        if (state === 'Yellow') {
+          return { kind: 'enabled', to: 'Red', meta: 'standard cycle' };
+        }
+
+        if (state === 'FlashingRed') {
+          return { kind: 'undefined', reason: 'no transition from FlashingRed' };
+        }
+      }
+
+      if (eventName === 'Emergency') {
+        const authorizedBy = String(argsContext.AuthorizedBy ?? '').trim();
+        const reason = String(argsContext.Reason ?? '').trim();
+        const hasArgs = authorizedBy !== '' && reason !== '';
+        if (!hasArgs) {
+          return {
+            kind: 'blocked',
+            reason: 'AuthorizedBy and Reason are required to activate emergency mode',
+            meta: 'requires event args'
+          };
+        }
+
+        return {
+          kind: 'enabled',
+          to: 'FlashingRed',
+          meta: `any -> FlashingRed as ${authorizedBy}`
+        };
+      }
+
+      if (eventName === 'ClearEmergency') {
+        if (state === 'FlashingRed') {
+          return { kind: 'enabled', to: 'Red', meta: 'resume normal cycle' };
+        }
+
+        return { kind: 'undefined', reason: `no transition from ${state}` };
+      }
+
+      return { kind: 'undefined', reason: `unknown event ${eventName}` };
+    }
+
+    function evaluateEvent(state, eventName) {
+      return evaluateEventWithContext(state, eventName, data, mockEmergencyArgs);
+    }
+
+    function applyTransition(from, eventName, to) {
+      if (eventName === 'Advance') {
+        if (from === 'Red' && to === 'FlashingGreen') {
+          data.LeftTurnQueued = false;
+          data.CycleCount += 1;
+        } else if (from === 'Red' && to === 'Green') {
+          data.CycleCount += 1;
+        } else if (from === 'FlashingGreen' || from === 'Green' || from === 'Yellow') {
+          data.CycleCount += 1;
+        }
+      }
+
+      if (eventName === 'Emergency') {
+        data.EmergencyReason = `${mockEmergencyArgs.AuthorizedBy.trim()}: ${mockEmergencyArgs.Reason.trim()}`;
+      }
+
+      if (eventName === 'ClearEmergency') {
+        data.EmergencyReason = null;
+      }
+    }
+
+    function getPointOnPath(pathD, fraction) {
+      const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      tempPath.setAttribute('d', pathD);
+      const totalLength = tempPath.getTotalLength();
+      const point = tempPath.getPointAtLength(totalLength * Math.max(0, Math.min(1, fraction)));
+      return { x: point.x, y: point.y };
+    }
+
+    function getChipPathFraction(transition) {
+      if (transition.from === transition.to) {
+        return 0.24;
+      }
+
+      if (transition.event === 'ClearEmergency') {
+        return 0.42;
+      }
+
+      if (transition.event === 'Emergency' && transition.to === 'FlashingRed' && transition.from !== 'FlashingRed') {
+        return 0.48;
+      }
+
+      if (transition.from === 'Red' && transition.event === 'Advance' && transition.to === 'Green') {
+        return 0.42;
+      }
+
+      return 0.5;
+    }
+
+    function buildParallelLaneBiasByIndex(edgeSegments) {
+      const grouped = new Map();
+
+      edgeSegments.forEach((segment) => {
+        const key = `${segment.transition.from}->${segment.transition.to}`;
+        const group = grouped.get(key) || [];
+        group.push(segment.index);
+        grouped.set(key, group);
+      });
+
+      const laneBiasByIndex = new Map();
+      grouped.forEach((indices) => {
+        const sorted = [...indices].sort((left, right) => left - right);
+        sorted.forEach((index, lane) => {
+          const centered = lane - ((sorted.length - 1) / 2);
+          laneBiasByIndex.set(index, centered * 0.06);
+        });
+      });
+
+      return laneBiasByIndex;
+    }
+
+    function deconflictAnnotationYs(annotationItems) {
+      const adjustedYByIndex = new Map();
+      const placed = [];
+
+      const sorted = [...annotationItems].sort((left, right) => {
+        if (Math.abs(left.x - right.x) < 0.001) {
+          return left.y - right.y;
+        }
+
+        return left.x - right.x;
+      });
+
+      sorted.forEach((item) => {
+        let y = item.y;
+        let attempts = 0;
+
+        while (attempts < 10) {
+          const collides = placed.some((other) => {
+            const overlapX = Math.abs(other.x - item.x) < ((other.width + item.width) / 2) + 8;
+            const overlapY = Math.abs(other.y - y) < 20;
+            return overlapX && overlapY;
+          });
+
+          if (!collides) {
+            break;
+          }
+
+          y += 20;
+          attempts += 1;
+        }
+
+        placed.push({ x: item.x, y, width: item.width });
+        adjustedYByIndex.set(item.index, y);
+      });
+
+      return adjustedYByIndex;
+    }
+
+    function applyEventButtonState(button, eventName) {
+      const evaluation = evaluateEvent(currentState, eventName);
+      button.classList.remove('enabled', 'blocked', 'undefined');
+      const glyph = button.querySelector('.event-glyph');
+      button.removeAttribute('title');
+
+      if (evaluation.kind === 'enabled') {
+        button.classList.add('enabled');
+        if (glyph) {
+          glyph.textContent = '✔';
+        }
+      } else if (evaluation.kind === 'blocked') {
+        button.classList.add('blocked');
+        if (glyph) {
+          glyph.textContent = '✖';
+        }
+      } else if (evaluation.kind === 'undefined') {
+        button.classList.add('undefined');
+        if (glyph) {
+          glyph.textContent = '∅';
+        }
+      }
+    }
+
+    function getEvaluationReason(evaluation) {
+      if (evaluation.kind !== 'blocked' && evaluation.kind !== 'undefined') {
+        return '';
+      }
+
+      if (evaluation.reason && evaluation.reason.trim().length > 0) {
+        return evaluation.reason;
+      }
+
+      return evaluation.kind === 'blocked'
+        ? 'Blocked by guard or reject condition.'
+        : 'No transition is available from the current state.';
+    }
+
+    function applyEventReasonState(eventEntry, evaluation) {
+      if (!eventEntry) {
+        return;
+      }
+
+      const reasonText = getEvaluationReason(evaluation);
+      let reasonEl = eventEntry.querySelector('.event-reason');
+
+      if (!reasonText) {
+        if (reasonEl) {
+          reasonEl.remove();
+        }
+        return;
+      }
+
+      if (!reasonEl) {
+        reasonEl = document.createElement('div');
+        reasonEl.className = 'event-reason';
+        eventEntry.appendChild(reasonEl);
+      }
+
+      reasonEl.textContent = reasonText;
+    }
+
+    function showRowFeedback(eventName, message, tone) {
+      rowFeedback = {
+        eventName,
+        message,
+        tone: tone === 'ok' ? 'ok' : 'err'
+      };
+
+      if (rowFeedbackTimer) {
+        window.clearTimeout(rowFeedbackTimer);
+      }
+
+      rowFeedbackTimer = window.setTimeout(() => {
+        rowFeedback = null;
+        renderEventBar();
+      }, FEEDBACK_DURATION_MS);
+
+      renderEventBar();
+    }
+
+    function drawDiagram() {
+      const diagramState = stateChangeAnimation ? stateChangeAnimation.from : currentState;
+      const defs = `
+        <defs>
+          <linearGradient id="transition-beam-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="${getComputedStyle(document.documentElement).getPropertyValue('--edge').trim()}" stop-opacity="0.1" />
+            <stop offset="42%" stop-color="${getComputedStyle(document.documentElement).getPropertyValue('--edge').trim()}" stop-opacity="0.95" />
+            <stop offset="100%" stop-color="${getComputedStyle(document.documentElement).getPropertyValue('--edge').trim()}" stop-opacity="0.22" />
+          </linearGradient>
+          <filter id="transition-glow-soft" x="-70%" y="-70%" width="240%" height="240%">
+            <feGaussianBlur stdDeviation="2.8" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <filter id="transition-glow-strong" x="-90%" y="-90%" width="280%" height="280%">
+            <feGaussianBlur stdDeviation="4.2" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <marker id="arrow" markerWidth="8" markerHeight="6" markerUnits="userSpaceOnUse" refX="7.1" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge').trim()}"/>
+          </marker>
+          <marker id="arrow-warn" markerWidth="8" markerHeight="6" markerUnits="userSpaceOnUse" refX="7.1" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-warn').trim()}"/>
+          </marker>
+          <marker id="arrow-error" markerWidth="8" markerHeight="6" markerUnits="userSpaceOnUse" refX="7.1" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-error').trim()}"/>
+          </marker>
+          <marker id="arrow-selected" markerWidth="8" markerHeight="6" markerUnits="userSpaceOnUse" refX="7.1" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="${getComputedStyle(document.documentElement).getPropertyValue('--event').trim()}"/>
+          </marker>
+          <marker id="arrow-muted" markerWidth="8" markerHeight="6" markerUnits="userSpaceOnUse" refX="7.1" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-muted').trim()}"/>
+          </marker>
+        </defs>
+      `;
+
+      function buildEdgePath(transition, from, to, transitionIndex) {
+        const precomputedPath = transitionPaths.get(transitionIndex);
+        if (precomputedPath) {
+          return precomputedPath;
+        }
+
+        const nodeHalfWidth = 56;
+        const nodeHalfHeight = 22;
+        const family = getFamilyTransitions(transition.from, transition.event);
+        const familyIndex = Math.max(0, family.findIndex((candidate) => candidate.to === transition.to));
+        const familySpread = (family.length - 1) / 2;
+        const laneOffset = (familyIndex - familySpread) * 16;
+
+        if (transition.from === transition.to) {
+          const loopX = from.x + nodeHalfWidth;
+          const loopTop = from.y - 8;
+          const loopReach = 66 + Math.abs(laneOffset * 0.6);
+          return `M ${loopX} ${loopTop} C ${loopX + loopReach} ${from.y - 56}, ${loopX + loopReach} ${from.y + 52}, ${from.x + 44} ${from.y + 16}`;
+        }
+
+        const dx = to.x - from.x;
+        const dy = to.y - from.y;
+        const forward = dx >= 0;
+
+        const startX = from.x + (forward ? nodeHalfWidth : -nodeHalfWidth);
+        const endX = to.x - (forward ? nodeHalfWidth : -nodeHalfWidth);
+        const startY = from.y + (laneOffset * 0.35);
+        const endY = to.y + (laneOffset * 0.35);
+
+        if (Math.abs(dy) < 40) {
+          const lift = Math.max(26, Math.min(84, Math.abs(dx) * 0.22)) + Math.abs(laneOffset * 0.25);
+          const controlX = Math.round((startX + endX) / 2);
+          const controlY = Math.round(Math.min(startY, endY) - lift);
+          return `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`;
+        }
+
+        if (!forward) {
+          const routeX = Math.min(startX, endX) - Math.max(60, Math.abs(dx) * 0.18) - Math.abs(laneOffset * 0.4);
+          const c1Y = startY + (dy > 0 ? 34 : -34);
+          const c2Y = endY + (dy > 0 ? -34 : 34);
+          return `M ${startX} ${startY} C ${routeX} ${c1Y}, ${routeX} ${c2Y}, ${endX} ${endY}`;
+        }
+
+        const c1X = startX + Math.max(42, Math.abs(dx) * 0.34);
+        const c2X = endX - Math.max(42, Math.abs(dx) * 0.34);
+        const yBias = dy * 0.2 + (laneOffset * 0.3);
+        return `M ${startX} ${startY} C ${c1X} ${startY + yBias}, ${c2X} ${endY - yBias}, ${endX} ${endY}`;
+      }
+
+      function getEdgeVisual(transition, index, selectedTransition, selectedEventName, eventEvaluations) {
+        const eventEvaluation = eventEvaluations[transition.event];
+        const fromCurrent = transition.from === diagramState;
+        const sameEventFromCurrent = selectedEventName !== null && fromCurrent && transition.event === selectedEventName;
+        const selectedExact = selectedTransition !== null && index === selectedTransitionIndex;
+        const hoveredMatch = activeHoverEventName !== null
+          && transition.from === diagramState
+          && transition.event === activeHoverEventName;
+
+        let stroke = 'var(--edge-muted)';
+        let marker = 'url(#arrow-muted)';
+        let width = 1.8;
+        let opacity = 0.5;
+        let dash = '';
+
+        if (fromCurrent && eventEvaluation && eventEvaluation.kind !== 'undefined') {
+          if (eventEvaluation.kind === 'enabled') {
+            if (eventEvaluation.to === transition.to) {
+              stroke = 'var(--edge)';
+              marker = 'url(#arrow)';
+              width = 2.1;
+              opacity = 0.68;
+            } else {
+              stroke = 'var(--edge-error)';
+              marker = 'url(#arrow-error)';
+              width = 2.0;
+              opacity = 0.62;
+              dash = '6 5';
+            }
+          } else if (eventEvaluation.kind === 'blocked') {
+            stroke = 'var(--edge-error)';
+            marker = 'url(#arrow-error)';
+            width = 2.0;
+            opacity = 0.62;
+            dash = '5 4';
+          }
+        }
+
+        if (sameEventFromCurrent) {
+          if (eventEvaluation?.kind === 'enabled') {
+            if (eventEvaluation.to === transition.to) {
+              stroke = 'var(--edge)';
+              marker = 'url(#arrow)';
+              width = 2.15;
+              opacity = 1;
+            } else {
+              stroke = 'var(--edge-error)';
+              marker = 'url(#arrow-error)';
+              width = 2.0;
+              opacity = 0.8;
+              dash = '6 5';
+            }
+          } else if (eventEvaluation?.kind === 'blocked') {
+            stroke = 'var(--edge-error)';
+            marker = 'url(#arrow-error)';
+            width = 2.0;
+            opacity = 0.8;
+            dash = '5 4';
+          }
+        }
+
+        if (selectedExact && !sameEventFromCurrent) {
+          if (!fromCurrent) {
+            stroke = 'var(--event)';
+            marker = 'url(#arrow-selected)';
+            width = 2.1;
+            opacity = 1;
+          } else {
+            width = Math.max(width, 2.1);
+            opacity = 1;
+          }
+        }
+
+        if (activeHoverEventName !== null) {
+          if (hoveredMatch) {
+            width = Math.max(width, 2.15);
+            opacity = Math.max(opacity, 1);
+          } else {
+            width = Math.max(1.6, width * 0.86);
+            opacity = Math.min(opacity, 0.2);
+          }
+        }
+
+        return { stroke, marker, width, opacity, dash };
+      }
+
+      function getEdgeAnnotation(transition, pathD, selectedEventName, eventEvaluations, pathFractionBias = 0) {
+        const fromCurrent = transition.from === diagramState;
+        const eventEvaluation = eventEvaluations[transition.event];
+        const shouldShowBecauseCurrent = fromCurrent && eventEvaluation && eventEvaluation.kind !== 'undefined';
+        const shouldShowBecauseSelected = selectedEventName !== null && transition.event === selectedEventName && transition.from === diagramState;
+
+        if (!shouldShowBecauseCurrent && !shouldShowBecauseSelected) {
+          return null;
+        }
+
+        const pathFraction = Math.max(0.12, Math.min(0.88, getChipPathFraction(transition) + pathFractionBias));
+        const position = getPointOnPath(pathD, pathFraction);
+
+        const annotation = {
+          position,
+          event: transition.event,
+          guard: null
+        };
+
+        if (transition.from === 'Red' && transition.event === 'Advance' && transition.to === 'FlashingGreen') {
+          annotation.guard = 'LeftTurnQueued';
+        } else if (transition.from === 'Red' && transition.event === 'Advance' && transition.to === 'Green') {
+          annotation.guard = 'VehiclesWaiting > 0';
+        }
+
+        return annotation;
+      }
+
+      function getStateEventEvaluations(stateName, dataContext = data, argsContext = mockEmergencyArgs) {
+        return Object.fromEntries(
+          getUniqueOutgoingEvents(stateName).map((eventName) => [eventName, evaluateEventWithContext(stateName, eventName, dataContext, argsContext)])
+        );
+      }
+
+      function getEdgeVisualForState(transition, eventEvaluations, stateName) {
+        const eventEvaluation = eventEvaluations[transition.event];
+        const fromCurrent = transition.from === stateName;
+
+        let stroke = 'var(--edge-muted)';
+        let marker = 'url(#arrow-muted)';
+        let width = 1.6;
+        let opacity = 0.2;
+        let dash = '';
+
+        if (fromCurrent && eventEvaluation && eventEvaluation.kind !== 'undefined') {
+          if (eventEvaluation.kind === 'enabled') {
+            if (eventEvaluation.to === transition.to) {
+              stroke = 'var(--edge)';
+              marker = 'url(#arrow)';
+              width = 2.15;
+              opacity = 0.88;
+            } else {
+              stroke = 'var(--edge-error)';
+              marker = 'url(#arrow-error)';
+              width = 2.0;
+              opacity = 0.74;
+              dash = '6 5';
+            }
+          } else if (eventEvaluation.kind === 'blocked') {
+            stroke = 'var(--edge-error)';
+            marker = 'url(#arrow-error)';
+            width = 2.0;
+            opacity = 0.74;
+            dash = '5 4';
+          }
+        }
+
+        return { stroke, marker, width, opacity, dash };
+      }
+
+      function getStateVisualMap(eventEvaluations, stateName) {
+        const visualMap = new Map();
+        const setStateVisual = (targetState, visual) => {
+          const existing = visualMap.get(targetState);
+          if (!existing) {
+            visualMap.set(targetState, visual);
+            return;
+          }
+
+          const rank = {
+            actual: 3,
+            alternate: 2,
+            blocked: 2
+          };
+
+          if ((rank[visual] ?? 0) >= (rank[existing] ?? 0)) {
+            visualMap.set(targetState, visual);
+          }
+        };
+
+        Object.entries(eventEvaluations).forEach(([eventName, evaluation]) => {
+          const family = transitions
+            .filter((transition) => transition.from === stateName && transition.event === eventName);
+
+          if (evaluation.kind === 'enabled' && evaluation.to) {
+            family.forEach((transition) => {
+              setStateVisual(transition.to, transition.to === evaluation.to ? 'actual' : 'alternate');
+            });
+          } else if (evaluation.kind === 'blocked') {
+            family.forEach((transition) => {
+              setStateVisual(transition.to, 'blocked');
+            });
+          }
+        });
+
+        return visualMap;
+      }
+
+      function easeInOut(progress) {
+        if (progress <= 0) return 0;
+        if (progress >= 1) return 1;
+        return progress < 0.5
+          ? 4 * progress * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+      }
+
+      const isAnimationPhase = stateChangeAnimation !== null;
+      if (isAnimationPhase) {
+        const progress = Math.max(0, Math.min(1, stateChangeAnimation.progress ?? 0));
+        const eased = easeInOut(progress);
+        const fromState = stateChangeAnimation.from;
+        const toState = stateChangeAnimation.to;
+        const preLayerOpacity = Math.max(0.05, 1 - (eased * 0.95));
+        const selectedEventNameForAnimation = stateChangeAnimation.eventName ?? null;
+        const fromEvaluations = getStateEventEvaluations(
+          fromState,
+          stateChangeAnimation.fromDataSnapshot ?? data,
+          stateChangeAnimation.fromArgsSnapshot ?? mockEmergencyArgs
+        );
+        const fromStateVisual = getStateVisualMap(fromEvaluations, fromState);
+        const selectedFamilyDestinations = selectedEventNameForAnimation
+          ? new Set(
+            transitions
+              .filter((transition) => transition.from === fromState && transition.event === selectedEventNameForAnimation)
+              .map((transition) => transition.to)
+          )
+          : new Set();
+
+        const edgeSegments = transitions.map((transition, index) => {
+          const from = statePositions[transition.from];
+          const to = statePositions[transition.to];
+          const pathD = buildEdgePath(transition, from, to, index);
+          return { index, transition, pathD };
+        });
+        const laneBiasByIndex = buildParallelLaneBiasByIndex(edgeSegments);
+
+        const getAnimatedFromEdgeVisual = (segment) => {
+          const visual = getEdgeVisualForState(segment.transition, fromEvaluations, fromState);
+
+          if (selectedEventNameForAnimation !== null && segment.transition.from === fromState) {
+            if (segment.transition.event === selectedEventNameForAnimation) {
+              const selectedEvaluation = fromEvaluations[selectedEventNameForAnimation];
+              if (selectedEvaluation?.kind === 'enabled') {
+                if (selectedEvaluation.to === segment.transition.to) {
+                  visual.width = Math.max(visual.width, 2.15);
+                  visual.opacity = 1;
+                } else {
+                  visual.width = Math.max(visual.width, 2.0);
+                  visual.opacity = 0.8;
+                }
+              } else if (selectedEvaluation?.kind === 'blocked') {
+                visual.width = Math.max(visual.width, 2.0);
+                visual.opacity = 0.8;
+              }
+            } else {
+              visual.width = Math.max(1.6, visual.width * 0.86);
+              visual.opacity = Math.min(visual.opacity, 0.2);
+            }
+          }
+
+          return visual;
+        };
+
+        const animatedFromEdgeSvg = edgeSegments
+          .map((segment) => {
+            if (segment.transition.from !== fromState) {
+              return '';
+            }
+
+            const visual = getAnimatedFromEdgeVisual(segment);
+            const opacity = visual.opacity * preLayerOpacity;
+            if (opacity <= 0.02) {
+              return '';
+            }
+
+            return `<path class="diagram-edge" d="${segment.pathD}" fill="none" stroke="${visual.stroke}" stroke-width="${visual.width}" stroke-linecap="round" stroke-linejoin="round" marker-end="${visual.marker}" stroke-dasharray="${visual.dash}" opacity="${opacity}"></path>`;
+          })
+          .join('');
+
+        const animatedAnnotationItems = edgeSegments
+          .filter((segment) => segment.transition.from === fromState)
+          .map((segment) => {
+            const transition = segment.transition;
+            const annotation = getEdgeAnnotation(
+              transition,
+              segment.pathD,
+              selectedEventNameForAnimation,
+              fromEvaluations,
+              laneBiasByIndex.get(segment.index) ?? 0
+            );
+            if (!annotation) {
+              return null;
+            }
+
+            const visual = getAnimatedFromEdgeVisual(segment);
+            const isMutedBySelection = selectedEventNameForAnimation !== null
+              && transition.from === fromState
+              && transition.event !== selectedEventNameForAnimation;
+            const chipWidth = annotation.event.length * 7 + 16;
+
+            return {
+              segment,
+              transition,
+              annotation,
+              visual,
+              chipWidth,
+              opacity: preLayerOpacity * (isMutedBySelection ? 0.2 : 0.92)
+            };
+          })
+          .filter((value) => value !== null);
+
+        const animatedAnnotationYByIndex = deconflictAnnotationYs(
+          animatedAnnotationItems.map((item) => ({
+            index: item.segment.index,
+            x: item.annotation.position.x,
+            y: item.annotation.position.y - 8,
+            width: item.chipWidth
+          }))
+        );
+
+        const animatedFromAnnotationSvg = animatedAnnotationItems
+          .map((item) => {
+            const chipY = animatedAnnotationYByIndex.get(item.segment.index) ?? (item.annotation.position.y - 8);
+            const chipHeight = 16;
+            const textY = chipY + chipHeight / 2;
+            const guardX = item.annotation.position.x;
+            const guardY = chipY + chipHeight + 10;
+
+            return `
+              <g class="edge-annotation" opacity="${item.opacity}">
+                <rect class="edge-chip" x="${item.annotation.position.x - item.chipWidth / 2}" y="${chipY}" width="${item.chipWidth}" height="${chipHeight}" fill="rgba(30,30,30,0.88)" stroke="${item.visual.stroke}" stroke-width="1.1"></rect>
+                <text class="edge-label" x="${item.annotation.position.x}" y="${textY}" fill="${item.visual.stroke}">${item.annotation.event}</text>
+                ${item.annotation.guard ? `<line x1="${item.annotation.position.x}" y1="${chipY + chipHeight}" x2="${item.annotation.position.x}" y2="${guardY - 6}" stroke="${item.visual.stroke}" stroke-width="1" opacity="0.9"></line><text class="edge-guard" x="${guardX}" y="${guardY}" fill="${item.visual.stroke}">[${item.annotation.guard}]</text>` : ''}
+              </g>
+            `;
+          })
+          .join('');
+
+        const mutedEdgeSvg = edgeSegments
+          .map((segment) => segment.transition.from === fromState
+            ? ''
+            : `<path class="diagram-edge" d="${segment.pathD}" fill="none" stroke="var(--edge-muted)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-muted)" opacity="0.16"></path>`)
+          .join('');
+
+        const transitionSegment = edgeSegments.find((segment) => segment.transition.from === fromState && segment.transition.to === toState);
+        const runnerProgress = Math.min(0.985, Math.max(0.001, 0.01 + (progress * 0.975)));
+        const runnerPoint = transitionSegment
+          ? getPointOnPath(transitionSegment.pathD, runnerProgress)
+          : null;
+        const runnerOpacity = Math.max(0.38, 1 - Math.abs((runnerProgress - 0.55) * 1.15));
+        const beamEnvelope = Math.max(0.18, Math.sin(Math.PI * runnerProgress));
+        const transitionPathHaloSvg = transitionSegment
+          ? `<path class="diagram-edge" d="${transitionSegment.pathD}" fill="none" stroke="var(--ok)" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" opacity="${0.16 + (beamEnvelope * 0.28)}" filter="url(#transition-glow-soft)"></path>`
+          : '';
+        const transitionPathSvg = transitionSegment
+          ? `<path class="diagram-edge" d="${transitionSegment.pathD}" fill="none" stroke="url(#transition-beam-gradient)" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" opacity="${0.3 + (beamEnvelope * 0.64)}"></path>`
+          : '';
+        const transitionSweepSvg = transitionSegment
+          ? `<path class="diagram-edge" d="${transitionSegment.pathD}" fill="none" stroke="var(--ok)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="24 120" stroke-dashoffset="${Math.round((1 - runnerProgress) * 220)}" opacity="${0.2 + (beamEnvelope * 0.45)}"></path>`
+          : '';
+
+        const trailOffsets = [0.045, 0.1, 0.17, 0.25];
+        const transitionTrailSvg = transitionSegment
+          ? trailOffsets.map((offset, idx) => {
+            const trailProgress = Math.max(0.01, runnerProgress - offset);
+            const point = getPointOnPath(transitionSegment.pathD, trailProgress);
+            const alpha = Math.max(0.05, (runnerOpacity * (1 - ((idx + 1) / (trailOffsets.length + 1)))) * 0.85);
+            const radius = Math.max(1.8, 4.4 - (idx * 0.8));
+            return `<circle cx="${point.x}" cy="${point.y}" r="${radius}" fill="var(--ok)" opacity="${alpha}" filter="url(#transition-glow-soft)"></circle>`;
+          }).join('')
+          : '';
+
+        const transitionRunnerSvg = runnerPoint
+          ? `<g filter="url(#transition-glow-strong)"><circle cx="${runnerPoint.x}" cy="${runnerPoint.y}" r="7" fill="var(--ok)" opacity="${Math.min(1, runnerOpacity + 0.12)}"></circle><circle cx="${runnerPoint.x}" cy="${runnerPoint.y}" r="3.1" fill="#d6ffe8" opacity="${Math.min(1, runnerOpacity + 0.2)}"></circle></g>`
+          : '';
+
+        const fromActiveBlend = Math.max(0, 1 - eased);
+        const toActiveBlend = Math.max(0, Math.min(1, (eased - 0.72) / 0.28));
+        const pulseStrength = Math.max(0, Math.sin(Math.PI * Math.max(0, Math.min(1, (eased - 0.52) / 0.48))));
+        const destinationDimStrokeOpacity = 0.72;
+        const destinationDimTextOpacity = 0.74;
+
+        const nodeSvg = Object.entries(statePositions).map(([name, pos]) => {
+          let stroke = 'var(--border)';
+          let strokeOpacity = 1;
+          let strokeWidth = 1.6;
+          let fill = 'var(--node)';
+          let fillOpacity = 1;
+          let fillOverlay = '';
+          let textFill = 'var(--border)';
+          let textOpacity = 1;
+          let fontWeight = 500;
+          let glow = '';
+          let pulseOverlay = '';
+          let handoffRing = '';
+
+          if (name === fromState) {
+            stroke = 'var(--ok)';
+            strokeOpacity = Math.max(0.38, 1 - (eased * 0.72));
+            strokeWidth = 2.6;
+            fill = 'var(--ok)';
+            fillOpacity = Math.max(0.14, 0.92 * fromActiveBlend);
+            textFill = 'var(--bg)';
+            textOpacity = Math.max(0.7, 1 - (eased * 0.4));
+            fontWeight = 700;
+            glow = 'filter="drop-shadow(0 0 5px rgba(31,255,122,.36))"';
+            const collapse = Math.max(0, 1 - eased);
+            const ringOpacity = collapse * 0.34;
+            if (ringOpacity > 0.01) {
+              const ringScale = 1 + ((1 - collapse) * 0.18);
+              handoffRing = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="none" stroke="var(--ok)" stroke-width="1.8" opacity="${ringOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${ringScale})"></rect>`;
+            }
+          } else if (name === toState) {
+            stroke = 'var(--ok)';
+            strokeOpacity = destinationDimStrokeOpacity + (toActiveBlend * (0.98 - destinationDimStrokeOpacity));
+            strokeWidth = 2.0 + (toActiveBlend * 0.6);
+            fill = 'var(--node)';
+            fillOpacity = 1;
+            fillOverlay = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="var(--ok)" fill-opacity="${toActiveBlend}" stroke="none"></rect>`;
+            textFill = toActiveBlend > 0.58 ? 'var(--bg)' : 'var(--ok)';
+            textOpacity = destinationDimTextOpacity + (toActiveBlend * (1 - destinationDimTextOpacity));
+            fontWeight = toActiveBlend > 0.58 ? 700 : 600;
+
+            if (pulseStrength > 0.01) {
+              const pulseOpacity = pulseStrength * Math.max(0.08, 1 - toActiveBlend);
+              pulseOverlay = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="none" stroke="var(--ok)" stroke-width="2.4" opacity="${pulseOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${1 + (0.24 * pulseStrength)})"></rect>`;
+            }
+            const arrival = Math.max(0, Math.min(1, (eased - 0.58) / 0.42));
+            const ringOpacity = arrival * (1 - toActiveBlend) * 0.32;
+            if (ringOpacity > 0.01) {
+              const ringScale = 1.16 - (arrival * 0.18);
+              handoffRing = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="none" stroke="var(--ok)" stroke-width="1.7" opacity="${ringOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${ringScale})"></rect>`;
+            }
+          } else {
+            const fromVisual = fromStateVisual.get(name);
+            if (fromVisual) {
+              let baseStrokeOpacity = 0.58;
+              let baseTextOpacity = 0.66;
+              if (selectedEventNameForAnimation !== null) {
+                if (selectedFamilyDestinations.has(name)) {
+                  if (fromVisual === 'actual') {
+                    baseStrokeOpacity = 1;
+                    baseTextOpacity = 1;
+                  } else {
+                    baseStrokeOpacity = 0.72;
+                    baseTextOpacity = 0.74;
+                  }
+                } else {
+                  baseStrokeOpacity = 0.18;
+                  baseTextOpacity = 0.24;
+                }
+              }
+
+              if (fromVisual === 'actual') {
+                stroke = 'var(--ok)';
+                textFill = 'var(--ok)';
+              } else {
+                stroke = 'var(--edge-error)';
+                textFill = 'var(--edge-error)';
+              }
+
+              strokeOpacity = Math.max(0.08, baseStrokeOpacity * preLayerOpacity);
+              textOpacity = Math.max(0.12, baseTextOpacity * preLayerOpacity);
+              strokeWidth = fromVisual === 'actual' ? 2.6 : 2.0;
+              fontWeight = fromVisual === 'actual' ? 700 : 600;
+            }
+          }
+
+          return `
+            <g ${glow}>
+              ${handoffRing}
+              ${pulseOverlay}
+              <rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="${strokeWidth}"></rect>
+              ${fillOverlay}
+              <text x="${pos.x}" y="${pos.y + 4}" text-anchor="middle" fill="${textFill}" fill-opacity="${textOpacity}" font-size="13" font-weight="${fontWeight}">${name}</text>
+            </g>
+          `;
+        }).join('');
+
+        diagram.innerHTML = `${defs}${mutedEdgeSvg}${animatedFromEdgeSvg}${transitionPathHaloSvg}${transitionPathSvg}${transitionSweepSvg}${transitionTrailSvg}${transitionRunnerSvg}${animatedFromAnnotationSvg}${nodeSvg}`;
+        return;
+      }
+
+      const selectedTransition = getSelectedTransition();
+      const selectedEventName = getSelectedEventName();
+      const activeHoverEventName = selectedEventName;
+      const eventEvaluations = Object.fromEntries(
+        getUniqueOutgoingEvents(diagramState).map((eventName) => [eventName, evaluateEvent(diagramState, eventName)])
+      );
+      const hoveredEvaluation = !isAnimationPhase && activeHoverEventName !== null
+        ? evaluateEvent(diagramState, activeHoverEventName)
+        : null;
+      const hoveredActualDestination = hoveredEvaluation && hoveredEvaluation.kind === 'enabled'
+        ? hoveredEvaluation.to
+        : null;
+      const hoveredStateVisual = new Map();
+      const hoveredEventDestinationStates = new Set();
+      const setStateVisual = (stateName, visual) => {
+        const existing = hoveredStateVisual.get(stateName);
+        if (!existing) {
+          hoveredStateVisual.set(stateName, visual);
+          return;
+        }
+
+        const rank = {
+          actual: 3,
+          alternate: 2,
+          blocked: 2
+        };
+
+        if ((rank[visual] ?? 0) >= (rank[existing] ?? 0)) {
+          hoveredStateVisual.set(stateName, visual);
+        }
+      };
+
+      if (!isAnimationPhase) {
+        Object.entries(eventEvaluations).forEach(([eventName, evaluation]) => {
+          const family = transitions
+            .filter((transition) => transition.from === diagramState && transition.event === eventName);
+
+          if (evaluation.kind === 'enabled' && evaluation.to) {
+            family.forEach((transition) => {
+              setStateVisual(transition.to, transition.to === evaluation.to ? 'actual' : 'alternate');
+            });
+          } else if (evaluation.kind === 'blocked') {
+            family.forEach((transition) => {
+              setStateVisual(transition.to, 'blocked');
+            });
+          }
+        });
+      }
+
+      if (!isAnimationPhase && activeHoverEventName !== null) {
+        const hoveredEvaluation = evaluateEvent(diagramState, activeHoverEventName);
+        const hoveredFamily = transitions
+          .filter((transition) => transition.from === diagramState && transition.event === activeHoverEventName);
+
+        hoveredFamily.forEach((transition) => {
+          hoveredEventDestinationStates.add(transition.to);
+        });
+
+        if (hoveredEvaluation.kind === 'enabled' && hoveredEvaluation.to) {
+          hoveredFamily.forEach((transition) => {
+            setStateVisual(transition.to, transition.to === hoveredEvaluation.to ? 'actual' : 'alternate');
+          });
+        } else if (hoveredEvaluation.kind === 'blocked') {
+          hoveredFamily.forEach((transition) => {
+            setStateVisual(transition.to, 'blocked');
+          });
+        }
+      }
+
+      const edgeSegments = transitions.map((t, index) => {
+        const from = statePositions[t.from];
+        const to = statePositions[t.to];
+        const visual = getEdgeVisual(t, index, selectedTransition, selectedEventName, eventEvaluations);
+
+        const pathD = buildEdgePath(t, from, to, index);
+        return {
+          index,
+          transition: t,
+          pathD,
+          visual,
+          svg: `<path class="diagram-edge" data-index="${index}" d="${pathD}" fill="none" stroke="${visual.stroke}" stroke-width="${visual.width}" stroke-linecap="round" stroke-linejoin="round" marker-end="${visual.marker}" stroke-dasharray="${visual.dash}" opacity="${visual.opacity}"></path>`
+        };
+      });
+      const laneBiasByIndex = buildParallelLaneBiasByIndex(edgeSegments);
+
+      const edgeSvg = edgeSegments.map((segment) => segment.svg).join('');
+
+      const annotationItems = edgeSegments
+        .map((segment) => {
+          const { transition, index, pathD, visual } = segment;
+          const annotation = getEdgeAnnotation(
+            transition,
+            pathD,
+            selectedEventName,
+            eventEvaluations,
+            laneBiasByIndex.get(index) ?? 0
+          );
+          if (!annotation) {
+            return null;
+          }
+
+          const isCurrentStateEvent = transition.from === diagramState && eventEvaluations[transition.event]?.kind !== 'undefined';
+          const isHoveredEvent = activeHoverEventName !== null && transition.event === activeHoverEventName && transition.from === diagramState;
+          const annotationOpacity = isCurrentStateEvent
+            ? activeHoverEventName === null
+              ? 0.62
+              : isHoveredEvent
+                ? 1
+                : 0.2
+            : Math.max(visual.opacity, 0.9);
+
+          return {
+            segment,
+            transition,
+            annotation,
+            visual,
+            index,
+            opacity: annotationOpacity,
+            chipWidth: annotation.event.length * 7 + 16
+          };
+        })
+        .filter((value) => value !== null);
+
+      const annotationYByIndex = deconflictAnnotationYs(
+        annotationItems.map((item) => ({
+          index: item.index,
+          x: item.annotation.position.x,
+          y: item.annotation.position.y - 8,
+          width: item.chipWidth
+        }))
+      );
+
+      const annotationSvg = annotationItems.map((item) => {
+        const chipY = annotationYByIndex.get(item.index) ?? (item.annotation.position.y - 8);
+        const chipHeight = 16;
+        const textY = chipY + chipHeight / 2;
+        const guardX = item.annotation.position.x;
+        const guardY = chipY + chipHeight + 10;
+
+        return `
+          <g class="edge-annotation clickable" data-index="${item.index}" opacity="${item.opacity}">
+            <rect class="edge-chip" x="${item.annotation.position.x - item.chipWidth / 2}" y="${chipY}" width="${item.chipWidth}" height="${chipHeight}" fill="rgba(30,30,30,0.88)" stroke="${item.visual.stroke}" stroke-width="1.1"></rect>
+            <text class="edge-label" x="${item.annotation.position.x}" y="${textY}" fill="${item.visual.stroke}">${item.annotation.event}</text>
+            ${item.annotation.guard ? `<line x1="${item.annotation.position.x}" y1="${chipY + chipHeight}" x2="${item.annotation.position.x}" y2="${guardY - 6}" stroke="${item.visual.stroke}" stroke-width="1" opacity="0.9"></line><text class="edge-guard" x="${guardX}" y="${guardY}" fill="${item.visual.stroke}">[${item.annotation.guard}]</text>` : ''}
+          </g>
+        `;
+      }).join('');
+
+      const nodeSvg = Object.entries(statePositions).map(([name, pos]) => {
+        const isActive = name === diagramState;
+        const hoveredVisual = hoveredStateVisual.get(name);
+        const isDestinationVisual = !isActive && (hoveredVisual === 'actual' || hoveredVisual === 'alternate' || hoveredVisual === 'blocked');
+        const isActualDestination = !isActive && hoveredVisual === 'actual';
+        const isHoveredEventDestination = hoveredEventDestinationStates.has(name);
+        const destinationOutlineOpacity = isDestinationVisual
+          ? activeHoverEventName === null
+            ? 0.58
+            : isActualDestination && isHoveredEventDestination
+              ? 1
+              : isHoveredEventDestination
+              ? 0.72
+              : 0.18
+          : 1;
+        const destinationTextOpacity = isDestinationVisual
+          ? activeHoverEventName === null
+            ? 0.66
+            : isActualDestination && isHoveredEventDestination
+              ? 1
+              : isHoveredEventDestination
+              ? 0.74
+              : 0.24
+          : 1;
+        const stroke = isActive
+          ? 'var(--ok)'
+          : hoveredVisual === 'actual'
+            ? 'var(--ok)'
+            : hoveredVisual === 'alternate' || hoveredVisual === 'blocked'
+              ? 'var(--edge-error)'
+            : 'var(--border)';
+        const glow = isActive
+          ? 'filter="drop-shadow(0 0 5px rgba(31,255,122,.45))"'
+          : hoveredVisual === 'actual' && isHoveredEventDestination
+            ? 'filter="drop-shadow(0 0 5px rgba(31,255,122,.36))"'
+            : hoveredVisual === 'actual'
+              ? 'filter="drop-shadow(0 0 3px rgba(31,255,122,.22))"'
+            : hoveredVisual === 'alternate' || hoveredVisual === 'blocked'
+              ? 'filter="drop-shadow(0 0 3px rgba(255,42,87,.2))"'
+            : '';
+        const fill = isActive
+          ? 'var(--ok)'
+          : 'var(--node)';
+        const textFill = isActive
+          ? 'var(--bg)'
+          : isDestinationVisual
+            ? stroke
+            : 'var(--border)';
+        const fontWeight = isActive ? 700 : isActualDestination && isHoveredEventDestination ? 700 : isDestinationVisual ? 600 : 500;
+        return `
+          <g ${glow}>
+            <rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="${fill}" stroke="${stroke}" stroke-opacity="${destinationOutlineOpacity}" stroke-width="${isActive ? 2.6 : isDestinationVisual ? 2.0 : 1.6}"></rect>
+            <text x="${pos.x}" y="${pos.y + 4}" text-anchor="middle" fill="${textFill}" fill-opacity="${destinationTextOpacity}" font-size="13" font-weight="${fontWeight}">${name}</text>
+          </g>
+        `;
+      }).join('');
+
+      diagram.innerHTML = `${defs}${edgeSvg}${annotationSvg}${nodeSvg}`;
+    }
+
+    function renderEventBar() {
+      const selectedEventName = getSelectedEventName();
+      const events = getOrderedCurrentEvents();
+
+      if (events.length === 0) {
+        eventBar.innerHTML = '<span class="muted">No events available from current state.</span>';
+        return;
+      }
+
+      eventBar.innerHTML = events
+        .map((eventName) => {
+          const evaluation = evaluateEvent(currentState, eventName);
+          const family = getFamilyTransitions(currentState, eventName);
+          const activeClass = eventName === selectedEventName ? ' active' : '';
+          const stateClass = evaluation.kind === 'enabled'
+            ? ' enabled'
+            : evaluation.kind === 'blocked'
+            ? ' blocked'
+            : evaluation.kind === 'undefined'
+              ? ' undefined'
+              : '';
+          const glyph = evaluation.kind === 'enabled'
+            ? '✔'
+            : evaluation.kind === 'blocked'
+              ? '✖'
+              : '∅';
+          const inlineArgs = eventName === 'Emergency'
+            ? `<span class="event-args-inline"><input data-event-arg="AuthorizedBy" type="text" placeholder="AuthorizedBy" value="${mockEmergencyArgs.AuthorizedBy.replace(/"/g, '&quot;')}"><input data-event-arg="Reason" type="text" placeholder="Reason" value="${mockEmergencyArgs.Reason.replace(/"/g, '&quot;')}"></span>`
+            : '';
+          const reasonText = getEvaluationReason(evaluation);
+          const escapedReason = reasonText
+            ? reasonText
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+            : '';
+          const inlineReason = reasonText
+            ? `<div class="event-reason">${escapedReason}</div>`
+            : '';
+          const inlineResult = rowFeedback && rowFeedback.eventName === eventName
+            ? `<span class="event-result-chip ${rowFeedback.tone} show">${rowFeedback.message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`
+            : '';
+
+          const selectedEntryClass = eventName === selectedEventName ? ' is-selected' : '';
+
+          return `<span class="event-entry${selectedEntryClass}"><button class="event-btn${activeClass}${stateClass}" data-event="${eventName}" type="button"><span class="event-label">${eventName}</span><span class="event-glyph">${glyph}</span></button>${inlineArgs}${inlineResult}${inlineReason}</span>`;
+        })
+        .join('');
+
+      eventBar.querySelectorAll('.event-btn').forEach((button) => {
+        const eventName = button.dataset.event;
+        applyEventButtonState(button, eventName);
+
+        button.addEventListener('mouseenter', () => {
+          if (suppressHoverUntilAnimationComplete) {
+            return;
+          }
+
+          hoveredEventName = eventName;
+          drawDiagram();
+        });
+
+        button.addEventListener('mouseleave', () => {
+          hoveredEventName = null;
+          drawDiagram();
+        });
+
+        button.addEventListener('click', () => {
+          selectEvent(eventName);
+
+          const evaluation = evaluateEvent(currentState, eventName);
+          if (evaluation.kind === 'undefined') {
+            renderAll();
+            return;
+          }
+
+          fireCurrentSelection(eventName);
+        });
+      });
+
+      eventBar.querySelectorAll('input[data-event-arg]').forEach((input) => {
+        input.addEventListener('mouseenter', (event) => {
+          event.stopPropagation();
+        });
+
+        input.addEventListener('focus', () => {
+          if (suppressHoverUntilAnimationComplete) {
+            return;
+          }
+
+          hoveredEventName = 'Emergency';
+          drawDiagram();
+        });
+
+        input.addEventListener('click', (event) => {
+          event.stopPropagation();
+        });
+
+        input.addEventListener('blur', () => {
+          const emergencyButton = eventBar.querySelector('button[data-event="Emergency"]');
+          const emergencyEntry = emergencyButton?.closest('.event-entry');
+          const activeElement = document.activeElement;
+          if (!emergencyEntry || !activeElement || !emergencyEntry.contains(activeElement)) {
+            hoveredEventName = null;
+            drawDiagram();
+          }
+        });
+
+        input.addEventListener('input', () => {
+          const argName = input.dataset.eventArg;
+          if (argName === 'AuthorizedBy') {
+            mockEmergencyArgs.AuthorizedBy = input.value;
+          } else if (argName === 'Reason') {
+            mockEmergencyArgs.Reason = input.value;
+          }
+
+          const emergencyButton = eventBar.querySelector('button[data-event="Emergency"]');
+          if (emergencyButton) {
+            applyEventButtonState(emergencyButton, 'Emergency');
+            const emergencyEvaluation = evaluateEvent(currentState, 'Emergency');
+            const emergencyEntry = emergencyButton.closest('.event-entry');
+            applyEventReasonState(emergencyEntry, emergencyEvaluation);
+          }
+
+          drawDiagram();
+        });
+      });
+
+      if (pendingFocusEventName) {
+        const focusTarget = eventBar.querySelector(`button[data-event="${pendingFocusEventName}"]`);
+        if (focusTarget) {
+          focusTarget.focus();
+        }
+
+        pendingFocusEventName = null;
+      }
+    }
+
+    async function fireCurrentSelection(explicitEventName = null) {
+      const eventName = explicitEventName ?? getSelectedEventName();
+      if (!eventName) {
+        return;
+      }
+
+      if (vscodeApi) {
+        const beforeState = currentState;
+        const beforeData = snapshotData();
+        const beforeArgs = {
+          AuthorizedBy: mockEmergencyArgs.AuthorizedBy,
+          Reason: mockEmergencyArgs.Reason
+        };
+
+        const args = eventName === 'Emergency'
+          ? {
+            AuthorizedBy: mockEmergencyArgs.AuthorizedBy,
+            Reason: mockEmergencyArgs.Reason
+          }
+          : undefined;
+
+        const response = await sendHostRequest('fire', { eventName, args });
+        if (!response.success || !response.snapshot) {
+          showRowFeedback(eventName, `✖ ${response.error || `Event '${eventName}' did not fire.`}`, 'err');
+          renderAll();
+          return;
+        }
+
+        applySnapshot(response.snapshot);
+        const afterData = snapshotData();
+        const changedKeys = getChangedDataKeys(beforeData, afterData);
+        showDataFieldToasts(changedKeys, beforeData, afterData);
+        triggerStateChangeAnimation(beforeState, currentState, eventName, beforeData, beforeArgs);
+        hoveredEventName = null;
+        mockEmergencyArgs.AuthorizedBy = '';
+        mockEmergencyArgs.Reason = '';
+        showRowFeedback(eventName, `✔ ${beforeState} → ${currentState}`, 'ok');
+        renderAll();
+        return;
+      }
+
+      const evaluation = evaluateEvent(currentState, eventName);
+      const failureReason = evaluation.reason && evaluation.reason.trim().length > 0
+        ? evaluation.reason
+        : evaluation.kind === 'blocked'
+          ? 'Blocked by guard or reject condition.'
+          : 'No transition is available from the current state.';
+
+      if (evaluation.kind === 'undefined') {
+        showRowFeedback(eventName, `∅ ${failureReason}`, 'err');
+        return;
+      }
+
+      if (evaluation.kind === 'blocked') {
+        showRowFeedback(eventName, `✖ ${failureReason}`, 'err');
+
+        renderAll();
+        return;
+      }
+
+      if (evaluation.kind !== 'enabled' || !evaluation.to) {
+        return;
+      }
+
+      const from = currentState;
+      const beforeData = snapshotData();
+      const beforeArgs = {
+        AuthorizedBy: mockEmergencyArgs.AuthorizedBy,
+        Reason: mockEmergencyArgs.Reason
+      };
+      currentState = evaluation.to;
+      applyTransition(from, eventName, currentState);
+      triggerStateChangeAnimation(from, currentState, eventName, beforeData, beforeArgs);
+      const afterData = snapshotData();
+      const changedKeys = getChangedDataKeys(beforeData, afterData);
+      showDataFieldToasts(changedKeys, beforeData, afterData);
+      hoveredEventName = null;
+      mockEmergencyArgs.AuthorizedBy = '';
+      mockEmergencyArgs.Reason = '';
+      showRowFeedback(eventName, `✔ ${from} → ${currentState}`, 'ok');
+
+      renderAll();
+    }
+
+    function formatValue(value) {
+      if (value === null) return 'null';
+      if (typeof value === 'string') return `"${value}"`;
+      return String(value);
+    }
+
+    function renderData() {
+      dataList.innerHTML = Object.entries(data)
+        .map(([key, value]) => {
+          const hasToast = dataFieldToasts.has(key);
+          const detail = dataFieldToastDetails.get(key);
+
+          return `
+            <li>
+              <span class="data-key">${key}</span>
+              <span class="data-value-stack">
+                ${hasToast && detail
+                  ? `<span class="data-value-toast show">${detail.before} → ${detail.after}</span>`
+                  : `<span class="muted">${formatValue(value)}</span>`}
+              </span>
+            </li>
+          `;
+        })
+        .join('');
+    }
+
+    function renderAll() {
+      syncSelectionToCurrentState();
+
+      headerState.textContent = ` · Current: ${currentState}`;
+      drawDiagram();
+      renderEventBar();
+
+      renderData();
+    }
+
+    document.addEventListener('keydown', (event) => {
+      const target = event.target;
+      const targetTag = target?.tagName;
+      const isInput = targetTag === 'INPUT' || targetTag === 'TEXTAREA';
+
+      if (isInput) {
+        return;
+      }
+
+      const events = getOrderedCurrentEvents();
+      if (events.length === 0) {
+        return;
+      }
+
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const currentEvent = getSelectedEventName();
+        const currentIndex = events.indexOf(currentEvent);
+        let nextIndex;
+
+        if (currentIndex < 0) {
+          nextIndex = event.key === 'ArrowDown' ? 0 : events.length - 1;
+        } else {
+          nextIndex = event.key === 'ArrowDown'
+            ? (currentIndex + 1) % events.length
+            : (currentIndex - 1 + events.length) % events.length;
+        }
+
+        const nextEvent = events[nextIndex];
+        hoveredEventName = nextEvent;
+        selectEvent(nextEvent);
+        pendingFocusEventName = nextEvent;
+        renderAll();
+        return;
+      }
+
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        fireCurrentSelection();
+      }
+    });
+
+    if (reloadButton) {
+      reloadButton.addEventListener('click', () => {
+        reloadButton.classList.add('is-clicked');
+        if (reloadButtonFeedbackTimer) {
+          window.clearTimeout(reloadButtonFeedbackTimer);
+        }
+
+        reloadButtonFeedbackTimer = window.setTimeout(() => {
+          reloadButton.classList.remove('is-clicked');
+          reloadButtonFeedbackTimer = null;
+        }, 140);
+
+        void reloadMockup();
+      });
+    }
+
+    if (renderModeSelect) {
+      renderModeSelect.value = renderLayoutMode;
+      renderModeSelect.addEventListener('change', () => {
+        const selected = String(renderModeSelect.value || 'default').toLowerCase();
+        renderLayoutMode = selected === 'optimized' ? 'optimized' : 'default';
+        applyRenderLayoutMode();
+        drawDiagram();
+      });
+    }
+
+    if (vscodeApi) {
+      window.addEventListener('message', (event) => {
+        const message = event.data;
+        if (!message || typeof message !== 'object') {
+          return;
+        }
+
+        if (message.type === 'previewResponse') {
+          const resolver = previewPendingRequests.get(message.requestId);
+          if (resolver) {
+            previewPendingRequests.delete(message.requestId);
+            resolver(message);
+          }
+          return;
+        }
+
+        if (message.type === 'snapshot') {
+          if (typeof message.snapshotSequence === 'number') {
+            if (message.snapshotSequence < latestSnapshotSequence) {
+              return;
+            }
+
+            latestSnapshotSequence = message.snapshotSequence;
+          }
+
+          if (!message.success || !message.snapshot) {
+            showRowFeedback('Snapshot', `✖ ${message.error || 'Snapshot failed'}`, 'err');
+            renderAll();
+            return;
+          }
+
+          applySnapshot(message.snapshot);
+          renderAll();
+        }
+      });
+
+      vscodeApi.postMessage({ type: 'ready' });
+      void reloadMockup();
+    }
+
+    renderAll();
+  </script>
+</body>
+</html>

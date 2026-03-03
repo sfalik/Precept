@@ -13,7 +13,8 @@ internal static class Program
                 .WithOutput(Console.OpenStandardOutput())
                 .WithHandler<SmTextDocumentSyncHandler>()
                 .WithHandler<SmCompletionHandler>()
-                .WithHandler<SmSemanticTokensHandler>();
+                .WithHandler<SmSemanticTokensHandler>()
+                .WithHandler<SmPreviewHandler>();
         });
 
         await server.WaitForExit;

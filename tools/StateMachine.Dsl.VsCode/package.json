@@ -36,16 +36,56 @@
         "scopeName": "source.state-machine-dsl",
         "path": "./syntaxes/state-machine-dsl.tmLanguage.json"
       }
-    ]
+    ],
+    "commands": [
+      {
+        "command": "stateMachineDsl.openInspectorPreview",
+        "title": "StateMachine DSL: Open Inspector Preview"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "stateMachineDsl.openInspectorPreview",
+          "when": "resourceExtname == .sm",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "stateMachineDsl.openInspectorPreview",
+          "when": "editorLangId == state-machine-dsl"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "StateMachine DSL Preview",
+      "properties": {
+        "stateMachineDsl.preview.layoutMode": {
+          "type": "string",
+          "enum": [
+            "spacious",
+            "balanced",
+            "compact",
+            "orthogonal",
+            "top-down"
+          ],
+          "default": "balanced",
+          "markdownDescription": "Layout preset for Inspector Preview graph rendering. `balanced` (default) is readability-first with compacted bounds; `spacious` opens larger gaps; `compact` reduces spacing further; `orthogonal` uses right-angle routing; `top-down` stacks layers vertically."
+        }
+      }
+    }
   },
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "dev:watch": "tsc -watch -p ./ --preserveWatchOutput",
     "package:local": "npm run compile && npx @vscode/vsce package --allow-missing-repository",
     "loop:local": "powershell -ExecutionPolicy Bypass -File ./scripts/install-local.ps1",
     "vscode:prepublish": "npm run compile"
   },
   "dependencies": {
+    "elkjs": "^0.11.0",
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {

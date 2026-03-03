@@ -2,19 +2,16 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "REPL (traffic sample)",
-      "type": "coreclr",
+      "name": "Extension (StateMachine DSL) Fast Dev",
+      "type": "extensionHost",
       "request": "launch",
-      "preLaunchTask": "build",
-      "program": "${workspaceFolder}/tools/StateMachine.Dsl.Cli/bin/Debug/net10.0/StateMachine.Dsl.Cli.dll",
       "args": [
-        "./trafficlight.sm",
-        "--instance",
-        "./traffic.instance.json"
+        "--extensionDevelopmentPath=${workspaceFolder}/tools/StateMachine.Dsl.VsCode"
       ],
-      "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "stopAtEntry": false
+      "outFiles": [
+        "${workspaceFolder}/tools/StateMachine.Dsl.VsCode/out/**/*.js"
+      ],
+      "preLaunchTask": "extension: watch"
     },
     {
       "name": "Extension (StateMachine DSL)",

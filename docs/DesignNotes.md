@@ -12,6 +12,38 @@ Implementation focus is the DSL runtime path:
 - validate semantic correctness
 - execute inspection/fire against a compiled in-memory workflow definition
 
+## Editor-First Preview Integration (Current)
+
+- The VS Code extension now includes an inspector preview command (`StateMachine DSL: Open Inspector Preview`).
+- Preview is implemented as dedicated webview panels keyed per `.sm` file URI (one panel/session per file).
+- This chooses the editor-first option where each file can maintain independent preview context without active-editor multiplexing.
+- Preview UI is loaded from `tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html` and uses the mock-style visual shell with a live runtime bridge.
+- The reference mock file remains at `tools/StateMachine.Dsl.VsCode/mockups/interactive-inspector-mockup.html`; runtime panel behavior is driven by the webview copy.
+- Runtime diagram layout is computed by ELK layered layout in the extension host and attached as `snapshot.layout` (`nodes`, `edges`, `width`, `height`).
+- Layout preset is configurable with `stateMachineDsl.preview.layoutMode` (`balanced` default, `spacious`, `compact`, `orthogonal`, `top-down`).
+- `balanced` uses a vertical-first layered profile (direction down) to better use available panel height and reduce over-wide diagrams.
+- Extension layout post-processing performs parallel-edge plus fan-in/fan-out lane separation and incremental snapshot-to-snapshot smoothing to reduce overlap and visual jump.
+- Extension layout post-processing also routes dense same-event fan-in edges through dedicated ingress bands near the destination to reduce terminal-edge crossings.
+- Runtime webview consumes ELK geometry first and falls back to internal heuristic routing only when `snapshot.layout` is unavailable.
+- Runtime webview applies lane-aware edge chip placement and annotation collision deconfliction for dense transition groups.
+- Extension normalizes layout to content bounds and webview fits SVG to the available pane without diagram scrollbars.
+- Preview header includes a `Layout` selector that switches rendering between `Default` (raw ELK geometry from `snapshot.layoutRaw`, without post-processing) and `Optimized` (extension-provided organically relaxed `snapshot.layout` rendered with curved webview routing).
+- The preview webview now calls a custom LSP endpoint (`stateMachine/preview/request`) for `snapshot`, `fire`, `reset`, and `replay` actions.
+- The preview endpoint is bound through a typed JSON-RPC request handler (`IJsonRpcRequestHandler<SmPreviewRequest, SmPreviewResponse>`) with the method contract declared on `SmPreviewRequest` via `[Method("stateMachine/preview/request")]` so registration is discoverable at runtime.
+- Language server preview sessions are in-memory and keyed by document URI; each session keeps parsed/compiled definition and current instance state.
+- The extension pushes updated snapshots to an open file panel on document change, keeping preview content aligned with current editor text.
+- Extension refreshes preview snapshots on document change, save, and panel re-focus/reveal for recovery from stale panel state.
+- Document-change refresh uses unsaved in-memory text from the open editor buffer; save is not required for preview updates.
+- Snapshot messages are sequence-ordered in the webview so stale async responses cannot overwrite newer editor changes.
+- Webview snapshot parsing accepts both camelCase and PascalCase payload keys for state/event/transition/data fields.
+- In preview mode, `Reload` performs a fresh `snapshot` request (with a short retry) from the current in-memory editor text instead of requiring persisted file state.
+- On webview startup, preview triggers the same reload path after `ready` to recover if the first host-pushed snapshot is missed.
+- Preview includes a replay control that runs a predefined scenario sequence through the language-server replay action.
+- Replay responses include `replayMessages`; the preview renders them as a compact transcript in the event dock.
+- Snapshot request failures are surfaced in the same transcript area.
+- Extension packaging must include `webview/inspector-preview.html` so installed VSIX preview panels can render.
+- Local extension development supports a fast watch loop (`npm run dev:watch` / task `extension: watch`) plus launch profile `Extension (StateMachine DSL) Fast Dev` to avoid VSIX repackaging on each edit.
+
 ### Design-Phase Compatibility Policy
 
 - Backwards compatibility is not required at this time.
@@ -220,14 +252,12 @@ Validation constraints:
 - `StateMachine.Dsl.DslWorkflowDefinition`
 - `StateMachine.Dsl.DslWorkflowInstance` persisted instance model
 - Instance result/compatibility types: `DslInstanceCompatibilityResult`, `DslInstanceFireResult`
-- CLI commands in `tools/StateMachine.Dsl.Cli`:
-  - instance-first `repl`
-  - script execution mode via `--script`
+- `tools/StateMachine.Dsl.LanguageServer` (LSP diagnostics/completion/semantic tokens + preview request handler)
+- `tools/StateMachine.Dsl.VsCode` (language client + inspector preview webview)
 
 ## Current Runtime Semantics
 
 - Undefined state/event/transition resolves to outcome `Undefined`
-- CLI display for `Undefined` distinguishes unknown event (`unknown event`) from no available edge on a known event (`no transition from <State>`).
 - Unguarded transitions resolve to outcome `Enabled` and return a target/new state
 - Guarded transitions are evaluated at runtime against optional event arguments; if provided, they are used for that call without mutating persisted instance data
 - `from ... on ...` blocks support ordered `if`/`else if`/`else` branches and end with an outcome statement: `transition <State>`, `reject "<message>"`, or `no transition`.
@@ -236,7 +266,6 @@ Validation constraints:
 - If one guarded transition evaluates `true`, inspection/fire is `Enabled` and returns target/new state
 - If all guarded transitions evaluate `false`, terminal `reject` returns `Blocked` with the configured reason; terminal `no transition` returns `Undefined`
 - Instance-based inspect/fire validates workflow name compatibility before evaluating transitions
-- CLI is instance-first; startup requires loading a persisted instance file
 
 ## Concurrency Model (Current)
 
@@ -264,51 +293,16 @@ Validation constraints:
 - Runtime uses `IGuardEvaluator` with a default implementation (`DefaultGuardEvaluator`).
 - `DslWorkflowCompiler.Compile(...)` accepts an optional custom evaluator.
 - `Inspect(...)` and `Fire(...)` accept optional event arguments (`IReadOnlyDictionary<string, object?>`).
-- Interactive REPL `inspect`/`fire` do not accept inline JSON event-argument payloads.
-- REPL supports `symbols test` to print an ASCII/Unicode compatibility matrix for terminal/font diagnostics.
-- REPL supports `clear` to clear the terminal screen.
-- REPL supports interactive `Tab` completion for top-level commands, event names (`inspect`/`fire`), `style theme` names, and `symbols` subcommands.
-- REPL supports `Up`/`Down` command history navigation and `Right Arrow` inline completion acceptance in interactive mode.
-- REPL supports inline type-ahead hints while typing (current-token completion preview).
-- REPL supports `style preview` (current theme) and `style preview all` (all themes) using compact timeline styling.
-- Style preview samples use a realistic traffic-light transcript (`Red`, `Advance`, `Green`, etc.) and now cover the full compact scenario matrix: inspect-all and inspect-single rows, multi-target reachable/unreachable child arrows, blocked guard-linked child previews, fire success, undefined unknown-event/no-transition rows, argument prompts, and truncation.
-- REPL supports `style theme <name|list>` to switch among built-in palettes during a session.
-- Built-in palettes now include `mono-accent`, `muted`, `nord-crisp`, `tokyo-night`, `github-dark`, `solarized-modern`, `dracula`, `rose-pine`, `everforest`, `catppuccin-mocha`, `one-dark-pro`, `gruvbox-dark`, `material-ocean`, `night-owl`, `palenight`, `cobalt2`, `ayu-mirage`, `horizon-dark`, `kanagawa-wave`, `synthwave-84`, `monokai-pro`, `sepia-soft`, `forest-night`, `iceberg`, `carbon`, `neon-mint`, `ember`, `lavender-mist`, `slate-blue`, and `slate-blue-vivid`.
-- REPL default startup theme is `slate-blue-vivid`.
-- REPL `inspect` supports optional event name; without one it inspects all events and reports callable plus guarded transitions for the current state.
 - Inspect preview is eager: if available instance data (plus supplied event args, if any) is sufficient to resolve a concrete branch, preview shows that concrete target.
 - When multiple targets are defined for an event, inspect shows the event on the parent line and renders all possible targets on child lines; the currently reachable target uses preview arrow (`──▷`) and alternates use unreachable marker (`──✕`, ASCII: `--X`).
 - Missing required args only force ambiguous preview when guard logic references the missing arg(s).
 - Ambiguous inspect rendering uses timeline rows: the event prints once and possible targets are rendered underneath as child lines using `├─`/`└─` with hollow preview arrows (`──▷` / `-->`).
 - If an ambiguous inspect result has a terminal `reject`, warning/reason remains on the event line.
-- REPL `fire` prompts for each required event arg with type-aware labels when the event is defined from the current state.
-- Interactive fire prompting performs scalar type coercion/validation against arg contracts and re-prompts on invalid input.
-- REPL `data` renders readable key-value output in interactive mode unless output mode is json.
-- Interactive REPL uses `compact` only.
-- Interactive REPL exits cleanly on stdin EOF (for example, when piped input is exhausted).
-- Script/non-interactive output is log-oriented (`INFO`/`WARN`/`ERROR`) for command traceability.
-- REPL compact output in interactive mode omits repeated command/event labels to reduce noise.
-- REPL compact mode uses a timeline-style prompt (`Red ›`) with branch prefixes (`├─`/`└─`) and semantic transition arrows: preview (`inspect`) uses `──▷` (ASCII fallback: `-->`), and committed success (`fire`) uses `──▶` (ASCII fallback: `==>`).
-- Compact color semantics are role-based: event labels use event color; state labels use state color; status markers use success/warn/error colors; reachable preview arrows (`──▷`/`-->`) are success-colored; committed fire arrows are success-colored; unreachable child arrows (`──✕`/`--X`) are error-colored while target state labels remain state-colored.
-- Structural timeline glyphs/indentation (`├─`, `└─`, `│`) are rendered in neutral/meta color rather than event/state colors.
-- For blocked guard outcomes that still show candidate child targets, child preview arrows (`──▷`/`-->`) use warning color to indicate conditionally reachable paths gated by guard data/args.
-- Single-event `inspect <EventName>` preview output is visually differentiated from inspect-all rows to make direct command results stand out.
-- Interactive compact `inspect`/`fire` result lines include the event name before the status marker (for example, `NotAnEvent ✖ | unknown event`, `Advance ⚠ | No cars waiting`, `Advance ✔ ──▶ Green`, `ClearEmergency ✖ | no transition from Red`).
-- Interactive argument prompts in compact mode follow the same style (for example, `│  Reason: value`).
-- Interactive commands that display events/states use the same timeline rendering, including `events`, `state`, and inspect callable lines.
-- Compact inspect callable lists use natural spacing (no fixed event-column padding) to avoid wide gaps with long event signatures.
-- Compact interactive inspect/fire outcome rows are single-line; long status text is truncated with `...` to preserve timeline arrow alignment.
-- Compact `events` output also aligns event-name columns to match inspect-list rhythm.
-- Compact interactive non-prompt lines (including argument prompts) are rendered as timeline children beneath each prompt.
-- Interactive inspect callable output lists only event/state lines (no separate "callable events" banner).
-- REPL verbose mode renders structured table/panel views for inspect/fire details and callable-event listings.
-- Symbol rendering supports `auto|ascii|unicode`; auto mode prefers Unicode only if runtime terminal heuristics indicate support.
 - Transition DSL supports `set <Key> = <expr>` where `<Key>` may be bare or `<Key>`.
 - Assignment expressions support literals and scoped references (`<EventName>.<ArgKey>`, `<Key>`).
 - Event declarations support optional indented argument declarations with scalar type contracts.
 - Top-level typed declarations define persisted instance-data scalar contracts.
 - Inline typed event arguments (`event Name(Type)`) are rejected; use indented event argument declarations instead.
-- CLI emits non-zero exit codes for incompatible instances and script command failures.
 - Runtime supports persisted instance creation and instance-based `Inspect(...)` / `Fire(...)`.
 - `tools/StateMachine.Dsl.LanguageServer` provides LSP stdio diagnostics/completion MVP for `.sm` files.
 - LSP diagnostics run parser/compiler validation on document open/change/save and map parser `Line N:` failures to line-scoped diagnostics.
@@ -326,10 +320,7 @@ Validation constraints:
 - Local VSIX packaging includes language-client runtime dependencies so activation works after install.
 - VS Code client supports a local package+install loop via `npm run loop:local` in `tools/StateMachine.Dsl.VsCode`.
 - VS Code client activates from `workspaceContains:**/*.sm` plus language contribution activation and writes startup diagnostics to the `StateMachine DSL` output channel.
-- CLI supports `--instance` at startup and REPL-level `load`/`save` for instance file management.
-- Repository root includes runnable examples: `trafficlight.sm`, `traffic.instance.json`, `traffic.script.txt`.
-- CLI includes interactive REPL and non-interactive script execution using the same command set.
-- Test suite includes CLI transcript rendering regression coverage for compact inspect/fire timeline scenarios (Unicode and ASCII symbol modes).
+- Repository root includes runnable DSL examples such as `trafficlight.sm`.
 
 Supported default guard forms:
 

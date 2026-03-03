@@ -1,6 +1,6 @@
 machine TrafficLight
 
-number VehiclesWaiting = 0
+number VehiclesWaiting = 2
 number CycleCount = 0
 boolean LeftTurnQueued = false
 string? EmergencyReason
@@ -10,6 +10,7 @@ state FlashingGreen
 state Green
 state Yellow
 state FlashingRed
+
 
 event Advance
 event Emergency

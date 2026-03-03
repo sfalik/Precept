@@ -1,9 +1,0 @@
-{
-  "profiles": {
-    "StateMachine.Dsl.Cli (Quick Start)": {
-      "commandName": "Project",
-      "workingDirectory": "$(SolutionDir)",
-      "commandLineArgs": "./trafficlight.sm --instance ./traffic.instance.json"
-    }
-  }
-}

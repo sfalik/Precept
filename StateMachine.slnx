@@ -5,6 +5,5 @@
   <Project Path="src/StateMachine/StateMachine.csproj" />
   <Project Path="test/StateMachine.Dsl.LanguageServer.Tests/StateMachine.Dsl.LanguageServer.Tests.csproj" />
   <Project Path="test/StateMachine.Tests/StateMachine.Tests.csproj" />
-  <Project Path="tools/StateMachine.Dsl.Cli/StateMachine.Dsl.Cli.csproj" />
   <Project Path="tools/StateMachine.Dsl.LanguageServer/StateMachine.Dsl.LanguageServer.csproj" />
 </Solution>
