@@ -15,7 +15,7 @@ StateMachine is a .NET DSL-driven state/workflow engine focused on deterministic
 - DSL parser/compiler/runtime is implemented and used by the language server for editor diagnostics and preview execution.
 - VS Code extension is implemented with automatic `.sm` language-client activation plus inspector preview panels per file.
 - Inspector preview now exchanges live `snapshot`/`fire`/`reset` requests through the language server (`stateMachine/preview/request`) instead of only local mock data.
-- Inspector preview layout uses ELK presets (`spacious`, `balanced`, `compact`, `orthogonal`, `top-down`) with `balanced` as default, plus stabilization/deconfliction passes to reduce edge overlap and node jumpiness between updates.
+- Inspector preview layout uses a single unified ELK layered layout with state-machine-tuned options (spline edge routing, feedback edges for cycles, inside self-loops, inline edge labels, DSL declaration-order node ordering), dynamic per-state node sizing, and responsive viewBox.
 - CLI host has been removed in this branch (hard cut); editor + language server are the active runtime surfaces.
 
 ## Quick Start (2 minutes)
@@ -396,15 +396,12 @@ Troubleshooting completion/diagnostics:
 - Runtime preview uses `tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html`, which now hosts the mock-style visual shell while sourcing runtime state from language-server snapshots.
 - Mock reference remains intact at `tools/StateMachine.Dsl.VsCode/mockups/interactive-inspector-mockup.html` and is not used as the runtime source file.
 - State graph/events/data visuals follow the mock-style presentation while `snapshot`/`fire`/`reset`/`replay` requests execute against the real `.sm` runtime session.
-- Runtime layout is hard-cut to ELK layered graph geometry computed in the extension host and injected into snapshots (`snapshot.layout`).
-- Layout preset is configurable with `stateMachineDsl.preview.layoutMode` (`balanced` default, `spacious`, `compact`, `orthogonal`, `top-down`).
-- Webview rendering now prefers ELK-provided node coordinates and edge polyline sections, with fallback heuristics only if layout payload is absent.
-- Extension post-processing applies parallel-edge plus fan-in/fan-out lane separation and incremental smoothing to improve readability and reduce visual jitter.
-- Dense same-event fan-in transitions into one target are routed through dedicated ingress bands near the destination to reduce terminal crossings.
-- Webview annotation chips apply lane-aware placement and collision deconfliction for dense transition clusters.
-- `balanced` now uses a vertical-first layered profile to better use available pane height and reduce very wide horizontal flows.
-- Extension normalizes layout to content bounds and webview fits the SVG to the pane (no diagram scrolling) while preserving readable annotation sizing.
-- Inspector top bar includes a `Layout` switch: `Default` (raw ELK geometry from `snapshot.layoutRaw`, no post-processing) and `Optimized` (organic relaxed node layout from `snapshot.layout` with curved webview routing).
+- Runtime layout uses a single unified ELK layered graph computed in the extension host and attached as `snapshot.layout` (`nodes` with per-node `width`/`height`, `edges` with ELK-routed bend-point arrays, `width`, `height`).
+- ELK options are state-machine-tuned: spline edge routing, feedback edges for cycle handling, inside self-loops, inline edge labels, network-simplex node placement, and DSL declaration-order node/port ordering.
+- Node dimensions are computed dynamically from state name length (8.5px char width, 36px padding, 80px minimum width, 40px fixed height).
+- Edge paths use Catmull-Rom to cubic Bézier spline conversion for smooth curves from ELK bend points.
+- Webview viewBox is set responsively from ELK-computed graph dimensions with 50px padding per side (minimum 600×300).
+- No post-processing passes (stabilization, deconfliction, ingress bands, normalization) are applied; ELK handles crossing minimization, self-loops, backward edges, and parallel edges directly.
 - Supported runtime actions are `snapshot` (reload), `fire`, `reset`, and `replay` via `stateMachine/preview/request`.
 - `Reload` requests a fresh runtime snapshot from the current in-memory editor text.
 - Activity log lines are sourced from runtime responses (including replay messages and snapshot failures).

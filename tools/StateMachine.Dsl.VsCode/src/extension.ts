@@ -12,7 +12,6 @@ let client: LanguageClient | undefined;
 const previewPanels = new Map<string, vscode.WebviewPanel>();
 const snapshotSequenceByPanel = new WeakMap<vscode.WebviewPanel, number>();
 let elkLayoutEngine: any | undefined;
-const layoutStabilityByUri = new Map<string, SnapshotLayout>();
 
 function getPreviewPanelKey(uri: vscode.Uri): string {
   return uri.toString().toLowerCase();
@@ -45,6 +44,8 @@ interface PreviewResponse {
 interface LayoutNode {
   x: number;
   y: number;
+  width: number;
+  height: number;
 }
 
 interface LayoutEdge {
@@ -244,7 +245,6 @@ async function openInspectorPreviewPanel(context: vscode.ExtensionContext, outpu
 
   panel.onDidDispose(() => {
     previewPanels.delete(panelKey);
-    layoutStabilityByUri.delete(document.uri.toString());
   });
 
   panel.onDidChangeViewState((event) => {
@@ -286,7 +286,7 @@ async function openInspectorPreviewPanel(context: vscode.ExtensionContext, outpu
     };
 
     const response = await sendPreviewRequest(request, output);
-    const responseWithLayout = await withLayout(response, output, request.uri);
+    const responseWithLayout = await withLayout(response, output);
     void panel.webview.postMessage({
       type: "previewResponse",
       requestId,
@@ -311,7 +311,7 @@ async function sendSnapshotToPanel(
     },
     output
   );
-  const responseWithLayout = await withLayout(response, output, document.uri.toString());
+  const responseWithLayout = await withLayout(response, output);
 
   void panel.webview.postMessage({
     type: "snapshot",
@@ -379,503 +379,45 @@ function getPreviewLayoutMode(): PreviewLayoutMode {
 }
 
 function getElkLayoutOptions(mode: PreviewLayoutMode): Record<string, string> {
-  if (mode === "spacious") {
-    return {
-      "elk.algorithm": "layered",
-      "elk.direction": "RIGHT",
-      "elk.spacing.nodeNode": "96",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "184",
-      "elk.layered.spacing.edgeNodeBetweenLayers": "56",
-      "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
-      "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
-      "elk.edgeRouting": "ORTHOGONAL"
-    };
-  }
-
-  if (mode === "compact") {
-    return {
-      "elk.algorithm": "layered",
-      "elk.direction": "RIGHT",
-      "elk.spacing.nodeNode": "42",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "78",
-      "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
-      "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
-      "elk.edgeRouting": "SPLINES"
-    };
-  }
-
-  if (mode === "orthogonal") {
-    return {
-      "elk.algorithm": "layered",
-      "elk.direction": "RIGHT",
-      "elk.spacing.nodeNode": "62",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "112",
-      "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
-      "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
-      "elk.edgeRouting": "ORTHOGONAL"
-    };
-  }
-
-  if (mode === "top-down") {
-    return {
-      "elk.algorithm": "layered",
-      "elk.direction": "DOWN",
-      "elk.spacing.nodeNode": "70",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "116",
-      "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
-      "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
-      "elk.edgeRouting": "SPLINES"
-    };
-  }
+  const direction = mode === "top-down" ? "DOWN" : "RIGHT";
+  const nodeSpacing = mode === "compact" ? "42" : mode === "spacious" ? "80" : "55";
+  const layerSpacing = mode === "compact" ? "70" : mode === "spacious" ? "140" : "90";
 
   return {
     "elk.algorithm": "layered",
-    "elk.direction": "DOWN",
-    "elk.spacing.nodeNode": "64",
-    "elk.layered.spacing.nodeNodeBetweenLayers": "108",
+    "elk.direction": direction,
+    "elk.spacing.nodeNode": nodeSpacing,
+    "elk.layered.spacing.nodeNodeBetweenLayers": layerSpacing,
+    "elk.layered.spacing.edgeNodeBetweenLayers": "30",
     "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
-    "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
-    "elk.edgeRouting": "ORTHOGONAL"
+    "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
+    "elk.edgeRouting": "SPLINES",
+    "elk.layered.mergeEdges": "false",
+    "elk.layered.feedbackEdges": "true",
+    "elk.separateConnectedComponents": "false",
+    "elk.layered.cycleBreaking.strategy": "INTERACTIVE",
+    "elk.insideSelfLoops.activate": "true",
+    "elk.edgeLabels.inline": "true",
+    "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES"
   };
 }
 
-function offsetPolyline(points: Array<{ x: number; y: number }>, offset: number): Array<{ x: number; y: number }> {
-  if (Math.abs(offset) < 0.001 || points.length < 2) {
-    return points;
-  }
-
-  const start = points[0];
-  const end = points[points.length - 1];
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const length = Math.hypot(dx, dy);
-  if (length < 0.001) {
-    return points;
-  }
-
-  const normalX = -dy / length;
-  const normalY = dx / length;
-
-  if (points.length === 2) {
-    const midX = (start.x + end.x) / 2 + (normalX * offset);
-    const midY = (start.y + end.y) / 2 + (normalY * offset);
-    return [start, { x: midX, y: midY }, end];
-  }
-
-  return points.map((point, index) => {
-    if (index === 0 || index === points.length - 1) {
-      return point;
-    }
-
-    return {
-      x: point.x + (normalX * offset),
-      y: point.y + (normalY * offset)
-    };
-  });
+function computeNodeSize(stateName: string): { width: number; height: number } {
+  const charWidth = 8.5;
+  const horizontalPadding = 36;
+  const width = Math.max(80, Math.round(stateName.length * charWidth + horizontalPadding));
+  const height = 40;
+  return { width, height };
 }
 
-function deconflictParallelEdges(edges: LayoutEdge[], transitions: TransitionLike[]): LayoutEdge[] {
-  const grouped = new Map<string, LayoutEdge[]>();
-  for (const edge of edges) {
-    const transition = transitions[edge.transitionIndex];
-    if (!transition) {
-      continue;
-    }
-
-    const key = `${transition.from}->${transition.to}`;
-    const group = grouped.get(key) ?? [];
-    group.push(edge);
-    grouped.set(key, group);
-  }
-
-  const deconflicted = new Map<number, LayoutEdge>();
-  for (const group of grouped.values()) {
-    if (group.length === 1) {
-      deconflicted.set(group[0].transitionIndex, group[0]);
-      continue;
-    }
-
-    const sorted = [...group].sort((left, right) => left.transitionIndex - right.transitionIndex);
-    sorted.forEach((edge, index) => {
-      const centered = index - ((sorted.length - 1) / 2);
-      const laneOffset = centered * 14;
-      deconflicted.set(edge.transitionIndex, {
-        transitionIndex: edge.transitionIndex,
-        points: offsetPolyline(edge.points, laneOffset)
-      });
-    });
-  }
-
-  return edges.map((edge) => deconflicted.get(edge.transitionIndex) ?? edge);
-}
-
-function deconflictFanEdges(edges: LayoutEdge[], transitions: TransitionLike[]): LayoutEdge[] {
-  const byTarget = new Map<string, LayoutEdge[]>();
-  const bySource = new Map<string, LayoutEdge[]>();
-
-  for (const edge of edges) {
-    const transition = transitions[edge.transitionIndex];
-    if (!transition) {
-      continue;
-    }
-
-    const targetGroup = byTarget.get(transition.to) ?? [];
-    targetGroup.push(edge);
-    byTarget.set(transition.to, targetGroup);
-
-    const sourceGroup = bySource.get(transition.from) ?? [];
-    sourceGroup.push(edge);
-    bySource.set(transition.from, sourceGroup);
-  }
-
-  const adjustments = new Map<number, number>();
-  const applySpread = (group: LayoutEdge[], magnitude: number, weight: number) => {
-    if (group.length <= 2) {
-      return;
-    }
-
-    const sorted = [...group].sort((left, right) => left.transitionIndex - right.transitionIndex);
-    sorted.forEach((edge, index) => {
-      const centered = index - ((sorted.length - 1) / 2);
-      const existing = adjustments.get(edge.transitionIndex) ?? 0;
-      adjustments.set(edge.transitionIndex, existing + (centered * magnitude * weight));
-    });
-  };
-
-  for (const group of byTarget.values()) {
-    applySpread(group, 11, 1);
-  }
-
-  for (const group of bySource.values()) {
-    applySpread(group, 8, 0.7);
-  }
-
-  return edges.map((edge) => {
-    const offset = adjustments.get(edge.transitionIndex) ?? 0;
-    if (Math.abs(offset) < 0.001) {
-      return edge;
-    }
-
-    return {
-      transitionIndex: edge.transitionIndex,
-      points: offsetPolyline(edge.points, offset)
-    };
-  });
-}
-
-function routeThroughTargetIngressBand(points: Array<{ x: number; y: number }>, bandOffset: number): Array<{ x: number; y: number }> {
-  if (Math.abs(bandOffset) < 0.001 || points.length < 2) {
-    return points;
-  }
-
-  const end = points[points.length - 1];
-  const previous = points[points.length - 2];
-  const dx = end.x - previous.x;
-  const dy = end.y - previous.y;
-  const length = Math.hypot(dx, dy);
-  if (length < 0.001) {
-    return points;
-  }
-
-  const ux = dx / length;
-  const uy = dy / length;
-  const normalX = -uy;
-  const normalY = ux;
-  const ingressDistance = Math.max(28, Math.min(54, length * 0.62));
-  const ingressPoint = {
-    x: end.x - (ux * ingressDistance) + (normalX * bandOffset),
-    y: end.y - (uy * ingressDistance) + (normalY * bandOffset)
-  };
-
-  return [
-    ...points.slice(0, -1),
-    ingressPoint,
-    end
-  ];
-}
-
-function applyTargetIngressBands(edges: LayoutEdge[], transitions: TransitionLike[]): LayoutEdge[] {
-  const grouped = new Map<string, LayoutEdge[]>();
-
-  for (const edge of edges) {
-    const transition = transitions[edge.transitionIndex];
-    if (!transition || transition.from === transition.to) {
-      continue;
-    }
-
-    const key = `${transition.to}::${transition.event}`;
-    const group = grouped.get(key) ?? [];
-    group.push(edge);
-    grouped.set(key, group);
-  }
-
-  const rerouted = new Map<number, LayoutEdge>();
-  for (const group of grouped.values()) {
-    if (group.length < 3) {
-      continue;
-    }
-
-    const sorted = [...group].sort((left, right) => {
-      const leftTransition = transitions[left.transitionIndex];
-      const rightTransition = transitions[right.transitionIndex];
-      const byFrom = leftTransition.from.localeCompare(rightTransition.from);
-      if (byFrom !== 0) {
-        return byFrom;
-      }
-
-      return left.transitionIndex - right.transitionIndex;
-    });
-
-    sorted.forEach((edge, index) => {
-      const centered = index - ((sorted.length - 1) / 2);
-      const bandOffset = centered * 18;
-      rerouted.set(edge.transitionIndex, {
-        transitionIndex: edge.transitionIndex,
-        points: routeThroughTargetIngressBand(edge.points, bandOffset)
-      });
-    });
-  }
-
-  return edges.map((edge) => rerouted.get(edge.transitionIndex) ?? edge);
-}
-
-function stabilizeLayout(uri: string, layout: SnapshotLayout): SnapshotLayout {
-  const previous = layoutStabilityByUri.get(uri);
-  if (!previous) {
-    layoutStabilityByUri.set(uri, layout);
-    return layout;
-  }
-
-  const nodes: Record<string, LayoutNode> = {};
-  for (const [name, node] of Object.entries(layout.nodes)) {
-    const prior = previous.nodes[name];
-    if (!prior) {
-      nodes[name] = node;
-      continue;
-    }
-
-    nodes[name] = {
-      x: (node.x * 0.78) + (prior.x * 0.22),
-      y: (node.y * 0.78) + (prior.y * 0.22)
-    };
-  }
-
-  const priorEdgeMap = new Map(previous.edges.map((edge) => [edge.transitionIndex, edge]));
-  const edges = layout.edges.map((edge) => {
-    const prior = priorEdgeMap.get(edge.transitionIndex);
-    if (!prior || prior.points.length !== edge.points.length) {
-      return edge;
-    }
-
-    return {
-      transitionIndex: edge.transitionIndex,
-      points: edge.points.map((point, index) => ({
-        x: (point.x * 0.82) + (prior.points[index].x * 0.18),
-        y: (point.y * 0.82) + (prior.points[index].y * 0.18)
-      }))
-    };
-  });
-
-  const stabilized: SnapshotLayout = {
-    width: (layout.width * 0.88) + (previous.width * 0.12),
-    height: (layout.height * 0.88) + (previous.height * 0.12),
-    nodes,
-    edges
-  };
-
-  layoutStabilityByUri.set(uri, stabilized);
-  return stabilized;
-}
-
-function normalizeLayoutBounds(layout: SnapshotLayout): SnapshotLayout {
-  const points: Array<{ x: number; y: number }> = [];
-  for (const node of Object.values(layout.nodes)) {
-    points.push({ x: node.x, y: node.y });
-  }
-
-  for (const edge of layout.edges) {
-    for (const point of edge.points) {
-      points.push({ x: point.x, y: point.y });
-    }
-  }
-
-  if (points.length === 0) {
-    return layout;
-  }
-
-  const minX = points.reduce((value, point) => Math.min(value, point.x), Number.POSITIVE_INFINITY);
-  const maxX = points.reduce((value, point) => Math.max(value, point.x), Number.NEGATIVE_INFINITY);
-  const minY = points.reduce((value, point) => Math.min(value, point.y), Number.POSITIVE_INFINITY);
-  const maxY = points.reduce((value, point) => Math.max(value, point.y), Number.NEGATIVE_INFINITY);
-
-  const baseSpanX = Math.max(260, (maxX - minX) + 140);
-  const baseSpanY = Math.max(180, (maxY - minY) + 90);
-  const targetWidth = 900;
-  const targetHeight = 740;
-  const fitScale = Math.min(targetWidth / baseSpanX, targetHeight / baseSpanY);
-  const scale = Math.max(0.78, Math.min(1.12, fitScale));
-  const paddingX = 56;
-  const paddingY = 64;
-
-  const transformPoint = (point: { x: number; y: number }) => ({
-    x: ((point.x - minX) * scale) + paddingX,
-    y: ((point.y - minY) * scale) + paddingY
-  });
-
-  const nodes: Record<string, LayoutNode> = {};
-  for (const [name, node] of Object.entries(layout.nodes)) {
-    nodes[name] = transformPoint(node);
-  }
-
-  const edges: LayoutEdge[] = layout.edges.map((edge) => ({
-    transitionIndex: edge.transitionIndex,
-    points: edge.points.map(transformPoint)
-  }));
-
-  const width = Math.max(700, (baseSpanX * scale) + (paddingX * 2));
-  const height = Math.max(420, (baseSpanY * scale) + (paddingY * 2));
-
-  return {
-    width,
-    height,
-    nodes,
-    edges
-  };
-}
-
-interface SnapshotLayoutPair {
-  raw: SnapshotLayout;
-  optimized: SnapshotLayout;
-}
-
-function hashName(value: string): number {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = ((hash << 5) - hash) + value.charCodeAt(index);
-    hash |= 0;
-  }
-
-  return Math.abs(hash);
-}
-
-function createOrganicOptimizedLayout(rawLayout: SnapshotLayout, transitions: TransitionLike[]): SnapshotLayout {
-  const nodeNames = Object.keys(rawLayout.nodes);
-  if (nodeNames.length <= 1) {
-    return rawLayout;
-  }
-
-  const positions: Record<string, { x: number; y: number }> = {};
-  for (const name of nodeNames) {
-    const base = rawLayout.nodes[name];
-    const hash = hashName(name);
-    positions[name] = {
-      x: base.x + (((hash % 15) - 7) * 3),
-      y: base.y + ((((Math.floor(hash / 15)) % 15) - 7) * 3)
-    };
-  }
-
-  const rawXs = nodeNames.map((name) => rawLayout.nodes[name].x);
-  const rawYs = nodeNames.map((name) => rawLayout.nodes[name].y);
-  const spanX = Math.max(160, Math.max(...rawXs) - Math.min(...rawXs));
-  const spanY = Math.max(160, Math.max(...rawYs) - Math.min(...rawYs));
-  const area = spanX * spanY;
-  const k = Math.sqrt(area / Math.max(1, nodeNames.length));
-  const iterations = 92;
-
-  for (let iteration = 0; iteration < iterations; iteration += 1) {
-    const cooling = 1 - (iteration / iterations);
-    const displacements = new Map(nodeNames.map((name) => [name, { x: 0, y: 0 }]));
-
-    for (let leftIndex = 0; leftIndex < nodeNames.length; leftIndex += 1) {
-      const leftName = nodeNames[leftIndex];
-      const left = positions[leftName];
-
-      for (let rightIndex = leftIndex + 1; rightIndex < nodeNames.length; rightIndex += 1) {
-        const rightName = nodeNames[rightIndex];
-        const right = positions[rightName];
-        let dx = left.x - right.x;
-        let dy = left.y - right.y;
-        let distance = Math.hypot(dx, dy);
-        if (distance < 1) {
-          distance = 1;
-          dx = 1;
-          dy = 0;
-        }
-
-        const force = (k * k) / distance;
-        const fx = (dx / distance) * force;
-        const fy = (dy / distance) * force;
-
-        const leftDisp = displacements.get(leftName)!;
-        const rightDisp = displacements.get(rightName)!;
-        leftDisp.x += fx;
-        leftDisp.y += fy;
-        rightDisp.x -= fx;
-        rightDisp.y -= fy;
-      }
-    }
-
-    for (const transition of transitions) {
-      const source = positions[transition.from];
-      const target = positions[transition.to];
-      if (!source || !target) {
-        continue;
-      }
-
-      let dx = source.x - target.x;
-      let dy = source.y - target.y;
-      let distance = Math.hypot(dx, dy);
-      if (distance < 1) {
-        distance = 1;
-      }
-
-      const force = (distance * distance) / Math.max(1, k * 2.4);
-      const fx = (dx / distance) * force;
-      const fy = (dy / distance) * force;
-
-      const sourceDisp = displacements.get(transition.from)!;
-      const targetDisp = displacements.get(transition.to)!;
-      sourceDisp.x -= fx;
-      sourceDisp.y -= fy;
-      targetDisp.x += fx;
-      targetDisp.y += fy;
-    }
-
-    for (const name of nodeNames) {
-      const displacement = displacements.get(name)!;
-      const magnitude = Math.hypot(displacement.x, displacement.y);
-      const stepLimit = Math.max(3, k * 0.24 * cooling);
-      if (magnitude > 0) {
-        const scale = Math.min(stepLimit, magnitude) / magnitude;
-        positions[name].x += displacement.x * scale;
-        positions[name].y += displacement.y * scale;
-      }
-
-      const anchor = rawLayout.nodes[name];
-      positions[name].x += (anchor.x - positions[name].x) * 0.055;
-      positions[name].y += (anchor.y - positions[name].y) * 0.055;
-    }
-  }
-
-  return normalizeLayoutBounds({
-    width: rawLayout.width,
-    height: rawLayout.height,
-    nodes: positions,
-    edges: []
-  });
-}
-
-async function computeLayoutForSnapshot(snapshot: Record<string, unknown>): Promise<SnapshotLayoutPair | undefined> {
+async function computeLayoutForSnapshot(snapshot: Record<string, unknown>): Promise<SnapshotLayout | undefined> {
   const states = extractSnapshotStates(snapshot);
   if (states.length === 0) {
     return undefined;
   }
 
   const transitions = extractSnapshotTransitions(snapshot);
-  const nodeSize = new Map(states.map((state) => [state, {
-    width: Math.max(112, Math.min(200, 68 + (state.length * 8))),
-    height: 44
-  }]));
+  const nodeSizes = new Map(states.map((state) => [state, computeNodeSize(state)]));
 
   const elk = getElkEngine();
   const layoutMode = getPreviewLayoutMode();
@@ -884,8 +426,8 @@ async function computeLayoutForSnapshot(snapshot: Record<string, unknown>): Prom
     layoutOptions: getElkLayoutOptions(layoutMode),
     children: states.map((state) => ({
       id: state,
-      width: nodeSize.get(state)?.width ?? 120,
-      height: nodeSize.get(state)?.height ?? 44
+      width: nodeSizes.get(state)?.width ?? 80,
+      height: nodeSizes.get(state)?.height ?? 40
     })),
     edges: transitions.map((transition, index) => ({
       id: `transition-${index}`,
@@ -906,17 +448,17 @@ async function computeLayoutForSnapshot(snapshot: Record<string, unknown>): Prom
   const resultChildren = Array.isArray(layoutResult.children) ? layoutResult.children : [];
   const resultEdges = Array.isArray(layoutResult.edges) ? layoutResult.edges : [];
 
+  const padding = 50;
   const nodes: Record<string, LayoutNode> = {};
   for (const child of resultChildren) {
     if (!child?.id) {
       continue;
     }
 
-    const width = Number(child.width ?? nodeSize.get(String(child.id))?.width ?? 120);
-    const height = Number(child.height ?? nodeSize.get(String(child.id))?.height ?? 44);
-    const x = Number(child.x ?? 0) + (width / 2) + 40;
-    const y = Number(child.y ?? 0) + (height / 2) + 40;
-    nodes[String(child.id)] = { x, y };
+    const size = nodeSizes.get(String(child.id)) ?? { width: 80, height: 40 };
+    const x = Number(child.x ?? 0) + (size.width / 2) + padding;
+    const y = Number(child.y ?? 0) + (size.height / 2) + padding;
+    nodes[String(child.id)] = { x, y, width: size.width, height: size.height };
   }
 
   const edges: LayoutEdge[] = [];
@@ -934,15 +476,15 @@ async function computeLayoutForSnapshot(snapshot: Record<string, unknown>): Prom
     if (sections.length > 0) {
       for (const section of sections) {
         if (section.startPoint) {
-          points.push({ x: Number(section.startPoint.x) + 40, y: Number(section.startPoint.y) + 40 });
+          points.push({ x: Number(section.startPoint.x) + padding, y: Number(section.startPoint.y) + padding });
         }
 
         for (const bendPoint of section.bendPoints ?? []) {
-          points.push({ x: Number(bendPoint.x) + 40, y: Number(bendPoint.y) + 40 });
+          points.push({ x: Number(bendPoint.x) + padding, y: Number(bendPoint.y) + padding });
         }
 
         if (section.endPoint) {
-          points.push({ x: Number(section.endPoint.x) + 40, y: Number(section.endPoint.y) + 40 });
+          points.push({ x: Number(section.endPoint.x) + padding, y: Number(section.endPoint.y) + padding });
         }
       }
     }
@@ -952,24 +494,13 @@ async function computeLayoutForSnapshot(snapshot: Record<string, unknown>): Prom
     }
   }
 
-  const width = Math.max(920, Number(layoutResult.width ?? 0) + 120);
-  const height = Math.max(430, Number(layoutResult.height ?? 0) + 120);
-  const rawLayout: SnapshotLayout = {
-    width,
-    height,
-    nodes,
-    edges
-  };
+  const width = Number(layoutResult.width ?? 0) + padding * 2;
+  const height = Number(layoutResult.height ?? 0) + padding * 2;
 
-  const optimizedLayout = createOrganicOptimizedLayout(rawLayout, transitions);
-
-  return {
-    raw: rawLayout,
-    optimized: optimizedLayout
-  };
+  return { width, height, nodes, edges };
 }
 
-async function withLayout(response: PreviewResponse, output: vscode.OutputChannel, uri: string): Promise<PreviewResponse> {
+async function withLayout(response: PreviewResponse, output: vscode.OutputChannel): Promise<PreviewResponse> {
   if (!response.success || !response.snapshot || typeof response.snapshot !== "object") {
     return response;
   }
@@ -980,14 +511,12 @@ async function withLayout(response: PreviewResponse, output: vscode.OutputChanne
     if (!layout) {
       return response;
     }
-    const stabilizedLayout = stabilizeLayout(uri, layout.optimized);
 
     return {
       ...response,
       snapshot: {
         ...snapshot,
-        layoutRaw: layout.raw,
-        layout: stabilizedLayout
+        layout
       }
     };
   } catch (error) {

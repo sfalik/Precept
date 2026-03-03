@@ -19,15 +19,12 @@ Implementation focus is the DSL runtime path:
 - This chooses the editor-first option where each file can maintain independent preview context without active-editor multiplexing.
 - Preview UI is loaded from `tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html` and uses the mock-style visual shell with a live runtime bridge.
 - The reference mock file remains at `tools/StateMachine.Dsl.VsCode/mockups/interactive-inspector-mockup.html`; runtime panel behavior is driven by the webview copy.
-- Runtime diagram layout is computed by ELK layered layout in the extension host and attached as `snapshot.layout` (`nodes`, `edges`, `width`, `height`).
-- Layout preset is configurable with `stateMachineDsl.preview.layoutMode` (`balanced` default, `spacious`, `compact`, `orthogonal`, `top-down`).
-- `balanced` uses a vertical-first layered profile (direction down) to better use available panel height and reduce over-wide diagrams.
-- Extension layout post-processing performs parallel-edge plus fan-in/fan-out lane separation and incremental snapshot-to-snapshot smoothing to reduce overlap and visual jump.
-- Extension layout post-processing also routes dense same-event fan-in edges through dedicated ingress bands near the destination to reduce terminal-edge crossings.
-- Runtime webview consumes ELK geometry first and falls back to internal heuristic routing only when `snapshot.layout` is unavailable.
-- Runtime webview applies lane-aware edge chip placement and annotation collision deconfliction for dense transition groups.
-- Extension normalizes layout to content bounds and webview fits SVG to the available pane without diagram scrollbars.
-- Preview header includes a `Layout` selector that switches rendering between `Default` (raw ELK geometry from `snapshot.layoutRaw`, without post-processing) and `Optimized` (extension-provided organically relaxed `snapshot.layout` rendered with curved webview routing).
+- Runtime diagram layout uses a single unified ELK layered layout computed in the extension host and attached as `snapshot.layout` (`nodes` with per-node `width`/`height`, `edges` with ELK-routed bend-point arrays, `width`, `height`).
+- ELK options are state-machine-tuned: spline edge routing (`elk.edgeRouting: SPLINES`), feedback edges for cycle handling, inside self-loops, inline edge labels, network-simplex node placement, and DSL declaration-order node/port ordering.
+- Node dimensions are computed dynamically from state name length (8.5px char width, 36px horizontal padding, 80px minimum width, 40px fixed height) and stored in each `LayoutNode`.
+- No post-processing passes are applied (no stabilization, deconfliction, ingress bands, or normalization); ELK handles crossing minimization, self-loops, backward edges, and parallel edges directly.
+- Runtime webview consumes ELK geometry (node positions/sizes and edge bend-point arrays) and converts edge points to smooth Catmull-Rom → cubic Bézier spline paths.
+- Webview viewBox is set responsively from ELK-computed graph dimensions with 50px padding per side (minimum 600×300); no content-bounds normalization or clamping is applied.
 - The preview webview now calls a custom LSP endpoint (`stateMachine/preview/request`) for `snapshot`, `fire`, `reset`, and `replay` actions.
 - The preview endpoint is bound through a typed JSON-RPC request handler (`IJsonRpcRequestHandler<SmPreviewRequest, SmPreviewResponse>`) with the method contract declared on `SmPreviewRequest` via `[Method("stateMachine/preview/request")]` so registration is discoverable at runtime.
 - Language server preview sessions are in-memory and keyed by document URI; each session keeps parsed/compiled definition and current instance state.

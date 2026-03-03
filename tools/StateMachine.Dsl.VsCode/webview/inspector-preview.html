@@ -596,11 +596,6 @@
       <span id="header-state" class="status"> · Current: Red</span>
     </div>
     <div class="actions">
-      <label for="render-mode" class="muted">Layout</label>
-      <select id="render-mode" class="mode-select" aria-label="layout mode">
-        <option value="default" selected>Default</option>
-        <option value="optimized">Optimized</option>
-      </select>
       <button id="reload-btn" type="button">Reload</button>
     </div>
   </div>
@@ -667,7 +662,7 @@
     const dataList = document.getElementById('data-list');
     const eventBar = document.getElementById('event-bar');
     const reloadButton = document.getElementById('reload-btn');
-    const renderModeSelect = document.getElementById('render-mode');
+
     let selectedTransitionIndex = transitions.findIndex((t) => t.from === 'Red' && t.event === 'Advance' && t.to === 'FlashingGreen');
     let hoveredEventName = null;
     let rowFeedbackTimer = null;
@@ -682,13 +677,8 @@
     let reloadButtonFeedbackTimer = null;
     let currentEventStatuses = [];
     let transitionPaths = new Map();
-    let renderLayoutMode = 'default';
-    let defaultStatePositions = { ...statePositions };
-    let defaultTransitionPaths = new Map();
-    let optimizedStatePositions = { ...statePositions };
-    let optimizedTransitionPaths = new Map();
-    let defaultDiagramBounds = { width: 920, height: 430 };
-    let optimizedDiagramBounds = { width: 920, height: 430 };
+    let nodeSizes = {};
+    let diagramBounds = { width: 920, height: 430 };
 
     const vscodeApi = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null;
     let previewRequestId = 1;
@@ -836,7 +826,7 @@
       return positions;
     }
 
-    function pointsToPath(points) {
+    function pointsToSmoothPath(points) {
       if (!Array.isArray(points) || points.length < 2) {
         return '';
       }
@@ -861,9 +851,27 @@
         return '';
       }
 
-      return normalized
-        .map((point, index) => `${index === 0 ? 'M' : 'L'} ${Math.round(point.x)} ${Math.round(point.y)}`)
-        .join(' ');
+      if (normalized.length === 2) {
+        return `M ${normalized[0].x} ${normalized[0].y} L ${normalized[1].x} ${normalized[1].y}`;
+      }
+
+      let d = `M ${normalized[0].x} ${normalized[0].y}`;
+
+      for (let i = 0; i < normalized.length - 1; i++) {
+        const p0 = normalized[Math.max(0, i - 1)];
+        const p1 = normalized[i];
+        const p2 = normalized[i + 1];
+        const p3 = normalized[Math.min(normalized.length - 1, i + 2)];
+
+        const cp1x = p1.x + (p2.x - p0.x) / 6;
+        const cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp2x = p2.x - (p3.x - p1.x) / 6;
+        const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+        d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+      }
+
+      return d;
     }
 
     function toHostEventStatus(raw) {
@@ -884,6 +892,7 @@
     function parseLayoutPayload(layoutPayload, fallbackPositions, fallbackBounds) {
       const fallback = {
         positions: fallbackPositions,
+        sizes: {},
         paths: new Map(),
         bounds: fallbackBounds
       };
@@ -893,6 +902,7 @@
       }
 
       const positions = {};
+      const sizes = {};
       for (const [name, pos] of Object.entries(layoutPayload.nodes)) {
         if (!pos || typeof pos !== 'object') {
           continue;
@@ -905,6 +915,12 @@
         }
 
         positions[String(name)] = { x, y };
+
+        const w = Number(pos.width);
+        const h = Number(pos.height);
+        if (Number.isFinite(w) && Number.isFinite(h)) {
+          sizes[String(name)] = { width: w, height: h };
+        }
       }
 
       const resolvedPositions = Object.keys(positions).length > 0 ? positions : fallbackPositions;
@@ -921,7 +937,7 @@
             continue;
           }
 
-          const path = pointsToPath(edge.points);
+          const path = pointsToSmoothPath(edge.points);
           if (path) {
             paths.set(transitionIndex, path);
           }
@@ -931,12 +947,13 @@
       const layoutWidth = Number(layoutPayload.width);
       const layoutHeight = Number(layoutPayload.height);
       const bounds = {
-        width: Number.isFinite(layoutWidth) ? Math.max(920, layoutWidth) : fallbackBounds.width,
-        height: Number.isFinite(layoutHeight) ? Math.max(430, layoutHeight) : fallbackBounds.height
+        width: Number.isFinite(layoutWidth) ? layoutWidth : fallbackBounds.width,
+        height: Number.isFinite(layoutHeight) ? layoutHeight : fallbackBounds.height
       };
 
       return {
         positions: resolvedPositions,
+        sizes,
         paths,
         bounds
       };
@@ -966,27 +983,25 @@
       }
 
       const defaultPositions = buildStatePositions(stateOrder);
-      defaultStatePositions = defaultPositions;
       const defaultPoints = Object.values(defaultPositions);
       const defaultMaxX = defaultPoints.reduce((maxValue, pos) => Math.max(maxValue, pos?.x ?? 0), 0);
       const defaultMaxY = defaultPoints.reduce((maxValue, pos) => Math.max(maxValue, pos?.y ?? 0), 0);
-      defaultDiagramBounds = {
+      const fallbackBounds = {
         width: Math.max(920, defaultMaxX + 180),
         height: Math.max(430, defaultMaxY + 140)
       };
 
-      const rawLayoutPayload = (snapshot.layoutRaw ?? snapshot.LayoutRaw ?? snapshot.layout ?? snapshot.Layout);
-      const optimizedLayoutPayload = (snapshot.layout ?? snapshot.Layout ?? snapshot.layoutRaw ?? snapshot.LayoutRaw);
-      const rawLayout = parseLayoutPayload(rawLayoutPayload, defaultPositions, defaultDiagramBounds);
-      const optimizedLayout = parseLayoutPayload(optimizedLayoutPayload, defaultPositions, defaultDiagramBounds);
+      const layoutPayload = (snapshot.layout ?? snapshot.Layout);
+      const parsed = parseLayoutPayload(layoutPayload, defaultPositions, fallbackBounds);
 
-      defaultStatePositions = rawLayout.positions;
-      defaultTransitionPaths = rawLayout.paths;
-      defaultDiagramBounds = rawLayout.bounds;
-      optimizedStatePositions = optimizedLayout.positions;
-      optimizedTransitionPaths = optimizedLayout.paths;
-      optimizedDiagramBounds = optimizedLayout.bounds;
-      applyRenderLayoutMode();
+      statePositions = parsed.positions;
+      nodeSizes = parsed.sizes;
+      transitionPaths = parsed.paths;
+      diagramBounds = parsed.bounds;
+
+      const width = Math.max(600, Number(diagramBounds.width ?? 920));
+      const height = Math.max(300, Number(diagramBounds.height ?? 430));
+      diagram.setAttribute('viewBox', `0 0 ${width} ${height}`);
 
       eventDefinitionOrder = Array.from(new Set(
         (Array.isArray(snapshotEvents) ? snapshotEvents : [])
@@ -1015,16 +1030,6 @@
       if (selectedTransitionIndex < 0) {
         selectedTransitionIndex = 0;
       }
-    }
-
-    function applyRenderLayoutMode() {
-      const useOptimized = renderLayoutMode === 'optimized';
-      statePositions = useOptimized ? optimizedStatePositions : defaultStatePositions;
-      transitionPaths = useOptimized ? new Map(optimizedTransitionPaths) : new Map(defaultTransitionPaths);
-      const bounds = useOptimized ? optimizedDiagramBounds : defaultDiagramBounds;
-      const width = Math.max(920, Number(bounds?.width ?? 920));
-      const height = Math.max(430, Number(bounds?.height ?? 430));
-      diagram.setAttribute('viewBox', `0 0 ${width} ${height}`);
     }
 
     function sendHostRequest(action, payload = {}) {
@@ -1658,47 +1663,27 @@
           return precomputedPath;
         }
 
-        const nodeHalfWidth = 56;
-        const nodeHalfHeight = 22;
-        const family = getFamilyTransitions(transition.from, transition.event);
-        const familyIndex = Math.max(0, family.findIndex((candidate) => candidate.to === transition.to));
-        const familySpread = (family.length - 1) / 2;
-        const laneOffset = (familyIndex - familySpread) * 16;
+        const fromSize = nodeSizes[transition.from] ?? { width: 112, height: 40 };
+        const toSize = nodeSizes[transition.to] ?? { width: 112, height: 40 };
+        const fromHalfW = fromSize.width / 2;
+        const toHalfW = toSize.width / 2;
 
         if (transition.from === transition.to) {
-          const loopX = from.x + nodeHalfWidth;
-          const loopTop = from.y - 8;
-          const loopReach = 66 + Math.abs(laneOffset * 0.6);
-          return `M ${loopX} ${loopTop} C ${loopX + loopReach} ${from.y - 56}, ${loopX + loopReach} ${from.y + 52}, ${from.x + 44} ${from.y + 16}`;
+          const loopX = from.x + fromHalfW;
+          const loopReach = 60;
+          return `M ${loopX} ${from.y - 8} C ${loopX + loopReach} ${from.y - 50}, ${loopX + loopReach} ${from.y + 46}, ${from.x + fromHalfW - 12} ${from.y + 16}`;
         }
 
         const dx = to.x - from.x;
         const dy = to.y - from.y;
         const forward = dx >= 0;
 
-        const startX = from.x + (forward ? nodeHalfWidth : -nodeHalfWidth);
-        const endX = to.x - (forward ? nodeHalfWidth : -nodeHalfWidth);
-        const startY = from.y + (laneOffset * 0.35);
-        const endY = to.y + (laneOffset * 0.35);
+        const startX = from.x + (forward ? fromHalfW : -fromHalfW);
+        const endX = to.x - (forward ? toHalfW : -toHalfW);
+        const startY = from.y;
+        const endY = to.y;
 
-        if (Math.abs(dy) < 40) {
-          const lift = Math.max(26, Math.min(84, Math.abs(dx) * 0.22)) + Math.abs(laneOffset * 0.25);
-          const controlX = Math.round((startX + endX) / 2);
-          const controlY = Math.round(Math.min(startY, endY) - lift);
-          return `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`;
-        }
-
-        if (!forward) {
-          const routeX = Math.min(startX, endX) - Math.max(60, Math.abs(dx) * 0.18) - Math.abs(laneOffset * 0.4);
-          const c1Y = startY + (dy > 0 ? 34 : -34);
-          const c2Y = endY + (dy > 0 ? -34 : 34);
-          return `M ${startX} ${startY} C ${routeX} ${c1Y}, ${routeX} ${c2Y}, ${endX} ${endY}`;
-        }
-
-        const c1X = startX + Math.max(42, Math.abs(dx) * 0.34);
-        const c2X = endX - Math.max(42, Math.abs(dx) * 0.34);
-        const yBias = dy * 0.2 + (laneOffset * 0.3);
-        return `M ${startX} ${startY} C ${c1X} ${startY + yBias}, ${c2X} ${endY - yBias}, ${endX} ${endY}`;
+        return `M ${startX} ${startY} L ${endX} ${endY}`;
       }
 
       function getEdgeVisual(transition, index, selectedTransition, selectedEventName, eventEvaluations) {
@@ -2080,6 +2065,10 @@
         const destinationDimTextOpacity = 0.74;
 
         const nodeSvg = Object.entries(statePositions).map(([name, pos]) => {
+          const ns = nodeSizes[name] ?? { width: 112, height: 40 };
+          const halfW = ns.width / 2;
+          const halfH = ns.height / 2;
+          const rx = halfH;
           let stroke = 'var(--border)';
           let strokeOpacity = 1;
           let strokeWidth = 1.6;
@@ -2107,7 +2096,7 @@
             const ringOpacity = collapse * 0.34;
             if (ringOpacity > 0.01) {
               const ringScale = 1 + ((1 - collapse) * 0.18);
-              handoffRing = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="none" stroke="var(--ok)" stroke-width="1.8" opacity="${ringOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${ringScale})"></rect>`;
+              handoffRing = `<rect x="${pos.x - halfW}" y="${pos.y - halfH}" width="${ns.width}" height="${ns.height}" rx="${rx}" fill="none" stroke="var(--ok)" stroke-width="1.8" opacity="${ringOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${ringScale})"></rect>`;
             }
           } else if (name === toState) {
             stroke = 'var(--ok)';
@@ -2115,20 +2104,20 @@
             strokeWidth = 2.0 + (toActiveBlend * 0.6);
             fill = 'var(--node)';
             fillOpacity = 1;
-            fillOverlay = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="var(--ok)" fill-opacity="${toActiveBlend}" stroke="none"></rect>`;
+            fillOverlay = `<rect x="${pos.x - halfW}" y="${pos.y - halfH}" width="${ns.width}" height="${ns.height}" rx="${rx}" fill="var(--ok)" fill-opacity="${toActiveBlend}" stroke="none"></rect>`;
             textFill = toActiveBlend > 0.58 ? 'var(--bg)' : 'var(--ok)';
             textOpacity = destinationDimTextOpacity + (toActiveBlend * (1 - destinationDimTextOpacity));
             fontWeight = toActiveBlend > 0.58 ? 700 : 600;
 
             if (pulseStrength > 0.01) {
               const pulseOpacity = pulseStrength * Math.max(0.08, 1 - toActiveBlend);
-              pulseOverlay = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="none" stroke="var(--ok)" stroke-width="2.4" opacity="${pulseOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${1 + (0.24 * pulseStrength)})"></rect>`;
+              pulseOverlay = `<rect x="${pos.x - halfW}" y="${pos.y - halfH}" width="${ns.width}" height="${ns.height}" rx="${rx}" fill="none" stroke="var(--ok)" stroke-width="2.4" opacity="${pulseOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${1 + (0.24 * pulseStrength)})"></rect>`;
             }
             const arrival = Math.max(0, Math.min(1, (eased - 0.58) / 0.42));
             const ringOpacity = arrival * (1 - toActiveBlend) * 0.32;
             if (ringOpacity > 0.01) {
               const ringScale = 1.16 - (arrival * 0.18);
-              handoffRing = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="none" stroke="var(--ok)" stroke-width="1.7" opacity="${ringOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${ringScale})"></rect>`;
+              handoffRing = `<rect x="${pos.x - halfW}" y="${pos.y - halfH}" width="${ns.width}" height="${ns.height}" rx="${rx}" fill="none" stroke="var(--ok)" stroke-width="1.7" opacity="${ringOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${ringScale})"></rect>`;
             }
           } else {
             const fromVisual = fromStateVisual.get(name);
@@ -2169,7 +2158,7 @@
             <g ${glow}>
               ${handoffRing}
               ${pulseOverlay}
-              <rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="${strokeWidth}"></rect>
+              <rect x="${pos.x - halfW}" y="${pos.y - halfH}" width="${ns.width}" height="${ns.height}" rx="${rx}" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="${strokeWidth}"></rect>
               ${fillOverlay}
               <text x="${pos.x}" y="${pos.y + 4}" text-anchor="middle" fill="${textFill}" fill-opacity="${textOpacity}" font-size="13" font-weight="${fontWeight}">${name}</text>
             </g>
@@ -2329,6 +2318,10 @@
       }).join('');
 
       const nodeSvg = Object.entries(statePositions).map(([name, pos]) => {
+        const ns = nodeSizes[name] || { width: 112, height: 44 };
+        const halfW = ns.width / 2;
+        const halfH = ns.height / 2;
+        const rx = Math.min(halfH, 22);
         const isActive = name === diagramState;
         const hoveredVisual = hoveredStateVisual.get(name);
         const isDestinationVisual = !isActive && (hoveredVisual === 'actual' || hoveredVisual === 'alternate' || hoveredVisual === 'blocked');
@@ -2379,7 +2372,7 @@
         const fontWeight = isActive ? 700 : isActualDestination && isHoveredEventDestination ? 700 : isDestinationVisual ? 600 : 500;
         return `
           <g ${glow}>
-            <rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="${fill}" stroke="${stroke}" stroke-opacity="${destinationOutlineOpacity}" stroke-width="${isActive ? 2.6 : isDestinationVisual ? 2.0 : 1.6}"></rect>
+            <rect x="${pos.x - halfW}" y="${pos.y - halfH}" width="${ns.width}" height="${ns.height}" rx="${rx}" fill="${fill}" stroke="${stroke}" stroke-opacity="${destinationOutlineOpacity}" stroke-width="${isActive ? 2.6 : isDestinationVisual ? 2.0 : 1.6}"></rect>
             <text x="${pos.x}" y="${pos.y + 4}" text-anchor="middle" fill="${textFill}" fill-opacity="${destinationTextOpacity}" font-size="13" font-weight="${fontWeight}">${name}</text>
           </g>
         `;
@@ -2701,16 +2694,6 @@
         }, 140);
 
         void reloadMockup();
-      });
-    }
-
-    if (renderModeSelect) {
-      renderModeSelect.value = renderLayoutMode;
-      renderModeSelect.addEventListener('change', () => {
-        const selected = String(renderModeSelect.value || 'default').toLowerCase();
-        renderLayoutMode = selected === 'optimized' ? 'optimized' : 'default';
-        applyRenderLayoutMode();
-        drawDiagram();
       });
     }
 
