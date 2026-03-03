@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -15,6 +16,15 @@ internal sealed class SmDslAnalyzer
     private static readonly Regex EventArgRegex = new("^\\s*(?:string|number|boolean|null)\\??\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex FromOnRegex = new("^\\s*from\\s+(?<from>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)\\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EventMemberPrefixRegex = new("(?<event>[A-Za-z_][A-Za-z0-9_]*)\\.$", RegexOptions.Compiled);
+    private static readonly Regex TransformLineRegex = new("^\\s*transform\\s+(?<key>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<expr>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly MethodInfo? ExpressionParseMethod = typeof(DslMachine).Assembly
+        .GetType("StateMachine.Dsl.DslExpressionParser", throwOnError: false)
+        ?.GetMethod(
+            "Parse",
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
+            binder: null,
+            types: [typeof(string)],
+            modifiers: null);
 
     private readonly ConcurrentDictionary<DocumentUri, string> _documents = new();
 
@@ -32,15 +42,18 @@ internal sealed class SmDslAnalyzer
         if (!_documents.TryGetValue(uri, out var text))
             return Array.Empty<Diagnostic>();
 
+        var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+
         try
         {
             var machine = StateMachineDslParser.Parse(text);
             DslWorkflowCompiler.Compile(machine);
-            return Array.Empty<Diagnostic>();
+
+            var diagnostics = GetSemanticDiagnostics(machine, lines);
+            return diagnostics.Count == 0 ? Array.Empty<Diagnostic>() : diagnostics;
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
-            var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             var diagnostic = ToDiagnostic(ex.Message, lines);
             return new[] { diagnostic };
         }
@@ -114,7 +127,7 @@ internal sealed class SmDslAnalyzer
     {
         var items = new List<CompletionItem>();
         items.AddRange(BuildItems(dataFields, CompletionItemKind.Variable));
-        items.AddRange(GuardOperatorItems);
+        items.AddRange(ExpressionOperatorItems);
         items.AddRange(LiteralItems);
 
         if (!string.IsNullOrWhiteSpace(currentEvent) && eventArgs.TryGetValue(currentEvent, out var argsForEvent) && argsForEvent.Count > 0)
@@ -138,6 +151,7 @@ internal sealed class SmDslAnalyzer
     {
         var items = new List<CompletionItem>();
         items.AddRange(BuildItems(dataFields, CompletionItemKind.Variable));
+        items.AddRange(ExpressionOperatorItems);
         items.AddRange(LiteralItems);
 
         if (!string.IsNullOrWhiteSpace(currentEvent) && eventArgs.TryGetValue(currentEvent, out var argsForEvent) && argsForEvent.Count > 0)
@@ -263,6 +277,413 @@ internal sealed class SmDslAnalyzer
             .OrderBy(item => item.Label, StringComparer.Ordinal)
             .ToArray();
 
+    private static IReadOnlyList<Diagnostic> GetSemanticDiagnostics(DslMachine machine, string[] lines)
+    {
+        var diagnostics = new List<Diagnostic>();
+        var dataFieldKinds = machine.DataFields.ToDictionary(
+            field => field.Name,
+            MapFieldContractKind,
+            StringComparer.Ordinal);
+
+        var eventArgKinds = machine.Events.ToDictionary(
+            evt => evt.Name,
+            evt => evt.Args.ToDictionary(
+                arg => arg.Name,
+                MapFieldContractKind,
+                StringComparer.Ordinal),
+            StringComparer.Ordinal);
+
+        var searchLine = 0;
+        foreach (var transition in machine.Transitions)
+        {
+            if (!string.IsNullOrWhiteSpace(transition.GuardExpression))
+            {
+                var guardLine = FindGuardLine(lines, ref searchLine, transition.GuardExpression!);
+                ValidateExpression(
+                    transition.GuardExpression!,
+                    guardLine,
+                    BuildSymbolKinds(dataFieldKinds, eventArgKinds, transition.EventName),
+                    expectedKind: StaticValueKind.Boolean,
+                    expectedLabel: "guard expression",
+                    diagnostics,
+                    lines);
+            }
+
+            foreach (var assignment in transition.TransformAssignments)
+            {
+                var assignmentLine = FindTransformLine(lines, ref searchLine, assignment.Key, assignment.ExpressionText);
+                if (!dataFieldKinds.TryGetValue(assignment.Key, out var targetKind))
+                    continue;
+
+                ValidateExpression(
+                    assignment.ExpressionText,
+                    assignmentLine,
+                    BuildSymbolKinds(dataFieldKinds, eventArgKinds, transition.EventName),
+                    expectedKind: targetKind,
+                    expectedLabel: $"transform target '{assignment.Key}'",
+                    diagnostics,
+                    lines);
+            }
+        }
+
+        return diagnostics;
+    }
+
+    private static Dictionary<string, StaticValueKind> BuildSymbolKinds(
+        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
+        IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
+        string eventName)
+    {
+        var symbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
+        foreach (var pair in dataFieldKinds)
+            symbols[pair.Key] = pair.Value;
+
+        if (eventArgKinds.TryGetValue(eventName, out var eventArgs))
+        {
+            foreach (var pair in eventArgs)
+                symbols[$"{eventName}.{pair.Key}"] = pair.Value;
+        }
+
+        return symbols;
+    }
+
+    private static void ValidateExpression(
+        string expressionText,
+        int lineIndex,
+        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        StaticValueKind expectedKind,
+        string expectedLabel,
+        List<Diagnostic> diagnostics,
+        string[] lines)
+    {
+        if (!TryParseExpression(expressionText, out var parsedExpression, out var parseError))
+        {
+            diagnostics.Add(CreateLineDiagnostic(lines, lineIndex, parseError));
+            return;
+        }
+
+        if (!TryInferKind(parsedExpression!, symbols, out var actualKind, out var semanticError))
+        {
+            diagnostics.Add(CreateLineDiagnostic(lines, lineIndex, semanticError));
+            return;
+        }
+
+        if (!IsAssignable(actualKind, expectedKind))
+        {
+            diagnostics.Add(CreateLineDiagnostic(
+                lines,
+                lineIndex,
+                $"{expectedLabel} type mismatch: expected {FormatKinds(expectedKind)} but expression produces {FormatKinds(actualKind)}."));
+        }
+    }
+
+    private static bool TryParseExpression(string expression, out DslExpression? parsed, out string error)
+    {
+        parsed = null;
+        error = string.Empty;
+
+        if (ExpressionParseMethod is null)
+        {
+            error = "expression analyzer unavailable in language server.";
+            return false;
+        }
+
+        try
+        {
+            parsed = ExpressionParseMethod.Invoke(null, [expression]) as DslExpression;
+            if (parsed is null)
+            {
+                error = "expression parse failed.";
+                return false;
+            }
+
+            return true;
+        }
+        catch (TargetInvocationException tie)
+        {
+            error = tie.InnerException?.Message ?? tie.Message;
+            return false;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private static bool TryInferKind(
+        DslExpression expression,
+        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        out StaticValueKind kind,
+        out string error)
+    {
+        kind = StaticValueKind.None;
+        error = string.Empty;
+
+        switch (expression)
+        {
+            case DslLiteralExpression literal:
+                kind = MapLiteralKind(literal.Value);
+                return true;
+
+            case DslIdentifierExpression identifier:
+            {
+                var key = identifier.Member is null ? identifier.Name : $"{identifier.Name}.{identifier.Member}";
+                if (!symbols.TryGetValue(key, out var symbolKind))
+                {
+                    error = $"unknown identifier '{key}'.";
+                    return false;
+                }
+
+                kind = symbolKind;
+                return true;
+            }
+
+            case DslParenthesizedExpression parenthesized:
+                return TryInferKind(parenthesized.Inner, symbols, out kind, out error);
+
+            case DslUnaryExpression unary:
+            {
+                if (!TryInferKind(unary.Operand, symbols, out var operandKind, out error))
+                    return false;
+
+                if (unary.Operator == "!")
+                {
+                    if (!HasFlag(operandKind, StaticValueKind.Boolean))
+                    {
+                        error = "operator '!' requires boolean operand.";
+                        return false;
+                    }
+
+                    kind = StaticValueKind.Boolean;
+                    return true;
+                }
+
+                if (unary.Operator == "-")
+                {
+                    if (!HasFlag(operandKind, StaticValueKind.Number))
+                    {
+                        error = "unary '-' requires numeric operand.";
+                        return false;
+                    }
+
+                    kind = StaticValueKind.Number;
+                    return true;
+                }
+
+                error = $"unsupported unary operator '{unary.Operator}'.";
+                return false;
+            }
+
+            case DslBinaryExpression binary:
+            {
+                if (!TryInferKind(binary.Left, symbols, out var leftKind, out error))
+                    return false;
+
+                if (!TryInferKind(binary.Right, symbols, out var rightKind, out error))
+                    return false;
+
+                switch (binary.Operator)
+                {
+                    case "&&":
+                    case "||":
+                        if (!HasFlag(leftKind, StaticValueKind.Boolean) || !HasFlag(rightKind, StaticValueKind.Boolean))
+                        {
+                            error = $"operator '{binary.Operator}' requires boolean operands.";
+                            return false;
+                        }
+
+                        kind = StaticValueKind.Boolean;
+                        return true;
+
+                    case "+":
+                    {
+                        var stringCandidate = HasFlag(leftKind, StaticValueKind.String) && HasFlag(rightKind, StaticValueKind.String);
+                        var numberCandidate = HasFlag(leftKind, StaticValueKind.Number) && HasFlag(rightKind, StaticValueKind.Number);
+
+                        if (stringCandidate && !numberCandidate)
+                        {
+                            kind = StaticValueKind.String;
+                            return true;
+                        }
+
+                        if (numberCandidate && !stringCandidate)
+                        {
+                            kind = StaticValueKind.Number;
+                            return true;
+                        }
+
+                        error = "operator '+' requires number+number or string+string.";
+                        return false;
+                    }
+
+                    case "-":
+                    case "*":
+                    case "/":
+                    case "%":
+                        if (!HasFlag(leftKind, StaticValueKind.Number) || !HasFlag(rightKind, StaticValueKind.Number))
+                        {
+                            error = $"operator '{binary.Operator}' requires numeric operands.";
+                            return false;
+                        }
+
+                        kind = StaticValueKind.Number;
+                        return true;
+
+                    case ">":
+                    case ">=":
+                    case "<":
+                    case "<=":
+                        if (!HasFlag(leftKind, StaticValueKind.Number) || !HasFlag(rightKind, StaticValueKind.Number))
+                        {
+                            error = $"operator '{binary.Operator}' requires numeric operands.";
+                            return false;
+                        }
+
+                        kind = StaticValueKind.Boolean;
+                        return true;
+
+                    case "==":
+                    case "!=":
+                        kind = StaticValueKind.Boolean;
+                        return true;
+
+                    default:
+                        error = $"unsupported binary operator '{binary.Operator}'.";
+                        return false;
+                }
+            }
+
+            default:
+                error = "unsupported expression node.";
+                return false;
+        }
+    }
+
+    private static bool IsAssignable(StaticValueKind actual, StaticValueKind expected)
+    {
+        var actualNonNull = actual & ~StaticValueKind.Null;
+        var expectedNonNull = expected & ~StaticValueKind.Null;
+
+        if ((actualNonNull & ~expectedNonNull) != StaticValueKind.None)
+            return false;
+
+        if (actual == StaticValueKind.Null)
+            return HasFlag(expected, StaticValueKind.Null);
+
+        return true;
+    }
+
+    private static int FindGuardLine(string[] lines, ref int searchLine, string guardExpression)
+    {
+        for (var i = Math.Max(0, searchLine); i < lines.Length; i++)
+        {
+            var trimmed = lines[i].Trim();
+            if (trimmed.StartsWith("if ", StringComparison.Ordinal))
+            {
+                var candidate = trimmed[3..].Trim();
+                if (Normalized(candidate) == Normalized(guardExpression))
+                {
+                    searchLine = i + 1;
+                    return i;
+                }
+            }
+
+            if (trimmed.StartsWith("else if ", StringComparison.Ordinal))
+            {
+                var candidate = trimmed[8..].Trim();
+                if (Normalized(candidate) == Normalized(guardExpression))
+                {
+                    searchLine = i + 1;
+                    return i;
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    private static int FindTransformLine(string[] lines, ref int searchLine, string key, string expression)
+    {
+        for (var i = Math.Max(0, searchLine); i < lines.Length; i++)
+        {
+            var match = TransformLineRegex.Match(lines[i]);
+            if (!match.Success)
+                continue;
+
+            var candidateKey = match.Groups["key"].Value;
+            var candidateExpr = match.Groups["expr"].Value.Trim();
+            if (candidateKey == key && Normalized(candidateExpr) == Normalized(expression))
+            {
+                searchLine = i + 1;
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    private static string Normalized(string text)
+        => Regex.Replace(text.Trim(), "\\s+", " ");
+
+    private static Diagnostic CreateLineDiagnostic(string[] lines, int lineIndex, string message)
+    {
+        var safeLineIndex = Math.Min(Math.Max(lineIndex, 0), Math.Max(lines.Length - 1, 0));
+        var lineLength = safeLineIndex < lines.Length ? lines[safeLineIndex].Length : 1;
+        return new Diagnostic
+        {
+            Severity = DiagnosticSeverity.Error,
+            Message = message,
+            Source = "state-machine-dsl",
+            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                new Position(safeLineIndex, 0),
+                new Position(safeLineIndex, Math.Max(1, lineLength)))
+        };
+    }
+
+    private static StaticValueKind MapFieldContractKind(DslFieldContract field)
+    {
+        var kind = field.Type switch
+        {
+            DslScalarType.String => StaticValueKind.String,
+            DslScalarType.Number => StaticValueKind.Number,
+            DslScalarType.Boolean => StaticValueKind.Boolean,
+            DslScalarType.Null => StaticValueKind.Null,
+            _ => StaticValueKind.None
+        };
+
+        if (field.IsNullable)
+            kind |= StaticValueKind.Null;
+
+        return kind;
+    }
+
+    private static StaticValueKind MapLiteralKind(object? value)
+        => value switch
+        {
+            null => StaticValueKind.Null,
+            string => StaticValueKind.String,
+            bool => StaticValueKind.Boolean,
+            byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal => StaticValueKind.Number,
+            _ => StaticValueKind.None
+        };
+
+    private static bool HasFlag(StaticValueKind kind, StaticValueKind flag)
+        => (kind & flag) == flag;
+
+    private static string FormatKinds(StaticValueKind kinds)
+    {
+        if (kinds == StaticValueKind.None)
+            return "none";
+
+        var labels = new List<string>();
+        if (HasFlag(kinds, StaticValueKind.String)) labels.Add("string");
+        if (HasFlag(kinds, StaticValueKind.Number)) labels.Add("number");
+        if (HasFlag(kinds, StaticValueKind.Boolean)) labels.Add("boolean");
+        if (HasFlag(kinds, StaticValueKind.Null)) labels.Add("null");
+        return string.Join("|", labels);
+    }
+
     private static IReadOnlyList<string> CollectIdentifiers(string text, Regex regex)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
@@ -336,8 +757,13 @@ internal sealed class SmDslAnalyzer
         new CompletionItem { Label = "null", Kind = CompletionItemKind.Keyword }
     ];
 
-    private static readonly IReadOnlyList<CompletionItem> GuardOperatorItems =
+    private static readonly IReadOnlyList<CompletionItem> ExpressionOperatorItems =
     [
+        new CompletionItem { Label = "+", Kind = CompletionItemKind.Operator },
+        new CompletionItem { Label = "-", Kind = CompletionItemKind.Operator },
+        new CompletionItem { Label = "*", Kind = CompletionItemKind.Operator },
+        new CompletionItem { Label = "/", Kind = CompletionItemKind.Operator },
+        new CompletionItem { Label = "%", Kind = CompletionItemKind.Operator },
         new CompletionItem { Label = "==", Kind = CompletionItemKind.Operator },
         new CompletionItem { Label = "!=", Kind = CompletionItemKind.Operator },
         new CompletionItem { Label = ">", Kind = CompletionItemKind.Operator },
@@ -393,4 +819,14 @@ internal sealed class SmDslAnalyzer
             InsertTextFormat = InsertTextFormat.Snippet,
             Detail = detail
         };
+
+    [Flags]
+    private enum StaticValueKind
+    {
+        None = 0,
+        String = 1,
+        Number = 2,
+        Boolean = 4,
+        Null = 8
+    }
 }

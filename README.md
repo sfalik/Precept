@@ -436,28 +436,30 @@ Implemented now:
 - Transition data assignments (`transform <Key> = ...`) on accepted `fire`
 - Transform parser/model foundation for B-v1: transitions now carry ordered transform-assignment lists and transform expressions parse into an expression AST.
 - Shared AST expression evaluator now drives guard evaluation and transform expression execution.
+- Atomic ordered multi-transform execution is implemented on fire-path updates with read-your-writes and all-or-nothing commit semantics.
 - CLI REPL + script execution
 - Active test coverage in `test/StateMachine.Tests/DslWorkflowTests.cs` and `test/StateMachine.Tests/CliRenderingTests.cs`
 - Active parser/runtime coverage also includes expression AST parsing/edge-case diagnostics, transform parsing coverage, and runtime evaluator operator/short-circuit behavior in `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslTransformParsingTests.cs`, and `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`.
 - Language server MVP in `tools/StateMachine.Dsl.LanguageServer` (stdio diagnostics + completion)
 - Language server MVP in `tools/StateMachine.Dsl.LanguageServer` (stdio diagnostics + completion + semantic tokens)
+- Language server semantic diagnostics now validate expression operator/type compatibility and transform-target type compatibility for B-v1 authoring patterns.
+- Language server completion now includes operator-aware suggestions in guard and transform-expression contexts.
 - VS Code client MVP in `tools/StateMachine.Dsl.VsCode` (auto-start for `.sm` files)
 - VS Code client contributes TextMate syntax highlighting for `.sm` files
 
 Pending:
 
 - Extension packaging/publishing workflow
-- Transform/expression expansion (B-v1) is design-locked but not yet implemented in runtime/parser.
 
-## Transform/Expression Roadmap (Design-Locked, Pending)
+## Transform/Expression Roadmap (Design-Locked)
 
-The following decisions are locked for the next transform/expression iteration and are documented here for clarity. Current runtime behavior remains the source of truth until this work is implemented.
+The following decisions are locked for transform/expression behavior and are documented here for clarity.
 
 Current progress:
 
 - Phase 1 (parser/model foundation) is implemented.
 - Phase 2 (shared expression evaluator integration) is implemented for guards and transform expression evaluation.
-- Runtime still applies only one assignment during fire-path data update (current behavior uses the last transform assignment for backward compatibility) until atomic multi-transform execution lands.
+- Phase 3 (atomic ordered multi-transform execution with read-your-writes) is implemented.
 
 - Atomic batch per selected branch: all transform assignments in a branch commit together or none commit.
 - Multiple `transform` lines per branch are supported; each `transform` remains a single assignment.
@@ -468,7 +470,7 @@ Current progress:
 - Planned B-v1 string `+` is strong concat only (both operands must be strings).
 - Planned B-v1 null handling: null checks via `==`/`!=` are allowed; arithmetic/ordered comparisons/boolean ops/concat with null are invalid.
 
-Example target behavior after implementation:
+Example behavior:
 
 ```text
 from Active on Retry
@@ -485,7 +487,7 @@ from Active on Retry
   - Parser/model: support multiple ordered `transform` assignments per selected branch and operator-aware expression parsing.
   - Runtime: shared guard/transform expression evaluator with strict type/null semantics, strong string concat, short-circuit boolean logic, and atomic batch commit.
   - Inspect/fire parity: same guard evaluation semantics in inspect and fire; transform expression failures reject fire and commit no transform changes.
-  - Tooling: language-server diagnostics/completion updates for operator/type/null rules and expression authoring.
+  - Tooling: continue iterating language-server diagnostics/completion precision for advanced null-flow scenarios and richer expression authoring hints.
   - Tests: precedence/associativity, read-your-writes, atomic rollback, strict typing, null behavior, strong concat, and inspect/fire parity coverage.
 
 Design-phase compatibility policy:

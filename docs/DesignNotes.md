@@ -98,15 +98,14 @@ Block-authoring equivalent (same semantics):
 - If no guard matches, configured block outcome is applied.
 - Transition transforms execute only on accepted fire-path transitions.
 
-### Transform/Expression Design Decisions (Locked, Pending Implementation)
+### Transform/Expression Design Decisions (Locked)
 
 Status:
 
 - The following choices are design-locked for the next transform/expression expansion.
-- These semantics are not fully implemented yet; current runtime behavior remains the source of truth until implementation lands.
 - Phase 1 parser/model foundation is implemented: transform expressions parse into a DSL expression AST and transitions retain ordered transform-assignment lists.
 - Phase 2 shared evaluator integration is implemented: guards and transform expressions evaluate through the shared AST-based expression evaluator.
-- Runtime atomic multi-transform execution is still pending; current fire-path assignment behavior remains single-apply for now.
+- Phase 3 runtime execution is implemented: transform assignments evaluate in declaration order on a working copy (read-your-writes) and commit atomically.
 
 Locked choices:
 
@@ -156,19 +155,18 @@ Implementation checklist (B-v1):
   - Implement strict type matrix and null rules from this document (no implicit coercion).
   - Implement strong string concat (`+`) only for string+string.
   - Implement short-circuit evaluation for `&&` and `||`.
-  - Evaluate transform assignments in branch order on a working copy (read-your-writes), then commit atomically.
+  - Evaluate transform assignments in branch order on a working copy (read-your-writes), then commit atomically. ✅
 - Inspect/fire behavior
   - Ensure inspect uses the same guard semantics as fire.
   - Ensure transform evaluation errors reject fire and commit no transform assignments.
 - LSP/editor tooling
-  - Update diagnostics for operator/type/null violations.
-  - Update completion/snippets to include new operator-aware expression authoring patterns.
+  - Update diagnostics for operator/type/null violations. ✅
+  - Update completion/snippets to include new operator-aware expression authoring patterns. ✅
 - Tests
   - Add parser tests for operator precedence/associativity and multi-transform parsing.
   - Add runtime tests for atomic batch rollback, read-your-writes, strict typing, strong concat, null-handling failures, and short-circuit behavior.
   - Add inspect/fire parity tests for shared guard semantics.
 - Documentation
-  - Move this section from "pending" to "implemented" once runtime/parser/test coverage lands.
   - Update README examples to include at least one valid modulo/concat expression and one null-safe guard pattern.
 
 ### Explicit Declarations (Current)
@@ -242,7 +240,7 @@ Validation constraints:
 
 ## Known Gaps
 
-- Runtime still applies only one transform assignment on fire-path updates (last assignment in declaration order); atomic multi-transform batch execution is pending.
+- Language-server expression diagnostics are currently best-effort static checks and do not perform full guard-flow null narrowing.
 - Extension packaging/publishing workflow
 
 ## Test Status
@@ -252,8 +250,8 @@ Validation constraints:
 
 ## Next Steps
 
-1. Expand guard language/features or swap in a richer evaluator implementation.
-2. Add packaging/publishing automation for the VS Code extension client.
+1. Add packaging/publishing automation for the VS Code extension client.
+2. Improve language-server expression analysis with deeper flow-aware null/type narrowing to reduce false-positive/false-negative diagnostics.
 
 ## Guard Evaluation + Event-Argument Model (Current)
 

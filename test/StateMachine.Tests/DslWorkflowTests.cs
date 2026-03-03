@@ -536,6 +536,70 @@ public class DslWorkflowTests
     }
 
     [Fact]
+    public void Fire_Instance_MultipleTransforms_AreAppliedInOrder_WithReadYourWrites()
+    {
+        const string dsl = """
+            machine Counters
+            number CarsWaiting
+            number LastCarsWaiting
+            state Red
+            state Green
+            event Advance
+            from Red on Advance
+                transform CarsWaiting = CarsWaiting + 1
+                transform LastCarsWaiting = CarsWaiting + 1
+                transition Green
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
+        {
+            ["CarsWaiting"] = 1d,
+            ["LastCarsWaiting"] = 0d
+        });
+
+        var fire = workflow.Fire(instance, "Advance");
+
+        fire.IsAccepted.Should().BeTrue();
+        fire.NewState.Should().Be("Green");
+        fire.UpdatedInstance!.InstanceData["CarsWaiting"].Should().Be(2d);
+        fire.UpdatedInstance!.InstanceData["LastCarsWaiting"].Should().Be(3d);
+    }
+
+    [Fact]
+    public void Fire_Instance_MultipleTransforms_Failure_RollsBackBatch()
+    {
+        const string dsl = """
+            machine Counters
+            number CarsWaiting
+            number LastCarsWaiting
+            state Red
+            state Green
+            event Advance
+            from Red on Advance
+                transform CarsWaiting = CarsWaiting + 1
+                transform LastCarsWaiting = "bad"
+                transition Green
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
+        {
+            ["CarsWaiting"] = 1d,
+            ["LastCarsWaiting"] = 0d
+        });
+
+        var fire = workflow.Fire(instance, "Advance");
+
+        fire.IsAccepted.Should().BeFalse();
+        fire.NewState.Should().BeNull();
+        fire.UpdatedInstance.Should().BeNull();
+        fire.Reasons.Should().ContainSingle(r => r.Contains("Data assignment failed", StringComparison.Ordinal));
+        instance.InstanceData["CarsWaiting"].Should().Be(1d);
+        instance.InstanceData["LastCarsWaiting"].Should().Be(0d);
+    }
+
+    [Fact]
     public void Fire_Instance_DataAssignment_ArithmeticExpression_IsAccepted()
     {
         const string dsl = """
