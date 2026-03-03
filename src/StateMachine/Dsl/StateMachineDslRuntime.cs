@@ -19,94 +19,32 @@ public sealed record GuardEvaluationResult(bool IsPassed, string? FailureReason)
 
 internal sealed class DefaultGuardEvaluator : IGuardEvaluator
 {
-    private static readonly Regex ComparisonRegex = new(
-        "^(?<left>[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)?)\\s*(?<op>==|!=|>=|<=|>|<)\\s*(?<right>.+)$",
-        RegexOptions.Compiled);
-
-    private static readonly Regex BooleanRegex = new(
-        "^(?<not>!)?(?<left>[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)?)$",
-        RegexOptions.Compiled);
-
     public GuardEvaluationResult Evaluate(string expression, IReadOnlyDictionary<string, object?> data)
     {
         if (string.IsNullOrWhiteSpace(expression))
             return GuardEvaluationResult.Passed();
 
         var trimmed = expression.Trim();
-
-        var comparison = ComparisonRegex.Match(trimmed);
-        if (comparison.Success)
-            return EvaluateComparison(trimmed, comparison, data);
-
-        var boolean = BooleanRegex.Match(trimmed);
-        if (boolean.Success)
-            return EvaluateBoolean(trimmed, boolean, data);
-
-        return GuardEvaluationResult.Failed($"Guard '{trimmed}' is not supported by the default evaluator.");
-    }
-
-    private static GuardEvaluationResult EvaluateComparison(
-        string originalExpression,
-        Match comparison,
-        IReadOnlyDictionary<string, object?> data)
-    {
-        string variable = comparison.Groups["left"].Value;
-        string op = comparison.Groups["op"].Value;
-        string literalText = comparison.Groups["right"].Value.Trim();
-
-        if (!data.TryGetValue(variable, out var currentValue))
-            return GuardEvaluationResult.Failed($"Guard '{originalExpression}' failed: data key '{variable}' was not provided.");
-
-        if (!TryParseLiteral(literalText, out var literal))
-            return GuardEvaluationResult.Failed($"Guard '{originalExpression}' failed: literal '{literalText}' is not supported.");
-
-        if (TryToNumber(currentValue, out var leftNumber) && TryToNumber(literal, out var rightNumber))
+        DslExpression parsed;
+        try
         {
-            bool numericResult = op switch
-            {
-                ">" => leftNumber > rightNumber,
-                ">=" => leftNumber >= rightNumber,
-                "<" => leftNumber < rightNumber,
-                "<=" => leftNumber <= rightNumber,
-                "==" => leftNumber == rightNumber,
-                "!=" => leftNumber != rightNumber,
-                _ => false
-            };
-
-            return numericResult
-                ? GuardEvaluationResult.Passed()
-                : GuardEvaluationResult.Failed($"Guard '{originalExpression}' failed.");
+            parsed = DslExpressionParser.Parse(trimmed);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return GuardEvaluationResult.Failed($"Guard '{trimmed}' failed: {ex.Message}");
         }
 
-        if (op is ">" or ">=" or "<" or "<=")
-            return GuardEvaluationResult.Failed($"Guard '{originalExpression}' failed: relational operators require numeric values.");
+        var evaluation = DslExpressionRuntimeEvaluator.Evaluate(parsed, data);
+        if (!evaluation.Success)
+            return GuardEvaluationResult.Failed($"Guard '{trimmed}' failed: {evaluation.Error}");
 
-        bool equals = Equals(currentValue, literal);
-        bool result = op == "==" ? equals : !equals;
+        if (evaluation.Value is not bool result)
+            return GuardEvaluationResult.Failed($"Guard '{trimmed}' failed: expression must evaluate to boolean.");
 
         return result
             ? GuardEvaluationResult.Passed()
-            : GuardEvaluationResult.Failed($"Guard '{originalExpression}' failed.");
-    }
-
-    private static GuardEvaluationResult EvaluateBoolean(
-        string originalExpression,
-        Match boolean,
-        IReadOnlyDictionary<string, object?> data)
-    {
-        string variable = boolean.Groups["left"].Value;
-        bool negate = boolean.Groups["not"].Success;
-
-        if (!data.TryGetValue(variable, out var value))
-            return GuardEvaluationResult.Failed($"Guard '{originalExpression}' failed: data key '{variable}' was not provided.");
-
-        if (value is not bool b)
-            return GuardEvaluationResult.Failed($"Guard '{originalExpression}' failed: data key '{variable}' is not a boolean.");
-
-        bool result = negate ? !b : b;
-        return result
-            ? GuardEvaluationResult.Passed()
-            : GuardEvaluationResult.Failed($"Guard '{originalExpression}' failed.");
+            : GuardEvaluationResult.Failed($"Guard '{trimmed}' failed.");
     }
 
     private static bool TryParseLiteral(string text, out object? value)
@@ -331,21 +269,15 @@ public sealed class DslWorkflowDefinition
         var assignment = resolution.Transition.TransformAssignments.LastOrDefault();
         if (assignment is not null)
         {
-            if (!TryResolveAssignmentValue(
-                assignment.ExpressionText,
-                instance.InstanceData,
-                eventName,
-                eventArguments ?? EmptyInstanceData.Instance,
-                out var assignedValue,
-                out var assignmentError))
-            {
-                return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { assignmentError! });
-            }
+            var assignmentContext = BuildEvaluationData(instance.InstanceData, eventName, eventArguments);
+            var assignmentEvaluation = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, assignmentContext);
+            if (!assignmentEvaluation.Success)
+                return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { $"Data assignment failed: {assignmentEvaluation.Error}" });
 
-            if (!TryValidateAssignedValue(assignment.Key, assignedValue, out var contractError))
+            if (!TryValidateAssignedValue(assignment.Key, assignmentEvaluation.Value, out var contractError))
                 return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { contractError! });
 
-            updatedData[assignment.Key] = assignedValue;
+            updatedData[assignment.Key] = assignmentEvaluation.Value;
         }
 
         var updated = instance with

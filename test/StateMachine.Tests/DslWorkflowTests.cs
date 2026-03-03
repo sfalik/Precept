@@ -328,7 +328,7 @@ public class DslWorkflowTests
     }
 
     [Fact]
-    public void Inspect_UnsupportedGuardExpression_UsesConfiguredReason()
+    public void Inspect_LogicalGuardExpression_IsAccepted_WhenTrue()
     {
         const string dsl = """
             machine Workflow
@@ -337,6 +337,34 @@ public class DslWorkflowTests
             event Go
             from A on Go
                 if Flag && OtherFlag
+                    transition B
+                reject "Both flags must be true"
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var data = new Dictionary<string, object?>
+        {
+            ["Flag"] = true,
+            ["OtherFlag"] = true
+        };
+
+        var inspection = workflow.Inspect("A", "Go", data);
+
+        inspection.IsDefined.Should().BeTrue();
+        inspection.IsAccepted.Should().BeTrue();
+        inspection.TargetState.Should().Be("B");
+    }
+
+    [Fact]
+    public void Inspect_InvalidGuardExpression_UsesConfiguredReason()
+    {
+        const string dsl = """
+            machine Workflow
+            state A
+            state B
+            event Go
+            from A on Go
+                if coalesce(Flag, OtherFlag)
                     transition B
                 reject "Both flags must be true"
             """;
@@ -505,6 +533,94 @@ public class DslWorkflowTests
 
         fire.IsAccepted.Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["LastCarsWaiting"].Should().Be(3d);
+    }
+
+    [Fact]
+    public void Fire_Instance_DataAssignment_ArithmeticExpression_IsAccepted()
+    {
+        const string dsl = """
+            machine Counters
+            number CarsWaiting
+            number NextCarsWaiting
+            state Red
+            state Green
+            event Advance
+            from Red on Advance
+                transform NextCarsWaiting = CarsWaiting + 2
+                transition Green
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
+        {
+            ["CarsWaiting"] = 3d,
+            ["NextCarsWaiting"] = 0d
+        });
+
+        var fire = workflow.Fire(instance, "Advance");
+
+        fire.IsAccepted.Should().BeTrue();
+        fire.UpdatedInstance!.InstanceData["NextCarsWaiting"].Should().Be(5d);
+    }
+
+    [Fact]
+    public void Fire_Instance_DataAssignment_StringConcatExpression_IsAccepted()
+    {
+        const string dsl = """
+            machine Alerts
+            string Prefix
+            string Message
+            state Red
+            state FlashingRed
+            event Emergency
+                string Reason
+            from Red on Emergency
+                transform Message = Prefix + Emergency.Reason
+                transition FlashingRed
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
+        {
+            ["Prefix"] = "Reason: ",
+            ["Message"] = ""
+        });
+
+        var fire = workflow.Fire(instance, "Emergency", new Dictionary<string, object?> { ["Reason"] = "Accident" });
+
+        fire.IsAccepted.Should().BeTrue();
+        fire.UpdatedInstance!.InstanceData["Message"].Should().Be("Reason: Accident");
+    }
+
+    [Fact]
+    public void Fire_Instance_DataAssignment_StringConcat_WithNullOperand_IsRejected()
+    {
+        const string dsl = """
+            machine Alerts
+            string Prefix
+            string? ReasonText
+            string Message
+            state Red
+            state FlashingRed
+            event Emergency
+                string? Reason
+            from Red on Emergency
+                transform Message = Prefix + Emergency.Reason
+                transition FlashingRed
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
+        {
+            ["Prefix"] = "Reason: ",
+            ["ReasonText"] = null,
+            ["Message"] = ""
+        });
+
+        var fire = workflow.Fire(instance, "Emergency", new Dictionary<string, object?> { ["Reason"] = null });
+
+        fire.IsAccepted.Should().BeFalse();
+        fire.Reasons.Should().ContainSingle(r => r.Contains("operator '+' requires number+number or string+string", StringComparison.Ordinal));
     }
 
     [Fact]

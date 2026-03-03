@@ -105,6 +105,7 @@ Status:
 - The following choices are design-locked for the next transform/expression expansion.
 - These semantics are not fully implemented yet; current runtime behavior remains the source of truth until implementation lands.
 - Phase 1 parser/model foundation is implemented: transform expressions parse into a DSL expression AST and transitions retain ordered transform-assignment lists.
+- Phase 2 shared evaluator integration is implemented: guards and transform expressions evaluate through the shared AST-based expression evaluator.
 - Runtime atomic multi-transform execution is still pending; current fire-path assignment behavior remains single-apply for now.
 
 Locked choices:
@@ -241,13 +242,13 @@ Validation constraints:
 
 ## Known Gaps
 
-- Guard language is intentionally minimal in this phase (`scope.key`, `!scope.key`, and simple comparisons)
+- Runtime still applies only one transform assignment on fire-path updates (last assignment in declaration order); atomic multi-transform batch execution is pending.
 - Extension packaging/publishing workflow
 
 ## Test Status
 
-- Active tests include `test/StateMachine.Tests/DslWorkflowTests.cs`, `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, and `test/StateMachine.Tests/DslTransformParsingTests.cs`.
-- Guard/expression test coverage includes: boolean guards, comparisons, string/null equality, numeric runtime type coercion, unsupported-expression rejection, reason aggregation, expression AST parsing precedence/invalid syntax diagnostics, lexer edge cases, and transform-branch parsing constraints.
+- Active tests include `test/StateMachine.Tests/DslWorkflowTests.cs`, `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslTransformParsingTests.cs`, and `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`.
+- Guard/expression test coverage includes: boolean guards, comparisons, string/null equality, numeric runtime type coercion, unsupported-expression rejection, reason aggregation, expression AST parsing precedence/invalid syntax diagnostics, lexer edge cases, transform-branch parsing constraints, and runtime evaluator operator/short-circuit behavior.
 
 ## Next Steps
 

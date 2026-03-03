@@ -435,9 +435,10 @@ Implemented now:
 - Guard evaluation with rejection reasons
 - Transition data assignments (`transform <Key> = ...`) on accepted `fire`
 - Transform parser/model foundation for B-v1: transitions now carry ordered transform-assignment lists and transform expressions parse into an expression AST.
+- Shared AST expression evaluator now drives guard evaluation and transform expression execution.
 - CLI REPL + script execution
 - Active test coverage in `test/StateMachine.Tests/DslWorkflowTests.cs` and `test/StateMachine.Tests/CliRenderingTests.cs`
-- Active parser/runtime coverage also includes expression AST parsing/edge-case diagnostics and transform parsing coverage in `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, and `test/StateMachine.Tests/DslTransformParsingTests.cs`.
+- Active parser/runtime coverage also includes expression AST parsing/edge-case diagnostics, transform parsing coverage, and runtime evaluator operator/short-circuit behavior in `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslTransformParsingTests.cs`, and `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`.
 - Language server MVP in `tools/StateMachine.Dsl.LanguageServer` (stdio diagnostics + completion)
 - Language server MVP in `tools/StateMachine.Dsl.LanguageServer` (stdio diagnostics + completion + semantic tokens)
 - VS Code client MVP in `tools/StateMachine.Dsl.VsCode` (auto-start for `.sm` files)
@@ -455,6 +456,7 @@ The following decisions are locked for the next transform/expression iteration a
 Current progress:
 
 - Phase 1 (parser/model foundation) is implemented.
+- Phase 2 (shared expression evaluator integration) is implemented for guards and transform expression evaluation.
 - Runtime still applies only one assignment during fire-path data update (current behavior uses the last transform assignment for backward compatibility) until atomic multi-transform execution lands.
 
 - Atomic batch per selected branch: all transform assignments in a branch commit together or none commit.
