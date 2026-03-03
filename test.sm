@@ -1,13 +1,16 @@
 machine test
 
-state Start initial
+number counter = 0
+
+state start initial
 state end
 
 event test
 event reset
 
-from Start on test
+from start on test
+    set counter = counter + 1
     transition end
 
 from end on reset
-    transition Start
+    transition start 

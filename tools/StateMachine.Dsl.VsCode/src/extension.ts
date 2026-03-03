@@ -397,7 +397,7 @@ function getElkLayoutOptions(mode: PreviewLayoutMode): Record<string, string> {
     "elk.layered.mergeEdges": "false",
     "elk.layered.feedbackEdges": "true",
     "elk.separateConnectedComponents": "false",
-    "elk.layered.cycleBreaking.strategy": "GREEDY",
+    "elk.layered.cycleBreaking.strategy": "MODEL_ORDER",
     "elk.insideSelfLoops.activate": "true",
     "elk.edgeLabels.inline": "true",
     "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES"

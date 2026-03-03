@@ -215,10 +215,10 @@
 
     .event-btn {
       border: 1px solid var(--border);
-      border-radius: 999px;
+      border-radius: 0;
       background: #242730;
       color: var(--text);
-      padding: 4px 10px;
+      padding: 4px 14px;
       font-size: 12px;
       cursor: pointer;
       display: inline-flex;
@@ -226,6 +226,8 @@
       justify-content: space-between;
       gap: 8px;
       min-width: 120px;
+      transform: skewX(-14deg);
+      margin-left: 8px;
     }
 
     .event-btn:hover {
@@ -283,6 +285,7 @@
       flex: 1;
       min-width: 0;
       overflow: hidden;
+      margin-left: 8px;
     }
 
     .event-reason {
@@ -344,6 +347,7 @@
       gap: 6px;
       opacity: 0.86;
       transition: opacity 120ms ease;
+      transform: skewX(14deg);
     }
 
     .event-entry.is-selected .event-label,
@@ -356,6 +360,7 @@
       font-weight: 700;
       min-width: 10px;
       text-align: center;
+      transform: skewX(14deg);
     }
 
     .event-args-inline {
@@ -371,10 +376,10 @@
     .event-args-inline input {
       width: 120px;
       border: 1px solid var(--border);
-      border-radius: 999px;
+      border-radius: 0;
       background: #1f2125;
       color: var(--text);
-      padding: 3px 10px;
+      padding: 3px 8px;
       font: inherit;
       font-size: 11px;
       outline: none;
@@ -570,7 +575,7 @@
       }
 
       .event-btn {
-        padding: 3px 9px;
+        padding: 3px 12px;
         font-size: 11px;
       }
 
@@ -826,6 +831,13 @@
           }
 
           for (const to of outgoing.get(from) ?? []) {
+            // Skip back-edges: transitions whose target is defined earlier than
+            // their source in the file. Back-edges close cycles and should never
+            // inflate the rank of an already-upstream state.
+            if ((orderIndex.get(to) ?? 0) < (orderIndex.get(from) ?? 0)) {
+              continue;
+            }
+
             const existing = rankByState.get(to) ?? Number.NEGATIVE_INFINITY;
             if (fromRank + 1 > existing) {
               rankByState.set(to, fromRank + 1);
@@ -1495,6 +1507,14 @@
       return evaluateEventWithContext(state, eventName);
     }
 
+    function parallelogramChipPath(cx, y, w, h) {
+      // Skewed parallelogram centered at cx; top leans right, bottom leans left.
+      const skew = h * 0.25; // horizontal offset = quarter-height gives ~14deg
+      const l = cx - w / 2;
+      const r = cx + w / 2;
+      return `M ${l+skew},${y} L ${r+skew},${y} L ${r-skew},${y+h} L ${l-skew},${y+h} Z`;
+    }
+
     function getPointOnPath(pathD, fraction) {
       const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       tempPath.setAttribute('d', pathD);
@@ -2036,7 +2056,7 @@
             const isMutedBySelection = selectedEventNameForAnimation !== null
               && transition.from === fromState
               && transition.event !== selectedEventNameForAnimation;
-            const chipWidth = annotation.event.length * 7 + 16;
+            const chipWidth = annotation.event.length * 7 + 32;
 
             return {
               segment,
@@ -2068,7 +2088,7 @@
 
             return `
               <g class="edge-annotation" opacity="${item.opacity}">
-                <rect class="edge-chip" x="${item.annotation.position.x - item.chipWidth / 2}" y="${chipY}" width="${item.chipWidth}" height="${chipHeight}" fill="rgba(30,30,30,0.88)" stroke="${item.visual.stroke}" stroke-width="1.1"></rect>
+                <path class="edge-chip" d="${parallelogramChipPath(item.annotation.position.x, chipY, item.chipWidth, chipHeight)}" fill="rgba(30,30,30,0.88)" stroke="${item.visual.stroke}" stroke-width="1.1"/>
                 <text class="edge-label" x="${item.annotation.position.x}" y="${textY}" fill="${item.visual.stroke}">${item.annotation.event}</text>
                 ${item.annotation.guard ? `<line x1="${item.annotation.position.x}" y1="${chipY + chipHeight}" x2="${item.annotation.position.x}" y2="${guardY - 6}" stroke="${item.visual.stroke}" stroke-width="1" opacity="0.9"></line><text class="edge-guard" x="${guardX}" y="${guardY}" fill="${item.visual.stroke}">[${item.annotation.guard}]</text>` : ''}
               </g>
@@ -2345,7 +2365,7 @@
             visual,
             index,
             opacity: annotationOpacity,
-            chipWidth: annotation.event.length * 7 + 16
+            chipWidth: annotation.event.length * 7 + 32
           };
         })
         .filter((value) => value !== null);
@@ -2368,7 +2388,7 @@
 
         return `
           <g class="edge-annotation clickable" data-index="${item.index}" opacity="${item.opacity}">
-            <rect class="edge-chip" x="${item.annotation.position.x - item.chipWidth / 2}" y="${chipY}" width="${item.chipWidth}" height="${chipHeight}" fill="rgba(30,30,30,0.88)" stroke="${item.visual.stroke}" stroke-width="1.1"></rect>
+            <path class="edge-chip" d="${parallelogramChipPath(item.annotation.position.x, chipY, item.chipWidth, chipHeight)}" fill="rgba(30,30,30,0.88)" stroke="${item.visual.stroke}" stroke-width="1.1"/>
             <text class="edge-label" x="${item.annotation.position.x}" y="${textY}" fill="${item.visual.stroke}">${item.annotation.event}</text>
             ${item.annotation.guard ? `<line x1="${item.annotation.position.x}" y1="${chipY + chipHeight}" x2="${item.annotation.position.x}" y2="${guardY - 6}" stroke="${item.visual.stroke}" stroke-width="1" opacity="0.9"></line><text class="edge-guard" x="${guardX}" y="${guardY}" fill="${item.visual.stroke}">[${item.annotation.guard}]</text>` : ''}
           </g>
@@ -2447,10 +2467,10 @@
           const ctrl = (loopPos.y - halfH) - 48;
           const labelX = loopPos.x;
           const chipHeight = 16;
-          const chipWidth = activeHoverEventName.length * 7 + 16;
+          const chipWidth = activeHoverEventName.length * 7 + 32;
           const chipY = ctrl - chipHeight - 4;
           const textY = chipY + chipHeight / 2;
-          selfLoopSvg = `<g opacity="0.72"><path d="${loopPathD}" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="5 4" stroke-linecap="round"></path><rect class="edge-chip" x="${labelX - chipWidth / 2}" y="${chipY}" width="${chipWidth}" height="${chipHeight}" fill="rgba(30,30,30,0.88)" stroke="var(--ok)" stroke-width="1.1"></rect><text class="edge-label" x="${labelX}" y="${textY}" fill="var(--ok)">${activeHoverEventName}</text></g>`;
+          selfLoopSvg = `<g opacity="0.72"><path d="${loopPathD}" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="5 4" stroke-linecap="round"></path><path class="edge-chip" d="${parallelogramChipPath(labelX, chipY, chipWidth, chipHeight)}" fill="rgba(30,30,30,0.88)" stroke="var(--ok)" stroke-width="1.1"/><text class="edge-label" x="${labelX}" y="${textY}" fill="var(--ok)">${activeHoverEventName}</text></g>`;
         }
       }
 
