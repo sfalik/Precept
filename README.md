@@ -111,9 +111,9 @@ boolean LeftTurnQueued = false
 string? EmergencyReason
 
 state Red initial
+state FlashingGreen
 state Green
 state Yellow
-state FlashingGreen
 state FlashingRed
 
 event Advance
@@ -498,6 +498,35 @@ Run/debug in VS Code:
 Troubleshooting completion/diagnostics:
 
 - Open `View: Output` and select `StateMachine DSL` to inspect language-client startup logs and server path resolution.
+
+### Interactive Inspector Mockup (Current)
+
+- Reference: `docs/InteractiveInspectorMockup.md`
+- Primary UX is bottom-dock driven with a state-scoped vertical event list.
+- Event rows execute directly and use transient hover/focus selection (no sticky selection).
+- `Emergency` args are inline and re-evaluate event/diagram semantics live.
+- Data changes after a successful fire are shown as per-field transient inline `before → after` text (not a chip) that temporarily replaces current value display.
+- Red events show always-visible inline reasons; reason text clears when the event becomes green.
+- Fire feedback is row-anchored (transient result chip).
+- Successful fires trigger one coherent transition timeline (same duration as transient toasts): source-state transition semantics fade out while destination-state semantics fade in, with a runner moving along the accepted transition path.
+- Hover-driven event emphasis resumes after the transition timeline completes.
+- During the timeline, source-state active emphasis leads and destination active fill is finalized at animation completion.
+- During this timeline, non-focused/de-emphasized transitions and states stay de-emphasized; animation is limited to the accepted path and source→destination handoff.
+- Pre-click semantic highlights (including red alternatives/reject paths on the fired event) fade out smoothly across the timeline rather than disappearing instantly.
+- Destination states remain dimmer than the current state (including hovered destinations) and only brighten to full active emphasis at the end of the transition timeline.
+- `Reload` resets to initial sample state/data and clears transient UI state.
+- `Reload` includes event-style hover emphasis and brief pressed-state click feedback.
+- Diagram semantics are always visible from current state and use hover-scoped emphasis:
+  - hovered event paths are slightly emphasized,
+  - non-hovered paths are strongly muted,
+  - destination outlines/labels are semantic (green/red),
+  - only hovered event's actual destination becomes solid green.
+- Edge/chip/sidecar rendering follows the same semantic color + muting model with normalized arrow/stroke sizing.
+- Layout is simplified to diagram + in-canvas Data lane above the bottom Events dock.
+- Diagram and in-canvas Data no longer share an outer panel wrapper.
+- Data lane has no inner panel wrapper.
+- Resize behavior is viewport-bounded: Data stays inside the diagram canvas and moves below the diagram area on narrower widths without overlaying it.
+- Data scrolls internally.
 
 Exit codes:
 

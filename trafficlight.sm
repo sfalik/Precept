@@ -6,9 +6,9 @@ boolean LeftTurnQueued = false
 string? EmergencyReason
 
 state Red initial
+state FlashingGreen
 state Green
 state Yellow
-state FlashingGreen
 state FlashingRed
 
 event Advance

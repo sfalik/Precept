@@ -1,0 +1,8 @@
+inspect Emergency
+inspect Advance
+inspect ClearEmergency
+fire Emergency
+fire Advance
+state
+data
+exit
