@@ -57,23 +57,6 @@
           "when": "editorLangId == state-machine-dsl"
         }
       ]
-    },
-    "configuration": {
-      "title": "StateMachine DSL Preview",
-      "properties": {
-        "stateMachineDsl.preview.layoutMode": {
-          "type": "string",
-          "enum": [
-            "spacious",
-            "balanced",
-            "compact",
-            "orthogonal",
-            "top-down"
-          ],
-          "default": "balanced",
-          "markdownDescription": "Layout preset for Inspector Preview graph rendering. `balanced` (default) is readability-first with compacted bounds; `spacious` opens larger gaps; `compact` reduces spacing further; `orthogonal` uses right-angle routing; `top-down` stacks layers vertically."
-        }
-      }
     }
   },
   "scripts": {
@@ -85,7 +68,7 @@
     "vscode:prepublish": "npm run compile"
   },
   "dependencies": {
-    "elkjs": "^0.11.0",
+    "mermaid": "^11.12.3",
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {

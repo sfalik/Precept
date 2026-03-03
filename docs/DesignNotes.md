@@ -19,15 +19,9 @@ Implementation focus is the DSL runtime path:
 - This chooses the editor-first option where each file can maintain independent preview context without active-editor multiplexing.
 - Preview UI is loaded from `tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html` and uses the mock-style visual shell with a live runtime bridge.
 - The reference mock file remains at `tools/StateMachine.Dsl.VsCode/mockups/interactive-inspector-mockup.html`; runtime panel behavior is driven by the webview copy.
-- Runtime diagram layout is computed by ELK layered layout in the extension host and attached as `snapshot.layout` (`nodes`, `edges`, `width`, `height`).
-- Layout preset is configurable with `stateMachineDsl.preview.layoutMode` (`balanced` default, `spacious`, `compact`, `orthogonal`, `top-down`).
-- `balanced` uses a vertical-first layered profile (direction down) to better use available panel height and reduce over-wide diagrams.
-- Extension layout post-processing performs parallel-edge plus fan-in/fan-out lane separation and incremental snapshot-to-snapshot smoothing to reduce overlap and visual jump.
-- Extension layout post-processing also routes dense same-event fan-in edges through dedicated ingress bands near the destination to reduce terminal-edge crossings.
-- Runtime webview consumes ELK geometry first and falls back to internal heuristic routing only when `snapshot.layout` is unavailable.
-- Runtime webview applies lane-aware edge chip placement and annotation collision deconfliction for dense transition groups.
-- Extension normalizes layout to content bounds and webview fits SVG to the available pane without diagram scrollbars.
-- Preview header includes a `Layout` selector that switches rendering between `Default` (raw ELK geometry from `snapshot.layoutRaw`, without post-processing) and `Optimized` (extension-provided organically relaxed `snapshot.layout` rendered with curved webview routing).
+- Diagram rendering is delegated to Mermaid.js (`stateDiagram-v2`). The extension host generates Mermaid DSL text from the snapshot (with edge deduplication) and attaches it as `snapshot.mermaidText`.
+- Webview calls `mermaid.render()` client-side and inserts the resulting SVG into a container div; the active (current) state node is highlighted via CSS class injection.
+- `reject` terminal rules are filtered from diagram edges in `SmPreviewHandler` to avoid misleading self-loop arrows.
 - The preview webview now calls a custom LSP endpoint (`stateMachine/preview/request`) for `snapshot`, `fire`, `reset`, and `replay` actions.
 - The preview endpoint is bound through a typed JSON-RPC request handler (`IJsonRpcRequestHandler<SmPreviewRequest, SmPreviewResponse>`) with the method contract declared on `SmPreviewRequest` via `[Method("stateMachine/preview/request")]` so registration is discoverable at runtime.
 - Language server preview sessions are in-memory and keyed by document URI; each session keeps parsed/compiled definition and current instance state.

@@ -15,7 +15,7 @@ StateMachine is a .NET DSL-driven state/workflow engine focused on deterministic
 - DSL parser/compiler/runtime is implemented and used by the language server for editor diagnostics and preview execution.
 - VS Code extension is implemented with automatic `.sm` language-client activation plus inspector preview panels per file.
 - Inspector preview now exchanges live `snapshot`/`fire`/`reset` requests through the language server (`stateMachine/preview/request`) instead of only local mock data.
-- Inspector preview layout uses ELK presets (`spacious`, `balanced`, `compact`, `orthogonal`, `top-down`) with `balanced` as default, plus stabilization/deconfliction passes to reduce edge overlap and node jumpiness between updates.
+- Inspector preview diagram rendering delegates to Mermaid.js (`stateDiagram-v2`), replacing the previous custom SVG + ELK layout engine.
 - CLI host has been removed in this branch (hard cut); editor + language server are the active runtime surfaces.
 
 ## Quick Start (2 minutes)
@@ -396,15 +396,11 @@ Troubleshooting completion/diagnostics:
 - Runtime preview uses `tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html`, which now hosts the mock-style visual shell while sourcing runtime state from language-server snapshots.
 - Mock reference remains intact at `tools/StateMachine.Dsl.VsCode/mockups/interactive-inspector-mockup.html` and is not used as the runtime source file.
 - State graph/events/data visuals follow the mock-style presentation while `snapshot`/`fire`/`reset`/`replay` requests execute against the real `.sm` runtime session.
-- Runtime layout is hard-cut to ELK layered graph geometry computed in the extension host and injected into snapshots (`snapshot.layout`).
-- Layout preset is configurable with `stateMachineDsl.preview.layoutMode` (`balanced` default, `spacious`, `compact`, `orthogonal`, `top-down`).
-- Webview rendering now prefers ELK-provided node coordinates and edge polyline sections, with fallback heuristics only if layout payload is absent.
-- Extension post-processing applies parallel-edge plus fan-in/fan-out lane separation and incremental smoothing to improve readability and reduce visual jitter.
-- Dense same-event fan-in transitions into one target are routed through dedicated ingress bands near the destination to reduce terminal crossings.
-- Webview annotation chips apply lane-aware placement and collision deconfliction for dense transition clusters.
-- `balanced` now uses a vertical-first layered profile to better use available pane height and reduce very wide horizontal flows.
-- Extension normalizes layout to content bounds and webview fits the SVG to the pane (no diagram scrolling) while preserving readable annotation sizing.
-- Inspector top bar includes a `Layout` switch: `Default` (raw ELK geometry from `snapshot.layoutRaw`, no post-processing) and `Optimized` (organic relaxed node layout from `snapshot.layout` with curved webview routing).
+- Diagram rendering delegates to Mermaid.js (`stateDiagram-v2`), which handles all layout, edge routing, and SVG generation.
+- Extension host generates Mermaid DSL text from the snapshot (with edge deduplication: same from→to edges are grouped, event labels joined with " / ") and injects it as `snapshot.mermaidText`.
+- Webview calls `mermaid.render()` client-side and inserts the resulting SVG into a container div.
+- Active (current) state node is highlighted via CSS class injection after Mermaid rendering.
+- `reject` terminal rules are filtered from diagram edges to avoid misleading self-loop arrows.
 - Supported runtime actions are `snapshot` (reload), `fire`, `reset`, and `replay` via `stateMachine/preview/request`.
 - `Reload` requests a fresh runtime snapshot from the current in-memory editor text.
 - Activity log lines are sourced from runtime responses (including replay messages and snapshot failures).

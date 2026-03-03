@@ -361,11 +361,68 @@
       letter-spacing: .4px;
     }
 
-    #diagram {
+    #diagram-container {
       width: 100%;
       min-width: 0;
       height: clamp(340px, 62vh, 620px);
       display: block;
+      overflow: auto;
+    }
+
+    #diagram-container svg {
+      width: 100%;
+      height: auto;
+    }
+
+    /* --- Active-state highlight (current state node) --- */
+    #diagram-container .active-state rect.basic,
+    #diagram-container .active-state > rect {
+      stroke: var(--ok) !important;
+      stroke-width: 2.5px !important;
+      filter: drop-shadow(0 0 6px var(--ok));
+    }
+
+    #diagram-container .active-state .nodeLabel {
+      font-weight: 700 !important;
+      color: var(--ok) !important;
+    }
+
+    /* --- Highlighted edge (matching transition path + label) --- */
+    #diagram-container .highlighted-edge path {
+      stroke: var(--event) !important;
+      stroke-width: 2.2px !important;
+      filter: drop-shadow(0 0 3px var(--event));
+    }
+
+    #diagram-container .highlighted-edge text {
+      fill: var(--event) !important;
+      font-weight: 600 !important;
+    }
+
+    #diagram-container .highlighted-edge .edgeLabel,
+    #diagram-container .highlighted-edge .nodeLabel {
+      color: var(--event) !important;
+      font-weight: 600 !important;
+    }
+
+    #diagram-container .highlighted-edge marker path {
+      fill: var(--event) !important;
+    }
+
+    /* --- Destination state (dashed purple border) --- */
+    #diagram-container .destination-state rect.basic,
+    #diagram-container .destination-state > rect {
+      stroke: var(--event) !important;
+      stroke-width: 2px !important;
+      stroke-dasharray: 6 3;
+    }
+
+    /* --- Muted edges (non-matching transitions) --- */
+    #diagram-container .muted-edge path,
+    #diagram-container .muted-edge text,
+    #diagram-container .muted-edge .edgeLabel,
+    #diagram-container .muted-edge foreignObject {
+      opacity: 0.25 !important;
     }
 
     .data-list {
@@ -510,7 +567,7 @@
         min-height: 200px;
       }
 
-      #diagram {
+      #diagram-container {
         height: clamp(250px, 46vh, 360px);
       }
 
@@ -551,7 +608,7 @@
         min-height: 170px;
       }
 
-      #diagram {
+      #diagram-container {
         height: 200px;
       }
 
@@ -569,7 +626,7 @@
         min-height: 150px;
       }
 
-      #diagram {
+      #diagram-container {
         height: 170px;
       }
 
@@ -587,6 +644,7 @@
     }
 
   </style>
+  <script src="__MERMAID_URI__"></script>
 </head>
 <body>
   <div class="header">
@@ -596,11 +654,6 @@
       <span id="header-state" class="status"> · Current: Red</span>
     </div>
     <div class="actions">
-      <label for="render-mode" class="muted">Layout</label>
-      <select id="render-mode" class="mode-select" aria-label="layout mode">
-        <option value="default" selected>Default</option>
-        <option value="optimized">Optimized</option>
-      </select>
       <button id="reload-btn" type="button">Reload</button>
     </div>
   </div>
@@ -609,7 +662,7 @@
     <div class="left-stack">
       <div class="diagram-canvas">
         <div class="diagram-scroll" aria-label="diagram scroll area">
-          <svg id="diagram" viewBox="0 0 920 430" aria-label="state diagram"></svg>
+          <div id="diagram-container" aria-label="state diagram" style="width:100%;min-height:340px;"></div>
         </div>
         <div class="data-overlay" aria-label="data overlay">
           <ul id="data-list" class="data-list"></ul>
@@ -623,13 +676,7 @@
 
   <script>
     let stateOrder = ['Red', 'Green', 'Yellow', 'FlashingGreen', 'FlashingRed'];
-    let statePositions = {
-      Red: { x: 120, y: 80 },
-      FlashingGreen: { x: 300, y: 80 },
-      Green: { x: 480, y: 80 },
-      Yellow: { x: 660, y: 80 },
-      FlashingRed: { x: 390, y: 250 }
-    };
+    let mermaidText = '';
     let transitions = [
       { from: 'Red', event: 'Advance', to: 'FlashingGreen' },
       { from: 'Red', event: 'Advance', to: 'Green' },
@@ -662,12 +709,11 @@
       Reason: ''
     };
 
-    const diagram = document.getElementById('diagram');
+    const diagramContainer = document.getElementById('diagram-container');
     const headerState = document.getElementById('header-state');
     const dataList = document.getElementById('data-list');
     const eventBar = document.getElementById('event-bar');
     const reloadButton = document.getElementById('reload-btn');
-    const renderModeSelect = document.getElementById('render-mode');
     let selectedTransitionIndex = transitions.findIndex((t) => t.from === 'Red' && t.event === 'Advance' && t.to === 'FlashingGreen');
     let hoveredEventName = null;
     let rowFeedbackTimer = null;
@@ -681,190 +727,11 @@
     let suppressHoverUntilAnimationComplete = false;
     let reloadButtonFeedbackTimer = null;
     let currentEventStatuses = [];
-    let transitionPaths = new Map();
-    let renderLayoutMode = 'default';
-    let defaultStatePositions = { ...statePositions };
-    let defaultTransitionPaths = new Map();
-    let optimizedStatePositions = { ...statePositions };
-    let optimizedTransitionPaths = new Map();
-    let defaultDiagramBounds = { width: 920, height: 430 };
-    let optimizedDiagramBounds = { width: 920, height: 430 };
 
     const vscodeApi = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null;
     let previewRequestId = 1;
     const previewPendingRequests = new Map();
     let latestSnapshotSequence = 0;
-
-    function buildStatePositions(states) {
-      const safeStates = Array.isArray(states) && states.length > 0 ? states : ['State'];
-      const fallback = {};
-      const startX = 120;
-      const fallbackSpacing = 180;
-      safeStates.forEach((name, index) => {
-        fallback[name] = { x: startX + (index * fallbackSpacing), y: 80 };
-      });
-
-      if (transitions.length === 0) {
-        return fallback;
-      }
-
-      const orderIndex = new Map(safeStates.map((name, index) => [name, index]));
-      const outgoing = new Map();
-      const incoming = new Map();
-      safeStates.forEach((name) => {
-        outgoing.set(name, []);
-        incoming.set(name, []);
-      });
-
-      for (const transition of transitions) {
-        if (!transition || !outgoing.has(transition.from) || !incoming.has(transition.to)) {
-          continue;
-        }
-
-        outgoing.get(transition.from).push(transition.to);
-        incoming.get(transition.to).push(transition.from);
-      }
-
-      const currentRoot = safeStates.includes(currentState) ? currentState : safeStates[0];
-      const rankByState = new Map(safeStates.map((name) => [name, name === currentRoot ? 0 : Number.NEGATIVE_INFINITY]));
-
-      for (let pass = 0; pass < safeStates.length; pass += 1) {
-        for (const from of safeStates) {
-          const fromRank = rankByState.get(from);
-          if (!Number.isFinite(fromRank)) {
-            continue;
-          }
-
-          for (const to of outgoing.get(from) ?? []) {
-            const existing = rankByState.get(to) ?? Number.NEGATIVE_INFINITY;
-            if (fromRank + 1 > existing) {
-              rankByState.set(to, fromRank + 1);
-            }
-          }
-        }
-      }
-
-      for (const name of safeStates) {
-        if (!Number.isFinite(rankByState.get(name))) {
-          rankByState.set(name, 0);
-        }
-      }
-
-      const minRank = Math.min(...safeStates.map((name) => rankByState.get(name) ?? 0));
-      for (const name of safeStates) {
-        rankByState.set(name, (rankByState.get(name) ?? 0) - minRank);
-      }
-
-      const columns = new Map();
-      for (const name of safeStates) {
-        const rank = rankByState.get(name) ?? 0;
-        if (!columns.has(rank)) {
-          columns.set(rank, []);
-        }
-
-        columns.get(rank).push(name);
-      }
-
-      const orderedRanks = Array.from(columns.keys()).sort((left, right) => left - right);
-      for (const rank of orderedRanks) {
-        columns.get(rank).sort((left, right) => (orderIndex.get(left) ?? 0) - (orderIndex.get(right) ?? 0));
-      }
-
-      const barycenter = (stateName, neighbors) => {
-        const values = (neighbors.get(stateName) ?? [])
-          .map((neighbor) => columns.get(rankByState.get(neighbor) ?? 0)?.indexOf(neighbor) ?? -1)
-          .filter((value) => value >= 0);
-
-        if (values.length === 0) {
-          return Number.POSITIVE_INFINITY;
-        }
-
-        return values.reduce((sum, value) => sum + value, 0) / values.length;
-      };
-
-      for (let sweep = 0; sweep < 4; sweep += 1) {
-        for (let i = 1; i < orderedRanks.length; i += 1) {
-          const rank = orderedRanks[i];
-          const statesInRank = columns.get(rank) ?? [];
-          statesInRank.sort((left, right) => {
-            const leftB = barycenter(left, incoming);
-            const rightB = barycenter(right, incoming);
-            if (leftB !== rightB) {
-              return leftB - rightB;
-            }
-
-            return (orderIndex.get(left) ?? 0) - (orderIndex.get(right) ?? 0);
-          });
-        }
-
-        for (let i = orderedRanks.length - 2; i >= 0; i -= 1) {
-          const rank = orderedRanks[i];
-          const statesInRank = columns.get(rank) ?? [];
-          statesInRank.sort((left, right) => {
-            const leftB = barycenter(left, outgoing);
-            const rightB = barycenter(right, outgoing);
-            if (leftB !== rightB) {
-              return leftB - rightB;
-            }
-
-            return (orderIndex.get(left) ?? 0) - (orderIndex.get(right) ?? 0);
-          });
-        }
-      }
-
-      const marginX = 130;
-      const marginY = 70;
-      const xSpacing = 230;
-      const ySpacing = 90;
-      const positions = {};
-
-      for (let columnIndex = 0; columnIndex < orderedRanks.length; columnIndex += 1) {
-        const rank = orderedRanks[columnIndex];
-        const statesInRank = columns.get(rank) ?? [];
-        const totalHeight = (Math.max(1, statesInRank.length) - 1) * ySpacing;
-        const baseY = marginY + Math.max(0, (340 - totalHeight) / 2);
-
-        for (let rowIndex = 0; rowIndex < statesInRank.length; rowIndex += 1) {
-          const stateName = statesInRank[rowIndex];
-          positions[stateName] = {
-            x: marginX + (columnIndex * xSpacing),
-            y: Math.round(baseY + (rowIndex * ySpacing))
-          };
-        }
-      }
-
-      return positions;
-    }
-
-    function pointsToPath(points) {
-      if (!Array.isArray(points) || points.length < 2) {
-        return '';
-      }
-
-      const normalized = points
-        .map((point) => {
-          if (!point || typeof point !== 'object') {
-            return null;
-          }
-
-          const x = Number(point.x);
-          const y = Number(point.y);
-          if (!Number.isFinite(x) || !Number.isFinite(y)) {
-            return null;
-          }
-
-          return { x, y };
-        })
-        .filter((point) => point !== null);
-
-      if (normalized.length < 2) {
-        return '';
-      }
-
-      return normalized
-        .map((point, index) => `${index === 0 ? 'M' : 'L'} ${Math.round(point.x)} ${Math.round(point.y)}`)
-        .join(' ');
-    }
 
     function toHostEventStatus(raw) {
       if (!raw || typeof raw !== 'object') {
@@ -881,66 +748,7 @@
       };
     }
 
-    function parseLayoutPayload(layoutPayload, fallbackPositions, fallbackBounds) {
-      const fallback = {
-        positions: fallbackPositions,
-        paths: new Map(),
-        bounds: fallbackBounds
-      };
-
-      if (!layoutPayload || typeof layoutPayload !== 'object' || !layoutPayload.nodes || typeof layoutPayload.nodes !== 'object') {
-        return fallback;
-      }
-
-      const positions = {};
-      for (const [name, pos] of Object.entries(layoutPayload.nodes)) {
-        if (!pos || typeof pos !== 'object') {
-          continue;
-        }
-
-        const x = Number(pos.x);
-        const y = Number(pos.y);
-        if (!Number.isFinite(x) || !Number.isFinite(y)) {
-          continue;
-        }
-
-        positions[String(name)] = { x, y };
-      }
-
-      const resolvedPositions = Object.keys(positions).length > 0 ? positions : fallbackPositions;
-      const paths = new Map();
-
-      if (Array.isArray(layoutPayload.edges)) {
-        for (const edge of layoutPayload.edges) {
-          if (!edge || typeof edge !== 'object') {
-            continue;
-          }
-
-          const transitionIndex = Number(edge.transitionIndex);
-          if (!Number.isFinite(transitionIndex)) {
-            continue;
-          }
-
-          const path = pointsToPath(edge.points);
-          if (path) {
-            paths.set(transitionIndex, path);
-          }
-        }
-      }
-
-      const layoutWidth = Number(layoutPayload.width);
-      const layoutHeight = Number(layoutPayload.height);
-      const bounds = {
-        width: Number.isFinite(layoutWidth) ? Math.max(920, layoutWidth) : fallbackBounds.width,
-        height: Number.isFinite(layoutHeight) ? Math.max(430, layoutHeight) : fallbackBounds.height
-      };
-
-      return {
-        positions: resolvedPositions,
-        paths,
-        bounds
-      };
-    }
+    mermaid.initialize({ startOnLoad: false, theme: 'dark' });
 
     function applySnapshot(snapshot) {
       if (!snapshot || typeof snapshot !== 'object') {
@@ -965,28 +773,7 @@
         stateOrder = snapshotStates.map((value) => String(value));
       }
 
-      const defaultPositions = buildStatePositions(stateOrder);
-      defaultStatePositions = defaultPositions;
-      const defaultPoints = Object.values(defaultPositions);
-      const defaultMaxX = defaultPoints.reduce((maxValue, pos) => Math.max(maxValue, pos?.x ?? 0), 0);
-      const defaultMaxY = defaultPoints.reduce((maxValue, pos) => Math.max(maxValue, pos?.y ?? 0), 0);
-      defaultDiagramBounds = {
-        width: Math.max(920, defaultMaxX + 180),
-        height: Math.max(430, defaultMaxY + 140)
-      };
-
-      const rawLayoutPayload = (snapshot.layoutRaw ?? snapshot.LayoutRaw ?? snapshot.layout ?? snapshot.Layout);
-      const optimizedLayoutPayload = (snapshot.layout ?? snapshot.Layout ?? snapshot.layoutRaw ?? snapshot.LayoutRaw);
-      const rawLayout = parseLayoutPayload(rawLayoutPayload, defaultPositions, defaultDiagramBounds);
-      const optimizedLayout = parseLayoutPayload(optimizedLayoutPayload, defaultPositions, defaultDiagramBounds);
-
-      defaultStatePositions = rawLayout.positions;
-      defaultTransitionPaths = rawLayout.paths;
-      defaultDiagramBounds = rawLayout.bounds;
-      optimizedStatePositions = optimizedLayout.positions;
-      optimizedTransitionPaths = optimizedLayout.paths;
-      optimizedDiagramBounds = optimizedLayout.bounds;
-      applyRenderLayoutMode();
+      mermaidText = snapshot.mermaidText ?? snapshot.MermaidText ?? '';
 
       eventDefinitionOrder = Array.from(new Set(
         (Array.isArray(snapshotEvents) ? snapshotEvents : [])
@@ -1015,16 +802,6 @@
       if (selectedTransitionIndex < 0) {
         selectedTransitionIndex = 0;
       }
-    }
-
-    function applyRenderLayoutMode() {
-      const useOptimized = renderLayoutMode === 'optimized';
-      statePositions = useOptimized ? optimizedStatePositions : defaultStatePositions;
-      transitionPaths = useOptimized ? new Map(optimizedTransitionPaths) : new Map(defaultTransitionPaths);
-      const bounds = useOptimized ? optimizedDiagramBounds : defaultDiagramBounds;
-      const width = Math.max(920, Number(bounds?.width ?? 920));
-      const height = Math.max(430, Number(bounds?.height ?? 430));
-      diagram.setAttribute('viewBox', `0 0 ${width} ${height}`);
     }
 
     function sendHostRequest(action, payload = {}) {
@@ -1159,7 +936,6 @@
       const elapsed = Math.max(0, timestamp - stateChangeAnimation.startedAt);
       const progress = Math.min(1, elapsed / stateChangeAnimation.duration);
       stateChangeAnimation.progress = progress;
-      drawDiagram();
 
       if (progress < 1) {
         stateChangeAnimationFrame = window.requestAnimationFrame(stepStateChangeAnimation);
@@ -1169,7 +945,7 @@
       stateChangeAnimation = null;
       suppressHoverUntilAnimationComplete = false;
       stateChangeAnimationFrame = null;
-      drawDiagram();
+      updateDiagramHighlights();
     }
 
     function triggerStateChangeAnimation(fromState, toState, eventName, fromDataSnapshot = null, fromArgsSnapshot = null) {
@@ -1442,94 +1218,6 @@
       }
     }
 
-    function getPointOnPath(pathD, fraction) {
-      const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      tempPath.setAttribute('d', pathD);
-      const totalLength = tempPath.getTotalLength();
-      const point = tempPath.getPointAtLength(totalLength * Math.max(0, Math.min(1, fraction)));
-      return { x: point.x, y: point.y };
-    }
-
-    function getChipPathFraction(transition) {
-      if (transition.from === transition.to) {
-        return 0.24;
-      }
-
-      if (transition.event === 'ClearEmergency') {
-        return 0.42;
-      }
-
-      if (transition.event === 'Emergency' && transition.to === 'FlashingRed' && transition.from !== 'FlashingRed') {
-        return 0.48;
-      }
-
-      if (transition.from === 'Red' && transition.event === 'Advance' && transition.to === 'Green') {
-        return 0.42;
-      }
-
-      return 0.5;
-    }
-
-    function buildParallelLaneBiasByIndex(edgeSegments) {
-      const grouped = new Map();
-
-      edgeSegments.forEach((segment) => {
-        const key = `${segment.transition.from}->${segment.transition.to}`;
-        const group = grouped.get(key) || [];
-        group.push(segment.index);
-        grouped.set(key, group);
-      });
-
-      const laneBiasByIndex = new Map();
-      grouped.forEach((indices) => {
-        const sorted = [...indices].sort((left, right) => left - right);
-        sorted.forEach((index, lane) => {
-          const centered = lane - ((sorted.length - 1) / 2);
-          laneBiasByIndex.set(index, centered * 0.06);
-        });
-      });
-
-      return laneBiasByIndex;
-    }
-
-    function deconflictAnnotationYs(annotationItems) {
-      const adjustedYByIndex = new Map();
-      const placed = [];
-
-      const sorted = [...annotationItems].sort((left, right) => {
-        if (Math.abs(left.x - right.x) < 0.001) {
-          return left.y - right.y;
-        }
-
-        return left.x - right.x;
-      });
-
-      sorted.forEach((item) => {
-        let y = item.y;
-        let attempts = 0;
-
-        while (attempts < 10) {
-          const collides = placed.some((other) => {
-            const overlapX = Math.abs(other.x - item.x) < ((other.width + item.width) / 2) + 8;
-            const overlapY = Math.abs(other.y - y) < 20;
-            return overlapX && overlapY;
-          });
-
-          if (!collides) {
-            break;
-          }
-
-          y += 20;
-          attempts += 1;
-        }
-
-        placed.push({ x: item.x, y, width: item.width });
-        adjustedYByIndex.set(item.index, y);
-      });
-
-      return adjustedYByIndex;
-    }
-
     function applyEventButtonState(button, eventName) {
       const evaluation = evaluateEvent(currentState, eventName);
       button.classList.remove('enabled', 'blocked', 'undefined');
@@ -1611,781 +1299,108 @@
       renderEventBar();
     }
 
-    function drawDiagram() {
-      const diagramState = stateChangeAnimation ? stateChangeAnimation.from : currentState;
-      const defs = `
-        <defs>
-          <linearGradient id="transition-beam-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="${getComputedStyle(document.documentElement).getPropertyValue('--edge').trim()}" stop-opacity="0.1" />
-            <stop offset="42%" stop-color="${getComputedStyle(document.documentElement).getPropertyValue('--edge').trim()}" stop-opacity="0.95" />
-            <stop offset="100%" stop-color="${getComputedStyle(document.documentElement).getPropertyValue('--edge').trim()}" stop-opacity="0.22" />
-          </linearGradient>
-          <filter id="transition-glow-soft" x="-70%" y="-70%" width="240%" height="240%">
-            <feGaussianBlur stdDeviation="2.8" result="blur"/>
-            <feMerge>
-              <feMergeNode in="blur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-          <filter id="transition-glow-strong" x="-90%" y="-90%" width="280%" height="280%">
-            <feGaussianBlur stdDeviation="4.2" result="blur"/>
-            <feMerge>
-              <feMergeNode in="blur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-          <marker id="arrow" markerWidth="8" markerHeight="6" markerUnits="userSpaceOnUse" refX="7.1" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge').trim()}"/>
-          </marker>
-          <marker id="arrow-warn" markerWidth="8" markerHeight="6" markerUnits="userSpaceOnUse" refX="7.1" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-warn').trim()}"/>
-          </marker>
-          <marker id="arrow-error" markerWidth="8" markerHeight="6" markerUnits="userSpaceOnUse" refX="7.1" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-error').trim()}"/>
-          </marker>
-          <marker id="arrow-selected" markerWidth="8" markerHeight="6" markerUnits="userSpaceOnUse" refX="7.1" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="${getComputedStyle(document.documentElement).getPropertyValue('--event').trim()}"/>
-          </marker>
-          <marker id="arrow-muted" markerWidth="8" markerHeight="6" markerUnits="userSpaceOnUse" refX="7.1" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-muted').trim()}"/>
-          </marker>
-        </defs>
-      `;
+    let lastRenderedMermaidText = '';
 
-      function buildEdgePath(transition, from, to, transitionIndex) {
-        const precomputedPath = transitionPaths.get(transitionIndex);
-        if (precomputedPath) {
-          return precomputedPath;
-        }
-
-        const nodeHalfWidth = 56;
-        const nodeHalfHeight = 22;
-        const family = getFamilyTransitions(transition.from, transition.event);
-        const familyIndex = Math.max(0, family.findIndex((candidate) => candidate.to === transition.to));
-        const familySpread = (family.length - 1) / 2;
-        const laneOffset = (familyIndex - familySpread) * 16;
-
-        if (transition.from === transition.to) {
-          const loopX = from.x + nodeHalfWidth;
-          const loopTop = from.y - 8;
-          const loopReach = 66 + Math.abs(laneOffset * 0.6);
-          return `M ${loopX} ${loopTop} C ${loopX + loopReach} ${from.y - 56}, ${loopX + loopReach} ${from.y + 52}, ${from.x + 44} ${from.y + 16}`;
-        }
-
-        const dx = to.x - from.x;
-        const dy = to.y - from.y;
-        const forward = dx >= 0;
-
-        const startX = from.x + (forward ? nodeHalfWidth : -nodeHalfWidth);
-        const endX = to.x - (forward ? nodeHalfWidth : -nodeHalfWidth);
-        const startY = from.y + (laneOffset * 0.35);
-        const endY = to.y + (laneOffset * 0.35);
-
-        if (Math.abs(dy) < 40) {
-          const lift = Math.max(26, Math.min(84, Math.abs(dx) * 0.22)) + Math.abs(laneOffset * 0.25);
-          const controlX = Math.round((startX + endX) / 2);
-          const controlY = Math.round(Math.min(startY, endY) - lift);
-          return `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`;
-        }
-
-        if (!forward) {
-          const routeX = Math.min(startX, endX) - Math.max(60, Math.abs(dx) * 0.18) - Math.abs(laneOffset * 0.4);
-          const c1Y = startY + (dy > 0 ? 34 : -34);
-          const c2Y = endY + (dy > 0 ? -34 : 34);
-          return `M ${startX} ${startY} C ${routeX} ${c1Y}, ${routeX} ${c2Y}, ${endX} ${endY}`;
-        }
-
-        const c1X = startX + Math.max(42, Math.abs(dx) * 0.34);
-        const c2X = endX - Math.max(42, Math.abs(dx) * 0.34);
-        const yBias = dy * 0.2 + (laneOffset * 0.3);
-        return `M ${startX} ${startY} C ${c1X} ${startY + yBias}, ${c2X} ${endY - yBias}, ${endX} ${endY}`;
-      }
-
-      function getEdgeVisual(transition, index, selectedTransition, selectedEventName, eventEvaluations) {
-        const eventEvaluation = eventEvaluations[transition.event];
-        const fromCurrent = transition.from === diagramState;
-        const sameEventFromCurrent = selectedEventName !== null && fromCurrent && transition.event === selectedEventName;
-        const selectedExact = selectedTransition !== null && index === selectedTransitionIndex;
-        const hoveredMatch = activeHoverEventName !== null
-          && transition.from === diagramState
-          && transition.event === activeHoverEventName;
-
-        let stroke = 'var(--edge-muted)';
-        let marker = 'url(#arrow-muted)';
-        let width = 1.8;
-        let opacity = 0.5;
-        let dash = '';
-
-        if (fromCurrent && eventEvaluation && eventEvaluation.kind !== 'undefined') {
-          if (eventEvaluation.kind === 'enabled') {
-            if (eventEvaluation.to === transition.to) {
-              stroke = 'var(--edge)';
-              marker = 'url(#arrow)';
-              width = 2.1;
-              opacity = 0.68;
-            } else {
-              stroke = 'var(--edge-error)';
-              marker = 'url(#arrow-error)';
-              width = 2.0;
-              opacity = 0.62;
-              dash = '6 5';
-            }
-          } else if (eventEvaluation.kind === 'blocked') {
-            stroke = 'var(--edge-error)';
-            marker = 'url(#arrow-error)';
-            width = 2.0;
-            opacity = 0.62;
-            dash = '5 4';
-          }
-        }
-
-        if (sameEventFromCurrent) {
-          if (eventEvaluation?.kind === 'enabled') {
-            if (eventEvaluation.to === transition.to) {
-              stroke = 'var(--edge)';
-              marker = 'url(#arrow)';
-              width = 2.15;
-              opacity = 1;
-            } else {
-              stroke = 'var(--edge-error)';
-              marker = 'url(#arrow-error)';
-              width = 2.0;
-              opacity = 0.8;
-              dash = '6 5';
-            }
-          } else if (eventEvaluation?.kind === 'blocked') {
-            stroke = 'var(--edge-error)';
-            marker = 'url(#arrow-error)';
-            width = 2.0;
-            opacity = 0.8;
-            dash = '5 4';
-          }
-        }
-
-        if (selectedExact && !sameEventFromCurrent) {
-          if (!fromCurrent) {
-            stroke = 'var(--event)';
-            marker = 'url(#arrow-selected)';
-            width = 2.1;
-            opacity = 1;
-          } else {
-            width = Math.max(width, 2.1);
-            opacity = 1;
-          }
-        }
-
-        if (activeHoverEventName !== null) {
-          if (hoveredMatch) {
-            width = Math.max(width, 2.15);
-            opacity = Math.max(opacity, 1);
-          } else {
-            width = Math.max(1.6, width * 0.86);
-            opacity = Math.min(opacity, 0.2);
-          }
-        }
-
-        return { stroke, marker, width, opacity, dash };
-      }
-
-      function getEdgeAnnotation(transition, pathD, selectedEventName, eventEvaluations, pathFractionBias = 0) {
-        const fromCurrent = transition.from === diagramState;
-        const eventEvaluation = eventEvaluations[transition.event];
-        const shouldShowBecauseCurrent = fromCurrent && eventEvaluation && eventEvaluation.kind !== 'undefined';
-        const shouldShowBecauseSelected = selectedEventName !== null && transition.event === selectedEventName && transition.from === diagramState;
-
-        if (!shouldShowBecauseCurrent && !shouldShowBecauseSelected) {
-          return null;
-        }
-
-        const pathFraction = Math.max(0.12, Math.min(0.88, getChipPathFraction(transition) + pathFractionBias));
-        const position = getPointOnPath(pathD, pathFraction);
-
-        const annotation = {
-          position,
-          event: transition.event,
-          guard: null
-        };
-
-        if (transition.from === 'Red' && transition.event === 'Advance' && transition.to === 'FlashingGreen') {
-          annotation.guard = 'LeftTurnQueued';
-        } else if (transition.from === 'Red' && transition.event === 'Advance' && transition.to === 'Green') {
-          annotation.guard = 'VehiclesWaiting > 0';
-        }
-
-        return annotation;
-      }
-
-      function getStateEventEvaluations(stateName, dataContext = data, argsContext = mockEmergencyArgs) {
-        return Object.fromEntries(
-          getUniqueOutgoingEvents(stateName).map((eventName) => [eventName, evaluateEventWithContext(stateName, eventName, dataContext, argsContext)])
-        );
-      }
-
-      function getEdgeVisualForState(transition, eventEvaluations, stateName) {
-        const eventEvaluation = eventEvaluations[transition.event];
-        const fromCurrent = transition.from === stateName;
-
-        let stroke = 'var(--edge-muted)';
-        let marker = 'url(#arrow-muted)';
-        let width = 1.6;
-        let opacity = 0.2;
-        let dash = '';
-
-        if (fromCurrent && eventEvaluation && eventEvaluation.kind !== 'undefined') {
-          if (eventEvaluation.kind === 'enabled') {
-            if (eventEvaluation.to === transition.to) {
-              stroke = 'var(--edge)';
-              marker = 'url(#arrow)';
-              width = 2.15;
-              opacity = 0.88;
-            } else {
-              stroke = 'var(--edge-error)';
-              marker = 'url(#arrow-error)';
-              width = 2.0;
-              opacity = 0.74;
-              dash = '6 5';
-            }
-          } else if (eventEvaluation.kind === 'blocked') {
-            stroke = 'var(--edge-error)';
-            marker = 'url(#arrow-error)';
-            width = 2.0;
-            opacity = 0.74;
-            dash = '5 4';
-          }
-        }
-
-        return { stroke, marker, width, opacity, dash };
-      }
-
-      function getStateVisualMap(eventEvaluations, stateName) {
-        const visualMap = new Map();
-        const setStateVisual = (targetState, visual) => {
-          const existing = visualMap.get(targetState);
-          if (!existing) {
-            visualMap.set(targetState, visual);
-            return;
-          }
-
-          const rank = {
-            actual: 3,
-            alternate: 2,
-            blocked: 2
-          };
-
-          if ((rank[visual] ?? 0) >= (rank[existing] ?? 0)) {
-            visualMap.set(targetState, visual);
-          }
-        };
-
-        Object.entries(eventEvaluations).forEach(([eventName, evaluation]) => {
-          const family = transitions
-            .filter((transition) => transition.from === stateName && transition.event === eventName);
-
-          if (evaluation.kind === 'enabled' && evaluation.to) {
-            family.forEach((transition) => {
-              setStateVisual(transition.to, transition.to === evaluation.to ? 'actual' : 'alternate');
-            });
-          } else if (evaluation.kind === 'blocked') {
-            family.forEach((transition) => {
-              setStateVisual(transition.to, 'blocked');
-            });
-          }
-        });
-
-        return visualMap;
-      }
-
-      function easeInOut(progress) {
-        if (progress <= 0) return 0;
-        if (progress >= 1) return 1;
-        return progress < 0.5
-          ? 4 * progress * progress * progress
-          : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-      }
-
-      const isAnimationPhase = stateChangeAnimation !== null;
-      if (isAnimationPhase) {
-        const progress = Math.max(0, Math.min(1, stateChangeAnimation.progress ?? 0));
-        const eased = easeInOut(progress);
-        const fromState = stateChangeAnimation.from;
-        const toState = stateChangeAnimation.to;
-        const preLayerOpacity = Math.max(0.05, 1 - (eased * 0.95));
-        const selectedEventNameForAnimation = stateChangeAnimation.eventName ?? null;
-        const fromEvaluations = getStateEventEvaluations(
-          fromState,
-          stateChangeAnimation.fromDataSnapshot ?? data,
-          stateChangeAnimation.fromArgsSnapshot ?? mockEmergencyArgs
-        );
-        const fromStateVisual = getStateVisualMap(fromEvaluations, fromState);
-        const selectedFamilyDestinations = selectedEventNameForAnimation
-          ? new Set(
-            transitions
-              .filter((transition) => transition.from === fromState && transition.event === selectedEventNameForAnimation)
-              .map((transition) => transition.to)
-          )
-          : new Set();
-
-        const edgeSegments = transitions.map((transition, index) => {
-          const from = statePositions[transition.from];
-          const to = statePositions[transition.to];
-          const pathD = buildEdgePath(transition, from, to, index);
-          return { index, transition, pathD };
-        });
-        const laneBiasByIndex = buildParallelLaneBiasByIndex(edgeSegments);
-
-        const getAnimatedFromEdgeVisual = (segment) => {
-          const visual = getEdgeVisualForState(segment.transition, fromEvaluations, fromState);
-
-          if (selectedEventNameForAnimation !== null && segment.transition.from === fromState) {
-            if (segment.transition.event === selectedEventNameForAnimation) {
-              const selectedEvaluation = fromEvaluations[selectedEventNameForAnimation];
-              if (selectedEvaluation?.kind === 'enabled') {
-                if (selectedEvaluation.to === segment.transition.to) {
-                  visual.width = Math.max(visual.width, 2.15);
-                  visual.opacity = 1;
-                } else {
-                  visual.width = Math.max(visual.width, 2.0);
-                  visual.opacity = 0.8;
-                }
-              } else if (selectedEvaluation?.kind === 'blocked') {
-                visual.width = Math.max(visual.width, 2.0);
-                visual.opacity = 0.8;
-              }
-            } else {
-              visual.width = Math.max(1.6, visual.width * 0.86);
-              visual.opacity = Math.min(visual.opacity, 0.2);
-            }
-          }
-
-          return visual;
-        };
-
-        const animatedFromEdgeSvg = edgeSegments
-          .map((segment) => {
-            if (segment.transition.from !== fromState) {
-              return '';
-            }
-
-            const visual = getAnimatedFromEdgeVisual(segment);
-            const opacity = visual.opacity * preLayerOpacity;
-            if (opacity <= 0.02) {
-              return '';
-            }
-
-            return `<path class="diagram-edge" d="${segment.pathD}" fill="none" stroke="${visual.stroke}" stroke-width="${visual.width}" stroke-linecap="round" stroke-linejoin="round" marker-end="${visual.marker}" stroke-dasharray="${visual.dash}" opacity="${opacity}"></path>`;
-          })
-          .join('');
-
-        const animatedAnnotationItems = edgeSegments
-          .filter((segment) => segment.transition.from === fromState)
-          .map((segment) => {
-            const transition = segment.transition;
-            const annotation = getEdgeAnnotation(
-              transition,
-              segment.pathD,
-              selectedEventNameForAnimation,
-              fromEvaluations,
-              laneBiasByIndex.get(segment.index) ?? 0
-            );
-            if (!annotation) {
-              return null;
-            }
-
-            const visual = getAnimatedFromEdgeVisual(segment);
-            const isMutedBySelection = selectedEventNameForAnimation !== null
-              && transition.from === fromState
-              && transition.event !== selectedEventNameForAnimation;
-            const chipWidth = annotation.event.length * 7 + 16;
-
-            return {
-              segment,
-              transition,
-              annotation,
-              visual,
-              chipWidth,
-              opacity: preLayerOpacity * (isMutedBySelection ? 0.2 : 0.92)
-            };
-          })
-          .filter((value) => value !== null);
-
-        const animatedAnnotationYByIndex = deconflictAnnotationYs(
-          animatedAnnotationItems.map((item) => ({
-            index: item.segment.index,
-            x: item.annotation.position.x,
-            y: item.annotation.position.y - 8,
-            width: item.chipWidth
-          }))
-        );
-
-        const animatedFromAnnotationSvg = animatedAnnotationItems
-          .map((item) => {
-            const chipY = animatedAnnotationYByIndex.get(item.segment.index) ?? (item.annotation.position.y - 8);
-            const chipHeight = 16;
-            const textY = chipY + chipHeight / 2;
-            const guardX = item.annotation.position.x;
-            const guardY = chipY + chipHeight + 10;
-
-            return `
-              <g class="edge-annotation" opacity="${item.opacity}">
-                <rect class="edge-chip" x="${item.annotation.position.x - item.chipWidth / 2}" y="${chipY}" width="${item.chipWidth}" height="${chipHeight}" fill="rgba(30,30,30,0.88)" stroke="${item.visual.stroke}" stroke-width="1.1"></rect>
-                <text class="edge-label" x="${item.annotation.position.x}" y="${textY}" fill="${item.visual.stroke}">${item.annotation.event}</text>
-                ${item.annotation.guard ? `<line x1="${item.annotation.position.x}" y1="${chipY + chipHeight}" x2="${item.annotation.position.x}" y2="${guardY - 6}" stroke="${item.visual.stroke}" stroke-width="1" opacity="0.9"></line><text class="edge-guard" x="${guardX}" y="${guardY}" fill="${item.visual.stroke}">[${item.annotation.guard}]</text>` : ''}
-              </g>
-            `;
-          })
-          .join('');
-
-        const mutedEdgeSvg = edgeSegments
-          .map((segment) => segment.transition.from === fromState
-            ? ''
-            : `<path class="diagram-edge" d="${segment.pathD}" fill="none" stroke="var(--edge-muted)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-muted)" opacity="0.16"></path>`)
-          .join('');
-
-        const transitionSegment = edgeSegments.find((segment) => segment.transition.from === fromState && segment.transition.to === toState);
-        const runnerProgress = Math.min(0.985, Math.max(0.001, 0.01 + (progress * 0.975)));
-        const runnerPoint = transitionSegment
-          ? getPointOnPath(transitionSegment.pathD, runnerProgress)
-          : null;
-        const runnerOpacity = Math.max(0.38, 1 - Math.abs((runnerProgress - 0.55) * 1.15));
-        const beamEnvelope = Math.max(0.18, Math.sin(Math.PI * runnerProgress));
-        const transitionPathHaloSvg = transitionSegment
-          ? `<path class="diagram-edge" d="${transitionSegment.pathD}" fill="none" stroke="var(--ok)" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" opacity="${0.16 + (beamEnvelope * 0.28)}" filter="url(#transition-glow-soft)"></path>`
-          : '';
-        const transitionPathSvg = transitionSegment
-          ? `<path class="diagram-edge" d="${transitionSegment.pathD}" fill="none" stroke="url(#transition-beam-gradient)" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" opacity="${0.3 + (beamEnvelope * 0.64)}"></path>`
-          : '';
-        const transitionSweepSvg = transitionSegment
-          ? `<path class="diagram-edge" d="${transitionSegment.pathD}" fill="none" stroke="var(--ok)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="24 120" stroke-dashoffset="${Math.round((1 - runnerProgress) * 220)}" opacity="${0.2 + (beamEnvelope * 0.45)}"></path>`
-          : '';
-
-        const trailOffsets = [0.045, 0.1, 0.17, 0.25];
-        const transitionTrailSvg = transitionSegment
-          ? trailOffsets.map((offset, idx) => {
-            const trailProgress = Math.max(0.01, runnerProgress - offset);
-            const point = getPointOnPath(transitionSegment.pathD, trailProgress);
-            const alpha = Math.max(0.05, (runnerOpacity * (1 - ((idx + 1) / (trailOffsets.length + 1)))) * 0.85);
-            const radius = Math.max(1.8, 4.4 - (idx * 0.8));
-            return `<circle cx="${point.x}" cy="${point.y}" r="${radius}" fill="var(--ok)" opacity="${alpha}" filter="url(#transition-glow-soft)"></circle>`;
-          }).join('')
-          : '';
-
-        const transitionRunnerSvg = runnerPoint
-          ? `<g filter="url(#transition-glow-strong)"><circle cx="${runnerPoint.x}" cy="${runnerPoint.y}" r="7" fill="var(--ok)" opacity="${Math.min(1, runnerOpacity + 0.12)}"></circle><circle cx="${runnerPoint.x}" cy="${runnerPoint.y}" r="3.1" fill="#d6ffe8" opacity="${Math.min(1, runnerOpacity + 0.2)}"></circle></g>`
-          : '';
-
-        const fromActiveBlend = Math.max(0, 1 - eased);
-        const toActiveBlend = Math.max(0, Math.min(1, (eased - 0.72) / 0.28));
-        const pulseStrength = Math.max(0, Math.sin(Math.PI * Math.max(0, Math.min(1, (eased - 0.52) / 0.48))));
-        const destinationDimStrokeOpacity = 0.72;
-        const destinationDimTextOpacity = 0.74;
-
-        const nodeSvg = Object.entries(statePositions).map(([name, pos]) => {
-          let stroke = 'var(--border)';
-          let strokeOpacity = 1;
-          let strokeWidth = 1.6;
-          let fill = 'var(--node)';
-          let fillOpacity = 1;
-          let fillOverlay = '';
-          let textFill = 'var(--border)';
-          let textOpacity = 1;
-          let fontWeight = 500;
-          let glow = '';
-          let pulseOverlay = '';
-          let handoffRing = '';
-
-          if (name === fromState) {
-            stroke = 'var(--ok)';
-            strokeOpacity = Math.max(0.38, 1 - (eased * 0.72));
-            strokeWidth = 2.6;
-            fill = 'var(--ok)';
-            fillOpacity = Math.max(0.14, 0.92 * fromActiveBlend);
-            textFill = 'var(--bg)';
-            textOpacity = Math.max(0.7, 1 - (eased * 0.4));
-            fontWeight = 700;
-            glow = 'filter="drop-shadow(0 0 5px rgba(31,255,122,.36))"';
-            const collapse = Math.max(0, 1 - eased);
-            const ringOpacity = collapse * 0.34;
-            if (ringOpacity > 0.01) {
-              const ringScale = 1 + ((1 - collapse) * 0.18);
-              handoffRing = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="none" stroke="var(--ok)" stroke-width="1.8" opacity="${ringOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${ringScale})"></rect>`;
-            }
-          } else if (name === toState) {
-            stroke = 'var(--ok)';
-            strokeOpacity = destinationDimStrokeOpacity + (toActiveBlend * (0.98 - destinationDimStrokeOpacity));
-            strokeWidth = 2.0 + (toActiveBlend * 0.6);
-            fill = 'var(--node)';
-            fillOpacity = 1;
-            fillOverlay = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="var(--ok)" fill-opacity="${toActiveBlend}" stroke="none"></rect>`;
-            textFill = toActiveBlend > 0.58 ? 'var(--bg)' : 'var(--ok)';
-            textOpacity = destinationDimTextOpacity + (toActiveBlend * (1 - destinationDimTextOpacity));
-            fontWeight = toActiveBlend > 0.58 ? 700 : 600;
-
-            if (pulseStrength > 0.01) {
-              const pulseOpacity = pulseStrength * Math.max(0.08, 1 - toActiveBlend);
-              pulseOverlay = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="none" stroke="var(--ok)" stroke-width="2.4" opacity="${pulseOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${1 + (0.24 * pulseStrength)})"></rect>`;
-            }
-            const arrival = Math.max(0, Math.min(1, (eased - 0.58) / 0.42));
-            const ringOpacity = arrival * (1 - toActiveBlend) * 0.32;
-            if (ringOpacity > 0.01) {
-              const ringScale = 1.16 - (arrival * 0.18);
-              handoffRing = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="none" stroke="var(--ok)" stroke-width="1.7" opacity="${ringOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${ringScale})"></rect>`;
-            }
-          } else {
-            const fromVisual = fromStateVisual.get(name);
-            if (fromVisual) {
-              let baseStrokeOpacity = 0.58;
-              let baseTextOpacity = 0.66;
-              if (selectedEventNameForAnimation !== null) {
-                if (selectedFamilyDestinations.has(name)) {
-                  if (fromVisual === 'actual') {
-                    baseStrokeOpacity = 1;
-                    baseTextOpacity = 1;
-                  } else {
-                    baseStrokeOpacity = 0.72;
-                    baseTextOpacity = 0.74;
-                  }
-                } else {
-                  baseStrokeOpacity = 0.18;
-                  baseTextOpacity = 0.24;
-                }
-              }
-
-              if (fromVisual === 'actual') {
-                stroke = 'var(--ok)';
-                textFill = 'var(--ok)';
-              } else {
-                stroke = 'var(--edge-error)';
-                textFill = 'var(--edge-error)';
-              }
-
-              strokeOpacity = Math.max(0.08, baseStrokeOpacity * preLayerOpacity);
-              textOpacity = Math.max(0.12, baseTextOpacity * preLayerOpacity);
-              strokeWidth = fromVisual === 'actual' ? 2.6 : 2.0;
-              fontWeight = fromVisual === 'actual' ? 700 : 600;
-            }
-          }
-
-          return `
-            <g ${glow}>
-              ${handoffRing}
-              ${pulseOverlay}
-              <rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="${strokeWidth}"></rect>
-              ${fillOverlay}
-              <text x="${pos.x}" y="${pos.y + 4}" text-anchor="middle" fill="${textFill}" fill-opacity="${textOpacity}" font-size="13" font-weight="${fontWeight}">${name}</text>
-            </g>
-          `;
-        }).join('');
-
-        diagram.innerHTML = `${defs}${mutedEdgeSvg}${animatedFromEdgeSvg}${transitionPathHaloSvg}${transitionPathSvg}${transitionSweepSvg}${transitionTrailSvg}${transitionRunnerSvg}${animatedFromAnnotationSvg}${nodeSvg}`;
+    async function drawDiagram() {
+      if (!mermaidText) {
+        diagramContainer.innerHTML = '<p style="color:var(--muted)">No diagram data.</p>';
+        lastRenderedMermaidText = '';
         return;
       }
 
-      const selectedTransition = getSelectedTransition();
-      const selectedEventName = getSelectedEventName();
-      const activeHoverEventName = selectedEventName;
-      const eventEvaluations = Object.fromEntries(
-        getUniqueOutgoingEvents(diagramState).map((eventName) => [eventName, evaluateEvent(diagramState, eventName)])
-      );
-      const hoveredEvaluation = !isAnimationPhase && activeHoverEventName !== null
-        ? evaluateEvent(diagramState, activeHoverEventName)
-        : null;
-      const hoveredActualDestination = hoveredEvaluation && hoveredEvaluation.kind === 'enabled'
-        ? hoveredEvaluation.to
-        : null;
-      const hoveredStateVisual = new Map();
-      const hoveredEventDestinationStates = new Set();
-      const setStateVisual = (stateName, visual) => {
-        const existing = hoveredStateVisual.get(stateName);
-        if (!existing) {
-          hoveredStateVisual.set(stateName, visual);
-          return;
-        }
-
-        const rank = {
-          actual: 3,
-          alternate: 2,
-          blocked: 2
-        };
-
-        if ((rank[visual] ?? 0) >= (rank[existing] ?? 0)) {
-          hoveredStateVisual.set(stateName, visual);
-        }
-      };
-
-      if (!isAnimationPhase) {
-        Object.entries(eventEvaluations).forEach(([eventName, evaluation]) => {
-          const family = transitions
-            .filter((transition) => transition.from === diagramState && transition.event === eventName);
-
-          if (evaluation.kind === 'enabled' && evaluation.to) {
-            family.forEach((transition) => {
-              setStateVisual(transition.to, transition.to === evaluation.to ? 'actual' : 'alternate');
-            });
-          } else if (evaluation.kind === 'blocked') {
-            family.forEach((transition) => {
-              setStateVisual(transition.to, 'blocked');
-            });
-          }
-        });
+      if (mermaidText === lastRenderedMermaidText && diagramContainer.querySelector('svg')) {
+        updateDiagramHighlights();
+        return;
       }
 
-      if (!isAnimationPhase && activeHoverEventName !== null) {
-        const hoveredEvaluation = evaluateEvent(diagramState, activeHoverEventName);
-        const hoveredFamily = transitions
-          .filter((transition) => transition.from === diagramState && transition.event === activeHoverEventName);
+      const id = 'mermaid-diagram-' + Date.now();
+      try {
+        const { svg } = await mermaid.render(id, mermaidText);
+        diagramContainer.innerHTML = svg;
+        lastRenderedMermaidText = mermaidText;
+        updateDiagramHighlights();
+      } catch (err) {
+        diagramContainer.innerHTML = `<pre style="color:var(--err)">${String(err.message ?? err)}</pre>`;
+      }
+    }
 
-        hoveredFamily.forEach((transition) => {
-          hoveredEventDestinationStates.add(transition.to);
-        });
-
-        if (hoveredEvaluation.kind === 'enabled' && hoveredEvaluation.to) {
-          hoveredFamily.forEach((transition) => {
-            setStateVisual(transition.to, transition.to === hoveredEvaluation.to ? 'actual' : 'alternate');
-          });
-        } else if (hoveredEvaluation.kind === 'blocked') {
-          hoveredFamily.forEach((transition) => {
-            setStateVisual(transition.to, 'blocked');
-          });
-        }
+    function updateDiagramHighlights() {
+      const svgEl = diagramContainer.querySelector('svg');
+      if (!svgEl) {
+        return;
       }
 
-      const edgeSegments = transitions.map((t, index) => {
-        const from = statePositions[t.from];
-        const to = statePositions[t.to];
-        const visual = getEdgeVisual(t, index, selectedTransition, selectedEventName, eventEvaluations);
-
-        const pathD = buildEdgePath(t, from, to, index);
-        return {
-          index,
-          transition: t,
-          pathD,
-          visual,
-          svg: `<path class="diagram-edge" data-index="${index}" d="${pathD}" fill="none" stroke="${visual.stroke}" stroke-width="${visual.width}" stroke-linecap="round" stroke-linejoin="round" marker-end="${visual.marker}" stroke-dasharray="${visual.dash}" opacity="${visual.opacity}"></path>`
-        };
+      // Build a map of label text → node element
+      // Mermaid v2 state nodes: <g class="node statediagram-state"> with <span class="nodeLabel">
+      const nodesByLabel = new Map();
+      svgEl.querySelectorAll('g.node').forEach((node) => {
+        const label = node.querySelector('.nodeLabel');
+        if (label) {
+          nodesByLabel.set(label.textContent.trim(), node);
+        }
       });
-      const laneBiasByIndex = buildParallelLaneBiasByIndex(edgeSegments);
 
-      const edgeSvg = edgeSegments.map((segment) => segment.svg).join('');
+      // Clear all highlight classes
+      svgEl.querySelectorAll('.active-state').forEach((el) => el.classList.remove('active-state'));
+      svgEl.querySelectorAll('.destination-state').forEach((el) => el.classList.remove('destination-state'));
+      svgEl.querySelectorAll('.highlighted-edge').forEach((el) => el.classList.remove('highlighted-edge'));
+      svgEl.querySelectorAll('.muted-edge').forEach((el) => el.classList.remove('muted-edge'));
 
-      const annotationItems = edgeSegments
-        .map((segment) => {
-          const { transition, index, pathD, visual } = segment;
-          const annotation = getEdgeAnnotation(
-            transition,
-            pathD,
-            selectedEventName,
-            eventEvaluations,
-            laneBiasByIndex.get(index) ?? 0
-          );
-          if (!annotation) {
-            return null;
-          }
+      // Highlight current state
+      if (currentState && nodesByLabel.has(currentState)) {
+        nodesByLabel.get(currentState).classList.add('active-state');
+      }
 
-          const isCurrentStateEvent = transition.from === diagramState && eventEvaluations[transition.event]?.kind !== 'undefined';
-          const isHoveredEvent = activeHoverEventName !== null && transition.event === activeHoverEventName && transition.from === diagramState;
-          const annotationOpacity = isCurrentStateEvent
-            ? activeHoverEventName === null
-              ? 0.62
-              : isHoveredEvent
-                ? 1
-                : 0.2
-            : Math.max(visual.opacity, 0.9);
+      // Determine the hovered/selected event name
+      const selectedEvent = getSelectedEventName();
+      if (!selectedEvent) {
+        return;
+      }
 
-          return {
-            segment,
-            transition,
-            annotation,
-            visual,
-            index,
-            opacity: annotationOpacity,
-            chipWidth: annotation.event.length * 7 + 16
-          };
-        })
-        .filter((value) => value !== null);
-
-      const annotationYByIndex = deconflictAnnotationYs(
-        annotationItems.map((item) => ({
-          index: item.index,
-          x: item.annotation.position.x,
-          y: item.annotation.position.y - 8,
-          width: item.chipWidth
-        }))
+      // Find destination states for this event from the current state
+      const destinationStates = new Set(
+        transitions
+          .filter((t) => t.from === currentState && t.event === selectedEvent)
+          .map((t) => t.to)
       );
 
-      const annotationSvg = annotationItems.map((item) => {
-        const chipY = annotationYByIndex.get(item.index) ?? (item.annotation.position.y - 8);
-        const chipHeight = 16;
-        const textY = chipY + chipHeight / 2;
-        const guardX = item.annotation.position.x;
-        const guardY = chipY + chipHeight + 10;
+      // Highlight destination state nodes
+      for (const dest of destinationStates) {
+        if (dest !== currentState && nodesByLabel.has(dest)) {
+          nodesByLabel.get(dest).classList.add('destination-state');
+        }
+      }
 
-        return `
-          <g class="edge-annotation clickable" data-index="${item.index}" opacity="${item.opacity}">
-            <rect class="edge-chip" x="${item.annotation.position.x - item.chipWidth / 2}" y="${chipY}" width="${item.chipWidth}" height="${chipHeight}" fill="rgba(30,30,30,0.88)" stroke="${item.visual.stroke}" stroke-width="1.1"></rect>
-            <text class="edge-label" x="${item.annotation.position.x}" y="${textY}" fill="${item.visual.stroke}">${item.annotation.event}</text>
-            ${item.annotation.guard ? `<line x1="${item.annotation.position.x}" y1="${chipY + chipHeight}" x2="${item.annotation.position.x}" y2="${guardY - 6}" stroke="${item.visual.stroke}" stroke-width="1" opacity="0.9"></line><text class="edge-guard" x="${guardX}" y="${guardY}" fill="${item.visual.stroke}">[${item.annotation.guard}]</text>` : ''}
-          </g>
-        `;
-      }).join('');
+      // Edge paths and edge labels are in SEPARATE containers in Mermaid:
+      //   <g class="edgePaths"> → <g class="transition"> (path lines)
+      //   <g class="edgeLabels"> → <g class="edgeLabel"> (label text)
+      // They correspond 1:1 by child index.
+      const edgePathsContainer = svgEl.querySelector('g.edgePaths');
+      const edgeLabelsContainer = svgEl.querySelector('g.edgeLabels');
+      if (!edgePathsContainer || !edgeLabelsContainer) {
+        return;
+      }
 
-      const nodeSvg = Object.entries(statePositions).map(([name, pos]) => {
-        const isActive = name === diagramState;
-        const hoveredVisual = hoveredStateVisual.get(name);
-        const isDestinationVisual = !isActive && (hoveredVisual === 'actual' || hoveredVisual === 'alternate' || hoveredVisual === 'blocked');
-        const isActualDestination = !isActive && hoveredVisual === 'actual';
-        const isHoveredEventDestination = hoveredEventDestinationStates.has(name);
-        const destinationOutlineOpacity = isDestinationVisual
-          ? activeHoverEventName === null
-            ? 0.58
-            : isActualDestination && isHoveredEventDestination
-              ? 1
-              : isHoveredEventDestination
-              ? 0.72
-              : 0.18
-          : 1;
-        const destinationTextOpacity = isDestinationVisual
-          ? activeHoverEventName === null
-            ? 0.66
-            : isActualDestination && isHoveredEventDestination
-              ? 1
-              : isHoveredEventDestination
-              ? 0.74
-              : 0.24
-          : 1;
-        const stroke = isActive
-          ? 'var(--ok)'
-          : hoveredVisual === 'actual'
-            ? 'var(--ok)'
-            : hoveredVisual === 'alternate' || hoveredVisual === 'blocked'
-              ? 'var(--edge-error)'
-            : 'var(--border)';
-        const glow = isActive
-          ? 'filter="drop-shadow(0 0 5px rgba(31,255,122,.45))"'
-          : hoveredVisual === 'actual' && isHoveredEventDestination
-            ? 'filter="drop-shadow(0 0 5px rgba(31,255,122,.36))"'
-            : hoveredVisual === 'actual'
-              ? 'filter="drop-shadow(0 0 3px rgba(31,255,122,.22))"'
-            : hoveredVisual === 'alternate' || hoveredVisual === 'blocked'
-              ? 'filter="drop-shadow(0 0 3px rgba(255,42,87,.2))"'
-            : '';
-        const fill = isActive
-          ? 'var(--ok)'
-          : 'var(--node)';
-        const textFill = isActive
-          ? 'var(--bg)'
-          : isDestinationVisual
-            ? stroke
-            : 'var(--border)';
-        const fontWeight = isActive ? 700 : isActualDestination && isHoveredEventDestination ? 700 : isDestinationVisual ? 600 : 500;
-        return `
-          <g ${glow}>
-            <rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="${fill}" stroke="${stroke}" stroke-opacity="${destinationOutlineOpacity}" stroke-width="${isActive ? 2.6 : isDestinationVisual ? 2.0 : 1.6}"></rect>
-            <text x="${pos.x}" y="${pos.y + 4}" text-anchor="middle" fill="${textFill}" fill-opacity="${destinationTextOpacity}" font-size="13" font-weight="${fontWeight}">${name}</text>
-          </g>
-        `;
-      }).join('');
+      const transitionEls = Array.from(edgePathsContainer.children);
+      const labelEls = Array.from(edgeLabelsContainer.children);
+      const edgeCount = Math.min(transitionEls.length, labelEls.length);
 
-      diagram.innerHTML = `${defs}${edgeSvg}${annotationSvg}${nodeSvg}`;
+      for (let i = 0; i < edgeCount; i++) {
+        const labelEl = labelEls[i];
+        const transitionEl = transitionEls[i];
+        const labelText = (labelEl.textContent || '').trim();
+
+        // An edge label may be "Event1 / Event2" (deduped), check if selectedEvent is one of them
+        const labelEvents = labelText.split(/\s*\/\s*/).map((s) => s.trim());
+
+        if (labelEvents.includes(selectedEvent)) {
+          transitionEl.classList.add('highlighted-edge');
+          labelEl.classList.add('highlighted-edge');
+        } else if (labelText) {
+          transitionEl.classList.add('muted-edge');
+          labelEl.classList.add('muted-edge');
+        }
+      }
     }
 
     function renderEventBar() {
@@ -2447,12 +1462,12 @@
           }
 
           hoveredEventName = eventName;
-          drawDiagram();
+          updateDiagramHighlights();
         });
 
         button.addEventListener('mouseleave', () => {
           hoveredEventName = null;
-          drawDiagram();
+          updateDiagramHighlights();
         });
 
         button.addEventListener('click', () => {
@@ -2479,7 +1494,7 @@
           }
 
           hoveredEventName = 'Emergency';
-          drawDiagram();
+          updateDiagramHighlights();
         });
 
         input.addEventListener('click', (event) => {
@@ -2492,7 +1507,7 @@
           const activeElement = document.activeElement;
           if (!emergencyEntry || !activeElement || !emergencyEntry.contains(activeElement)) {
             hoveredEventName = null;
-            drawDiagram();
+            updateDiagramHighlights();
           }
         });
 
@@ -2512,7 +1527,7 @@
             applyEventReasonState(emergencyEntry, emergencyEvaluation);
           }
 
-          drawDiagram();
+          updateDiagramHighlights();
         });
       });
 
@@ -2640,7 +1655,7 @@
       syncSelectionToCurrentState();
 
       headerState.textContent = ` · Current: ${currentState}`;
-      drawDiagram();
+      void drawDiagram();
       renderEventBar();
 
       renderData();
@@ -2701,16 +1716,6 @@
         }, 140);
 
         void reloadMockup();
-      });
-    }
-
-    if (renderModeSelect) {
-      renderModeSelect.value = renderLayoutMode;
-      renderModeSelect.addEventListener('change', () => {
-        const selected = String(renderModeSelect.value || 'default').toLowerCase();
-        renderLayoutMode = selected === 'optimized' ? 'optimized' : 'default';
-        applyRenderLayoutMode();
-        drawDiagram();
       });
     }
 
