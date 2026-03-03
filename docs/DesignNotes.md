@@ -20,7 +20,8 @@ Implementation focus is the DSL runtime path:
 - Preview UI is loaded from `tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html` and uses the mock-style visual shell with a live runtime bridge.
 - The reference mock file remains at `tools/StateMachine.Dsl.VsCode/mockups/interactive-inspector-mockup.html`; runtime panel behavior is driven by the webview copy.
 - Runtime diagram layout uses a single unified ELK layered layout computed in the extension host and attached as `snapshot.layout` (`nodes` with per-node `width`/`height`, `edges` with ELK-routed bend-point arrays, `width`, `height`).
-- ELK options are state-machine-tuned: spline edge routing (`elk.edgeRouting: SPLINES`), feedback edges for cycle handling, inside self-loops, inline edge labels, network-simplex node placement, and DSL declaration-order node/port ordering.
+- ELK options are state-machine-tuned: top-down direction (`elk.direction: DOWN`), spline edge routing (`elk.edgeRouting: SPLINES`), greedy cycle breaking, feedback edges for cycle handling, inside self-loops, inline edge labels, network-simplex node placement, and DSL declaration-order node/port ordering.
+- Reject and no-transition terminal rules are excluded from the ELK layout graph and webview diagram edges; only real state-change transitions produce edges. Terminal rules remain in the transitions array for event discovery and evaluation logic.
 - Node dimensions are computed dynamically from state name length (8.5px char width, 36px horizontal padding, 80px minimum width, 40px fixed height) and stored in each `LayoutNode`.
 - No post-processing passes are applied (no stabilization, deconfliction, ingress bands, or normalization); ELK handles crossing minimization, self-loops, backward edges, and parallel edges directly.
 - Runtime webview consumes ELK geometry (node positions/sizes and edge bend-point arrays) and converts edge points to smooth Catmull-Rom → cubic Bézier spline paths.

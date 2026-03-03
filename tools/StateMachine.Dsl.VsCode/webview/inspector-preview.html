@@ -974,7 +974,8 @@
         ? snapshotTransitions.map((transition) => ({
           from: String(transition.from ?? transition.From ?? ''),
           event: String(transition.event ?? transition.Event ?? ''),
-          to: String(transition.to ?? transition.To ?? '')
+          to: String(transition.to ?? transition.To ?? ''),
+          kind: String(transition.kind ?? transition.Kind ?? 'transition')
         }))
         : [];
 
@@ -1911,11 +1912,14 @@
           : new Set();
 
         const edgeSegments = transitions.map((transition, index) => {
+          if (transition.kind !== 'transition') {
+            return null;
+          }
           const from = statePositions[transition.from];
           const to = statePositions[transition.to];
           const pathD = buildEdgePath(transition, from, to, index);
           return { index, transition, pathD };
-        });
+        }).filter(Boolean);
         const laneBiasByIndex = buildParallelLaneBiasByIndex(edgeSegments);
 
         const getAnimatedFromEdgeVisual = (segment) => {
@@ -2239,6 +2243,9 @@
       }
 
       const edgeSegments = transitions.map((t, index) => {
+        if (t.kind !== 'transition') {
+          return null;
+        }
         const from = statePositions[t.from];
         const to = statePositions[t.to];
         const visual = getEdgeVisual(t, index, selectedTransition, selectedEventName, eventEvaluations);
@@ -2251,7 +2258,7 @@
           visual,
           svg: `<path class="diagram-edge" data-index="${index}" d="${pathD}" fill="none" stroke="${visual.stroke}" stroke-width="${visual.width}" stroke-linecap="round" stroke-linejoin="round" marker-end="${visual.marker}" stroke-dasharray="${visual.dash}" opacity="${visual.opacity}"></path>`
         };
-      });
+      }).filter(Boolean);
       const laneBiasByIndex = buildParallelLaneBiasByIndex(edgeSegments);
 
       const edgeSvg = edgeSegments.map((segment) => segment.svg).join('');

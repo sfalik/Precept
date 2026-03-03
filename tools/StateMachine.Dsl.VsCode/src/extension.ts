@@ -64,6 +64,7 @@ interface TransitionLike {
   from: string;
   to: string;
   event: string;
+  kind: string;
 }
 
 type PreviewLayoutMode = "spacious" | "balanced" | "compact" | "orthogonal" | "top-down";
@@ -357,11 +358,12 @@ function extractSnapshotTransitions(snapshot: Record<string, unknown>): Transiti
       const from = String(value.from ?? value.From ?? "");
       const to = String(value.to ?? value.To ?? "");
       const event = String(value.event ?? value.Event ?? "");
+      const kind = String(value.kind ?? value.Kind ?? "transition");
       if (!from || !to) {
         return null;
       }
 
-      return { from, to, event };
+      return { from, to, event, kind };
     })
     .filter((value): value is TransitionLike => value !== null);
 }
@@ -379,9 +381,9 @@ function getPreviewLayoutMode(): PreviewLayoutMode {
 }
 
 function getElkLayoutOptions(mode: PreviewLayoutMode): Record<string, string> {
-  const direction = mode === "top-down" ? "DOWN" : "RIGHT";
+  const direction = mode === "top-down" ? "DOWN" : "DOWN";
   const nodeSpacing = mode === "compact" ? "42" : mode === "spacious" ? "80" : "55";
-  const layerSpacing = mode === "compact" ? "70" : mode === "spacious" ? "140" : "90";
+  const layerSpacing = mode === "compact" ? "80" : mode === "spacious" ? "160" : "110";
 
   return {
     "elk.algorithm": "layered",
@@ -395,7 +397,7 @@ function getElkLayoutOptions(mode: PreviewLayoutMode): Record<string, string> {
     "elk.layered.mergeEdges": "false",
     "elk.layered.feedbackEdges": "true",
     "elk.separateConnectedComponents": "false",
-    "elk.layered.cycleBreaking.strategy": "INTERACTIVE",
+    "elk.layered.cycleBreaking.strategy": "GREEDY",
     "elk.insideSelfLoops.activate": "true",
     "elk.edgeLabels.inline": "true",
     "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES"
@@ -429,13 +431,16 @@ async function computeLayoutForSnapshot(snapshot: Record<string, unknown>): Prom
       width: nodeSizes.get(state)?.width ?? 80,
       height: nodeSizes.get(state)?.height ?? 40
     })),
-    edges: transitions.map((transition, index) => ({
-      id: `transition-${index}`,
+    edges: transitions
+      .map((transition, originalIndex) => ({ transition, originalIndex }))
+      .filter(({ transition }) => transition.kind === "transition")
+      .map(({ transition, originalIndex }) => ({
+      id: `transition-${originalIndex}`,
       sources: [transition.from],
       targets: [transition.to],
       labels: transition.event
         ? [{
-          id: `label-${index}`,
+          id: `label-${originalIndex}`,
           text: transition.event,
           width: Math.max(32, transition.event.length * 7),
           height: 12
