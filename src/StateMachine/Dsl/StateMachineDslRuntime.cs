@@ -328,11 +328,11 @@ public sealed class DslWorkflowDefinition
             return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
 
         var updatedData = new Dictionary<string, object?>(instance.InstanceData, StringComparer.Ordinal);
-        if (!string.IsNullOrWhiteSpace(resolution.Transition.DataAssignmentKey) &&
-            !string.IsNullOrWhiteSpace(resolution.Transition.DataAssignmentExpression))
+        var assignment = resolution.Transition.TransformAssignments.LastOrDefault();
+        if (assignment is not null)
         {
             if (!TryResolveAssignmentValue(
-                resolution.Transition.DataAssignmentExpression,
+                assignment.ExpressionText,
                 instance.InstanceData,
                 eventName,
                 eventArguments ?? EmptyInstanceData.Instance,
@@ -342,10 +342,10 @@ public sealed class DslWorkflowDefinition
                 return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { assignmentError! });
             }
 
-            if (!TryValidateAssignedValue(resolution.Transition.DataAssignmentKey!, assignedValue, out var contractError))
+            if (!TryValidateAssignedValue(assignment.Key, assignedValue, out var contractError))
                 return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { contractError! });
 
-            updatedData[resolution.Transition.DataAssignmentKey!] = assignedValue;
+            updatedData[assignment.Key] = assignedValue;
         }
 
         var updated = instance with

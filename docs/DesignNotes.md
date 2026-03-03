@@ -104,6 +104,8 @@ Status:
 
 - The following choices are design-locked for the next transform/expression expansion.
 - These semantics are not fully implemented yet; current runtime behavior remains the source of truth until implementation lands.
+- Phase 1 parser/model foundation is implemented: transform expressions parse into a DSL expression AST and transitions retain ordered transform-assignment lists.
+- Runtime atomic multi-transform execution is still pending; current fire-path assignment behavior remains single-apply for now.
 
 Locked choices:
 
@@ -244,8 +246,8 @@ Validation constraints:
 
 ## Test Status
 
-- Active tests: `test/StateMachine.Tests/DslWorkflowTests.cs`
-- Guard test coverage includes: boolean guards, comparisons, string/null equality, numeric runtime type coercion, unsupported-expression rejection, and reason aggregation.
+- Active tests include `test/StateMachine.Tests/DslWorkflowTests.cs`, `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, and `test/StateMachine.Tests/DslTransformParsingTests.cs`.
+- Guard/expression test coverage includes: boolean guards, comparisons, string/null equality, numeric runtime type coercion, unsupported-expression rejection, reason aggregation, expression AST parsing precedence/invalid syntax diagnostics, lexer edge cases, and transform-branch parsing constraints.
 
 ## Next Steps
 

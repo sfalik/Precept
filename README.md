@@ -434,8 +434,10 @@ Implemented now:
 - Instance-first runtime APIs (`CreateInstance`, `Inspect`, `Fire`)
 - Guard evaluation with rejection reasons
 - Transition data assignments (`transform <Key> = ...`) on accepted `fire`
+- Transform parser/model foundation for B-v1: transitions now carry ordered transform-assignment lists and transform expressions parse into an expression AST.
 - CLI REPL + script execution
 - Active test coverage in `test/StateMachine.Tests/DslWorkflowTests.cs` and `test/StateMachine.Tests/CliRenderingTests.cs`
+- Active parser/runtime coverage also includes expression AST parsing/edge-case diagnostics and transform parsing coverage in `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, and `test/StateMachine.Tests/DslTransformParsingTests.cs`.
 - Language server MVP in `tools/StateMachine.Dsl.LanguageServer` (stdio diagnostics + completion)
 - Language server MVP in `tools/StateMachine.Dsl.LanguageServer` (stdio diagnostics + completion + semantic tokens)
 - VS Code client MVP in `tools/StateMachine.Dsl.VsCode` (auto-start for `.sm` files)
@@ -449,6 +451,11 @@ Pending:
 ## Transform/Expression Roadmap (Design-Locked, Pending)
 
 The following decisions are locked for the next transform/expression iteration and are documented here for clarity. Current runtime behavior remains the source of truth until this work is implemented.
+
+Current progress:
+
+- Phase 1 (parser/model foundation) is implemented.
+- Runtime still applies only one assignment during fire-path data update (current behavior uses the last transform assignment for backward compatibility) until atomic multi-transform execution lands.
 
 - Atomic batch per selected branch: all transform assignments in a branch commit together or none commit.
 - Multiple `transform` lines per branch are supported; each `transform` remains a single assignment.

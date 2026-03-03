@@ -27,13 +27,29 @@ public enum DslScalarType
     Null
 }
 
+public abstract record DslExpression;
+
+public sealed record DslLiteralExpression(object? Value) : DslExpression;
+
+public sealed record DslIdentifierExpression(string Name, string? Member = null) : DslExpression;
+
+public sealed record DslUnaryExpression(string Operator, DslExpression Operand) : DslExpression;
+
+public sealed record DslBinaryExpression(string Operator, DslExpression Left, DslExpression Right) : DslExpression;
+
+public sealed record DslParenthesizedExpression(DslExpression Inner) : DslExpression;
+
+public sealed record DslTransformAssignment(
+    string Key,
+    string ExpressionText,
+    DslExpression Expression);
+
 public sealed record DslTransition(
     string FromState,
     string ToState,
     string EventName,
     string? GuardExpression,
-    string? DataAssignmentKey,
-    string? DataAssignmentExpression,
+    IReadOnlyList<DslTransformAssignment> TransformAssignments,
     int Order = 0);
 
 public sealed record DslTerminalRule(

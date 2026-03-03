@@ -229,8 +229,7 @@ public static class StateMachineDslParser
         bool hasIfChain = false;
         bool hasElseBranch = false;
 
-        string? pendingSetKey = null;
-        string? pendingSetExpr = null;
+        var pendingTransforms = new List<DslTransformAssignment>();
 
         index++;
         while (index < lines.Length)
@@ -324,8 +323,7 @@ public static class StateMachineDslParser
             var transformAtBlock = TransformRegex.Match(line);
             if (transformAtBlock.Success)
             {
-                pendingSetKey = NormalizeDataAssignmentKey(transformAtBlock.Groups["setKey"].Value.Trim());
-                pendingSetExpr = transformAtBlock.Groups["setExpr"].Value.Trim();
+                pendingTransforms.Add(ParseTransformAssignment(transformAtBlock, index + 1));
                 index++;
                 continue;
             }
@@ -341,14 +339,12 @@ public static class StateMachineDslParser
                         targetState,
                         eventName,
                         null,
-                        pendingSetKey,
-                        pendingSetExpr,
+                        pendingTransforms.ToArray(),
                         branchOrder));
                 }
                 branchOrder++;
 
-                pendingSetKey = null;
-                pendingSetExpr = null;
+                pendingTransforms.Clear();
                 reachedTerminalStatement = true;
                 index++;
                 continue;
@@ -381,7 +377,7 @@ public static class StateMachineDslParser
             throw new InvalidOperationException($"Line {index + 1}: unrecognized statement '{line}' inside from/on block.");
         }
 
-        if (pendingSetKey is not null)
+        if (pendingTransforms.Count > 0)
             throw new InvalidOperationException($"Line {index}: transform requires a following transition.");
 
         if (!reachedTerminalStatement)
@@ -405,8 +401,7 @@ public static class StateMachineDslParser
         ref int branchOrder,
         string guardExpression)
     {
-        string? branchSetKey = null;
-        string? branchSetExpr = null;
+        var branchTransforms = new List<DslTransformAssignment>();
         string? branchTargetState = null;
         bool hasNoTransitionOutcome = false;
 
@@ -428,8 +423,7 @@ public static class StateMachineDslParser
             var transformMatch = TransformRegex.Match(nestedLine);
             if (transformMatch.Success)
             {
-                branchSetKey = NormalizeDataAssignmentKey(transformMatch.Groups["setKey"].Value.Trim());
-                branchSetExpr = transformMatch.Groups["setExpr"].Value.Trim();
+                branchTransforms.Add(ParseTransformAssignment(transformMatch, index + 1));
                 index++;
                 continue;
             }
@@ -464,7 +458,7 @@ public static class StateMachineDslParser
         if (string.IsNullOrWhiteSpace(branchTargetState) && !hasNoTransitionOutcome)
             throw new InvalidOperationException($"Line {index}: if/else if branch requires 'transition <State>' or 'no transition'.");
 
-        if (hasNoTransitionOutcome && branchSetKey is not null)
+        if (hasNoTransitionOutcome && branchTransforms.Count > 0)
             throw new InvalidOperationException($"Line {index}: transform requires a transition outcome and cannot be used with 'no transition'.");
 
         if (hasNoTransitionOutcome)
@@ -483,8 +477,7 @@ public static class StateMachineDslParser
                 branchTargetState!,
                 eventName,
                 guardExpression,
-                branchSetKey,
-                branchSetExpr,
+                branchTransforms.ToArray(),
                 branchOrder));
         }
 
@@ -501,8 +494,7 @@ public static class StateMachineDslParser
         ICollection<DslTerminalRule> blockTerminalRules,
         ref int branchOrder)
     {
-        string? branchSetKey = null;
-        string? branchSetExpr = null;
+        var branchTransforms = new List<DslTransformAssignment>();
         string? branchTargetState = null;
         DslTerminalKind? branchTerminalKind = null;
         string? branchTerminalReason = null;
@@ -529,8 +521,7 @@ public static class StateMachineDslParser
             var transformMatch = TransformRegex.Match(nestedLine);
             if (transformMatch.Success)
             {
-                branchSetKey = NormalizeDataAssignmentKey(transformMatch.Groups["setKey"].Value.Trim());
-                branchSetExpr = transformMatch.Groups["setExpr"].Value.Trim();
+                branchTransforms.Add(ParseTransformAssignment(transformMatch, index + 1));
                 index++;
                 continue;
             }
@@ -578,8 +569,7 @@ public static class StateMachineDslParser
                     branchTargetState,
                     eventName,
                     null,
-                    branchSetKey,
-                    branchSetExpr,
+                    branchTransforms.ToArray(),
                     branchOrder));
             }
 
@@ -656,6 +646,22 @@ public static class StateMachineDslParser
     private static string NormalizeDataAssignmentKey(string setKey)
         => setKey;
 
+    private static DslTransformAssignment ParseTransformAssignment(Match transformMatch, int lineNumber)
+    {
+        var key = NormalizeDataAssignmentKey(transformMatch.Groups["setKey"].Value.Trim());
+        var expressionText = transformMatch.Groups["setExpr"].Value.Trim();
+
+        try
+        {
+            var expression = DslExpressionParser.Parse(expressionText);
+            return new DslTransformAssignment(key, expressionText, expression);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new InvalidOperationException($"Line {lineNumber}: invalid transform expression '{expressionText}'. {ex.Message}");
+        }
+    }
+
     private static void ValidateReferences(
         IReadOnlyCollection<string> states,
         IReadOnlyCollection<DslEvent> events,
@@ -677,11 +683,14 @@ public static class StateMachineDslParser
             if (!eventSet.Contains(transition.EventName))
                 throw new InvalidOperationException($"Transition references unknown event '{transition.EventName}'.");
 
-            if (!string.IsNullOrWhiteSpace(transition.DataAssignmentKey) && dataFields.Count > 0)
+            foreach (var assignment in transition.TransformAssignments)
             {
-                var knownDataField = dataFields.Any(f => string.Equals(f.Name, transition.DataAssignmentKey, StringComparison.Ordinal));
+                if (dataFields.Count == 0)
+                    continue;
+
+                var knownDataField = dataFields.Any(f => string.Equals(f.Name, assignment.Key, StringComparison.Ordinal));
                 if (!knownDataField)
-                    throw new InvalidOperationException($"Transition '{transition.FromState} -> {transition.ToState}' on '{transition.EventName}' assigns unknown data field '{transition.DataAssignmentKey}'.");
+                    throw new InvalidOperationException($"Transition '{transition.FromState} -> {transition.ToState}' on '{transition.EventName}' assigns unknown data field '{assignment.Key}'.");
             }
         }
 

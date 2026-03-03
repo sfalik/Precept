@@ -789,10 +789,35 @@ public class DslWorkflowTests
 
         machine.Transitions.Should().ContainSingle();
         machine.Transitions[0].GuardExpression.Should().Be("CarsWaiting > 0");
-        machine.Transitions[0].DataAssignmentKey.Should().Be("CarsWaiting");
-        machine.Transitions[0].DataAssignmentExpression.Should().Be("0");
+        machine.Transitions[0].TransformAssignments.Should().ContainSingle();
+        machine.Transitions[0].TransformAssignments[0].Key.Should().Be("CarsWaiting");
+        machine.Transitions[0].TransformAssignments[0].ExpressionText.Should().Be("0");
         machine.TerminalRules.Should().ContainSingle();
         machine.TerminalRules[0].Reason.Should().Be("Cars waiting required");
+    }
+
+    [Fact]
+    public void Parse_FromOnBlock_WithMultipleTransforms_PreservesAssignmentOrder()
+    {
+        const string dsl = """
+            machine TrafficLight
+            state Red
+            state Green
+            event Advance
+            from Red on Advance
+                transform CarsWaiting = CarsWaiting + 1
+                transform LastCarsWaiting = CarsWaiting
+                transition Green
+            """;
+
+        var machine = StateMachineDslParser.Parse(dsl);
+
+        machine.Transitions.Should().ContainSingle();
+        machine.Transitions[0].TransformAssignments.Should().HaveCount(2);
+        machine.Transitions[0].TransformAssignments[0].Key.Should().Be("CarsWaiting");
+        machine.Transitions[0].TransformAssignments[0].ExpressionText.Should().Be("CarsWaiting + 1");
+        machine.Transitions[0].TransformAssignments[1].Key.Should().Be("LastCarsWaiting");
+        machine.Transitions[0].TransformAssignments[1].ExpressionText.Should().Be("CarsWaiting");
     }
 
     [Fact]
