@@ -1,16 +1,13 @@
-machine test
+machine Test
 
-number counter = 0
+state Idle initial
+state Active
 
-state start initial
-state end
+event Start
+event Stop
 
-event test
-event reset
+from Idle on Start
+    transition Active
 
-from start on test
-    set counter = counter + 1
-    transition end
-
-from end on reset
-    transition start 
+from Active on Stop
+    transition Idle

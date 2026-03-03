@@ -15,7 +15,7 @@ StateMachine is a .NET DSL-driven state/workflow engine focused on deterministic
 - DSL parser/compiler/runtime is implemented and used by the language server for editor diagnostics and preview execution.
 - VS Code extension is implemented with automatic `.sm` language-client activation plus inspector preview panels per file.
 - Inspector preview now exchanges live `snapshot`/`fire`/`reset`/`inspect` requests through the language server (`stateMachine/preview/request`) instead of only local mock data. The `inspect` action re-evaluates a single event with user-supplied arguments, enabling real-time guard feedback as the user types.
-- Inspector preview layout uses a single unified ELK layered layout with state-machine-tuned options (top-down direction, spline edge routing, greedy cycle breaking, feedback edges for cycles, inside self-loops, inline edge labels, DSL declaration-order node ordering), dynamic per-state node sizing, and responsive viewBox. Reject and no-transition terminal rules are excluded from the diagram graph.
+- Inspector preview layout uses a single unified ELK layered layout with state-machine-tuned options (top-down direction, spline edge routing, model-order cycle breaking, feedback edges for cycles, inside self-loops, inline edge labels, DSL declaration-order node ordering), dynamic per-state node sizing, and responsive viewBox. Reject and no-transition terminal rules are excluded from the diagram graph.
 - CLI host has been removed in this branch (hard cut); editor + language server are the active runtime surfaces.
 
 ## Quick Start (2 minutes)
@@ -405,16 +405,16 @@ Troubleshooting completion/diagnostics:
 
 ### Inspector Preview UI (Current)
 
-- Runtime preview uses `tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html`, which now hosts the mock-style visual shell while sourcing runtime state from language-server snapshots.
+- Runtime preview uses `tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html`, which is the production webview sourcing all state from language-server snapshots. The file contains no hardcoded demo data and requires the VS Code extension host to function.
 - Mock reference remains intact at `tools/StateMachine.Dsl.VsCode/mockups/interactive-inspector-mockup.html` and is not used as the runtime source file.
 - State graph/events/data visuals follow the mock-style presentation while `snapshot`/`fire`/`reset`/`replay` requests execute against the real `.sm` runtime session.
 - Runtime layout uses a single unified ELK layered graph computed in the extension host and attached as `snapshot.layout` (`nodes` with per-node `width`/`height`, `edges` with ELK-routed bend-point arrays, `width`, `height`).
-- ELK options are state-machine-tuned: top-down direction, spline edge routing, greedy cycle breaking, feedback edges for cycle handling, inside self-loops, inline edge labels, network-simplex node placement, and DSL declaration-order node/port ordering.
+- ELK options are state-machine-tuned: top-down direction, spline edge routing, model-order cycle breaking, feedback edges for cycle handling, inside self-loops, inline edge labels, network-simplex node placement, and DSL declaration-order node/port ordering.
 - Reject and no-transition terminal rules are excluded from the layout graph and diagram edges; only real state-change transitions are rendered.
 - Node dimensions are computed dynamically from state name length (8.5px char width, 36px padding, 80px minimum width, 40px fixed height).
 - Edge paths use Catmull-Rom to cubic Bézier spline conversion for smooth curves from ELK bend points.
 - Webview viewBox is set responsively from ELK-computed graph dimensions with 50px padding per side (minimum 600×300).
-- No post-processing passes (stabilization, deconfliction, ingress bands, normalization) are applied; ELK handles crossing minimization, self-loops, backward edges, and parallel edges directly.
+- If ELK layout data is missing or empty, the diagram shows an error message instead of attempting a fallback layout.
 - Supported runtime actions are `snapshot` (reload), `fire`, `reset`, and `replay` via `stateMachine/preview/request`.
 - `Reload` requests a fresh runtime snapshot from the current in-memory editor text.
 - Activity log lines are sourced from runtime responses (including replay messages and snapshot failures).
