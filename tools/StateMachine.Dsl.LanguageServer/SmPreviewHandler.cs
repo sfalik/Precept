@@ -202,7 +202,8 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         var transitions = session.Machine.Transitions
             .Select(t => new SmPreviewTransition(t.FromState, t.ToState, t.EventName, t.GuardExpression, "transition"))
             .Concat(session.Machine.TerminalRules
-                .Select(r => new SmPreviewTransition(r.FromState, r.Kind == DslTerminalKind.NoTransition ? r.FromState : r.FromState, r.EventName, r.GuardExpression, r.Kind.ToString().ToLowerInvariant())))
+                .Where(r => r.Kind != DslTerminalKind.Reject)
+                .Select(r => new SmPreviewTransition(r.FromState, r.FromState, r.EventName, r.GuardExpression, r.Kind.ToString().ToLowerInvariant())))
             .ToArray();
 
         var diagnostics = SmTextDocumentSyncHandler.SharedAnalyzer.GetDiagnostics(session.Uri)

@@ -32,6 +32,21 @@
             "problemMatcher": []
         },
         {
+            "label": "extension: reload window",
+            "type": "shell",
+            "command": "echo ${command:workbench.action.reloadWindow}",
+            "problemMatcher": []
+        },
+        {
+            "label": "extension: loop local install and reload",
+            "dependsOn": [
+                "extension: loop local install",
+                "extension: reload window"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": []
+        },
+        {
             "label": "extension: watch",
             "type": "shell",
             "command": "npm",

@@ -596,11 +596,6 @@
       <span id="header-state" class="status"> · Current: Red</span>
     </div>
     <div class="actions">
-      <label for="render-mode" class="muted">Layout</label>
-      <select id="render-mode" class="mode-select" aria-label="layout mode">
-        <option value="default" selected>Default</option>
-        <option value="optimized">Optimized</option>
-      </select>
       <button id="reload-btn" type="button">Reload</button>
     </div>
   </div>
@@ -667,7 +662,6 @@
     const dataList = document.getElementById('data-list');
     const eventBar = document.getElementById('event-bar');
     const reloadButton = document.getElementById('reload-btn');
-    const renderModeSelect = document.getElementById('render-mode');
     let selectedTransitionIndex = transitions.findIndex((t) => t.from === 'Red' && t.event === 'Advance' && t.to === 'FlashingGreen');
     let hoveredEventName = null;
     let rowFeedbackTimer = null;
@@ -682,161 +676,25 @@
     let reloadButtonFeedbackTimer = null;
     let currentEventStatuses = [];
     let transitionPaths = new Map();
-    let renderLayoutMode = 'default';
-    let defaultStatePositions = { ...statePositions };
-    let defaultTransitionPaths = new Map();
-    let optimizedStatePositions = { ...statePositions };
-    let optimizedTransitionPaths = new Map();
-    let defaultDiagramBounds = { width: 920, height: 430 };
-    let optimizedDiagramBounds = { width: 920, height: 430 };
+    let diagramBounds = { width: 920, height: 430 };
 
     const vscodeApi = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null;
     let previewRequestId = 1;
     const previewPendingRequests = new Map();
     let latestSnapshotSequence = 0;
 
-    function buildStatePositions(states) {
+    function buildFallbackPositions(states) {
       const safeStates = Array.isArray(states) && states.length > 0 ? states : ['State'];
-      const fallback = {};
-      const startX = 120;
-      const fallbackSpacing = 180;
-      safeStates.forEach((name, index) => {
-        fallback[name] = { x: startX + (index * fallbackSpacing), y: 80 };
-      });
-
-      if (transitions.length === 0) {
-        return fallback;
-      }
-
-      const orderIndex = new Map(safeStates.map((name, index) => [name, index]));
-      const outgoing = new Map();
-      const incoming = new Map();
-      safeStates.forEach((name) => {
-        outgoing.set(name, []);
-        incoming.set(name, []);
-      });
-
-      for (const transition of transitions) {
-        if (!transition || !outgoing.has(transition.from) || !incoming.has(transition.to)) {
-          continue;
-        }
-
-        outgoing.get(transition.from).push(transition.to);
-        incoming.get(transition.to).push(transition.from);
-      }
-
-      const currentRoot = safeStates.includes(currentState) ? currentState : safeStates[0];
-      const rankByState = new Map(safeStates.map((name) => [name, name === currentRoot ? 0 : Number.NEGATIVE_INFINITY]));
-
-      for (let pass = 0; pass < safeStates.length; pass += 1) {
-        for (const from of safeStates) {
-          const fromRank = rankByState.get(from);
-          if (!Number.isFinite(fromRank)) {
-            continue;
-          }
-
-          for (const to of outgoing.get(from) ?? []) {
-            const existing = rankByState.get(to) ?? Number.NEGATIVE_INFINITY;
-            if (fromRank + 1 > existing) {
-              rankByState.set(to, fromRank + 1);
-            }
-          }
-        }
-      }
-
-      for (const name of safeStates) {
-        if (!Number.isFinite(rankByState.get(name))) {
-          rankByState.set(name, 0);
-        }
-      }
-
-      const minRank = Math.min(...safeStates.map((name) => rankByState.get(name) ?? 0));
-      for (const name of safeStates) {
-        rankByState.set(name, (rankByState.get(name) ?? 0) - minRank);
-      }
-
-      const columns = new Map();
-      for (const name of safeStates) {
-        const rank = rankByState.get(name) ?? 0;
-        if (!columns.has(rank)) {
-          columns.set(rank, []);
-        }
-
-        columns.get(rank).push(name);
-      }
-
-      const orderedRanks = Array.from(columns.keys()).sort((left, right) => left - right);
-      for (const rank of orderedRanks) {
-        columns.get(rank).sort((left, right) => (orderIndex.get(left) ?? 0) - (orderIndex.get(right) ?? 0));
-      }
-
-      const barycenter = (stateName, neighbors) => {
-        const values = (neighbors.get(stateName) ?? [])
-          .map((neighbor) => columns.get(rankByState.get(neighbor) ?? 0)?.indexOf(neighbor) ?? -1)
-          .filter((value) => value >= 0);
-
-        if (values.length === 0) {
-          return Number.POSITIVE_INFINITY;
-        }
-
-        return values.reduce((sum, value) => sum + value, 0) / values.length;
-      };
-
-      for (let sweep = 0; sweep < 4; sweep += 1) {
-        for (let i = 1; i < orderedRanks.length; i += 1) {
-          const rank = orderedRanks[i];
-          const statesInRank = columns.get(rank) ?? [];
-          statesInRank.sort((left, right) => {
-            const leftB = barycenter(left, incoming);
-            const rightB = barycenter(right, incoming);
-            if (leftB !== rightB) {
-              return leftB - rightB;
-            }
-
-            return (orderIndex.get(left) ?? 0) - (orderIndex.get(right) ?? 0);
-          });
-        }
-
-        for (let i = orderedRanks.length - 2; i >= 0; i -= 1) {
-          const rank = orderedRanks[i];
-          const statesInRank = columns.get(rank) ?? [];
-          statesInRank.sort((left, right) => {
-            const leftB = barycenter(left, outgoing);
-            const rightB = barycenter(right, outgoing);
-            if (leftB !== rightB) {
-              return leftB - rightB;
-            }
-
-            return (orderIndex.get(left) ?? 0) - (orderIndex.get(right) ?? 0);
-          });
-        }
-      }
-
-      const marginX = 130;
-      const marginY = 70;
-      const xSpacing = 230;
-      const ySpacing = 90;
       const positions = {};
-
-      for (let columnIndex = 0; columnIndex < orderedRanks.length; columnIndex += 1) {
-        const rank = orderedRanks[columnIndex];
-        const statesInRank = columns.get(rank) ?? [];
-        const totalHeight = (Math.max(1, statesInRank.length) - 1) * ySpacing;
-        const baseY = marginY + Math.max(0, (340 - totalHeight) / 2);
-
-        for (let rowIndex = 0; rowIndex < statesInRank.length; rowIndex += 1) {
-          const stateName = statesInRank[rowIndex];
-          positions[stateName] = {
-            x: marginX + (columnIndex * xSpacing),
-            y: Math.round(baseY + (rowIndex * ySpacing))
-          };
-        }
-      }
-
+      const startX = 120;
+      const spacing = 180;
+      safeStates.forEach((name, index) => {
+        positions[name] = { x: startX + (index * spacing), y: 80 };
+      });
       return positions;
     }
 
-    function pointsToPath(points) {
+    function pointsToSmoothPath(points) {
       if (!Array.isArray(points) || points.length < 2) {
         return '';
       }
@@ -861,9 +719,28 @@
         return '';
       }
 
-      return normalized
-        .map((point, index) => `${index === 0 ? 'M' : 'L'} ${Math.round(point.x)} ${Math.round(point.y)}`)
-        .join(' ');
+      if (normalized.length === 2) {
+        return `M ${Math.round(normalized[0].x)} ${Math.round(normalized[0].y)} L ${Math.round(normalized[1].x)} ${Math.round(normalized[1].y)}`;
+      }
+
+      // Catmull-Rom to cubic Bézier conversion for smooth curves
+      let d = `M ${Math.round(normalized[0].x)} ${Math.round(normalized[0].y)}`;
+
+      for (let i = 0; i < normalized.length - 1; i++) {
+        const p0 = normalized[Math.max(0, i - 1)];
+        const p1 = normalized[i];
+        const p2 = normalized[i + 1];
+        const p3 = normalized[Math.min(normalized.length - 1, i + 2)];
+
+        const cp1x = p1.x + (p2.x - p0.x) / 6;
+        const cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp2x = p2.x - (p3.x - p1.x) / 6;
+        const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+        d += ` C ${Math.round(cp1x)} ${Math.round(cp1y)}, ${Math.round(cp2x)} ${Math.round(cp2y)}, ${Math.round(p2.x)} ${Math.round(p2.y)}`;
+      }
+
+      return d;
     }
 
     function toHostEventStatus(raw) {
@@ -921,7 +798,7 @@
             continue;
           }
 
-          const path = pointsToPath(edge.points);
+          const path = pointsToSmoothPath(edge.points);
           if (path) {
             paths.set(transitionIndex, path);
           }
@@ -931,8 +808,8 @@
       const layoutWidth = Number(layoutPayload.width);
       const layoutHeight = Number(layoutPayload.height);
       const bounds = {
-        width: Number.isFinite(layoutWidth) ? Math.max(920, layoutWidth) : fallbackBounds.width,
-        height: Number.isFinite(layoutHeight) ? Math.max(430, layoutHeight) : fallbackBounds.height
+        width: Number.isFinite(layoutWidth) ? Math.max(600, layoutWidth) : fallbackBounds.width,
+        height: Number.isFinite(layoutHeight) ? Math.max(300, layoutHeight) : fallbackBounds.height
       };
 
       return {
@@ -965,28 +842,15 @@
         stateOrder = snapshotStates.map((value) => String(value));
       }
 
-      const defaultPositions = buildStatePositions(stateOrder);
-      defaultStatePositions = defaultPositions;
-      const defaultPoints = Object.values(defaultPositions);
-      const defaultMaxX = defaultPoints.reduce((maxValue, pos) => Math.max(maxValue, pos?.x ?? 0), 0);
-      const defaultMaxY = defaultPoints.reduce((maxValue, pos) => Math.max(maxValue, pos?.y ?? 0), 0);
-      defaultDiagramBounds = {
-        width: Math.max(920, defaultMaxX + 180),
-        height: Math.max(430, defaultMaxY + 140)
-      };
+      const fallbackPositions = buildFallbackPositions(stateOrder);
+      const fallbackBounds = { width: 920, height: 430 };
+      const layoutPayload = snapshot.layout ?? snapshot.Layout;
+      const layout = parseLayoutPayload(layoutPayload, fallbackPositions, fallbackBounds);
 
-      const rawLayoutPayload = (snapshot.layoutRaw ?? snapshot.LayoutRaw ?? snapshot.layout ?? snapshot.Layout);
-      const optimizedLayoutPayload = (snapshot.layout ?? snapshot.Layout ?? snapshot.layoutRaw ?? snapshot.LayoutRaw);
-      const rawLayout = parseLayoutPayload(rawLayoutPayload, defaultPositions, defaultDiagramBounds);
-      const optimizedLayout = parseLayoutPayload(optimizedLayoutPayload, defaultPositions, defaultDiagramBounds);
-
-      defaultStatePositions = rawLayout.positions;
-      defaultTransitionPaths = rawLayout.paths;
-      defaultDiagramBounds = rawLayout.bounds;
-      optimizedStatePositions = optimizedLayout.positions;
-      optimizedTransitionPaths = optimizedLayout.paths;
-      optimizedDiagramBounds = optimizedLayout.bounds;
-      applyRenderLayoutMode();
+      statePositions = layout.positions;
+      transitionPaths = layout.paths;
+      diagramBounds = layout.bounds;
+      applyDiagramBounds();
 
       eventDefinitionOrder = Array.from(new Set(
         (Array.isArray(snapshotEvents) ? snapshotEvents : [])
@@ -1017,13 +881,9 @@
       }
     }
 
-    function applyRenderLayoutMode() {
-      const useOptimized = renderLayoutMode === 'optimized';
-      statePositions = useOptimized ? optimizedStatePositions : defaultStatePositions;
-      transitionPaths = useOptimized ? new Map(optimizedTransitionPaths) : new Map(defaultTransitionPaths);
-      const bounds = useOptimized ? optimizedDiagramBounds : defaultDiagramBounds;
-      const width = Math.max(920, Number(bounds?.width ?? 920));
-      const height = Math.max(430, Number(bounds?.height ?? 430));
+    function applyDiagramBounds() {
+      const width = Math.max(600, Number(diagramBounds?.width ?? 600));
+      const height = Math.max(300, Number(diagramBounds?.height ?? 300));
       diagram.setAttribute('viewBox', `0 0 ${width} ${height}`);
     }
 
@@ -1528,6 +1388,14 @@
       });
 
       return adjustedYByIndex;
+    }
+
+    function getNodeSize(name) {
+      const charWidth = 8.5;
+      const padding = 36;
+      const w = Math.max(80, Math.round(name.length * charWidth + padding));
+      const h = 40;
+      return { w, h, halfW: w / 2, halfH: h / 2, rx: h / 2 };
     }
 
     function applyEventButtonState(button, eventName) {
@@ -2080,6 +1948,7 @@
         const destinationDimTextOpacity = 0.74;
 
         const nodeSvg = Object.entries(statePositions).map(([name, pos]) => {
+          const ns = getNodeSize(name);
           let stroke = 'var(--border)';
           let strokeOpacity = 1;
           let strokeWidth = 1.6;
@@ -2107,7 +1976,7 @@
             const ringOpacity = collapse * 0.34;
             if (ringOpacity > 0.01) {
               const ringScale = 1 + ((1 - collapse) * 0.18);
-              handoffRing = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="none" stroke="var(--ok)" stroke-width="1.8" opacity="${ringOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${ringScale})"></rect>`;
+              handoffRing = `<rect x="${pos.x - ns.halfW}" y="${pos.y - ns.halfH}" width="${ns.w}" height="${ns.h}" rx="${ns.rx}" fill="none" stroke="var(--ok)" stroke-width="1.8" opacity="${ringOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${ringScale})"></rect>`;
             }
           } else if (name === toState) {
             stroke = 'var(--ok)';
@@ -2115,20 +1984,20 @@
             strokeWidth = 2.0 + (toActiveBlend * 0.6);
             fill = 'var(--node)';
             fillOpacity = 1;
-            fillOverlay = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="var(--ok)" fill-opacity="${toActiveBlend}" stroke="none"></rect>`;
+            fillOverlay = `<rect x="${pos.x - ns.halfW}" y="${pos.y - ns.halfH}" width="${ns.w}" height="${ns.h}" rx="${ns.rx}" fill="var(--ok)" fill-opacity="${toActiveBlend}" stroke="none"></rect>`;
             textFill = toActiveBlend > 0.58 ? 'var(--bg)' : 'var(--ok)';
             textOpacity = destinationDimTextOpacity + (toActiveBlend * (1 - destinationDimTextOpacity));
             fontWeight = toActiveBlend > 0.58 ? 700 : 600;
 
             if (pulseStrength > 0.01) {
               const pulseOpacity = pulseStrength * Math.max(0.08, 1 - toActiveBlend);
-              pulseOverlay = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="none" stroke="var(--ok)" stroke-width="2.4" opacity="${pulseOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${1 + (0.24 * pulseStrength)})"></rect>`;
+              pulseOverlay = `<rect x="${pos.x - ns.halfW}" y="${pos.y - ns.halfH}" width="${ns.w}" height="${ns.h}" rx="${ns.rx}" fill="none" stroke="var(--ok)" stroke-width="2.4" opacity="${pulseOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${1 + (0.24 * pulseStrength)})"></rect>`;
             }
             const arrival = Math.max(0, Math.min(1, (eased - 0.58) / 0.42));
             const ringOpacity = arrival * (1 - toActiveBlend) * 0.32;
             if (ringOpacity > 0.01) {
               const ringScale = 1.16 - (arrival * 0.18);
-              handoffRing = `<rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="none" stroke="var(--ok)" stroke-width="1.7" opacity="${ringOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${ringScale})"></rect>`;
+              handoffRing = `<rect x="${pos.x - ns.halfW}" y="${pos.y - ns.halfH}" width="${ns.w}" height="${ns.h}" rx="${ns.rx}" fill="none" stroke="var(--ok)" stroke-width="1.7" opacity="${ringOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${ringScale})"></rect>`;
             }
           } else {
             const fromVisual = fromStateVisual.get(name);
@@ -2169,7 +2038,7 @@
             <g ${glow}>
               ${handoffRing}
               ${pulseOverlay}
-              <rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="${strokeWidth}"></rect>
+              <rect x="${pos.x - ns.halfW}" y="${pos.y - ns.halfH}" width="${ns.w}" height="${ns.h}" rx="${ns.rx}" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="${strokeWidth}"></rect>
               ${fillOverlay}
               <text x="${pos.x}" y="${pos.y + 4}" text-anchor="middle" fill="${textFill}" fill-opacity="${textOpacity}" font-size="13" font-weight="${fontWeight}">${name}</text>
             </g>
@@ -2377,9 +2246,10 @@
             ? stroke
             : 'var(--border)';
         const fontWeight = isActive ? 700 : isActualDestination && isHoveredEventDestination ? 700 : isDestinationVisual ? 600 : 500;
+        const ns = getNodeSize(name);
         return `
           <g ${glow}>
-            <rect x="${pos.x - 56}" y="${pos.y - 22}" width="112" height="44" rx="22" fill="${fill}" stroke="${stroke}" stroke-opacity="${destinationOutlineOpacity}" stroke-width="${isActive ? 2.6 : isDestinationVisual ? 2.0 : 1.6}"></rect>
+            <rect x="${pos.x - ns.halfW}" y="${pos.y - ns.halfH}" width="${ns.w}" height="${ns.h}" rx="${ns.rx}" fill="${fill}" stroke="${stroke}" stroke-opacity="${destinationOutlineOpacity}" stroke-width="${isActive ? 2.6 : isDestinationVisual ? 2.0 : 1.6}"></rect>
             <text x="${pos.x}" y="${pos.y + 4}" text-anchor="middle" fill="${textFill}" fill-opacity="${destinationTextOpacity}" font-size="13" font-weight="${fontWeight}">${name}</text>
           </g>
         `;
@@ -2701,16 +2571,6 @@
         }, 140);
 
         void reloadMockup();
-      });
-    }
-
-    if (renderModeSelect) {
-      renderModeSelect.value = renderLayoutMode;
-      renderModeSelect.addEventListener('change', () => {
-        const selected = String(renderModeSelect.value || 'default').toLowerCase();
-        renderLayoutMode = selected === 'optimized' ? 'optimized' : 'default';
-        applyRenderLayoutMode();
-        drawDiagram();
       });
     }
 
