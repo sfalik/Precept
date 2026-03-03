@@ -165,32 +165,59 @@ The full file (with block comments) is at [`trafficlight.sm`](trafficlight.sm).
 
 ```text
 machine <Name>
-state <StateName>
 
-event <EventName>
-[ <string|number|boolean|null>[?] <ArgName> { <ArgDecl> } ]
+state <StateName> { <StateDecl> }
 
-<string|number|boolean|null>[?] <FieldName> { <FieldDecl> }
+event <EventName> { <EventDecl> }
+[ <ScalarType>[?] <ArgName> { <ArgDecl> } ]
+
+<ScalarType>[?] <FieldName> { <FieldDecl> }
+
+<ScalarType> := string | number | boolean | null
 
 from <any|StateA[,StateB...]> on <EventName>
 (
-    if <Guard> [ set <Field> = <Expr> ] ( transition <ToState> | no transition )
-  | else if <Guard> [ set <Field> = <Expr> ] ( transition <ToState> | no transition )
-  | else [ set <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
-  | [ set <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
+    if <GuardExpr>
+      { set <Field> = <Expr> }
+      ( transition <ToState> | no transition )
+
+  | else if <GuardExpr>
+      { set <Field> = <Expr> }
+      ( transition <ToState> | no transition )
+
+  | else
+      { set <Field> = <Expr> }
+      ( transition <ToState> | reject "<Reason>" | no transition )
+
+  | { set <Field> = <Expr> }
+    ( transition <ToState> | reject "<Reason>" | no transition )
 )+
 
-<Expr> := <Literal|<DataField>|<EventName>.<ArgName>>
-<Literal> := <null|true|false|number|string>
+<Expr> :=
+    <Literal>
+  | <FieldName>
+  | <EventName>.<ArgName>
+  | ( <Expr> )
+  | !<Expr>
+  | -<Expr>
+  | <Expr> <BinaryOp> <Expr>
+
+<BinaryOp> := + | - | * | / | % | == | != | < | <= | > | >= | && | ||
+
+<Literal> := null | true | false | <number> | <string>
 ```
 
 Constraints:
 
-- `()+` means one-or-more branch lines in the `from ... on ...` body.
-- `if` and `else if` branches must end in either `transition <ToState>` or `no transition`.
-- `else` may end in `transition`, `reject`, or `no transition`.
+- `()+` means one-or-more branch lines in a `from ... on ...` body.
+- `if` and `else if` branches must end in exactly one outcome: `transition <ToState>` or `no transition`.
+- `else` (or unguarded body) must end in exactly one outcome: `transition`, `reject`, or `no transition`.
+- `set <Field> = <Expr>` is valid only inside a `from ... on ...` branch body.
+- Multiple `set` lines are allowed and execute in declaration order with read-your-writes on the fire path.
+- `set` is not allowed with `no transition` in `if` / `else if` branches.
 - `reason "..."` is valid only on `reject`.
-- Unsupported syntax: `states ...`, `events ...`, `transition A -> B on E ...`, `set ...`.
+- Event arguments and persisted data fields are scalar-only (`string|number|boolean|null`, optional `?`).
+- Unsupported syntax: `states ...`, `events ...`, and legacy inline form `transition A -> B on E ...`.
 
 ## DSL Cookbook
 
@@ -203,7 +230,7 @@ from Draft on Submit
   transition PendingReview
 ```
 
-2) Transition with data update
+2) Transition with one field assignment (`set`)
 
 ```text
 from Draft on Submit
@@ -211,30 +238,44 @@ from Draft on Submit
   transition PendingReview
 ```
 
-3) Guarded routing with fallback reject
+3) Guarded routing with `else if` and fallback `reject`
 
 ```text
 from PendingReview on Approve
   if Score >= 80
+    set RiskTier = "Low"
+    transition Approved
+  else if Score >= 80
+    set RiskTier = "Medium"
     transition Approved
   else
     reject "Score below approval threshold"
 ```
 
-4) Event args copied into persisted data
+4) Event args + expression assignment
 
 ```text
 event Escalate
+  string Actor
   string Reason
+
 from PendingReview on Escalate
-  if Escalate.Reason != ""
-    set EscalationReason = Escalate.Reason
+  if Escalate.Actor != "" && Escalate.Reason != ""
+    set EscalationReason = Escalate.Actor + ": " + Escalate.Reason
     transition Escalated
   else
-    reject "Reason is required"
+    reject "Actor and Reason are required"
 ```
 
-5) Multi-source handler with `from any`
+5) Multi-source state list (explicit sources)
+
+```text
+from Draft,PendingReview on Cancel
+  set CancelledAt = "2026-02-27T00:00:00Z"
+  transition Cancelled
+```
+
+6) Global handler with `from any`
 
 ```text
 event Archive
@@ -243,11 +284,38 @@ from any on Archive
   transition Archived
 ```
 
-6) Explicitly disable an event in a state
+7) Explicitly disable an event in one state
 
 ```text
 from Archived on Submit
   no transition
+```
+
+8) Null-safe numeric guard + read-your-writes multi-set
+
+```text
+number? RetryCount
+number Attempts
+string AuditMessage
+
+from Active on Retry
+  if RetryCount != null && RetryCount % 2 == 0
+    set RetryCount = RetryCount + 1
+    set Attempts = RetryCount
+    set AuditMessage = "Retry #" + Attempts
+    transition Active
+  else
+    reject "RetryCount is unavailable"
+```
+
+9) Guarded `no transition` (valid in `if`/`else if`)
+
+```text
+from Active on Pause
+  if HasPendingWork
+    no transition
+  else
+    transition Paused
 ```
 
 ## Instance JSON Example

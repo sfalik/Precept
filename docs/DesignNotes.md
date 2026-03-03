@@ -59,7 +59,7 @@ Canonical constraints:
 - `if` and `else if` must end with `transition <State>` or `no transition`.
 - `else` may end with `transition`, `reject`, or `no transition`.
 - `reason "..."` is valid only on `reject`.
-- Unsupported syntax: `states ...`, `events ...`, `transition A -> B on E ...`, `set ...`.
+- Unsupported syntax: `states ...`, `events ...`, and legacy inline form `transition A -> B on E ...`.
 
 Block-authoring equivalent (same semantics):
 
