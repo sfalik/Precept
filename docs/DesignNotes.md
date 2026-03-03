@@ -43,10 +43,10 @@ event <EventName>
 
 from <any|StateA[,StateB...]> on <EventName>
 (
-    if <Guard> [ transform <Field> = <Expr> ] ( transition <ToState> | no transition )
-  | else if <Guard> [ transform <Field> = <Expr> ] ( transition <ToState> | no transition )
-  | else [ transform <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
-  | [ transform <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
+    if <Guard> [ set <Field> = <Expr> ] ( transition <ToState> | no transition )
+  | else if <Guard> [ set <Field> = <Expr> ] ( transition <ToState> | no transition )
+  | else [ set <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
+  | [ set <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
 )+
 
 <Expr> := <Literal|<DataField>|<EventName>.<ArgName>>
@@ -68,7 +68,7 @@ Block-authoring equivalent (same semantics):
 - Additional guarded branch headers: `else if <Guard>`
 - Optional fallback header: `else`
 - Allowed branch body statements:
-  - `transform <Key> = <Expr>` (optional)
+  - `set <Key> = <Expr>` (optional)
   - `transition <State>` or `no transition` (required for `if`/`else if` branch bodies)
 - Allowed block outcome statements:
   - `transition <State>`
@@ -84,11 +84,11 @@ Block-authoring equivalent (same semantics):
 #### Branch/body constraints
 
 - `if` and `else if` branch bodies:
-  - allow optional `transform <Key> = <Expr>`
+  - allow optional `set <Key> = <Expr>`
   - require exactly one outcome: `transition <State>` or `no transition`
   - do not allow `reject`
 - `else` branch body:
-  - may include optional `transform <Key> = <Expr>`
+  - may include optional `set <Key> = <Expr>`
   - must end in exactly one outcome statement: `transition <State>`, `reject "<message>"`, or `no transition`
 
 #### Evaluation model
@@ -96,24 +96,24 @@ Block-authoring equivalent (same semantics):
 - Branches are evaluated in declaration order.
 - First matching guarded branch wins.
 - If no guard matches, configured block outcome is applied.
-- Transition transforms execute only on accepted fire-path transitions.
+- Transition sets execute only on accepted fire-path transitions.
 
-### Transform/Expression Design Decisions (Locked)
+### Set/Expression Design Decisions (Locked)
 
 Status:
 
-- The following choices are design-locked for the next transform/expression expansion.
-- Phase 1 parser/model foundation is implemented: transform expressions parse into a DSL expression AST and transitions retain ordered transform-assignment lists.
-- Phase 2 shared evaluator integration is implemented: guards and transform expressions evaluate through the shared AST-based expression evaluator.
-- Phase 3 runtime execution is implemented: transform assignments evaluate in declaration order on a working copy (read-your-writes) and commit atomically.
+- The following choices are design-locked for the next set/expression expansion.
+- Phase 1 parser/model foundation is implemented: set expressions parse into a DSL expression AST and transitions retain ordered set-assignment lists.
+- Phase 2 shared evaluator integration is implemented: guards and set expressions evaluate through the shared AST-based expression evaluator.
+- Phase 3 runtime execution is implemented: set assignments evaluate in declaration order on a working copy (read-your-writes) and commit atomically.
 
 Locked choices:
 
-- Execution model is atomic batch per selected branch: all transform assignments in that branch must succeed or none are committed.
-- Branches support multiple `transform` statements; each `transform` remains single-assignment (`transform <Key> = <Expr>`).
+- Execution model is atomic batch per selected branch: all set assignments in that branch must succeed or none are committed.
+- Branches support multiple `set` statements; each `set` remains single-assignment (`set <Key> = <Expr>`).
 - In-branch evaluation is read-your-writes using a working copy in declaration order.
 - Assignment typing is strict fail-fast with no implicit coercion.
-- Guard and transform expressions use one shared expression semantics model; only expected result type differs (guard => `boolean`, transform => assigned field contract type).
+- Guard and set expressions use one shared expression semantics model; only expected result type differs (guard => `boolean`, set => assigned field contract type).
 
 Expression scope (B-v1):
 
@@ -128,42 +128,42 @@ Null handling (B-v1):
 - Arithmetic (`+`, `-`, `*`, `/`, `%`) with null is invalid.
 - Boolean operators with null operands are invalid.
 - String concat with null operand is invalid.
-- Any invalid expression evaluation fails the fire path for that branch and, due to atomic batch semantics, commits no transform assignments.
+- Any invalid expression evaluation fails the fire path for that branch and, due to atomic batch semantics, commits no set assignments.
 
 Examples:
 
 ```text
 # valid (guard + arithmetic + modulo + concat)
 if RetryCount != null && RetryCount % 2 == 0
-  transform RetryCount = RetryCount + 1
-  transform AuditMessage = "Retry #" + RetryCount
+  set RetryCount = RetryCount + 1
+  set AuditMessage = "Retry #" + RetryCount
   transition Retrying
 
 # invalid (strict typing / null handling)
-transform RetryCount = "1"           # string -> number (type mismatch)
-transform AuditMessage = "Reason: " + Emergency.Reason   # invalid when Emergency.Reason is null
+set RetryCount = "1"           # string -> number (type mismatch)
+set AuditMessage = "Reason: " + Emergency.Reason   # invalid when Emergency.Reason is null
 ```
 
 Implementation checklist (B-v1):
 
 - Parser/model
-  - Replace single assignment storage (`DataAssignmentKey`/`DataAssignmentExpression`) with ordered transform-assignment list per transition outcome.
-  - Parse multiple `transform` lines per branch and preserve declaration order.
+  - Replace single assignment storage (`DataAssignmentKey`/`DataAssignmentExpression`) with ordered set-assignment list per transition outcome.
+  - Parse multiple `set` lines per branch and preserve declaration order.
   - Extend expression grammar to support `()`, `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `<=`, `>`, `>=`, `&&`, `||`, `!`.
 - Runtime
-  - Implement one shared expression evaluator used by both guards and transforms.
+  - Implement one shared expression evaluator used by both guards and sets.
   - Implement strict type matrix and null rules from this document (no implicit coercion).
   - Implement strong string concat (`+`) only for string+string.
   - Implement short-circuit evaluation for `&&` and `||`.
-  - Evaluate transform assignments in branch order on a working copy (read-your-writes), then commit atomically. ✅
+  - Evaluate set assignments in branch order on a working copy (read-your-writes), then commit atomically. ✅
 - Inspect/fire behavior
   - Ensure inspect uses the same guard semantics as fire.
-  - Ensure transform evaluation errors reject fire and commit no transform assignments.
+  - Ensure set evaluation errors reject fire and commit no set assignments.
 - LSP/editor tooling
   - Update diagnostics for operator/type/null violations. ✅
   - Update completion/snippets to include new operator-aware expression authoring patterns. ✅
 - Tests
-  - Add parser tests for operator precedence/associativity and multi-transform parsing.
+  - Add parser tests for operator precedence/associativity and multi-set parsing.
   - Add runtime tests for atomic batch rollback, read-your-writes, strict typing, strong concat, null-handling failures, and short-circuit behavior.
   - Add inspect/fire parity tests for shared guard semantics.
 - Documentation
@@ -204,7 +204,7 @@ Validation constraints:
 - Event args and data fields are scalar-only; nested object/array values are invalid.
 - Unknown event-arg keys and unknown data keys are rejected.
 - `Type?` means nullable; non-nullable values reject `null`.
-- Guards/transforms support explicit scoped references (`<EventName>.<ArgKey>`, `<Key>`).
+- Guards/sets support explicit scoped references (`<EventName>.<ArgKey>`, `<Key>`).
 
 ## Implemented Components
 
@@ -245,8 +245,8 @@ Validation constraints:
 
 ## Test Status
 
-- Active tests include `test/StateMachine.Tests/DslWorkflowTests.cs`, `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslTransformParsingTests.cs`, `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`, and `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs`.
-- Guard/expression test coverage includes: boolean guards, comparisons, string/null equality, numeric runtime type coercion, unsupported-expression rejection, reason aggregation, expression AST parsing precedence/invalid syntax diagnostics, lexer edge cases, transform-branch parsing constraints, and runtime evaluator operator/short-circuit behavior.
+- Active tests include `test/StateMachine.Tests/DslWorkflowTests.cs`, `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslSetParsingTests.cs`, `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`, and `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs`.
+- Guard/expression test coverage includes: boolean guards, comparisons, string/null equality, numeric runtime type coercion, unsupported-expression rejection, reason aggregation, expression AST parsing precedence/invalid syntax diagnostics, lexer edge cases, set-branch parsing constraints, and runtime evaluator operator/short-circuit behavior.
 
 ## Next Steps
 
@@ -297,7 +297,7 @@ Validation constraints:
 - Interactive inspect callable output lists only event/state lines (no separate "callable events" banner).
 - REPL verbose mode renders structured table/panel views for inspect/fire details and callable-event listings.
 - Symbol rendering supports `auto|ascii|unicode`; auto mode prefers Unicode only if runtime terminal heuristics indicate support.
-- Transition DSL supports `transform <Key> = <expr>` where `<Key>` may be bare or `<Key>`.
+- Transition DSL supports `set <Key> = <expr>` where `<Key>` may be bare or `<Key>`.
 - Assignment expressions support literals and scoped references (`<EventName>.<ArgKey>`, `<Key>`).
 - Event declarations support optional indented argument declarations with scalar type contracts.
 - Top-level typed declarations define persisted instance-data scalar contracts.
@@ -308,9 +308,9 @@ Validation constraints:
 - LSP diagnostics run parser/compiler validation on document open/change/save and map parser `Line N:` failures to line-scoped diagnostics.
 - LSP completion includes DSL keywords plus contextual state/event suggestions (`from`, `transition`, `on`).
 - LSP completion includes contextual guard suggestions for `if`/`else if` (data fields, operators/literals, and current-event argument references).
-- LSP completion includes contextual transform suggestions (data-field target names before `=`, expression suggestions after `=`).
-- LSP completion includes event-argument member suggestions after `<EventName>.` in guard/transform expressions.
-- LSP completion includes snippet-style templates for common branch/outcome patterns (`from ... on ...`, `if/else if/else`, `transition`, `reject`, `no transition`, and `transform`).
+- LSP completion includes contextual set suggestions (data-field target names before `=`, expression suggestions after `=`).
+- LSP completion includes event-argument member suggestions after `<EventName>.` in guard/set expressions.
+- LSP completion includes snippet-style templates for common branch/outcome patterns (`from ... on ...`, `if/else if/else`, `transition`, `reject`, `no transition`, and `set`).
 - LSP semantic tokens provide role-aware highlighting for keywords, state/event symbols, variable identifiers, strings, numbers, operators, and comments.
 - `tools/StateMachine.Dsl.VsCode` provides a VS Code client MVP that auto-starts the language server for `.sm` files.
 - VS Code client startup resolves the language-server project relative to extension location and does not require a workspace folder in Extension Development Host.

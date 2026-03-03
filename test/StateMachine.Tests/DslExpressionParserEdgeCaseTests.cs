@@ -11,45 +11,45 @@ public class DslExpressionParserEdgeCaseTests
     [Theory]
     [InlineData("true", true)]
     [InlineData("false", false)]
-    public void Parse_TransformExpression_BooleanLiteral_IsLiteralExpression(string input, bool expected)
+    public void Parse_SetExpression_BooleanLiteral_IsLiteralExpression(string input, bool expected)
     {
-        var expression = DslExpressionTestHelper.ParseFirstTransformExpression(input);
+        var expression = DslExpressionTestHelper.ParseFirstSetExpression(input);
 
         expression.Should().BeOfType<DslLiteralExpression>();
         ((DslLiteralExpression)expression).Value.Should().Be(expected);
     }
 
     [Fact]
-    public void Parse_TransformExpression_NullLiteral_IsLiteralExpression()
+    public void Parse_SetExpression_NullLiteral_IsLiteralExpression()
     {
-        var expression = DslExpressionTestHelper.ParseFirstTransformExpression("null");
+        var expression = DslExpressionTestHelper.ParseFirstSetExpression("null");
 
         expression.Should().BeOfType<DslLiteralExpression>();
         ((DslLiteralExpression)expression).Value.Should().BeNull();
     }
 
     [Fact]
-    public void Parse_TransformExpression_NumberWithExponent_IsLiteralExpression()
+    public void Parse_SetExpression_NumberWithExponent_IsLiteralExpression()
     {
-        var expression = DslExpressionTestHelper.ParseFirstTransformExpression("1.5e2");
+        var expression = DslExpressionTestHelper.ParseFirstSetExpression("1.5e2");
 
         expression.Should().BeOfType<DslLiteralExpression>();
         ((DslLiteralExpression)expression).Value.Should().Be(150d);
     }
 
     [Fact]
-    public void Parse_TransformExpression_StringWithEscapes_IsLiteralExpression()
+    public void Parse_SetExpression_StringWithEscapes_IsLiteralExpression()
     {
-        var expression = DslExpressionTestHelper.ParseFirstTransformExpression("\"line1\\nline2\"");
+        var expression = DslExpressionTestHelper.ParseFirstSetExpression("\"line1\\nline2\"");
 
         expression.Should().BeOfType<DslLiteralExpression>();
         ((DslLiteralExpression)expression).Value.Should().Be("line1\nline2");
     }
 
     [Fact]
-    public void Parse_TransformExpression_ComparisonChain_RespectsPrecedence()
+    public void Parse_SetExpression_ComparisonChain_RespectsPrecedence()
     {
-        var expression = DslExpressionTestHelper.ParseFirstTransformExpression("A > B == C");
+        var expression = DslExpressionTestHelper.ParseFirstSetExpression("A > B == C");
 
         expression.Should().BeOfType<DslBinaryExpression>();
         var equals = (DslBinaryExpression)expression;
@@ -59,47 +59,47 @@ public class DslExpressionParserEdgeCaseTests
     }
 
     [Fact]
-    public void Parse_TransformExpression_SingleAmpersand_ThrowsLineError()
+    public void Parse_SetExpression_SingleAmpersand_ThrowsLineError()
     {
-        var act = DslExpressionTestHelper.ParseFirstTransformExpressionAction("A & B");
+        var act = DslExpressionTestHelper.ParseFirstSetExpressionAction("A & B");
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invalid transform expression*unexpected character '&'*");
+            .WithMessage("*invalid set expression*unexpected character '&'*");
     }
 
     [Fact]
-    public void Parse_TransformExpression_SinglePipe_ThrowsLineError()
+    public void Parse_SetExpression_SinglePipe_ThrowsLineError()
     {
-        var act = DslExpressionTestHelper.ParseFirstTransformExpressionAction("A | B");
+        var act = DslExpressionTestHelper.ParseFirstSetExpressionAction("A | B");
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invalid transform expression*unexpected character '|'*");
+            .WithMessage("*invalid set expression*unexpected character '|'*");
     }
 
     [Fact]
-    public void Parse_TransformExpression_UnexpectedCharacter_ThrowsLineError()
+    public void Parse_SetExpression_UnexpectedCharacter_ThrowsLineError()
     {
-        var act = DslExpressionTestHelper.ParseFirstTransformExpressionAction("A @ B");
+        var act = DslExpressionTestHelper.ParseFirstSetExpressionAction("A @ B");
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invalid transform expression*unexpected character '@'*");
+            .WithMessage("*invalid set expression*unexpected character '@'*");
     }
 
     [Fact]
-    public void Parse_TransformExpression_MissingRightParenthesis_ThrowsLineError()
+    public void Parse_SetExpression_MissingRightParenthesis_ThrowsLineError()
     {
-        var act = DslExpressionTestHelper.ParseFirstTransformExpressionAction("(A + 1");
+        var act = DslExpressionTestHelper.ParseFirstSetExpressionAction("(A + 1");
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invalid transform expression*expected ')'*");
+            .WithMessage("*invalid set expression*expected ')'*");
     }
 
     [Fact]
-    public void Parse_TransformExpression_UnexpectedTrailingToken_ThrowsLineError()
+    public void Parse_SetExpression_UnexpectedTrailingToken_ThrowsLineError()
     {
-        var act = DslExpressionTestHelper.ParseFirstTransformExpressionAction("A + 1 extra");
+        var act = DslExpressionTestHelper.ParseFirstSetExpressionAction("A + 1 extra");
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invalid transform expression*expected '<end>'*found 'extra'*");
+            .WithMessage("*invalid set expression*expected '<end>'*found 'extra'*");
     }
 }

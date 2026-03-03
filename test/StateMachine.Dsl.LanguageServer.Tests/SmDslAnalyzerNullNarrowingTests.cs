@@ -75,7 +75,7 @@ public class SmDslAnalyzerNullNarrowingTests
     }
 
     [Fact]
-    public void Diagnostics_Transform_NullableValueAssignedToNonNullableTarget_Fails()
+    public void Diagnostics_Set_NullableValueAssignedToNonNullableTarget_Fails()
     {
         const string text = """
             machine M
@@ -85,18 +85,18 @@ public class SmDslAnalyzerNullNarrowingTests
             state B
             event Go
             from A on Go
-              transform Value = RetryCount
+              set Value = RetryCount
               transition B
             """;
 
         var diagnostics = Analyze(text);
 
         diagnostics.Should().ContainSingle();
-        diagnostics[0].Message.Should().Contain("transform target 'Value' type mismatch");
+        diagnostics[0].Message.Should().Contain("set target 'Value' type mismatch");
     }
 
     [Fact]
-    public void Diagnostics_Transform_NullableValueNarrowedByGuard_AssignsCleanly()
+    public void Diagnostics_Set_NullableValueNarrowedByGuard_AssignsCleanly()
     {
         const string text = """
             machine M
@@ -107,7 +107,7 @@ public class SmDslAnalyzerNullNarrowingTests
             event Go
             from A on Go
               if RetryCount != null
-                transform Value = RetryCount
+                set Value = RetryCount
                 transition B
               else
                 reject \"blocked\"

@@ -5,7 +5,7 @@ namespace StateMachine.Tests.Infrastructure;
 
 internal static class DslExpressionTestHelper
 {
-    internal static DslExpression ParseFirstTransformExpression(string expressionText)
+    internal static DslExpression ParseFirstSetExpression(string expressionText)
     {
         var dsl = $$"""
             machine Parser
@@ -14,16 +14,16 @@ internal static class DslExpressionTestHelper
             state Red
             state Green
             from Red on Advance
-                transform Value = {{expressionText}}
+                set Value = {{expressionText}}
                 transition Green
             """;
 
         var machine = StateMachineDslParser.Parse(dsl);
         machine.Transitions.Should().ContainSingle();
-        machine.Transitions[0].TransformAssignments.Should().ContainSingle();
-        return machine.Transitions[0].TransformAssignments[0].Expression;
+        machine.Transitions[0].SetAssignments.Should().ContainSingle();
+        return machine.Transitions[0].SetAssignments[0].Expression;
     }
 
-    internal static System.Action ParseFirstTransformExpressionAction(string expressionText)
-        => () => _ = ParseFirstTransformExpression(expressionText);
+    internal static System.Action ParseFirstSetExpressionAction(string expressionText)
+        => () => _ = ParseFirstSetExpression(expressionText);
 }

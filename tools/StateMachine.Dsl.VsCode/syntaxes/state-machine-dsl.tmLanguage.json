@@ -131,7 +131,7 @@
       "patterns": [
         {
           "name": "keyword.other.state-machine-dsl",
-          "match": "\\b(transition|reject|transform|reason|any)\\b"
+          "match": "\\b(transition|reject|set|reason|any)\\b"
         },
         {
           "name": "keyword.other.state-machine-dsl",

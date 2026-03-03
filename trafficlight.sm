@@ -19,32 +19,32 @@ event ClearEmergency
 # Red: priority to left-turn queue, then general demand, else hold
 from Red on Advance
 	if LeftTurnQueued
-		transform LeftTurnQueued = false
-		transform CycleCount = CycleCount + 1
+		set LeftTurnQueued = false
+		set CycleCount = CycleCount + 1
 		transition FlashingGreen
 	else if VehiclesWaiting > 0
-		transform CycleCount = CycleCount + 1
+		set CycleCount = CycleCount + 1
 		transition Green
 	else
 		reject "No demand detected at red"
 
 # Protected left-turn phase rejoins normal cycle at Green
 from FlashingGreen on Advance
-	transform CycleCount = CycleCount + 1
+	set CycleCount = CycleCount + 1
 	transition Green
 
 from Green on Advance
-	transform CycleCount = CycleCount + 1
+	set CycleCount = CycleCount + 1
 	transition Yellow
 
 from Yellow on Advance
-	transform CycleCount = CycleCount + 1
+	set CycleCount = CycleCount + 1
 	transition Red
 
 # Emergency preemption: requires a reason to record why it was activated
 from any on Emergency
 	if Emergency.AuthorizedBy != "" && Emergency.Reason != ""
-		transform EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason
+		set EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason
 		transition FlashingRed
 	reject "AuthorizedBy and Reason are required to activate emergency mode"
 
@@ -53,6 +53,6 @@ from FlashingRed on Advance
 	no transition
 
 from FlashingRed on ClearEmergency
-	transform EmergencyReason = null
+	set EmergencyReason = null
 	transition Red
 

@@ -8,7 +8,7 @@ StateMachine is a .NET DSL-driven state/workflow engine focused on deterministic
 - **Inspect before fire**: evaluate whether a transition is not available from the current state, blocked, or enabled before mutating state.
 - **Persistable runtime instances**: load/save a JSON instance with current state and instance 
 - **Explicit event arguments**: per-call arguments are separate from persisted instance 
-- **Transition-scoped data updates**: `transform <Key> = ...` assignments run only on accepted `fire`.
+- **Transition-scoped data updates**: `set <Key> = ...` assignments run only on accepted `fire`.
 
 ## Quick Start (2 minutes)
 
@@ -123,30 +123,30 @@ event Emergency
 event ClearEmergency
 from Red on Advance
   if LeftTurnQueued
-    transform LeftTurnQueued = false
-    transform CycleCount = CycleCount + 1
+    set LeftTurnQueued = false
+    set CycleCount = CycleCount + 1
     transition FlashingGreen
   else if VehiclesWaiting > 0
-    transform CycleCount = CycleCount + 1
+    set CycleCount = CycleCount + 1
     transition Green
   else
     reject "No demand detected at red"
 
 from FlashingGreen on Advance
-  transform CycleCount = CycleCount + 1
+  set CycleCount = CycleCount + 1
   transition Green
 
 from Green on Advance
-  transform CycleCount = CycleCount + 1
+  set CycleCount = CycleCount + 1
   transition Yellow
 
 from Yellow on Advance
-  transform CycleCount = CycleCount + 1
+  set CycleCount = CycleCount + 1
   transition Red
 
 from any on Emergency
   if Emergency.AuthorizedBy != "" && Emergency.Reason != ""
-    transform EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason
+    set EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason
     transition FlashingRed
   else
     reject "AuthorizedBy and Reason are required to activate emergency mode"
@@ -155,7 +155,7 @@ from FlashingRed on Advance
   no transition
 
 from FlashingRed on ClearEmergency
-  transform EmergencyReason = null
+  set EmergencyReason = null
   transition Red
 ```
 
@@ -174,10 +174,10 @@ event <EventName>
 
 from <any|StateA[,StateB...]> on <EventName>
 (
-    if <Guard> [ transform <Field> = <Expr> ] ( transition <ToState> | no transition )
-  | else if <Guard> [ transform <Field> = <Expr> ] ( transition <ToState> | no transition )
-  | else [ transform <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
-  | [ transform <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
+    if <Guard> [ set <Field> = <Expr> ] ( transition <ToState> | no transition )
+  | else if <Guard> [ set <Field> = <Expr> ] ( transition <ToState> | no transition )
+  | else [ set <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
+  | [ set <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
 )+
 
 <Expr> := <Literal|<DataField>|<EventName>.<ArgName>>
@@ -207,7 +207,7 @@ from Draft on Submit
 
 ```text
 from Draft on Submit
-  transform SubmittedAt = "2026-02-27T00:00:00Z"
+  set SubmittedAt = "2026-02-27T00:00:00Z"
   transition PendingReview
 ```
 
@@ -228,7 +228,7 @@ event Escalate
   string Reason
 from PendingReview on Escalate
   if Escalate.Reason != ""
-    transform EscalationReason = Escalate.Reason
+    set EscalationReason = Escalate.Reason
     transition Escalated
   else
     reject "Reason is required"
@@ -363,9 +363,9 @@ Current MVP capabilities:
 - Provides completion items for DSL keywords.
 - Provides contextual completion for known `state` names (`from`, `transition`) and known `event` names (`on`).
 - Provides contextual guard completion for `if`/`else if` lines (data fields, operators/literals, and current-event argument references).
-- Provides contextual transform completion for `transform` lines (data-field targets before `=`, expression suggestions after `=`).
-- Provides event-argument member completion after `<EventName>.` in guard and transform expressions.
-- Provides snippet-style completions for common branch/outcome patterns (`from ... on ...`, `if/else if/else`, `transition`, `reject`, `no transition`, and `transform`).
+- Provides contextual set completion for `set` lines (data-field targets before `=`, expression suggestions after `=`).
+- Provides event-argument member completion after `<EventName>.` in guard and set expressions.
+- Provides snippet-style completions for common branch/outcome patterns (`from ... on ...`, `if/else if/else`, `transition`, `reject`, `no transition`, and `set`).
 - Provides semantic token highlighting for declarations/usages (keywords, state/event symbols, variables, strings, numbers, operators, comments).
 
 Notes:
@@ -441,18 +441,18 @@ Implemented now:
 - Explicit `data` contracts and event argument contracts (scalar-only)
 - Instance-first runtime APIs (`CreateInstance`, `Inspect`, `Fire`)
 - Guard evaluation with rejection reasons
-- Transition data assignments (`transform <Key> = ...`) on accepted `fire`
-- Transform parser/model foundation for B-v1: transitions now carry ordered transform-assignment lists and transform expressions parse into an expression AST.
-- Shared AST expression evaluator now drives guard evaluation and transform expression execution.
-- Atomic ordered multi-transform execution is implemented on fire-path updates with read-your-writes and all-or-nothing commit semantics.
+- Transition data assignments (`set <Key> = ...`) on accepted `fire`
+- Set parser/model foundation for B-v1: transitions now carry ordered set-assignment lists and set expressions parse into an expression AST.
+- Shared AST expression evaluator now drives guard evaluation and set expression execution.
+- Atomic ordered multi-set execution is implemented on fire-path updates with read-your-writes and all-or-nothing commit semantics.
 - CLI REPL + script execution
 - Active test coverage in `test/StateMachine.Tests/DslWorkflowTests.cs` and `test/StateMachine.Tests/CliRenderingTests.cs`
-- Active parser/runtime coverage also includes expression AST parsing/edge-case diagnostics, transform parsing coverage, and runtime evaluator operator/short-circuit behavior in `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslTransformParsingTests.cs`, and `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`.
+- Active parser/runtime coverage also includes expression AST parsing/edge-case diagnostics, set parsing coverage, and runtime evaluator operator/short-circuit behavior in `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslSetParsingTests.cs`, and `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`.
 - Language-server analyzer coverage now includes null-flow narrowing diagnostics tests in `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs`.
 - Language server MVP in `tools/StateMachine.Dsl.LanguageServer` (stdio diagnostics + completion)
 - Language server MVP in `tools/StateMachine.Dsl.LanguageServer` (stdio diagnostics + completion + semantic tokens)
-- Language server semantic diagnostics now validate expression operator/type compatibility, transform-target type compatibility, and null-flow narrowing for explicit null checks in `&&`/`||` guard paths.
-- Language server completion now includes operator-aware suggestions in guard and transform-expression contexts.
+- Language server semantic diagnostics now validate expression operator/type compatibility, set-target type compatibility, and null-flow narrowing for explicit null checks in `&&`/`||` guard paths.
+- Language server completion now includes operator-aware suggestions in guard and set-expression contexts.
 - VS Code client MVP in `tools/StateMachine.Dsl.VsCode` (auto-start for `.sm` files)
 - VS Code client contributes TextMate syntax highlighting for `.sm` files
 
@@ -460,21 +460,21 @@ Pending:
 
 - Extension packaging/publishing workflow
 
-## Transform/Expression Roadmap (Design-Locked)
+## Set/Expression Roadmap (Design-Locked)
 
-The following decisions are locked for transform/expression behavior and are documented here for clarity.
+The following decisions are locked for set/expression behavior and are documented here for clarity.
 
 Current progress:
 
 - Phase 1 (parser/model foundation) is implemented.
-- Phase 2 (shared expression evaluator integration) is implemented for guards and transform expression evaluation.
-- Phase 3 (atomic ordered multi-transform execution with read-your-writes) is implemented.
+- Phase 2 (shared expression evaluator integration) is implemented for guards and set expression evaluation.
+- Phase 3 (atomic ordered multi-set execution with read-your-writes) is implemented.
 
-- Atomic batch per selected branch: all transform assignments in a branch commit together or none commit.
-- Multiple `transform` lines per branch are supported; each `transform` remains a single assignment.
-- In-branch transform evaluation is read-your-writes in declaration order.
+- Atomic batch per selected branch: all set assignments in a branch commit together or none commit.
+- Multiple `set` lines per branch are supported; each `set` remains a single assignment.
+- In-branch set evaluation is read-your-writes in declaration order.
 - Strict fail-fast typing (no implicit coercion).
-- Guard/transform consistency: shared expression semantics; guards must evaluate to `boolean`, transforms must match target field contract type.
+- Guard/set consistency: shared expression semantics; guards must evaluate to `boolean`, sets must match target field contract type.
 - Planned B-v1 expression scope includes operators `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `<=`, `>`, `>=`, `&&`, `||`, `!`.
 - Planned B-v1 string `+` is strong concat only (both operands must be strings).
 - Planned B-v1 null handling: null checks via `==`/`!=` are allowed; arithmetic/ordered comparisons/boolean ops/concat with null are invalid.
@@ -484,8 +484,8 @@ Example behavior:
 ```text
 from Active on Retry
   if RetryCount != null && RetryCount % 2 == 0
-    transform RetryCount = RetryCount + 1
-    transform AuditMessage = "Retry #" + RetryCount
+    set RetryCount = RetryCount + 1
+    set AuditMessage = "Retry #" + RetryCount
     transition Active
   else
     reject "RetryCount is unavailable"
@@ -493,9 +493,9 @@ from Active on Retry
 
   Implementation checklist (B-v1):
 
-  - Parser/model: support multiple ordered `transform` assignments per selected branch and operator-aware expression parsing.
-  - Runtime: shared guard/transform expression evaluator with strict type/null semantics, strong string concat, short-circuit boolean logic, and atomic batch commit.
-  - Inspect/fire parity: same guard evaluation semantics in inspect and fire; transform expression failures reject fire and commit no transform changes.
+  - Parser/model: support multiple ordered `set` assignments per selected branch and operator-aware expression parsing.
+  - Runtime: shared guard/set expression evaluator with strict type/null semantics, strong string concat, short-circuit boolean logic, and atomic batch commit.
+  - Inspect/fire parity: same guard evaluation semantics in inspect and fire; set expression failures reject fire and commit no set changes.
   - Tooling: continue iterating language-server diagnostics/completion precision for advanced multi-branch null-flow scenarios and richer expression authoring hints.
   - Tests: precedence/associativity, read-your-writes, atomic rollback, strict typing, null behavior, strong concat, and inspect/fire parity coverage.
 

@@ -14,9 +14,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     [InlineData("*", 8d)]
     [InlineData("/", 2d)]
     [InlineData("%", 0d)]
-    public void Fire_Transform_NumericOperators_AreApplied(string op, double expected)
+    public void Fire_Set_NumericOperators_AreApplied(string op, double expected)
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "number Input\nnumber Output",
             "Output",
             $"Input {op} 2",
@@ -37,9 +37,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     [InlineData("<=", true)]
     [InlineData("==", true)]
     [InlineData("!=", false)]
-    public void Fire_Transform_ComparisonOperators_AreApplied(string op, bool expected)
+    public void Fire_Set_ComparisonOperators_AreApplied(string op, bool expected)
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "number Input\nboolean IsMatch",
             "IsMatch",
             $"Input {op} 4",
@@ -54,9 +54,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     }
 
     [Fact]
-    public void Fire_Transform_StringConcat_IsApplied()
+    public void Fire_Set_StringConcat_IsApplied()
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "string Prefix\nstring Message",
             "Message",
             "Prefix + Go.EventText",
@@ -75,9 +75,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     }
 
     [Fact]
-    public void Fire_Transform_MixedStringAndNumberConcat_IsRejected()
+    public void Fire_Set_MixedStringAndNumberConcat_IsRejected()
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "string Prefix\nnumber Count\nstring Message",
             "Message",
             "Prefix + Count",
@@ -93,9 +93,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     }
 
     [Fact]
-    public void Fire_Transform_UnaryNot_IsApplied()
+    public void Fire_Set_UnaryNot_IsApplied()
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "boolean IsEnabled\nboolean IsDisabled",
             "IsDisabled",
             "!IsEnabled",
@@ -110,9 +110,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     }
 
     [Fact]
-    public void Fire_Transform_UnaryMinus_IsApplied()
+    public void Fire_Set_UnaryMinus_IsApplied()
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "number Input\nnumber Negated",
             "Negated",
             "-Input",
@@ -127,9 +127,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     }
 
     [Fact]
-    public void Fire_Transform_ParenthesizedExpression_IsApplied()
+    public void Fire_Set_ParenthesizedExpression_IsApplied()
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "number Input\nnumber Output",
             "Output",
             "(Input + 2) * 3",
@@ -144,9 +144,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     }
 
     [Fact]
-    public void Fire_Transform_BooleanAndWithNonBooleanOperand_IsRejected()
+    public void Fire_Set_BooleanAndWithNonBooleanOperand_IsRejected()
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "boolean Flag\nnumber Count\nboolean Result",
             "Result",
             "Flag && Count",
@@ -162,9 +162,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     }
 
     [Fact]
-    public void Fire_Transform_BooleanAnd_WithNonBooleanLeftOperand_IsRejected()
+    public void Fire_Set_BooleanAnd_WithNonBooleanLeftOperand_IsRejected()
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "number Count\nboolean Flag\nboolean Result",
             "Result",
             "Count && Flag",
@@ -180,9 +180,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     }
 
     [Fact]
-    public void Fire_Transform_UnaryOperandResolutionFailure_IsRejected()
+    public void Fire_Set_UnaryOperandResolutionFailure_IsRejected()
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "number Output",
             "Output",
             "-Missing",
@@ -203,14 +203,14 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     [InlineData(">=", "operator '>=' requires numeric operands")]
     [InlineData("<", "operator '<' requires numeric operands")]
     [InlineData("<=", "operator '<=' requires numeric operands")]
-    public void Fire_Transform_NonNumericOperands_AreRejected(string op, string expectedMessage)
+    public void Fire_Set_NonNumericOperands_AreRejected(string op, string expectedMessage)
     {
         var targetField = op is ">=" or "<" or "<=" ? "ResultBool" : "ResultNum";
         var declarations = op is ">=" or "<" or "<="
             ? "string Input\nboolean ResultBool"
             : "string Input\nnumber ResultNum";
 
-        var fire = FireForTransform(
+        var fire = FireForSet(
             declarations,
             targetField,
             $"Input {op} 1",
@@ -231,9 +231,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     [InlineData((long)4, 6d)]
     [InlineData((ulong)4, 6d)]
     [InlineData((float)4, 6d)]
-    public void Fire_Transform_NumericRuntimeTypes_AreAccepted(object input, double expected)
+    public void Fire_Set_NumericRuntimeTypes_AreAccepted(object input, double expected)
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "number Input\nnumber Output",
             "Output",
             "Input + 2",
@@ -248,9 +248,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     }
 
     [Fact]
-    public void Fire_Transform_UnknownIdentifier_IsRejected()
+    public void Fire_Set_UnknownIdentifier_IsRejected()
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "number Output",
             "Output",
             "Missing + 1",
@@ -347,9 +347,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     }
 
     [Fact]
-    public void Fire_Transform_UnaryNot_WithNonBooleanOperand_IsRejected()
+    public void Fire_Set_UnaryNot_WithNonBooleanOperand_IsRejected()
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "number Input\nboolean Result",
             "Result",
             "!Input",
@@ -364,9 +364,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     }
 
     [Fact]
-    public void Fire_Transform_UnaryMinus_WithNonNumericOperand_IsRejected()
+    public void Fire_Set_UnaryMinus_WithNonNumericOperand_IsRejected()
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "string Input\nnumber Result",
             "Result",
             "-Input",
@@ -381,9 +381,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     }
 
     [Fact]
-    public void Fire_Transform_BooleanOr_WithNonBooleanLeftOperand_IsRejected()
+    public void Fire_Set_BooleanOr_WithNonBooleanLeftOperand_IsRejected()
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "number Count\nboolean Flag\nboolean Result",
             "Result",
             "Count || Flag",
@@ -399,9 +399,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     }
 
     [Fact]
-    public void Fire_Transform_BooleanOr_WithNonBooleanRightOperand_IsRejected()
+    public void Fire_Set_BooleanOr_WithNonBooleanRightOperand_IsRejected()
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "boolean Flag\nnumber Count\nboolean Result",
             "Result",
             "Flag || Count",
@@ -417,9 +417,9 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     }
 
     [Fact]
-    public void Fire_Transform_OrderedComparison_WithNonNumericOperand_IsRejected()
+    public void Fire_Set_OrderedComparison_WithNonNumericOperand_IsRejected()
     {
-        var fire = FireForTransform(
+        var fire = FireForSet(
             "string Input\nboolean Result",
             "Result",
             "Input > 0",
@@ -433,7 +433,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
         fire.Reasons.Should().ContainSingle(r => r.Contains("operator '>' requires numeric operands", StringComparison.Ordinal));
     }
 
-    private static DslInstanceFireResult FireForTransform(
+    private static DslInstanceFireResult FireForSet(
         string declarations,
         string targetField,
         string expression,
@@ -449,7 +449,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
               number? EventNum
               string? EventText
             from A on Go
-              transform {{targetField}} = {{expression}}
+              set {{targetField}} = {{expression}}
               transition B
             """;
 

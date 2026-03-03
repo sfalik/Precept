@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace StateMachine.Dsl;
 
@@ -39,7 +39,7 @@ public sealed record DslBinaryExpression(string Operator, DslExpression Left, Ds
 
 public sealed record DslParenthesizedExpression(DslExpression Inner) : DslExpression;
 
-public sealed record DslTransformAssignment(
+public sealed record DslSetAssignment(
     string Key,
     string ExpressionText,
     DslExpression Expression);
@@ -49,7 +49,7 @@ public sealed record DslTransition(
     string ToState,
     string EventName,
     string? GuardExpression,
-    IReadOnlyList<DslTransformAssignment> TransformAssignments,
+    IReadOnlyList<DslSetAssignment> SetAssignments,
     int Order = 0);
 
 public sealed record DslTerminalRule(

@@ -16,7 +16,7 @@ internal sealed class SmDslAnalyzer
     private static readonly Regex EventArgRegex = new("^\\s*(?:string|number|boolean|null)\\??\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex FromOnRegex = new("^\\s*from\\s+(?<from>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)\\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EventMemberPrefixRegex = new("(?<event>[A-Za-z_][A-Za-z0-9_]*)\\.$", RegexOptions.Compiled);
-    private static readonly Regex TransformLineRegex = new("^\\s*transform\\s+(?<key>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<expr>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex SetLineRegex = new("^\\s*set\\s+(?<key>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<expr>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly MethodInfo? ExpressionParseMethod = typeof(DslMachine).Assembly
         .GetType("StateMachine.Dsl.DslExpressionParser", throwOnError: false)
         ?.GetMethod(
@@ -93,11 +93,11 @@ internal sealed class SmDslAnalyzer
             return DistinctAndSort(guardItems.Concat(GuardSnippetItems));
         }
 
-        if (Regex.IsMatch(beforeCursor, "^\\s*transform\\s+[^=\\n]*$", RegexOptions.IgnoreCase) &&
+        if (Regex.IsMatch(beforeCursor, "^\\s*set\\s+[^=\\n]*$", RegexOptions.IgnoreCase) &&
             !beforeCursor.Contains('=', StringComparison.Ordinal))
-            return DistinctAndSort(BuildItems(dataFields, CompletionItemKind.Field).Concat(TransformSnippetItems));
+            return DistinctAndSort(BuildItems(dataFields, CompletionItemKind.Field).Concat(SetSnippetItems));
 
-        if (Regex.IsMatch(beforeCursor, "^\\s*transform\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*[^\\n]*$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*set\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*[^\\n]*$", RegexOptions.IgnoreCase))
             return BuildExpressionCompletions(dataFields, currentEvent, eventArgs);
 
         if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+[^\\n]*\\s+on(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
@@ -297,7 +297,7 @@ internal sealed class SmDslAnalyzer
         foreach (var transition in machine.Transitions)
         {
             var transitionSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, transition.EventName);
-            IReadOnlyDictionary<string, StaticValueKind> transformSymbols = transitionSymbols;
+            IReadOnlyDictionary<string, StaticValueKind> setSymbols = transitionSymbols;
 
             if (!string.IsNullOrWhiteSpace(transition.GuardExpression))
             {
@@ -312,21 +312,21 @@ internal sealed class SmDslAnalyzer
                     lines);
 
                 if (TryParseExpression(transition.GuardExpression!, out var parsedGuard, out _))
-                    transformSymbols = ApplyNarrowing(parsedGuard!, transitionSymbols, assumeTrue: true);
+                    setSymbols = ApplyNarrowing(parsedGuard!, transitionSymbols, assumeTrue: true);
             }
 
-            foreach (var assignment in transition.TransformAssignments)
+            foreach (var assignment in transition.SetAssignments)
             {
-                var assignmentLine = FindTransformLine(lines, ref searchLine, assignment.Key, assignment.ExpressionText);
+                var assignmentLine = FindSetLine(lines, ref searchLine, assignment.Key, assignment.ExpressionText);
                 if (!dataFieldKinds.TryGetValue(assignment.Key, out var targetKind))
                     continue;
 
                 ValidateExpression(
                     assignment.ExpressionText,
                     assignmentLine,
-                    transformSymbols,
+                    setSymbols,
                     expectedKind: targetKind,
-                    expectedLabel: $"transform target '{assignment.Key}'",
+                    expectedLabel: $"set target '{assignment.Key}'",
                     diagnostics,
                     lines);
             }
@@ -783,11 +783,11 @@ internal sealed class SmDslAnalyzer
         return 0;
     }
 
-    private static int FindTransformLine(string[] lines, ref int searchLine, string key, string expression)
+    private static int FindSetLine(string[] lines, ref int searchLine, string key, string expression)
     {
         for (var i = Math.Max(0, searchLine); i < lines.Length; i++)
         {
-            var match = TransformLineRegex.Match(lines[i]);
+            var match = SetLineRegex.Match(lines[i]);
             if (!match.Success)
                 continue;
 
@@ -928,7 +928,7 @@ internal sealed class SmDslAnalyzer
         new CompletionItem { Label = "else if", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "else", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "transition", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "transform", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "set", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "reject", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "no transition", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "string", Kind = CompletionItemKind.Keyword },
@@ -978,9 +978,9 @@ internal sealed class SmDslAnalyzer
         SnippetItem("else ... reject", "else\n  reject \"${1:Reason}\"", "Fallback branch")
     ];
 
-    private static readonly IReadOnlyList<CompletionItem> TransformSnippetItems =
+    private static readonly IReadOnlyList<CompletionItem> SetSnippetItems =
     [
-        SnippetItem("transform assignment", "transform ${1:Field} = ${2:value}", "Data assignment")
+        SnippetItem("set assignment", "set ${1:Field} = ${2:value}", "Data assignment")
     ];
 
     private static readonly IReadOnlyList<CompletionItem> TransitionSnippetItems =

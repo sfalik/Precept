@@ -9,27 +9,27 @@ namespace StateMachine.Tests;
 public class DslExpressionParserTests
 {
     [Fact]
-    public void Parse_TransformExpression_NumberLiteral_IsLiteralExpression()
+    public void Parse_SetExpression_NumberLiteral_IsLiteralExpression()
     {
-        var expression = DslExpressionTestHelper.ParseFirstTransformExpression("42");
+        var expression = DslExpressionTestHelper.ParseFirstSetExpression("42");
 
         expression.Should().BeOfType<DslLiteralExpression>();
         ((DslLiteralExpression)expression).Value.Should().Be(42d);
     }
 
     [Fact]
-    public void Parse_TransformExpression_StringLiteral_IsLiteralExpression()
+    public void Parse_SetExpression_StringLiteral_IsLiteralExpression()
     {
-        var expression = DslExpressionTestHelper.ParseFirstTransformExpression("\"hello\"");
+        var expression = DslExpressionTestHelper.ParseFirstSetExpression("\"hello\"");
 
         expression.Should().BeOfType<DslLiteralExpression>();
         ((DslLiteralExpression)expression).Value.Should().Be("hello");
     }
 
     [Fact]
-    public void Parse_TransformExpression_Identifier_IsIdentifierExpression()
+    public void Parse_SetExpression_Identifier_IsIdentifierExpression()
     {
-        var expression = DslExpressionTestHelper.ParseFirstTransformExpression("CarsWaiting");
+        var expression = DslExpressionTestHelper.ParseFirstSetExpression("CarsWaiting");
 
         expression.Should().BeOfType<DslIdentifierExpression>();
         var identifier = (DslIdentifierExpression)expression;
@@ -38,9 +38,9 @@ public class DslExpressionParserTests
     }
 
     [Fact]
-    public void Parse_TransformExpression_ScopedIdentifier_IsIdentifierExpressionWithMember()
+    public void Parse_SetExpression_ScopedIdentifier_IsIdentifierExpressionWithMember()
     {
-        var expression = DslExpressionTestHelper.ParseFirstTransformExpression("Emergency.Reason");
+        var expression = DslExpressionTestHelper.ParseFirstSetExpression("Emergency.Reason");
 
         expression.Should().BeOfType<DslIdentifierExpression>();
         var identifier = (DslIdentifierExpression)expression;
@@ -49,9 +49,9 @@ public class DslExpressionParserTests
     }
 
     [Fact]
-    public void Parse_TransformExpression_UnaryNot_IsUnaryExpression()
+    public void Parse_SetExpression_UnaryNot_IsUnaryExpression()
     {
-        var expression = DslExpressionTestHelper.ParseFirstTransformExpression("!IsEnabled");
+        var expression = DslExpressionTestHelper.ParseFirstSetExpression("!IsEnabled");
 
         expression.Should().BeOfType<DslUnaryExpression>();
         var unary = (DslUnaryExpression)expression;
@@ -60,9 +60,9 @@ public class DslExpressionParserTests
     }
 
     [Fact]
-    public void Parse_TransformExpression_UnaryMinus_IsUnaryExpression()
+    public void Parse_SetExpression_UnaryMinus_IsUnaryExpression()
     {
-        var expression = DslExpressionTestHelper.ParseFirstTransformExpression("-RetryCount");
+        var expression = DslExpressionTestHelper.ParseFirstSetExpression("-RetryCount");
 
         expression.Should().BeOfType<DslUnaryExpression>();
         var unary = (DslUnaryExpression)expression;
@@ -71,9 +71,9 @@ public class DslExpressionParserTests
     }
 
     [Fact]
-    public void Parse_TransformExpression_ArithmeticPrecedence_MultipliesBeforeAddition()
+    public void Parse_SetExpression_ArithmeticPrecedence_MultipliesBeforeAddition()
     {
-        var expression = DslExpressionTestHelper.ParseFirstTransformExpression("A + B * 2");
+        var expression = DslExpressionTestHelper.ParseFirstSetExpression("A + B * 2");
 
         expression.Should().BeOfType<DslBinaryExpression>();
         var add = (DslBinaryExpression)expression;
@@ -86,9 +86,9 @@ public class DslExpressionParserTests
     }
 
     [Fact]
-    public void Parse_TransformExpression_ParenthesesOverridePrecedence()
+    public void Parse_SetExpression_ParenthesesOverridePrecedence()
     {
-        var expression = DslExpressionTestHelper.ParseFirstTransformExpression("(A + B) * 2");
+        var expression = DslExpressionTestHelper.ParseFirstSetExpression("(A + B) * 2");
 
         expression.Should().BeOfType<DslBinaryExpression>();
         var multiply = (DslBinaryExpression)expression;
@@ -101,9 +101,9 @@ public class DslExpressionParserTests
     }
 
     [Fact]
-    public void Parse_TransformExpression_LogicalPrecedence_AndBeforeOr()
+    public void Parse_SetExpression_LogicalPrecedence_AndBeforeOr()
     {
-        var expression = DslExpressionTestHelper.ParseFirstTransformExpression("A || B && C");
+        var expression = DslExpressionTestHelper.ParseFirstSetExpression("A || B && C");
 
         expression.Should().BeOfType<DslBinaryExpression>();
         var or = (DslBinaryExpression)expression;
@@ -113,39 +113,39 @@ public class DslExpressionParserTests
     }
 
     [Fact]
-    public void Parse_TransformExpression_ModuloOperator_IsBinaryExpression()
+    public void Parse_SetExpression_ModuloOperator_IsBinaryExpression()
     {
-        var expression = DslExpressionTestHelper.ParseFirstTransformExpression("RetryCount % 2");
+        var expression = DslExpressionTestHelper.ParseFirstSetExpression("RetryCount % 2");
 
         expression.Should().BeOfType<DslBinaryExpression>();
         ((DslBinaryExpression)expression).Operator.Should().Be("%");
     }
 
     [Fact]
-    public void Parse_TransformExpression_InvalidSingleEquals_ThrowsLineError()
+    public void Parse_SetExpression_InvalidSingleEquals_ThrowsLineError()
     {
-        var act = DslExpressionTestHelper.ParseFirstTransformExpressionAction("A = 1");
+        var act = DslExpressionTestHelper.ParseFirstSetExpressionAction("A = 1");
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invalid transform expression*did you mean '=='*", because: "single '=' is not valid expression syntax");
+            .WithMessage("*invalid set expression*did you mean '=='*", because: "single '=' is not valid expression syntax");
     }
 
     [Fact]
-    public void Parse_TransformExpression_MissingScopedMember_ThrowsLineError()
+    public void Parse_SetExpression_MissingScopedMember_ThrowsLineError()
     {
-        var act = DslExpressionTestHelper.ParseFirstTransformExpressionAction("Emergency.");
+        var act = DslExpressionTestHelper.ParseFirstSetExpressionAction("Emergency.");
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invalid transform expression*expected identifier after '.'*");
+            .WithMessage("*invalid set expression*expected identifier after '.'*");
     }
 
     [Fact]
-    public void Parse_TransformExpression_UnterminatedString_ThrowsLineError()
+    public void Parse_SetExpression_UnterminatedString_ThrowsLineError()
     {
-        var act = DslExpressionTestHelper.ParseFirstTransformExpressionAction("\"oops");
+        var act = DslExpressionTestHelper.ParseFirstSetExpressionAction("\"oops");
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invalid transform expression*unterminated string literal*");
+            .WithMessage("*invalid set expression*unterminated string literal*");
     }
 
 }

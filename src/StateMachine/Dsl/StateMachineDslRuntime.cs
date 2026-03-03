@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -205,7 +205,7 @@ public sealed class DslWorkflowDefinition
             return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
 
         var updatedData = new Dictionary<string, object?>(instance.InstanceData, StringComparer.Ordinal);
-        foreach (var assignment in resolution.Transition.TransformAssignments)
+        foreach (var assignment in resolution.Transition.SetAssignments)
         {
             var assignmentContext = BuildEvaluationData(updatedData, eventName, eventArguments);
             var assignmentEvaluation = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, assignmentContext);

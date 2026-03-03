@@ -24,7 +24,7 @@ The library enforces that **state and data change together, only through transit
 | Name | What occupies it |
 |---|---|
 | Tether | Registered (unlisted, abandoned — ObservableCollection sync, 2014) |
-| Forge | Data transformation/import library |
+| Forge | Data mapping/import library |
 | Sentry | Sentry error monitoring SDK |
 | Gatekeeper | RBAC library |
 | Nexum | CQRS/MediatR successor |

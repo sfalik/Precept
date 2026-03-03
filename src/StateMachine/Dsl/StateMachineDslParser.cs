@@ -27,8 +27,8 @@ public static class StateMachineDslParser
         "^else\\s+if\\s+(?<guard>.+?)(?:\\s+reason\\s+\"(?<reason>[^\"]+)\")?$",
         RegexOptions.Compiled);
     private static readonly Regex ElseRegex = new("^else$", RegexOptions.Compiled);
-    private static readonly Regex TransformRegex = new(
-        "^transform\\s+(?<setKey>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<setExpr>.+)$",
+    private static readonly Regex SetRegex = new(
+        "^set\\s+(?<setKey>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<setExpr>.+)$",
         RegexOptions.Compiled);
     private static readonly Regex SimpleTransitionRegex = new(
         "^transition\\s+(?<to>[A-Za-z_][A-Za-z0-9_]*)$",
@@ -229,7 +229,7 @@ public static class StateMachineDslParser
         bool hasIfChain = false;
         bool hasElseBranch = false;
 
-        var pendingTransforms = new List<DslTransformAssignment>();
+        var pendingSets = new List<DslSetAssignment>();
 
         index++;
         while (index < lines.Length)
@@ -320,10 +320,10 @@ public static class StateMachineDslParser
                 continue;
             }
 
-            var transformAtBlock = TransformRegex.Match(line);
-            if (transformAtBlock.Success)
+            var setAtBlock = SetRegex.Match(line);
+            if (setAtBlock.Success)
             {
-                pendingTransforms.Add(ParseTransformAssignment(transformAtBlock, index + 1));
+                pendingSets.Add(ParseSetAssignment(setAtBlock, index + 1));
                 index++;
                 continue;
             }
@@ -339,12 +339,12 @@ public static class StateMachineDslParser
                         targetState,
                         eventName,
                         null,
-                        pendingTransforms.ToArray(),
+                        pendingSets.ToArray(),
                         branchOrder));
                 }
                 branchOrder++;
 
-                pendingTransforms.Clear();
+                pendingSets.Clear();
                 reachedTerminalStatement = true;
                 index++;
                 continue;
@@ -377,8 +377,8 @@ public static class StateMachineDslParser
             throw new InvalidOperationException($"Line {index + 1}: unrecognized statement '{line}' inside from/on block.");
         }
 
-        if (pendingTransforms.Count > 0)
-            throw new InvalidOperationException($"Line {index}: transform requires a following transition.");
+        if (pendingSets.Count > 0)
+            throw new InvalidOperationException($"Line {index}: set requires a following transition.");
 
         if (!reachedTerminalStatement)
             throw new InvalidOperationException($"Line {index}: from/on block must end with an outcome statement: transition <State>, reject <reason>, or no transition.");
@@ -401,7 +401,7 @@ public static class StateMachineDslParser
         ref int branchOrder,
         string guardExpression)
     {
-        var branchTransforms = new List<DslTransformAssignment>();
+        var branchSets = new List<DslSetAssignment>();
         string? branchTargetState = null;
         bool hasNoTransitionOutcome = false;
 
@@ -420,10 +420,10 @@ public static class StateMachineDslParser
             if (nestedIndent <= branchHeaderIndent)
                 break;
 
-            var transformMatch = TransformRegex.Match(nestedLine);
-            if (transformMatch.Success)
+            var setMatch = SetRegex.Match(nestedLine);
+            if (setMatch.Success)
             {
-                branchTransforms.Add(ParseTransformAssignment(transformMatch, index + 1));
+                branchSets.Add(ParseSetAssignment(setMatch, index + 1));
                 index++;
                 continue;
             }
@@ -452,14 +452,14 @@ public static class StateMachineDslParser
             if (RejectRegex.IsMatch(nestedLine))
                 throw new InvalidOperationException($"Line {index + 1}: if/else if branches support 'transition <State>' or 'no transition'; use else or a block outcome statement for reject.");
 
-            throw new InvalidOperationException($"Line {index + 1}: expected 'transform <Key> = <Expr>', 'transition <State>', or 'no transition' inside if-branch.");
+            throw new InvalidOperationException($"Line {index + 1}: expected 'set <Key> = <Expr>', 'transition <State>', or 'no transition' inside if-branch.");
         }
 
         if (string.IsNullOrWhiteSpace(branchTargetState) && !hasNoTransitionOutcome)
             throw new InvalidOperationException($"Line {index}: if/else if branch requires 'transition <State>' or 'no transition'.");
 
-        if (hasNoTransitionOutcome && branchTransforms.Count > 0)
-            throw new InvalidOperationException($"Line {index}: transform requires a transition outcome and cannot be used with 'no transition'.");
+        if (hasNoTransitionOutcome && branchSets.Count > 0)
+            throw new InvalidOperationException($"Line {index}: set requires a transition outcome and cannot be used with 'no transition'.");
 
         if (hasNoTransitionOutcome)
         {
@@ -477,7 +477,7 @@ public static class StateMachineDslParser
                 branchTargetState!,
                 eventName,
                 guardExpression,
-                branchTransforms.ToArray(),
+                branchSets.ToArray(),
                 branchOrder));
         }
 
@@ -494,7 +494,7 @@ public static class StateMachineDslParser
         ICollection<DslTerminalRule> blockTerminalRules,
         ref int branchOrder)
     {
-        var branchTransforms = new List<DslTransformAssignment>();
+        var branchSets = new List<DslSetAssignment>();
         string? branchTargetState = null;
         DslTerminalKind? branchTerminalKind = null;
         string? branchTerminalReason = null;
@@ -518,10 +518,10 @@ public static class StateMachineDslParser
             if (branchReachedOutcome)
                 throw new InvalidOperationException($"Line {index + 1}: no statements are allowed after an outcome statement in an else-branch.");
 
-            var transformMatch = TransformRegex.Match(nestedLine);
-            if (transformMatch.Success)
+            var setMatch = SetRegex.Match(nestedLine);
+            if (setMatch.Success)
             {
-                branchTransforms.Add(ParseTransformAssignment(transformMatch, index + 1));
+                branchSets.Add(ParseSetAssignment(setMatch, index + 1));
                 index++;
                 continue;
             }
@@ -569,7 +569,7 @@ public static class StateMachineDslParser
                     branchTargetState,
                     eventName,
                     null,
-                    branchTransforms.ToArray(),
+                    branchSets.ToArray(),
                     branchOrder));
             }
 
@@ -646,19 +646,19 @@ public static class StateMachineDslParser
     private static string NormalizeDataAssignmentKey(string setKey)
         => setKey;
 
-    private static DslTransformAssignment ParseTransformAssignment(Match transformMatch, int lineNumber)
+    private static DslSetAssignment ParseSetAssignment(Match setMatch, int lineNumber)
     {
-        var key = NormalizeDataAssignmentKey(transformMatch.Groups["setKey"].Value.Trim());
-        var expressionText = transformMatch.Groups["setExpr"].Value.Trim();
+        var key = NormalizeDataAssignmentKey(setMatch.Groups["setKey"].Value.Trim());
+        var expressionText = setMatch.Groups["setExpr"].Value.Trim();
 
         try
         {
             var expression = DslExpressionParser.Parse(expressionText);
-            return new DslTransformAssignment(key, expressionText, expression);
+            return new DslSetAssignment(key, expressionText, expression);
         }
         catch (InvalidOperationException ex)
         {
-            throw new InvalidOperationException($"Line {lineNumber}: invalid transform expression '{expressionText}'. {ex.Message}");
+            throw new InvalidOperationException($"Line {lineNumber}: invalid set expression '{expressionText}'. {ex.Message}");
         }
     }
 
@@ -683,7 +683,7 @@ public static class StateMachineDslParser
             if (!eventSet.Contains(transition.EventName))
                 throw new InvalidOperationException($"Transition references unknown event '{transition.EventName}'.");
 
-            foreach (var assignment in transition.TransformAssignments)
+            foreach (var assignment in transition.SetAssignments)
             {
                 if (dataFields.Count == 0)
                     continue;

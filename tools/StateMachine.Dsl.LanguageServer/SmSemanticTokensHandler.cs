@@ -35,13 +35,13 @@ internal sealed class SmSemanticTokensHandler : SemanticTokensHandlerBase
     private static readonly Regex EventDeclRegex = new("^(\\s*)event\\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex FromOnRegex = new("^(\\s*)from\\s+(any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex TransitionRegex = new("^(\\s*)transition\\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
-    private static readonly Regex TransformRegex = new("^(\\s*)transform\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=", RegexOptions.Compiled);
+    private static readonly Regex SetRegex = new("^(\\s*)set\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=", RegexOptions.Compiled);
     private static readonly Regex TypeDeclRegex = new("^(\\s*)(string|number|boolean|null)\\??\\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly string[] KeywordTokens =
     [
         "machine", "state", "event", "from", "on", "if", "else",
-        "transition", "transform", "reject", "reason", "no", "any",
+        "transition", "set", "reject", "reason", "no", "any",
         "true", "false", "null", "string", "number", "boolean"
     ];
 
@@ -129,9 +129,9 @@ internal sealed class SmSemanticTokensHandler : SemanticTokensHandlerBase
         if (transition.Success)
             Push(builder, lineIndex, transition.Groups[2].Index, transition.Groups[2].Length, "type");
 
-        var transform = TransformRegex.Match(line);
-        if (transform.Success)
-            Push(builder, lineIndex, transform.Groups[2].Index, transform.Groups[2].Length, "variable");
+        var set = SetRegex.Match(line);
+        if (set.Success)
+            Push(builder, lineIndex, set.Groups[2].Index, set.Groups[2].Length, "variable");
 
         var typeDecl = TypeDeclRegex.Match(line);
         if (typeDecl.Success)

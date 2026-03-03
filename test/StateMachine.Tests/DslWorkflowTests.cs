@@ -444,7 +444,7 @@ public class DslWorkflowTests
             state Green
             event Advance
             from Red on Advance
-                transform CarsWaiting = 0
+                set CarsWaiting = 0
                 transition Green
             """;
 
@@ -468,7 +468,7 @@ public class DslWorkflowTests
             state FlashingRed
             event Emergency
             from Red on Emergency
-                transform EmergencyReason = Emergency.Reason
+                set EmergencyReason = Emergency.Reason
                 transition FlashingRed
             """;
 
@@ -493,7 +493,7 @@ public class DslWorkflowTests
             event Emergency
                 string Reason
             from Red on Emergency
-                transform EmergencyReason = Emergency.Reason
+                set EmergencyReason = Emergency.Reason
                 transition FlashingRed
             """;
 
@@ -518,7 +518,7 @@ public class DslWorkflowTests
                 number LastCarsWaiting
             event Advance
             from Red on Advance
-                transform LastCarsWaiting = CarsWaiting
+                set LastCarsWaiting = CarsWaiting
                 transition Green
             """;
 
@@ -536,7 +536,7 @@ public class DslWorkflowTests
     }
 
     [Fact]
-    public void Fire_Instance_MultipleTransforms_AreAppliedInOrder_WithReadYourWrites()
+    public void Fire_Instance_MultipleSets_AreAppliedInOrder_WithReadYourWrites()
     {
         const string dsl = """
             machine Counters
@@ -546,8 +546,8 @@ public class DslWorkflowTests
             state Green
             event Advance
             from Red on Advance
-                transform CarsWaiting = CarsWaiting + 1
-                transform LastCarsWaiting = CarsWaiting + 1
+                set CarsWaiting = CarsWaiting + 1
+                set LastCarsWaiting = CarsWaiting + 1
                 transition Green
             """;
 
@@ -567,7 +567,7 @@ public class DslWorkflowTests
     }
 
     [Fact]
-    public void Fire_Instance_MultipleTransforms_Failure_RollsBackBatch()
+    public void Fire_Instance_MultipleSets_Failure_RollsBackBatch()
     {
         const string dsl = """
             machine Counters
@@ -577,8 +577,8 @@ public class DslWorkflowTests
             state Green
             event Advance
             from Red on Advance
-                transform CarsWaiting = CarsWaiting + 1
-                transform LastCarsWaiting = "bad"
+                set CarsWaiting = CarsWaiting + 1
+                set LastCarsWaiting = "bad"
                 transition Green
             """;
 
@@ -610,7 +610,7 @@ public class DslWorkflowTests
             state Green
             event Advance
             from Red on Advance
-                transform NextCarsWaiting = CarsWaiting + 2
+                set NextCarsWaiting = CarsWaiting + 2
                 transition Green
             """;
 
@@ -639,7 +639,7 @@ public class DslWorkflowTests
             event Emergency
                 string Reason
             from Red on Emergency
-                transform Message = Prefix + Emergency.Reason
+                set Message = Prefix + Emergency.Reason
                 transition FlashingRed
             """;
 
@@ -669,7 +669,7 @@ public class DslWorkflowTests
             event Emergency
                 string? Reason
             from Red on Emergency
-                transform Message = Prefix + Emergency.Reason
+                set Message = Prefix + Emergency.Reason
                 transition FlashingRed
             """;
 
@@ -717,7 +717,7 @@ public class DslWorkflowTests
                 string Reason
                 string? EmergencyReason
             from Red on Emergency
-                transform EmergencyReason = Emergency.Reason
+                set EmergencyReason = Emergency.Reason
                 transition FlashingRed
             """;
 
@@ -742,7 +742,7 @@ public class DslWorkflowTests
             event Emergency
                 string Reason
             from Red on Emergency
-                transform EmergencyReason = Emergency.Reason
+                set EmergencyReason = Emergency.Reason
                 transition FlashingRed
             """;
 
@@ -766,10 +766,10 @@ public class DslWorkflowTests
             event Enable
             event Disable
             from Off on Enable
-                transform IsEnabled = true
+                set IsEnabled = true
                 transition On
             from On on Disable
-                transform IsEnabled = false
+                set IsEnabled = false
                 transition Off
             """;
 
@@ -794,7 +794,7 @@ public class DslWorkflowTests
             state Cleared
             event Clear
             from Open on Clear
-                transform Note = null
+                set Note = null
                 transition Cleared
             """;
 
@@ -816,7 +816,7 @@ public class DslWorkflowTests
             state Green
             event Advance
             from Red on Advance
-                transform CarsWaiting = 0
+                set CarsWaiting = 0
                 transition Green
             """;
 
@@ -960,7 +960,7 @@ public class DslWorkflowTests
             event Advance
             from Red on Advance
                 if CarsWaiting > 0
-                    transform CarsWaiting = 0
+                    set CarsWaiting = 0
                     transition Green
                 reject "Cars waiting required"
             """;
@@ -969,15 +969,15 @@ public class DslWorkflowTests
 
         machine.Transitions.Should().ContainSingle();
         machine.Transitions[0].GuardExpression.Should().Be("CarsWaiting > 0");
-        machine.Transitions[0].TransformAssignments.Should().ContainSingle();
-        machine.Transitions[0].TransformAssignments[0].Key.Should().Be("CarsWaiting");
-        machine.Transitions[0].TransformAssignments[0].ExpressionText.Should().Be("0");
+        machine.Transitions[0].SetAssignments.Should().ContainSingle();
+        machine.Transitions[0].SetAssignments[0].Key.Should().Be("CarsWaiting");
+        machine.Transitions[0].SetAssignments[0].ExpressionText.Should().Be("0");
         machine.TerminalRules.Should().ContainSingle();
         machine.TerminalRules[0].Reason.Should().Be("Cars waiting required");
     }
 
     [Fact]
-    public void Parse_FromOnBlock_WithMultipleTransforms_PreservesAssignmentOrder()
+    public void Parse_FromOnBlock_WithMultipleSets_PreservesAssignmentOrder()
     {
         const string dsl = """
             machine TrafficLight
@@ -985,19 +985,19 @@ public class DslWorkflowTests
             state Green
             event Advance
             from Red on Advance
-                transform CarsWaiting = CarsWaiting + 1
-                transform LastCarsWaiting = CarsWaiting
+                set CarsWaiting = CarsWaiting + 1
+                set LastCarsWaiting = CarsWaiting
                 transition Green
             """;
 
         var machine = StateMachineDslParser.Parse(dsl);
 
         machine.Transitions.Should().ContainSingle();
-        machine.Transitions[0].TransformAssignments.Should().HaveCount(2);
-        machine.Transitions[0].TransformAssignments[0].Key.Should().Be("CarsWaiting");
-        machine.Transitions[0].TransformAssignments[0].ExpressionText.Should().Be("CarsWaiting + 1");
-        machine.Transitions[0].TransformAssignments[1].Key.Should().Be("LastCarsWaiting");
-        machine.Transitions[0].TransformAssignments[1].ExpressionText.Should().Be("CarsWaiting");
+        machine.Transitions[0].SetAssignments.Should().HaveCount(2);
+        machine.Transitions[0].SetAssignments[0].Key.Should().Be("CarsWaiting");
+        machine.Transitions[0].SetAssignments[0].ExpressionText.Should().Be("CarsWaiting + 1");
+        machine.Transitions[0].SetAssignments[1].Key.Should().Be("LastCarsWaiting");
+        machine.Transitions[0].SetAssignments[1].ExpressionText.Should().Be("CarsWaiting");
     }
 
     [Fact]
@@ -1250,10 +1250,11 @@ public class DslWorkflowTests
             }
 
             [Fact]
-            public void Parse_SetAlias_IsRejected()
+            public void Parse_SetStatement_IsAccepted()
             {
                 const string dsl = """
                     machine TrafficLight
+                    number CarsWaiting
                     state Red
                     state Green
                     event Advance
@@ -1263,11 +1264,11 @@ public class DslWorkflowTests
                         transition Green
                     """;
 
-                var act = () => StateMachineDslParser.Parse(dsl);
+                var machine = StateMachineDslParser.Parse(dsl);
 
-                act.Should()
-                    .Throw<InvalidOperationException>()
-                    .WithMessage("*unrecognized statement 'set CarsWaiting = 0' inside from/on block*");
+                machine.Transitions.Should().ContainSingle();
+                machine.Transitions[0].SetAssignments.Should().ContainSingle();
+                machine.Transitions[0].SetAssignments[0].Key.Should().Be("CarsWaiting");
             }
 
             [Fact]
