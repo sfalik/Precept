@@ -2685,6 +2685,7 @@
           mockEmergencyArgs.AuthorizedBy = '';
           mockEmergencyArgs.Reason = '';
           showRowFeedback(eventName, `✔ ${beforeState} → ${newState}`, 'ok');
+          renderAll();
         });
         drawDiagram();
         return;
@@ -2737,6 +2738,7 @@
         mockEmergencyArgs.AuthorizedBy = '';
         mockEmergencyArgs.Reason = '';
         showRowFeedback(eventName, `✔ ${from} → ${currentState}`, 'ok');
+        renderAll();
       });
       drawDiagram();
     }
