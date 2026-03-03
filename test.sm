@@ -1,0 +1,8 @@
+machine test
+
+state before
+state after
+
+event go
+from before on go
+    transition after

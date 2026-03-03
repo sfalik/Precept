@@ -1399,7 +1399,7 @@
             };
           }
 
-          if (liveStatus.outcome === 'noTransition') {
+          if (liveStatus.outcome === 'notransition') {
             return {
               kind: 'noTransition',
               to: state,
@@ -2457,7 +2457,28 @@
         `;
       }).join('');
 
-      diagram.innerHTML = `${defs}${edgeSvg}${annotationSvg}${nodeSvg}`;
+      let selfLoopSvg = '';
+      if (hoveredEvaluation !== null && hoveredEvaluation.kind === 'noTransition' && activeHoverEventName !== null) {
+        const loopPos = statePositions[diagramState];
+        if (loopPos) {
+          const ns = nodeSizes[diagramState] ?? { width: 112, height: 44 };
+          const halfW = ns.width / 2;
+          const halfH = ns.height / 2;
+          const x0 = loopPos.x - halfW * 0.42;
+          const x1 = loopPos.x + halfW * 0.42;
+          const top = loopPos.y - halfH;
+          const ctrl = top - 48;
+          const pathD = `M ${x0} ${top} C ${x0} ${ctrl}, ${x1} ${ctrl}, ${x1} ${top}`;
+          const labelX = loopPos.x;
+          const chipHeight = 16;
+          const chipWidth = activeHoverEventName.length * 7 + 16;
+          const chipY = ctrl - chipHeight - 4;
+          const textY = chipY + chipHeight / 2;
+          selfLoopSvg = `<g opacity="0.72"><path d="${pathD}" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="5 4" stroke-linecap="round"></path><rect class="edge-chip" x="${labelX - chipWidth / 2}" y="${chipY}" width="${chipWidth}" height="${chipHeight}" fill="rgba(30,30,30,0.88)" stroke="var(--ok)" stroke-width="1.1"></rect><text class="edge-label" x="${labelX}" y="${textY}" fill="var(--ok)">${activeHoverEventName}</text></g>`;
+        }
+      }
+
+      diagram.innerHTML = `${defs}${edgeSvg}${selfLoopSvg}${annotationSvg}${nodeSvg}`;
     }
 
     function renderEventBar() {
@@ -2476,6 +2497,8 @@
           const activeClass = eventName === selectedEventName ? ' active' : '';
           const stateClass = evaluation.kind === 'enabled'
             ? ' enabled'
+            : evaluation.kind === 'noTransition'
+            ? ' noTransition'
             : evaluation.kind === 'blocked'
             ? ' blocked'
             : evaluation.kind === 'undefined'
@@ -2483,6 +2506,8 @@
               : '';
           const glyph = evaluation.kind === 'enabled'
             ? '✔'
+            : evaluation.kind === 'noTransition'
+            ? '⏸'
             : evaluation.kind === 'blocked'
               ? '✖'
               : '∅';
