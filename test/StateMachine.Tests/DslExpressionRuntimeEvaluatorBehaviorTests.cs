@@ -127,6 +127,23 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     }
 
     [Fact]
+    public void Fire_Transform_ParenthesizedExpression_IsApplied()
+    {
+        var fire = FireForTransform(
+            "number Input\nnumber Output",
+            "Output",
+            "(Input + 2) * 3",
+            new Dictionary<string, object?>
+            {
+                ["Input"] = 4d,
+                ["Output"] = 0d
+            });
+
+        fire.IsAccepted.Should().BeTrue();
+        fire.UpdatedInstance!.InstanceData["Output"].Should().Be(18d);
+    }
+
+    [Fact]
     public void Fire_Transform_BooleanAndWithNonBooleanOperand_IsRejected()
     {
         var fire = FireForTransform(
@@ -142,6 +159,92 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
 
         fire.IsAccepted.Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains("operator '&&' requires boolean operands", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Fire_Transform_BooleanAnd_WithNonBooleanLeftOperand_IsRejected()
+    {
+        var fire = FireForTransform(
+            "number Count\nboolean Flag\nboolean Result",
+            "Result",
+            "Count && Flag",
+            new Dictionary<string, object?>
+            {
+                ["Count"] = 1d,
+                ["Flag"] = true,
+                ["Result"] = false
+            });
+
+        fire.IsAccepted.Should().BeFalse();
+        fire.Reasons.Should().ContainSingle(r => r.Contains("operator '&&' requires boolean operands", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Fire_Transform_UnaryOperandResolutionFailure_IsRejected()
+    {
+        var fire = FireForTransform(
+            "number Output",
+            "Output",
+            "-Missing",
+            new Dictionary<string, object?>
+            {
+                ["Output"] = 0d
+            });
+
+        fire.IsAccepted.Should().BeFalse();
+        fire.Reasons.Should().ContainSingle(r => r.Contains("data key 'Missing' was not provided", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("-", "operator '-' requires numeric operands")]
+    [InlineData("*", "operator '*' requires numeric operands")]
+    [InlineData("/", "operator '/' requires numeric operands")]
+    [InlineData("%", "operator '%' requires numeric operands")]
+    [InlineData(">=", "operator '>=' requires numeric operands")]
+    [InlineData("<", "operator '<' requires numeric operands")]
+    [InlineData("<=", "operator '<=' requires numeric operands")]
+    public void Fire_Transform_NonNumericOperands_AreRejected(string op, string expectedMessage)
+    {
+        var targetField = op is ">=" or "<" or "<=" ? "ResultBool" : "ResultNum";
+        var declarations = op is ">=" or "<" or "<="
+            ? "string Input\nboolean ResultBool"
+            : "string Input\nnumber ResultNum";
+
+        var fire = FireForTransform(
+            declarations,
+            targetField,
+            $"Input {op} 1",
+            op is ">=" or "<" or "<="
+                ? new Dictionary<string, object?> { ["Input"] = "text", ["ResultBool"] = false }
+                : new Dictionary<string, object?> { ["Input"] = "text", ["ResultNum"] = 0d });
+
+        fire.IsAccepted.Should().BeFalse();
+        fire.Reasons.Should().ContainSingle(r => r.Contains(expectedMessage, StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData((byte)4, 6d)]
+    [InlineData((sbyte)4, 6d)]
+    [InlineData((short)4, 6d)]
+    [InlineData((ushort)4, 6d)]
+    [InlineData((uint)4, 6d)]
+    [InlineData((long)4, 6d)]
+    [InlineData((ulong)4, 6d)]
+    [InlineData((float)4, 6d)]
+    public void Fire_Transform_NumericRuntimeTypes_AreAccepted(object input, double expected)
+    {
+        var fire = FireForTransform(
+            "number Input\nnumber Output",
+            "Output",
+            "Input + 2",
+            new Dictionary<string, object?>
+            {
+                ["Input"] = input,
+                ["Output"] = 0d
+            });
+
+        fire.IsAccepted.Should().BeTrue();
+        fire.UpdatedInstance!.InstanceData["Output"].Should().Be(expected);
     }
 
     [Fact]
@@ -241,6 +344,93 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
 
         inspect.IsAccepted.Should().BeFalse();
         inspect.Reasons.Should().ContainSingle("blocked");
+    }
+
+    [Fact]
+    public void Fire_Transform_UnaryNot_WithNonBooleanOperand_IsRejected()
+    {
+        var fire = FireForTransform(
+            "number Input\nboolean Result",
+            "Result",
+            "!Input",
+            new Dictionary<string, object?>
+            {
+                ["Input"] = 1d,
+                ["Result"] = false
+            });
+
+        fire.IsAccepted.Should().BeFalse();
+        fire.Reasons.Should().ContainSingle(r => r.Contains("operator '!' requires boolean operand", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Fire_Transform_UnaryMinus_WithNonNumericOperand_IsRejected()
+    {
+        var fire = FireForTransform(
+            "string Input\nnumber Result",
+            "Result",
+            "-Input",
+            new Dictionary<string, object?>
+            {
+                ["Input"] = "x",
+                ["Result"] = 0d
+            });
+
+        fire.IsAccepted.Should().BeFalse();
+        fire.Reasons.Should().ContainSingle(r => r.Contains("unary '-' requires numeric operand", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Fire_Transform_BooleanOr_WithNonBooleanLeftOperand_IsRejected()
+    {
+        var fire = FireForTransform(
+            "number Count\nboolean Flag\nboolean Result",
+            "Result",
+            "Count || Flag",
+            new Dictionary<string, object?>
+            {
+                ["Count"] = 1d,
+                ["Flag"] = true,
+                ["Result"] = false
+            });
+
+        fire.IsAccepted.Should().BeFalse();
+        fire.Reasons.Should().ContainSingle(r => r.Contains("operator '||' requires boolean operands", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Fire_Transform_BooleanOr_WithNonBooleanRightOperand_IsRejected()
+    {
+        var fire = FireForTransform(
+            "boolean Flag\nnumber Count\nboolean Result",
+            "Result",
+            "Flag || Count",
+            new Dictionary<string, object?>
+            {
+                ["Flag"] = false,
+                ["Count"] = 1d,
+                ["Result"] = false
+            });
+
+        fire.IsAccepted.Should().BeFalse();
+        fire.Reasons.Should().ContainSingle(r => r.Contains("operator '||' requires boolean operands", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Fire_Transform_OrderedComparison_WithNonNumericOperand_IsRejected()
+    {
+        var fire = FireForTransform(
+            "string Input\nboolean Result",
+            "Result",
+            "Input > 0",
+            new Dictionary<string, object?>
+            {
+                ["Input"] = "text",
+                ["Result"] = false
+            });
+
+        fire.IsAccepted.Should().BeFalse();
+        fire.Reasons.Should().ContainSingle(r => r.Contains("operator '>' requires numeric operands", StringComparison.Ordinal));
     }
 
     private static DslInstanceFireResult FireForTransform(

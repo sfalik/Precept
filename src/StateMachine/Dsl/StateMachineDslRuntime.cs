@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
-using System.Text.RegularExpressions;
 
 namespace StateMachine.Dsl;
 
@@ -46,64 +44,6 @@ internal sealed class DefaultGuardEvaluator : IGuardEvaluator
             ? GuardEvaluationResult.Passed()
             : GuardEvaluationResult.Failed($"Guard '{trimmed}' failed.");
     }
-
-    private static bool TryParseLiteral(string text, out object? value)
-    {
-        if (text.Equals("null", StringComparison.OrdinalIgnoreCase))
-        {
-            value = null;
-            return true;
-        }
-
-        if (text.Equals("true", StringComparison.OrdinalIgnoreCase))
-        {
-            value = true;
-            return true;
-        }
-
-        if (text.Equals("false", StringComparison.OrdinalIgnoreCase))
-        {
-            value = false;
-            return true;
-        }
-
-        if ((text.Length >= 2 && text[0] == '\'' && text[^1] == '\'') ||
-            (text.Length >= 2 && text[0] == '"' && text[^1] == '"'))
-        {
-            value = text.Substring(1, text.Length - 2);
-            return true;
-        }
-
-        if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
-        {
-            value = number;
-            return true;
-        }
-
-        value = null;
-        return false;
-    }
-
-    private static bool TryToNumber(object? value, out double number)
-    {
-        switch (value)
-        {
-            case byte b: number = b; return true;
-            case sbyte sb: number = sb; return true;
-            case short s: number = s; return true;
-            case ushort us: number = us; return true;
-            case int i: number = i; return true;
-            case uint ui: number = ui; return true;
-            case long l: number = l; return true;
-            case ulong ul: number = ul; return true;
-            case float f: number = f; return true;
-            case double d: number = d; return true;
-            case decimal dec: number = (double)dec; return true;
-            default:
-                number = default;
-                return false;
-        }
-    }
 }
 
 public sealed class DslWorkflowDefinition
@@ -113,7 +53,6 @@ public sealed class DslWorkflowDefinition
     private readonly Dictionary<string, DslFieldContract> _dataContractMap;
     private readonly Dictionary<string, Dictionary<string, DslFieldContract>> _eventArgContractMap;
     private readonly IGuardEvaluator _guardEvaluator;
-    private static readonly Regex IdentifierRegex = new("^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
 
     public string Name { get; }
     public IReadOnlyList<string> States { get; }
@@ -266,10 +205,9 @@ public sealed class DslWorkflowDefinition
             return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
 
         var updatedData = new Dictionary<string, object?>(instance.InstanceData, StringComparer.Ordinal);
-        var assignment = resolution.Transition.TransformAssignments.LastOrDefault();
-        if (assignment is not null)
+        foreach (var assignment in resolution.Transition.TransformAssignments)
         {
-            var assignmentContext = BuildEvaluationData(instance.InstanceData, eventName, eventArguments);
+            var assignmentContext = BuildEvaluationData(updatedData, eventName, eventArguments);
             var assignmentEvaluation = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, assignmentContext);
             if (!assignmentEvaluation.Success)
                 return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { $"Data assignment failed: {assignmentEvaluation.Error}" });
@@ -389,70 +327,6 @@ public sealed class DslWorkflowDefinition
         };
     }
 
-    private bool TryResolveAssignmentValue(
-        string assignmentExpression,
-        IReadOnlyDictionary<string, object?> instanceData,
-        string eventName,
-        IReadOnlyDictionary<string, object?> eventArguments,
-        out object? assignedValue,
-        out string? error)
-    {
-        if (string.IsNullOrWhiteSpace(assignmentExpression))
-        {
-            assignedValue = null;
-            error = "Data assignment expression is empty.";
-            return false;
-        }
-
-        var expression = assignmentExpression.Trim();
-
-        if (TryParseLiteral(expression, out assignedValue))
-        {
-            error = null;
-            return true;
-        }
-
-        if (TryResolveScopedIdentifier(expression, out var scope, out var key))
-        {
-            if (scope.Equals("data", StringComparison.Ordinal))
-            {
-                error = "Data assignment failed: 'data.' scope is no longer supported. Use bare data field names.";
-                assignedValue = null;
-                return false;
-            }
-
-            if (!scope.Equals(eventName, StringComparison.Ordinal))
-            {
-                error = $"Data assignment failed: event-argument scope '{scope}' does not match current event '{eventName}'.";
-                return false;
-            }
-
-            if (!eventArguments.TryGetValue(key, out assignedValue))
-            {
-                error = $"Data assignment failed: event argument '{key}' was not provided.";
-                return false;
-            }
-
-            error = null;
-            return true;
-        }
-
-        if (IdentifierRegex.IsMatch(expression))
-        {
-            if (!instanceData.TryGetValue(expression, out assignedValue))
-            {
-                error = $"Data assignment failed: data field '{expression}' was not provided.";
-                return false;
-            }
-
-            error = null;
-            return true;
-        }
-
-        error = $"Data assignment failed: expression '{expression}' is not supported. Use literals, <DataField>, or {eventName}.<Arg>.";
-        return false;
-    }
-
     private IReadOnlyList<string> GetRequiredEventArgumentKeys(string eventName)
     {
         if (!_eventArgContractMap.TryGetValue(eventName, out var argContract) || argContract.Count == 0)
@@ -501,24 +375,6 @@ public sealed class DslWorkflowDefinition
         }
 
         return evaluation;
-    }
-
-    private static bool TryResolveScopedIdentifier(string text, out string scope, out string key)
-    {
-        scope = string.Empty;
-        key = string.Empty;
-
-        var separatorIndex = text.IndexOf('.');
-        if (separatorIndex <= 0 || separatorIndex == text.Length - 1)
-            return false;
-
-        if (text.IndexOf('.', separatorIndex + 1) >= 0)
-            return false;
-
-        scope = text[..separatorIndex];
-        key = text[(separatorIndex + 1)..];
-
-        return IdentifierRegex.IsMatch(scope) && IdentifierRegex.IsMatch(key);
     }
 
     private bool TryValidateDataContract(IReadOnlyDictionary<string, object?> data, out string error)
@@ -648,43 +504,6 @@ public sealed class DslWorkflowDefinition
 
         error = string.Empty;
         return true;
-    }
-
-    private static bool TryParseLiteral(string text, out object? value)
-    {
-        if (text.Equals("null", StringComparison.OrdinalIgnoreCase))
-        {
-            value = null;
-            return true;
-        }
-
-        if (text.Equals("true", StringComparison.OrdinalIgnoreCase))
-        {
-            value = true;
-            return true;
-        }
-
-        if (text.Equals("false", StringComparison.OrdinalIgnoreCase))
-        {
-            value = false;
-            return true;
-        }
-
-        if ((text.Length >= 2 && text[0] == '\'' && text[^1] == '\'') ||
-            (text.Length >= 2 && text[0] == '"' && text[^1] == '"'))
-        {
-            value = text.Substring(1, text.Length - 2);
-            return true;
-        }
-
-        if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
-        {
-            value = number;
-            return true;
-        }
-
-        value = null;
-        return false;
     }
 
     private enum TransitionResolutionKind
