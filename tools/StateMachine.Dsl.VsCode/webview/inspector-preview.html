@@ -147,6 +147,7 @@
     }
 
     .diagram-scroll {
+      position: relative;
       min-width: 0;
       min-height: 0;
       height: 100%;
@@ -264,21 +265,37 @@
     }
 
     .event-entry {
-      display: grid;
-      grid-template-columns: 160px 1fr;
+      display: flex;
       align-items: center;
       gap: 6px;
       padding: 2px 0;
+      min-width: 0;
+    }
+
+    .event-btn {
+      flex: 0 0 160px;
+    }
+
+    .event-content {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
     }
 
     .event-reason {
-      grid-column: 1 / -1;
       color: var(--err);
       font-size: 11px;
       line-height: 1.25;
-      margin-top: -1px;
       opacity: 0.7;
       transition: opacity 120ms ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+      min-width: 0;
     }
 
     .event-entry.is-selected .event-reason,
@@ -286,35 +303,38 @@
       opacity: 0.98;
     }
 
-    .event-result-chip {
-      justify-self: start;
+    .diagram-toast {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 10;
       border: 1px solid var(--border);
       border-radius: 999px;
-      font-size: 10px;
-      line-height: 1;
-      padding: 3px 8px;
-      opacity: 0;
-      transform: translateY(2px);
-      transition: opacity 130ms ease, transform 130ms ease;
+      background: rgba(28, 30, 34, 0.92);
+      font-size: 11px;
+      padding: 4px 10px;
       pointer-events: none;
       white-space: nowrap;
+      opacity: 0;
+      transform: translateY(-4px);
+      transition: opacity 160ms ease, transform 160ms ease;
     }
 
-    .event-result-chip.show {
-      opacity: 0.98;
+    .diagram-toast.show {
+      opacity: 0.96;
       transform: translateY(0);
     }
 
-    .event-result-chip.ok {
+    .diagram-toast.ok {
       border-color: var(--ok);
       color: var(--ok);
-      background: rgba(31, 255, 122, 0.12);
+      background: rgba(31, 255, 122, 0.10);
     }
 
-    .event-result-chip.err {
+    .diagram-toast.err {
       border-color: var(--err);
       color: var(--err);
-      background: rgba(255, 42, 87, 0.12);
+      background: rgba(255, 42, 87, 0.10);
     }
 
     .event-label {
@@ -484,7 +504,11 @@
       }
 
       .event-entry {
-        grid-template-columns: 146px 1fr;
+        gap: 5px;
+      }
+
+      .event-btn {
+        flex: 0 0 146px;
       }
 
       .event-args-inline {
@@ -612,6 +636,7 @@
       <div class="diagram-canvas">
         <div class="diagram-scroll" aria-label="diagram scroll area">
           <svg id="diagram" viewBox="0 0 920 430" preserveAspectRatio="xMidYMid meet" aria-label="state diagram"></svg>
+          <div id="diagram-toast" class="diagram-toast" aria-live="polite"></div>
         </div>
         <div class="data-overlay" aria-label="data overlay">
           <ul id="data-list" class="data-list"></ul>
@@ -683,10 +708,58 @@
       Object.keys(eventArgValues).forEach((key) => { delete eventArgValues[key]; });
     }
 
+    let inspectDebounceTimer = null;
+    function inspectEventOnServer(eventName) {
+      if (inspectDebounceTimer) clearTimeout(inspectDebounceTimer);
+      inspectDebounceTimer = setTimeout(async () => {
+        const args = collectEventArgs(eventName);
+        const response = await sendHostRequest('inspect', { eventName, args });
+        if (!response.success) return;
+        const raw = response.inspectResult ?? response.InspectResult;
+        if (!raw) return;
+        const updated = toHostEventStatus(raw);
+        if (!updated) return;
+        // Patch the live status for this event
+        const idx = currentEventStatuses.findIndex((s) => s.name === eventName);
+        if (idx >= 0) {
+          currentEventStatuses[idx] = updated;
+        } else {
+          currentEventStatuses.push(updated);
+        }
+        // Re-evaluate and update UI
+        const evaluation = evaluateEvent(currentState, eventName);
+        if (evaluation.kind === 'enabled') {
+          selectEvent(eventName);
+        } else {
+          syncSelectionToCurrentState();
+        }
+        // Preserve focus across re-render
+        const focused = document.activeElement;
+        const focusedArgName = focused?.dataset?.eventArg;
+        const caretPos = focused?.selectionStart;
+
+        suppressArgBlur = true;
+        renderEventBar();
+        suppressArgBlur = false;
+
+        if (focusedArgName) {
+          const refocus = eventBar.querySelector(`input[data-event-arg="${focusedArgName}"]`);
+          if (refocus) {
+            refocus.focus();
+            if (typeof caretPos === 'number') {
+              refocus.setSelectionRange(caretPos, caretPos);
+            }
+          }
+        }
+        drawDiagram();
+      }, 150);
+    }
+
     const diagram = document.getElementById('diagram');
     const headerState = document.getElementById('header-state');
     const dataList = document.getElementById('data-list');
     const eventBar = document.getElementById('event-bar');
+    const diagramToast = document.getElementById('diagram-toast');
     const reloadButton = document.getElementById('reload-btn');
 
     let selectedTransitionIndex = transitions.findIndex((t) => t.from === 'Red' && t.event === 'Advance' && t.to === 'FlashingGreen');
@@ -929,12 +1002,20 @@
         return null;
       }
 
+      const rawArgs = raw.args ?? raw.Args;
       return {
         name: String(raw.name ?? raw.Name ?? ''),
         outcome: String(raw.outcome ?? raw.Outcome ?? 'undefined').toLowerCase(),
         targetState: raw.targetState ?? raw.TargetState ?? null,
         reasons: Array.isArray(raw.reasons ?? raw.Reasons)
           ? (raw.reasons ?? raw.Reasons).map((reason) => String(reason))
+          : [],
+        args: Array.isArray(rawArgs)
+          ? rawArgs.map((arg) => ({
+            name: String(arg.name ?? arg.Name ?? ''),
+            type: String(arg.type ?? arg.Type ?? 'string').toLowerCase(),
+            isNullable: Boolean(arg.isNullable ?? arg.IsNullable ?? false)
+          }))
           : []
       };
     }
@@ -1529,6 +1610,7 @@
       }
 
       const reasonText = getEvaluationReason(evaluation);
+      const contentEl = eventEntry.querySelector('.event-content');
       let reasonEl = eventEntry.querySelector('.event-reason');
 
       if (!reasonText) {
@@ -1541,7 +1623,7 @@
       if (!reasonEl) {
         reasonEl = document.createElement('div');
         reasonEl.className = 'event-reason';
-        eventEntry.appendChild(reasonEl);
+        (contentEl || eventEntry).appendChild(reasonEl);
       }
 
       reasonEl.textContent = reasonText;
@@ -1554,16 +1636,19 @@
         tone: tone === 'ok' ? 'ok' : 'err'
       };
 
+      const toneClass = rowFeedback.tone;
+      const escaped = message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      diagramToast.innerHTML = escaped;
+      diagramToast.className = `diagram-toast ${toneClass} show`;
+
       if (rowFeedbackTimer) {
         window.clearTimeout(rowFeedbackTimer);
       }
 
       rowFeedbackTimer = window.setTimeout(() => {
         rowFeedback = null;
-        renderEventBar();
+        diagramToast.classList.remove('show');
       }, FEEDBACK_DURATION_MS);
-
-      renderEventBar();
     }
 
     function drawDiagram() {
@@ -2389,13 +2474,10 @@
           const inlineReason = reasonText
             ? `<div class="event-reason">${escapedReason}</div>`
             : '';
-          const inlineResult = rowFeedback && rowFeedback.eventName === eventName
-            ? `<span class="event-result-chip ${rowFeedback.tone} show">${rowFeedback.message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`
-            : '';
-
           const selectedEntryClass = eventName === selectedEventName ? ' is-selected' : '';
 
-          return `<span class="event-entry${selectedEntryClass}"><button class="event-btn${activeClass}${stateClass}" data-event="${eventName}" type="button"><span class="event-label">${eventName}</span><span class="event-glyph">${glyph}</span></button>${inlineArgs}${inlineResult}${inlineReason}</span>`;
+          const contentInner = `${inlineArgs}${inlineReason}`;
+          return `<span class="event-entry${selectedEntryClass}"><button class="event-btn${activeClass}${stateClass}" data-event="${eventName}" type="button"><span class="event-label">${eventName}</span><span class="event-glyph">${glyph}</span></button><span class="event-content">${contentInner}</span></span>`;
         })
         .join('');
 
@@ -2467,6 +2549,9 @@
           const argName = input.dataset.eventArg;
           const focusedArgName = argName;
           eventArgValues[argName] = input.value;
+
+          // Ask the server to re-evaluate with the current arg values
+          inspectEventOnServer(ownerEventName);
 
           // Pin hover so the blur from DOM rebuild doesn't clear it
           hoveredEventName = ownerEventName;

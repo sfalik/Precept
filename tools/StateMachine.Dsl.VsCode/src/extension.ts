@@ -23,7 +23,7 @@ function nextSnapshotSequence(panel: vscode.WebviewPanel): number {
   return next;
 }
 
-type PreviewAction = "snapshot" | "fire" | "reset" | "replay";
+type PreviewAction = "snapshot" | "fire" | "reset" | "replay" | "inspect";
 
 interface PreviewRequest {
   action: PreviewAction;

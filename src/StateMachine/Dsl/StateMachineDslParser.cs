@@ -178,9 +178,6 @@ public static class StateMachineDslParser
         if (initialState is null)
             throw new InvalidOperationException("Exactly one state must be marked initial. Use 'state <Name> initial'.");
 
-        if (events.Count == 0)
-            throw new InvalidOperationException("At least one event must be declared.");
-
         ValidateReferences(states, events, transitions, terminalRules, dataFields);
 
         return new DslMachine(name, states, initialState, events, transitions, terminalRules, dataFields);

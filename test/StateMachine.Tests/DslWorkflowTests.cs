@@ -33,6 +33,37 @@ public class DslWorkflowTests
     }
 
     [Fact]
+    public void Parse_MachineWithNoEvents_IsValid()
+    {
+        const string dsl = """
+            machine Minimal
+            state Idle initial
+            """;
+
+        var machine = StateMachineDslParser.Parse(dsl);
+
+        machine.Name.Should().Be("Minimal");
+        machine.InitialState.Should().Be("Idle");
+        machine.Events.Should().BeEmpty();
+        machine.Transitions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Compile_MachineWithNoEvents_Succeeds()
+    {
+        const string dsl = """
+            machine Minimal
+            state Idle initial
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+
+        workflow.InitialState.Should().Be("Idle");
+        workflow.States.Should().ContainSingle().Which.Should().Be("Idle");
+        workflow.Events.Should().BeEmpty();
+    }
+
+    [Fact]
     public void Inspect_Outcome_Maps_To_Undefined_Blocked_Enabled()
     {
         const string dsl = """

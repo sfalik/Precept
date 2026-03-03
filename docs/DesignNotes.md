@@ -26,7 +26,7 @@ Implementation focus is the DSL runtime path:
 - No post-processing passes are applied (no stabilization, deconfliction, ingress bands, or normalization); ELK handles crossing minimization, self-loops, backward edges, and parallel edges directly.
 - Runtime webview consumes ELK geometry (node positions/sizes and edge bend-point arrays) and converts edge points to smooth Catmull-Rom → cubic Bézier spline paths.
 - Webview viewBox is set responsively from ELK-computed graph dimensions with 50px padding per side (minimum 600×300); no content-bounds normalization or clamping is applied.
-- The preview webview now calls a custom LSP endpoint (`stateMachine/preview/request`) for `snapshot`, `fire`, `reset`, and `replay` actions.
+- The preview webview now calls a custom LSP endpoint (`stateMachine/preview/request`) for `snapshot`, `fire`, `reset`, `replay`, and `inspect` actions. The `inspect` action re-evaluates a single event with caller-supplied arguments so the webview gets real-time guard status without local duplication of guard logic.
 - The preview endpoint is bound through a typed JSON-RPC request handler (`IJsonRpcRequestHandler<SmPreviewRequest, SmPreviewResponse>`) with the method contract declared on `SmPreviewRequest` via `[Method("stateMachine/preview/request")]` so registration is discoverable at runtime.
 - Language server preview sessions are in-memory and keyed by document URI; each session keeps parsed/compiled definition and current instance state.
 - The extension pushes updated snapshots to an open file panel on document change, keeping preview content aligned with current editor text.
@@ -41,6 +41,24 @@ Implementation focus is the DSL runtime path:
 - Snapshot request failures are surfaced in the same transcript area.
 - Extension packaging must include `webview/inspector-preview.html` so installed VSIX preview panels can render.
 - Local extension development supports a fast watch loop (`npm run dev:watch` / task `extension: watch`) plus launch profile `Extension (StateMachine DSL) Fast Dev` to avoid VSIX repackaging on each edit.
+
+### Preview Fire-Animation Ordering (Deferred)
+
+The current fire flow is fire-then-animate: the client sends the `fire` request to the server immediately on button click, receives the response (with updated snapshot), then plays the dot animation as a visual flourish and applies the snapshot in `onComplete`.
+
+An alternative flow is animate-then-fire: the animation plays first using the target state already known from `inspect`/`snapshot` status, and only when the dot reaches the target does the client send `fire` to the server and apply the resulting snapshot.
+
+**Current (fire-then-animate):**
+- Pros: error feedback is immediate (no wasted animation on a failed fire); snapshot is already available when animation ends so commit is synchronous in `onComplete`.
+- Cons: the animation is decorative — the state has already committed server-side before the user sees the dot move.
+
+**Alternative (animate-then-fire):**
+- Pros: better matches an exploration-oriented preview — the user watches the transition unfold and then the commit follows, making the animation feel like the event is happening rather than merely replaying a done deal.
+- Cons: if the server rejects after the dot arrives (edge case), the UI must handle failure post-animation (show error, keep old state); `onComplete` becomes async; animation target must come from `currentEventStatuses[event].targetState` rather than from the fire response.
+
+Both flows are structurally simple — the difference is ~10-15 lines rearranged in `fireCurrentSelection`. The rest of the webview is unaffected.
+
+Decision: keeping fire-then-animate for now; revisit when preview UX stabilises.
 
 ### Design-Phase Compatibility Policy
 
@@ -89,6 +107,7 @@ Canonical constraints:
 
 - `()+` means one-or-more lines in a `from ... on ...` body.
 - Exactly one `state` declaration must include `initial`.
+- `event` declarations are optional. A machine with no events is syntactically valid. The language server emits a `Hint` diagnostic on the `machine` line when no events are declared, as such a machine cannot respond to any input.
 - `if` and `else if` must end with `transition <State>` or `no transition`.
 - `else` may end with `transition`, `reject`, or `no transition`.
 - After an `if`/`else if` chain, a fallback **must** use `else`; a bare block-level outcome after a chain is a parse error.

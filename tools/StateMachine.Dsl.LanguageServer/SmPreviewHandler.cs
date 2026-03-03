@@ -24,6 +24,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
                 "fire" => Task.FromResult(HandleFire(request)),
                 "reset" => Task.FromResult(HandleReset(request)),
                 "replay" => Task.FromResult(HandleReplay(request)),
+                "inspect" => Task.FromResult(HandleInspect(request)),
                 _ => Task.FromResult(new SmPreviewResponse(false, Error: $"Unknown action '{request.Action}'."))
             };
         }
@@ -40,6 +41,40 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
             return new SmPreviewResponse(false, Error: sessionOrError.Error);
 
         return new SmPreviewResponse(true, Snapshot: BuildSnapshot(sessionOrError.Session));
+    }
+
+    private static SmPreviewResponse HandleInspect(SmPreviewRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.EventName))
+            return new SmPreviewResponse(false, Error: "Missing event name for inspect action.");
+
+        var sessionOrError = EnsureSession(request);
+        if (!sessionOrError.Success || sessionOrError.Session is null)
+            return new SmPreviewResponse(false, Error: sessionOrError.Error);
+
+        var session = sessionOrError.Session;
+        var inspect = session.Definition.Inspect(session.Instance, request.EventName!, request.Args);
+        var evt = session.Machine.Events.FirstOrDefault(e => string.Equals(e.Name, request.EventName, StringComparison.Ordinal));
+        var args = (evt?.Args ?? Array.Empty<DslFieldContract>())
+            .Select(arg => new SmPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable))
+            .ToArray();
+
+        var outcome = inspect.Outcome switch
+        {
+            DslOutcomeKind.Enabled => "enabled",
+            DslOutcomeKind.NoTransition => "noTransition",
+            DslOutcomeKind.Blocked => "blocked",
+            _ => "undefined"
+        };
+
+        var eventStatus = new SmPreviewEventStatus(
+            request.EventName!,
+            outcome,
+            inspect.TargetState,
+            inspect.Reasons,
+            args);
+
+        return new SmPreviewResponse(true, InspectResult: eventStatus);
     }
 
     private static SmPreviewResponse HandleFire(SmPreviewRequest request)

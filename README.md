@@ -14,7 +14,7 @@ StateMachine is a .NET DSL-driven state/workflow engine focused on deterministic
 
 - DSL parser/compiler/runtime is implemented and used by the language server for editor diagnostics and preview execution.
 - VS Code extension is implemented with automatic `.sm` language-client activation plus inspector preview panels per file.
-- Inspector preview now exchanges live `snapshot`/`fire`/`reset` requests through the language server (`stateMachine/preview/request`) instead of only local mock data.
+- Inspector preview now exchanges live `snapshot`/`fire`/`reset`/`inspect` requests through the language server (`stateMachine/preview/request`) instead of only local mock data. The `inspect` action re-evaluates a single event with user-supplied arguments, enabling real-time guard feedback as the user types.
 - Inspector preview layout uses a single unified ELK layered layout with state-machine-tuned options (top-down direction, spline edge routing, greedy cycle breaking, feedback edges for cycles, inside self-loops, inline edge labels, DSL declaration-order node ordering), dynamic per-state node sizing, and responsive viewBox. Reject and no-transition terminal rules are excluded from the diagram graph.
 - CLI host has been removed in this branch (hard cut); editor + language server are the active runtime surfaces.
 
@@ -153,6 +153,7 @@ Constraints:
 
 - `()+` means one-or-more branch lines in a `from ... on ...` body.
 - Exactly one `state` declaration must include `initial`.
+- `event` declarations are optional. A machine with no events is syntactically valid but behaviorally inert; the language server emits a hint when no events are declared.
 - `if` and `else if` branches must end in exactly one outcome: `transition <ToState>` or `no transition`.
 - `else` (or unguarded body) must end in exactly one outcome: `transition`, `reject`, or `no transition`.
 - After an `if`/`else if` chain, a fallback **must** use `else`; a bare block-level outcome after a chain is a parse error.

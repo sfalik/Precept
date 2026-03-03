@@ -19,7 +19,8 @@ internal sealed record SmPreviewResponse(
     bool Success,
     string? Error = null,
     SmPreviewSnapshot? Snapshot = null,
-    IReadOnlyList<string>? ReplayMessages = null);
+    IReadOnlyList<string>? ReplayMessages = null,
+    SmPreviewEventStatus? InspectResult = null);
 
 internal sealed record SmPreviewSnapshot(
     string WorkflowName,

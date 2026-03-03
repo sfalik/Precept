@@ -1,8 +1,13 @@
 machine test
 
-state before
-state after
+state Start initial
+state end
 
-event go
-from before on go
-    transition after
+event test
+event reset
+
+from Start on test
+    transition end
+
+from end on reset
+    transition Start

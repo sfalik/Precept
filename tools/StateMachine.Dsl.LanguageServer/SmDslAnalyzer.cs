@@ -373,6 +373,30 @@ internal sealed class SmDslAnalyzer
             }
         }
 
+        if (machine.Events.Count == 0)
+        {
+            var machineLine = 0;
+            for (var li = 0; li < lines.Length; li++)
+            {
+                if (lines[li].TrimStart().StartsWith("machine ", StringComparison.Ordinal))
+                {
+                    machineLine = li;
+                    break;
+                }
+            }
+
+            var lineLength = machineLine < lines.Length ? lines[machineLine].Length : 1;
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = DiagnosticSeverity.Hint,
+                Message = "Machine has no events declared. It cannot respond to any input.",
+                Source = "state-machine-dsl",
+                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                    new Position(machineLine, 0),
+                    new Position(machineLine, Math.Max(1, lineLength)))
+            });
+        }
+
         return diagnostics;
     }
 
