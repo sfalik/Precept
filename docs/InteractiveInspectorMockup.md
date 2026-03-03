@@ -5,7 +5,7 @@ Goal: validate UX for executing `.sm` transitions from a VS Code side panel befo
 ## Panel Layout (concept)
 
 - Header
-  - Machine file: `trafficlight.sm`
+  - Machine file: `samples/trafficlight.sm`
   - Session state: `Connected`
   - Actions: `Reload`, `Reset Instance`, `Save Instance`
 - Main surface

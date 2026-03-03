@@ -1,5 +1,5 @@
 using StateMachine.Dsl;
-var text = System.IO.File.ReadAllText("trafficlight.sm");
+var text = System.IO.File.ReadAllText("../../samples/trafficlight.sm");
 try
 {
     var machine = StateMachineDslParser.Parse(text);

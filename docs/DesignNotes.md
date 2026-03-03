@@ -345,7 +345,7 @@ Validation constraints:
 - Local VSIX packaging includes language-client runtime dependencies so activation works after install.
 - VS Code client supports a local package+install loop via `npm run loop:local` in `tools/StateMachine.Dsl.VsCode`.
 - VS Code client activates from `workspaceContains:**/*.sm` plus language contribution activation and writes startup diagnostics to the `StateMachine DSL` output channel.
-- Repository root includes runnable DSL examples such as `trafficlight.sm`.
+- Repository includes runnable DSL examples such as `samples/trafficlight.sm`.
 
 Supported default guard forms:
 

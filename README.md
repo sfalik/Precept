@@ -106,7 +106,7 @@ from FlashingRed on ClearEmergency
   transition Red
 ```
 
-The full file (with block comments) is at [`trafficlight.sm`](trafficlight.sm).
+The full file (with block comments) is at [`samples/trafficlight.sm`](samples/trafficlight.sm).
 
 ## DSL Syntax Reference
 
