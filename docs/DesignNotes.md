@@ -91,6 +91,7 @@ Canonical constraints:
 - Exactly one `state` declaration must include `initial`.
 - `if` and `else if` must end with `transition <State>` or `no transition`.
 - `else` may end with `transition`, `reject`, or `no transition`.
+- After an `if`/`else if` chain, a fallback **must** use `else`; a bare block-level outcome after a chain is a parse error.
 - `set` is allowed with `no transition` in all branch contexts; assignments execute on fire but state does not change.
 - `reason "..."` is valid only on `reject`.
 - Top-level data fields may declare literal defaults using `<Field> = <Literal>`.
@@ -115,6 +116,7 @@ Block-authoring equivalent (same semantics):
   - Every `from ... on ...` block must end with an outcome statement.
   - No statements are allowed after an outcome statement.
   - `else if` and `else` require a preceding `if` in the same block.
+  - After an `if`/`else if` chain, any block-level outcome statement requires `else`; bare fallbacks without `else` are a parse error.
   - `reason "<message>"` is valid **only** on `reject` statements; writing it on `if` or `else if` is a parse error.
   - Inline guarded transitions (`transition A -> B on E` with trailing guard clauses) are invalid.
 

@@ -47,7 +47,8 @@ from any on Emergency
 	if Emergency.AuthorizedBy != "" && Emergency.Reason != ""
 		set EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason
 		transition FlashingRed
-	reject "AuthorizedBy and Reason are required to activate emergency mode"
+	else
+		reject "AuthorizedBy and Reason are required to activate emergency mode"
 
 # Signal cycle is suspended during emergency; Advance does nothing
 from FlashingRed on Advance

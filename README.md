@@ -155,6 +155,7 @@ Constraints:
 - Exactly one `state` declaration must include `initial`.
 - `if` and `else if` branches must end in exactly one outcome: `transition <ToState>` or `no transition`.
 - `else` (or unguarded body) must end in exactly one outcome: `transition`, `reject`, or `no transition`.
+- After an `if`/`else if` chain, a fallback **must** use `else`; a bare block-level outcome after a chain is a parse error.
 - `set <Field> = <Expr>` is valid only inside a `from ... on ...` branch body.
 - Multiple `set` lines are allowed and execute in declaration order with read-your-writes on the fire path.
 - `set` is allowed with `no transition` in all branch contexts; assignments execute on fire but state does not change.

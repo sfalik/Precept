@@ -352,6 +352,8 @@ public static class StateMachineDslParser
             var setAtBlock = SetRegex.Match(line);
             if (setAtBlock.Success)
             {
+                if (hasIfChain && !hasElseBranch)
+                    throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
                 pendingSets.Add(ParseSetAssignment(setAtBlock, index + 1));
                 index++;
                 continue;
@@ -360,6 +362,8 @@ public static class StateMachineDslParser
             var simpleTransitionAtBlock = SimpleTransitionRegex.Match(line);
             if (simpleTransitionAtBlock.Success)
             {
+                if (hasIfChain && !hasElseBranch)
+                    throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
                 var targetState = simpleTransitionAtBlock.Groups["to"].Value.Trim();
                 foreach (var sourceState in sourceStates)
                 {
@@ -381,6 +385,8 @@ public static class StateMachineDslParser
 
             if (line.Equals("no transition", StringComparison.Ordinal))
             {
+                if (hasIfChain && !hasElseBranch)
+                    throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
                 foreach (var sourceState in sourceStates)
                     blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, DslTerminalKind.NoTransition, null, null, pendingSets.Count > 0 ? pendingSets.ToArray() : null, branchOrder));
 
@@ -394,6 +400,8 @@ public static class StateMachineDslParser
             var rejectMatch = RejectRegex.Match(line);
             if (rejectMatch.Success)
             {
+                if (hasIfChain && !hasElseBranch)
+                    throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
                 var reason = Unquote(rejectMatch.Groups["reason"].Value.Trim());
                 foreach (var sourceState in sourceStates)
                     blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, DslTerminalKind.Reject, reason, null, null, branchOrder));

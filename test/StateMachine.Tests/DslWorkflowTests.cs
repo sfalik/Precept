@@ -43,7 +43,8 @@ public class DslWorkflowTests
             from Red on Advance
                 if CarsWaiting > 0
                     transition Green
-                reject "Cars waiting required"
+                else
+                    reject "Cars waiting required"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -68,7 +69,8 @@ public class DslWorkflowTests
             from Red on Advance
                 if CarsWaiting > 0
                     transition Green
-                reject "Cars waiting required"
+                else
+                    reject "Cars waiting required"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -93,7 +95,8 @@ public class DslWorkflowTests
             from Red on Advance
                 if CarsWaiting > 0
                     transition Green
-                reject "Cars waiting required"
+                else
+                    reject "Cars waiting required"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -118,7 +121,8 @@ public class DslWorkflowTests
             from Red on Advance
                 if CarsWaiting > 0
                     transition Green
-                reject "Cars waiting required"
+                else
+                    reject "Cars waiting required"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -142,7 +146,8 @@ public class DslWorkflowTests
             from Disabled on Evaluate
                 if IsEnabled
                     transition Enabled
-                reject "Feature must be enabled"
+                else
+                    reject "Feature must be enabled"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -169,7 +174,8 @@ public class DslWorkflowTests
                     transition Green
                 else if IsManualOverride
                     transition Yellow
-                reject "No eligible transition"
+                else
+                    reject "No eligible transition"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -268,7 +274,8 @@ public class DslWorkflowTests
             from Draft on Publish
                 if Mode == "Manual"
                     transition Live
-                reject "Manual mode required"
+                else
+                    reject "Manual mode required"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -292,7 +299,8 @@ public class DslWorkflowTests
             from Open on Escalate
                 if Assignee == null
                     transition Pending
-                reject "Assignee must be empty"
+                else
+                    reject "Assignee must be empty"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -316,7 +324,8 @@ public class DslWorkflowTests
             from Low on Scale
                 if Qps >= 100
                     transition High
-                reject "Qps threshold not met"
+                else
+                    reject "Qps threshold not met"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -340,7 +349,8 @@ public class DslWorkflowTests
             from A on Go
                 if Flag && OtherFlag
                     transition B
-                reject "Both flags must be true"
+                else
+                    reject "Both flags must be true"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -368,7 +378,8 @@ public class DslWorkflowTests
             from A on Go
                 if coalesce(Flag, OtherFlag)
                     transition B
-                reject "Both flags must be true"
+                else
+                    reject "Both flags must be true"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -396,7 +407,8 @@ public class DslWorkflowTests
             from Red on Advance
                 if CarsWaiting > 0
                     transition Green
-                reject "Cars waiting required"
+                else
+                    reject "Cars waiting required"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -421,7 +433,8 @@ public class DslWorkflowTests
             from Red on Advance
                 if CarsWaiting > 0
                     transition Green
-                reject "Cars waiting required"
+                else
+                    reject "Cars waiting required"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -843,7 +856,8 @@ public class DslWorkflowTests
             from Disabled on Evaluate
                 if IsEnabled
                     transition Enabled
-                reject "Feature must be enabled"
+                else
+                    reject "Feature must be enabled"
             """;
 
         var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -964,7 +978,8 @@ public class DslWorkflowTests
                 if CarsWaiting > 0
                     set CarsWaiting = 0
                     transition Green
-                reject "Cars waiting required"
+                else
+                    reject "Cars waiting required"
             """;
 
         var machine = StateMachineDslParser.Parse(dsl);
@@ -1031,7 +1046,8 @@ public class DslWorkflowTests
                         from Red on Advance
                             if CarsWaiting > 0
                                 transition Green
-                            reject "No cars waiting"
+                            else
+                                reject "No cars waiting"
                         """;
 
                 var machine = StateMachineDslParser.Parse(dsl);
@@ -1055,7 +1071,8 @@ public class DslWorkflowTests
                         from Red on Advance
                             if CarsWaiting > 0
                                 transition Green
-                            reject "No cars waiting"
+                            else
+                                reject "No cars waiting"
                         """;
 
                 var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -1079,7 +1096,8 @@ public class DslWorkflowTests
                         from Red on Advance
                             if CarsWaiting > 0
                                 transition Green
-                            no transition
+                            else
+                                no transition
                         """;
 
                 var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -1105,7 +1123,8 @@ public class DslWorkflowTests
                         from any on Emergency
                             if Emergency.Reason != ""
                                 transition FlashingRed
-                            reject "Emergency reason is required"
+                            else
+                                reject "Emergency reason is required"
                         """;
 
                 var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
@@ -1132,6 +1151,51 @@ public class DslWorkflowTests
                 act.Should()
                         .Throw<InvalidOperationException>()
                     .WithMessage("*must end with an outcome statement*");
+        }
+
+        [Fact]
+        public void Parse_IfChain_WithBlockLevelFallback_WithoutElse_Throws()
+        {
+            const string dsl = """
+                machine TrafficLight
+                state Red initial
+                state Green
+                event Advance
+                from Red on Advance
+                    if CarsWaiting > 0
+                        transition Green
+                    reject "Cars waiting required"
+                """;
+
+            var act = () => StateMachineDslParser.Parse(dsl);
+
+            act.Should()
+                .Throw<InvalidOperationException>()
+                .WithMessage("*block-level statement after an 'if' chain requires 'else'*");
+        }
+
+        [Fact]
+        public void Parse_ElseIfChain_WithBlockLevelFallback_WithoutElse_Throws()
+        {
+            const string dsl = """
+                machine TrafficLight
+                state Red initial
+                state Green
+                state Yellow
+                event Advance
+                from Red on Advance
+                    if CarsWaiting > 3
+                        transition Green
+                    else if CarsWaiting > 0
+                        transition Yellow
+                    reject "No cars waiting"
+                """;
+
+            var act = () => StateMachineDslParser.Parse(dsl);
+
+            act.Should()
+                .Throw<InvalidOperationException>()
+                .WithMessage("*block-level statement after an 'if' chain requires 'else'*");
         }
 
             [Fact]
