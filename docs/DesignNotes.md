@@ -240,18 +240,18 @@ Validation constraints:
 
 ## Known Gaps
 
-- Language-server expression diagnostics are currently best-effort static checks and do not perform full guard-flow null narrowing.
+- Language-server expression diagnostics now perform null-flow narrowing for explicit null checks in `&&`/`||` paths, but still do not perform full cross-branch flow analysis.
 - Extension packaging/publishing workflow
 
 ## Test Status
 
-- Active tests include `test/StateMachine.Tests/DslWorkflowTests.cs`, `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslTransformParsingTests.cs`, and `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`.
+- Active tests include `test/StateMachine.Tests/DslWorkflowTests.cs`, `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslTransformParsingTests.cs`, `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`, and `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs`.
 - Guard/expression test coverage includes: boolean guards, comparisons, string/null equality, numeric runtime type coercion, unsupported-expression rejection, reason aggregation, expression AST parsing precedence/invalid syntax diagnostics, lexer edge cases, transform-branch parsing constraints, and runtime evaluator operator/short-circuit behavior.
 
 ## Next Steps
 
 1. Add packaging/publishing automation for the VS Code extension client.
-2. Improve language-server expression analysis with deeper flow-aware null/type narrowing to reduce false-positive/false-negative diagnostics.
+2. Improve language-server expression analysis with deeper cross-branch null/type narrowing to reduce false-positive/false-negative diagnostics.
 
 ## Guard Evaluation + Event-Argument Model (Current)
 

@@ -440,9 +440,10 @@ Implemented now:
 - CLI REPL + script execution
 - Active test coverage in `test/StateMachine.Tests/DslWorkflowTests.cs` and `test/StateMachine.Tests/CliRenderingTests.cs`
 - Active parser/runtime coverage also includes expression AST parsing/edge-case diagnostics, transform parsing coverage, and runtime evaluator operator/short-circuit behavior in `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslTransformParsingTests.cs`, and `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`.
+- Language-server analyzer coverage now includes null-flow narrowing diagnostics tests in `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs`.
 - Language server MVP in `tools/StateMachine.Dsl.LanguageServer` (stdio diagnostics + completion)
 - Language server MVP in `tools/StateMachine.Dsl.LanguageServer` (stdio diagnostics + completion + semantic tokens)
-- Language server semantic diagnostics now validate expression operator/type compatibility and transform-target type compatibility for B-v1 authoring patterns.
+- Language server semantic diagnostics now validate expression operator/type compatibility, transform-target type compatibility, and null-flow narrowing for explicit null checks in `&&`/`||` guard paths.
 - Language server completion now includes operator-aware suggestions in guard and transform-expression contexts.
 - VS Code client MVP in `tools/StateMachine.Dsl.VsCode` (auto-start for `.sm` files)
 - VS Code client contributes TextMate syntax highlighting for `.sm` files
@@ -487,7 +488,7 @@ from Active on Retry
   - Parser/model: support multiple ordered `transform` assignments per selected branch and operator-aware expression parsing.
   - Runtime: shared guard/transform expression evaluator with strict type/null semantics, strong string concat, short-circuit boolean logic, and atomic batch commit.
   - Inspect/fire parity: same guard evaluation semantics in inspect and fire; transform expression failures reject fire and commit no transform changes.
-  - Tooling: continue iterating language-server diagnostics/completion precision for advanced null-flow scenarios and richer expression authoring hints.
+  - Tooling: continue iterating language-server diagnostics/completion precision for advanced multi-branch null-flow scenarios and richer expression authoring hints.
   - Tests: precedence/associativity, read-your-writes, atomic rollback, strict typing, null behavior, strong concat, and inspect/fire parity coverage.
 
 Design-phase compatibility policy:

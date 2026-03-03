@@ -296,17 +296,23 @@ internal sealed class SmDslAnalyzer
         var searchLine = 0;
         foreach (var transition in machine.Transitions)
         {
+            var transitionSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, transition.EventName);
+            IReadOnlyDictionary<string, StaticValueKind> transformSymbols = transitionSymbols;
+
             if (!string.IsNullOrWhiteSpace(transition.GuardExpression))
             {
                 var guardLine = FindGuardLine(lines, ref searchLine, transition.GuardExpression!);
                 ValidateExpression(
                     transition.GuardExpression!,
                     guardLine,
-                    BuildSymbolKinds(dataFieldKinds, eventArgKinds, transition.EventName),
+                    transitionSymbols,
                     expectedKind: StaticValueKind.Boolean,
                     expectedLabel: "guard expression",
                     diagnostics,
                     lines);
+
+                if (TryParseExpression(transition.GuardExpression!, out var parsedGuard, out _))
+                    transformSymbols = ApplyNarrowing(parsedGuard!, transitionSymbols, assumeTrue: true);
             }
 
             foreach (var assignment in transition.TransformAssignments)
@@ -318,7 +324,7 @@ internal sealed class SmDslAnalyzer
                 ValidateExpression(
                     assignment.ExpressionText,
                     assignmentLine,
-                    BuildSymbolKinds(dataFieldKinds, eventArgKinds, transition.EventName),
+                    transformSymbols,
                     expectedKind: targetKind,
                     expectedLabel: $"transform target '{assignment.Key}'",
                     diagnostics,
@@ -449,7 +455,7 @@ internal sealed class SmDslAnalyzer
 
                 if (unary.Operator == "!")
                 {
-                    if (!HasFlag(operandKind, StaticValueKind.Boolean))
+                    if (!IsExactly(operandKind, StaticValueKind.Boolean))
                     {
                         error = "operator '!' requires boolean operand.";
                         return false;
@@ -461,7 +467,7 @@ internal sealed class SmDslAnalyzer
 
                 if (unary.Operator == "-")
                 {
-                    if (!HasFlag(operandKind, StaticValueKind.Number))
+                    if (!IsExactly(operandKind, StaticValueKind.Number))
                     {
                         error = "unary '-' requires numeric operand.";
                         return false;
@@ -477,29 +483,68 @@ internal sealed class SmDslAnalyzer
 
             case DslBinaryExpression binary:
             {
-                if (!TryInferKind(binary.Left, symbols, out var leftKind, out error))
-                    return false;
-
-                if (!TryInferKind(binary.Right, symbols, out var rightKind, out error))
-                    return false;
-
                 switch (binary.Operator)
                 {
                     case "&&":
-                    case "||":
-                        if (!HasFlag(leftKind, StaticValueKind.Boolean) || !HasFlag(rightKind, StaticValueKind.Boolean))
+                    {
+                        if (!TryInferKind(binary.Left, symbols, out var leftKind, out error))
+                            return false;
+
+                        if (!IsExactly(leftKind, StaticValueKind.Boolean))
                         {
-                            error = $"operator '{binary.Operator}' requires boolean operands.";
+                            error = "operator '&&' requires boolean operands.";
+                            return false;
+                        }
+
+                        var rightSymbols = ApplyNarrowing(binary.Left, symbols, assumeTrue: true);
+                        if (!TryInferKind(binary.Right, rightSymbols, out var rightKind, out error))
+                            return false;
+
+                        if (!IsExactly(rightKind, StaticValueKind.Boolean))
+                        {
+                            error = "operator '&&' requires boolean operands.";
                             return false;
                         }
 
                         kind = StaticValueKind.Boolean;
                         return true;
+                    }
+
+                    case "||":
+                    {
+                        if (!TryInferKind(binary.Left, symbols, out var leftKind, out error))
+                            return false;
+
+                        if (!IsExactly(leftKind, StaticValueKind.Boolean))
+                        {
+                            error = "operator '||' requires boolean operands.";
+                            return false;
+                        }
+
+                        var rightSymbols = ApplyNarrowing(binary.Left, symbols, assumeTrue: false);
+                        if (!TryInferKind(binary.Right, rightSymbols, out var rightKind, out error))
+                            return false;
+
+                        if (!IsExactly(rightKind, StaticValueKind.Boolean))
+                        {
+                            error = "operator '||' requires boolean operands.";
+                            return false;
+                        }
+
+                        kind = StaticValueKind.Boolean;
+                        return true;
+                    }
 
                     case "+":
                     {
-                        var stringCandidate = HasFlag(leftKind, StaticValueKind.String) && HasFlag(rightKind, StaticValueKind.String);
-                        var numberCandidate = HasFlag(leftKind, StaticValueKind.Number) && HasFlag(rightKind, StaticValueKind.Number);
+                        if (!TryInferKind(binary.Left, symbols, out var leftKind, out error))
+                            return false;
+
+                        if (!TryInferKind(binary.Right, symbols, out var rightKind, out error))
+                            return false;
+
+                        var stringCandidate = IsExactly(leftKind, StaticValueKind.String) && IsExactly(rightKind, StaticValueKind.String);
+                        var numberCandidate = IsExactly(leftKind, StaticValueKind.Number) && IsExactly(rightKind, StaticValueKind.Number);
 
                         if (stringCandidate && !numberCandidate)
                         {
@@ -521,7 +566,14 @@ internal sealed class SmDslAnalyzer
                     case "*":
                     case "/":
                     case "%":
-                        if (!HasFlag(leftKind, StaticValueKind.Number) || !HasFlag(rightKind, StaticValueKind.Number))
+                    {
+                        if (!TryInferKind(binary.Left, symbols, out var leftKind, out error))
+                            return false;
+
+                        if (!TryInferKind(binary.Right, symbols, out var rightKind, out error))
+                            return false;
+
+                        if (!IsExactly(leftKind, StaticValueKind.Number) || !IsExactly(rightKind, StaticValueKind.Number))
                         {
                             error = $"operator '{binary.Operator}' requires numeric operands.";
                             return false;
@@ -529,12 +581,20 @@ internal sealed class SmDslAnalyzer
 
                         kind = StaticValueKind.Number;
                         return true;
+                    }
 
                     case ">":
                     case ">=":
                     case "<":
                     case "<=":
-                        if (!HasFlag(leftKind, StaticValueKind.Number) || !HasFlag(rightKind, StaticValueKind.Number))
+                    {
+                        if (!TryInferKind(binary.Left, symbols, out var leftKind, out error))
+                            return false;
+
+                        if (!TryInferKind(binary.Right, symbols, out var rightKind, out error))
+                            return false;
+
+                        if (!IsExactly(leftKind, StaticValueKind.Number) || !IsExactly(rightKind, StaticValueKind.Number))
                         {
                             error = $"operator '{binary.Operator}' requires numeric operands.";
                             return false;
@@ -542,9 +602,16 @@ internal sealed class SmDslAnalyzer
 
                         kind = StaticValueKind.Boolean;
                         return true;
+                    }
 
                     case "==":
                     case "!=":
+                        if (!TryInferKind(binary.Left, symbols, out _, out error))
+                            return false;
+
+                        if (!TryInferKind(binary.Right, symbols, out _, out error))
+                            return false;
+
                         kind = StaticValueKind.Boolean;
                         return true;
 
@@ -560,10 +627,123 @@ internal sealed class SmDslAnalyzer
         }
     }
 
+    private static IReadOnlyDictionary<string, StaticValueKind> ApplyNarrowing(
+        DslExpression expression,
+        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        bool assumeTrue)
+    {
+        expression = StripParentheses(expression);
+
+        if (expression is DslUnaryExpression { Operator: "!" } unary)
+            return ApplyNarrowing(unary.Operand, symbols, !assumeTrue);
+
+        if (expression is DslBinaryExpression binary)
+        {
+            if (binary.Operator == "&&")
+            {
+                if (assumeTrue)
+                {
+                    var leftNarrowed = ApplyNarrowing(binary.Left, symbols, assumeTrue: true);
+                    return ApplyNarrowing(binary.Right, leftNarrowed, assumeTrue: true);
+                }
+
+                return symbols;
+            }
+
+            if (binary.Operator == "||")
+            {
+                if (!assumeTrue)
+                {
+                    var leftNarrowed = ApplyNarrowing(binary.Left, symbols, assumeTrue: false);
+                    return ApplyNarrowing(binary.Right, leftNarrowed, assumeTrue: false);
+                }
+
+                return symbols;
+            }
+
+            if (binary.Operator is "==" or "!=" &&
+                TryApplyNullComparisonNarrowing(binary, symbols, assumeTrue, out var narrowed))
+                return narrowed;
+        }
+
+        return symbols;
+    }
+
+    private static bool TryApplyNullComparisonNarrowing(
+        DslBinaryExpression binary,
+        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        bool assumeTrue,
+        out IReadOnlyDictionary<string, StaticValueKind> narrowed)
+    {
+        narrowed = symbols;
+
+        if (!TryGetIdentifierKey(binary.Left, out var leftKey) && !TryGetIdentifierKey(binary.Right, out leftKey))
+            return false;
+
+        var leftIsNull = IsNullLiteral(binary.Left);
+        var rightIsNull = IsNullLiteral(binary.Right);
+        if (!leftIsNull && !rightIsNull)
+            return false;
+
+        if (!symbols.TryGetValue(leftKey, out var existingKind))
+            return false;
+
+        var expectsNull = binary.Operator switch
+        {
+            "==" => assumeTrue,
+            "!=" => !assumeTrue,
+            _ => false
+        };
+
+        var updatedKind = expectsNull
+            ? StaticValueKind.Null
+            : (existingKind & ~StaticValueKind.Null);
+
+        var updated = new Dictionary<string, StaticValueKind>(symbols, StringComparer.Ordinal)
+        {
+            [leftKey] = updatedKind
+        };
+
+        narrowed = updated;
+        return true;
+    }
+
+    private static bool TryGetIdentifierKey(DslExpression expression, out string key)
+    {
+        var stripped = StripParentheses(expression);
+        if (stripped is DslIdentifierExpression identifier)
+        {
+            key = identifier.Member is null
+                ? identifier.Name
+                : $"{identifier.Name}.{identifier.Member}";
+            return true;
+        }
+
+        key = string.Empty;
+        return false;
+    }
+
+    private static DslExpression StripParentheses(DslExpression expression)
+    {
+        while (expression is DslParenthesizedExpression parenthesized)
+            expression = parenthesized.Inner;
+
+        return expression;
+    }
+
+    private static bool IsNullLiteral(DslExpression expression)
+        => StripParentheses(expression) is DslLiteralExpression { Value: null };
+
+    private static bool IsExactly(StaticValueKind kind, StaticValueKind expected)
+        => kind == expected;
+
     private static bool IsAssignable(StaticValueKind actual, StaticValueKind expected)
     {
         var actualNonNull = actual & ~StaticValueKind.Null;
         var expectedNonNull = expected & ~StaticValueKind.Null;
+
+        if (!HasFlag(expected, StaticValueKind.Null) && HasFlag(actual, StaticValueKind.Null))
+            return false;
 
         if ((actualNonNull & ~expectedNonNull) != StaticValueKind.None)
             return false;
