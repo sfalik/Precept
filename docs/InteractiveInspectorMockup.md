@@ -58,7 +58,14 @@ Goal: validate UX for executing `.sm` transitions from a VS Code side panel befo
 - During the transition timeline, the source state starts as active, destination emphasis appears progressively, and final destination active-state fill is committed at animation end.
 - During this timeline, all non-focused/de-emphasized edges and nodes remain de-emphasized; only the accepted transition path and source→destination state handoff animate.
 - Pre-click semantic highlights (including red alternatives/reject paths for the fired event) fade out over the timeline instead of disappearing instantaneously.
-- Destination states (green/red outlines and hovered destinations) remain visually dimmer than the current state; they brighten to full active emphasis only at the end of a successful transition timeline.
+- On hover, the actual selected destination is full-bright (matching current-state emphasis) but remains hollow; alternate/blocked destinations remain dimmer.
+- On click/transition, destination nodes retain their frame-0 hover intensity and then animate smoothly into committed current-state fill at timeline end.
+- Transition visuals are layered for smoother motion: soft beam halo + core beam + moving sweep + runner trail, with subtle source-collapse/destination-arrival handoff rings.
+
+Animation contract (simplified):
+1. Hover phase: selected event semantics are emphasized; non-selected semantics are de-emphasized.
+2. Click/transition phase: freeze and fade pre-click semantics, animate only accepted path + runner, keep destination dim, suppress hover.
+3. Commit phase: destination becomes the current state, normal hover-driven semantics resume.
 - `Reload` resets the mockup session to the initial sample state/data and clears transient UI state (hover, args, toasts, and active animations).
 - `Reload` uses event-button-like affordances (`hover` emphasis and short pressed click feedback) so invocation is visually confirmed.
 - Current-state outgoing transitions are always semantically visible.

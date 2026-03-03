@@ -513,7 +513,14 @@ Troubleshooting completion/diagnostics:
 - During the timeline, source-state active emphasis leads and destination active fill is finalized at animation completion.
 - During this timeline, non-focused/de-emphasized transitions and states stay de-emphasized; animation is limited to the accepted path and source→destination handoff.
 - Pre-click semantic highlights (including red alternatives/reject paths on the fired event) fade out smoothly across the timeline rather than disappearing instantly.
-- Destination states remain dimmer than the current state (including hovered destinations) and only brighten to full active emphasis at the end of the transition timeline.
+- On hover, the actual selected destination matches current-state brightness but stays hollow; alternate/blocked destinations remain dimmer.
+- On click/transition, destination brightness is preserved from frame 0 (no instant jump), then transitions smoothly to committed current-state fill at timeline end.
+- Transition rendering is layered (halo + beam + sweep + runner trail) with subtle source-collapse and destination-arrival rings for smoother visual continuity.
+
+Simplified animation contract:
+1. Hover: emphasize selected event semantics; keep others de-emphasized.
+2. Click/transition: freeze+fade pre-click semantics, animate accepted path/runner only, keep destination dim, suppress hover.
+3. Commit: destination becomes current, then normal hover semantics resume.
 - `Reload` resets to initial sample state/data and clears transient UI state.
 - `Reload` includes event-style hover emphasis and brief pressed-state click feedback.
 - Diagram semantics are always visible from current state and use hover-scoped emphasis:
