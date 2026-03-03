@@ -382,18 +382,18 @@ function getPreviewLayoutMode(): PreviewLayoutMode {
 
 function getElkLayoutOptions(mode: PreviewLayoutMode): Record<string, string> {
   const direction = mode === "top-down" ? "DOWN" : "DOWN";
-  const nodeSpacing = mode === "compact" ? "42" : mode === "spacious" ? "80" : "55";
-  const layerSpacing = mode === "compact" ? "80" : mode === "spacious" ? "160" : "110";
+  const nodeSpacing = mode === "compact" ? "6" : mode === "spacious" ? "12" : "7";
+  const layerSpacing = mode === "compact" ? "10" : mode === "spacious" ? "20" : "15";
 
   return {
     "elk.algorithm": "layered",
     "elk.direction": direction,
     "elk.spacing.nodeNode": nodeSpacing,
     "elk.layered.spacing.nodeNodeBetweenLayers": layerSpacing,
-    "elk.layered.spacing.edgeNodeBetweenLayers": "30",
+    "elk.layered.spacing.edgeNodeBetweenLayers": "21",
     "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
     "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
-    "elk.edgeRouting": "SPLINES",
+    "elk.edgeRouting": "ORTHOGONAL",
     "elk.layered.mergeEdges": "false",
     "elk.layered.feedbackEdges": "true",
     "elk.separateConnectedComponents": "false",
@@ -408,7 +408,7 @@ function computeNodeSize(stateName: string): { width: number; height: number } {
   const charWidth = 8.5;
   const horizontalPadding = 36;
   const width = Math.max(80, Math.round(stateName.length * charWidth + horizontalPadding));
-  const height = 40;
+  const height = 44;
   return { width, height };
 }
 
@@ -429,7 +429,7 @@ async function computeLayoutForSnapshot(snapshot: Record<string, unknown>): Prom
     children: states.map((state) => ({
       id: state,
       width: nodeSizes.get(state)?.width ?? 80,
-      height: nodeSizes.get(state)?.height ?? 40
+      height: nodeSizes.get(state)?.height ?? 44
     })),
     edges: transitions
       .map((transition, originalIndex) => ({ transition, originalIndex }))
@@ -453,14 +453,14 @@ async function computeLayoutForSnapshot(snapshot: Record<string, unknown>): Prom
   const resultChildren = Array.isArray(layoutResult.children) ? layoutResult.children : [];
   const resultEdges = Array.isArray(layoutResult.edges) ? layoutResult.edges : [];
 
-  const padding = 50;
+  const padding = 14;
   const nodes: Record<string, LayoutNode> = {};
   for (const child of resultChildren) {
     if (!child?.id) {
       continue;
     }
 
-    const size = nodeSizes.get(String(child.id)) ?? { width: 80, height: 40 };
+    const size = nodeSizes.get(String(child.id)) ?? { width: 80, height: 44 };
     const x = Number(child.x ?? 0) + (size.width / 2) + padding;
     const y = Number(child.y ?? 0) + (size.height / 2) + padding;
     nodes[String(child.id)] = { x, y, width: size.width, height: size.height };

@@ -364,7 +364,7 @@
     #diagram {
       width: 100%;
       min-width: 0;
-      height: clamp(340px, 62vh, 620px);
+      height: 100%;
       display: block;
     }
 
@@ -511,7 +511,7 @@
       }
 
       #diagram {
-        height: clamp(250px, 46vh, 360px);
+        height: 100%;
       }
 
       .data-overlay .data-list {
@@ -552,7 +552,7 @@
       }
 
       #diagram {
-        height: 200px;
+        height: 100%;
       }
 
       .data-overlay .data-list {
@@ -570,7 +570,7 @@
       }
 
       #diagram {
-        height: 170px;
+        height: 100%;
       }
 
       .data-overlay {
@@ -604,7 +604,7 @@
     <div class="left-stack">
       <div class="diagram-canvas">
         <div class="diagram-scroll" aria-label="diagram scroll area">
-          <svg id="diagram" viewBox="0 0 920 430" aria-label="state diagram"></svg>
+          <svg id="diagram" viewBox="0 0 920 430" preserveAspectRatio="xMidYMid meet" aria-label="state diagram"></svg>
         </div>
         <div class="data-overlay" aria-label="data overlay">
           <ul id="data-list" class="data-list"></ul>
@@ -640,6 +640,9 @@
     ];
     let eventDefinitionOrder = ['Advance', 'Emergency', 'ClearEmergency'];
     const FEEDBACK_DURATION_MS = 2200;
+    const DOT_SPEED_PX_PER_MS = 0.22;  // pixels per millisecond — constant travel speed
+    const ANIMATION_MIN_MS = 250;
+    const ANIMATION_MAX_MS = 2000;
 
     let initialState = 'Red';
     let initialData = {
@@ -674,6 +677,7 @@
     let dataFieldToastDetails = new Map();
     let stateChangeAnimation = null;
     let suppressHoverUntilAnimationComplete = false;
+    let suppressArgBlur = false;
     let reloadButtonFeedbackTimer = null;
     let currentEventStatuses = [];
     let transitionPaths = new Map();
@@ -855,22 +859,45 @@
         return `M ${normalized[0].x} ${normalized[0].y} L ${normalized[1].x} ${normalized[1].y}`;
       }
 
+      // Rounded-corner polyline: approach each bend point, round the corner
+      // with a quadratic Bézier, then continue to the next segment.
+      const radius = 30;
       let d = `M ${normalized[0].x} ${normalized[0].y}`;
 
-      for (let i = 0; i < normalized.length - 1; i++) {
-        const p0 = normalized[Math.max(0, i - 1)];
-        const p1 = normalized[i];
-        const p2 = normalized[i + 1];
-        const p3 = normalized[Math.min(normalized.length - 1, i + 2)];
+      for (let i = 1; i < normalized.length - 1; i++) {
+        const prev = normalized[i - 1];
+        const curr = normalized[i];
+        const next = normalized[i + 1];
 
-        const cp1x = p1.x + (p2.x - p0.x) / 6;
-        const cp1y = p1.y + (p2.y - p0.y) / 6;
-        const cp2x = p2.x - (p3.x - p1.x) / 6;
-        const cp2y = p2.y - (p3.y - p1.y) / 6;
+        // Vector from curr to prev and curr to next
+        const dx1 = prev.x - curr.x;
+        const dy1 = prev.y - curr.y;
+        const dx2 = next.x - curr.x;
+        const dy2 = next.y - curr.y;
 
-        d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+        const len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+        const len2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+
+        if (len1 === 0 || len2 === 0) {
+          d += ` L ${curr.x} ${curr.y}`;
+          continue;
+        }
+
+        // Clamp radius to half the shorter segment
+        const r = Math.min(radius, len1 / 2, len2 / 2);
+
+        // Points where the curve starts and ends
+        const startX = curr.x + (dx1 / len1) * r;
+        const startY = curr.y + (dy1 / len1) * r;
+        const endX = curr.x + (dx2 / len2) * r;
+        const endY = curr.y + (dy2 / len2) * r;
+
+        d += ` L ${startX} ${startY}`;
+        d += ` Q ${curr.x} ${curr.y}, ${endX} ${endY}`;
       }
 
+      const last = normalized[normalized.length - 1];
+      d += ` L ${last.x} ${last.y}`;
       return d;
     }
 
@@ -1175,10 +1202,26 @@
       stateChangeAnimation = null;
       suppressHoverUntilAnimationComplete = false;
       stateChangeAnimationFrame = null;
-      drawDiagram();
+
+      const onComplete = stateChangeAnimationOnComplete;
+      stateChangeAnimationOnComplete = null;
+
+      if (onComplete) {
+        onComplete();
+      }
+
+      renderAll();
     }
 
-    function triggerStateChangeAnimation(fromState, toState, eventName, fromDataSnapshot = null, fromArgsSnapshot = null) {
+    function getPathLength(pathD) {
+      const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      tempPath.setAttribute('d', pathD);
+      return tempPath.getTotalLength();
+    }
+
+    let stateChangeAnimationOnComplete = null;
+
+    function triggerStateChangeAnimation(fromState, toState, eventName, fromDataSnapshot = null, fromArgsSnapshot = null, onComplete = null) {
       suppressHoverUntilAnimationComplete = true;
       hoveredEventName = null;
       pendingFocusEventName = null;
@@ -1186,6 +1229,17 @@
       if (stateChangeAnimationFrame !== null) {
         window.cancelAnimationFrame(stateChangeAnimationFrame);
         stateChangeAnimationFrame = null;
+      }
+
+      // Derive duration from path length so the dot travels at a constant speed
+      const transitionIndex = transitions.findIndex((t) => t.from === fromState && t.to === toState);
+      let duration = DOT_SPEED_PX_PER_MS * 200; // fallback for ~200px
+      if (transitionIndex >= 0) {
+        const pathD = transitionPaths.get(transitionIndex);
+        if (pathD) {
+          const length = getPathLength(pathD);
+          duration = Math.max(ANIMATION_MIN_MS, Math.min(ANIMATION_MAX_MS, length / DOT_SPEED_PX_PER_MS));
+        }
       }
 
       stateChangeAnimation = {
@@ -1198,9 +1252,11 @@
           Reason: mockEmergencyArgs.Reason
         },
         startedAt: performance.now(),
-        duration: FEEDBACK_DURATION_MS,
+        duration,
         progress: 0
       };
+
+      stateChangeAnimationOnComplete = onComplete;
 
       stateChangeAnimationFrame = window.requestAnimationFrame(stepStateChangeAnimation);
     }
@@ -1319,7 +1375,12 @@
     }
 
     function evaluateEventWithContext(state, eventName, dataContext, argsContext) {
-      if (vscodeApi && state === currentState) {
+      // For events with client-side args (Emergency), always use mock evaluation
+      // so that typing in the arg fields re-evaluates immediately.
+      // The runtime status doesn't know about client-side arg edits.
+      const hasClientSideArgs = eventName === 'Emergency';
+
+      if (vscodeApi && state === currentState && !hasClientSideArgs) {
         const liveStatus = currentEventStatuses.find((status) => status.name === eventName);
         if (liveStatus) {
           const reason = liveStatus.reasons.length > 0 ? liveStatus.reasons[0] : undefined;
@@ -1640,20 +1701,20 @@
               <feMergeNode in="SourceGraphic"/>
             </feMerge>
           </filter>
-          <marker id="arrow" markerWidth="8" markerHeight="6" markerUnits="userSpaceOnUse" refX="7.1" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge').trim()}"/>
+          <marker id="arrow" markerWidth="14" markerHeight="10.5" markerUnits="userSpaceOnUse" refX="12.4" refY="5.25" orient="auto">
+            <polygon points="0 0, 14 5.25, 0 10.5" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge').trim()}"/>
           </marker>
-          <marker id="arrow-warn" markerWidth="8" markerHeight="6" markerUnits="userSpaceOnUse" refX="7.1" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-warn').trim()}"/>
+          <marker id="arrow-warn" markerWidth="14" markerHeight="10.5" markerUnits="userSpaceOnUse" refX="12.4" refY="5.25" orient="auto">
+            <polygon points="0 0, 14 5.25, 0 10.5" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-warn').trim()}"/>
           </marker>
-          <marker id="arrow-error" markerWidth="8" markerHeight="6" markerUnits="userSpaceOnUse" refX="7.1" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-error').trim()}"/>
+          <marker id="arrow-error" markerWidth="14" markerHeight="10.5" markerUnits="userSpaceOnUse" refX="12.4" refY="5.25" orient="auto">
+            <polygon points="0 0, 14 5.25, 0 10.5" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-error').trim()}"/>
           </marker>
-          <marker id="arrow-selected" markerWidth="8" markerHeight="6" markerUnits="userSpaceOnUse" refX="7.1" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="${getComputedStyle(document.documentElement).getPropertyValue('--event').trim()}"/>
+          <marker id="arrow-selected" markerWidth="14" markerHeight="10.5" markerUnits="userSpaceOnUse" refX="12.4" refY="5.25" orient="auto">
+            <polygon points="0 0, 14 5.25, 0 10.5" fill="${getComputedStyle(document.documentElement).getPropertyValue('--event').trim()}"/>
           </marker>
-          <marker id="arrow-muted" markerWidth="8" markerHeight="6" markerUnits="userSpaceOnUse" refX="7.1" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-muted').trim()}"/>
+          <marker id="arrow-muted" markerWidth="14" markerHeight="10.5" markerUnits="userSpaceOnUse" refX="12.4" refY="5.25" orient="auto">
+            <polygon points="0 0, 14 5.25, 0 10.5" fill="${getComputedStyle(document.documentElement).getPropertyValue('--edge-muted').trim()}"/>
           </marker>
         </defs>
       `;
@@ -1664,8 +1725,8 @@
           return precomputedPath;
         }
 
-        const fromSize = nodeSizes[transition.from] ?? { width: 112, height: 40 };
-        const toSize = nodeSizes[transition.to] ?? { width: 112, height: 40 };
+        const fromSize = nodeSizes[transition.from] ?? { width: 112, height: 44 };
+        const toSize = nodeSizes[transition.to] ?? { width: 112, height: 44 };
         const fromHalfW = fromSize.width / 2;
         const toHalfW = toSize.width / 2;
 
@@ -2047,29 +2108,20 @@
           ? `<path class="diagram-edge" d="${transitionSegment.pathD}" fill="none" stroke="var(--ok)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="24 120" stroke-dashoffset="${Math.round((1 - runnerProgress) * 220)}" opacity="${0.2 + (beamEnvelope * 0.45)}"></path>`
           : '';
 
-        const trailOffsets = [0.045, 0.1, 0.17, 0.25];
-        const transitionTrailSvg = transitionSegment
-          ? trailOffsets.map((offset, idx) => {
-            const trailProgress = Math.max(0.01, runnerProgress - offset);
-            const point = getPointOnPath(transitionSegment.pathD, trailProgress);
-            const alpha = Math.max(0.05, (runnerOpacity * (1 - ((idx + 1) / (trailOffsets.length + 1)))) * 0.85);
-            const radius = Math.max(1.8, 4.4 - (idx * 0.8));
-            return `<circle cx="${point.x}" cy="${point.y}" r="${radius}" fill="var(--ok)" opacity="${alpha}" filter="url(#transition-glow-soft)"></circle>`;
-          }).join('')
-          : '';
+        const transitionTrailSvg = '';
 
         const transitionRunnerSvg = runnerPoint
           ? `<g filter="url(#transition-glow-strong)"><circle cx="${runnerPoint.x}" cy="${runnerPoint.y}" r="7" fill="var(--ok)" opacity="${Math.min(1, runnerOpacity + 0.12)}"></circle><circle cx="${runnerPoint.x}" cy="${runnerPoint.y}" r="3.1" fill="#d6ffe8" opacity="${Math.min(1, runnerOpacity + 0.2)}"></circle></g>`
           : '';
 
         const fromActiveBlend = Math.max(0, 1 - eased);
-        const toActiveBlend = Math.max(0, Math.min(1, (eased - 0.72) / 0.28));
-        const pulseStrength = Math.max(0, Math.sin(Math.PI * Math.max(0, Math.min(1, (eased - 0.52) / 0.48))));
+        const toActiveBlend = 0;
+        const pulseStrength = 0;
         const destinationDimStrokeOpacity = 0.72;
         const destinationDimTextOpacity = 0.74;
 
         const nodeSvg = Object.entries(statePositions).map(([name, pos]) => {
-          const ns = nodeSizes[name] ?? { width: 112, height: 40 };
+          const ns = nodeSizes[name] ?? { width: 112, height: 44 };
           const halfW = ns.width / 2;
           const halfH = ns.height / 2;
           const rx = halfH;
@@ -2164,7 +2216,7 @@
               ${pulseOverlay}
               <rect x="${pos.x - halfW}" y="${pos.y - halfH}" width="${ns.width}" height="${ns.height}" rx="${rx}" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="${strokeWidth}"></rect>
               ${fillOverlay}
-              <text x="${pos.x}" y="${pos.y + 4}" text-anchor="middle" fill="${textFill}" fill-opacity="${textOpacity}" font-size="13" font-weight="${fontWeight}">${name}</text>
+              <text x="${pos.x}" y="${pos.y + 5}" text-anchor="middle" fill="${textFill}" fill-opacity="${textOpacity}" font-size="14" font-weight="${fontWeight}">${name}</text>
             </g>
           `;
         }).join('');
@@ -2380,7 +2432,7 @@
         return `
           <g ${glow}>
             <rect x="${pos.x - halfW}" y="${pos.y - halfH}" width="${ns.width}" height="${ns.height}" rx="${rx}" fill="${fill}" stroke="${stroke}" stroke-opacity="${destinationOutlineOpacity}" stroke-width="${isActive ? 2.6 : isDestinationVisual ? 2.0 : 1.6}"></rect>
-            <text x="${pos.x}" y="${pos.y + 4}" text-anchor="middle" fill="${textFill}" fill-opacity="${destinationTextOpacity}" font-size="13" font-weight="${fontWeight}">${name}</text>
+            <text x="${pos.x}" y="${pos.y + 5}" text-anchor="middle" fill="${textFill}" fill-opacity="${destinationTextOpacity}" font-size="14" font-weight="${fontWeight}">${name}</text>
           </g>
         `;
       }).join('');
@@ -2487,6 +2539,9 @@
         });
 
         input.addEventListener('blur', () => {
+          if (suppressArgBlur) {
+            return;
+          }
           const emergencyButton = eventBar.querySelector('button[data-event="Emergency"]');
           const emergencyEntry = emergencyButton?.closest('.event-entry');
           const activeElement = document.activeElement;
@@ -2498,20 +2553,37 @@
 
         input.addEventListener('input', () => {
           const argName = input.dataset.eventArg;
+          const focusedArgName = argName; // remember which field to re-focus
           if (argName === 'AuthorizedBy') {
             mockEmergencyArgs.AuthorizedBy = input.value;
           } else if (argName === 'Reason') {
             mockEmergencyArgs.Reason = input.value;
           }
 
-          const emergencyButton = eventBar.querySelector('button[data-event="Emergency"]');
-          if (emergencyButton) {
-            applyEventButtonState(emergencyButton, 'Emergency');
-            const emergencyEvaluation = evaluateEvent(currentState, 'Emergency');
-            const emergencyEntry = emergencyButton.closest('.event-entry');
-            applyEventReasonState(emergencyEntry, emergencyEvaluation);
+          const emergencyEvaluation = evaluateEvent(currentState, 'Emergency');
+          if (emergencyEvaluation.kind === 'enabled') {
+            selectEvent('Emergency');
+          } else {
+            syncSelectionToCurrentState();
           }
 
+          // Pin hover to Emergency so the blur from DOM rebuild doesn't clear it
+          hoveredEventName = 'Emergency';
+          suppressArgBlur = true;
+
+          // Full re-render so button state, glyph, reason text and diagram all update together
+          renderEventBar();
+          suppressArgBlur = false;
+
+          // Restore focus to the same input field after re-render
+          const refocusInput = eventBar.querySelector(`input[data-event-arg="${focusedArgName}"]`);
+          if (refocusInput) {
+            refocusInput.focus();
+            const len = refocusInput.value.length;
+            refocusInput.setSelectionRange(len, len);
+          }
+
+          // Draw after focus so hoveredEventName is still 'Emergency'
           drawDiagram();
         });
       });
@@ -2554,16 +2626,22 @@
           return;
         }
 
-        applySnapshot(response.snapshot);
-        const afterData = snapshotData();
-        const changedKeys = getChangedDataKeys(beforeData, afterData);
-        showDataFieldToasts(changedKeys, beforeData, afterData);
-        triggerStateChangeAnimation(beforeState, currentState, eventName, beforeData, beforeArgs);
-        hoveredEventName = null;
-        mockEmergencyArgs.AuthorizedBy = '';
-        mockEmergencyArgs.Reason = '';
-        showRowFeedback(eventName, `✔ ${beforeState} → ${currentState}`, 'ok');
-        renderAll();
+        // Capture the new state but don't commit UI yet — animate first
+        const newSnapshot = response.snapshot;
+        const newState = String(newSnapshot.currentState ?? newSnapshot.CurrentState ?? beforeState);
+
+        triggerStateChangeAnimation(beforeState, newState, eventName, beforeData, beforeArgs, () => {
+          // Commit all state changes after animation completes
+          applySnapshot(newSnapshot);
+          const afterData = snapshotData();
+          const changedKeys = getChangedDataKeys(beforeData, afterData);
+          showDataFieldToasts(changedKeys, beforeData, afterData);
+          hoveredEventName = null;
+          mockEmergencyArgs.AuthorizedBy = '';
+          mockEmergencyArgs.Reason = '';
+          showRowFeedback(eventName, `✔ ${beforeState} → ${newState}`, 'ok');
+        });
+        drawDiagram();
         return;
       }
 
@@ -2596,18 +2674,20 @@
         AuthorizedBy: mockEmergencyArgs.AuthorizedBy,
         Reason: mockEmergencyArgs.Reason
       };
-      currentState = evaluation.to;
-      applyTransition(from, eventName, currentState);
-      triggerStateChangeAnimation(from, currentState, eventName, beforeData, beforeArgs);
-      const afterData = snapshotData();
-      const changedKeys = getChangedDataKeys(beforeData, afterData);
-      showDataFieldToasts(changedKeys, beforeData, afterData);
-      hoveredEventName = null;
-      mockEmergencyArgs.AuthorizedBy = '';
-      mockEmergencyArgs.Reason = '';
-      showRowFeedback(eventName, `✔ ${from} → ${currentState}`, 'ok');
 
-      renderAll();
+      // Start animation first, commit state changes in onComplete callback
+      triggerStateChangeAnimation(from, evaluation.to, eventName, beforeData, beforeArgs, () => {
+        currentState = evaluation.to;
+        applyTransition(from, eventName, currentState);
+        const afterData = snapshotData();
+        const changedKeys = getChangedDataKeys(beforeData, afterData);
+        showDataFieldToasts(changedKeys, beforeData, afterData);
+        hoveredEventName = null;
+        mockEmergencyArgs.AuthorizedBy = '';
+        mockEmergencyArgs.Reason = '';
+        showRowFeedback(eventName, `✔ ${from} → ${currentState}`, 'ok');
+      });
+      drawDiagram();
     }
 
     function formatValue(value) {
