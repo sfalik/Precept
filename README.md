@@ -27,6 +27,7 @@ Red › events
   └─ ClearEmergency
 
 Red › data
+  ├─ CycleCount: 0
   ├─ EmergencyReason: <null>
   ├─ LeftTurnQueued: true
   └─ VehiclesWaiting: 0
@@ -105,6 +106,7 @@ sm> fire Emergency '{"AuthorizedBy":"Dispatcher","Reason":"Accident"}'
 machine TrafficLight
 
 number VehiclesWaiting
+number CycleCount
 boolean LeftTurnQueued
 string? EmergencyReason
 
@@ -122,24 +124,29 @@ event ClearEmergency
 from Red on Advance
   if LeftTurnQueued
     transform LeftTurnQueued = false
+    transform CycleCount = CycleCount + 1
     transition FlashingGreen
   else if VehiclesWaiting > 0
+    transform CycleCount = CycleCount + 1
     transition Green
   else
     reject "No demand detected at red"
 
 from FlashingGreen on Advance
+  transform CycleCount = CycleCount + 1
   transition Green
 
 from Green on Advance
+  transform CycleCount = CycleCount + 1
   transition Yellow
 
 from Yellow on Advance
+  transform CycleCount = CycleCount + 1
   transition Red
 
 from any on Emergency
   if Emergency.AuthorizedBy != "" && Emergency.Reason != ""
-    transform EmergencyReason = Emergency.Reason
+    transform EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason
     transition FlashingRed
   else
     reject "AuthorizedBy and Reason are required to activate emergency mode"
@@ -252,6 +259,7 @@ from Archived on Submit
   "lastEvent": null,
   "updatedAt": "2026-02-27T00:00:00+00:00",
   "instanceData": {
+    "CycleCount": 0,
     "VehiclesWaiting": 0,
     "LeftTurnQueued": true,
     "EmergencyReason": null

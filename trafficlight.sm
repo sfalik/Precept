@@ -1,6 +1,7 @@
 machine TrafficLight
 
 number VehiclesWaiting
+number CycleCount
 boolean LeftTurnQueued
 string? EmergencyReason
 
@@ -19,26 +20,31 @@ event ClearEmergency
 from Red on Advance
 	if LeftTurnQueued
 		transform LeftTurnQueued = false
+		transform CycleCount = CycleCount + 1
 		transition FlashingGreen
 	else if VehiclesWaiting > 0
+		transform CycleCount = CycleCount + 1
 		transition Green
 	else
 		reject "No demand detected at red"
 
 # Protected left-turn phase rejoins normal cycle at Green
 from FlashingGreen on Advance
+	transform CycleCount = CycleCount + 1
 	transition Green
 
 from Green on Advance
+	transform CycleCount = CycleCount + 1
 	transition Yellow
 
 from Yellow on Advance
+	transform CycleCount = CycleCount + 1
 	transition Red
 
 # Emergency preemption: requires a reason to record why it was activated
-from Red, Green, FlashingGreen, Yellow on Emergency
+from any on Emergency
 	if Emergency.AuthorizedBy != "" && Emergency.Reason != ""
-		transform EmergencyReason = Emergency.Reason
+		transform EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason
 		transition FlashingRed
 	reject "AuthorizedBy and Reason are required to activate emergency mode"
 
