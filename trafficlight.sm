@@ -1,8 +1,8 @@
 machine TrafficLight
 
 number VehiclesWaiting = 2
-number CycleCount = 0
 boolean LeftTurnQueued = false
+number CycleCount = 0
 string? EmergencyReason
 
 state Red initial
@@ -15,11 +15,14 @@ event Advance
 event Emergency
 	string AuthorizedBy
 	string Reason
+event LeftTurnRequest
+event VehicleArrives
 event ClearEmergency
+
+
 # Red: priority to left-turn queue, then general demand, else hold
 from Red on Advance
 	if LeftTurnQueued
-		set LeftTurnQueued = false
 		set CycleCount = CycleCount + 1
 		transition FlashingGreen
 	else if VehiclesWaiting > 0
@@ -28,17 +31,33 @@ from Red on Advance
 	else
 		reject "No demand detected at red"
 
+from any on LeftTurnRequest
+	set LeftTurnQueued = true
+	no transition
+
+from any on VehicleArrives
+	set VehiclesWaiting = VehiclesWaiting + 1
+	no transition
+
 # Protected left-turn phase rejoins normal cycle at Green
 from FlashingGreen on Advance
-	set CycleCount = CycleCount + 1
+	set LeftTurnQueued = false
 	transition Green
 
 from Green on Advance
-	set CycleCount = CycleCount + 1
+	set VehiclesWaiting = 0
 	transition Yellow
 
 from Yellow on Advance
+	transition Red
+
+# Signal cycle is suspended during emergency; Advance does nothing
+from FlashingRed on Advance
 	set CycleCount = CycleCount + 1
+	no transition
+
+from FlashingRed on ClearEmergency
+	set EmergencyReason = null
 	transition Red
 
 # Emergency preemption: requires a reason to record why it was activated
@@ -49,12 +68,4 @@ from any on Emergency
 	else
 		reject "AuthorizedBy and Reason are required to activate emergency mode"
 
-# Signal cycle is suspended during emergency; Advance does nothing
-from FlashingRed on Advance
-	set CycleCount = CycleCount + 1
-	no transition
-
-from FlashingRed on ClearEmergency
-	set EmergencyReason = null
-	transition Red
 

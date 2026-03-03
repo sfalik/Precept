@@ -1273,6 +1273,19 @@
       return tempPath.getTotalLength();
     }
 
+    function buildNoTransitionLoopPath(stateName) {
+      const pos = statePositions[stateName];
+      if (!pos) return null;
+      const ns = nodeSizes[stateName] ?? { width: 112, height: 44 };
+      const halfW = ns.width / 2;
+      const halfH = ns.height / 2;
+      const x0 = pos.x - halfW * 0.42;
+      const x1 = pos.x + halfW * 0.42;
+      const top = pos.y - halfH;
+      const ctrl = top - 48;
+      return `M ${x0} ${top} C ${x0} ${ctrl}, ${x1} ${ctrl}, ${x1} ${top}`;
+    }
+
     let stateChangeAnimationOnComplete = null;
 
     function triggerStateChangeAnimation(fromState, toState, eventName, onComplete = null) {
@@ -1286,13 +1299,22 @@
       }
 
       // Derive duration from path length so the dot travels at a constant speed
-      const transitionIndex = transitions.findIndex((t) => t.from === fromState && t.to === toState);
-      let duration = DOT_SPEED_PX_PER_MS * 200; // fallback for ~200px
-      if (transitionIndex >= 0) {
-        const pathD = transitionPaths.get(transitionIndex);
-        if (pathD) {
-          const length = getPathLength(pathD);
+      let duration = ANIMATION_MIN_MS;
+      if (fromState === toState) {
+        // Self-loop or noTransition: measure the hover preview arc
+        const loopPathD = buildNoTransitionLoopPath(fromState);
+        if (loopPathD) {
+          const length = getPathLength(loopPathD);
           duration = Math.max(ANIMATION_MIN_MS, Math.min(ANIMATION_MAX_MS, length / DOT_SPEED_PX_PER_MS));
+        }
+      } else {
+        const transitionIndex = transitions.findIndex((t) => t.from === fromState && t.to === toState);
+        if (transitionIndex >= 0) {
+          const pathD = transitionPaths.get(transitionIndex);
+          if (pathD) {
+            const length = getPathLength(pathD);
+            duration = Math.max(ANIMATION_MIN_MS, Math.min(ANIMATION_MAX_MS, length / DOT_SPEED_PX_PER_MS));
+          }
         }
       }
 
@@ -2061,20 +2083,28 @@
           .join('');
 
         const transitionSegment = edgeSegments.find((segment) => segment.transition.from === fromState && segment.transition.to === toState);
+        // When staying in the same state (noTransition outcome OR actual self-loop transition),
+        // always animate along the hover preview arc so the two visuals match.
+        const selfLoopPathD = fromState === toState ? buildNoTransitionLoopPath(fromState) : null;
+        const activePathD = selfLoopPathD ?? (transitionSegment ? transitionSegment.pathD : null);
+
         const runnerProgress = Math.min(0.985, Math.max(0.001, 0.01 + (progress * 0.975)));
-        const runnerPoint = transitionSegment
-          ? getPointOnPath(transitionSegment.pathD, runnerProgress)
+        const runnerPoint = activePathD
+          ? getPointOnPath(activePathD, runnerProgress)
           : null;
         const runnerOpacity = Math.max(0.38, 1 - Math.abs((runnerProgress - 0.55) * 1.15));
         const beamEnvelope = Math.max(0.18, Math.sin(Math.PI * runnerProgress));
-        const transitionPathHaloSvg = transitionSegment
-          ? `<path class="diagram-edge" d="${transitionSegment.pathD}" fill="none" stroke="var(--ok)" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" opacity="${0.16 + (beamEnvelope * 0.28)}" filter="url(#transition-glow-soft)"></path>`
+        const noTransitionArcSvg = selfLoopPathD
+          ? `<path d="${selfLoopPathD}" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="5 4" stroke-linecap="round" opacity="${0.48 + beamEnvelope * 0.38}"></path>`
           : '';
-        const transitionPathSvg = transitionSegment
-          ? `<path class="diagram-edge" d="${transitionSegment.pathD}" fill="none" stroke="url(#transition-beam-gradient)" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" opacity="${0.3 + (beamEnvelope * 0.64)}"></path>`
+        const transitionPathHaloSvg = activePathD
+          ? `<path class="diagram-edge" d="${activePathD}" fill="none" stroke="var(--ok)" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round" opacity="${0.16 + (beamEnvelope * 0.28)}" filter="url(#transition-glow-soft)"></path>`
           : '';
-        const transitionSweepSvg = transitionSegment
-          ? `<path class="diagram-edge" d="${transitionSegment.pathD}" fill="none" stroke="var(--ok)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="24 120" stroke-dashoffset="${Math.round((1 - runnerProgress) * 220)}" opacity="${0.2 + (beamEnvelope * 0.45)}"></path>`
+        const transitionPathSvg = activePathD
+          ? `<path class="diagram-edge" d="${activePathD}" fill="none" stroke="url(#transition-beam-gradient)" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round" opacity="${0.3 + (beamEnvelope * 0.64)}"></path>`
+          : '';
+        const transitionSweepSvg = activePathD
+          ? `<path class="diagram-edge" d="${activePathD}" fill="none" stroke="var(--ok)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="24 120" stroke-dashoffset="${Math.round((1 - runnerProgress) * 220)}" opacity="${0.2 + (beamEnvelope * 0.45)}"></path>`
           : '';
 
         const transitionTrailSvg = '';
@@ -2190,7 +2220,7 @@
           `;
         }).join('');
 
-        diagram.innerHTML = `${defs}${mutedEdgeSvg}${animatedFromEdgeSvg}${transitionPathHaloSvg}${transitionPathSvg}${transitionSweepSvg}${transitionTrailSvg}${transitionRunnerSvg}${animatedFromAnnotationSvg}${nodeSvg}`;
+        diagram.innerHTML = `${defs}${mutedEdgeSvg}${animatedFromEdgeSvg}${noTransitionArcSvg}${transitionPathHaloSvg}${transitionPathSvg}${transitionSweepSvg}${transitionTrailSvg}${transitionRunnerSvg}${animatedFromAnnotationSvg}${nodeSvg}`;
         return;
       }
 
@@ -2408,22 +2438,19 @@
 
       let selfLoopSvg = '';
       if (hoveredEvaluation !== null && hoveredEvaluation.kind === 'noTransition' && activeHoverEventName !== null) {
-        const loopPos = statePositions[diagramState];
-        if (loopPos) {
+        const loopPathD = buildNoTransitionLoopPath(diagramState);
+        if (loopPathD) {
+          const loopPos = statePositions[diagramState];
           const ns = nodeSizes[diagramState] ?? { width: 112, height: 44 };
           const halfW = ns.width / 2;
           const halfH = ns.height / 2;
-          const x0 = loopPos.x - halfW * 0.42;
-          const x1 = loopPos.x + halfW * 0.42;
-          const top = loopPos.y - halfH;
-          const ctrl = top - 48;
-          const pathD = `M ${x0} ${top} C ${x0} ${ctrl}, ${x1} ${ctrl}, ${x1} ${top}`;
+          const ctrl = (loopPos.y - halfH) - 48;
           const labelX = loopPos.x;
           const chipHeight = 16;
           const chipWidth = activeHoverEventName.length * 7 + 16;
           const chipY = ctrl - chipHeight - 4;
           const textY = chipY + chipHeight / 2;
-          selfLoopSvg = `<g opacity="0.72"><path d="${pathD}" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="5 4" stroke-linecap="round"></path><rect class="edge-chip" x="${labelX - chipWidth / 2}" y="${chipY}" width="${chipWidth}" height="${chipHeight}" fill="rgba(30,30,30,0.88)" stroke="var(--ok)" stroke-width="1.1"></rect><text class="edge-label" x="${labelX}" y="${textY}" fill="var(--ok)">${activeHoverEventName}</text></g>`;
+          selfLoopSvg = `<g opacity="0.72"><path d="${loopPathD}" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="5 4" stroke-linecap="round"></path><rect class="edge-chip" x="${labelX - chipWidth / 2}" y="${chipY}" width="${chipWidth}" height="${chipHeight}" fill="rgba(30,30,30,0.88)" stroke="var(--ok)" stroke-width="1.1"></rect><text class="edge-label" x="${labelX}" y="${textY}" fill="var(--ok)">${activeHoverEventName}</text></g>`;
         }
       }
 
