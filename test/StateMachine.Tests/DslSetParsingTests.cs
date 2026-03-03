@@ -13,7 +13,7 @@ public class DslSetParsingTests
     {
         const string dsl = """
             machine Sample
-            number Count
+            number Count = 0
             state Red initial
             state Green
             event Advance
@@ -34,7 +34,7 @@ public class DslSetParsingTests
     {
         const string dsl = """
             machine Sample
-            number Count
+            number Count = 0
             state Red initial
             state Green
             event Advance
@@ -53,7 +53,7 @@ public class DslSetParsingTests
     {
         const string dsl = """
             machine Sample
-            number Count
+            number Count = 0
             state Red initial
             state Green
             event Advance
@@ -73,8 +73,8 @@ public class DslSetParsingTests
     {
         const string dsl = """
             machine Sample
-            number Count
-            string Label
+            number Count = 0
+            string Label = ""
             state Red initial
             state Green
             event Advance

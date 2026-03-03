@@ -1,8 +1,8 @@
 machine TrafficLight
 
-number VehiclesWaiting
-number CycleCount
-boolean LeftTurnQueued
+number VehiclesWaiting = 0
+number CycleCount = 0
+boolean LeftTurnQueued = false
 string? EmergencyReason
 
 state Red initial

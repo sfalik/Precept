@@ -79,7 +79,7 @@ public class SmDslAnalyzerNullNarrowingTests
     {
         const string text = """
             machine M
-            number Value
+            number Value = 0
             number? RetryCount
             state A initial
             state B
@@ -100,7 +100,7 @@ public class SmDslAnalyzerNullNarrowingTests
     {
         const string text = """
             machine M
-            number Value
+            number Value = 0
             number? RetryCount
             state A initial
             state B

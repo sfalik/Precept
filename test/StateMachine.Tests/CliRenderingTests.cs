@@ -80,7 +80,7 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
-            number Vehicles
+            number Vehicles = 0
             state Red initial
             state Green
             event Advance
@@ -253,7 +253,7 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
-            number Score
+            number Score = 0
             state Paused initial
             state Beta
             state Gamma
@@ -288,7 +288,7 @@ public sealed class CliRenderingTests
     {
         var dsl = """
             machine Sample
-            boolean IsReady
+            boolean IsReady = false
             state Idle initial
             state Processing
             event StartPipelineWithExtremelyDescriptiveNameAndMetadata

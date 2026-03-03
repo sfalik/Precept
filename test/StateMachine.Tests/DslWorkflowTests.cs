@@ -135,7 +135,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine FeatureFlag
-            boolean IsEnabled
+            boolean IsEnabled = false
             state Disabled initial
             state Enabled
             event Evaluate
@@ -191,7 +191,7 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine Route
-            boolean Hold
+            boolean Hold = false
             state Red initial
             state Green
             event Advance
@@ -219,8 +219,8 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine Route
-            boolean PreferStop
-            boolean PreferAlpha
+            boolean PreferStop = false
+            boolean PreferAlpha = false
             state Source initial
             state Alpha
             state Beta
@@ -514,8 +514,8 @@ public class DslWorkflowTests
             machine TrafficLight
             state Red initial
             state Green
-                number CarsWaiting
-                number LastCarsWaiting
+                number CarsWaiting = 0
+                number LastCarsWaiting = 0
             event Advance
             from Red on Advance
                 set LastCarsWaiting = CarsWaiting
@@ -540,8 +540,8 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine Counters
-            number CarsWaiting
-            number LastCarsWaiting
+            number CarsWaiting = 0
+            number LastCarsWaiting = 0
             state Red initial
             state Green
             event Advance
@@ -571,8 +571,8 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine Counters
-            number CarsWaiting
-            number LastCarsWaiting
+            number CarsWaiting = 0
+            number LastCarsWaiting = 0
             state Red initial
             state Green
             event Advance
@@ -604,8 +604,8 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine Counters
-            number CarsWaiting
-            number NextCarsWaiting
+            number CarsWaiting = 0
+            number NextCarsWaiting = 0
             state Red initial
             state Green
             event Advance
@@ -632,8 +632,8 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine Alerts
-            string Prefix
-            string Message
+            string Prefix = ""
+            string Message = ""
             state Red initial
             state FlashingRed
             event Emergency
@@ -661,9 +661,9 @@ public class DslWorkflowTests
     {
         const string dsl = """
             machine Alerts
-            string Prefix
+            string Prefix = ""
             string? ReasonText
-            string Message
+            string Message = ""
             state Red initial
             state FlashingRed
             event Emergency
@@ -1254,7 +1254,7 @@ public class DslWorkflowTests
             {
                 const string dsl = """
                     machine TrafficLight
-                    number CarsWaiting
+                    number CarsWaiting = 0
                     state Red initial
                     state Green
                     event Advance
@@ -1269,6 +1269,115 @@ public class DslWorkflowTests
                 machine.Transitions.Should().ContainSingle();
                 machine.Transitions[0].SetAssignments.Should().ContainSingle();
                 machine.Transitions[0].SetAssignments[0].Key.Should().Be("CarsWaiting");
+            }
+
+            [Fact]
+            public void Parse_DataField_DefaultLiteral_IsAccepted()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    number CarsWaiting = 3
+                    string? Note = null
+                    state Red initial
+                    state Green
+                    event Advance
+
+                    from Red on Advance
+                        transition Green
+                    """;
+
+                var machine = StateMachineDslParser.Parse(dsl);
+
+                machine.DataFields.Should().HaveCount(2);
+                machine.DataFields[0].HasDefaultValue.Should().BeTrue();
+                machine.DataFields[0].DefaultValue.Should().Be(3d);
+                machine.DataFields[1].HasDefaultValue.Should().BeTrue();
+                machine.DataFields[1].DefaultValue.Should().BeNull();
+            }
+
+            [Fact]
+            public void Parse_DataField_DefaultMustBeLiteral_IsRejected()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    number CarsWaiting = OtherCount + 1
+                    state Red initial
+                    state Green
+                    event Advance
+
+                    from Red on Advance
+                        transition Green
+                    """;
+
+                var act = () => StateMachineDslParser.Parse(dsl);
+
+                act.Should()
+                    .Throw<InvalidOperationException>()
+                    .WithMessage("*default value for field 'CarsWaiting' must be a literal*");
+            }
+
+            [Fact]
+            public void Parse_DataField_DefaultTypeMismatch_IsRejected()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    number CarsWaiting = "three"
+                    state Red initial
+                    state Green
+                    event Advance
+
+                    from Red on Advance
+                        transition Green
+                    """;
+
+                var act = () => StateMachineDslParser.Parse(dsl);
+
+                act.Should()
+                    .Throw<InvalidOperationException>()
+                    .WithMessage("*default value for field 'CarsWaiting' does not match declared type*");
+            }
+
+            [Fact]
+            public void Parse_NonNullableDataField_WithoutDefault_IsRejected()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    number CarsWaiting
+                    state Red initial
+                    state Green
+                    event Advance
+
+                    from Red on Advance
+                        transition Green
+                    """;
+
+                var act = () => StateMachineDslParser.Parse(dsl);
+
+                act.Should()
+                    .Throw<InvalidOperationException>()
+                    .WithMessage("*non-nullable field 'CarsWaiting' requires a default value*");
+            }
+
+            [Fact]
+            public void Parse_NullableDataField_WithoutDefault_IsAccepted()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    string? Note
+                    state Red initial
+                    state Green
+                    event Advance
+
+                    from Red on Advance
+                        transition Green
+                    """;
+
+                var machine = StateMachineDslParser.Parse(dsl);
+
+                machine.DataFields.Should().ContainSingle();
+                machine.DataFields[0].Name.Should().Be("Note");
+                machine.DataFields[0].IsNullable.Should().BeTrue();
+                machine.DataFields[0].HasDefaultValue.Should().BeFalse();
             }
 
             [Fact]
@@ -1346,6 +1455,50 @@ public class DslWorkflowTests
                 act.Should()
                     .Throw<InvalidOperationException>()
                     .WithMessage("*'events' declaration is not supported*");
+            }
+
+            [Fact]
+            public void CreateInstance_WithoutData_UsesDeclaredFieldDefaults()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    number CarsWaiting = 0
+                    string? Note = null
+                    state Red initial
+                    state Green
+                    event Advance
+
+                    from Red on Advance
+                        transition Green
+                    """;
+
+                var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+
+                var instance = workflow.CreateInstance("Red");
+
+                instance.InstanceData["CarsWaiting"].Should().Be(0d);
+                instance.InstanceData["Note"].Should().BeNull();
+            }
+
+            [Fact]
+            public void CreateInstance_ProvidedData_OverridesDeclaredDefaults()
+            {
+                const string dsl = """
+                    machine TrafficLight
+                    number CarsWaiting = 0
+                    state Red initial
+                    state Green
+                    event Advance
+
+                    from Red on Advance
+                        transition Green
+                    """;
+
+                var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+
+                var instance = workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 5d });
+
+                instance.InstanceData["CarsWaiting"].Should().Be(5d);
             }
 }
 

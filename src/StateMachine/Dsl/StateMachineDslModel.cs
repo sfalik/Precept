@@ -18,7 +18,9 @@ public sealed record DslEvent(
 public sealed record DslFieldContract(
     string Name,
     DslScalarType Type,
-    bool IsNullable);
+    bool IsNullable,
+    bool HasDefaultValue = false,
+    object? DefaultValue = null);
 
 public enum DslScalarType
 {

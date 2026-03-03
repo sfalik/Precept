@@ -11,8 +11,11 @@ public static class StateMachineDslParser
     private static readonly Regex StateRegex = new("^state\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+(?<initial>initial))?$", RegexOptions.Compiled);
     private static readonly Regex EventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
     private static readonly Regex TypedEventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*\\((?<arg>[A-Za-z_][A-Za-z0-9_<>., ]*)\\)$", RegexOptions.Compiled);
-    private static readonly Regex ContractFieldRegex = new(
+    private static readonly Regex EventArgFieldRegex = new(
         "^(?<type>string|number|boolean|null)(?<nullable>\\?)?\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex DataFieldRegex = new(
+        "^(?<type>string|number|boolean|null)(?<nullable>\\?)?\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\s*=\\s*(?<default>.+))?$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex TransitionRegex = new(
         "^transition\\s+(?<from>[A-Za-z_][A-Za-z0-9_]*)\\s*->\\s*(?<to>[A-Za-z_][A-Za-z0-9_]*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+set\\s+(?<setKey>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<setExpr>.+))?$",
@@ -114,17 +117,30 @@ public static class StateMachineDslParser
                 throw new InvalidOperationException($"Line {i + 1}: inline typed event arguments are not supported. Use 'event {eventName}' with optional indented argument declarations.");
             }
 
-            var dataFieldMatch = ContractFieldRegex.Match(line);
+            var dataFieldMatch = DataFieldRegex.Match(line);
             if (dataFieldMatch.Success)
             {
                 var fieldName = dataFieldMatch.Groups["name"].Value;
                 if (dataFields.Any(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal)))
                     throw new InvalidOperationException($"Line {i + 1}: duplicate data field '{fieldName}'.");
 
+                var fieldType = ParseScalarType(dataFieldMatch.Groups["type"].Value);
+                var isNullable = dataFieldMatch.Groups["nullable"].Success;
+                var hasDefaultValue = dataFieldMatch.Groups["default"].Success;
+
+                if (!isNullable && !hasDefaultValue)
+                    throw new InvalidOperationException($"Line {i + 1}: non-nullable field '{fieldName}' requires a default value.");
+
+                var defaultValue = hasDefaultValue
+                    ? ParseFieldDefaultLiteral(dataFieldMatch.Groups["default"].Value.Trim(), fieldType, isNullable, fieldName, i + 1)
+                    : null;
+
                 dataFields.Add(new DslFieldContract(
                     fieldName,
-                    ParseScalarType(dataFieldMatch.Groups["type"].Value),
-                    dataFieldMatch.Groups["nullable"].Success));
+                    fieldType,
+                    isNullable,
+                    hasDefaultValue,
+                    defaultValue));
 
                 i++;
                 continue;
@@ -197,7 +213,7 @@ public static class StateMachineDslParser
             if (indent <= headerIndent)
                 break;
 
-            var fieldMatch = ContractFieldRegex.Match(line);
+            var fieldMatch = EventArgFieldRegex.Match(line);
             if (!fieldMatch.Success)
                 throw new InvalidOperationException($"Line {index + 1}: invalid argument declaration '{line}'. Expected '<string|number|boolean|null>[?] <Name>'.");
 
@@ -655,6 +671,42 @@ public static class StateMachineDslParser
             "null" => DslScalarType.Null,
             _ => throw new InvalidOperationException($"Unsupported scalar type '{token}'.")
         };
+
+    private static object? ParseFieldDefaultLiteral(string text, DslScalarType type, bool isNullable, string fieldName, int lineNumber)
+    {
+        DslExpression parsedExpression;
+        try
+        {
+            parsedExpression = DslExpressionParser.Parse(text);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new InvalidOperationException($"Line {lineNumber}: invalid default value for field '{fieldName}'. {ex.Message}");
+        }
+
+        if (parsedExpression is not DslLiteralExpression literal)
+            throw new InvalidOperationException($"Line {lineNumber}: default value for field '{fieldName}' must be a literal.");
+
+        if (!IsValidDefaultLiteral(type, isNullable, literal.Value))
+            throw new InvalidOperationException($"Line {lineNumber}: default value for field '{fieldName}' does not match declared type.");
+
+        return literal.Value;
+    }
+
+    private static bool IsValidDefaultLiteral(DslScalarType type, bool isNullable, object? value)
+    {
+        if (value is null)
+            return isNullable;
+
+        return type switch
+        {
+            DslScalarType.String => value is string,
+            DslScalarType.Boolean => value is bool,
+            DslScalarType.Number => value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal,
+            DslScalarType.Null => false,
+            _ => false
+        };
+    }
 
     private static string NormalizeDataAssignmentKey(string setKey)
         => setKey;

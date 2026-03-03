@@ -9,7 +9,7 @@ internal static class DslExpressionTestHelper
     {
         var dsl = $$"""
             machine Parser
-            number Value
+            number Value = 0
             event Advance
             state Red initial
             state Green

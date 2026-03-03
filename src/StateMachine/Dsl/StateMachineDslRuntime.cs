@@ -103,7 +103,7 @@ public sealed class DslWorkflowDefinition
         if (!States.Contains(initialState, StringComparer.Ordinal))
             throw new InvalidOperationException($"State '{initialState}' is not defined in workflow '{Name}'.");
 
-        var data = instanceData ?? EmptyInstanceData.Instance;
+        var data = BuildInitialInstanceData(instanceData);
         if (!TryValidateDataContract(data, out var dataError))
             throw new InvalidOperationException(dataError);
 
@@ -113,6 +113,28 @@ public sealed class DslWorkflowDefinition
             null,
             DateTimeOffset.UtcNow,
             data);
+    }
+
+    private IReadOnlyDictionary<string, object?> BuildInitialInstanceData(IReadOnlyDictionary<string, object?>? instanceData)
+    {
+        var hasDefaults = DataFields.Any(field => field.HasDefaultValue);
+        if (!hasDefaults && instanceData is null)
+            return EmptyInstanceData.Instance;
+
+        var merged = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var field in DataFields)
+        {
+            if (field.HasDefaultValue)
+                merged[field.Name] = field.DefaultValue;
+        }
+
+        if (instanceData is not null)
+        {
+            foreach (var pair in instanceData)
+                merged[pair.Key] = pair.Value;
+        }
+
+        return merged;
     }
 
     public DslInstanceCompatibilityResult CheckCompatibility(DslWorkflowInstance instance)

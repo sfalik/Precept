@@ -105,9 +105,9 @@ sm> fire Emergency '{"AuthorizedBy":"Dispatcher","Reason":"Accident"}'
 ```text
 machine TrafficLight
 
-number VehiclesWaiting
-number CycleCount
-boolean LeftTurnQueued
+number VehiclesWaiting = 0
+number CycleCount = 0
+boolean LeftTurnQueued = false
 string? EmergencyReason
 
 state Red initial
@@ -173,6 +173,8 @@ event <EventName>
 
 <ScalarType>[?] <FieldName>
 
+<ScalarType>[?] <FieldName> [= <Literal>]
+
 <ScalarType> := string | number | boolean | null
 
 from <any|StateA[,StateB...]> on <EventName>
@@ -211,6 +213,9 @@ Constraints:
 - `set` is not allowed with `no transition` in `if` / `else if` branches.
 - `reason "..."` is valid only on `reject`.
 - Event arguments and persisted data fields are scalar-only (`string|number|boolean|null`, optional `?`).
+- Top-level data fields may declare literal defaults using `<Field> = <Literal>`.
+- Defaults are applied when creating instances and can be overridden by caller-supplied instance data.
+- Non-nullable top-level data fields must declare defaults.
 - Unsupported syntax: `states ...`, `events ...`, and legacy inline form `transition A -> B on E ...`.
 
 ## DSL Cookbook
@@ -297,8 +302,8 @@ from Archived on Submit
 
 ```text
 number? RetryCount
-number Attempts
-string AuditMessage
+number Attempts = 0
+string AuditMessage = ""
 
 from Active on Retry
   if RetryCount != null && RetryCount % 2 == 0

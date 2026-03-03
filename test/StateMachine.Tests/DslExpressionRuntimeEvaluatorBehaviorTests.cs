@@ -440,9 +440,11 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
         IReadOnlyDictionary<string, object?> instanceData,
         IReadOnlyDictionary<string, object?>? eventArgs = null)
     {
+        var normalizedDeclarations = AddDefaultsForNonNullableFields(declarations);
+
         var dsl = $$"""
             machine Calc
-            {{declarations}}
+            {{normalizedDeclarations}}
             state A initial
             state B
             event Go
@@ -458,12 +460,58 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
         return workflow.Fire(instance, "Go", eventArgs);
     }
 
+    private static string AddDefaultsForNonNullableFields(string declarations)
+    {
+        var lines = declarations.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        var updated = new string[lines.Length];
+
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            var trimmed = line.Trim();
+
+            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.Contains("=", StringComparison.Ordinal))
+            {
+                updated[i] = line;
+                continue;
+            }
+
+            var parts = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2)
+            {
+                updated[i] = line;
+                continue;
+            }
+
+            var typeToken = parts[0];
+            if (typeToken.EndsWith("?", StringComparison.Ordinal))
+            {
+                updated[i] = line;
+                continue;
+            }
+
+            string? defaultLiteral = typeToken switch
+            {
+                "number" => "0",
+                "boolean" => "false",
+                "string" => "\"\"",
+                _ => null
+            };
+
+            updated[i] = defaultLiteral is null
+                ? line
+                : $"{line} = {defaultLiteral}";
+        }
+
+        return string.Join(Environment.NewLine, updated);
+    }
+
     private static DslInspectionResult InspectForGuard(string guardExpression, IReadOnlyDictionary<string, object?> data)
     {
         var dsl = $$"""
             machine Guards
-            boolean Flag
-            boolean OtherFlag
+            boolean Flag = false
+            boolean OtherFlag = false
             state A initial
             state B
             event Go

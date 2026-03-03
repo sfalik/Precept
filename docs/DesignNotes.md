@@ -41,6 +41,7 @@ event <EventName>
 [ <string|number|boolean|null>[?] <ArgName> { <ArgDecl> } ]
 
 <string|number|boolean|null>[?] <FieldName> { <FieldDecl> }
+<string|number|boolean|null>[?] <FieldName> [= <Literal>]
 
 from <any|StateA[,StateB...]> on <EventName>
 (
@@ -61,6 +62,9 @@ Canonical constraints:
 - `if` and `else if` must end with `transition <State>` or `no transition`.
 - `else` may end with `transition`, `reject`, or `no transition`.
 - `reason "..."` is valid only on `reject`.
+- Top-level data fields may declare literal defaults using `<Field> = <Literal>`.
+- Defaults are applied when creating instances and can be overridden by caller-supplied instance data.
+- Non-nullable top-level data fields must declare defaults.
 - Unsupported syntax: `states ...`, `events ...`, and legacy inline form `transition A -> B on E ...`.
 
 Block-authoring equivalent (same semantics):
