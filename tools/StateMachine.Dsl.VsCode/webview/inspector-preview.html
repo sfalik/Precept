@@ -611,9 +611,10 @@
     let transitions = [];
     let eventDefinitionOrder = [];
     const FEEDBACK_DURATION_MS = 2200;
-    const DOT_SPEED_PX_PER_MS = 0.22;  // pixels per millisecond — constant travel speed
+    const DOT_SPEED_PX_PER_MS = 0.264;  // pixels per millisecond — constant travel speed
     const ANIMATION_MIN_MS = 250;
     const ANIMATION_MAX_MS = 2000;
+    const FADE_DURATION_MS = 220;  // fixed fade duration appended after dot arrives
 
     let initialState = '';
     let initialData = {};
@@ -1089,14 +1090,14 @@
         stateChangeAnimationFrame = null;
       }
 
-      // Derive duration from path length so the dot travels at a constant speed
-      let duration = ANIMATION_MIN_MS;
+      // Derive travel duration from path length so the dot travels at a constant speed
+      let travelDuration = ANIMATION_MIN_MS;
       if (fromState === toState) {
         // Self-loop or noTransition: measure the hover preview arc
         const loopPathD = buildNoTransitionLoopPath(fromState);
         if (loopPathD) {
           const length = getPathLength(loopPathD);
-          duration = Math.max(ANIMATION_MIN_MS, Math.min(ANIMATION_MAX_MS, length / DOT_SPEED_PX_PER_MS));
+          travelDuration = Math.max(ANIMATION_MIN_MS, Math.min(ANIMATION_MAX_MS, length / DOT_SPEED_PX_PER_MS));
         }
       } else {
         const transitionIndex = transitions.findIndex((t) => t.from === fromState && t.to === toState);
@@ -1104,10 +1105,13 @@
           const pathD = transitionPaths.get(transitionIndex);
           if (pathD) {
             const length = getPathLength(pathD);
-            duration = Math.max(ANIMATION_MIN_MS, Math.min(ANIMATION_MAX_MS, length / DOT_SPEED_PX_PER_MS));
+            travelDuration = Math.max(ANIMATION_MIN_MS, Math.min(ANIMATION_MAX_MS, length / DOT_SPEED_PX_PER_MS));
           }
         }
       }
+
+      const duration = travelDuration + FADE_DURATION_MS;
+      const fadeFraction = travelDuration / duration;
 
       stateChangeAnimation = {
         from: fromState,
@@ -1115,6 +1119,7 @@
         eventName,
         startedAt: performance.now(),
         duration,
+        fadeFraction,
         progress: 0
       };
 
@@ -1456,18 +1461,6 @@
       const diagramState = stateChangeAnimation ? stateChangeAnimation.from : currentState;
       const defs = `
         <defs>
-          <linearGradient id="transition-beam-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="${getComputedStyle(document.documentElement).getPropertyValue('--edge').trim()}" stop-opacity="0.1" />
-            <stop offset="42%" stop-color="${getComputedStyle(document.documentElement).getPropertyValue('--edge').trim()}" stop-opacity="0.95" />
-            <stop offset="100%" stop-color="${getComputedStyle(document.documentElement).getPropertyValue('--edge').trim()}" stop-opacity="0.22" />
-          </linearGradient>
-          <filter id="transition-glow-soft" x="-70%" y="-70%" width="240%" height="240%">
-            <feGaussianBlur stdDeviation="2.8" result="blur"/>
-            <feMerge>
-              <feMergeNode in="blur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
           <filter id="transition-glow-strong" x="-90%" y="-90%" width="280%" height="280%">
             <feGaussianBlur stdDeviation="4.2" result="blur"/>
             <feMerge>
@@ -1667,44 +1660,6 @@
         return { stroke, marker, width, opacity, dash };
       }
 
-      function getStateVisualMap(eventEvaluations, stateName) {
-        const visualMap = new Map();
-        const setStateVisual = (targetState, visual) => {
-          const existing = visualMap.get(targetState);
-          if (!existing) {
-            visualMap.set(targetState, visual);
-            return;
-          }
-
-          const rank = {
-            actual: 3,
-            alternate: 2,
-            blocked: 2
-          };
-
-          if ((rank[visual] ?? 0) >= (rank[existing] ?? 0)) {
-            visualMap.set(targetState, visual);
-          }
-        };
-
-        Object.entries(eventEvaluations).forEach(([eventName, evaluation]) => {
-          const family = transitions
-            .filter((transition) => transition.from === stateName && transition.event === eventName);
-
-          if (evaluation.kind === 'enabled' && evaluation.to) {
-            family.forEach((transition) => {
-              setStateVisual(transition.to, transition.to === evaluation.to ? 'actual' : 'alternate');
-            });
-          } else if (evaluation.kind === 'blocked') {
-            family.forEach((transition) => {
-              setStateVisual(transition.to, 'blocked');
-            });
-          }
-        });
-
-        return visualMap;
-      }
-
       function easeInOut(progress) {
         if (progress <= 0) return 0;
         if (progress >= 1) return 1;
@@ -1719,22 +1674,12 @@
         const eased = easeInOut(progress);
         const fromState = stateChangeAnimation.from;
         const toState = stateChangeAnimation.to;
-        const preLayerOpacity = Math.max(0.05, 1 - (eased * 0.95));
-        const selectedEventNameForAnimation = stateChangeAnimation.eventName ?? null;
-        const fromEvaluations = getStateEventEvaluations(fromState);
-        const fromStateVisual = getStateVisualMap(fromEvaluations, fromState);
-        const selectedFamilyDestinations = selectedEventNameForAnimation
-          ? new Set(
-            transitions
-              .filter((transition) => transition.from === fromState && transition.event === selectedEventNameForAnimation)
-              .map((transition) => transition.to)
-          )
-          : new Set();
+        const FADE_START = stateChangeAnimation.fadeFraction;
+        const fadeOpacity = progress < FADE_START ? 1 : Math.max(0, 1 - (progress - FADE_START) / (1 - FADE_START));
 
+        // Build edge geometry
         const edgeSegments = transitions.map((transition, index) => {
-          if (transition.kind !== 'transition') {
-            return null;
-          }
+          if (transition.kind !== 'transition') return null;
           const from = statePositions[transition.from];
           const to = statePositions[transition.to];
           const pathD = buildEdgePath(transition, from, to, index);
@@ -1742,105 +1687,15 @@
         }).filter(Boolean);
         const laneBiasByIndex = buildParallelLaneBiasByIndex(edgeSegments);
 
-        const getAnimatedFromEdgeVisual = (segment) => {
-          const visual = getEdgeVisualForState(segment.transition, fromEvaluations, fromState);
-
-          if (selectedEventNameForAnimation !== null && segment.transition.from === fromState) {
-            if (segment.transition.event === selectedEventNameForAnimation) {
-              const selectedEvaluation = fromEvaluations[selectedEventNameForAnimation];
-              if (selectedEvaluation?.kind === 'enabled') {
-                if (selectedEvaluation.to === segment.transition.to) {
-                  visual.width = Math.max(visual.width, 2.15);
-                  visual.opacity = 1;
-                } else {
-                  visual.width = Math.max(visual.width, 2.0);
-                  visual.opacity = 0.8;
-                }
-              } else if (selectedEvaluation?.kind === 'blocked') {
-                visual.width = Math.max(visual.width, 2.0);
-                visual.opacity = 0.8;
-              }
-            } else {
-              visual.width = Math.max(1.6, visual.width * 0.86);
-              visual.opacity = Math.min(visual.opacity, 0.2);
-            }
-          }
-
-          return visual;
-        };
-
-        const animatedFromEdgeSvg = edgeSegments
+        // Active transition edge fades out; all other from-state edges stay muted
+        const fromEdgeSvg = edgeSegments
           .map((segment) => {
-            if (segment.transition.from !== fromState) {
-              return '';
-            }
-
-            const visual = getAnimatedFromEdgeVisual(segment);
-            const opacity = visual.opacity * preLayerOpacity;
-            if (opacity <= 0.02) {
-              return '';
-            }
-
-            return `<path class="diagram-edge" d="${segment.pathD}" fill="none" stroke="${visual.stroke}" stroke-width="${visual.width}" stroke-linecap="round" stroke-linejoin="round" marker-end="${visual.marker}" stroke-dasharray="${visual.dash}" opacity="${opacity}"></path>`;
-          })
-          .join('');
-
-        const animatedAnnotationItems = edgeSegments
-          .filter((segment) => segment.transition.from === fromState)
-          .map((segment) => {
-            const transition = segment.transition;
-            const annotation = getEdgeAnnotation(
-              transition,
-              segment.pathD,
-              selectedEventNameForAnimation,
-              fromEvaluations,
-              laneBiasByIndex.get(segment.index) ?? 0
-            );
-            if (!annotation) {
-              return null;
-            }
-
-            const visual = getAnimatedFromEdgeVisual(segment);
-            const isMutedBySelection = selectedEventNameForAnimation !== null
-              && transition.from === fromState
-              && transition.event !== selectedEventNameForAnimation;
-            const chipWidth = annotation.event.length * 7 + 32;
-
-            return {
-              segment,
-              transition,
-              annotation,
-              visual,
-              chipWidth,
-              opacity: preLayerOpacity * (isMutedBySelection ? 0.2 : 0.92)
-            };
-          })
-          .filter((value) => value !== null);
-
-        const animatedAnnotationYByIndex = deconflictAnnotationYs(
-          animatedAnnotationItems.map((item) => ({
-            index: item.segment.index,
-            x: item.annotation.position.x,
-            y: item.annotation.position.y - 8,
-            width: item.chipWidth
-          }))
-        );
-
-        const animatedFromAnnotationSvg = animatedAnnotationItems
-          .map((item) => {
-            const chipY = animatedAnnotationYByIndex.get(item.segment.index) ?? (item.annotation.position.y - 8);
-            const chipHeight = 16;
-            const textY = chipY + chipHeight / 2;
-            const guardX = item.annotation.position.x;
-            const guardY = chipY + chipHeight + 10;
-
-            return `
-              <g class="edge-annotation" opacity="${item.opacity}">
-                <path class="edge-chip" d="${parallelogramChipPath(item.annotation.position.x, chipY, item.chipWidth, chipHeight)}" fill="rgba(30,30,30,0.88)" stroke="${item.visual.stroke}" stroke-width="1.1"/>
-                <text class="edge-label" x="${item.annotation.position.x}" y="${textY}" fill="${item.visual.stroke}">${item.annotation.event}</text>
-                ${item.annotation.guard ? `<line x1="${item.annotation.position.x}" y1="${chipY + chipHeight}" x2="${item.annotation.position.x}" y2="${guardY - 6}" stroke="${item.visual.stroke}" stroke-width="1" opacity="0.9"></line><text class="edge-guard" x="${guardX}" y="${guardY}" fill="${item.visual.stroke}">[${item.annotation.guard}]</text>` : ''}
-              </g>
-            `;
+            if (segment.transition.from !== fromState) return '';
+            const isActive = segment.transition.to === toState && segment.transition.event === stateChangeAnimation.eventName;
+            if (!isActive) return `<path class="diagram-edge" d="${segment.pathD}" fill="none" stroke="var(--edge-muted)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-muted)" opacity="0.16"></path>`;
+            const opacity = fadeOpacity;
+            if (opacity <= 0.02) return '';
+            return `<path class="diagram-edge" d="${segment.pathD}" fill="none" stroke="var(--edge)" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" opacity="${opacity}"></path>`;
           })
           .join('');
 
@@ -1850,37 +1705,68 @@
             : `<path class="diagram-edge" d="${segment.pathD}" fill="none" stroke="var(--edge-muted)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-muted)" opacity="0.16"></path>`)
           .join('');
 
-        const transitionSegment = edgeSegments.find((segment) => segment.transition.from === fromState && segment.transition.to === toState);
-        // When staying in the same state (noTransition outcome OR actual self-loop transition),
-        // always animate along the hover preview arc so the two visuals match.
+        // Only the active transition's annotation fades out
+        const annotationItems = edgeSegments
+          .filter((segment) =>
+            segment.transition.from === fromState &&
+            segment.transition.to === toState &&
+            segment.transition.event === stateChangeAnimation.eventName
+          )
+          .map((segment) => {
+            const annotation = getEdgeAnnotation(
+              segment.transition, segment.pathD, null, {},
+              laneBiasByIndex.get(segment.index) ?? 0
+            );
+            if (!annotation) return null;
+            const chipWidth = annotation.event.length * 7 + 32;
+            return { segment, annotation, stroke: 'var(--edge)', chipWidth, opacity: fadeOpacity * 0.92 };
+          })
+          .filter(Boolean);
+
+        const annotationYByIndex = deconflictAnnotationYs(
+          annotationItems.map((item) => ({
+            index: item.segment.index,
+            x: item.annotation.position.x,
+            y: item.annotation.position.y - 8,
+            width: item.chipWidth
+          }))
+        );
+
+        const annotationSvg = annotationItems
+          .map((item) => {
+            const chipY = annotationYByIndex.get(item.segment.index) ?? (item.annotation.position.y - 8);
+            const chipHeight = 16;
+            const textY = chipY + chipHeight / 2;
+            const guardX = item.annotation.position.x;
+            const guardY = chipY + chipHeight + 10;
+            return `
+              <g class="edge-annotation" opacity="${item.opacity}">
+                <path class="edge-chip" d="${parallelogramChipPath(item.annotation.position.x, chipY, item.chipWidth, chipHeight)}" fill="rgba(30,30,30,0.88)" stroke="${item.stroke}" stroke-width="1.1"/>
+                <text class="edge-label" x="${item.annotation.position.x}" y="${textY}" fill="${item.stroke}">${item.annotation.event}</text>
+                ${item.annotation.guard ? `<line x1="${item.annotation.position.x}" y1="${chipY + chipHeight}" x2="${item.annotation.position.x}" y2="${guardY - 6}" stroke="${item.stroke}" stroke-width="1" opacity="0.9"></line><text class="edge-guard" x="${guardX}" y="${guardY}" fill="${item.stroke}">[${item.annotation.guard}]</text>` : ''}
+              </g>
+            `;
+          })
+          .join('');
+
+        // Travelling dot along the active transition path
+        const transitionSegment = edgeSegments.find((segment) =>
+          segment.transition.from === fromState && segment.transition.to === toState);
         const selfLoopPathD = fromState === toState ? buildNoTransitionLoopPath(fromState) : null;
         const activePathD = selfLoopPathD ?? (transitionSegment ? transitionSegment.pathD : null);
 
-        const runnerProgress = Math.min(0.985, Math.max(0.001, 0.01 + (progress * 0.975)));
-        const runnerPoint = activePathD
-          ? getPointOnPath(activePathD, runnerProgress)
-          : null;
-        const runnerOpacity = Math.max(0.38, 1 - Math.abs((runnerProgress - 0.55) * 1.15));
-        const beamEnvelope = Math.max(0.18, Math.sin(Math.PI * runnerProgress));
-        const noTransitionArcSvg = selfLoopPathD
-          ? `<path d="${selfLoopPathD}" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="5 4" stroke-linecap="round" opacity="${0.48 + beamEnvelope * 0.38}"></path>`
-          : '';
-        const transitionPathHaloSvg = activePathD
-          ? `<path class="diagram-edge" d="${activePathD}" fill="none" stroke="var(--ok)" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round" opacity="${0.16 + (beamEnvelope * 0.28)}" filter="url(#transition-glow-soft)"></path>`
-          : '';
-        const transitionPathSvg = activePathD
-          ? `<path class="diagram-edge" d="${activePathD}" fill="none" stroke="url(#transition-beam-gradient)" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round" opacity="${0.3 + (beamEnvelope * 0.64)}"></path>`
-          : '';
-        const transitionSweepSvg = activePathD
-          ? `<path class="diagram-edge" d="${activePathD}" fill="none" stroke="var(--ok)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="24 120" stroke-dashoffset="${Math.round((1 - runnerProgress) * 220)}" opacity="${0.2 + (beamEnvelope * 0.45)}"></path>`
+        const selfLoopSvg = selfLoopPathD
+          ? `<path d="${selfLoopPathD}" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="5 4" stroke-linecap="round" opacity="0.52"></path>`
           : '';
 
-        const transitionRunnerSvg = runnerPoint
-          ? `<g filter="url(#transition-glow-strong)"><circle cx="${runnerPoint.x}" cy="${runnerPoint.y}" r="7" fill="var(--ok)" opacity="${Math.min(1, runnerOpacity + 0.12)}"></circle><circle cx="${runnerPoint.x}" cy="${runnerPoint.y}" r="3.1" fill="#d6ffe8" opacity="${Math.min(1, runnerOpacity + 0.2)}"></circle></g>`
+        // Dot travels during the first FADE_START fraction of the animation, then holds at destination
+        const dotProgress = Math.min(0.985, Math.max(0.001, 0.01 + (Math.min(progress, FADE_START) / FADE_START) * 0.975));
+        const dotPoint = activePathD ? getPointOnPath(activePathD, dotProgress) : null;
+        const dotSvg = dotPoint
+          ? `<g filter="url(#transition-glow-strong)"><circle cx="${dotPoint.x}" cy="${dotPoint.y}" r="5.5" fill="var(--ok)" opacity="0.92"></circle><circle cx="${dotPoint.x}" cy="${dotPoint.y}" r="2.4" fill="#d6ffe8" opacity="0.96"></circle></g>`
           : '';
 
-        const fromActiveBlend = Math.max(0, 1 - eased);
-
+        // Nodes: from-state fades, to-state highlighted, others default
         const nodeSvg = Object.entries(statePositions).map(([name, pos]) => {
           const ns = nodeSizes[name] ?? { width: 112, height: 44 };
           const halfW = ns.width / 2;
@@ -1889,91 +1775,44 @@
           let stroke = 'var(--border)';
           let strokeOpacity = 1;
           let strokeWidth = 1.6;
-          let fill = 'var(--node)';
-          let fillOpacity = 1;
           let textFill = 'var(--border)';
           let textOpacity = 1;
           let fontWeight = 500;
+          let overlayRect = '';
           let glow = '';
-          let handoffRing = '';
 
           if (name === fromState) {
+            // Interior and border both hold full, then fade together after dot arrives
+            overlayRect = `<rect x="${pos.x - halfW}" y="${pos.y - halfH}" width="${ns.width}" height="${ns.height}" rx="${rx}" fill="var(--ok)" fill-opacity="${(fadeOpacity * 0.9).toFixed(3)}" stroke="none"></rect>`;
             stroke = 'var(--ok)';
-            strokeOpacity = Math.max(0.38, 1 - (eased * 0.72));
-            strokeWidth = 2.6;
-            fill = 'var(--ok)';
-            fillOpacity = Math.max(0.14, 0.92 * fromActiveBlend);
-            textFill = 'var(--bg)';
-            textOpacity = Math.max(0.7, 1 - (eased * 0.4));
+            strokeOpacity = Math.max(0.4, fadeOpacity);
+            strokeWidth = 2.4;
+            // Text: light on green while fill is still visible, green on dark once it's gone
+            textFill = fadeOpacity > 0.5 ? 'var(--bg)' : 'var(--ok)';
             fontWeight = 700;
-            glow = 'filter="drop-shadow(0 0 5px rgba(31,255,122,.36))"';
-            const collapse = Math.max(0, 1 - eased);
-            const ringOpacity = collapse * 0.34;
-            if (ringOpacity > 0.01) {
-              const ringScale = 1 + ((1 - collapse) * 0.18);
-              handoffRing = `<rect x="${pos.x - halfW}" y="${pos.y - halfH}" width="${ns.width}" height="${ns.height}" rx="${rx}" fill="none" stroke="var(--ok)" stroke-width="1.8" opacity="${ringOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${ringScale})"></rect>`;
-            }
+            glow = 'filter="drop-shadow(0 0 5px rgba(31,255,122,.45))"';
           } else if (name === toState) {
+            const arrivalFill = 1 - fadeOpacity;
+            overlayRect = `<rect x="${pos.x - halfW}" y="${pos.y - halfH}" width="${ns.width}" height="${ns.height}" rx="${rx}" fill="var(--ok)" fill-opacity="${(arrivalFill * 0.9).toFixed(3)}" stroke="none"></rect>`;
             stroke = 'var(--ok)';
-            strokeOpacity = 0.72;
+            strokeOpacity = 1;
             strokeWidth = 2.0;
-            fill = 'var(--node)';
-            fillOpacity = 1;
             textFill = 'var(--ok)';
-            textOpacity = 0.74;
+            textOpacity = 1;
             fontWeight = 600;
-
-            const arrival = Math.max(0, Math.min(1, (eased - 0.58) / 0.42));
-            const ringOpacity = arrival * 0.32;
-            if (ringOpacity > 0.01) {
-              const ringScale = 1.16 - (arrival * 0.18);
-              handoffRing = `<rect x="${pos.x - halfW}" y="${pos.y - halfH}" width="${ns.width}" height="${ns.height}" rx="${rx}" fill="none" stroke="var(--ok)" stroke-width="1.7" opacity="${ringOpacity}" transform-origin="${pos.x}px ${pos.y}px" transform="scale(${ringScale})"></rect>`;
-            }
-          } else {
-            const fromVisual = fromStateVisual.get(name);
-            if (fromVisual) {
-              let baseStrokeOpacity = 0.58;
-              let baseTextOpacity = 0.66;
-              if (selectedEventNameForAnimation !== null) {
-                if (selectedFamilyDestinations.has(name)) {
-                  if (fromVisual === 'actual') {
-                    baseStrokeOpacity = 1;
-                    baseTextOpacity = 1;
-                  } else {
-                    baseStrokeOpacity = 0.72;
-                    baseTextOpacity = 0.74;
-                  }
-                } else {
-                  baseStrokeOpacity = 0.18;
-                  baseTextOpacity = 0.24;
-                }
-              }
-
-              if (fromVisual === 'actual') {
-                stroke = 'var(--ok)';
-                textFill = 'var(--ok)';
-              } else {
-                stroke = 'var(--edge-error)';
-                textFill = 'var(--edge-error)';
-              }
-
-              strokeOpacity = Math.max(0.08, baseStrokeOpacity * preLayerOpacity);
-              textOpacity = Math.max(0.12, baseTextOpacity * preLayerOpacity);
-              strokeWidth = fromVisual === 'actual' ? 2.6 : 2.0;
-              fontWeight = fromVisual === 'actual' ? 700 : 600;
-            }
+            glow = 'filter="drop-shadow(0 0 5px rgba(31,255,122,.45))"';
           }
 
           return `
             <g ${glow}>
-              ${handoffRing}
-              <rect x="${pos.x - halfW}" y="${pos.y - halfH}" width="${ns.width}" height="${ns.height}" rx="${rx}" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="${strokeWidth}"></rect>
+              <rect x="${pos.x - halfW}" y="${pos.y - halfH}" width="${ns.width}" height="${ns.height}" rx="${rx}" fill="var(--node)" fill-opacity="1" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="${strokeWidth}"></rect>
+              ${overlayRect}
               <text x="${pos.x}" y="${pos.y + 5}" text-anchor="middle" fill="${textFill}" fill-opacity="${textOpacity}" font-size="14" font-weight="${fontWeight}">${name}</text>
             </g>
           `;
         }).join('');
 
-        diagram.innerHTML = `${defs}${mutedEdgeSvg}${animatedFromEdgeSvg}${noTransitionArcSvg}${transitionPathHaloSvg}${transitionPathSvg}${transitionSweepSvg}${transitionRunnerSvg}${animatedFromAnnotationSvg}${nodeSvg}`;
+        diagram.innerHTML = `${defs}${mutedEdgeSvg}${fromEdgeSvg}${selfLoopSvg}${dotSvg}${annotationSvg}${nodeSvg}`;
         return;
       }
 
