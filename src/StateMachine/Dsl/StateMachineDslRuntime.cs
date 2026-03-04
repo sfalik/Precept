@@ -186,7 +186,7 @@ public sealed class DslWorkflowDefinition
         if (!compatibility.IsCompatible)
             return DslInspectionResult.NotDefined(instance.CurrentState, eventName, compatibility.Reason!);
 
-        if (eventArguments is not null && !TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
+        if (!TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
             return DslInspectionResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
 
         var evaluationArguments = BuildEvaluationData(instance.InstanceData, eventName, eventArguments);

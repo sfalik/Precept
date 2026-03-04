@@ -234,7 +234,7 @@ async function openInspectorPreviewPanel(context: vscode.ExtensionContext, outpu
 
   const panel = vscode.window.createWebviewPanel(
     "stateMachineDslInspectorPreview",
-    `Inspector Preview: ${path.basename(document.fileName)}`,
+    `Preview ${path.basename(document.fileName)}`,
     vscode.ViewColumn.Beside,
     {
       enableScripts: true,
