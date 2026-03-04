@@ -3,6 +3,7 @@ machine PackageDelivery
 string? CurrentLocation = null
 boolean RequiresSignature = false
 number DeliveryAttempts = 0
+	rule DeliveryAttempts >= 0 "Delivery attempts cannot be negative"
 string? FailureReason = null
 
 state Pending initial
@@ -26,6 +27,7 @@ event AttemptDelivery
 
 event MarkReturned
 	string Reason
+		rule Reason != "" "Return reason is required"
 
 from Pending on PickUp
 	set CurrentLocation = PickUp.WarehouseLocation
@@ -53,8 +55,5 @@ from DeliveryFailed on LoadForDelivery
 	transition OutForDelivery
 
 from DeliveryFailed on MarkReturned
-	if MarkReturned.Reason != ""
-		set FailureReason = MarkReturned.Reason
-		transition Returned
-	else
-		reject "Return reason is required"
+	set FailureReason = MarkReturned.Reason
+	transition Returned

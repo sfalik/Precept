@@ -2,8 +2,11 @@ machine JobApplication
 
 string? CandidateName = null
 number PhoneScore = 0
+	rule PhoneScore >= 0 "Phone score cannot be negative"
 number TechnicalScore = 0
+	rule TechnicalScore >= 0 "Technical score cannot be negative"
 number OfferedSalary = 0
+	rule OfferedSalary >= 0 "Offered salary cannot be negative"
 boolean BackgroundCleared = false
 string? RejectionReason = null
 
@@ -13,6 +16,7 @@ state PhoneInterview
 state TechnicalInterview
 state OfferExtended
 state Hired
+	rule BackgroundCleared "Background check must be cleared"
 state Rejected
 
 event StartScreening
@@ -28,6 +32,7 @@ event CompleteTechnical
 
 event ExtendOffer
 	number Salary
+		rule Salary > 0 "Offered salary must be greater than zero"
 
 event ClearBackground
 
@@ -37,6 +42,7 @@ event Decline
 
 event Reject
 	string Reason
+		rule Reason != "" "Rejection reason is required"
 
 from Submitted on StartScreening
 	set CandidateName = StartScreening.CandidateName
@@ -46,11 +52,8 @@ from Screening on PassScreening
 	transition PhoneInterview
 
 from Screening, PhoneInterview, TechnicalInterview on Reject
-	if Reject.Reason != ""
-		set RejectionReason = Reject.Reason
-		transition Rejected
-	else
-		reject "Rejection reason is required"
+	set RejectionReason = Reject.Reason
+	transition Rejected
 
 from PhoneInterview on CompletePhone
 	if CompletePhone.Score >= 70
@@ -69,21 +72,15 @@ from TechnicalInterview on CompleteTechnical
 		transition Rejected
 
 from OfferExtended on ExtendOffer
-	if ExtendOffer.Salary > 0
-		set OfferedSalary = ExtendOffer.Salary
-		no transition
-	else
-		reject "Offered salary must be greater than zero"
+	set OfferedSalary = ExtendOffer.Salary
+	no transition
 
 from OfferExtended on ClearBackground
 	set BackgroundCleared = true
 	no transition
 
 from OfferExtended on Accept
-	if BackgroundCleared
-		transition Hired
-	else
-		reject "Background check must be cleared before accepting"
+	transition Hired
 
 from OfferExtended on Decline
 	transition Rejected

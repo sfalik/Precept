@@ -384,4 +384,6 @@ Tests: add comprehensive tests covering each rule position, scope restrictions, 
 
 Documentation: update docs/DesignNotes.md DSL Syntax Contract section to include rule syntax. Update README.md DSL Syntax Reference, DSL Cookbook, and Status sections. Update docs/RulesDesign.md status from design phase to implemented. Update `tools/StateMachine.Dsl.VsCode/syntaxes/state-machine-dsl.tmLanguage.json` to add/update grammar patterns for any new keywords or constructs.
 
+Intelligence sync (non-negotiable — do not skip): apply the Intellisense Sync Checklist from `.github/copilot-instructions.md` for every new keyword or construct introduced by this feature. At minimum: add `rule` to `KeywordItems` and `KeywordTokens`; add a context-specific completion branch for `^\s*rule\s+` that offers field/arg identifiers and operators (same scope as `if` guards); ensure `ExpressionLineRegex` in `SmSemanticTokensHandler` matches `rule` lines so identifier references in rule expressions receive `variable` token coloring.
+
 Build with dotnet build from repo root. Run tests in test/StateMachine.Tests/ and test/StateMachine.Dsl.LanguageServer.Tests/. Make sure all existing tests still pass.

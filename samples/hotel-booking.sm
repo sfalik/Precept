@@ -2,8 +2,11 @@ machine HotelBooking
 
 string? GuestName = null
 number NightsBooked = 0
+	rule NightsBooked >= 0 "Nights booked cannot be negative"
 number RatePerNight = 0
+	rule RatePerNight >= 0 "Rate per night cannot be negative"
 number TotalCharge = 0
+	rule TotalCharge >= 0 "Total charge cannot be negative"
 boolean IsLateCheckout = false
 string? CancellationReason = null
 
@@ -16,7 +19,9 @@ state Cancelled
 event Reserve
 	string GuestName
 	number Nights
+		rule Nights > 0 "Nights must be greater than zero"
 	number RatePerNight
+		rule RatePerNight > 0 "Rate must be greater than zero"
 
 event CheckIn
 
@@ -26,16 +31,14 @@ event CheckOut
 
 event Cancel
 	string Reason
+		rule Reason != "" "Cancellation reason is required"
 
 from Available on Reserve
-	if Reserve.Nights > 0 && Reserve.RatePerNight > 0
-		set GuestName = Reserve.GuestName
-		set NightsBooked = Reserve.Nights
-		set RatePerNight = Reserve.RatePerNight
-		set TotalCharge = Reserve.Nights * Reserve.RatePerNight
-		transition Reserved
-	else
-		reject "Nights and rate must be greater than zero"
+	set GuestName = Reserve.GuestName
+	set NightsBooked = Reserve.Nights
+	set RatePerNight = Reserve.RatePerNight
+	set TotalCharge = Reserve.Nights * Reserve.RatePerNight
+	transition Reserved
 
 from Reserved on CheckIn
 	transition CheckedIn
@@ -52,8 +55,5 @@ from CheckedIn on CheckOut
 	transition CheckedOut
 
 from Reserved, CheckedIn on Cancel
-	if Cancel.Reason != ""
-		set CancellationReason = Cancel.Reason
-		transition Cancelled
-	else
-		reject "Cancellation reason is required"
+	set CancellationReason = Cancel.Reason
+	transition Cancelled

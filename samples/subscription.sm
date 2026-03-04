@@ -2,14 +2,17 @@ machine Subscription
 
 string? PlanName = null
 number MonthlyPrice = 0
+	rule MonthlyPrice >= 0 "Monthly price cannot be negative"
 number BillingCycleDay = 1
 boolean AutoRenew = true
 number FailedPayments = 0
+	rule FailedPayments >= 0 "Failed payments cannot be negative"
 string? CancellationReason = null
 
 state Free initial
 state TrialActive
 state Active
+	rule PlanName != null "Must have a plan name to be active"
 state PastDue
 state Suspended
 state Cancelled
@@ -17,10 +20,12 @@ state Cancelled
 event StartTrial
 	string PlanName
 	number MonthlyPrice
+		rule MonthlyPrice > 0 "Plan requires a valid monthly price"
 
 event Upgrade
 	string PlanName
 	number MonthlyPrice
+		rule MonthlyPrice > 0 "Monthly price must be greater than zero"
 
 event BillSucceeded
 
@@ -32,27 +37,23 @@ event ToggleAutoRenew
 
 event Cancel
 	string Reason
+		rule Reason != "" "Cancellation reason is required"
 
 event Reactivate
 	string PlanName
 	number MonthlyPrice
+		rule MonthlyPrice > 0 "Monthly price must be greater than zero"
 
 from Free on StartTrial
-	if StartTrial.MonthlyPrice > 0
-		set PlanName = StartTrial.PlanName
-		set MonthlyPrice = StartTrial.MonthlyPrice
-		set FailedPayments = 0
-		transition TrialActive
-	else
-		reject "Plan requires a valid monthly price"
+	set PlanName = StartTrial.PlanName
+	set MonthlyPrice = StartTrial.MonthlyPrice
+	set FailedPayments = 0
+	transition TrialActive
 
 from Free, TrialActive on Upgrade
-	if Upgrade.MonthlyPrice > 0
-		set PlanName = Upgrade.PlanName
-		set MonthlyPrice = Upgrade.MonthlyPrice
-		transition Active
-	else
-		reject "Monthly price must be greater than zero"
+	set PlanName = Upgrade.PlanName
+	set MonthlyPrice = Upgrade.MonthlyPrice
+	transition Active
 
 from any on ToggleAutoRenew
 	set AutoRenew = !AutoRenew
@@ -83,17 +84,11 @@ from PastDue on PayOutstanding
 	transition Active
 
 from Active, PastDue, TrialActive on Cancel
-	if Cancel.Reason != ""
-		set CancellationReason = Cancel.Reason
-		transition Cancelled
-	else
-		reject "Cancellation reason is required"
+	set CancellationReason = Cancel.Reason
+	transition Cancelled
 
 from Suspended on Reactivate
-	if Reactivate.MonthlyPrice > 0
-		set PlanName = Reactivate.PlanName
-		set MonthlyPrice = Reactivate.MonthlyPrice
-		set FailedPayments = 0
-		transition Active
-	else
-		reject "Monthly price must be greater than zero"
+	set PlanName = Reactivate.PlanName
+	set MonthlyPrice = Reactivate.MonthlyPrice
+	set FailedPayments = 0
+	transition Active

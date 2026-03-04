@@ -7,13 +7,17 @@ state Shipped
 state Cancelled
 
 number TotalItems = 0
+	rule TotalItems >= 0 "Total items cannot be negative"
 number TotalCost = 0
+	rule TotalCost >= 0 "Total cost cannot be negative"
 boolean IsGuest = true
 string? PromoCode = null
 
 event AddItem
 	number Count
+		rule Count > 0 "Must add at least one item"
 	number Price
+		rule Price > 0 "Item price must be positive"
 
 event ApplyPromo
 	string Code
@@ -28,14 +32,12 @@ event Ship
 
 event Cancel
 	string Reason
+		rule Reason != "" "Cancellation reason required"
 
 from Shopping on AddItem
-	if AddItem.Count > 0
-		set TotalItems = TotalItems + AddItem.Count
-		set TotalCost = TotalCost + (AddItem.Price * AddItem.Count)
-		no transition
-	else
-		reject "Must add at least one item"
+	set TotalItems = TotalItems + AddItem.Count
+	set TotalCost = TotalCost + (AddItem.Price * AddItem.Count)
+	no transition
 
 from Shopping on ApplyPromo
 	if PromoCode == null && ApplyPromo.Discount < TotalCost
@@ -62,7 +64,4 @@ from Paid on Ship
 		reject "Nothing to ship"
 
 from Shopping, Checkout, Paid on Cancel
-	if Cancel.Reason != ""
-		transition Cancelled
-	else
-		reject "Cancellation reason required"
+	transition Cancelled

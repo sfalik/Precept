@@ -4,6 +4,7 @@ machine SmartHomeAlarm
 stack<string> TriggeredSensors
 boolean IsNightMode = false
 number MasterPin = 1234
+	rule MasterPin > 0 "Pin must be positive"
 
 state Disarmed initial
 state ArmingDelay
@@ -21,6 +22,7 @@ event Disarm
 
 event SensorTripped
 	string SensorName
+		rule SensorName != "" "Sensor name is required"
 	boolean IsPerimeter
 
 event DelayTimerExpired

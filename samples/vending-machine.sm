@@ -1,7 +1,9 @@
 machine VendingMachine
 
 number CreditCents = 0
+	rule CreditCents >= 0 "Credit cannot be negative"
 number SelectedItemPrice = 0
+	rule SelectedItemPrice >= 0 "Item price cannot be negative"
 string? SelectedItem = null
 boolean MaintenanceMode = false
 
@@ -9,15 +11,18 @@ state Idle initial
 state HasCredit
 state ItemSelected
 state Dispensing
+	rule SelectedItem != null "An item must be selected to dispense"
 state ChangeDue
 state OutOfOrder
 
 event InsertCoin
 	number Cents
+		rule Cents > 0 "Coin value must be positive"
 
 event SelectItem
 	string Name
 	number PriceCents
+		rule PriceCents > 0 "Price must be positive"
 
 event ConfirmPurchase
 
@@ -30,11 +35,8 @@ event EnterMaintenance
 event ExitMaintenance
 
 from Idle, HasCredit on InsertCoin
-	if InsertCoin.Cents > 0
-		set CreditCents = CreditCents + InsertCoin.Cents
-		transition HasCredit
-	else
-		reject "Coin value must be positive"
+	set CreditCents = CreditCents + InsertCoin.Cents
+	transition HasCredit
 
 from HasCredit on SelectItem
 	if SelectItem.PriceCents <= CreditCents

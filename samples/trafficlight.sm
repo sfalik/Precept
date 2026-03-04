@@ -1,8 +1,10 @@
 machine TrafficLight
 
-number VehiclesWaiting = 2
+number VehiclesWaiting = 1
+	rule VehiclesWaiting >= 0 "Vehicles waiting cannot be negative"
 boolean LeftTurnQueued = false
 number CycleCount = 0
+	rule CycleCount >= 0 "Cycle count cannot be negative"
 string? EmergencyReason
 
 state Red initial
@@ -12,12 +14,15 @@ state Yellow
 state FlashingRed
 
 event Advance
-event Emergency
-	string AuthorizedBy
-	string Reason
 event LeftTurnRequest
 event VehiclesArrive
 	number Count = 5
+		rule Count > 0 "Vehicle count must be positive"
+event Emergency
+	string AuthorizedBy
+		rule AuthorizedBy != "" "AuthorizedBy is required"
+	string Reason
+		rule Reason != "" "Reason is required"
 event ClearEmergency
 
 
@@ -63,10 +68,7 @@ from FlashingRed on ClearEmergency
 
 # Emergency preemption: requires a reason to record why it was activated
 from any on Emergency
-	if Emergency.AuthorizedBy != "" && Emergency.Reason != ""
-		set EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason
-		transition FlashingRed
-	else
-		reject "AuthorizedBy and Reason are required to activate emergency mode"
+	set EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason
+	transition FlashingRed
 
 

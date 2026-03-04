@@ -67,21 +67,21 @@
       cursor: pointer;
     }
 
-    #reload-btn {
+    .action-btn {
       border-radius: 999px;
       background: #242730;
       transition: border-color 120ms ease, background 120ms ease, transform 90ms ease, box-shadow 120ms ease;
     }
 
-    #reload-btn:hover,
-    #reload-btn:focus-visible {
+    .action-btn:hover,
+    .action-btn:focus-visible {
       border-color: var(--event);
       box-shadow: 0 0 0 1px rgba(133, 115, 168, 0.26);
       outline: none;
     }
 
-    #reload-btn:active,
-    #reload-btn.is-clicked {
+    .action-btn:active,
+    .action-btn.is-clicked {
       border-color: var(--event);
       background: rgba(133, 115, 168, 0.22);
       transform: translateY(1px);
@@ -713,7 +713,7 @@
       <span class="muted"> · __FILE_NAME__</span>
     </div>
     <div class="actions">
-      <button id="reload-btn" type="button">Reload</button>
+      <button id="reset-btn" class="action-btn" type="button" title="Restart from initial state and default data.">Reset</button>
     </div>
   </div>
 
@@ -760,19 +760,76 @@
       return (status && Array.isArray(status.args)) ? status.args : [];
     }
 
+    function normalizeArgValueForSend(argDef, rawValue) {
+      if (rawValue === null) {
+        return null;
+      }
+
+      if (argDef.type === 'boolean') {
+        if (rawValue === true || rawValue === false) {
+          return rawValue;
+        }
+
+        if (rawValue === 'true') {
+          return true;
+        }
+
+        if (rawValue === 'false') {
+          return false;
+        }
+
+        return rawValue;
+      }
+
+      if (argDef.type === 'number') {
+        if (typeof rawValue === 'number') {
+          return rawValue;
+        }
+
+        if (typeof rawValue === 'string') {
+          if (rawValue.length === 0) {
+            return rawValue;
+          }
+
+          const parsed = Number(rawValue);
+          return Number.isFinite(parsed) ? parsed : rawValue;
+        }
+
+        return rawValue;
+      }
+
+      if (argDef.type === 'string') {
+        return typeof rawValue === 'string' ? rawValue : String(rawValue);
+      }
+
+      return rawValue;
+    }
+
     function collectEventArgs(eventName) {
       const argDefs = getEventArgDefinitions(eventName);
       if (argDefs.length === 0) return undefined;
       const args = {};
-      let hasAny = false;
       argDefs.forEach((arg) => {
-        const raw = eventArgValues[eventName + ':' + arg.name];
-        if (raw !== undefined && raw !== '') {
-          args[arg.name] = raw;
-          hasAny = true;
+        const key = eventName + ':' + arg.name;
+        const userRaw = eventArgValues[key];
+        if (userRaw !== undefined) {
+          args[arg.name] = normalizeArgValueForSend(arg, userRaw);
+          return;
         }
+
+        if (arg.hasDefaultValue) {
+          args[arg.name] = arg.defaultValue;
+          return;
+        }
+
+        if (arg.isNullable) {
+          args[arg.name] = null;
+          return;
+        }
+
+        args[arg.name] = '';
       });
-      return hasAny ? args : undefined;
+      return args;
     }
 
     function clearEventArgs() {
@@ -827,11 +884,64 @@
       }, 30);
     }
 
+    let eventStatusRefreshToken = 0;
+    async function refreshCurrentEventStatusesFromInspect() {
+      const refreshToken = ++eventStatusRefreshToken;
+      const eventNames = getOrderedCurrentEvents();
+      if (eventNames.length === 0) {
+        return;
+      }
+
+      const refreshed = await Promise.all(eventNames.map(async (eventName) => {
+        const args = collectEventArgs(eventName);
+        const response = await sendHostRequest('inspect', { eventName, args });
+        if (!response.success) {
+          return null;
+        }
+
+        const raw = response.inspectResult ?? response.InspectResult;
+        if (!raw) {
+          return null;
+        }
+
+        const status = toHostEventStatus(raw);
+        return status ? { eventName, status } : null;
+      }));
+
+      if (refreshToken !== eventStatusRefreshToken) {
+        return;
+      }
+
+      let hasAnyUpdate = false;
+      refreshed.forEach((item) => {
+        if (!item) {
+          return;
+        }
+
+        const idx = currentEventStatuses.findIndex((s) => s.name === item.eventName);
+        if (idx >= 0) {
+          currentEventStatuses[idx] = item.status;
+        } else {
+          currentEventStatuses.push(item.status);
+        }
+
+        hasAnyUpdate = true;
+      });
+
+      if (!hasAnyUpdate) {
+        return;
+      }
+
+      syncSelectionToCurrentState();
+      drawDiagram();
+      renderEventBar();
+    }
+
     const diagram = document.getElementById('diagram');
     const dataList = document.getElementById('data-list');
     const eventBar = document.getElementById('event-bar');
     const diagramToast = document.getElementById('diagram-toast');
-    const reloadButton = document.getElementById('reload-btn');
+    const resetButton = document.getElementById('reset-btn');
 
     let selectedTransitionIndex = 0;
     let hoveredEventName = null;
@@ -845,7 +955,7 @@
     let stateChangeAnimation = null;
     let suppressHoverUntilAnimationComplete = false;
     let suppressArgBlur = false;
-    let reloadButtonFeedbackTimer = null;
+    let resetButtonFeedbackTimer = null;
     let currentEventStatuses = [];
     let currentActiveRuleViolations = [];
     let currentRuleDefinitions = [];
@@ -1182,8 +1292,26 @@
         stateChangeAnimation = null;
         suppressHoverUntilAnimationComplete = false;
         renderAll();
+        void refreshCurrentEventStatusesFromInspect();
       } else {
-        showRowFeedback('Reload', `✖ ${response.error || 'Snapshot failed'}`, 'err');
+        showRowFeedback('Snapshot', `✖ ${response.error || 'Snapshot failed'}`, 'err');
+      }
+    }
+
+    async function resetSnapshot() {
+      const response = await sendHostRequest('reset');
+      if (response.success && response.snapshot) {
+        applySnapshot(response.snapshot);
+        clearEventArgs();
+        hoveredEventName = null;
+        pendingFocusEventName = null;
+        rowFeedback = null;
+        stateChangeAnimation = null;
+        suppressHoverUntilAnimationComplete = false;
+        renderAll();
+        void refreshCurrentEventStatusesFromInspect();
+      } else {
+        showRowFeedback('Reset', `✖ ${response.error || 'Reset failed'}`, 'err');
       }
     }
 
@@ -2338,7 +2466,7 @@
         const argName = seg.dataset.eventArg;
         seg.addEventListener('click', (event) => {
           event.stopPropagation();
-          eventArgValues[ownerEventName + ':' + argName] = seg.dataset.val;
+          eventArgValues[ownerEventName + ':' + argName] = seg.dataset.val === 'true';
           hoveredEventName = ownerEventName;
           inspectEventOnServer(ownerEventName);
           suppressArgBlur = true;
@@ -2449,6 +2577,7 @@
         showDataFieldToasts(changedKeys, beforeData, afterData);
         hoveredEventName = null;
         clearEventArgs();
+        void refreshCurrentEventStatusesFromInspect();
         showRowFeedback(eventName, `✔ ${beforeState} → ${newState}`, 'ok');
       });
 
@@ -2567,19 +2696,19 @@
       }
     });
 
-    if (reloadButton) {
-      reloadButton.addEventListener('click', () => {
-        reloadButton.classList.add('is-clicked');
-        if (reloadButtonFeedbackTimer) {
-          window.clearTimeout(reloadButtonFeedbackTimer);
+    if (resetButton) {
+      resetButton.addEventListener('click', () => {
+        resetButton.classList.add('is-clicked');
+        if (resetButtonFeedbackTimer) {
+          window.clearTimeout(resetButtonFeedbackTimer);
         }
 
-        reloadButtonFeedbackTimer = window.setTimeout(() => {
-          reloadButton.classList.remove('is-clicked');
-          reloadButtonFeedbackTimer = null;
+        resetButtonFeedbackTimer = window.setTimeout(() => {
+          resetButton.classList.remove('is-clicked');
+          resetButtonFeedbackTimer = null;
         }, 140);
 
-        void reloadSnapshot();
+        void resetSnapshot();
       });
     }
 
@@ -2615,6 +2744,7 @@
 
         applySnapshot(message.snapshot);
         renderAll();
+        void refreshCurrentEventStatusesFromInspect();
       }
     });
 

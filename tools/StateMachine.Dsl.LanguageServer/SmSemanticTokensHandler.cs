@@ -28,7 +28,7 @@ internal sealed class SmSemanticTokensHandler : SemanticTokensHandlerBase
     private static readonly Regex LineCommentRegex = new("#.*$", RegexOptions.Compiled);
     private static readonly Regex StringRegex = new("\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'", RegexOptions.Compiled);
     private static readonly Regex NumberRegex = new("\\b\\d+(?:\\.\\d+)?\\b", RegexOptions.Compiled);
-    private static readonly Regex OperatorRegex = new("==|!=|>=|<=|&&|\\|\\||>|<|=|!", RegexOptions.Compiled);
+    private static readonly Regex OperatorRegex = new("==|!=|>=|<=|&&|\\|\\||[+\\-*/%]|>|<|=|!", RegexOptions.Compiled);
 
     private static readonly Regex MachineDeclRegex = new("^(\\s*)machine\\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex StateDeclRegex = new("^(\\s*)state\\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
@@ -37,14 +37,19 @@ internal sealed class SmSemanticTokensHandler : SemanticTokensHandlerBase
     private static readonly Regex TransitionRegex = new("^(\\s*)transition\\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex SetRegex = new("^(\\s*)set\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=", RegexOptions.Compiled);
     private static readonly Regex TypeDeclRegex = new("^(\\s*)(string|number|boolean|null)\\??\\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    // Dotted event arg reference: EventName.ArgName in expression positions
+    private static readonly Regex EventArgRefRegex = new("\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
+    // Variable identifiers in expression lines (after set =, if/else if, rule keyword, or collection mutation value)
+    private static readonly Regex ExpressionLineRegex = new("^\\s*(?:if|else\\s+if|set\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=|rule|(?:add|remove|push|enqueue)\\s+[A-Za-z_][A-Za-z0-9_]*)\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex IdentifierInExprRegex = new("\\b([A-Za-z_][A-Za-z0-9_]*)\\b", RegexOptions.Compiled);
 
     private static readonly string[] KeywordTokens =
     [
         "machine", "state", "initial", "event", "from", "on", "if", "else",
-        "transition", "set", "reject", "reason", "no", "any",
+        "transition", "set", "reject", "rule", "reason", "no", "any",
         "true", "false", "null", "string", "number", "boolean",
         "add", "remove", "enqueue", "dequeue", "push", "pop", "clear",
-        "contains", "queue", "stack", "into"
+        "contains", "queue", "stack", "into", "above", "below"
     ];
 
     protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities)
@@ -138,6 +143,28 @@ internal sealed class SmSemanticTokensHandler : SemanticTokensHandlerBase
         var typeDecl = TypeDeclRegex.Match(line);
         if (typeDecl.Success)
             Push(builder, lineIndex, typeDecl.Groups[3].Index, typeDecl.Groups[3].Length, "variable");
+
+        // Highlight EventName.ArgName dotted references in expression positions
+        foreach (Match m in EventArgRefRegex.Matches(line))
+        {
+            Push(builder, lineIndex, m.Groups[1].Index, m.Groups[1].Length, "function");
+            Push(builder, lineIndex, m.Groups[3].Index, m.Groups[3].Length, "variable");
+        }
+
+        // Highlight bare identifier references on expression lines (if/else if guards, set RHS, rule exprs)
+        if (ExpressionLineRegex.IsMatch(line))
+        {
+            // Find where the expression body starts (after the first keyword prefix)
+            var prefixMatch = ExpressionLineRegex.Match(line);
+            var exprStart = prefixMatch.Index + prefixMatch.Length;
+            foreach (Match m in IdentifierInExprRegex.Matches(line, exprStart))
+            {
+                // Skip tokens already colored as keywords
+                if (KeywordTokens.Any(k => string.Equals(k, m.Value, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+                Push(builder, lineIndex, m.Index, m.Length, "variable");
+            }
+        }
     }
 
     private static void Push(SemanticTokensBuilder builder, int line, int character, int length, string tokenType)

@@ -80,7 +80,7 @@ The two paths coexist safely because rules (declarative invariants like `rule Ba
 
 - DSL parser/compiler/runtime is implemented and used by the language server for editor diagnostics and preview execution.
 - VS Code extension is implemented with automatic `.sm` language-client activation plus inspector preview panels per file.
-- Inspector preview now exchanges live `snapshot`/`fire`/`reset`/`inspect` requests through the language server (`stateMachine/preview/request`) instead of only local mock data. The `inspect` action re-evaluates a single event with user-supplied arguments, enabling real-time guard feedback as the user types.
+- Inspector preview now exchanges live `snapshot`/`fire`/`reset`/`inspect` requests through the language server (`stateMachine/preview/request`) instead of only local mock data. In the inspector webview, declared event arguments are always sent using DSL-aware semantics (typed user values, explicit `null` for nullable unset args, defaults when declared, and blank for required-without-default), so event status reflects what would happen if the user clicks now; as the user types, `inspect` re-evaluates that same argument set in real time. Server-side preview coercion no longer rewrites blank strings to `null`. Snapshot sync from current `.sm` text is automatic on edit/save/reveal; the toolbar exposes a single lifecycle action, `Reset`, which reinitializes the preview instance to initial state and DSL defaults.
 - Inspector preview layout uses a single unified ELK layered layout with state-machine-tuned options (top-down direction, spline edge routing, model-order cycle breaking, feedback edges for cycles, inside self-loops, inline edge labels, DSL declaration-order node ordering), dynamic per-state node sizing, and responsive viewBox. Reject and no-transition terminal rules are excluded from the diagram graph.
 - CLI host has been removed in this branch (hard cut); editor + language server are the active runtime surfaces.
 - **Collection types** (`set<T>`, `queue<T>`, `stack<T>`) are implemented with full parser, runtime, and language-server support. Declarations, mutations (`add`/`remove`/`enqueue`/`dequeue`/`push`/`pop`/`clear`), guard properties (`.count`/`.min`/`.max`/`.peek`), and the `contains` operator are all functional. Directional set queries (`above`/`below`) remain deferred pending real usage data.
@@ -122,7 +122,9 @@ Then press `F5`, open a `.sm` file, and run `StateMachine DSL: Open Inspector Pr
 machine TrafficLight
 
 number VehiclesWaiting = 0
+  rule VehiclesWaiting >= 0 "Vehicles waiting cannot be negative"
 number CycleCount = 0
+  rule CycleCount >= 0 "Cycle count cannot be negative"
 boolean LeftTurnQueued = false
 string? EmergencyReason
 
@@ -135,11 +137,25 @@ state FlashingRed
 event Advance
 event Emergency
   string AuthorizedBy
+    rule AuthorizedBy != "" "AuthorizedBy is required"
   string Reason
+    rule Reason != "" "Reason is required"
+event VehiclesArrive
+  number Count = 5
+    rule Count > 0 "Vehicle count must be positive"
+event LeftTurnRequest
 event ClearEmergency
+
+from any on VehiclesArrive
+  set VehiclesWaiting = VehiclesWaiting + VehiclesArrive.Count
+  no transition
+
+from any on LeftTurnRequest
+  set LeftTurnQueued = true
+  no transition
+
 from Red on Advance
   if LeftTurnQueued
-    set LeftTurnQueued = false
     set CycleCount = CycleCount + 1
     transition FlashingGreen
   else if VehiclesWaiting > 0
@@ -157,15 +173,11 @@ from Green on Advance
   transition Yellow
 
 from Yellow on Advance
-  set CycleCount = CycleCount + 1
   transition Red
 
 from any on Emergency
-  if Emergency.AuthorizedBy != "" && Emergency.Reason != ""
-    set EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason
-    transition FlashingRed
-  else
-    reject "AuthorizedBy and Reason are required to activate emergency mode"
+  set EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason
+  transition FlashingRed
 
 from FlashingRed on Advance
   set CycleCount = CycleCount + 1
@@ -184,23 +196,22 @@ Ready-to-use `.sm` files covering a range of domains and DSL features.
 
 | File | Scenario | Key Features |
 |---|---|---|
-| [`samples/test.sm`](samples/test.sm) | Minimal linear chain (Start → One → Two → Three → Four → End) | Basic state/event/transition skeleton; good starting template |
-| [`samples/trafficlight.sm`](samples/trafficlight.sm) | Traffic-light controller with emergency flashing mode | `from any`, data fields, nullable string, `set`, `no transition`, complex guards |
-| [`samples/ecommerce.sm`](samples/ecommerce.sm) | E-commerce order lifecycle (cart → checkout → paid → shipped) | Math expressions (`Quantity * Price`), comma-separated `from`, combined guards |
-| [`samples/bugtracker.sm`](samples/bugtracker.sm) | Bug/issue tracker (triage → in-progress → review → resolved → closed) | `from any` intercept, `!IsBlocked` guard, prerequisite-flag guards |
-| [`samples/smarthome.sm`](samples/smarthome.sm) | Home security system (disarmed → arming delay → armed away/stay → triggered) | Boolean data fields with defaults, PIN validation, `from any on Disarm` |
-| [`samples/hotel-booking.sm`](samples/hotel-booking.sm) | Hotel reservation lifecycle (available → reserved → checked-in → checked-out) | `Nights * Rate` revenue calculation, idempotent `no transition` guard |
-| [`samples/package-delivery.sm`](samples/package-delivery.sm) | Parcel delivery with re-delivery and return flow | `if / else if / else` on attempt count, numeric thresholds |
-| [`samples/job-application.sm`](samples/job-application.sm) | Hiring pipeline (submitted → screening → phone → technical → offer → hired) | Score-threshold routing, multi-branch pass/fail `if / else` |
-| [`samples/bank-loan.sm`](samples/bank-loan.sm) | Loan origination and repayment lifecycle | Running-balance arithmetic, `||` guard, missed-payment default path |
-| [`samples/subscription.sm`](samples/subscription.sm) | SaaS subscription billing (free → trial → active → past-due → suspended → cancelled) | `from any on ToggleAutoRenew`, multi-state billing guard |
-| [`samples/patient-admission.sm`](samples/patient-admission.sm) | Hospital patient flow (registered → triaged → admitted → treatment → discharge → transferred) | Multiple boolean prerequisite flags, `from any on EmergencyTransfer` |
-| [`samples/restaurant-order.sm`](samples/restaurant-order.sm) | Restaurant table order (seated → ordering → kitchen → served → bill → paid) | Item/total accumulation, payment-amount validation |
-| [`samples/support-ticket.sm`](samples/support-ticket.sm) | Customer support ticket with escalation and reopen | `from any on CustomerReply`, reopen counter, escalation composite guard |
-| [`samples/document-signing.sm`](samples/document-signing.sm) | Multi-party document signing workflow | Signature counter driving transitions, one-time expiry extension flag |
-| [`samples/vending-machine.sm`](samples/vending-machine.sm) | Coin-operated vending machine | Credit accumulation, item-price guard, `from any on EnterMaintenance` |
-| [`samples/elevator.sm`](samples/elevator.sm) | Elevator controller with door lifecycle and emergency halt | Sensor events (`DoorOpened`, `DoorClosed`, `FloorReached`) vs user events (`HoldDoor`, `CloseDoors`), overload reopening doors mid-close, `from any on TriggerEmergency` |
-| [`samples/game-character.sm`](samples/game-character.sm) | RPG character states (alive → stunned/shielded/leveling → dead → respawning) | Shield blocking, XP threshold, nullable `string?` status message, respawn probability |
+| [`samples/test.sm`](samples/test.sm) | Bank-account style balance transitions | Compact top-level + event rule example (`balance` limit, positive deposit/withdraw amounts) |
+| [`samples/trafficlight.sm`](samples/trafficlight.sm) | Traffic-light controller with emergency flashing mode | Field rules (`VehiclesWaiting`, `CycleCount`) + event rules (`Emergency`, `VehiclesArrive`) |
+| [`samples/ecommerce.sm`](samples/ecommerce.sm) | E-commerce order lifecycle (shopping → paid → shipped/cancelled) | Event arg validation moved to event rules (`AddItem`, `Cancel`) + cart total arithmetic |
+| [`samples/bugtracker.sm`](samples/bugtracker.sm) | Bug tracker (triage → in progress → review → resolved → closed) | State entry rule (`InProgress` requires assignee) + event rule (`Block.Reason`) |
+| [`samples/smarthome.sm`](samples/smarthome.sm) | Home security system (disarmed → arming delay → armed → triggered) | Stack mutations (`push`/`clear`) + event rule (`SensorTripped.SensorName`) |
+| [`samples/hotel-booking.sm`](samples/hotel-booking.sm) | Hotel reservation lifecycle | Field non-negative rules (`NightsBooked`, `RatePerNight`, `TotalCharge`) + event rules (`Reserve`, `Cancel`) |
+| [`samples/package-delivery.sm`](samples/package-delivery.sm) | Parcel delivery with retry and return flow | Attempt-count field rule + return-reason event rule with retry branching |
+| [`samples/job-application.sm`](samples/job-application.sm) | Hiring pipeline (submitted → interviews → offer → hired/rejected) | Score/salary field rules + state entry rule (`Hired` requires background clear) |
+| [`samples/bank-loan.sm`](samples/bank-loan.sm) | Loan origination and repayment lifecycle | All rule positions: field, top-level, state, and event |
+| [`samples/subscription.sm`](samples/subscription.sm) | SaaS billing lifecycle (free/trial/active/past-due/suspended/cancelled) | Event-rule-driven input validation + state rule for active-plan integrity |
+| [`samples/patient-admission.sm`](samples/patient-admission.sm) | Patient flow (registered → triaged → admitted → treatment → discharge/transfer) | State entry rule on `Admitted` plus progression via `UpdateProgress` |
+| [`samples/restaurant-order.sm`](samples/restaurant-order.sm) | Restaurant order lifecycle (seated → ordering → prep → served → paid) | Payment state contract (`Paid` requires `PaymentReceived`) + event rules (`SeatGuests`, `AddItem`, `ProcessPayment`) |
+| [`samples/support-ticket.sm`](samples/support-ticket.sm) | Support ticket with escalation and reopen loop | Queue-based assignment (`enqueue`/`dequeue`) + field/state/event rules (`Priority`, `Assigned`, `Resolve`) |
+| [`samples/document-signing.sm`](samples/document-signing.sm) | Multi-party document signing workflow | Collection-driven transitions with state rules (`PendingSignatories.count`) and event rules (`Void`, `SubmitForReview`) |
+| [`samples/vending-machine.sm`](samples/vending-machine.sm) | Coin-operated vending machine | Monetary field rules (`CreditCents`, `SelectedItemPrice`) + state rule on `Dispensing` |
+| [`samples/elevator.sm`](samples/elevator.sm) | Elevator controller with door lifecycle and emergency halt | Range constraints via field/top-level rules + set-driven floor-request routing |
 
 ## DSL Syntax Reference
 

@@ -7,7 +7,7 @@ Goal: validate UX for executing `.sm` transitions from a VS Code side panel befo
 - Header
   - Machine file: `samples/trafficlight.sm`
   - Session state: `Connected`
-  - Actions: `Reload`, `Reset Instance`, `Save Instance`
+  - Actions: `Reset`, `Save Instance`
 - Main surface
   - State diagram (read-first; no click interaction required)
   - `Data` is rendered inside the diagram canvas in a dedicated non-overlapping lane

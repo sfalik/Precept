@@ -1,7 +1,6 @@
 machine Test
 
 number balance = 0
-    rule balance >= 0 "Balance cannot be negative"
 number overdraftLimit = 100
 
 rule balance >= 0 - overdraftLimit "Balance must be within overdraft limit"

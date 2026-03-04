@@ -112,6 +112,14 @@ internal sealed class SmDslAnalyzer
             return DistinctAndSort(guardItems.Concat(GuardSnippetItems));
         }
 
+        // rule expression: offer all in-scope identifiers + operators
+        if (Regex.IsMatch(beforeCursor, "^\\s*rule\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+            return DistinctAndSort(BuildGuardCompletions(dataFields, collectionFields, currentEvent, eventArgs));
+
+        // reject: offer a string snippet
+        if (Regex.IsMatch(beforeCursor, "^\\s*reject(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
+            return [SnippetItem("reject reason", "reject \"${1:Reason}\"", "Rejection reason")];
+
         // Mutation verb lines: suggest collection field names after add/remove/enqueue/dequeue/push/pop/clear
         if (Regex.IsMatch(beforeCursor, "^\\s*(?:add|remove|enqueue|dequeue|push|pop|clear)(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
         {
@@ -127,6 +135,10 @@ internal sealed class SmDslAnalyzer
                 return items.ToArray();
             }
 
+            // After "add|remove|push|enqueue <Field> ", suggest expression (the value to add/push/remove)
+            if (Regex.IsMatch(beforeCursor, "^\\s*(?:add|remove|push|enqueue)\\s+[A-Za-z_][A-Za-z0-9_]*\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+                return BuildExpressionCompletions(dataFields, currentEvent, eventArgs);
+
             return BuildItems(collectionFields, CompletionItemKind.Field);
         }
 
@@ -135,7 +147,7 @@ internal sealed class SmDslAnalyzer
             return DistinctAndSort(BuildItems(dataFields, CompletionItemKind.Field).Concat(SetSnippetItems));
 
         if (Regex.IsMatch(beforeCursor, "^\\s*set\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*[^\\n]*$", RegexOptions.IgnoreCase))
-            return BuildExpressionCompletions(dataFields, currentEvent, eventArgs);
+            return BuildExpressionCompletions(dataFields, currentEvent, eventArgs, collectionFields);
 
         if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+[^\\n]*\\s+on(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
             return BuildItems(events, CompletionItemKind.Event);
@@ -146,6 +158,10 @@ internal sealed class SmDslAnalyzer
             var stateItems = BuildItems(states.Append("any"), CompletionItemKind.EnumMember);
             return stateItems.Concat(KeywordItems.Where(item => item.Label == "on")).ToArray();
         }
+
+        // After "state <Name> ", suggest the "initial" keyword
+        if (Regex.IsMatch(beforeCursor, "^\\s*state\\s+[A-Za-z_][A-Za-z0-9_]*\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+            return [new CompletionItem { Label = "initial", Kind = CompletionItemKind.Keyword }];
 
         if (Regex.IsMatch(beforeCursor, "^\\s*transition(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
             return DistinctAndSort(BuildItems(states, CompletionItemKind.EnumMember).Concat(TransitionSnippetItems));
@@ -186,12 +202,26 @@ internal sealed class SmDslAnalyzer
     private static IReadOnlyList<CompletionItem> BuildExpressionCompletions(
         IReadOnlyList<string> dataFields,
         string? currentEvent,
-        IReadOnlyDictionary<string, IReadOnlyList<string>> eventArgs)
+        IReadOnlyDictionary<string, IReadOnlyList<string>> eventArgs,
+        IReadOnlyList<string>? collectionFields = null)
     {
         var items = new List<CompletionItem>();
         items.AddRange(BuildItems(dataFields, CompletionItemKind.Variable));
         items.AddRange(ExpressionOperatorItems);
         items.AddRange(LiteralItems);
+
+        // Collection field members are valid in set-RHS expressions (e.g. MySet.count)
+        if (collectionFields is not null)
+        {
+            foreach (var col in collectionFields)
+            {
+                items.Add(new CompletionItem { Label = col + ".", Kind = CompletionItemKind.Module });
+                items.Add(new CompletionItem { Label = col + ".count", Kind = CompletionItemKind.Property, Detail = "Number of elements" });
+                items.Add(new CompletionItem { Label = col + ".min", Kind = CompletionItemKind.Property, Detail = "Minimum element (set only)" });
+                items.Add(new CompletionItem { Label = col + ".max", Kind = CompletionItemKind.Property, Detail = "Maximum element (set only)" });
+                items.Add(new CompletionItem { Label = col + ".peek", Kind = CompletionItemKind.Property, Detail = "Front/top element (queue/stack)" });
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(currentEvent) && eventArgs.TryGetValue(currentEvent, out var argsForEvent) && argsForEvent.Count > 0)
         {
@@ -1322,6 +1352,10 @@ internal sealed class SmDslAnalyzer
         new CompletionItem { Label = "pop", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "clear", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "contains", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "into", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "above", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "below", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "reason", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "rule", Kind = CompletionItemKind.Keyword }
     ];
 

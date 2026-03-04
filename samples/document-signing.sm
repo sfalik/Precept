@@ -14,16 +14,21 @@ state AwaitingLegalReview
 state AwaitingSignatures
 state PartialSigned
 state FullySigned
+	rule PendingSignatories.count == 0 "All signatories must have signed"
+	rule CollectedSignatures.count > 0 "At least one signature must be collected"
 state Executed
+	rule LegalReviewPassed "Legal review must have passed"
 state Expired
 state Voided
 
 # Add required signatories before submitting for review
 event AddSignatory
 	string Name
+		rule Name != "" "Signatory name is required"
 
 event SubmitForReview
 	string DocumentTitle
+		rule DocumentTitle != "" "Document title is required"
 
 event ApproveLegalReview
 
@@ -42,20 +47,18 @@ event Execute
 
 event Void
 	string Reason
+		rule Reason != "" "A void reason is required"
 
 from Draft on AddSignatory
-	if AddSignatory.Name != ""
-		add PendingSignatories AddSignatory.Name
-		no transition
-	else
-		reject "Signatory name is required"
+	add PendingSignatories AddSignatory.Name
+	no transition
 
 from Draft on SubmitForReview
-	if SubmitForReview.DocumentTitle != "" && PendingSignatories.count > 0
+	if PendingSignatories.count > 0
 		set DocumentTitle = SubmitForReview.DocumentTitle
 		transition AwaitingLegalReview
 	else
-		reject "Document title is required and at least one signatory must be added first"
+		reject "At least one signatory must be added first"
 
 from AwaitingLegalReview on ApproveLegalReview
 	set LegalReviewPassed = true
@@ -91,8 +94,5 @@ from FullySigned on Execute
 	transition Executed
 
 from Draft, AwaitingLegalReview, AwaitingSignatures, PartialSigned on Void
-	if Void.Reason != ""
-		set VoidReason = Void.Reason
-		transition Voided
-	else
-		reject "A void reason is required"
+	set VoidReason = Void.Reason
+	transition Voided

@@ -2,12 +2,14 @@ machine BugTracker
 
 state Triage initial
 state InProgress
+	rule Assignee != null "Must have an assignee to be in progress"
 state InReview
 state Resolved
 state Closed
 
 string? Assignee = null
 number Priority = 3
+	rule Priority >= 1 && Priority <= 5 "Priority must be between 1 and 5"
 boolean IsBlocked = false
 string? BlockReason = null
 
@@ -16,6 +18,7 @@ event Assign
 
 event Block
 	string Reason
+		rule Reason != "" "Block reason is required"
 
 event Unblock
 
@@ -31,12 +34,9 @@ event Resolve
 event Close
 
 from any on Block
-	if Block.Reason != ""
-		set IsBlocked = true
-		set BlockReason = Block.Reason
-		no transition
-	else
-		reject "Block reason is required"
+	set IsBlocked = true
+	set BlockReason = Block.Reason
+	no transition
 
 from any on Unblock
 	set IsBlocked = false

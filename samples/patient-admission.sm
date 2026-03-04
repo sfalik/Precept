@@ -5,12 +5,14 @@ string? Ward = null
 boolean InsuranceVerified = false
 boolean ConsentSigned = false
 number DaysSinceAdmission = 0
+	rule DaysSinceAdmission >= 0 "Days since admission cannot be negative"
 boolean ReadyForDischarge = false
 string? DischargeNotes = null
 
 state Registered initial
 state Triaged
 state Admitted
+	rule InsuranceVerified && ConsentSigned "Insurance must be verified and consent signed"
 state InTreatment
 state RecoveryMonitoring
 state DischargeReady
@@ -54,10 +56,7 @@ from Triaged on ObtainConsent
 	no transition
 
 from Triaged on Admit
-	if InsuranceVerified && ConsentSigned
-		transition Admitted
-	else
-		reject "Insurance must be verified and consent signed before admission"
+	transition Admitted
 
 from Admitted on StartTreatment
 	transition InTreatment

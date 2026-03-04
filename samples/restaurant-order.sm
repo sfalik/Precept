@@ -2,7 +2,9 @@ machine RestaurantOrder
 
 number TableNumber = 0
 number ItemCount = 0
+	rule ItemCount >= 0 "Item count cannot be negative"
 number Subtotal = 0
+	rule Subtotal >= 0 "Subtotal cannot be negative"
 boolean IsTakeout = false
 boolean PaymentReceived = false
 string? SpecialInstructions = null
@@ -15,14 +17,17 @@ state ReadyForService
 state Served
 state BillRequested
 state Paid
+	rule PaymentReceived "Payment must have been received"
 state Completed
 
 event SeatGuests
 	number TableNumber
+		rule TableNumber > 0 "A valid table number is required"
 	boolean IsTakeout = false
 
 event AddItem
 	number Price
+		rule Price > 0 "Item price must be greater than zero"
 
 event AddSpecialInstructions
 	string Instructions
@@ -39,24 +44,19 @@ event RequestBill
 
 event ProcessPayment
 	number Amount
+		rule Amount > 0 "Payment amount must be positive"
 
 event Complete
 
 from Seated on SeatGuests
-	if SeatGuests.TableNumber > 0
-		set TableNumber = SeatGuests.TableNumber
-		set IsTakeout = SeatGuests.IsTakeout
-		transition Ordering
-	else
-		reject "A valid table number is required"
+	set TableNumber = SeatGuests.TableNumber
+	set IsTakeout = SeatGuests.IsTakeout
+	transition Ordering
 
 from Ordering on AddItem
-	if AddItem.Price > 0
-		set ItemCount = ItemCount + 1
-		set Subtotal = Subtotal + AddItem.Price
-		no transition
-	else
-		reject "Item price must be greater than zero"
+	set ItemCount = ItemCount + 1
+	set Subtotal = Subtotal + AddItem.Price
+	no transition
 
 from Ordering on AddSpecialInstructions
 	set SpecialInstructions = AddSpecialInstructions.Instructions

@@ -365,10 +365,6 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         if (value is null)
             return null;
 
-        // Empty string from UI text input treated as "not provided".
-        if (value is string s && s.Length == 0)
-            return null;
-
         return contract.Type switch
         {
             DslScalarType.Number => CoerceToNumber(value),

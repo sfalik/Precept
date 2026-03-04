@@ -27,6 +27,9 @@ Implementation focus is the DSL runtime path:
 - Runtime webview consumes ELK geometry (node positions/sizes and edge bend-point arrays) and converts edge points to smooth Catmull-Rom → cubic Bézier spline paths.
 - Webview viewBox is set responsively from ELK-computed graph dimensions with 50px padding per side (minimum 600×300); no content-bounds normalization or clamping is applied.
 - The preview webview now calls a custom LSP endpoint (`stateMachine/preview/request`) for `snapshot`, `fire`, `reset`, `replay`, and `inspect` actions. The `inspect` action re-evaluates a single event with caller-supplied arguments so the webview gets real-time guard status without local duplication of guard logic.
+- Inspector webview behavior is intentionally "click-now" oriented: for events with declared arguments, the webview sends all declared arg keys on `inspect`/`fire` (blank when the user has not typed a value yet), and after each snapshot it performs an immediate per-event inspect refresh so initial status colors match immediate click outcomes.
+- Argument construction in the inspector webview is DSL-contract strict: user-entered values are normalized to declared scalar types, nullable unset args are sent as `null`, declared defaults are sent when untouched, and required-without-default args are sent as blank placeholders. The preview handler no longer converts blank strings to `null`; it only performs JSON-shape/type coercion.
+- Inspector webview exposes a single explicit lifecycle control: `Reset` issues `reset` to create a fresh instance at the machine's initial state with DSL defaults.
 - The preview endpoint is bound through a typed JSON-RPC request handler (`IJsonRpcRequestHandler<SmPreviewRequest, SmPreviewResponse>`) with the method contract declared on `SmPreviewRequest` via `[Method("stateMachine/preview/request")]` so registration is discoverable at runtime.
 - Language server preview sessions are in-memory and keyed by document URI; each session keeps parsed/compiled definition and current instance state.
 - The extension pushes updated snapshots to an open file panel on document change, keeping preview content aligned with current editor text.
@@ -34,8 +37,8 @@ Implementation focus is the DSL runtime path:
 - Document-change refresh uses unsaved in-memory text from the open editor buffer; save is not required for preview updates.
 - Snapshot messages are sequence-ordered in the webview so stale async responses cannot overwrite newer editor changes.
 - Webview snapshot parsing accepts both camelCase and PascalCase payload keys for state/event/transition/data fields.
-- In preview mode, `Reload` performs a fresh `snapshot` request (with a short retry) from the current in-memory editor text instead of requiring persisted file state.
-- On webview startup, preview triggers the same reload path after `ready` to recover if the first host-pushed snapshot is missed.
+- In preview mode, startup recovery performs a fresh `snapshot` request (with a short retry) from the current in-memory editor text instead of requiring persisted file state.
+- On webview startup, preview triggers that same snapshot-recovery path after `ready` to recover if the first host-pushed snapshot is missed.
 - Preview includes a replay control that runs a predefined scenario sequence through the language-server replay action.
 - Replay responses include `replayMessages`; the preview renders them as a compact transcript in the event dock.
 - Snapshot request failures are surfaced in the same transcript area.
@@ -117,6 +120,79 @@ Critically, editable fields are viable *because* rules exist. Rules are declarat
 #### "State and data live together"
 
 A core design principle is that the machine instance is the single source of truth for both state and associated data. If data editing requires the same ceremony as lifecycle transitions, authors are incentivized to move data-heavy fields (notes, descriptions, free-text comments) out of the machine into host-managed storage. That splits the truth — the machine knows the state, the host knows the data, and they must be kept in sync externally. Editable fields keep data in the machine while acknowledging that modifying a notes field is categorically different from approving a work order.
+
+### Common Set Before Guards (Rejected — Future Consideration)
+
+**Status: Rejected for now. May be revisited in the future.**
+
+#### Motivation
+
+When multiple branches of a guarded `from` block perform the same `set` assignment, the expression is duplicated across every branch:
+
+```
+from GoodStanding on Withdraw
+    if balance - Withdraw.Amount >= 0
+        set balance = balance - Withdraw.Amount   ← duplicated
+        no transition
+    else
+        set balance = balance - Withdraw.Amount   ← duplicated
+        transition Overdrawn
+```
+
+The idea is to allow `set` statements between the `from ... on` header and the first `if`, so they apply to all branches without repetition:
+
+```
+from GoodStanding on Withdraw
+    set balance = balance - Withdraw.Amount        ← common set
+    if balance >= 0
+        no transition
+    else
+        transition Overdrawn
+```
+
+#### Execution-order question
+
+Two possible semantics:
+
+- **Set before guard evaluation:** The common set executes first, then guards see the modified data. This simplifies guards (e.g. `if balance >= 0` instead of `if balance - Withdraw.Amount >= 0`) but commits a mutation before the routing decision is made.
+- **Set after guard evaluation, before the terminal:** Guards still see the original data (no semantic change to existing guards); the common set just eliminates duplication. More conservative but less intuitive — the `set` appears before the `if` textually but executes after it.
+
+#### The `reject` problem
+
+This is the core reason this approach is rejected for now. Consider:
+
+```
+from Overdrawn on Withdraw
+    set balance = balance - Withdraw.Amount
+    reject "Cannot withdraw from an overdrawn account"
+```
+
+Current semantics: `reject` means the event is not allowed and no mutation occurs. If a common set executes unconditionally, it would mutate state and then reject, contradicting the meaning of rejection. The possible resolutions are all unsatisfying:
+
+1. **Common sets are skipped when the resolved terminal is `reject`** — intuitive (reject = nothing happened), but the "common" set is not truly common. It silently skips `reject` branches. This is a subtle gotcha: an author adding a `reject` branch to an existing block may not realize the common set no longer applies there.
+
+2. **Common sets always execute, even before reject** — consistent, but semantically wrong. A rejected event should have no side effects.
+
+3. **Parser error: common sets are illegal when any branch is `reject`** — honest, but limits the feature's usefulness to a narrow subset of blocks.
+
+A mixed block with both mutation and reject branches is common in practice (e.g. the Withdraw example above has `reject` in some states), so options 1 and 3 frequently collide with real usage.
+
+#### Alternative considered: `let` bindings
+
+A lighter-weight DRY mechanism would be a local `let` binding that is purely computational (no state mutation):
+
+```
+from GoodStanding on Withdraw
+    let newBalance = balance - Withdraw.Amount
+    if newBalance >= 0
+        set balance = newBalance
+        no transition
+    else
+        set balance = newBalance
+        transition Overdrawn
+```
+
+This avoids the reject problem entirely — `let` is just a named expression, not a state mutation — and eliminates the duplicated arithmetic. The `set` remains explicit in each branch, but the expression is written once. This alternative may be worth revisiting if duplication becomes a frequent authoring pain point.
 
 ### DSL Syntax Contract (Current)
 
@@ -534,6 +610,9 @@ Validation constraints:
 - VS Code client startup for locally installed VSIX resolves the language-server project from current workspace folder paths (repo root or `tools/StateMachine.Dsl.VsCode`) with extension-path fallback for Extension Development Host.
 - VS Code client contributes TextMate grammar-based syntax highlighting for `.sm` files.
 - The TextMate grammar is at `tools/StateMachine.Dsl.VsCode/syntaxes/state-machine-dsl.tmLanguage.json`. It must be kept in sync with the DSL parser whenever keywords, statement forms, operators, or type names change. Patterns are ordered: declarations → dotted event-arg refs → field declarations → control keywords → type keywords → action keywords → operators → boolean/null constants → numbers → identifier catch-all → strings. Multi-character operators must appear before single-character operators in the operators block.
+- Completions are implemented in `tools/StateMachine.Dsl.LanguageServer/SmDslAnalyzer.cs` (`GetCompletions`, `KeywordItems`, context-specific branches, snippet lists). It must be kept in sync with the DSL parser: every new keyword goes into `KeywordItems`; every new statement position that has a distinct valid completion set needs a regex branch in `GetCompletions`.
+- Semantic tokens are implemented in `tools/StateMachine.Dsl.LanguageServer/SmSemanticTokensHandler.cs` (`KeywordTokens`, `HighlightNamedSymbols`, `OperatorRegex`, `ExpressionLineRegex`). It must be kept in sync with the DSL parser: every new keyword goes into `KeywordTokens`; new declaration header forms go into `HighlightNamedSymbols`; new operators go into `OperatorRegex` (multi-char first); new expression-containing line prefixes go into `ExpressionLineRegex`.
+- Apply the Grammar Sync Checklist and Intellisense Sync Checklist from `.github/copilot-instructions.md` for every DSL change.
 - VS Code client supports local-only VSIX packaging via `npm run package:local` in `tools/StateMachine.Dsl.VsCode`.
 - Local VSIX packaging includes language-client runtime dependencies so activation works after install.
 - VS Code client supports a local package+install loop via `npm run loop:local` in `tools/StateMachine.Dsl.VsCode`.

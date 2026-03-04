@@ -2,11 +2,17 @@ machine Elevator
 
 # Persistent data
 number CurrentFloor = 1
+	rule CurrentFloor >= 1 "Current floor must be at least 1"
 number TargetFloor = 1
+	rule TargetFloor >= 1 "Target floor must be at least 1"
 number TotalFloors = 10
+	rule TotalFloors >= 1 "Must have at least one floor"
 boolean Overloaded = false
 boolean EmergencyActive = false
 boolean MovingUp = true    # Direction of current or last trip
+
+rule CurrentFloor <= TotalFloors "Current floor cannot exceed total floors"
+rule TargetFloor <= TotalFloors "Target floor cannot exceed total floors"
 
 # Collection: floors with pending requests (sorted, deduplicated)
 set<number> PendingFloors
@@ -20,6 +26,7 @@ state EmergencyHalt        # Emergency stop; requires technician reset
 # User / hall-call button — accepted in Idle, Moving, and DoorsOpen
 event RequestFloor
 	number Floor
+		rule Floor >= 1 "Floor must be at least 1"
 
 # Sensor: cabin has reached TargetFloor (fired by position sensor)
 event FloorReached
@@ -44,27 +51,27 @@ event ResetEmergency
 # --- Idle ---
 # Accept a floor call, add to pending set, then begin moving
 from Idle on RequestFloor
-	if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor > CurrentFloor
+	if RequestFloor.Floor <= TotalFloors && RequestFloor.Floor > CurrentFloor
 		add PendingFloors RequestFloor.Floor
 		set TargetFloor = RequestFloor.Floor
 		set MovingUp = true
 		transition Moving
-	else if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor < CurrentFloor
+	else if RequestFloor.Floor <= TotalFloors && RequestFloor.Floor < CurrentFloor
 		add PendingFloors RequestFloor.Floor
 		set TargetFloor = RequestFloor.Floor
 		set MovingUp = false
 		transition Moving
 	else
-		reject "Floor must be between 1 and TotalFloors and different from the current floor"
+		reject "Floor must be within range and different from the current floor"
 
 # --- Moving ---
 # Queue additional destinations into the pending set while en route
 from Moving on RequestFloor
-	if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor != CurrentFloor
+	if RequestFloor.Floor <= TotalFloors && RequestFloor.Floor != CurrentFloor
 		add PendingFloors RequestFloor.Floor
 		no transition
 	else
-		reject "Floor must be between 1 and TotalFloors and different from the current floor"
+		reject "Floor must be within range and different from the current floor"
 
 # Position sensor fires when the cabin arrives at TargetFloor
 from Moving on FloorReached
@@ -75,11 +82,11 @@ from Moving on FloorReached
 # --- DoorsOpen ---
 # Accept a new destination while waiting at a stop
 from DoorsOpen on RequestFloor
-	if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor != CurrentFloor
+	if RequestFloor.Floor <= TotalFloors && RequestFloor.Floor != CurrentFloor
 		add PendingFloors RequestFloor.Floor
 		no transition
 	else
-		reject "Floor must be between 1 and TotalFloors and different from the current floor"
+		reject "Floor must be within range and different from the current floor"
 
 # Close doors: if pending floors remain, pick nearest in current direction; otherwise Idle
 from DoorsOpen on CloseDoors

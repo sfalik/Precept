@@ -465,4 +465,13 @@ Syntax highlighting grammar sync (non-negotiable — do not skip): update `tools
 
 Verify the grammar file is valid JSON after changes by parsing it. Confirm that `edit` does not accidentally color identifiers that happen to start with the substring — word-boundary anchors (`\b`) are required.
 
+Intelligence sync (non-negotiable — do not skip): apply the Intellisense Sync Checklist from `.github/copilot-instructions.md` in full. At minimum, the following changes are required for this feature:
+
+1. **`KeywordItems`** — add `edit` to `KeywordItems` in `SmDslAnalyzer.cs`.
+2. **`KeywordTokens`** — add `edit` to `KeywordTokens` in `SmSemanticTokensHandler.cs`.
+3. **Completion context for `from … edit` header** — add a regex branch in `GetCompletions` that detects `^\s*from\s+[^\n]+\s+edit(?:\s+[^\n]*)?$` and returns field name completions (the declared instance data fields are the valid completions inside an edit block body).
+4. **Completion context for edit block body** — lines indented under `from … edit` contain bare field names; add a regex branch that detects this indented position and suggests declared data field names.
+5. **Semantic token for edit header** — add a regex to `HighlightNamedSymbols` matching the `from … edit` header line and push the state list tokens as `type` and `edit` as `keyword`.
+6. **`ExpressionLineRegex`** — edit block bodies do not contain expressions (only bare field names), so no update to `ExpressionLineRegex` is needed.
+
 Build with dotnet build from repo root. Run tests in test/StateMachine.Tests/ and test/StateMachine.Dsl.LanguageServer.Tests/. Make sure all existing tests still pass.
