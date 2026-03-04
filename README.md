@@ -56,6 +56,26 @@ Every transition can be evaluated read-only (`Inspect`) before committing (`Fire
 
 The DSL is not a general-purpose language, and that is a feature. `map<K,V>`, function-call syntax, loops, collection nesting, and user-defined functions are deliberately excluded. When a workflow needs logic beyond what the DSL expresses, that logic belongs in the host application — not in a more complex DSL. Every feature proposal is weighed against the cost of moving the DSL closer to a programming language, and the answer is usually "no."
 
+### Declare constraints once
+
+Guards are per-transition — they route branch logic. But data invariants ("Balance must not go negative") are not per-transition; they are facts about the data that must hold after every mutation, in every state, through every event. The current model forces authors to repeat these invariants as guards on every transition that touches the field. Add a new event that debits `Balance` and forget the guard, and the invariant is silently violated.
+
+Rules (`rule <Expr> "<Reason>"`) elevate data contracts from per-transition guards to declarations. The author states the invariant once, at the field or at the top level, and the runtime enforces it after every mutation — regardless of which event, which branch, or which mutation path changed the data. Guards remain for routing logic (which branch fires); rules handle data integrity (what must always hold). This separation is clean: guards answer "which path?", rules answer "is the result valid?"
+
+Rules use the same expression grammar as guards and `set` expressions — no new operators, no new syntax. Four scoped positions (field, top-level, state, event) give precise attachment without a new concept. See docs/RulesDesign.md for the full design.
+
+### State and data live together
+
+The machine instance is the single source of truth for both lifecycle state and associated data. A work order's `Notes`, `Priority`, and `Tags` live alongside its state — not in a separate data store that the host has to keep synchronized. If editing data were prohibitively expensive (requiring full event ceremony for every field change), authors would be incentivized to split data out of the machine and manage it externally. That splits the truth and defeats the purpose. The DSL must make data-heavy entities practical to model, not just lifecycle-only entities.
+
+### Two mutation paths, one safety net
+
+Not every data change is a lifecycle event. Updating a notes field is not the same as approving a loan. The event pipeline (declare event → define arguments → write `set` assignments → route with guards) is the right ceremony for lifecycle actions where routing, scoping, and audit matter. But for pure data editing — changing a description, correcting a priority — that ceremony is three layers of overhead for a mechanical pass-through.
+
+Editable fields (`from <State> edit`) are a second mutation path that acknowledges this distinction. They eliminate event declaration, argument definitions, and `set` assignments simultaneously. This is not a shortcut around the event system — it is a genuinely different semantic: "edit this field" vs. "process this lifecycle action."
+
+The two paths coexist safely because rules (declarative invariants like `rule Balance >= 0 "..."`) enforce data integrity regardless of which path mutates the data. Rules are the safety net that makes direct editing viable — without them, editable fields would bypass all constraints. With them, the DSL author declares invariants once and the runtime enforces them on every mutation, whether it comes from `Fire` or `Update`. This parallels how actor systems protect state through message passing, but relaxes the constraint in the single-instance, single-threaded domain where the "mailbox protection" argument carries less weight.
+
 ## Current Status
 
 - DSL parser/compiler/runtime is implemented and used by the language server for editor diagnostics and preview execution.

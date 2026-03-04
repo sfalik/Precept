@@ -76,6 +76,48 @@ Decision: keeping fire-then-animate for now; revisit when preview UX stabilises.
 - Outcome-first clarity: fallback behavior is explicit (`reject` or `no transition`) rather than implicit failure.
 - Tooling-friendly grammar: indentation + fixed keywords provide stable anchors for completion, diagnostics, and formatting.
 
+### Guards vs. Rules: Routing Logic vs. Data Integrity
+
+The DSL's guard system is per-transition: each `if`/`else if` branch evaluates a condition to decide which path fires. This is the right tool for routing logic — "if the queue is empty, reject; otherwise, dequeue and transition." But data invariants are not per-transition concerns. "Balance must not go negative" is a fact about the data that must hold after every mutation, regardless of which event or branch caused the change.
+
+The current model forces authors to enforce data invariants as guards on every transition that modifies the field. This scales poorly. Add a new event that debits `Balance`, forget to add the guard, and the invariant is silently violated. The author's intent ("Balance must never be negative") is scattered across multiple guards rather than declared once.
+
+Rules separate these two concerns:
+
+- **Guards** answer "which path?" — they are routing logic, evaluated during branch selection, scoped to a single `from ... on ...` block.
+- **Rules** answer "is the result valid?" — they are data integrity constraints, evaluated after all mutations commit, enforced regardless of which event or mutation path changed the data.
+
+This separation is not merely organizational. It changes the failure model: a guard that doesn't match simply means a different branch fires (or the event is blocked). A rule that fails means the committed data would violate an invariant, so all mutations are atomically rolled back. Guards are routing; rules are protection.
+
+Rules use the same expression grammar as guards and `set` expressions — one grammar, one evaluator, four scoped positions (field, top-level, state, event). No new operators, no new syntax. The scope restrictions are intentional: field rules can only reference their own field (cross-field constraints belong in top-level rules where the multi-field nature is visible), event rules can only reference event arguments (so they validate inputs, not state). See docs/RulesDesign.md for the full design.
+
+#### Rules as prerequisite for the broader design
+
+Rules are not an isolated feature — they are infrastructure. The editable fields feature (docs/EditableFieldsDesign.md) depends on rules existing. Without rules, direct field editing would bypass all data integrity constraints. With rules, the safety net is uniform across both mutation paths (events and editable fields). This dependency is architectural: rules must be implemented before editable fields.
+
+### Data Editing vs. Lifecycle Events
+
+The event pipeline (`from State on Event` → guards → `set` assignments → `transition`) handles lifecycle actions: state changes routed by business logic, with audit-relevant semantics. Every field mutation flows through an event declaration, argument definitions, and explicit `set` assignments. This three-layer structure earns its cost for lifecycle actions — it provides routing, scoping, atomicity, and reviewability.
+
+But not every data change is a lifecycle event. Real-world entities carry data-heavy fields (notes, descriptions, contact information, tags) that need to be modified in-place without changing state. Forcing these through the event pipeline creates three layers of ceremony for a mechanical pass-through: an event that carries no routing logic, arguments that mirror the field, and `set` assignments that copy the argument to the field.
+
+The design choice is to recognize two genuinely different mutation semantics:
+
+- **Lifecycle actions** (events): routed by guards, may transition state, carry audit semantics
+- **Data editing** (editable fields): state-scoped field modification, no routing or transitions involved
+
+See docs/EditableFieldsDesign.md for the full design.
+
+#### Why this is not a shortcut
+
+The actor model maps cleanly to the DSL: private state ↔ instance data, messages ↔ events, behavior switch ↔ state transitions. In a distributed actor system, mandatory message passing is justified by concurrency protection (the "mailbox"). The DSL operates in a single-instance, single-threaded domain — the structural protection argument is weaker, and the cost of mandatory message passing for data edits is higher relative to the benefit.
+
+Critically, editable fields are viable *because* rules exist. Rules are declarative invariants (`rule Balance >= 0 "..."`) that the runtime enforces on every mutation regardless of path. Without rules, direct editing would bypass all constraints. With rules, the safety net is uniform: the same invariants protect data whether it arrives through `Fire` or `Update`. This dependency is explicit — editable fields cannot be implemented before rules.
+
+#### "State and data live together"
+
+A core design principle is that the machine instance is the single source of truth for both state and associated data. If data editing requires the same ceremony as lifecycle transitions, authors are incentivized to move data-heavy fields (notes, descriptions, free-text comments) out of the machine into host-managed storage. That splits the truth — the machine knows the state, the host knows the data, and they must be kept in sync externally. Editable fields keep data in the machine while acknowledging that modifying a notes field is categorically different from approving a work order.
+
 ### DSL Syntax Contract (Current)
 
 Canonical linear form:
