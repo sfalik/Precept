@@ -456,4 +456,13 @@ Tests: add comprehensive tests covering edit block parsing, multi-state edit blo
 
 Documentation: update docs/DesignNotes.md DSL Syntax Contract section to include edit block syntax. Update README.md DSL Syntax Reference, DSL Cookbook, and Status sections. Update docs/EditableFieldsDesign.md status from design phase to implemented.
 
+Syntax highlighting grammar sync (non-negotiable — do not skip): update `tools/StateMachine.Dsl.VsCode/syntaxes/state-machine-dsl.tmLanguage.json` for every new DSL construct introduced by this feature. Apply the Grammar Sync Checklist from `.github/copilot-instructions.md` in full. At minimum, the following changes are required for this feature:
+
+1. **Declaration form** — add a `fromEditHeader` pattern matching `^(\s*)(from)(\s+)(any|StateList)(\s+)(edit)` so that `from` and `edit` are colored as control/action keywords and the state list gets entity coloring, consistent with the existing `fromOnHeader` pattern.
+2. **Keyword** — add `edit` to the `controlKeywords` alternation so it is highlighted wherever it appears.
+3. **Field references in edit block body** — field names indented under `from ... edit` are already caught by the `identifierReference` catch-all; no dedicated pattern is needed unless a more specific scope (e.g. `variable.other.editable-field`) is desired.
+4. **Pattern ordering** — insert `fromEditHeader` into the top-level `patterns` array alongside (and at the same priority as) `fromOnHeader`, before `controlKeywords`.
+
+Verify the grammar file is valid JSON after changes by parsing it. Confirm that `edit` does not accidentally color identifiers that happen to start with the substring — word-boundary anchors (`\b`) are required.
+
 Build with dotnet build from repo root. Run tests in test/StateMachine.Tests/ and test/StateMachine.Dsl.LanguageServer.Tests/. Make sure all existing tests still pass.

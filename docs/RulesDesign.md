@@ -382,6 +382,6 @@ Implementation layers. Model: add a DslRule record to StateMachineDslModel.cs to
 
 Tests: add comprehensive tests covering each rule position, scope restrictions, compile-time validations, runtime fire behavior with rule violations, inspect behavior with rules, null handling in rules, collection rules, self-transition state rule triggering, no-transition not triggering state rules, multiple violation collection, and from-any with state rules.
 
-Documentation: update docs/DesignNotes.md DSL Syntax Contract section to include rule syntax. Update README.md DSL Syntax Reference, DSL Cookbook, and Status sections. Update docs/RulesDesign.md status from design phase to implemented.
+Documentation: update docs/DesignNotes.md DSL Syntax Contract section to include rule syntax. Update README.md DSL Syntax Reference, DSL Cookbook, and Status sections. Update docs/RulesDesign.md status from design phase to implemented. Update `tools/StateMachine.Dsl.VsCode/syntaxes/state-machine-dsl.tmLanguage.json` to add/update grammar patterns for any new keywords or constructs.
 
 Build with dotnet build from repo root. Run tests in test/StateMachine.Tests/ and test/StateMachine.Dsl.LanguageServer.Tests/. Make sure all existing tests still pass.

@@ -46,6 +46,30 @@ When any DSL grammar, keyword, rule, or semantics change (for example: `set`, `s
 
 These sections must not contradict each other. If one is updated, all relevant sections must be updated before final response.
 
+## Syntax Highlighting Grammar Sync (Non-Negotiable)
+
+The TextMate grammar at `tools/StateMachine.Dsl.VsCode/syntaxes/state-machine-dsl.tmLanguage.json` must stay in sync with the DSL parser at `src/StateMachine/Dsl/StateMachineDslParser.cs`.
+
+When any of the following change, update the grammar file in the same pass:
+
+- New keywords added (control, action, type, or collection)
+- New statement or declaration forms (e.g. a new block type like `edit`)
+- New expression constructs or operators
+- New collection type kinds or inner types
+- Changes to identifier naming rules
+- Any DSL Syntax Contract change in `docs/DesignNotes.md`
+
+### Grammar Sync Checklist
+
+For every new or changed DSL construct, verify the grammar covers:
+
+1. **Declaration form** — does the keyword appear at the start of a line? Add/update a named declaration pattern with capture groups for the keyword and following identifier.
+2. **Keyword** — is it a control keyword (`if/else/from/on/state/event/machine/initial`) or action keyword (`set/transition/reject/rule/add/remove/…`)? Add to the correct `controlKeywords` or `actionKeywords` alternation.
+3. **Type token** — is it a type name (`string/number/boolean`) or collection type (`set<T>/queue<T>/stack<T>`)? Add to `typeKeywords`.
+4. **Operator** — is it a new operator symbol? Add to `operators` in priority order (multi-char before single-char).
+5. **Identifier references** — identifiers in expression positions are caught by the `identifierReference` catch-all; no change needed unless a new dotted form (like `EventName.ArgName`) is introduced, in which case add a dedicated pattern before `identifierReference`.
+6. **Pattern ordering** — specific patterns (declarations, dotted refs) must appear before general ones (type keywords, identifier catch-all). Verify the top-level `patterns` array order is still correct after changes.
+
 ## Current-Status Hygiene
 
 Maintain a concise "Current Status" section in `README.md` that reflects:

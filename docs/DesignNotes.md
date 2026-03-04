@@ -533,6 +533,7 @@ Validation constraints:
 - VS Code client startup resolves the language-server project relative to extension location and does not require a workspace folder in Extension Development Host.
 - VS Code client startup for locally installed VSIX resolves the language-server project from current workspace folder paths (repo root or `tools/StateMachine.Dsl.VsCode`) with extension-path fallback for Extension Development Host.
 - VS Code client contributes TextMate grammar-based syntax highlighting for `.sm` files.
+- The TextMate grammar is at `tools/StateMachine.Dsl.VsCode/syntaxes/state-machine-dsl.tmLanguage.json`. It must be kept in sync with the DSL parser whenever keywords, statement forms, operators, or type names change. Patterns are ordered: declarations → dotted event-arg refs → field declarations → control keywords → type keywords → action keywords → operators → boolean/null constants → numbers → identifier catch-all → strings. Multi-character operators must appear before single-character operators in the operators block.
 - VS Code client supports local-only VSIX packaging via `npm run package:local` in `tools/StateMachine.Dsl.VsCode`.
 - Local VSIX packaging includes language-client runtime dependencies so activation works after install.
 - VS Code client supports a local package+install loop via `npm run loop:local` in `tools/StateMachine.Dsl.VsCode`.

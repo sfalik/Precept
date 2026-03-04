@@ -19,13 +19,22 @@
       "include": "#fromOnHeader"
     },
     {
+      "include": "#simpleTransition"
+    },
+    {
+      "include": "#eventArgReference"
+    },
+    {
+      "include": "#fieldDeclaration"
+    },
+    {
       "include": "#controlKeywords"
     },
     {
-      "include": "#actionKeywords"
+      "include": "#typeKeywords"
     },
     {
-      "include": "#typeKeywords"
+      "include": "#actionKeywords"
     },
     {
       "include": "#operators"
@@ -35,6 +44,9 @@
     },
     {
       "include": "#numbers"
+    },
+    {
+      "include": "#identifierReference"
     },
     {
       "include": "#strings"
@@ -143,23 +155,31 @@
       "patterns": [
         {
           "name": "storage.type.state-machine-dsl",
-          "match": "\\b(string|number|boolean|null)\\??\\b"
+          "match": "\\b(set|queue|stack)<(string|number|boolean)>\\b"
         },
         {
           "name": "storage.type.state-machine-dsl",
-          "match": "\\b(set|queue|stack)<(string|number|boolean)>\\b"
+          "match": "\\b(string|number|boolean)\\??\\b"
         }
       ]
     },
     "operators": {
       "patterns": [
         {
+          "name": "keyword.operator.comparison.state-machine-dsl",
+          "match": "==|!=|>=|<="
+        },
+        {
           "name": "keyword.operator.logical.state-machine-dsl",
           "match": "&&|\\|\\||!"
         },
         {
+          "name": "keyword.operator.arithmetic.state-machine-dsl",
+          "match": "[+\\-*/%]"
+        },
+        {
           "name": "keyword.operator.comparison.state-machine-dsl",
-          "match": "==|!=|>=|<=|>|<"
+          "match": ">|<"
         },
         {
           "name": "keyword.operator.assignment.state-machine-dsl",
@@ -180,6 +200,74 @@
         {
           "name": "constant.numeric.state-machine-dsl",
           "match": "\\b\\d+(?:\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "fieldDeclaration": {
+      "patterns": [
+        {
+          "comment": "collection field: set<number> FieldName",
+          "name": "meta.field-declaration.collection.state-machine-dsl",
+          "match": "\\b(set|queue|stack)<(string|number|boolean)>\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.state-machine-dsl" },
+            "2": { "name": "storage.type.state-machine-dsl" },
+            "3": { "name": "variable.other.field.state-machine-dsl" }
+          }
+        },
+        {
+          "comment": "scalar field: number balance = 0  or  string? Name",
+          "name": "meta.field-declaration.scalar.state-machine-dsl",
+          "match": "\\b(string|number|boolean|null)(\\?)?\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.state-machine-dsl" },
+            "2": { "name": "keyword.operator.state-machine-dsl" },
+            "3": { "name": "variable.other.field.state-machine-dsl" }
+          }
+        }
+      ]
+    },
+    "eventArgReference": {
+      "patterns": [
+        {
+          "name": "meta.event-arg-ref.state-machine-dsl",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.event.state-machine-dsl"
+            },
+            "2": {
+              "name": "punctuation.accessor.state-machine-dsl"
+            },
+            "3": {
+              "name": "variable.other.property.state-machine-dsl"
+            }
+          }
+        }
+      ]
+    },
+    "simpleTransition": {
+      "patterns": [
+        {
+          "name": "meta.transition.simple.state-machine-dsl",
+          "match": "^(\\s*)(transition)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "2": {
+              "name": "keyword.other.state-machine-dsl"
+            },
+            "4": {
+              "name": "entity.name.type.state.state-machine-dsl"
+            }
+          }
+        }
+      ]
+    },
+    "identifierReference": {
+      "patterns": [
+        {
+          "comment": "catch-all for bare identifier references (field names, arg names) in expression positions",
+          "name": "variable.other.state-machine-dsl",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
         }
       ]
     },

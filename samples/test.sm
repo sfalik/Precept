@@ -1,6 +1,7 @@
 machine Test
 
 number balance = 0
+    rule balance >= 0 "Balance cannot be negative"
 number overdraftLimit = 100
 
 rule balance >= 0 - overdraftLimit "Balance must be within overdraft limit"
@@ -9,30 +10,30 @@ state GoodStanding initial
 state Overdrawn
 
 event Deposit
-    number amount
-        rule amount > 0 "Deposit amount must be positive"
+    number Amount
+        rule Amount > 0 "Deposit amount must be positive"
 event Withdraw
-    number amount
-        rule amount > 0 "Withdraw amount must be positive"
+    number Amount
+        rule Amount > 0 "Withdraw amount must be positive"
 
 from GoodStanding on Deposit   
-    set balance = balance +Deposit.amount
+    set balance = balance + Deposit.Amount
     no transition
 
 from GoodStanding on Withdraw
-    if balance - Withdraw.amount >= 0 
-        set balance = balance - Withdraw.amount
+    if balance - Withdraw.Amount >= 0 
+        set balance = balance - Withdraw.Amount
         no transition
     else
-        set balance = balance - Withdraw.amount
+        set balance = balance - Withdraw.Amount
         transition Overdrawn
 
 from Overdrawn on Deposit
-    if balance + Deposit.amount >= 0 
-        set balance = balance + Deposit.amount
+    if balance + Deposit.Amount >= 0 
+        set balance = balance + Deposit.Amount
         transition GoodStanding
     else
-        set balance = balance + Deposit.amount
+        set balance = balance + Deposit.Amount
         no transition
 
 from Overdrawn on Withdraw
