@@ -332,76 +332,71 @@ internal sealed class SmDslAnalyzer
                 StringComparer.Ordinal),
             StringComparer.Ordinal);
 
-        var searchLine = 0;
+        var collectionFieldMap = machine.CollectionFields.ToDictionary(
+            c => c.Name,
+            c => c,
+            StringComparer.Ordinal);
+
+        // Build a unified candidate list from transitions and terminal rules so we can
+        // apply cross-branch null narrowing within each (FromState, EventName) group.
+        var allCandidates = new List<(string FromState, string EventName, int Order, string? GuardExpression,
+            IReadOnlyList<DslSetAssignment> SetAssignments, IReadOnlyList<DslCollectionMutation>? CollectionMutations, int SourceLine)>();
+
         foreach (var transition in machine.Transitions)
-        {
-            searchLine = Math.Max(0, transition.SourceLine - 1);
-            var fallbackLine = Math.Max(0, transition.SourceLine - 1);
-
-            var transitionSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, transition.EventName, machine.CollectionFields);
-            IReadOnlyDictionary<string, StaticValueKind> setSymbols = transitionSymbols;
-
-            if (!string.IsNullOrWhiteSpace(transition.GuardExpression))
-            {
-                var guardLine = FindGuardLine(lines, ref searchLine, transition.GuardExpression!, fallbackLine);
-                ValidateExpression(
-                    transition.GuardExpression!,
-                    guardLine,
-                    transitionSymbols,
-                    expectedKind: StaticValueKind.Boolean,
-                    expectedLabel: "guard expression",
-                    diagnostics,
-                    lines);
-
-                if (TryParseExpression(transition.GuardExpression!, out var parsedGuard, out _))
-                    setSymbols = ApplyNarrowing(parsedGuard!, transitionSymbols, assumeTrue: true);
-            }
-
-            foreach (var assignment in transition.SetAssignments)
-            {
-                var assignmentFallback = assignment.SourceLine > 0 ? assignment.SourceLine - 1 : fallbackLine;
-                var assignmentLine = FindSetLine(lines, ref searchLine, assignment.Key, assignment.ExpressionText, assignmentFallback);
-                if (!dataFieldKinds.TryGetValue(assignment.Key, out var targetKind))
-                    continue;
-
-                ValidateExpression(
-                    assignment.ExpressionText,
-                    assignmentLine,
-                    setSymbols,
-                    expectedKind: targetKind,
-                    expectedLabel: $"set target '{assignment.Key}'",
-                    diagnostics,
-                    lines);
-            }
-        }
+            allCandidates.Add((transition.FromState, transition.EventName, transition.Order,
+                transition.GuardExpression, transition.SetAssignments,
+                transition.CollectionMutations, transition.SourceLine));
 
         foreach (var terminalRule in machine.TerminalRules)
+            allCandidates.Add((terminalRule.FromState, terminalRule.EventName, terminalRule.Order,
+                terminalRule.GuardExpression, terminalRule.SetAssignments ?? [],
+                terminalRule.CollectionMutations, terminalRule.SourceLine));
+
+        // Group by (FromState, EventName) and process each group in Order so that prior-branch
+        // guard negations are accumulated into the symbols for subsequent branches.
+        var groups = allCandidates
+            .GroupBy(c => (c.FromState, c.EventName))
+            .Select(g => g.OrderBy(c => c.Order).ToList());
+
+        foreach (var group in groups)
         {
-            searchLine = Math.Max(0, terminalRule.SourceLine - 1);
-            var fallbackLine = Math.Max(0, terminalRule.SourceLine - 1);
+            var eventName = group[0].EventName;
+            var baseSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, eventName, machine.CollectionFields);
 
-            var terminalSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, terminalRule.EventName, machine.CollectionFields);
-            IReadOnlyDictionary<string, StaticValueKind> terminalSetSymbols = terminalSymbols;
+            // branchSymbols accumulates negations of prior guards so later branches see a
+            // progressively narrowed view (e.g. after "if X == null / reject", else-if sees X as non-null).
+            IReadOnlyDictionary<string, StaticValueKind> branchSymbols = baseSymbols;
 
-            if (!string.IsNullOrWhiteSpace(terminalRule.GuardExpression))
+            foreach (var candidate in group)
             {
-                var guardLine = FindGuardLine(lines, ref searchLine, terminalRule.GuardExpression!, fallbackLine);
-                ValidateExpression(
-                    terminalRule.GuardExpression!,
-                    guardLine,
-                    terminalSymbols,
-                    expectedKind: StaticValueKind.Boolean,
-                    expectedLabel: "guard expression",
-                    diagnostics,
-                    lines);
+                var searchLine = Math.Max(0, candidate.SourceLine - 1);
+                var fallbackLine = Math.Max(0, candidate.SourceLine - 1);
 
-                if (TryParseExpression(terminalRule.GuardExpression!, out var parsedGuard, out _))
-                    terminalSetSymbols = ApplyNarrowing(parsedGuard!, terminalSymbols, assumeTrue: true);
-            }
+                // setSymbols is used for set-assignment and mutation validation within this branch.
+                IReadOnlyDictionary<string, StaticValueKind> setSymbols = branchSymbols;
 
-            if (terminalRule.SetAssignments is not null)
-            {
-                foreach (var assignment in terminalRule.SetAssignments)
+                if (!string.IsNullOrWhiteSpace(candidate.GuardExpression))
+                {
+                    var guardLine = FindGuardLine(lines, ref searchLine, candidate.GuardExpression!, fallbackLine);
+                    ValidateExpression(
+                        candidate.GuardExpression!,
+                        guardLine,
+                        branchSymbols,
+                        expectedKind: StaticValueKind.Boolean,
+                        expectedLabel: "guard expression",
+                        diagnostics,
+                        lines);
+
+                    if (TryParseExpression(candidate.GuardExpression!, out var parsedGuard, out _))
+                    {
+                        // Within this branch the guard is true — narrow symbols for set/mutation validation.
+                        setSymbols = ApplyNarrowing(parsedGuard!, branchSymbols, assumeTrue: true);
+                        // For the next branch the guard was false — accumulate the negation.
+                        branchSymbols = ApplyNarrowing(parsedGuard!, branchSymbols, assumeTrue: false);
+                    }
+                }
+
+                foreach (var assignment in candidate.SetAssignments)
                 {
                     var assignmentFallback = assignment.SourceLine > 0 ? assignment.SourceLine - 1 : fallbackLine;
                     var assignmentLine = FindSetLine(lines, ref searchLine, assignment.Key, assignment.ExpressionText, assignmentFallback);
@@ -411,12 +406,22 @@ internal sealed class SmDslAnalyzer
                     ValidateExpression(
                         assignment.ExpressionText,
                         assignmentLine,
-                        terminalSetSymbols,
+                        setSymbols,
                         expectedKind: targetKind,
                         expectedLabel: $"set target '{assignment.Key}'",
                         diagnostics,
                         lines);
                 }
+
+                ValidateCollectionMutations(
+                    candidate.CollectionMutations,
+                    setSymbols,
+                    dataFieldKinds,
+                    collectionFieldMap,
+                    ref searchLine,
+                    fallbackLine,
+                    diagnostics,
+                    lines);
             }
         }
 
@@ -846,6 +851,80 @@ internal sealed class SmDslAnalyzer
         return true;
     }
 
+    private static void ValidateCollectionMutations(
+        IReadOnlyList<DslCollectionMutation>? mutations,
+        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
+        IReadOnlyDictionary<string, DslCollectionFieldContract> collectionFieldMap,
+        ref int searchLine,
+        int fallbackLine,
+        List<Diagnostic> diagnostics,
+        string[] lines)
+    {
+        if (mutations is null || mutations.Count == 0)
+            return;
+
+        foreach (var mutation in mutations)
+        {
+            if (!collectionFieldMap.TryGetValue(mutation.TargetField, out var colField))
+                continue;
+
+            var innerKind = MapScalarTypeToKind(colField.InnerType);
+            var verbLabel = mutation.Verb.ToString().ToLowerInvariant();
+            var mutationLine = FindMutationLine(lines, ref searchLine, verbLabel, mutation.TargetField, fallbackLine);
+
+            switch (mutation.Verb)
+            {
+                case DslCollectionMutationVerb.Add:
+                case DslCollectionMutationVerb.Remove:
+                case DslCollectionMutationVerb.Enqueue:
+                case DslCollectionMutationVerb.Push:
+                    if (!string.IsNullOrWhiteSpace(mutation.ExpressionText))
+                    {
+                        ValidateExpression(
+                            mutation.ExpressionText!,
+                            mutationLine,
+                            symbols,
+                            expectedKind: innerKind,
+                            expectedLabel: $"'{verbLabel} {mutation.TargetField}' value",
+                            diagnostics,
+                            lines);
+                    }
+
+                    break;
+
+                case DslCollectionMutationVerb.Dequeue:
+                case DslCollectionMutationVerb.Pop:
+                    if (!string.IsNullOrWhiteSpace(mutation.IntoField) &&
+                        dataFieldKinds.TryGetValue(mutation.IntoField!, out var intoKind))
+                    {
+                        if (!IsAssignable(innerKind, intoKind))
+                        {
+                            diagnostics.Add(CreateLineDiagnostic(
+                                lines,
+                                mutationLine,
+                                $"'{verbLabel} {mutation.TargetField} into {mutation.IntoField}': " +
+                                $"cannot assign {FormatKinds(innerKind)} to target '{mutation.IntoField}' of type {FormatKinds(intoKind)}."));
+                        }
+                    }
+
+                    break;
+
+                case DslCollectionMutationVerb.Clear:
+                    break;
+            }
+        }
+    }
+
+    private static StaticValueKind MapScalarTypeToKind(DslScalarType type) => type switch
+    {
+        DslScalarType.String => StaticValueKind.String,
+        DslScalarType.Number => StaticValueKind.Number,
+        DslScalarType.Boolean => StaticValueKind.Boolean,
+        DslScalarType.Null => StaticValueKind.Null,
+        _ => StaticValueKind.None
+    };
+
     private static bool TryGetIdentifierKey(DslExpression expression, out string key)
     {
         var stripped = StripParentheses(expression);
@@ -915,6 +994,25 @@ internal sealed class SmDslAnalyzer
                     searchLine = i + 1;
                     return i;
                 }
+            }
+        }
+
+        return fallbackLine;
+    }
+
+    private static int FindMutationLine(string[] lines, ref int searchLine, string verb, string targetField, int fallbackLine = 0)
+    {
+        // Mutation lines have the form: <verb> <targetField> [<rest>]
+        // e.g. "add Tags Value", "dequeue Names into LastRemoved", "clear Floors"
+        var prefix = $"{verb} {targetField}";
+        for (var i = Math.Max(0, searchLine); i < lines.Length; i++)
+        {
+            var trimmed = lines[i].Trim();
+            if (trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                (trimmed.Length == prefix.Length || char.IsWhiteSpace(trimmed[prefix.Length])))
+            {
+                searchLine = i + 1;
+                return i;
             }
         }
 

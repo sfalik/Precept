@@ -425,18 +425,17 @@ Validation constraints:
 
 ## Known Gaps
 
-- Language-server expression diagnostics now perform null-flow narrowing for explicit null checks in `&&`/`||` paths, but still do not perform full cross-branch flow analysis.
 - Extension packaging/publishing workflow
 
 ## Test Status
 
-- Active tests include `test/StateMachine.Tests/DslWorkflowTests.cs`, `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslSetParsingTests.cs`, `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`, and `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs`.
+- Active tests include `test/StateMachine.Tests/DslWorkflowTests.cs`, `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslSetParsingTests.cs`, `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`, `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs`, and `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerCollectionMutationTests.cs`.
 - Guard/expression test coverage includes: boolean guards, comparisons, string/null equality, numeric runtime type coercion, unsupported-expression rejection, reason aggregation, expression AST parsing precedence/invalid syntax diagnostics, lexer edge cases, set-branch parsing constraints, and runtime evaluator operator/short-circuit behavior.
+- Language-server null-narrowing coverage includes: single-expression `&&`/`||` narrowing, cross-branch narrowing across ordered if/else-if/else chains, set-assignment validation under narrowed types, and collection mutation value type checking.
 
 ## Next Steps
 
 1. Add packaging/publishing automation for the VS Code extension client.
-2. Improve language-server expression analysis with deeper cross-branch null/type narrowing to reduce false-positive/false-negative diagnostics.
 
 ## Guard Evaluation + Event-Argument Model (Current)
 
@@ -463,6 +462,8 @@ Validation constraints:
 - Duplicate unguarded outcome validation now points to the second (duplicate) rule's `SourceLine` rather than having no line context.
 - `SmDslAnalyzer.GetSemanticDiagnostics` now resets the guard/set text-search cursor per-rule to `rule.SourceLine - 1` instead of advancing monotonically from 0, fixing cases where interleaved or reversed rules caused the search to overshoot the actual guard/set line.
 - `FindGuardLine` and `FindSetLine` now accept a `fallbackLine` parameter; on a text-match miss they return the fallback (the `from … on …` header line) instead of line 0.
+- `SmDslAnalyzer.GetSemanticDiagnostics` groups all transitions and terminal rules by `(FromState, EventName)` and processes each group in `Order`-sorted sequence, accumulating negations of prior guards into a running `branchSymbols` dictionary. This provides cross-branch null narrowing: after `if X == null → no transition`, the `else if` and `else` branches see `X` as non-nullable, eliminating false-positive diagnostics on numeric comparisons or `set` assignments that follow a null-guard branch.
+- Collection mutation value expressions (`add`, `remove`, `enqueue`, `push`) are type-checked in the same `GetSemanticDiagnostics` pass as `set` assignments, using the branch's narrowed symbol table. `dequeue`/`pop into` target field types are validated against the collection's inner type. Each mutation error is squiggled at the actual mutation line using `FindMutationLine` (modelled after `FindGuardLine`/`FindSetLine`), not at the `from … on …` header.
 - LSP completion includes DSL keywords plus contextual state/event suggestions (`from`, `transition`, `on`).
 - LSP completion includes contextual guard suggestions for `if`/`else if` (data fields, operators/literals, and current-event argument references).
 - LSP completion includes contextual set suggestions (data-field target names before `=`, expression suggestions after `=`).

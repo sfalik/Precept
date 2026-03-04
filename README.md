@@ -34,6 +34,8 @@ When a feature introduces a context-sensitive rule — "this keyword is an expre
 
 `set<T>` is backed by a sorted structure as a semantic guarantee, not an implementation detail. Iteration order, `.min`, `.max` are all deterministic regardless of insertion order. Guard evaluation follows declaration order. There are no race conditions, no nondeterministic outcomes, and no cases where running the same event with the same data could produce different results.
 
+Null safety is part of this guarantee. A field declared as `number?` can be `null`, and using it in a comparison or arithmetic without first establishing that it is non-null is a compile-time error — the editor squiggles the line and refuses to let the ambiguity propagate to runtime. When a branch tests `if X == null → reject`, every subsequent branch in the chain knows statically that `X` is non-null: the null check is not just documentation, it is enforced by the analyzer and narrows the type for all following branches. Null uncertainty cannot silently reach a guard comparison or a data assignment.
+
 ### Atomic transitions
 
 When a branch fires, all scalar assignments and collection mutations either commit together or roll back together. If a `dequeue` fails because the queue is empty, the entire branch is rejected — no partial mutations leak into the persisted instance. This is true even when a branch contains multiple `set` assignments and multiple collection mutations interleaved.
@@ -62,6 +64,7 @@ The DSL is not a general-purpose language, and that is a feature. `map<K,V>`, fu
 - Inspector preview layout uses a single unified ELK layered layout with state-machine-tuned options (top-down direction, spline edge routing, model-order cycle breaking, feedback edges for cycles, inside self-loops, inline edge labels, DSL declaration-order node ordering), dynamic per-state node sizing, and responsive viewBox. Reject and no-transition terminal rules are excluded from the diagram graph.
 - CLI host has been removed in this branch (hard cut); editor + language server are the active runtime surfaces.
 - **Collection types** (`set<T>`, `queue<T>`, `stack<T>`) are implemented with full parser, runtime, and language-server support. Declarations, mutations (`add`/`remove`/`enqueue`/`dequeue`/`push`/`pop`/`clear`), guard properties (`.count`/`.min`/`.max`/`.peek`), and the `contains` operator are all functional. Directional set queries (`above`/`below`) remain deferred pending real usage data.
+- **Language-server null-flow diagnostics** perform both intra-expression narrowing (`&&`/`||`/`!` within a single guard) and cross-branch narrowing: when guarded branches form an `if`/`else if`/`else` chain, prior guard negations are accumulated so later branches see a progressively narrowed type environment (e.g. after `if X == null → no transition`, the `else if` and `else` branches see `X` as non-nullable). Collection mutation value expressions (`add`, `enqueue`, `push`) are type-checked against the collection's inner type with the same narrowed symbols as `set` assignments; `dequeue`/`pop into` target types are validated against the collection's inner type.
 
 ## Quick Start (2 minutes)
 
@@ -272,6 +275,57 @@ Constraints:
 - No function-call syntax. No nullable inner types. No collection nesting. No array literals. No `map<K,V>`.
 - Unsupported syntax: `states ...`, `events ...`, and legacy inline form `transition A -> B on E ...`.
 
+### Null Safety
+
+Appending `?` to a type name declares a nullable field or event argument.
+
+```text
+number? RetryCount
+string? LastError
+```
+
+Using a nullable field in any operator, comparison, or assignment that requires a concrete type is a **compile-time error** — the language server squiggles the exact offending line. This prevents null-related surprises from reaching the runtime.
+
+**Three patterns for handling nullable fields before use:**
+
+1. Inline with `&&` — test and use in the same guard:
+
+```text
+if RetryCount != null && RetryCount > 0
+  set Attempts = RetryCount
+  transition Retry
+else
+  reject "RetryCount unavailable"
+```
+
+The analyzer understands that the right-hand side of `&&` is only reached when the left side is true, so `RetryCount` is treated as non-nullable for the `RetryCount > 0` test and for the `set` assignment.
+
+2. Inline with `||` — short-circuit the null case:
+
+```text
+if RetryCount == null || RetryCount > 0
+  transition Retry
+else
+  reject "Retry limit reached"
+```
+
+The right-hand side of `||` is only reached when the left side is false (i.e. `RetryCount != null`), so the comparison is valid.
+
+3. Early-exit pattern across branches — reject the null case first, then use freely:
+
+```text
+from Active on Retry
+  if RetryCount == null
+    reject "RetryCount unavailable"
+  else if RetryCount > 0
+    set Attempts = RetryCount
+    transition Active
+  else
+    reject "No retries remaining"
+```
+
+Because the first branch rejects when `RetryCount == null`, the analyzer knows every subsequent `else if` and `else` branch can only be reached when `RetryCount` is non-null. Using `RetryCount` in `RetryCount > 0` or in `set Attempts = RetryCount` requires no additional null check. This cross-branch narrowing is enforced statically — you get the same squiggle you would get in the single-guard case if you mistakenly skip the null check.
+
 ## DSL Cookbook
 
 Practical patterns that map directly to the syntax:
@@ -432,6 +486,105 @@ from DoorsOpen on CloseDoors
 ```
 
 14) Collection: queue with enqueue/dequeue/peek
+
+```text
+queue<string> ApprovalChain
+string LastApprover = ""
+
+from Submitted on AssignApprover
+  enqueue ApprovalChain Approver.Name
+  no transition
+
+from AwaitingApproval on Approve
+  if ApprovalChain.count > 1
+    dequeue ApprovalChain into LastApprover
+    no transition
+  else
+    dequeue ApprovalChain into LastApprover
+    transition Approved
+```
+
+15) Collection: stack with push/pop/peek
+
+```text
+stack<string> BreadcrumbTrail
+string CurrentRoom = ""
+
+from Exploring on EnterRoom
+  push BreadcrumbTrail CurrentRoom
+  set CurrentRoom = EnterRoom.RoomName
+  transition Exploring
+
+from Exploring on Backtrack
+  if BreadcrumbTrail.count > 0
+    pop BreadcrumbTrail into CurrentRoom
+    no transition
+  else
+    reject "No rooms to backtrack to"
+```
+
+16) Collection: contains operator in guards
+
+```text
+from Idle on RequestFloor
+  if PendingFloors contains RequestFloor.Floor
+    reject "Floor already requested"
+  else
+    add PendingFloors RequestFloor.Floor
+    transition Moving
+```
+
+17) Collection: cross-collection transfer via scalar intermediary
+
+```text
+queue<string> PendingReviewers
+stack<string> CompletedReviewers
+string Reviewer = ""
+
+from AwaitingReview on CompleteReview
+  if PendingReviewers.count > 1
+    dequeue PendingReviewers into Reviewer
+    push CompletedReviewers Reviewer
+    no transition
+  else
+    dequeue PendingReviewers into Reviewer
+    push CompletedReviewers Reviewer
+    transition FullyReviewed
+```
+
+18) Nullable field — inline null check with `&&`
+
+```text
+number? Score
+string RiskTier = "Unknown"
+
+from Pending on Evaluate
+  if Score != null && Score >= 80
+    set RiskTier = "Low"
+    transition Approved
+  else
+    reject "Score unavailable or below threshold"
+```
+
+The editor squiggles `Score >= 80` if you remove the `Score != null &&` prefix, because `Score` is declared nullable and the `>=` operator requires a non-null number. The null check in the same `&&` clause narrows `Score` to non-nullable for the right-hand side.
+
+19) Nullable field — early-exit null rejection, then use freely in else branches
+
+```text
+number? RetryCount
+number Attempts = 0
+
+from Active on Retry
+  if RetryCount == null
+    reject "RetryCount unavailable"
+  else if RetryCount > 0
+    set Attempts = RetryCount
+    transition Active
+  else
+    reject "No retries remaining"
+```
+
+After the first branch rejects on `null`, all following `else if` and `else` branches are statically known to execute only when `RetryCount` is non-null. `RetryCount > 0` and `set Attempts = RetryCount` require no additional null guard — the analyzer enforces this across the branch chain. Removing the `if RetryCount == null` branch causes the editor to squiggle `RetryCount > 0` in the next branch.
 
 ```text
 queue<string> ApprovalChain
