@@ -1,0 +1,98 @@
+machine SupportTicket
+
+string? AssignedAgent = null
+number Priority = 3
+boolean CustomerConfirmed = false
+boolean EscalatedOnce = false
+string? ResolutionSummary = null
+number ReopenCount = 0
+
+state Open initial
+state Assigned
+state InProgress
+state PendingCustomer
+state Escalated
+state Resolved
+state Closed
+state Reopened
+
+event Assign
+	string AgentName
+	number Priority = 3
+
+event StartWork
+
+event RequestCustomerInfo
+	string Question
+
+event CustomerReply
+	string Answer
+
+event Escalate
+	string Reason
+
+event Resolve
+	string Summary
+
+event ConfirmResolution
+
+event Close
+
+event Reopen
+	string Reason
+
+from Open on Assign
+	if Assign.Priority >= 1 && Assign.Priority <= 5
+		set AssignedAgent = Assign.AgentName
+		set Priority = Assign.Priority
+		transition Assigned
+	else
+		reject "Priority must be between 1 and 5"
+
+from Assigned on StartWork
+	transition InProgress
+
+from InProgress on RequestCustomerInfo
+	no transition
+
+from any on CustomerReply
+	no transition
+
+from InProgress, PendingCustomer on Escalate
+	if !EscalatedOnce
+		set EscalatedOnce = true
+		set Priority = 1
+		transition Escalated
+	else
+		reject "Ticket has already been escalated once"
+
+from InProgress, Escalated on Resolve
+	if Resolve.Summary != ""
+		set ResolutionSummary = Resolve.Summary
+		transition Resolved
+	else
+		reject "Resolution summary is required"
+
+from Resolved on ConfirmResolution
+	set CustomerConfirmed = true
+	no transition
+
+from Resolved on Close
+	transition Closed
+
+from Resolved, Closed on Reopen
+	if ReopenCount < 3
+		set ReopenCount = ReopenCount + 1
+		set ResolutionSummary = null
+		set CustomerConfirmed = false
+		transition Reopened
+	else
+		reject "Ticket cannot be reopened more than three times"
+
+from Reopened on Assign
+	if Assign.Priority >= 1 && Assign.Priority <= 5
+		set AssignedAgent = Assign.AgentName
+		set Priority = Assign.Priority
+		transition Assigned
+	else
+		reject "Priority must be between 1 and 5"

@@ -156,7 +156,9 @@
       border-radius: 0;
       background: transparent;
       padding: 0;
-      align-self: stretch;
+      align-self: start;
+      max-height: 100%;
+      overflow: hidden;
     }
 
     .meta-card {
@@ -452,9 +454,11 @@
 
     .data-overlay .data-list {
       margin: 0;
-      max-height: clamp(84px, 20vh, 170px);
+      max-height: none;
       background: rgba(20, 21, 26, 0.85);
       flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
     }
 
     .data-list li {
@@ -589,9 +593,7 @@
         height: 100%;
       }
 
-      .data-overlay .data-list {
-        max-height: clamp(78px, 20vh, 124px);
-      }
+
 
       .event-bar {
         max-height: clamp(104px, 24vh, 192px);
@@ -626,9 +628,7 @@
         height: 100%;
       }
 
-      .data-overlay .data-list {
-        max-height: 82px;
-      }
+
 
       .event-bar {
         max-height: clamp(96px, 22vh, 164px);
@@ -648,9 +648,7 @@
         padding: 6px 7px;
       }
 
-      .data-overlay .data-list {
-        max-height: 68px;
-      }
+
 
       .event-bar {
         max-height: clamp(88px, 20vh, 136px);

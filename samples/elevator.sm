@@ -1,0 +1,121 @@
+machine Elevator
+
+# Persistent data
+number CurrentFloor = 1
+number TargetFloor = 1
+number TotalFloors = 10
+boolean Overloaded = false
+boolean EmergencyActive = false
+boolean MovingUp = true    # Direction of current or last trip
+
+# States
+state Idle initial         # At a floor, doors closed, no pending request
+state Moving               # Traveling toward TargetFloor
+state DoorsOpen            # Doors fully open, passengers boarding/alighting
+state EmergencyHalt        # Emergency stop; requires technician reset
+
+# User / hall-call button — accepted in Idle, Moving, and DoorsOpen
+event RequestFloor
+	number Floor
+
+# Sensor: cabin has reached TargetFloor (fired by position sensor)
+event FloorReached
+
+# Button: request doors to close (cabin button or automatic-timer expiry)
+event CloseDoors
+
+# Button: hold doors open (door-open button, obstruction sensor, or re-request)
+event HoldDoor
+
+# Weight sensor
+event DetectOverload
+
+event ClearOverload
+
+# Emergency stop — valid from any state
+event TriggerEmergency
+
+# Technician resets after emergency inspection
+event ResetEmergency
+
+# --- Idle ---
+# Accept a floor call and begin moving in the correct direction
+from Idle on RequestFloor
+	if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor > CurrentFloor
+		set TargetFloor = RequestFloor.Floor
+		set MovingUp = true
+		transition Moving
+	else if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor < CurrentFloor
+		set TargetFloor = RequestFloor.Floor
+		set MovingUp = false
+		transition Moving
+	else
+		reject "Floor must be between 1 and TotalFloors and different from the current floor"
+
+# --- Moving ---
+# Allow passengers to queue the next destination while en route
+from Moving on RequestFloor
+	if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor > CurrentFloor
+		set TargetFloor = RequestFloor.Floor
+		set MovingUp = true
+		no transition
+	else if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor < CurrentFloor
+		set TargetFloor = RequestFloor.Floor
+		set MovingUp = false
+		no transition
+	else
+		reject "Floor must be between 1 and TotalFloors and different from the current floor"
+
+# Position sensor fires when the cabin arrives at TargetFloor
+from Moving on FloorReached
+	set CurrentFloor = TargetFloor
+	transition DoorsOpen
+
+# --- DoorsOpen ---
+# Accept a new destination while waiting at a stop
+from DoorsOpen on RequestFloor
+	if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor > CurrentFloor
+		set TargetFloor = RequestFloor.Floor
+		set MovingUp = true
+		no transition
+	else if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor < CurrentFloor
+		set TargetFloor = RequestFloor.Floor
+		set MovingUp = false
+		no transition
+	else
+		reject "Floor must be between 1 and TotalFloors and different from the current floor"
+
+# Close doors: if a destination is pending, begin moving immediately; otherwise return to Idle
+from DoorsOpen on CloseDoors
+	if !Overloaded && TargetFloor > CurrentFloor
+		set MovingUp = true
+		transition Moving
+	else if !Overloaded && TargetFloor < CurrentFloor
+		set MovingUp = false
+		transition Moving
+	else if !Overloaded
+		transition Idle
+	else
+		reject "Cannot close doors while elevator is overloaded"
+
+# Hold button while doors are open — resets the close timer (no state change)
+from DoorsOpen on HoldDoor
+	no transition
+
+from DoorsOpen on DetectOverload
+	set Overloaded = true
+	no transition
+
+from DoorsOpen on ClearOverload
+	set Overloaded = false
+	no transition
+
+# --- Emergency (any state) ---
+from any on TriggerEmergency
+	set EmergencyActive = true
+	transition EmergencyHalt
+
+from EmergencyHalt on ResetEmergency
+	set EmergencyActive = false
+	set Overloaded = false
+	transition Idle

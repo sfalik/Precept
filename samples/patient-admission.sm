@@ -1,0 +1,85 @@
+machine PatientAdmission
+
+string? PatientName = null
+string? Ward = null
+boolean InsuranceVerified = false
+boolean ConsentSigned = false
+number DaysSinceAdmission = 0
+boolean ReadyForDischarge = false
+string? DischargeNotes = null
+
+state Registered initial
+state Triaged
+state Admitted
+state InTreatment
+state RecoveryMonitoring
+state DischargeReady
+state Discharged
+state Transferred
+
+event Triage
+	string PatientName
+	string Ward
+
+event VerifyInsurance
+
+event ObtainConsent
+
+event Admit
+
+event StartTreatment
+
+event UpdateProgress
+	boolean ReadyForDischarge
+
+event PrepareDischarge
+	string Notes
+
+event Discharge
+
+event Transfer
+	string FacilityName
+
+from Registered on Triage
+	set PatientName = Triage.PatientName
+	set Ward = Triage.Ward
+	transition Triaged
+
+from Triaged on VerifyInsurance
+	set InsuranceVerified = true
+	no transition
+
+from Triaged on ObtainConsent
+	set ConsentSigned = true
+	no transition
+
+from Triaged on Admit
+	if InsuranceVerified && ConsentSigned
+		transition Admitted
+	else
+		reject "Insurance must be verified and consent signed before admission"
+
+from Admitted on StartTreatment
+	transition InTreatment
+
+from InTreatment on UpdateProgress
+	if UpdateProgress.ReadyForDischarge
+		set ReadyForDischarge = true
+		transition RecoveryMonitoring
+	else
+		set DaysSinceAdmission = DaysSinceAdmission + 1
+		no transition
+
+from RecoveryMonitoring on PrepareDischarge
+	if DischargeNotes == null
+		set DischargeNotes = PrepareDischarge.Notes
+		transition DischargeReady
+	else
+		reject "Discharge notes already prepared"
+
+from DischargeReady on Discharge
+	transition Discharged
+
+from Admitted, InTreatment, RecoveryMonitoring on Transfer
+	set Ward = Transfer.FacilityName
+	transition Transferred

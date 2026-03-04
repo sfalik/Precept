@@ -1,0 +1,60 @@
+machine PackageDelivery
+
+string? CurrentLocation = null
+boolean RequiresSignature = false
+number DeliveryAttempts = 0
+string? FailureReason = null
+
+state Pending initial
+state PickedUp
+state InTransit
+state OutForDelivery
+state Delivered
+state DeliveryFailed
+state Returned
+
+event PickUp
+	string WarehouseLocation
+
+event TransferHub
+	string HubName
+
+event LoadForDelivery
+
+event AttemptDelivery
+	boolean RecipientPresent
+
+event MarkReturned
+	string Reason
+
+from Pending on PickUp
+	set CurrentLocation = PickUp.WarehouseLocation
+	transition PickedUp
+
+from PickedUp, InTransit on TransferHub
+	set CurrentLocation = TransferHub.HubName
+	transition InTransit
+
+from InTransit on LoadForDelivery
+	transition OutForDelivery
+
+from OutForDelivery on AttemptDelivery
+	if AttemptDelivery.RecipientPresent
+		set DeliveryAttempts = DeliveryAttempts + 1
+		transition Delivered
+	else if DeliveryAttempts < 2
+		set DeliveryAttempts = DeliveryAttempts + 1
+		transition OutForDelivery
+	else
+		set DeliveryAttempts = DeliveryAttempts + 1
+		transition DeliveryFailed
+
+from DeliveryFailed on LoadForDelivery
+	transition OutForDelivery
+
+from DeliveryFailed on MarkReturned
+	if MarkReturned.Reason != ""
+		set FailureReason = MarkReturned.Reason
+		transition Returned
+	else
+		reject "Return reason is required"

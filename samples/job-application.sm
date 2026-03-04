@@ -1,0 +1,89 @@
+machine JobApplication
+
+string? CandidateName = null
+number PhoneScore = 0
+number TechnicalScore = 0
+number OfferedSalary = 0
+boolean BackgroundCleared = false
+string? RejectionReason = null
+
+state Submitted initial
+state Screening
+state PhoneInterview
+state TechnicalInterview
+state OfferExtended
+state Hired
+state Rejected
+
+event StartScreening
+	string CandidateName
+
+event PassScreening
+
+event CompletePhone
+	number Score
+
+event CompleteTechnical
+	number Score
+
+event ExtendOffer
+	number Salary
+
+event ClearBackground
+
+event Accept
+
+event Decline
+
+event Reject
+	string Reason
+
+from Submitted on StartScreening
+	set CandidateName = StartScreening.CandidateName
+	transition Screening
+
+from Screening on PassScreening
+	transition PhoneInterview
+
+from Screening, PhoneInterview, TechnicalInterview on Reject
+	if Reject.Reason != ""
+		set RejectionReason = Reject.Reason
+		transition Rejected
+	else
+		reject "Rejection reason is required"
+
+from PhoneInterview on CompletePhone
+	if CompletePhone.Score >= 70
+		set PhoneScore = CompletePhone.Score
+		transition TechnicalInterview
+	else
+		set PhoneScore = CompletePhone.Score
+		transition Rejected
+
+from TechnicalInterview on CompleteTechnical
+	if CompleteTechnical.Score >= 75
+		set TechnicalScore = CompleteTechnical.Score
+		transition OfferExtended
+	else
+		set TechnicalScore = CompleteTechnical.Score
+		transition Rejected
+
+from OfferExtended on ExtendOffer
+	if ExtendOffer.Salary > 0
+		set OfferedSalary = ExtendOffer.Salary
+		no transition
+	else
+		reject "Offered salary must be greater than zero"
+
+from OfferExtended on ClearBackground
+	set BackgroundCleared = true
+	no transition
+
+from OfferExtended on Accept
+	if BackgroundCleared
+		transition Hired
+	else
+		reject "Background check must be cleared before accepting"
+
+from OfferExtended on Decline
+	transition Rejected

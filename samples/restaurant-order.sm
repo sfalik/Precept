@@ -1,0 +1,91 @@
+machine RestaurantOrder
+
+number TableNumber = 0
+number ItemCount = 0
+number Subtotal = 0
+boolean IsTakeout = false
+boolean PaymentReceived = false
+string? SpecialInstructions = null
+
+state Seated initial
+state Ordering
+state Submitted
+state Preparing
+state ReadyForService
+state Served
+state BillRequested
+state Paid
+state Completed
+
+event SeatGuests
+	number TableNumber
+	boolean IsTakeout = false
+
+event AddItem
+	number Price
+
+event AddSpecialInstructions
+	string Instructions
+
+event PlaceOrder
+
+event BeginPreparing
+
+event MarkReady
+
+event Serve
+
+event RequestBill
+
+event ProcessPayment
+	number Amount
+
+event Complete
+
+from Seated on SeatGuests
+	if SeatGuests.TableNumber > 0
+		set TableNumber = SeatGuests.TableNumber
+		set IsTakeout = SeatGuests.IsTakeout
+		transition Ordering
+	else
+		reject "A valid table number is required"
+
+from Ordering on AddItem
+	if AddItem.Price > 0
+		set ItemCount = ItemCount + 1
+		set Subtotal = Subtotal + AddItem.Price
+		no transition
+	else
+		reject "Item price must be greater than zero"
+
+from Ordering on AddSpecialInstructions
+	set SpecialInstructions = AddSpecialInstructions.Instructions
+	no transition
+
+from Ordering on PlaceOrder
+	if ItemCount > 0
+		transition Submitted
+	else
+		reject "Cannot place an empty order"
+
+from Submitted on BeginPreparing
+	transition Preparing
+
+from Preparing on MarkReady
+	transition ReadyForService
+
+from ReadyForService on Serve
+	transition Served
+
+from Served on RequestBill
+	transition BillRequested
+
+from BillRequested on ProcessPayment
+	if ProcessPayment.Amount >= Subtotal
+		set PaymentReceived = true
+		transition Paid
+	else
+		reject "Payment amount is less than the bill total"
+
+from Paid on Complete
+	transition Completed

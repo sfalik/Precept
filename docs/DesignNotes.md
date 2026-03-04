@@ -81,6 +81,10 @@ Decision: keeping fire-then-animate for now; revisit when preview UX stabilises.
 Canonical linear form:
 
 ```text
+# Full-line comment
+state Idle initial  # Inline comment — # outside a double-quoted string literal
+                    # starts a comment; everything from that # to end of line is ignored
+
 machine <Name>
 state <StateName> [initial]
 <StateDecl> := initial

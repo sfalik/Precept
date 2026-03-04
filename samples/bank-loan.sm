@@ -1,0 +1,96 @@
+machine BankLoan
+
+number RequestedAmount = 0
+number ApprovedAmount = 0
+number CreditScore = 0
+number RemainingBalance = 0
+number MissedPayments = 0
+boolean CollateralVerified = false
+string? OfficerName = null
+
+state Applied initial
+state UnderReview
+state Approved
+state Disbursed
+state Repaying
+state PaidOff
+state Defaulted
+state Rejected
+
+event Submit
+	number Amount
+	number CreditScore
+
+event AssignOfficer
+	string OfficerName
+
+event VerifyCollateral
+
+event Approve
+	number ApprovedAmount
+
+event Reject
+	string Reason
+
+event Disburse
+
+event MakePayment
+	number Amount
+
+event MissPayment
+
+from Applied on Submit
+	if Submit.Amount > 0 && Submit.CreditScore >= 300
+		set RequestedAmount = Submit.Amount
+		set CreditScore = Submit.CreditScore
+		transition UnderReview
+	else
+		reject "Amount must be positive and credit score must be at least 300"
+
+from UnderReview on AssignOfficer
+	set OfficerName = AssignOfficer.OfficerName
+	no transition
+
+from UnderReview on VerifyCollateral
+	set CollateralVerified = true
+	no transition
+
+from UnderReview on Approve
+	if Approve.ApprovedAmount > 0 && Approve.ApprovedAmount <= RequestedAmount
+		set ApprovedAmount = Approve.ApprovedAmount
+		set RemainingBalance = Approve.ApprovedAmount
+		transition Approved
+	else
+		reject "Approved amount must be positive and not exceed requested amount"
+
+from UnderReview on Reject
+	transition Rejected
+
+from Approved on Disburse
+	if CollateralVerified || CreditScore >= 700
+		transition Disbursed
+	else
+		reject "Collateral must be verified or credit score must be at least 700 to disburse"
+
+from Disbursed on MakePayment
+	if RemainingBalance > 0
+		set RemainingBalance = RemainingBalance - MakePayment.Amount
+		transition Repaying
+	else
+		reject "No remaining balance"
+
+from Repaying on MakePayment
+	if MakePayment.Amount >= RemainingBalance
+		set RemainingBalance = 0
+		transition PaidOff
+	else
+		set RemainingBalance = RemainingBalance - MakePayment.Amount
+		no transition
+
+from Repaying on MissPayment
+	if MissedPayments >= 2
+		set MissedPayments = MissedPayments + 1
+		transition Defaulted
+	else
+		set MissedPayments = MissedPayments + 1
+		no transition

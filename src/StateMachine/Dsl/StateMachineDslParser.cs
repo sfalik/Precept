@@ -56,7 +56,7 @@ public static class StateMachineDslParser
         while (i < lines.Length)
         {
             var raw = lines[i];
-            string line = raw.Trim();
+            string line = StripInlineComment(raw.Trim());
             if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
             {
                 i++;
@@ -199,7 +199,7 @@ public static class StateMachineDslParser
         while (index < lines.Length)
         {
             var raw = lines[index];
-            var line = raw.Trim();
+            var line = StripInlineComment(raw.Trim());
             if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
             {
                 index++;
@@ -270,7 +270,7 @@ public static class StateMachineDslParser
         while (index < lines.Length)
         {
             var raw = lines[index];
-            var line = raw.Trim();
+            var line = StripInlineComment(raw.Trim());
             if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
             {
                 index++;
@@ -453,7 +453,7 @@ public static class StateMachineDslParser
         while (index < lines.Length)
         {
             var nestedRaw = lines[index];
-            var nestedLine = nestedRaw.Trim();
+            var nestedLine = StripInlineComment(nestedRaw.Trim());
             if (string.IsNullOrWhiteSpace(nestedLine) || nestedLine.StartsWith("#", StringComparison.Ordinal))
             {
                 index++;
@@ -545,7 +545,7 @@ public static class StateMachineDslParser
         while (index < lines.Length)
         {
             var nestedRaw = lines[index];
-            var nestedLine = nestedRaw.Trim();
+            var nestedLine = StripInlineComment(nestedRaw.Trim());
             if (string.IsNullOrWhiteSpace(nestedLine) || nestedLine.StartsWith("#", StringComparison.Ordinal))
             {
                 index++;
@@ -722,6 +722,26 @@ public static class StateMachineDslParser
 
     private static string NormalizeDataAssignmentKey(string setKey)
         => setKey;
+
+    /// <summary>
+    /// Strips an inline comment from an already-trimmed line.
+    /// A <c>#</c> character outside a double-quoted string starts a comment;
+    /// everything from that point to the end of the line is discarded.
+    /// The result is right-trimmed so trailing whitespace before the <c>#</c> is removed.
+    /// </summary>
+    private static string StripInlineComment(string line)
+    {
+        bool inString = false;
+        for (int ci = 0; ci < line.Length; ci++)
+        {
+            char c = line[ci];
+            if (c == '"')
+                inString = !inString;
+            else if (c == '#' && !inString)
+                return line.Substring(0, ci).TrimEnd();
+        }
+        return line;
+    }
 
     private static DslSetAssignment ParseSetAssignment(Match setMatch, int lineNumber)
     {

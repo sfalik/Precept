@@ -1,0 +1,83 @@
+machine VendingMachine
+
+number CreditCents = 0
+number SelectedItemPrice = 0
+string? SelectedItem = null
+boolean MaintenanceMode = false
+
+state Idle initial
+state HasCredit
+state ItemSelected
+state Dispensing
+state ChangeDue
+state OutOfOrder
+
+event InsertCoin
+	number Cents
+
+event SelectItem
+	string Name
+	number PriceCents
+
+event ConfirmPurchase
+
+event DispenseComplete
+
+event ReturnCredit
+
+event EnterMaintenance
+
+event ExitMaintenance
+
+from Idle, HasCredit on InsertCoin
+	if InsertCoin.Cents > 0
+		set CreditCents = CreditCents + InsertCoin.Cents
+		transition HasCredit
+	else
+		reject "Coin value must be positive"
+
+from HasCredit on SelectItem
+	if SelectItem.PriceCents <= CreditCents
+		set SelectedItem = SelectItem.Name
+		set SelectedItemPrice = SelectItem.PriceCents
+		transition ItemSelected
+	else
+		reject "Insufficient credit for selected item"
+
+from ItemSelected on InsertCoin
+	set CreditCents = CreditCents + InsertCoin.Cents
+	no transition
+
+from ItemSelected on ConfirmPurchase
+	set CreditCents = CreditCents - SelectedItemPrice
+	transition Dispensing
+
+from Dispensing on DispenseComplete
+	if CreditCents > 0
+		transition ChangeDue
+	else
+		set SelectedItem = null
+		set SelectedItemPrice = 0
+		transition Idle
+
+from ChangeDue on ReturnCredit
+	set CreditCents = 0
+	set SelectedItem = null
+	set SelectedItemPrice = 0
+	transition Idle
+
+from HasCredit, ItemSelected on ReturnCredit
+	set CreditCents = 0
+	set SelectedItem = null
+	set SelectedItemPrice = 0
+	transition Idle
+
+from any on EnterMaintenance
+	set MaintenanceMode = true
+	transition OutOfOrder
+
+from OutOfOrder on ExitMaintenance
+	set MaintenanceMode = false
+	set CreditCents = 0
+	set SelectedItem = null
+	transition Idle

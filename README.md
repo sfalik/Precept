@@ -108,9 +108,37 @@ from FlashingRed on ClearEmergency
 
 The full file (with block comments) is at [`samples/trafficlight.sm`](samples/trafficlight.sm).
 
+## Samples
+
+Ready-to-use `.sm` files covering a range of domains and DSL features.
+
+| File | Scenario | Key Features |
+|---|---|---|
+| [`samples/test.sm`](samples/test.sm) | Minimal linear chain (Start → One → Two → Three → Four → End) | Basic state/event/transition skeleton; good starting template |
+| [`samples/trafficlight.sm`](samples/trafficlight.sm) | Traffic-light controller with emergency flashing mode | `from any`, data fields, nullable string, `set`, `no transition`, complex guards |
+| [`samples/ecommerce.sm`](samples/ecommerce.sm) | E-commerce order lifecycle (cart → checkout → paid → shipped) | Math expressions (`Quantity * Price`), comma-separated `from`, combined guards |
+| [`samples/bugtracker.sm`](samples/bugtracker.sm) | Bug/issue tracker (triage → in-progress → review → resolved → closed) | `from any` intercept, `!IsBlocked` guard, prerequisite-flag guards |
+| [`samples/smarthome.sm`](samples/smarthome.sm) | Home security system (disarmed → arming delay → armed away/stay → triggered) | Boolean data fields with defaults, PIN validation, `from any on Disarm` |
+| [`samples/hotel-booking.sm`](samples/hotel-booking.sm) | Hotel reservation lifecycle (available → reserved → checked-in → checked-out) | `Nights * Rate` revenue calculation, idempotent `no transition` guard |
+| [`samples/package-delivery.sm`](samples/package-delivery.sm) | Parcel delivery with re-delivery and return flow | `if / else if / else` on attempt count, numeric thresholds |
+| [`samples/job-application.sm`](samples/job-application.sm) | Hiring pipeline (submitted → screening → phone → technical → offer → hired) | Score-threshold routing, multi-branch pass/fail `if / else` |
+| [`samples/bank-loan.sm`](samples/bank-loan.sm) | Loan origination and repayment lifecycle | Running-balance arithmetic, `||` guard, missed-payment default path |
+| [`samples/subscription.sm`](samples/subscription.sm) | SaaS subscription billing (free → trial → active → past-due → suspended → cancelled) | `from any on ToggleAutoRenew`, multi-state billing guard |
+| [`samples/patient-admission.sm`](samples/patient-admission.sm) | Hospital patient flow (registered → triaged → admitted → treatment → discharge → transferred) | Multiple boolean prerequisite flags, `from any on EmergencyTransfer` |
+| [`samples/restaurant-order.sm`](samples/restaurant-order.sm) | Restaurant table order (seated → ordering → kitchen → served → bill → paid) | Item/total accumulation, payment-amount validation |
+| [`samples/support-ticket.sm`](samples/support-ticket.sm) | Customer support ticket with escalation and reopen | `from any on CustomerReply`, reopen counter, escalation composite guard |
+| [`samples/document-signing.sm`](samples/document-signing.sm) | Multi-party document signing workflow | Signature counter driving transitions, one-time expiry extension flag |
+| [`samples/vending-machine.sm`](samples/vending-machine.sm) | Coin-operated vending machine | Credit accumulation, item-price guard, `from any on EnterMaintenance` |
+| [`samples/elevator.sm`](samples/elevator.sm) | Elevator controller with door lifecycle and emergency halt | Sensor events (`DoorOpened`, `DoorClosed`, `FloorReached`) vs user events (`HoldDoor`, `CloseDoors`), overload reopening doors mid-close, `from any on TriggerEmergency` |
+| [`samples/game-character.sm`](samples/game-character.sm) | RPG character states (alive → stunned/shielded/leveling → dead → respawning) | Shield blocking, XP threshold, nullable `string?` status message, respawn probability |
+
 ## DSL Syntax Reference
 
 ```text
+# Full-line comment
+state Idle initial  # Inline comment — # outside a string literal starts a comment;
+                    # everything from that # to end of line is ignored
+
 machine <Name>
 
 state <StateName> [initial]

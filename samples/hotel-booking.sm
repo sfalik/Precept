@@ -1,0 +1,59 @@
+machine HotelBooking
+
+string? GuestName = null
+number NightsBooked = 0
+number RatePerNight = 0
+number TotalCharge = 0
+boolean IsLateCheckout = false
+string? CancellationReason = null
+
+state Available initial
+state Reserved
+state CheckedIn
+state CheckedOut
+state Cancelled
+
+event Reserve
+	string GuestName
+	number Nights
+	number RatePerNight
+
+event CheckIn
+
+event RequestLateCheckout
+
+event CheckOut
+
+event Cancel
+	string Reason
+
+from Available on Reserve
+	if Reserve.Nights > 0 && Reserve.RatePerNight > 0
+		set GuestName = Reserve.GuestName
+		set NightsBooked = Reserve.Nights
+		set RatePerNight = Reserve.RatePerNight
+		set TotalCharge = Reserve.Nights * Reserve.RatePerNight
+		transition Reserved
+	else
+		reject "Nights and rate must be greater than zero"
+
+from Reserved on CheckIn
+	transition CheckedIn
+
+from CheckedIn on RequestLateCheckout
+	if IsLateCheckout
+		no transition
+	else
+		set IsLateCheckout = true
+		set TotalCharge = TotalCharge + RatePerNight
+		no transition
+
+from CheckedIn on CheckOut
+	transition CheckedOut
+
+from Reserved, CheckedIn on Cancel
+	if Cancel.Reason != ""
+		set CancellationReason = Cancel.Reason
+		transition Cancelled
+	else
+		reject "Cancellation reason is required"

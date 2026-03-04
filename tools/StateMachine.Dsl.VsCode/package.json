@@ -40,7 +40,7 @@
     "commands": [
       {
         "command": "stateMachineDsl.openInspectorPreview",
-        "title": "Open Preview (Ctrl+Shift+V)",
+        "title": "Open Preview",
         "icon": "$(open-preview)"
       }
     ],

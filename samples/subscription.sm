@@ -1,0 +1,99 @@
+machine Subscription
+
+string? PlanName = null
+number MonthlyPrice = 0
+number BillingCycleDay = 1
+boolean AutoRenew = true
+number FailedPayments = 0
+string? CancellationReason = null
+
+state Free initial
+state TrialActive
+state Active
+state PastDue
+state Suspended
+state Cancelled
+
+event StartTrial
+	string PlanName
+	number MonthlyPrice
+
+event Upgrade
+	string PlanName
+	number MonthlyPrice
+
+event BillSucceeded
+
+event BillFailed
+
+event PayOutstanding
+
+event ToggleAutoRenew
+
+event Cancel
+	string Reason
+
+event Reactivate
+	string PlanName
+	number MonthlyPrice
+
+from Free on StartTrial
+	if StartTrial.MonthlyPrice > 0
+		set PlanName = StartTrial.PlanName
+		set MonthlyPrice = StartTrial.MonthlyPrice
+		set FailedPayments = 0
+		transition TrialActive
+	else
+		reject "Plan requires a valid monthly price"
+
+from Free, TrialActive on Upgrade
+	if Upgrade.MonthlyPrice > 0
+		set PlanName = Upgrade.PlanName
+		set MonthlyPrice = Upgrade.MonthlyPrice
+		transition Active
+	else
+		reject "Monthly price must be greater than zero"
+
+from any on ToggleAutoRenew
+	set AutoRenew = !AutoRenew
+	no transition
+
+from TrialActive, Active on BillSucceeded
+	set FailedPayments = 0
+	transition Active
+
+from TrialActive, Active on BillFailed
+	if FailedPayments >= 2
+		set FailedPayments = FailedPayments + 1
+		transition Suspended
+	else
+		set FailedPayments = FailedPayments + 1
+		transition PastDue
+
+from PastDue on BillSucceeded
+	set FailedPayments = 0
+	transition Active
+
+from PastDue on BillFailed
+	set FailedPayments = FailedPayments + 1
+	transition Suspended
+
+from PastDue on PayOutstanding
+	set FailedPayments = 0
+	transition Active
+
+from Active, PastDue, TrialActive on Cancel
+	if Cancel.Reason != ""
+		set CancellationReason = Cancel.Reason
+		transition Cancelled
+	else
+		reject "Cancellation reason is required"
+
+from Suspended on Reactivate
+	if Reactivate.MonthlyPrice > 0
+		set PlanName = Reactivate.PlanName
+		set MonthlyPrice = Reactivate.MonthlyPrice
+		set FailedPayments = 0
+		transition Active
+	else
+		reject "Monthly price must be greater than zero"

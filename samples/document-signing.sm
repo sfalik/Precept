@@ -1,0 +1,90 @@
+machine DocumentSigning
+
+string? DocumentTitle = null
+number SignaturesRequired = 0
+number SignaturesCollected = 0
+boolean LegalReviewPassed = false
+boolean ExpiryExtended = false
+string? VoidReason = null
+
+state Draft initial
+state AwaitingLegalReview
+state AwaitingSignatures
+state PartialSigned
+state FullySigned
+state Executed
+state Expired
+state Voided
+
+event SubmitForReview
+	string DocumentTitle
+	number SignaturesRequired
+
+event ApproveLegalReview
+
+event RejectLegalReview
+	string Reason
+
+event SendForSigning
+
+event RecordSignature
+
+event ExpireDocument
+
+event ExtendExpiry
+
+event Execute
+
+event Void
+	string Reason
+
+from Draft on SubmitForReview
+	if SubmitForReview.SignaturesRequired > 0 && SubmitForReview.DocumentTitle != ""
+		set DocumentTitle = SubmitForReview.DocumentTitle
+		set SignaturesRequired = SubmitForReview.SignaturesRequired
+		transition AwaitingLegalReview
+	else
+		reject "Document title and at least one required signature must be provided"
+
+from AwaitingLegalReview on ApproveLegalReview
+	set LegalReviewPassed = true
+	transition AwaitingSignatures
+
+from AwaitingLegalReview on RejectLegalReview
+	transition Draft
+
+from AwaitingSignatures on RecordSignature
+	if SignaturesCollected + 1 >= SignaturesRequired
+		set SignaturesCollected = SignaturesCollected + 1
+		transition FullySigned
+	else
+		set SignaturesCollected = SignaturesCollected + 1
+		transition PartialSigned
+
+from PartialSigned on RecordSignature
+	if SignaturesCollected + 1 >= SignaturesRequired
+		set SignaturesCollected = SignaturesCollected + 1
+		transition FullySigned
+	else
+		set SignaturesCollected = SignaturesCollected + 1
+		no transition
+
+from AwaitingSignatures, PartialSigned on ExpireDocument
+	transition Expired
+
+from Expired on ExtendExpiry
+	if !ExpiryExtended
+		set ExpiryExtended = true
+		transition AwaitingSignatures
+	else
+		reject "Expiry can only be extended once"
+
+from FullySigned on Execute
+	transition Executed
+
+from Draft, AwaitingLegalReview, AwaitingSignatures, PartialSigned on Void
+	if Void.Reason != ""
+		set VoidReason = Void.Reason
+		transition Voided
+	else
+		reject "A void reason is required"
