@@ -333,3 +333,31 @@ The rule model enables language-server analysis that can be explored in future w
 - **Detect contradictory rules** on the same scope (e.g., `rule X > 100` + `rule X < 0` on the same field). Simple single-variable bound contradictions are tractable; compound expression contradiction detection is not worth pursuing initially.
 
 These are tooling enhancements, not runtime behavior, and do not need to be designed or implemented with the initial rule system.
+
+## Implementation Prompt
+
+The following prompt can be pasted into a new session to implement the rules feature:
+
+---
+
+Implement the rules feature for the state machine DSL as specified in docs/RulesDesign.md. This is a full-stack implementation across parser, model, compiler, runtime, language server, and documentation. Read docs/RulesDesign.md thoroughly before starting — it is the complete design spec.
+
+Summary of what rules are: declarative boolean constraints using the keyword "rule" with syntax "rule BooleanExpr ReasonString". They use the existing expression grammar (same operators, same evaluator as guards and set expressions). They protect data integrity so authors declare constraints once rather than repeating guards in every transition.
+
+There are four rule positions. Field rules are indented under a scalar or collection field declaration, may only reference the declaring field, its dotted properties, and literal constants, and are checked after fire commits all sets. Top-level rules are unindented statements placed after all referenced fields are declared, see all instance data fields declared above, and are checked after fire commits all sets. State rules are indented under a state declaration, see all instance data fields, and are checked on entry to the state including self-transitions but not on no-transition. Event rules are indented under an event declaration, see event arguments only (not instance data), and are checked before guard evaluation.
+
+The evaluation pipeline order is: event rules, then guard evaluation, then set execution, then field and top-level rules, then state rules. If any rules fail at their respective stage, the outcome is Blocked with all violated rule reasons collected in the Reasons list. Field/top-level rule and state rule violations cause atomic rollback of all set mutations, consistent with existing batch semantics.
+
+Key constraints to implement. Field rule scope restriction: parser rejects field rules that reference any identifier other than the declaring field, its properties, or literals. Event rule scope restriction: parser rejects event rules that reference instance data fields. Top-level rules enforce no forward references (same validation as from-on blocks). State rules fire on entry only — no-transition does not trigger them, but self-transitions do. Null handling inherits the general strict null model — nullable in a rule without explicit null check is a compile-time error. Multiple violations are collected into the Reasons list, not short-circuited. Outcome kind is Blocked, no new outcome kind.
+
+Compile-time checks to implement. Validate field rules and top-level rules against field default values at compile time. Validate initial state entry rules against default data at compile time. Validate event rules against event argument defaults at compile time. Validate collection rules against known empty initial state (count is 0, contains is false) at compile time. Validate literal set assignment RHS values against field and top-level rules at compile time. Warn when a state has entry rules but no transition in the machine targets it. Hint when a rule expression is tautological (constant-foldable to true).
+
+Inspect semantics: event rules are checked during inspect. If inspect simulates set assignments on scratch data, field/top-level/state rules should be checked against the simulated result for full preview.
+
+Implementation layers. Model: add a DslRule record to StateMachineDslModel.cs to hold expression, reason string, source line, and position metadata. Extend DslMachine, DslFieldContract, DslCollectionFieldContract, DslEvent, and state declarations to carry rule lists. Parser: extend StateMachineDslParser.cs to parse "rule Expr Reason" lines in all four positions (field-indented, top-level, state-indented, event-indented). Enforce scope restrictions at parse time. Compiler: extend DslWorkflowCompiler to store rules on the compiled DslWorkflowDefinition. Implement all compile-time validations (defaults, collection empty state, event arg defaults, literal set assignments, untargeted states, tautologies). Runtime: extend DslWorkflowDefinition.Fire and DslWorkflowDefinition.Inspect to evaluate rules at the correct pipeline stages. Implement atomic rollback on rule violation. Language server: extend SmDslAnalyzer to validate rule expressions with correct scope and null checking. Add completions and semantic tokens for rule keyword and expressions.
+
+Tests: add comprehensive tests covering each rule position, scope restrictions, compile-time validations, runtime fire behavior with rule violations, inspect behavior with rules, null handling in rules, collection rules, self-transition state rule triggering, no-transition not triggering state rules, multiple violation collection, and from-any with state rules.
+
+Documentation: update docs/DesignNotes.md DSL Syntax Contract section to include rule syntax. Update README.md DSL Syntax Reference, DSL Cookbook, and Status sections. Update docs/RulesDesign.md status from design phase to implemented.
+
+Build with dotnet build from repo root. Run tests in test/StateMachine.Tests/ and test/StateMachine.Dsl.LanguageServer.Tests/. Make sure all existing tests still pass.
