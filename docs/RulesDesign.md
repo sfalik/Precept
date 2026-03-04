@@ -187,6 +187,68 @@ state Paid initial
 
 Caller-supplied overrides at `CreateInstance` are validated at runtime.
 
+### Compile-time validation of event argument defaults
+
+Event arguments may declare literal defaults. If an event has rules, the compiler evaluates those rules against the default values for any defaulted arguments:
+
+```text
+event Submit
+  number Priority = 0
+  rule Priority > 0 "Priority must be positive"
+# Compile error: default value 0 violates event rule
+```
+
+Non-defaulted required arguments cannot be checked at compile time (their values are not known until fire-time).
+
+### Compile-time validation of collection rules at creation
+
+Collections always start empty (locked design decision). The compiler knows `.count` is 0 and `contains X` is false for any X at creation. Collection rules are evaluated against this known initial state:
+
+```text
+set<string> Approvers
+  rule Approvers.count >= 1 "Need at least one approver"
+# Compile error: collection starts empty, rule is violated at creation
+```
+
+### Compile-time validation of literal set assignments
+
+When a `set` assignment's right-hand side is a literal, the compiler can check whether the resulting value would violate any field rule or top-level rule:
+
+```text
+number Balance = 100
+  rule Balance >= 0 "Must be non-negative"
+
+from Active on Reset
+  set Balance = -1
+  transition Active
+# Compile error: literal -1 violates rule "Must be non-negative" on Balance
+```
+
+This applies only to literal RHS values — expressions like `set Balance = Balance - Amount` cannot be statically resolved. But literal assignments (`set X = 0`, `set X = null`, `set X = ""`) are common enough that catching violations at compile time is valuable.
+
+### Compile-time detection of untargeted states with entry rules
+
+If a state has entry rules but no `transition` in the entire machine targets it, the rules are dead code. The compiler emits a warning:
+
+```text
+state Completed
+  rule AmountPaid == TotalDue "Must be fully paid"
+# Warning: no transition targets Completed — entry rules are never checked
+```
+
+This is a warning, not an error — the state might be targeted in a future edit.
+
+### Compile-time detection of tautological rules
+
+A rule expression that is trivially always true provides no protection. The compiler emits a hint when a rule is constant-foldable to `true`:
+
+```text
+boolean IsActive = true
+  rule IsActive == true || IsActive == false "..."   # Always true — hint
+```
+
+The existing expression evaluator can detect these via constant folding over literal-only expressions.
+
 ### Rules do not have access to current state
 
 Rule expressions cannot reference the current state of the machine. State-awareness is expressed through state rule *attachment* (indenting under a state declaration), not through a variable or identifier.
@@ -268,5 +330,6 @@ The rule model enables language-server analysis that can be explored in future w
 - **Warn** when a transition targets a state whose entry rules cannot possibly be satisfied by the transition's `set` assignments
 - **Warn** when a `set` assignment can provably violate a field rule or top-level rule
 - **Hint** when a guard already covers what a rule would catch (redundant but harmless)
+- **Detect contradictory rules** on the same scope (e.g., `rule X > 100` + `rule X < 0` on the same field). Simple single-variable bound contradictions are tractable; compound expression contradiction detection is not worth pursuing initially.
 
 These are tooling enhancements, not runtime behavior, and do not need to be designed or implemented with the initial rule system.
