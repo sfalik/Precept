@@ -323,6 +323,19 @@ The language server catches nullable-without-narrowing errors at **compile time*
 
 The DSL already pushes authors toward non-nullable fields with defaults. For fields that genuinely need to be nullable, the `== null ||` pattern in rules is the correct and only way to express "null is acceptable." This is intentional — the author must decide whether null is a valid state for the constraint.
 
+### Error reporting: line numbers and precise spans
+
+Every diagnostic produced by the parser, compiler, or language server for a rule violation must include:
+
+- The **1-based source line number** of the `rule` statement.
+- A **character-precise range** (start column, end column) so the editor renders squigglies under the specific offending token or sub-expression — not the entire line.
+
+For scope violations (e.g., a field rule referencing another field), the squiggly must underline the **offending identifier**, not the whole rule line. For nullable-without-narrowing errors, the squiggly must underline the **nullable identifier** at the expression site where it is used unsafely. For compile-time default-value violations, the squiggly must underline the **rule keyword or expression** on the rule's source line.
+
+The `DslRule` model record must store enough position metadata (line number, expression start/end columns, reason string start/end columns) to support precise span reporting. The parser must capture these spans during tokenisation of the `rule` line.
+
+This is consistent with how existing diagnostics work for guards, `set` expressions, and other DSL constructs — every error should point the author to the exact location, never just a line.
+
 ## Future: Static Analysis Opportunities
 
 The rule model enables language-server analysis that can be explored in future work:
@@ -354,7 +367,7 @@ Compile-time checks to implement. Validate field rules and top-level rules again
 
 Inspect semantics: event rules are checked during inspect. If inspect simulates set assignments on scratch data, field/top-level/state rules should be checked against the simulated result for full preview.
 
-Implementation layers. Model: add a DslRule record to StateMachineDslModel.cs to hold expression, reason string, source line, and position metadata. Extend DslMachine, DslFieldContract, DslCollectionFieldContract, DslEvent, and state declarations to carry rule lists. Parser: extend StateMachineDslParser.cs to parse "rule Expr Reason" lines in all four positions (field-indented, top-level, state-indented, event-indented). Enforce scope restrictions at parse time. Compiler: extend DslWorkflowCompiler to store rules on the compiled DslWorkflowDefinition. Implement all compile-time validations (defaults, collection empty state, event arg defaults, literal set assignments, untargeted states, tautologies). Runtime: extend DslWorkflowDefinition.Fire and DslWorkflowDefinition.Inspect to evaluate rules at the correct pipeline stages. Implement atomic rollback on rule violation. Language server: extend SmDslAnalyzer to validate rule expressions with correct scope and null checking. Add completions and semantic tokens for rule keyword and expressions.
+Implementation layers. Model: add a DslRule record to StateMachineDslModel.cs to hold expression, reason string, source line, and position metadata (expression start/end columns, reason start/end columns) sufficient for precise diagnostic spans. Extend DslMachine, DslFieldContract, DslCollectionFieldContract, DslEvent, and state declarations to carry rule lists. Parser: extend StateMachineDslParser.cs to parse "rule Expr Reason" lines in all four positions (field-indented, top-level, state-indented, event-indented). Capture character-precise column spans for the expression and reason string during tokenisation. Enforce scope restrictions at parse time. Compiler: extend DslWorkflowCompiler to store rules on the compiled DslWorkflowDefinition. Implement all compile-time validations (defaults, collection empty state, event arg defaults, literal set assignments, untargeted states, tautologies). Runtime: extend DslWorkflowDefinition.Fire and DslWorkflowDefinition.Inspect to evaluate rules at the correct pipeline stages. Implement atomic rollback on rule violation. Language server: extend SmDslAnalyzer to validate rule expressions with correct scope and null checking. All diagnostics must report line numbers and character-precise ranges so the editor renders squigglies on the exact offending token or sub-expression, not the whole line. Add completions and semantic tokens for rule keyword and expressions.
 
 Tests: add comprehensive tests covering each rule position, scope restrictions, compile-time validations, runtime fire behavior with rule violations, inspect behavior with rules, null handling in rules, collection rules, self-transition state rule triggering, no-transition not triggering state rules, multiple violation collection, and from-any with state rules.
 
