@@ -74,7 +74,7 @@ internal static class DslExpressionParser
         private DslExpression ParseComparison()
         {
             var left = ParseTerm();
-            while (Match(TokenKind.Greater) || Match(TokenKind.GreaterEqual) || Match(TokenKind.Less) || Match(TokenKind.LessEqual))
+            while (Match(TokenKind.Greater) || Match(TokenKind.GreaterEqual) || Match(TokenKind.Less) || Match(TokenKind.LessEqual) || Match(TokenKind.Contains))
             {
                 var op = Previous().Text;
                 var right = ParseTerm();
@@ -152,7 +152,11 @@ internal static class DslExpressionParser
                     if (!Match(TokenKind.Identifier))
                         throw Error("expected identifier after '.'.");
 
-                    return new DslIdentifierExpression(identifier, Previous().Text);
+                    var member = Previous().Text;
+
+                    // Support chained dot access for collection properties like CollectionField.count
+                    // The first identifier.member is treated as a DslIdentifierExpression
+                    return new DslIdentifierExpression(identifier, member);
                 }
 
                 return new DslIdentifierExpression(identifier);
@@ -355,6 +359,7 @@ internal static class DslExpressionParser
                 "true" => TokenKind.True,
                 "false" => TokenKind.False,
                 "null" => TokenKind.Null,
+                "contains" => TokenKind.Contains,
                 _ => TokenKind.Identifier
             };
 
@@ -379,6 +384,7 @@ internal static class DslExpressionParser
         True,
         False,
         Null,
+        Contains,
         LeftParen,
         RightParen,
         Dot,

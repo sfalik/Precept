@@ -8,6 +8,9 @@ boolean Overloaded = false
 boolean EmergencyActive = false
 boolean MovingUp = true    # Direction of current or last trip
 
+# Collection: floors with pending requests (sorted, deduplicated)
+set<number> PendingFloors
+
 # States
 state Idle initial         # At a floor, doors closed, no pending request
 state Moving               # Traveling toward TargetFloor
@@ -39,13 +42,15 @@ event TriggerEmergency
 event ResetEmergency
 
 # --- Idle ---
-# Accept a floor call and begin moving in the correct direction
+# Accept a floor call, add to pending set, then begin moving
 from Idle on RequestFloor
 	if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor > CurrentFloor
+		add PendingFloors RequestFloor.Floor
 		set TargetFloor = RequestFloor.Floor
 		set MovingUp = true
 		transition Moving
 	else if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor < CurrentFloor
+		add PendingFloors RequestFloor.Floor
 		set TargetFloor = RequestFloor.Floor
 		set MovingUp = false
 		transition Moving
@@ -53,15 +58,10 @@ from Idle on RequestFloor
 		reject "Floor must be between 1 and TotalFloors and different from the current floor"
 
 # --- Moving ---
-# Allow passengers to queue the next destination while en route
+# Queue additional destinations into the pending set while en route
 from Moving on RequestFloor
-	if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor > CurrentFloor
-		set TargetFloor = RequestFloor.Floor
-		set MovingUp = true
-		no transition
-	else if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor < CurrentFloor
-		set TargetFloor = RequestFloor.Floor
-		set MovingUp = false
+	if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor != CurrentFloor
+		add PendingFloors RequestFloor.Floor
 		no transition
 	else
 		reject "Floor must be between 1 and TotalFloors and different from the current floor"
@@ -69,31 +69,27 @@ from Moving on RequestFloor
 # Position sensor fires when the cabin arrives at TargetFloor
 from Moving on FloorReached
 	set CurrentFloor = TargetFloor
+	remove PendingFloors TargetFloor
 	transition DoorsOpen
 
 # --- DoorsOpen ---
 # Accept a new destination while waiting at a stop
 from DoorsOpen on RequestFloor
-	if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor > CurrentFloor
-		set TargetFloor = RequestFloor.Floor
-		set MovingUp = true
-		no transition
-	else if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor < CurrentFloor
-		set TargetFloor = RequestFloor.Floor
-		set MovingUp = false
+	if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors && RequestFloor.Floor != CurrentFloor
+		add PendingFloors RequestFloor.Floor
 		no transition
 	else
 		reject "Floor must be between 1 and TotalFloors and different from the current floor"
 
-# Close doors: if a destination is pending, begin moving immediately; otherwise return to Idle
+# Close doors: if pending floors remain, pick nearest in current direction; otherwise Idle
 from DoorsOpen on CloseDoors
-	if !Overloaded && TargetFloor > CurrentFloor
-		set MovingUp = true
+	if !Overloaded && PendingFloors.count > 0 && MovingUp
+		set TargetFloor = PendingFloors.min
 		transition Moving
-	else if !Overloaded && TargetFloor < CurrentFloor
-		set MovingUp = false
+	else if !Overloaded && PendingFloors.count > 0 && !MovingUp
+		set TargetFloor = PendingFloors.max
 		transition Moving
-	else if !Overloaded
+	else if !Overloaded && PendingFloors.count == 0
 		transition Idle
 	else
 		reject "Cannot close doors while elevator is overloaded"
@@ -118,4 +114,5 @@ from any on TriggerEmergency
 from EmergencyHalt on ResetEmergency
 	set EmergencyActive = false
 	set Overloaded = false
+	clear PendingFloors
 	transition Idle

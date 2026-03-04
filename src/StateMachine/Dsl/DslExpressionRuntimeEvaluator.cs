@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace StateMachine.Dsl;
 
@@ -26,6 +27,35 @@ internal static class DslExpressionRuntimeEvaluator
 
     private static EvaluationResult EvaluateIdentifier(DslIdentifierExpression identifier, IReadOnlyDictionary<string, object?> context)
     {
+        // Handle collection property access: Collection.count, Collection.min, Collection.max, Collection.peek
+        if (identifier.Member is not null)
+        {
+            var collectionKey = $"__collection__{identifier.Name}";
+            if (context.TryGetValue(collectionKey, out var collectionObj) && collectionObj is CollectionValue collection)
+            {
+                return identifier.Member switch
+                {
+                    "count" => EvaluationResult.Ok((double)collection.Count),
+                    "min" => collection.Kind == DslCollectionKind.Set
+                        ? (collection.Count > 0
+                            ? EvaluationResult.Ok(collection.Min()!)
+                            : EvaluationResult.Fail($"'{identifier.Name}.min' failed: set is empty."))
+                        : EvaluationResult.Fail($"'{identifier.Name}.min' is only valid on set<T> fields."),
+                    "max" => collection.Kind == DslCollectionKind.Set
+                        ? (collection.Count > 0
+                            ? EvaluationResult.Ok(collection.Max()!)
+                            : EvaluationResult.Fail($"'{identifier.Name}.max' failed: set is empty."))
+                        : EvaluationResult.Fail($"'{identifier.Name}.max' is only valid on set<T> fields."),
+                    "peek" => collection.Kind is DslCollectionKind.Queue or DslCollectionKind.Stack
+                        ? (collection.Count > 0
+                            ? EvaluationResult.Ok(collection.Peek()!)
+                            : EvaluationResult.Fail($"'{identifier.Name}.peek' failed: collection is empty."))
+                        : EvaluationResult.Fail($"'{identifier.Name}.peek' is only valid on queue<T> or stack<T> fields."),
+                    _ => EvaluationResult.Fail($"unknown collection property '{identifier.Member}'.")
+                };
+            }
+        }
+
         var key = identifier.Member is null ? identifier.Name : $"{identifier.Name}.{identifier.Member}";
         if (!context.TryGetValue(key, out var value))
             return EvaluationResult.Fail($"data key '{key}' was not provided.");
@@ -53,6 +83,9 @@ internal static class DslExpressionRuntimeEvaluator
 
     private static EvaluationResult EvaluateBinary(DslBinaryExpression binary, IReadOnlyDictionary<string, object?> context)
     {
+        if (binary.Operator == "contains")
+            return EvaluateContains(binary, context);
+
         if (binary.Operator == "&&")
         {
             var left = Evaluate(binary.Left, context);
@@ -182,6 +215,23 @@ internal static class DslExpressionRuntimeEvaluator
         }
     }
 
+    private static EvaluationResult EvaluateContains(DslBinaryExpression binary, IReadOnlyDictionary<string, object?> context)
+    {
+        // Left side must be a collection identifier
+        if (binary.Left is not DslIdentifierExpression collectionIdentifier || collectionIdentifier.Member is not null)
+            return EvaluationResult.Fail("'contains' requires a collection field on the left side.");
+
+        var collectionKey = $"__collection__{collectionIdentifier.Name}";
+        if (!context.TryGetValue(collectionKey, out var collectionObj) || collectionObj is not CollectionValue collection)
+            return EvaluationResult.Fail($"'{collectionIdentifier.Name}' is not a collection field.");
+
+        var rightResult = Evaluate(binary.Right, context);
+        if (!rightResult.Success)
+            return rightResult;
+
+        return EvaluationResult.Ok(collection.Contains(rightResult.Value));
+    }
+
     private static bool TryToNumber(object? value, out double number)
     {
         switch (value)
@@ -200,6 +250,170 @@ internal static class DslExpressionRuntimeEvaluator
             default:
                 number = default;
                 return false;
+        }
+    }
+}
+
+/// <summary>
+/// Runtime backing store for collection fields (set/queue/stack).
+/// This class is mutable and supports clone for working-copy semantics.
+/// </summary>
+public sealed class CollectionValue
+{
+    public DslCollectionKind Kind { get; }
+    public DslScalarType InnerType { get; }
+
+    // set<T> backed by SortedSet keyed on IComparable
+    private SortedSet<object>? _set;
+    // queue<T> / stack<T> backed by List (front=0 for queue, top=last for stack)
+    private List<object>? _list;
+
+    public CollectionValue(DslCollectionKind kind, DslScalarType innerType)
+    {
+        Kind = kind;
+        InnerType = innerType;
+
+        if (kind == DslCollectionKind.Set)
+            _set = new SortedSet<object>(CollectionComparer.Instance);
+        else
+            _list = new List<object>();
+    }
+
+    private CollectionValue(DslCollectionKind kind, DslScalarType innerType, SortedSet<object>? set, List<object>? list)
+    {
+        Kind = kind;
+        InnerType = innerType;
+        _set = set;
+        _list = list;
+    }
+
+    public int Count => Kind == DslCollectionKind.Set ? _set!.Count : _list!.Count;
+
+    public object? Min() => _set?.Min;
+    public object? Max() => _set?.Max;
+
+    public object? Peek()
+    {
+        if (Kind == DslCollectionKind.Queue)
+            return _list!.Count > 0 ? _list![0] : null;
+        if (Kind == DslCollectionKind.Stack)
+            return _list!.Count > 0 ? _list![^1] : null;
+        return null;
+    }
+
+    public bool Contains(object? value)
+    {
+        if (value is null) return false;
+        var normalized = NormalizeValue(value);
+
+        if (Kind == DslCollectionKind.Set)
+            return _set!.Contains(normalized);
+
+        return _list!.Any(item => CollectionComparer.Instance.Compare(item, normalized) == 0);
+    }
+
+    /// <summary>Add to set (idempotent — no-op if duplicate).</summary>
+    public void Add(object value) => _set!.Add(NormalizeValue(value));
+
+    /// <summary>Remove from set by value (idempotent — no-op if absent).</summary>
+    public void Remove(object value) => _set!.Remove(NormalizeValue(value));
+
+    /// <summary>Enqueue to queue (append to back).</summary>
+    public void Enqueue(object value) => _list!.Add(NormalizeValue(value));
+
+    /// <summary>Dequeue from queue (remove from front). Returns false if empty.</summary>
+    public bool Dequeue()
+    {
+        if (_list!.Count == 0) return false;
+        _list.RemoveAt(0);
+        return true;
+    }
+
+    /// <summary>Push onto stack (add to top/end).</summary>
+    public void Push(object value) => _list!.Add(NormalizeValue(value));
+
+    /// <summary>Pop from stack (remove from top/end). Returns false if empty.</summary>
+    public bool Pop()
+    {
+        if (_list!.Count == 0) return false;
+        _list.RemoveAt(_list.Count - 1);
+        return true;
+    }
+
+    /// <summary>Clear all elements.</summary>
+    public void Clear()
+    {
+        if (Kind == DslCollectionKind.Set)
+            _set!.Clear();
+        else
+            _list!.Clear();
+    }
+
+    /// <summary>Deep-clone for working-copy semantics.</summary>
+    public CollectionValue Clone()
+    {
+        if (Kind == DslCollectionKind.Set)
+            return new CollectionValue(Kind, InnerType, new SortedSet<object>(_set!, CollectionComparer.Instance), null);
+
+        return new CollectionValue(Kind, InnerType, null, new List<object>(_list!));
+    }
+
+    /// <summary>Serialize to a list for JSON output.</summary>
+    public List<object> ToSerializableList()
+    {
+        if (Kind == DslCollectionKind.Set)
+            return _set!.ToList();
+
+        return new List<object>(_list!);
+    }
+
+    /// <summary>Populate from a deserialized list.</summary>
+    public void LoadFrom(IEnumerable<object> items)
+    {
+        if (Kind == DslCollectionKind.Set)
+        {
+            _set!.Clear();
+            foreach (var item in items)
+                _set.Add(NormalizeValue(item));
+        }
+        else
+        {
+            _list!.Clear();
+            foreach (var item in items)
+                _list.Add(NormalizeValue(item));
+        }
+    }
+
+    /// <summary>Normalize numeric values to double for consistent comparison.</summary>
+    private static object NormalizeValue(object value)
+    {
+        if (value is byte or sbyte or short or ushort or int or uint or long or ulong or float or decimal)
+            return Convert.ToDouble(value);
+        return value;
+    }
+
+    /// <summary>Comparer that handles mixed types by converting numerics to double.</summary>
+    private sealed class CollectionComparer : IComparer<object>
+    {
+        public static readonly CollectionComparer Instance = new();
+
+        public int Compare(object? x, object? y)
+        {
+            if (x is null && y is null) return 0;
+            if (x is null) return -1;
+            if (y is null) return 1;
+
+            if (x is double xd && y is double yd)
+                return xd.CompareTo(yd);
+
+            if (x is string xs && y is string ys)
+                return string.Compare(xs, ys, StringComparison.Ordinal);
+
+            if (x is bool xb && y is bool yb)
+                return xb.CompareTo(yb);
+
+            // Fallback: convert both to string for comparison
+            return string.Compare(x.ToString(), y.ToString(), StringComparison.Ordinal);
         }
     }
 }

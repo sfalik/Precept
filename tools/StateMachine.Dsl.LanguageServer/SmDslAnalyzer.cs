@@ -17,6 +17,7 @@ internal sealed class SmDslAnalyzer
     private static readonly Regex FromOnRegex = new("^\\s*from\\s+(?<from>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)\\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EventMemberPrefixRegex = new("(?<event>[A-Za-z_][A-Za-z0-9_]*)\\.$", RegexOptions.Compiled);
     private static readonly Regex SetLineRegex = new("^\\s*set\\s+(?<key>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<expr>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex CollectionDeclRegex = new("^\\s*(?:set|queue|stack)<(?:number|string|boolean)>\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly MethodInfo? ExpressionParseMethod = typeof(DslMachine).Assembly
         .GetType("StateMachine.Dsl.DslExpressionParser", throwOnError: false)
         ?.GetMethod(
@@ -76,8 +77,26 @@ internal sealed class SmDslAnalyzer
         var states = CollectIdentifiers(text, StateRegex);
         var events = CollectIdentifiers(text, EventRegex);
         var dataFields = CollectTopLevelDataFields(lines);
+        var collectionFields = CollectIdentifiers(text, CollectionDeclRegex);
         var eventArgs = CollectEventArgs(lines);
         var currentEvent = FindCurrentEventName(lines, (int)position.Line);
+
+        // Collection member prefix: e.g. "Floors." → suggest .count, .min, .max, .peek
+        var collectionMemberPrefixMatch = Regex.Match(beforeCursor, "(?<col>[A-Za-z_][A-Za-z0-9_]*)\\.$");
+        if (collectionMemberPrefixMatch.Success)
+        {
+            var colName = collectionMemberPrefixMatch.Groups["col"].Value;
+            if (collectionFields.Contains(colName, StringComparer.Ordinal))
+            {
+                return new CompletionItem[]
+                {
+                    new() { Label = colName + ".count", Kind = CompletionItemKind.Property, Detail = "Number of elements" },
+                    new() { Label = colName + ".min", Kind = CompletionItemKind.Property, Detail = "Minimum element (set only)" },
+                    new() { Label = colName + ".max", Kind = CompletionItemKind.Property, Detail = "Maximum element (set only)" },
+                    new() { Label = colName + ".peek", Kind = CompletionItemKind.Property, Detail = "Front/top element (queue/stack)" }
+                };
+            }
+        }
 
         var eventMemberPrefixMatch = EventMemberPrefixRegex.Match(beforeCursor);
         if (eventMemberPrefixMatch.Success)
@@ -89,8 +108,26 @@ internal sealed class SmDslAnalyzer
 
         if (Regex.IsMatch(beforeCursor, "^\\s*(?:if|else\\s+if)\\s+[^\\n]*$", RegexOptions.IgnoreCase))
         {
-            var guardItems = BuildGuardCompletions(dataFields, currentEvent, eventArgs);
+            var guardItems = BuildGuardCompletions(dataFields, collectionFields, currentEvent, eventArgs);
             return DistinctAndSort(guardItems.Concat(GuardSnippetItems));
+        }
+
+        // Mutation verb lines: suggest collection field names after add/remove/enqueue/dequeue/push/pop/clear
+        if (Regex.IsMatch(beforeCursor, "^\\s*(?:add|remove|enqueue|dequeue|push|pop|clear)(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
+        {
+            // After "dequeue <Field> into" or "pop <Field> into", suggest scalar data fields
+            if (Regex.IsMatch(beforeCursor, "^\\s*(?:dequeue|pop)\\s+[A-Za-z_][A-Za-z0-9_]*\\s+into(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
+                return BuildItems(dataFields, CompletionItemKind.Field);
+
+            // After "dequeue <Field>" or "pop <Field>", suggest "into" keyword and collection fields
+            if (Regex.IsMatch(beforeCursor, "^\\s*(?:dequeue|pop)\\s+[A-Za-z_][A-Za-z0-9_]*(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
+            {
+                var items = new List<CompletionItem>(BuildItems(collectionFields, CompletionItemKind.Field));
+                items.Add(new CompletionItem { Label = "into", Kind = CompletionItemKind.Keyword });
+                return items.ToArray();
+            }
+
+            return BuildItems(collectionFields, CompletionItemKind.Field);
         }
 
         if (Regex.IsMatch(beforeCursor, "^\\s*set\\s+[^=\\n]*$", RegexOptions.IgnoreCase) &&
@@ -122,11 +159,13 @@ internal sealed class SmDslAnalyzer
 
     private static IReadOnlyList<CompletionItem> BuildGuardCompletions(
         IReadOnlyList<string> dataFields,
+        IReadOnlyList<string> collectionFields,
         string? currentEvent,
         IReadOnlyDictionary<string, IReadOnlyList<string>> eventArgs)
     {
         var items = new List<CompletionItem>();
         items.AddRange(BuildItems(dataFields, CompletionItemKind.Variable));
+        items.AddRange(BuildItems(collectionFields, CompletionItemKind.Variable));
         items.AddRange(ExpressionOperatorItems);
         items.AddRange(LiteralItems);
 
@@ -296,7 +335,7 @@ internal sealed class SmDslAnalyzer
         var searchLine = 0;
         foreach (var transition in machine.Transitions)
         {
-            var transitionSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, transition.EventName);
+            var transitionSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, transition.EventName, machine.CollectionFields);
             IReadOnlyDictionary<string, StaticValueKind> setSymbols = transitionSymbols;
 
             if (!string.IsNullOrWhiteSpace(transition.GuardExpression))
@@ -334,7 +373,7 @@ internal sealed class SmDslAnalyzer
 
         foreach (var terminalRule in machine.TerminalRules)
         {
-            var terminalSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, terminalRule.EventName);
+            var terminalSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, terminalRule.EventName, machine.CollectionFields);
             IReadOnlyDictionary<string, StaticValueKind> terminalSetSymbols = terminalSymbols;
 
             if (!string.IsNullOrWhiteSpace(terminalRule.GuardExpression))
@@ -403,7 +442,8 @@ internal sealed class SmDslAnalyzer
     private static Dictionary<string, StaticValueKind> BuildSymbolKinds(
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
-        string eventName)
+        string eventName,
+        IReadOnlyList<DslCollectionFieldContract>? collectionFields = null)
     {
         var symbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
         foreach (var pair in dataFieldKinds)
@@ -413,6 +453,26 @@ internal sealed class SmDslAnalyzer
         {
             foreach (var pair in eventArgs)
                 symbols[$"{eventName}.{pair.Key}"] = pair.Value;
+        }
+
+        // Add collection property symbols
+        if (collectionFields is not null)
+        {
+            foreach (var col in collectionFields)
+            {
+                var innerKind = col.InnerType switch
+                {
+                    DslScalarType.Number => StaticValueKind.Number,
+                    DslScalarType.String => StaticValueKind.String,
+                    DslScalarType.Boolean => StaticValueKind.Boolean,
+                    _ => StaticValueKind.None
+                };
+
+                symbols[$"{col.Name}.count"] = StaticValueKind.Number;
+                symbols[$"{col.Name}.min"] = innerKind;
+                symbols[$"{col.Name}.max"] = innerKind;
+                symbols[$"{col.Name}.peek"] = innerKind;
+            }
         }
 
         return symbols;
@@ -677,6 +737,11 @@ internal sealed class SmDslAnalyzer
                         if (!TryInferKind(binary.Right, symbols, out _, out error))
                             return false;
 
+                        kind = StaticValueKind.Boolean;
+                        return true;
+
+                    case "contains":
+                        // contains is always boolean — left side is a collection identifier, right is a value
                         kind = StaticValueKind.Boolean;
                         return true;
 
@@ -1000,7 +1065,24 @@ internal sealed class SmDslAnalyzer
         new CompletionItem { Label = "string", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "number", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "boolean", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "null", Kind = CompletionItemKind.Keyword }
+        new CompletionItem { Label = "null", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "set<number>", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "set<string>", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "set<boolean>", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "queue<number>", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "queue<string>", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "queue<boolean>", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "stack<number>", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "stack<string>", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "stack<boolean>", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "add", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "remove", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "enqueue", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "dequeue", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "push", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "pop", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "clear", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "contains", Kind = CompletionItemKind.Keyword }
     ];
 
     private static readonly IReadOnlyList<CompletionItem> ExpressionOperatorItems =
@@ -1018,7 +1100,8 @@ internal sealed class SmDslAnalyzer
         new CompletionItem { Label = "<=", Kind = CompletionItemKind.Operator },
         new CompletionItem { Label = "&&", Kind = CompletionItemKind.Operator },
         new CompletionItem { Label = "||", Kind = CompletionItemKind.Operator },
-        new CompletionItem { Label = "!", Kind = CompletionItemKind.Operator }
+        new CompletionItem { Label = "!", Kind = CompletionItemKind.Operator },
+        new CompletionItem { Label = "contains", Kind = CompletionItemKind.Operator }
     ];
 
     private static readonly IReadOnlyList<CompletionItem> LiteralItems =

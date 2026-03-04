@@ -95,7 +95,7 @@ event <EventName>
 <string|number|boolean|null>[?] <FieldName> { <FieldDecl> }
 <string|number|boolean|null>[?] <FieldName> [= <Literal>]
 
-# Collection field declarations (design phase — not yet implemented)
+# Collection field declarations
 set<T> <FieldName>                  # sorted unique set, always starts empty
 queue<T> <FieldName>                # FIFO ordered, allows duplicates, always starts empty
 stack<T> <FieldName>                # LIFO ordered, allows duplicates, always starts empty
@@ -117,9 +117,9 @@ from <any|StateA[,StateB...]> on <EventName>
     add <SetField> <Expr>
   | remove <SetField> <Expr>
   | enqueue <QueueField> <Expr>
-  | dequeue <QueueField>
+  | dequeue <QueueField> [into <ScalarField>]
   | push <StackField> <Expr>
-  | pop <StackField>
+  | pop <StackField> [into <ScalarField>]
   | clear <CollectionField>
 ```
 
@@ -183,7 +183,7 @@ Block-authoring equivalent (same semantics):
 
 ### Collection Types Design Decisions
 
-Status: **Design phase — not yet implemented.**
+Status: **Implemented.** All collection types, mutations, properties, and the `contains` operator are functional across parser, runtime, expression evaluator, and language server.
 
 #### Locked decisions
 
@@ -209,8 +209,10 @@ Mutation statements (same level as `set`, `transition`, etc.):
 | `remove <Collection> <Expr>` | Yes | — | — | Remove by value; no-op if absent (idempotent) |
 | `enqueue <Collection> <Expr>` | — | Yes | — | Append to back; always succeeds |
 | `dequeue <Collection>` | — | Yes | — | Remove from front; fails if empty |
+| `dequeue <Collection> into <Field>` | — | Yes | — | Copy front element to scalar field, then remove; fails if empty |
 | `push <Collection> <Expr>` | — | — | Yes | Add to top; always succeeds |
 | `pop <Collection>` | — | — | Yes | Remove from top; fails if empty |
+| `pop <Collection> into <Field>` | — | — | Yes | Copy top element to scalar field, then remove; fails if empty |
 | `clear <Collection>` | Yes | Yes | Yes | Remove all elements (idempotent) |
 
 Properties (dot-access, no parentheses):
@@ -259,16 +261,15 @@ Collection mutations within a branch body participate in the working copy, consi
 
 #### Cross-collection operations
 
-No direct collection-to-collection operations. Use a scalar intermediary:
+No direct collection-to-collection operations. Use a scalar intermediary with `into`:
 ```text
-set NextApprover = ApprovalChain.peek
-dequeue ApprovalChain
+dequeue ApprovalChain into NextApprover
 push CompletedApprovers NextApprover
 ```
 
-#### `dequeue`/`pop` are statements, not expressions
+#### `dequeue`/`pop` statements with optional `into`
 
-Read with `peek`, remove separately. Keeps mutation at statement level and queries as pure expressions.
+`dequeue` and `pop` are mutation statements, not expressions. The optional `into <ScalarField>` clause copies the front/top element into a declared scalar data field before removing it. Without `into`, the element is simply discarded. The `into` target must be a declared scalar (non-collection) data field whose type matches the collection's element type. This keeps mutation at statement level while providing a concise way to capture the removed element without a separate `set` + `peek` step.
 
 #### Decision pending: directional set queries (`above`/`below`)
 
@@ -283,7 +284,7 @@ Sorted sets naturally support directional nearest-neighbor queries (e.g., "small
 
 All options introduce syntax cost (new keywords, filter expressions, or parameterized properties). The core concern is that element-returning filtered queries either need function-call syntax (which the DSL avoids) or introduce new expression composition patterns.
 
-**Current decision**: deferred. `min`/`max` cover the majority of real use cases. The directional query pattern can be revisited once collection types are implemented and real usage patterns emerge. For now, authors can approximate directional behavior using `min`/`max` with a `MovingUp` boolean to select the appropriate branch.
+**Current decision**: deferred. `min`/`max` cover the majority of real use cases. The directional query pattern can be revisited once real usage patterns emerge. For now, authors can approximate directional behavior using `min`/`max` with a `MovingUp` boolean to select the appropriate branch.
 
 ### Set/Expression Design Decisions (Locked — Scalars)
 

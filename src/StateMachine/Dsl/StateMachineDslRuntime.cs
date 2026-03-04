@@ -51,6 +51,7 @@ public sealed class DslWorkflowDefinition
     private readonly Dictionary<(string State, string Event), List<DslTransition>> _transitionMap;
     private readonly Dictionary<(string State, string Event), List<DslTerminalRule>> _terminalRuleMap;
     private readonly Dictionary<string, DslFieldContract> _dataContractMap;
+    private readonly Dictionary<string, DslCollectionFieldContract> _collectionContractMap;
     private readonly Dictionary<string, Dictionary<string, DslFieldContract>> _eventArgContractMap;
     private readonly IGuardEvaluator _guardEvaluator;
 
@@ -59,6 +60,7 @@ public sealed class DslWorkflowDefinition
     public string InitialState { get; }
     public IReadOnlyList<DslEvent> Events { get; }
     public IReadOnlyList<DslFieldContract> DataFields { get; }
+    public IReadOnlyList<DslCollectionFieldContract> CollectionFields { get; }
 
     internal DslWorkflowDefinition(DslMachine machine, IGuardEvaluator guardEvaluator)
     {
@@ -67,6 +69,7 @@ public sealed class DslWorkflowDefinition
         InitialState = machine.InitialState;
         Events = machine.Events;
         DataFields = machine.DataFields;
+        CollectionFields = machine.CollectionFields;
         _guardEvaluator = guardEvaluator;
 
         _transitionMap = machine.Transitions
@@ -86,12 +89,19 @@ public sealed class DslWorkflowDefinition
         _dataContractMap = machine.DataFields
             .ToDictionary(f => f.Name, f => f, StringComparer.Ordinal);
 
+        _collectionContractMap = machine.CollectionFields
+            .ToDictionary(f => f.Name, f => f, StringComparer.Ordinal);
+
         _eventArgContractMap = machine.Events
             .ToDictionary(
                 evt => evt.Name,
                 evt => evt.Args.ToDictionary(a => a.Name, a => a, StringComparer.Ordinal),
                 StringComparer.Ordinal);
     }
+
+    public DslWorkflowInstance CreateInstance(
+        IReadOnlyDictionary<string, object?>? instanceData = null)
+        => CreateInstance(InitialState, instanceData);
 
     public DslWorkflowInstance CreateInstance(
         string initialState,
@@ -118,7 +128,8 @@ public sealed class DslWorkflowDefinition
     private IReadOnlyDictionary<string, object?> BuildInitialInstanceData(IReadOnlyDictionary<string, object?>? instanceData)
     {
         var hasDefaults = DataFields.Any(field => field.HasDefaultValue);
-        if (!hasDefaults && instanceData is null)
+        var hasCollections = CollectionFields.Count > 0;
+        if (!hasDefaults && !hasCollections && instanceData is null)
             return EmptyInstanceData.Instance;
 
         var merged = new Dictionary<string, object?>(StringComparer.Ordinal);
@@ -128,10 +139,35 @@ public sealed class DslWorkflowDefinition
                 merged[field.Name] = field.DefaultValue;
         }
 
+        // Initialize collection fields as empty CollectionValues
+        foreach (var collField in CollectionFields)
+        {
+            var collectionKey = $"__collection__{collField.Name}";
+            merged[collectionKey] = new CollectionValue(collField.CollectionKind, collField.InnerType);
+        }
+
         if (instanceData is not null)
         {
             foreach (var pair in instanceData)
+            {
+                // If caller provides a list for a collection field, load it
+                if (_collectionContractMap.TryGetValue(pair.Key, out var collContract) && pair.Value is System.Collections.IEnumerable enumerable && pair.Value is not string)
+                {
+                    var collectionKey = $"__collection__{pair.Key}";
+                    var collection = new CollectionValue(collContract.CollectionKind, collContract.InnerType);
+                    var items = new List<object>();
+                    foreach (var item in enumerable)
+                    {
+                        if (item is not null)
+                            items.Add(item);
+                    }
+                    collection.LoadFrom(items);
+                    merged[collectionKey] = collection;
+                    continue;
+                }
+
                 merged[pair.Key] = pair.Value;
+            }
         }
 
         return merged;
@@ -234,11 +270,15 @@ public sealed class DslWorkflowDefinition
         if (resolution.Kind == TransitionResolutionKind.NoTransition)
         {
             var noTransitionData = new Dictionary<string, object?>(instance.InstanceData, StringComparer.Ordinal);
+
+            // Deep-clone collections for working copy
+            var workingCollections = CloneCollections(noTransitionData);
+
             if (resolution.TerminalRule?.SetAssignments is { } noTransitionSets)
             {
                 foreach (var assignment in noTransitionSets)
                 {
-                    var assignmentContext = BuildEvaluationData(noTransitionData, eventName, eventArguments);
+                    var assignmentContext = BuildEvaluationDataWithCollections(noTransitionData, workingCollections, eventName, eventArguments);
                     var assignmentEvaluation = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, assignmentContext);
                     if (!assignmentEvaluation.Success)
                         return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { $"Data assignment failed: {assignmentEvaluation.Error}" });
@@ -249,6 +289,17 @@ public sealed class DslWorkflowDefinition
                     noTransitionData[assignment.Key] = assignmentEvaluation.Value;
                 }
             }
+
+            // Execute collection mutations
+            if (resolution.TerminalRule?.CollectionMutations is { } noTransitionMutations)
+            {
+                var mutationError = ExecuteCollectionMutations(noTransitionMutations, workingCollections, noTransitionData, eventName, eventArguments);
+                if (mutationError is not null)
+                    return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { mutationError });
+            }
+
+            // Commit working collections back to data
+            CommitCollections(noTransitionData, workingCollections);
 
             var noTransitionUpdated = instance with
             {
@@ -264,9 +315,13 @@ public sealed class DslWorkflowDefinition
             return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
 
         var updatedData = new Dictionary<string, object?>(instance.InstanceData, StringComparer.Ordinal);
+
+        // Deep-clone collections for working copy
+        var transitionCollections = CloneCollections(updatedData);
+
         foreach (var assignment in resolution.Transition.SetAssignments)
         {
-            var assignmentContext = BuildEvaluationData(updatedData, eventName, eventArguments);
+            var assignmentContext = BuildEvaluationDataWithCollections(updatedData, transitionCollections, eventName, eventArguments);
             var assignmentEvaluation = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, assignmentContext);
             if (!assignmentEvaluation.Success)
                 return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { $"Data assignment failed: {assignmentEvaluation.Error}" });
@@ -276,6 +331,17 @@ public sealed class DslWorkflowDefinition
 
             updatedData[assignment.Key] = assignmentEvaluation.Value;
         }
+
+        // Execute collection mutations
+        if (resolution.Transition.CollectionMutations is { } transitionMutations)
+        {
+            var mutationError = ExecuteCollectionMutations(transitionMutations, transitionCollections, updatedData, eventName, eventArguments);
+            if (mutationError is not null)
+                return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { mutationError });
+        }
+
+        // Commit working collections back to data
+        CommitCollections(updatedData, transitionCollections);
 
         var updated = instance with
         {
@@ -407,6 +473,20 @@ public sealed class DslWorkflowDefinition
         foreach (var kvp in instanceData)
             evaluation[kvp.Key] = kvp.Value;
 
+        // Inject collection backing values so guards can reference .count, .min, etc.
+        foreach (var col in _collectionContractMap.Values)
+        {
+            var backingKey = $"__collection__{col.Name}";
+            if (instanceData.TryGetValue(backingKey, out var existing) && existing is CollectionValue)
+            {
+                // Already in dict from instanceData copy
+            }
+            else
+            {
+                evaluation[backingKey] = new CollectionValue(col.CollectionKind, col.InnerType);
+            }
+        }
+
         if (eventArguments is not null)
         {
             foreach (var kvp in eventArguments)
@@ -475,9 +555,130 @@ public sealed class DslWorkflowDefinition
         return evaluation;
     }
 
+    private IReadOnlyDictionary<string, object?> BuildEvaluationDataWithCollections(
+        Dictionary<string, object?> data,
+        Dictionary<string, CollectionValue> workingCollections,
+        string eventName,
+        IReadOnlyDictionary<string, object?>? eventArguments)
+    {
+        var evaluation = new Dictionary<string, object?>(StringComparer.Ordinal);
+
+        foreach (var kvp in data)
+        {
+            if (!kvp.Key.StartsWith("__collection__", StringComparison.Ordinal))
+                evaluation[kvp.Key] = kvp.Value;
+        }
+
+        // Inject working-copy collections so set-expressions see read-your-writes
+        foreach (var kvp in workingCollections)
+            evaluation[$"__collection__{kvp.Key}"] = kvp.Value;
+
+        if (eventArguments is not null)
+        {
+            foreach (var kvp in eventArguments)
+                evaluation[$"{eventName}.{kvp.Key}"] = kvp.Value;
+        }
+
+        // Inject default values for any declared args not supplied by caller.
+        if (_eventArgContractMap.TryGetValue(eventName, out var argContract))
+        {
+            foreach (var arg in argContract.Values)
+            {
+                var key = $"{eventName}.{arg.Name}";
+                if (!evaluation.ContainsKey(key))
+                {
+                    if (arg.HasDefaultValue)
+                        evaluation[key] = arg.DefaultValue;
+                    else if (arg.IsNullable)
+                        evaluation[key] = null;
+                }
+            }
+        }
+
+        return evaluation;
+    }
+
+    private Dictionary<string, CollectionValue> CloneCollections(Dictionary<string, object?> data)
+    {
+        var clones = new Dictionary<string, CollectionValue>(StringComparer.Ordinal);
+        foreach (var col in _collectionContractMap.Values)
+        {
+            var backingKey = $"__collection__{col.Name}";
+            if (data.TryGetValue(backingKey, out var val) && val is CollectionValue cv)
+                clones[col.Name] = cv.Clone();
+            else
+                clones[col.Name] = new CollectionValue(col.CollectionKind, col.InnerType);
+        }
+        return clones;
+    }
+
+    private string? ExecuteCollectionMutations(
+        IReadOnlyList<DslCollectionMutation> mutations,
+        Dictionary<string, CollectionValue> workingCollections,
+        Dictionary<string, object?> data,
+        string eventName,
+        IReadOnlyDictionary<string, object?>? eventArguments)
+    {
+        foreach (var mutation in mutations)
+        {
+            if (!workingCollections.TryGetValue(mutation.TargetField, out var collection))
+                return $"Collection mutation failed: unknown collection field '{mutation.TargetField}'.";
+
+            object? argValue = null;
+            if (mutation.Expression is not null)
+            {
+                var ctx = BuildEvaluationDataWithCollections(data, workingCollections, eventName, eventArguments);
+                var result = DslExpressionRuntimeEvaluator.Evaluate(mutation.Expression, ctx);
+                if (!result.Success)
+                    return $"Collection mutation failed: {result.Error}";
+                argValue = result.Value;
+            }
+
+            switch (mutation.Verb)
+            {
+                case DslCollectionMutationVerb.Add:
+                    collection.Add(argValue!);
+                    break;
+                case DslCollectionMutationVerb.Remove:
+                    collection.Remove(argValue!);
+                    break;
+                case DslCollectionMutationVerb.Enqueue:
+                    collection.Enqueue(argValue!);
+                    break;
+                case DslCollectionMutationVerb.Dequeue:
+                    if (collection.Count == 0)
+                        return $"Collection mutation failed: cannot dequeue from empty queue '{mutation.TargetField}'.";
+                    if (mutation.IntoField is not null)
+                        data[mutation.IntoField] = collection.Peek();
+                    collection.Dequeue();
+                    break;
+                case DslCollectionMutationVerb.Push:
+                    collection.Push(argValue!);
+                    break;
+                case DslCollectionMutationVerb.Pop:
+                    if (collection.Count == 0)
+                        return $"Collection mutation failed: cannot pop from empty stack '{mutation.TargetField}'.";
+                    if (mutation.IntoField is not null)
+                        data[mutation.IntoField] = collection.Peek();
+                    collection.Pop();
+                    break;
+                case DslCollectionMutationVerb.Clear:
+                    collection.Clear();
+                    break;
+            }
+        }
+        return null;
+    }
+
+    private static void CommitCollections(Dictionary<string, object?> data, Dictionary<string, CollectionValue> workingCollections)
+    {
+        foreach (var kvp in workingCollections)
+            data[$"__collection__{kvp.Key}"] = kvp.Value;
+    }
+
     private bool TryValidateDataContract(IReadOnlyDictionary<string, object?> data, out string error)
     {
-        if (_dataContractMap.Count == 0)
+        if (_dataContractMap.Count == 0 && _collectionContractMap.Count == 0)
         {
             error = string.Empty;
             return true;
@@ -485,6 +686,10 @@ public sealed class DslWorkflowDefinition
 
         foreach (var key in data.Keys)
         {
+            // Skip internal collection backing keys
+            if (key.StartsWith("__collection__", StringComparison.Ordinal))
+                continue;
+
             if (!_dataContractMap.ContainsKey(key))
             {
                 error = $"Data validation failed: unknown data field '{key}'.";

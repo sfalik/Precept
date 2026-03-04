@@ -4,11 +4,55 @@ StateMachine is a .NET DSL-driven state/workflow engine focused on deterministic
 
 ## Why this project
 
-- **Inspect before fire**: evaluate whether an event is defined/accepted before mutating state.
-- **Inspect before fire**: evaluate whether a transition is not available from the current state, blocked, or enabled before mutating state.
-- **Persistable runtime instances**: load/save a JSON instance with current state and instance 
-- **Explicit event arguments**: per-call arguments are separate from persisted instance 
-- **Transition-scoped data updates**: `set <Key> = ...` assignments run only on accepted `fire`.
+StateMachine is for applications where entities move through explicit, long-lived lifecycles: support tickets, orders, approvals, onboarding flows, loan pipelines, or any process where "what state are we in and what can happen next" must be clear and consistent.
+
+Most teams start these workflows as scattered `if`/`switch` logic across handlers and services. That works at first, then drifts: states become implicit, transition rules are duplicated, and nobody can easily answer why an action is enabled in one case and blocked in another. StateMachine exists to make that lifecycle explicit, executable, and reviewable in one place.
+
+The design philosophy is driven by that goal, not by language novelty:
+
+- **Predictability over cleverness**: deterministic evaluation and declaration-ordered rules mean the same input produces the same outcome every time.
+- **Safe introspection over hidden side effects**: `Inspect` works because expressions are pure; you can ask "what would happen" without mutating persisted state.
+- **Consistency over syntax shortcuts**: statements mutate and expressions read. This keeps the mental model small and prevents context-specific exceptions.
+- **Integrity over partial success**: transitions are atomic, so branch mutations either all commit or all roll back.
+- **Declarative workflow over embedded programming language**: the DSL intentionally models lifecycle rules, while complex computation stays in host code.
+
+In practice, this library is a good fit when you need auditable workflow behavior that both developers and domain stakeholders can read. The `.sm` file becomes both runtime contract and living documentation, while persisted instances and explicit event arguments make integration straightforward for APIs, UIs, and background processing.
+
+## Design Philosophy
+
+StateMachine's DSL is shaped by a small number of principles that come up repeatedly when deciding what to add, what to reject, and how new features should behave.
+
+### Expressions are pure; statements mutate
+
+Evaluating a guard condition or a `set` right-hand side never changes state. You can evaluate `Floors.count > 0` a hundred times and the collection is untouched every time. Mutations — `add`, `remove`, `dequeue`, `pop`, `clear` — are explicit statements that only execute during an accepted `Fire`. This separation is not incidental; it is the reason `Inspect` can safely preview any transition without side effects, and it is why we chose `dequeue Q into X` (a statement) over `set X = dequeue Q` (which would have made `dequeue` an expression in one context and a statement in another).
+
+### One rule, no exceptions
+
+When a feature introduces a context-sensitive rule — "this keyword is an expression here but a statement there" — we look for an alternative that avoids the exception. The `into` syntax exists because we found a way to make `dequeue` one-line without bending the expression model. A shorter syntax with a caveat is worse than a slightly longer syntax with no caveats.
+
+### Deterministic by construction
+
+`set<T>` is backed by a sorted structure as a semantic guarantee, not an implementation detail. Iteration order, `.min`, `.max` are all deterministic regardless of insertion order. Guard evaluation follows declaration order. There are no race conditions, no nondeterministic outcomes, and no cases where running the same event with the same data could produce different results.
+
+### Atomic transitions
+
+When a branch fires, all scalar assignments and collection mutations either commit together or roll back together. If a `dequeue` fails because the queue is empty, the entire branch is rejected — no partial mutations leak into the persisted instance. This is true even when a branch contains multiple `set` assignments and multiple collection mutations interleaved.
+
+### Read-your-writes within a branch
+
+Within a single branch body, mutations are immediately visible to subsequent expressions. After `add PendingFloors 5`, a later guard or `set` expression can reference `PendingFloors.count` and see the updated count, or test `PendingFloors contains 5` and get `true`. Scalar `set` assignments work the same way — `set Count = Count + 1` followed by `set DoubleCount = Count * 2` sees the incremented value. The working copy that enables atomic rollback is the same mechanism that enables read-your-writes: all mutations happen against a branch-local copy, and expressions read from that copy.
+
+### Lenient writes, strict reads
+
+`add` of a duplicate value is a no-op. `remove` of a missing value is a no-op. `clear` on an empty collection is a no-op. But `dequeue` on an empty queue, `pop` on an empty stack, and `.min`/`.max`/`.peek` on an empty collection all fail the branch. The asymmetry is intentional: writes should be safe to issue without precondition checks, but reads that assume data exists should fail loudly when that assumption is wrong.
+
+### Inspect before fire
+
+Every transition can be evaluated read-only (`Inspect`) before committing (`Fire`). This enables UIs to show which events are defined, which are blocked by guards, and which are enabled — all without touching persisted state. The inspect/fire split is the reason expressions must stay pure: if evaluating a guard could mutate a collection, inspection would no longer be safe.
+
+### The declarative boundary
+
+The DSL is not a general-purpose language, and that is a feature. `map<K,V>`, function-call syntax, loops, collection nesting, and user-defined functions are deliberately excluded. When a workflow needs logic beyond what the DSL expresses, that logic belongs in the host application — not in a more complex DSL. Every feature proposal is weighed against the cost of moving the DSL closer to a programming language, and the answer is usually "no."
 
 ## Current Status
 
@@ -17,7 +61,7 @@ StateMachine is a .NET DSL-driven state/workflow engine focused on deterministic
 - Inspector preview now exchanges live `snapshot`/`fire`/`reset`/`inspect` requests through the language server (`stateMachine/preview/request`) instead of only local mock data. The `inspect` action re-evaluates a single event with user-supplied arguments, enabling real-time guard feedback as the user types.
 - Inspector preview layout uses a single unified ELK layered layout with state-machine-tuned options (top-down direction, spline edge routing, model-order cycle breaking, feedback edges for cycles, inside self-loops, inline edge labels, DSL declaration-order node ordering), dynamic per-state node sizing, and responsive viewBox. Reject and no-transition terminal rules are excluded from the diagram graph.
 - CLI host has been removed in this branch (hard cut); editor + language server are the active runtime surfaces.
-- **Collection types** (`set<T>`, `queue<T>`, `stack<T>`) are in design phase with locked decisions documented in `docs/DesignNotes.md`. Implementation has not started. Directional set queries (`above`/`below`) are deferred pending real usage data.
+- **Collection types** (`set<T>`, `queue<T>`, `stack<T>`) are implemented with full parser, runtime, and language-server support. Declarations, mutations (`add`/`remove`/`enqueue`/`dequeue`/`push`/`pop`/`clear`), guard properties (`.count`/`.min`/`.max`/`.peek`), and the `contains` operator are all functional. Directional set queries (`above`/`below`) remain deferred pending real usage data.
 
 ## Quick Start (2 minutes)
 
@@ -153,7 +197,7 @@ event <EventName>
 
 <ScalarType> := string | number | boolean | null
 
-# Collection field declarations (design phase — not yet implemented)
+# Collection field declarations
 set<T> <FieldName>                  # sorted unique set, always starts empty
 queue<T> <FieldName>                # FIFO ordered, allows duplicates, always starts empty
 stack<T> <FieldName>                # LIFO ordered, allows duplicates, always starts empty
@@ -191,9 +235,9 @@ from <any|StateA[,StateB...]> on <EventName>
     add <SetField> <Expr>
   | remove <SetField> <Expr>
   | enqueue <QueueField> <Expr>
-  | dequeue <QueueField>
+  | dequeue <QueueField> [into <ScalarField>]
   | push <StackField> <Expr>
-  | pop <StackField>
+  | pop <StackField> [into <ScalarField>]
   | clear <CollectionField>
 
 <Literal> := null | true | false | <number> | <string>
@@ -220,6 +264,7 @@ Constraints:
 - Defaults are applied when creating instances and can be overridden by caller-supplied instance data.
 - Non-nullable top-level data fields must declare defaults.
 - Collection mutation statements (`add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`) are valid only inside `from ... on ...` branch bodies, at the same level as `set`. Each mutation verb is valid only on its matching collection kind (parser rejects mismatches).
+- `dequeue <QueueField> into <ScalarField>` and `pop <StackField> into <ScalarField>` atomically read the front/top element into a scalar data field and remove it from the collection. The `into` target must be a declared scalar data field whose type matches the collection's inner type. Empty collection → branch failure + atomic rollback.
 - Collection properties: `.count` (all types, returns number, valid in guards and `set` RHS), `.min`/`.max` (`set<T>` only, returns element, `set` RHS only), `.peek` (`queue<T>`/`stack<T>` only, returns element, `set` RHS only).
 - `contains` is an infix boolean operator: `<Collection> contains <Expr>` (valid in guards and `set` RHS).
 - Element-returning properties (`.min`, `.max`, `.peek`) fail on empty collections, triggering atomic branch rollback.
@@ -359,7 +404,7 @@ from FlashingRed on Advance
   no transition
 ```
 
-13) Collection: sorted set with add/remove/min (design phase — not yet implemented)
+13) Collection: sorted set with add/remove/min
 
 ```text
 set<number> PendingFloors
@@ -386,10 +431,11 @@ from DoorsOpen on CloseDoors
     reject "Cannot close doors while overloaded"
 ```
 
-14) Collection: queue with enqueue/dequeue/peek (design phase — not yet implemented)
+14) Collection: queue with enqueue/dequeue/peek
 
 ```text
 queue<string> ApprovalChain
+string LastApprover = ""
 
 from Submitted on AssignApprover
   enqueue ApprovalChain Approver.Name
@@ -397,18 +443,18 @@ from Submitted on AssignApprover
 
 from AwaitingApproval on Approve
   if ApprovalChain.count > 1
-    set LastApprover = ApprovalChain.peek
-    dequeue ApprovalChain
+    dequeue ApprovalChain into LastApprover
     no transition
   else
-    dequeue ApprovalChain
+    dequeue ApprovalChain into LastApprover
     transition Approved
 ```
 
-15) Collection: stack with push/pop/peek (design phase — not yet implemented)
+15) Collection: stack with push/pop/peek
 
 ```text
 stack<string> BreadcrumbTrail
+string CurrentRoom = ""
 
 from Exploring on EnterRoom
   push BreadcrumbTrail CurrentRoom
@@ -417,14 +463,13 @@ from Exploring on EnterRoom
 
 from Exploring on Backtrack
   if BreadcrumbTrail.count > 0
-    set CurrentRoom = BreadcrumbTrail.peek
-    pop BreadcrumbTrail
+    pop BreadcrumbTrail into CurrentRoom
     no transition
   else
     reject "No rooms to backtrack to"
 ```
 
-16) Collection: contains operator in guards (design phase — not yet implemented)
+16) Collection: contains operator in guards
 
 ```text
 from Idle on RequestFloor
@@ -435,21 +480,20 @@ from Idle on RequestFloor
     transition Moving
 ```
 
-17) Collection: cross-collection transfer via scalar intermediary (design phase — not yet implemented)
+17) Collection: cross-collection transfer via scalar intermediary
 
 ```text
 queue<string> PendingReviewers
 stack<string> CompletedReviewers
+string Reviewer = ""
 
 from AwaitingReview on CompleteReview
   if PendingReviewers.count > 1
-    set Reviewer = PendingReviewers.peek
-    dequeue PendingReviewers
+    dequeue PendingReviewers into Reviewer
     push CompletedReviewers Reviewer
     no transition
   else
-    set Reviewer = PendingReviewers.peek
-    dequeue PendingReviewers
+    dequeue PendingReviewers into Reviewer
     push CompletedReviewers Reviewer
     transition FullyReviewed
 ```

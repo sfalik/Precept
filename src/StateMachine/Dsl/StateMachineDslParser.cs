@@ -17,6 +17,9 @@ public static class StateMachineDslParser
     private static readonly Regex DataFieldRegex = new(
         "^(?<type>string|number|boolean|null)(?<nullable>\\?)?\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\s*=\\s*(?<default>.+))?$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex CollectionFieldRegex = new(
+        "^(?<kind>set|queue|stack)<(?<inner>number|string|boolean)>\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex TransitionRegex = new(
         "^transition\\s+(?<from>[A-Za-z_][A-Za-z0-9_]*)\\s*->\\s*(?<to>[A-Za-z_][A-Za-z0-9_]*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+set\\s+(?<setKey>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<setExpr>.+))?$",
         RegexOptions.Compiled);
@@ -32,6 +35,27 @@ public static class StateMachineDslParser
     private static readonly Regex ElseRegex = new("^else$", RegexOptions.Compiled);
     private static readonly Regex SetRegex = new(
         "^set\\s+(?<setKey>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<setExpr>.+)$",
+        RegexOptions.Compiled);
+    private static readonly Regex AddRegex = new(
+        "^add\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)\\s+(?<expr>.+)$",
+        RegexOptions.Compiled);
+    private static readonly Regex RemoveRegex = new(
+        "^remove\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)\\s+(?<expr>.+)$",
+        RegexOptions.Compiled);
+    private static readonly Regex EnqueueRegex = new(
+        "^enqueue\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)\\s+(?<expr>.+)$",
+        RegexOptions.Compiled);
+    private static readonly Regex DequeueRegex = new(
+        "^dequeue\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+into\\s+(?<into>[A-Za-z_][A-Za-z0-9_]*))?$",
+        RegexOptions.Compiled);
+    private static readonly Regex PushRegex = new(
+        "^push\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)\\s+(?<expr>.+)$",
+        RegexOptions.Compiled);
+    private static readonly Regex PopRegex = new(
+        "^pop\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+into\\s+(?<into>[A-Za-z_][A-Za-z0-9_]*))?$",
+        RegexOptions.Compiled);
+    private static readonly Regex ClearRegex = new(
+        "^clear\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)$",
         RegexOptions.Compiled);
     private static readonly Regex SimpleTransitionRegex = new(
         "^transition\\s+(?<to>[A-Za-z_][A-Za-z0-9_]*)$",
@@ -50,6 +74,7 @@ public static class StateMachineDslParser
         var transitions = new List<DslTransition>();
         var terminalRules = new List<DslTerminalRule>();
         var dataFields = new List<DslFieldContract>();
+        var collectionFields = new List<DslCollectionFieldContract>();
 
         var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
         int i = 0;
@@ -117,11 +142,36 @@ public static class StateMachineDslParser
                 throw new InvalidOperationException($"Line {i + 1}: inline typed event arguments are not supported. Use 'event {eventName}' with optional indented argument declarations.");
             }
 
+            var collectionFieldMatch = CollectionFieldRegex.Match(line);
+            if (collectionFieldMatch.Success)
+            {
+                var fieldName = collectionFieldMatch.Groups["name"].Value;
+                if (dataFields.Any(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal)))
+                    throw new InvalidOperationException($"Line {i + 1}: duplicate data field '{fieldName}'.");
+                if (collectionFields.Any(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal)))
+                    throw new InvalidOperationException($"Line {i + 1}: duplicate collection field '{fieldName}'.");
+
+                var collectionKind = collectionFieldMatch.Groups["kind"].Value.ToLowerInvariant() switch
+                {
+                    "set" => DslCollectionKind.Set,
+                    "queue" => DslCollectionKind.Queue,
+                    "stack" => DslCollectionKind.Stack,
+                    _ => throw new InvalidOperationException($"Line {i + 1}: unknown collection kind '{collectionFieldMatch.Groups["kind"].Value}'.")
+                };
+                var innerType = ParseScalarType(collectionFieldMatch.Groups["inner"].Value);
+
+                collectionFields.Add(new DslCollectionFieldContract(fieldName, collectionKind, innerType));
+                i++;
+                continue;
+            }
+
             var dataFieldMatch = DataFieldRegex.Match(line);
             if (dataFieldMatch.Success)
             {
                 var fieldName = dataFieldMatch.Groups["name"].Value;
                 if (dataFields.Any(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal)))
+                    throw new InvalidOperationException($"Line {i + 1}: duplicate data field '{fieldName}'.");
+                if (collectionFields.Any(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal)))
                     throw new InvalidOperationException($"Line {i + 1}: duplicate data field '{fieldName}'.");
 
                 var fieldType = ParseScalarType(dataFieldMatch.Groups["type"].Value);
@@ -155,7 +205,9 @@ public static class StateMachineDslParser
                     fromOnMatch,
                     states,
                     transitions,
-                    terminalRules);
+                    terminalRules,
+                    collectionFields,
+                    dataFields);
                 continue;
             }
 
@@ -178,9 +230,9 @@ public static class StateMachineDslParser
         if (initialState is null)
             throw new InvalidOperationException("Exactly one state must be marked initial. Use 'state <Name> initial'.");
 
-        ValidateReferences(states, events, transitions, terminalRules, dataFields);
+        ValidateReferences(states, events, transitions, terminalRules, dataFields, collectionFields);
 
-        return new DslMachine(name, states, initialState, events, transitions, terminalRules, dataFields);
+        return new DslMachine(name, states, initialState, events, transitions, terminalRules, dataFields, collectionFields);
     }
 
     private static void ParseEventDeclaration(
@@ -243,7 +295,9 @@ public static class StateMachineDslParser
         Match fromOnMatch,
         IReadOnlyList<string> declaredStates,
         ICollection<DslTransition> transitions,
-        ICollection<DslTerminalRule> terminalRules)
+        ICollection<DslTerminalRule> terminalRules,
+        IReadOnlyList<DslCollectionFieldContract> collectionFields,
+        IReadOnlyList<DslFieldContract> dataFields)
     {
         var headerRaw = lines[index];
         var headerIndent = GetIndentation(headerRaw);
@@ -265,6 +319,7 @@ public static class StateMachineDslParser
         bool hasElseBranch = false;
 
         var pendingSets = new List<DslSetAssignment>();
+        var pendingMutations = new List<DslCollectionMutation>();
 
         index++;
         while (index < lines.Length)
@@ -303,7 +358,9 @@ public static class StateMachineDslParser
                     blockBranches,
                     blockTerminalRules,
                     ref branchOrder,
-                    ifMatch.Groups["guard"].Value.Trim());
+                    ifMatch.Groups["guard"].Value.Trim(),
+                    collectionFields,
+                    dataFields);
                 continue;
             }
 
@@ -328,7 +385,9 @@ public static class StateMachineDslParser
                     blockBranches,
                     blockTerminalRules,
                     ref branchOrder,
-                    elseIfMatch.Groups["guard"].Value.Trim());
+                    elseIfMatch.Groups["guard"].Value.Trim(),
+                    collectionFields,
+                    dataFields);
                 continue;
             }
 
@@ -349,7 +408,9 @@ public static class StateMachineDslParser
                     eventName,
                     blockBranches,
                     blockTerminalRules,
-                    ref branchOrder);
+                    ref branchOrder,
+                    collectionFields,
+                    dataFields);
 
                 reachedTerminalStatement = true;
                 continue;
@@ -361,6 +422,16 @@ public static class StateMachineDslParser
                 if (hasIfChain && !hasElseBranch)
                     throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
                 pendingSets.Add(ParseSetAssignment(setAtBlock, index + 1));
+                index++;
+                continue;
+            }
+
+            var mutationResult = TryParseCollectionMutation(line, index + 1, collectionFields, dataFields);
+            if (mutationResult is not null)
+            {
+                if (hasIfChain && !hasElseBranch)
+                    throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
+                pendingMutations.Add(mutationResult);
                 index++;
                 continue;
             }
@@ -379,11 +450,13 @@ public static class StateMachineDslParser
                         eventName,
                         null,
                         pendingSets.ToArray(),
-                        branchOrder));
+                        branchOrder,
+                        pendingMutations.Count > 0 ? pendingMutations.ToArray() : null));
                 }
                 branchOrder++;
 
                 pendingSets.Clear();
+                pendingMutations.Clear();
                 reachedTerminalStatement = true;
                 index++;
                 continue;
@@ -394,9 +467,10 @@ public static class StateMachineDslParser
                 if (hasIfChain && !hasElseBranch)
                     throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
                 foreach (var sourceState in sourceStates)
-                    blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, DslTerminalKind.NoTransition, null, null, pendingSets.Count > 0 ? pendingSets.ToArray() : null, branchOrder));
+                    blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, DslTerminalKind.NoTransition, null, null, pendingSets.Count > 0 ? pendingSets.ToArray() : null, branchOrder, pendingMutations.Count > 0 ? pendingMutations.ToArray() : null));
 
                 pendingSets.Clear();
+                pendingMutations.Clear();
                 branchOrder++;
                 reachedTerminalStatement = true;
                 index++;
@@ -421,7 +495,7 @@ public static class StateMachineDslParser
             throw new InvalidOperationException($"Line {index + 1}: unrecognized statement '{line}' inside from/on block.");
         }
 
-        if (pendingSets.Count > 0)
+        if (pendingSets.Count > 0 || pendingMutations.Count > 0)
             throw new InvalidOperationException($"Line {index}: set requires a following transition.");
 
         if (!reachedTerminalStatement)
@@ -443,9 +517,12 @@ public static class StateMachineDslParser
         ICollection<DslTransition> blockBranches,
         ICollection<DslTerminalRule> blockTerminalRules,
         ref int branchOrder,
-        string guardExpression)
+        string guardExpression,
+        IReadOnlyList<DslCollectionFieldContract> collectionFields,
+        IReadOnlyList<DslFieldContract> dataFields)
     {
         var branchSets = new List<DslSetAssignment>();
+        var branchMutations = new List<DslCollectionMutation>();
         string? branchTargetState = null;
         bool hasNoTransitionOutcome = false;
 
@@ -468,6 +545,14 @@ public static class StateMachineDslParser
             if (setMatch.Success)
             {
                 branchSets.Add(ParseSetAssignment(setMatch, index + 1));
+                index++;
+                continue;
+            }
+
+            var mutationResult = TryParseCollectionMutation(nestedLine, index + 1, collectionFields, dataFields);
+            if (mutationResult is not null)
+            {
+                branchMutations.Add(mutationResult);
                 index++;
                 continue;
             }
@@ -496,7 +581,7 @@ public static class StateMachineDslParser
             if (RejectRegex.IsMatch(nestedLine))
                 throw new InvalidOperationException($"Line {index + 1}: if/else if branches support 'transition <State>' or 'no transition'; use else or a block outcome statement for reject.");
 
-            throw new InvalidOperationException($"Line {index + 1}: expected 'set <Key> = <Expr>', 'transition <State>', or 'no transition' inside if-branch.");
+            throw new InvalidOperationException($"Line {index + 1}: expected 'set <Key> = <Expr>', collection mutation, 'transition <State>', or 'no transition' inside if-branch.");
         }
 
         if (string.IsNullOrWhiteSpace(branchTargetState) && !hasNoTransitionOutcome)
@@ -505,7 +590,7 @@ public static class StateMachineDslParser
         if (hasNoTransitionOutcome)
         {
             foreach (var sourceState in sourceStates)
-                blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, DslTerminalKind.NoTransition, null, guardExpression, branchSets.Count > 0 ? branchSets.ToArray() : null, branchOrder));
+                blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, DslTerminalKind.NoTransition, null, guardExpression, branchSets.Count > 0 ? branchSets.ToArray() : null, branchOrder, branchMutations.Count > 0 ? branchMutations.ToArray() : null));
 
             branchOrder++;
             return;
@@ -519,7 +604,8 @@ public static class StateMachineDslParser
                 eventName,
                 guardExpression,
                 branchSets.ToArray(),
-                branchOrder));
+                branchOrder,
+                branchMutations.Count > 0 ? branchMutations.ToArray() : null));
         }
 
         branchOrder++;
@@ -533,9 +619,12 @@ public static class StateMachineDslParser
         string eventName,
         ICollection<DslTransition> blockBranches,
         ICollection<DslTerminalRule> blockTerminalRules,
-        ref int branchOrder)
+        ref int branchOrder,
+        IReadOnlyList<DslCollectionFieldContract> collectionFields,
+        IReadOnlyList<DslFieldContract> dataFields)
     {
         var branchSets = new List<DslSetAssignment>();
+        var branchMutations = new List<DslCollectionMutation>();
         string? branchTargetState = null;
         DslTerminalKind? branchTerminalKind = null;
         string? branchTerminalReason = null;
@@ -563,6 +652,14 @@ public static class StateMachineDslParser
             if (setMatch.Success)
             {
                 branchSets.Add(ParseSetAssignment(setMatch, index + 1));
+                index++;
+                continue;
+            }
+
+            var mutationResult = TryParseCollectionMutation(nestedLine, index + 1, collectionFields, dataFields);
+            if (mutationResult is not null)
+            {
+                branchMutations.Add(mutationResult);
                 index++;
                 continue;
             }
@@ -611,7 +708,8 @@ public static class StateMachineDslParser
                     eventName,
                     null,
                     branchSets.ToArray(),
-                    branchOrder));
+                    branchOrder,
+                    branchMutations.Count > 0 ? branchMutations.ToArray() : null));
             }
 
             branchOrder++;
@@ -620,9 +718,123 @@ public static class StateMachineDslParser
         }
 
         foreach (var sourceState in sourceStates)
-            blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, branchTerminalKind!.Value, branchTerminalReason, null, branchSets.Count > 0 ? branchSets.ToArray() : null, branchOrder));
+            blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, branchTerminalKind!.Value, branchTerminalReason, null, branchSets.Count > 0 ? branchSets.ToArray() : null, branchOrder, branchMutations.Count > 0 ? branchMutations.ToArray() : null));
 
         branchOrder++;
+    }
+
+    private static DslCollectionMutation? TryParseCollectionMutation(
+        string line,
+        int lineNumber,
+        IReadOnlyList<DslCollectionFieldContract> collectionFields,
+        IReadOnlyList<DslFieldContract> dataFields)
+    {
+        // Try each mutation verb
+        var addMatch = AddRegex.Match(line);
+        if (addMatch.Success)
+            return BuildMutation(DslCollectionMutationVerb.Add, addMatch.Groups["field"].Value, addMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, DslCollectionKind.Set);
+
+        var removeMatch = RemoveRegex.Match(line);
+        if (removeMatch.Success)
+            return BuildMutation(DslCollectionMutationVerb.Remove, removeMatch.Groups["field"].Value, removeMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, DslCollectionKind.Set);
+
+        var enqueueMatch = EnqueueRegex.Match(line);
+        if (enqueueMatch.Success)
+            return BuildMutation(DslCollectionMutationVerb.Enqueue, enqueueMatch.Groups["field"].Value, enqueueMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, DslCollectionKind.Queue);
+
+        var dequeueMatch = DequeueRegex.Match(line);
+        if (dequeueMatch.Success)
+        {
+            string? intoField = dequeueMatch.Groups["into"].Success ? dequeueMatch.Groups["into"].Value : null;
+            return BuildMutationNoExpr(DslCollectionMutationVerb.Dequeue, dequeueMatch.Groups["field"].Value, lineNumber, collectionFields, DslCollectionKind.Queue, dataFields, intoField);
+        }
+
+        var pushMatch = PushRegex.Match(line);
+        if (pushMatch.Success)
+            return BuildMutation(DslCollectionMutationVerb.Push, pushMatch.Groups["field"].Value, pushMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, DslCollectionKind.Stack);
+
+        var popMatch = PopRegex.Match(line);
+        if (popMatch.Success)
+        {
+            string? intoField = popMatch.Groups["into"].Success ? popMatch.Groups["into"].Value : null;
+            return BuildMutationNoExpr(DslCollectionMutationVerb.Pop, popMatch.Groups["field"].Value, lineNumber, collectionFields, DslCollectionKind.Stack, dataFields, intoField);
+        }
+
+        var clearMatch = ClearRegex.Match(line);
+        if (clearMatch.Success)
+        {
+            var fieldName = clearMatch.Groups["field"].Value;
+            var field = collectionFields.FirstOrDefault(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal));
+            if (field is null)
+                throw new InvalidOperationException($"Line {lineNumber}: 'clear' targets unknown collection field '{fieldName}'.");
+
+            return new DslCollectionMutation(DslCollectionMutationVerb.Clear, fieldName, null, null);
+        }
+
+        return null;
+    }
+
+    private static DslCollectionMutation BuildMutation(
+        DslCollectionMutationVerb verb,
+        string fieldName,
+        string expressionText,
+        int lineNumber,
+        IReadOnlyList<DslCollectionFieldContract> collectionFields,
+        DslCollectionKind requiredKind)
+    {
+        var field = collectionFields.FirstOrDefault(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal));
+        if (field is null)
+            throw new InvalidOperationException($"Line {lineNumber}: '{verb.ToString().ToLowerInvariant()}' targets unknown collection field '{fieldName}'.");
+
+        if (field.CollectionKind != requiredKind)
+            throw new InvalidOperationException($"Line {lineNumber}: '{verb.ToString().ToLowerInvariant()}' is not valid on {field.CollectionKind.ToString().ToLowerInvariant()}<{field.InnerType.ToString().ToLowerInvariant()}> field '{fieldName}'.");
+
+        try
+        {
+            var expression = DslExpressionParser.Parse(expressionText);
+            return new DslCollectionMutation(verb, fieldName, expressionText, expression);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new InvalidOperationException($"Line {lineNumber}: invalid expression '{expressionText}'. {ex.Message}");
+        }
+    }
+
+    private static DslCollectionMutation BuildMutationNoExpr(
+        DslCollectionMutationVerb verb,
+        string fieldName,
+        int lineNumber,
+        IReadOnlyList<DslCollectionFieldContract> collectionFields,
+        DslCollectionKind requiredKind,
+        IReadOnlyList<DslFieldContract> dataFields,
+        string? intoFieldName = null)
+    {
+        var field = collectionFields.FirstOrDefault(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal));
+        if (field is null)
+            throw new InvalidOperationException($"Line {lineNumber}: '{verb.ToString().ToLowerInvariant()}' targets unknown collection field '{fieldName}'.");
+
+        if (field.CollectionKind != requiredKind)
+            throw new InvalidOperationException($"Line {lineNumber}: '{verb.ToString().ToLowerInvariant()}' is not valid on {field.CollectionKind.ToString().ToLowerInvariant()}<{field.InnerType.ToString().ToLowerInvariant()}> field '{fieldName}'.");
+
+        if (intoFieldName is not null)
+        {
+            var targetField = dataFields.FirstOrDefault(f => string.Equals(f.Name, intoFieldName, StringComparison.Ordinal));
+            if (targetField is null)
+            {
+                // Check if it's a collection field (not allowed)
+                var isCollection = collectionFields.Any(f => string.Equals(f.Name, intoFieldName, StringComparison.Ordinal));
+                if (isCollection)
+                    throw new InvalidOperationException($"Line {lineNumber}: 'into' target '{intoFieldName}' is a collection field. The target must be a scalar data field.");
+
+                throw new InvalidOperationException($"Line {lineNumber}: 'into' target '{intoFieldName}' is not a declared data field.");
+            }
+
+            // Validate type compatibility: the scalar field's type must match the collection's inner type
+            if (targetField.Type != field.InnerType)
+                throw new InvalidOperationException($"Line {lineNumber}: type mismatch — 'into' target '{intoFieldName}' is {targetField.Type.ToString().ToLowerInvariant()}{(targetField.IsNullable ? "?" : "")} but collection '{fieldName}' has inner type {field.InnerType.ToString().ToLowerInvariant()}.");
+        }
+
+        return new DslCollectionMutation(verb, fieldName, null, null, intoFieldName);
     }
 
     private static string Unquote(string value)
@@ -764,7 +976,8 @@ public static class StateMachineDslParser
         IReadOnlyCollection<DslEvent> events,
         IReadOnlyCollection<DslTransition> transitions,
         IReadOnlyCollection<DslTerminalRule> terminalRules,
-        IReadOnlyCollection<DslFieldContract> dataFields)
+        IReadOnlyCollection<DslFieldContract> dataFields,
+        IReadOnlyCollection<DslCollectionFieldContract> collectionFields)
     {
         var stateSet = new HashSet<string>(states, StringComparer.Ordinal);
         var eventSet = new HashSet<string>(events.Select(e => e.Name), StringComparer.Ordinal);

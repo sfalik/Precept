@@ -42,7 +42,9 @@ internal sealed class SmSemanticTokensHandler : SemanticTokensHandlerBase
     [
         "machine", "state", "initial", "event", "from", "on", "if", "else",
         "transition", "set", "reject", "reason", "no", "any",
-        "true", "false", "null", "string", "number", "boolean"
+        "true", "false", "null", "string", "number", "boolean",
+        "add", "remove", "enqueue", "dequeue", "push", "pop", "clear",
+        "contains", "queue", "stack", "into"
     ];
 
     protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities)

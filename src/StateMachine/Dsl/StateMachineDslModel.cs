@@ -9,7 +9,8 @@ public sealed record DslMachine(
     IReadOnlyList<DslEvent> Events,
     IReadOnlyList<DslTransition> Transitions,
     IReadOnlyList<DslTerminalRule> TerminalRules,
-    IReadOnlyList<DslFieldContract> DataFields);
+    IReadOnlyList<DslFieldContract> DataFields,
+    IReadOnlyList<DslCollectionFieldContract> CollectionFields);
 
 public sealed record DslEvent(
     string Name,
@@ -21,6 +22,18 @@ public sealed record DslFieldContract(
     bool IsNullable,
     bool HasDefaultValue = false,
     object? DefaultValue = null);
+
+public sealed record DslCollectionFieldContract(
+    string Name,
+    DslCollectionKind CollectionKind,
+    DslScalarType InnerType);
+
+public enum DslCollectionKind
+{
+    Set,
+    Queue,
+    Stack
+}
 
 public enum DslScalarType
 {
@@ -47,13 +60,32 @@ public sealed record DslSetAssignment(
     string ExpressionText,
     DslExpression Expression);
 
+public sealed record DslCollectionMutation(
+    DslCollectionMutationVerb Verb,
+    string TargetField,
+    string? ExpressionText,
+    DslExpression? Expression,
+    string? IntoField = null);
+
+public enum DslCollectionMutationVerb
+{
+    Add,
+    Remove,
+    Enqueue,
+    Dequeue,
+    Push,
+    Pop,
+    Clear
+}
+
 public sealed record DslTransition(
     string FromState,
     string ToState,
     string EventName,
     string? GuardExpression,
     IReadOnlyList<DslSetAssignment> SetAssignments,
-    int Order = 0);
+    int Order = 0,
+    IReadOnlyList<DslCollectionMutation>? CollectionMutations = null);
 
 public sealed record DslTerminalRule(
     string FromState,
@@ -62,7 +94,8 @@ public sealed record DslTerminalRule(
     string? Reason,
     string? GuardExpression = null,
     IReadOnlyList<DslSetAssignment>? SetAssignments = null,
-    int Order = 0);
+    int Order = 0,
+    IReadOnlyList<DslCollectionMutation>? CollectionMutations = null);
 
 public enum DslTerminalKind
 {
