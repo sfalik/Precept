@@ -1,26 +1,39 @@
 machine Test
 
-string? LastAdded
-string? LastRemoved
-queue<string> Names
+number balance = 0
+number overdraftLimit = 100
 
-state Start initial
-state End
+rule balance >= 0 - overdraftLimit "Balance must be within overdraft limit"
 
-event add
-    string Name
-event remove
+state GoodStanding initial
+state Overdrawn
 
-from Start on add
- if add.Name != ""
-    enqueue Names add.Name
+event Deposit
+    number amount
+        rule amount > 0 "Deposit amount must be positive"
+event Withdraw
+    number amount
+        rule amount > 0 "Withdraw amount must be positive"
+
+from GoodStanding on Deposit   
+    set balance = balance +Deposit.amount
     no transition
- else
-    reject "Name cannot be empty"
 
-from Start on remove
-    if Names.count > 0
-        dequeue Names into LastRemoved
+from GoodStanding on Withdraw
+    if balance - Withdraw.amount >= 0 
+        set balance = balance - Withdraw.amount
         no transition
     else
-        transition End
+        set balance = balance - Withdraw.amount
+        transition Overdrawn
+
+from Overdrawn on Deposit
+    if balance + Deposit.amount >= 0 
+        set balance = balance + Deposit.amount
+        transition GoodStanding
+    else
+        set balance = balance + Deposit.amount
+        no transition
+
+from Overdrawn on Withdraw
+    reject "Cannot withdraw from an overdrawn account"

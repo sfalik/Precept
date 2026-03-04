@@ -655,6 +655,55 @@
       }
     }
 
+    .rule-violations-banner {
+      background: rgba(255, 165, 0, 0.12);
+      border: 1px solid rgba(255, 165, 0, 0.4);
+      border-radius: 6px;
+      padding: 6px 8px;
+      margin-bottom: 6px;
+      font-size: 11px;
+      color: #ffb347;
+      flex-shrink: 0;
+    }
+
+    .rule-violations-banner ul {
+      margin: 4px 0 0;
+      padding-left: 14px;
+    }
+
+    .rule-violations-banner li {
+      border: none !important;
+      padding: 2px 0 !important;
+      justify-content: flex-start !important;
+      font-size: 11px;
+      background: transparent !important;
+    }
+
+    .data-rule-icon {
+      font-size: 9px;
+      opacity: 0.75;
+      margin-left: 3px;
+      cursor: help;
+      color: #ffb347;
+    }
+
+    .state-rules-indicator {
+      margin-bottom: 4px;
+      flex-shrink: 0;
+    }
+
+    .state-rules-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      font-size: 10px;
+      color: #ffb347;
+      border: 1px solid rgba(255, 165, 0, 0.35);
+      border-radius: 3px;
+      padding: 1px 5px;
+      cursor: help;
+    }
+
   </style>
 </head>
 <body>
@@ -676,6 +725,8 @@
           <div id="diagram-toast" class="diagram-toast" aria-live="polite"></div>
         </div>
         <div class="data-overlay" aria-label="data overlay">
+          <div id="rule-violations-banner" class="rule-violations-banner" hidden></div>
+          <div id="state-rules-indicator" class="state-rules-indicator" hidden></div>
           <ul id="data-list" class="data-list"></ul>
         </div>
       </div>
@@ -715,7 +766,7 @@
       const args = {};
       let hasAny = false;
       argDefs.forEach((arg) => {
-        const raw = eventArgValues[arg.name];
+        const raw = eventArgValues[eventName + ':' + arg.name];
         if (raw !== undefined && raw !== '') {
           args[arg.name] = raw;
           hasAny = true;
@@ -756,14 +807,15 @@
         // Preserve focus across re-render
         const focused = document.activeElement;
         const focusedArgName = focused?.dataset?.eventArg;
+        const focusedEventName = focused?.dataset?.event;
         const caretPos = focused?.selectionStart;
 
         suppressArgBlur = true;
         renderEventBar();
         suppressArgBlur = false;
 
-        if (focusedArgName) {
-          const refocus = eventBar.querySelector(`input[data-event-arg="${focusedArgName}"]`);
+        if (focusedArgName && focusedEventName) {
+          const refocus = eventBar.querySelector(`input[data-event="${focusedEventName}"][data-event-arg="${focusedArgName}"]`);
           if (refocus) {
             refocus.focus();
             if (typeof caretPos === 'number') {
@@ -772,7 +824,7 @@
           }
         }
         drawDiagram();
-      }, 150);
+      }, 30);
     }
 
     const diagram = document.getElementById('diagram');
@@ -795,6 +847,8 @@
     let suppressArgBlur = false;
     let reloadButtonFeedbackTimer = null;
     let currentEventStatuses = [];
+    let currentActiveRuleViolations = [];
+    let currentRuleDefinitions = [];
     let transitionPaths = new Map();
     let nodeSizes = {};
     let diagramBounds = { width: 920, height: 430 };
@@ -1045,6 +1099,18 @@
       currentEventStatuses = (Array.isArray(snapshotEvents) ? snapshotEvents : [])
         .map(toHostEventStatus)
         .filter((status) => status !== null);
+
+      const rawViolations = snapshot.activeRuleViolations ?? snapshot.ActiveRuleViolations;
+      currentActiveRuleViolations = Array.isArray(rawViolations) ? rawViolations.map(String) : [];
+
+      const rawRuleDefs = snapshot.ruleDefinitions ?? snapshot.RuleDefinitions;
+      currentRuleDefinitions = Array.isArray(rawRuleDefs)
+        ? rawRuleDefs.map((r) => ({
+          scope: String(r.scope ?? r.Scope ?? ''),
+          expression: String(r.expression ?? r.Expression ?? ''),
+          reason: String(r.reason ?? r.Reason ?? '')
+        }))
+        : [];
 
       selectedTransitionIndex = transitions.findIndex((transition) => transition.from === currentState);
       if (selectedTransitionIndex < 0) {
@@ -1357,6 +1423,7 @@
             return {
               kind: 'blocked',
               reason: reason ?? 'blocked',
+              reasons: liveStatus.reasons,
               meta: 'runtime blocked'
             };
           }
@@ -1364,6 +1431,7 @@
           return {
             kind: 'undefined',
             reason: reason ?? `no transition from ${state}`,
+            reasons: liveStatus.reasons,
             meta: 'runtime undefined'
           };
         }
@@ -1491,6 +1559,10 @@
     function getEvaluationReason(evaluation) {
       if (evaluation.kind !== 'blocked' && evaluation.kind !== 'undefined') {
         return '';
+      }
+
+      if (evaluation.reasons && evaluation.reasons.length > 1) {
+        return evaluation.reasons.join(' · ');
       }
 
       if (evaluation.reason && evaluation.reason.trim().length > 0) {
@@ -2173,7 +2245,7 @@
           const argDefs = getEventArgDefinitions(eventName);
           const inlineArgs = argDefs.length > 0
             ? `<span class="event-args-inline">${argDefs.map((arg) => {
-                const userVal = eventArgValues[arg.name];
+                const userVal = eventArgValues[eventName + ':' + arg.name];
                 const displayVal = userVal !== undefined ? userVal : (arg.hasDefaultValue ? formatArgDefault(arg.defaultValue) : '');
                 const placeholder = arg.hasDefaultValue
                   ? formatArgDefault(arg.defaultValue)
@@ -2252,7 +2324,7 @@
         const argName = btn.dataset.eventArg;
         btn.addEventListener('click', (event) => {
           event.stopPropagation();
-          eventArgValues[argName] = null;
+          eventArgValues[ownerEventName + ':' + argName] = null;
           hoveredEventName = ownerEventName;
           inspectEventOnServer(ownerEventName);
           suppressArgBlur = true;
@@ -2266,7 +2338,7 @@
         const argName = seg.dataset.eventArg;
         seg.addEventListener('click', (event) => {
           event.stopPropagation();
-          eventArgValues[argName] = seg.dataset.val;
+          eventArgValues[ownerEventName + ':' + argName] = seg.dataset.val;
           hoveredEventName = ownerEventName;
           inspectEventOnServer(ownerEventName);
           suppressArgBlur = true;
@@ -2310,8 +2382,7 @@
 
         input.addEventListener('input', () => {
           const argName = input.dataset.eventArg;
-          const focusedArgName = argName;
-          eventArgValues[argName] = input.value;
+          eventArgValues[ownerEventName + ':' + argName] = input.value;
 
           // Ask the server to re-evaluate with the current arg values
           inspectEventOnServer(ownerEventName);
@@ -2324,7 +2395,7 @@
           suppressArgBlur = false;
 
           // Restore focus to the same input field after re-render
-          const refocusInput = eventBar.querySelector(`input[data-event-arg="${focusedArgName}"]`);
+          const refocusInput = eventBar.querySelector(`input[data-event="${ownerEventName}"][data-event-arg="${argName}"]`);
           if (refocusInput) {
             refocusInput.focus();
             const len = refocusInput.value.length;
@@ -2358,7 +2429,11 @@
 
       const response = await sendHostRequest('fire', { eventName, args });
       if (!response.success || !response.snapshot) {
-        showRowFeedback(eventName, `✖ ${response.error || `Event '${eventName}' did not fire.`}`, 'err');
+        const allErrors = response.errors ?? response.Errors;
+        const errMsg = Array.isArray(allErrors) && allErrors.length > 1
+          ? `✖ ${allErrors.join(' · ')}`
+          : `✖ ${response.error || `Event '${eventName}' did not fire.`}`;
+        showRowFeedback(eventName, errMsg, 'err');
         renderAll();
         return;
       }
@@ -2387,14 +2462,49 @@
     }
 
     function renderData() {
+      const violationsBanner = document.getElementById('rule-violations-banner');
+      if (violationsBanner) {
+        if (currentActiveRuleViolations.length > 0) {
+          const items = currentActiveRuleViolations
+            .map((v) => `<li>${v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>`)
+            .join('');
+          violationsBanner.innerHTML = `<strong>⚠ Rule violations:</strong><ul>${items}</ul>`;
+          violationsBanner.removeAttribute('hidden');
+        } else {
+          violationsBanner.innerHTML = '';
+          violationsBanner.setAttribute('hidden', '');
+        }
+      }
+
+      const stateRulesIndicator = document.getElementById('state-rules-indicator');
+      if (stateRulesIndicator) {
+        const stateRules = currentRuleDefinitions.filter((r) => r.scope === `state:${currentState}`);
+        if (stateRules.length > 0) {
+          const tooltip = stateRules.map((r) => r.reason).join('; ').replace(/"/g, '&quot;');
+          stateRulesIndicator.innerHTML = `<span class="state-rules-badge" title="${tooltip}">⚠ ${stateRules.length} state rule${stateRules.length !== 1 ? 's' : ''} on entry</span>`;
+          stateRulesIndicator.removeAttribute('hidden');
+        } else {
+          stateRulesIndicator.innerHTML = '';
+          stateRulesIndicator.setAttribute('hidden', '');
+        }
+      }
+
       dataList.innerHTML = Object.entries(data)
         .map(([key, value]) => {
           const hasToast = dataFieldToasts.has(key);
           const detail = dataFieldToastDetails.get(key);
+          const fieldRules = currentRuleDefinitions.filter((r) => r.scope === `field:${key}`);
+          const hasFieldRule = fieldRules.length > 0;
+          const ruleTooltip = hasFieldRule
+            ? fieldRules.map((r) => `expr: ${r.expression}\nreason: ${r.reason}`).join('\n---\n').replace(/"/g, '&quot;')
+            : '';
+          const ruleIcon = hasFieldRule
+            ? `<span class="data-rule-icon" title="${ruleTooltip}">⚠</span>`
+            : '';
 
           return `
             <li>
-              <span class="data-key">${key}</span>
+              <span class="data-key">${key}${ruleIcon}</span>
               <span class="data-value-stack">
                 ${hasToast && detail
                   ? `<span class="data-value-toast show">${detail.before} → ${detail.after}</span>`

@@ -123,7 +123,7 @@
       "patterns": [
         {
           "name": "keyword.control.state-machine-dsl",
-          "match": "\\b(machine|state|event|from|on|if|else)\\b"
+          "match": "\\b(machine|state|event|from|on|if|else|initial)\\b"
         }
       ]
     },
@@ -131,7 +131,7 @@
       "patterns": [
         {
           "name": "keyword.other.state-machine-dsl",
-          "match": "\\b(transition|reject|set|reason|any)\\b"
+          "match": "\\b(transition|reject|set|reason|any|rule|add|remove|enqueue|dequeue|push|pop|clear|into|contains|above|below)\\b"
         },
         {
           "name": "keyword.other.state-machine-dsl",
@@ -144,6 +144,10 @@
         {
           "name": "storage.type.state-machine-dsl",
           "match": "\\b(string|number|boolean|null)\\??\\b"
+        },
+        {
+          "name": "storage.type.state-machine-dsl",
+          "match": "\\b(set|queue|stack)<(string|number|boolean)>\\b"
         }
       ]
     },

@@ -279,6 +279,17 @@ Event rules  →  Guard evaluation  →  Set execution  →  Field/top-level rul
 - If inspect simulates set assignments on a scratch copy, field/top-level/state rules can be checked against the simulated result
 - This gives a full preview: "would this fire succeed or fail, and why?"
 
+### Preview snapshot includes rule metadata
+
+The `SmPreviewSnapshot` record (in `SmPreviewProtocol.cs`) carries two optional fields populated by `BuildSnapshot` in `SmPreviewHandler.cs`:
+
+- **`ActiveRuleViolations`** (`IReadOnlyList<string>?`): flat list of all rule reason strings currently violated by the live instance's data and current state. Populated by `DslWorkflowDefinition.EvaluateCurrentRules(instance)`, which internally calls `EvaluateDataRules` (field + top-level rules) and `EvaluateStateRules` (current state entry rules). `null` when no rules are violated.
+- **`RuleDefinitions`** (`IReadOnlyList<SmPreviewRuleInfo>?`): all rule declarations in the machine — field rules (scope `"field:<Name>"`), top-level rules (scope `"topLevel"`), state rules (scope `"state:<StateName>"`), and event rules (scope `"event:<EventName>"`). `null` when the machine has no rules.
+
+`SmPreviewResponse` also carries `Errors` (`IReadOnlyList<string>?`): when a fire is rejected, `Errors` contains the full list of all failure reasons (not just the first). The existing `Error` field is preserved with the first reason for backward compatibility.
+
+The webview uses `activeRuleViolations` to render an amber violations banner above the data table, `ruleDefinitions` to annotate data rows with field rule icons and tooltips and to show state rule badges, and `errors` to display all fire failure reasons in the feedback toast.
+
 ## Nullable Behaviour in Rules
 
 Rules inherit the general compile-time null safety model (cross-branch narrowing, strict null checking across all expression sites). No rules-specific null semantics are needed — the same infrastructure applies.

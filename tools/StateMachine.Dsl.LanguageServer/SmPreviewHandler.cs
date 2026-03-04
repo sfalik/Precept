@@ -97,7 +97,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         if (!fire.IsAccepted)
         {
             var reason = fire.Reasons.FirstOrDefault() ?? $"Event '{request.EventName}' did not fire.";
-            return new SmPreviewResponse(false, Error: reason, Snapshot: BuildSnapshot(session));
+            return new SmPreviewResponse(false, Error: reason, Errors: fire.Reasons, Snapshot: BuildSnapshot(session));
         }
 
         return new SmPreviewResponse(true, Snapshot: BuildSnapshot(session));
@@ -258,6 +258,24 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
                 (int)d.Range.Start.Character))
             .ToArray();
 
+        var activeRuleViolations = session.Definition.EvaluateCurrentRules(session.Instance);
+
+        var ruleDefinitions = new List<SmPreviewRuleInfo>();
+        foreach (var field in session.Machine.DataFields.Where(f => f.Rules is not null))
+            foreach (var rule in field.Rules!)
+                ruleDefinitions.Add(new SmPreviewRuleInfo($"field:{field.Name}", rule.ExpressionText, rule.Reason));
+        foreach (var field in session.Machine.CollectionFields.Where(f => f.Rules is not null))
+            foreach (var rule in field.Rules!)
+                ruleDefinitions.Add(new SmPreviewRuleInfo($"field:{field.Name}", rule.ExpressionText, rule.Reason));
+        foreach (var rule in session.Machine.TopLevelRules ?? Array.Empty<DslRule>())
+            ruleDefinitions.Add(new SmPreviewRuleInfo("topLevel", rule.ExpressionText, rule.Reason));
+        foreach (var (stateName, stateRuleList) in session.Machine.StateRules ?? (IReadOnlyDictionary<string, IReadOnlyList<DslRule>>)new Dictionary<string, IReadOnlyList<DslRule>>())
+            foreach (var rule in stateRuleList)
+                ruleDefinitions.Add(new SmPreviewRuleInfo($"state:{stateName}", rule.ExpressionText, rule.Reason));
+        foreach (var evt in session.Machine.Events.Where(e => e.Rules is not null && e.Rules.Count > 0))
+            foreach (var rule in evt.Rules!)
+                ruleDefinitions.Add(new SmPreviewRuleInfo($"event:{evt.Name}", rule.ExpressionText, rule.Reason));
+
         return new SmPreviewSnapshot(
             session.Definition.Name,
             session.Instance.CurrentState,
@@ -265,7 +283,9 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
             transitions,
             events,
             new Dictionary<string, object?>(session.Instance.InstanceData, StringComparer.Ordinal),
-            diagnostics);
+            diagnostics,
+            activeRuleViolations.Count > 0 ? activeRuleViolations : null,
+            ruleDefinitions.Count > 0 ? ruleDefinitions : null);
     }
 
     private static string ResolveText(SmPreviewRequest request)

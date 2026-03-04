@@ -20,7 +20,8 @@ internal sealed record SmPreviewResponse(
     string? Error = null,
     SmPreviewSnapshot? Snapshot = null,
     IReadOnlyList<string>? ReplayMessages = null,
-    SmPreviewEventStatus? InspectResult = null);
+    SmPreviewEventStatus? InspectResult = null,
+    IReadOnlyList<string>? Errors = null);
 
 internal sealed record SmPreviewSnapshot(
     string WorkflowName,
@@ -29,7 +30,11 @@ internal sealed record SmPreviewSnapshot(
     IReadOnlyList<SmPreviewTransition> Transitions,
     IReadOnlyList<SmPreviewEventStatus> Events,
     IReadOnlyDictionary<string, object?> Data,
-    IReadOnlyList<SmPreviewDiagnostic> Diagnostics);
+    IReadOnlyList<SmPreviewDiagnostic> Diagnostics,
+    IReadOnlyList<string>? ActiveRuleViolations = null,
+    IReadOnlyList<SmPreviewRuleInfo>? RuleDefinitions = null);
+
+internal sealed record SmPreviewRuleInfo(string Scope, string Expression, string Reason);
 
 internal sealed record SmPreviewTransition(
     string From,

@@ -450,6 +450,8 @@ Inspect integration: extend the existing Inspect response to include an `Editabl
 
 Language server: recognize `edit` after `from <states>` as alternative to `on <event>`. Parse indented field names. Validate field and state references. Suggest `edit` in completions after `from <states>`. Suggest field names inside edit block body. Highlight `edit` keyword and field references with semantic tokens.
 
+Preview UI needs to be updated to support editing of fields inline in the data panel according to the definition defining which fields are editable for the current state.  While editing, the rules should be checked and the input box highlighted red when rules are violated.
+
 Tests: add comprehensive tests covering edit block parsing, multi-state edit blocks, `from any edit`, additive semantics across overlapping blocks, Update API with scalar fields, Update with collection fields (all types), editability enforcement per state, type checking, rules enforcement on update, atomic rollback on rule violation, patch conflict detection, inspect editable fields response, and coexistence of edit blocks with event transitions.
 
 Documentation: update docs/DesignNotes.md DSL Syntax Contract section to include edit block syntax. Update README.md DSL Syntax Reference, DSL Cookbook, and Status sections. Update docs/EditableFieldsDesign.md status from design phase to implemented.

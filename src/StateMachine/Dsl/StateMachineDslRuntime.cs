@@ -459,6 +459,19 @@ public sealed class DslWorkflowDefinition
         return DslInstanceFireResult.Accepted(instance.CurrentState, eventName, targetState, updated);
     }
 
+    /// <summary>
+    /// Evaluates all field rules, top-level rules, and the current state's entry rules against the
+    /// instance's current data. Returns a flat list of violated rule reason strings. An empty list
+    /// means all rules are satisfied. Never throws — violations are collected without short-circuiting.
+    /// </summary>
+    public IReadOnlyList<string> EvaluateCurrentRules(DslWorkflowInstance instance)
+    {
+        var violations = new List<string>();
+        violations.AddRange(EvaluateDataRules(instance.InstanceData));
+        violations.AddRange(EvaluateStateRules(instance.CurrentState, instance.InstanceData));
+        return violations;
+    }
+
     private TransitionResolution ResolveTransition(
         string currentState,
         string eventName,
