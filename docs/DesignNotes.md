@@ -95,16 +95,32 @@ event <EventName>
 <string|number|boolean|null>[?] <FieldName> { <FieldDecl> }
 <string|number|boolean|null>[?] <FieldName> [= <Literal>]
 
+# Collection field declarations (design phase — not yet implemented)
+set<T> <FieldName>                  # sorted unique set, always starts empty
+queue<T> <FieldName>                # FIFO ordered, allows duplicates, always starts empty
+stack<T> <FieldName>                # LIFO ordered, allows duplicates, always starts empty
+<T> := number | string | boolean    # no nullable inner types, no nesting
+
 from <any|StateA[,StateB...]> on <EventName>
 (
-    if <Guard> [ set <Field> = <Expr> ] ( transition <ToState> | no transition )
-  | else if <Guard> [ set <Field> = <Expr> ] ( transition <ToState> | no transition )
-  | else [ set <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
-  | [ set <Field> = <Expr> ] ( transition <ToState> | reject <Reason> | no transition )
+    if <Guard> [ set <Field> = <Expr> ] [ <CollectionMutation> ] ( transition <ToState> | no transition )
+  | else if <Guard> [ set <Field> = <Expr> ] [ <CollectionMutation> ] ( transition <ToState> | no transition )
+  | else [ set <Field> = <Expr> ] [ <CollectionMutation> ] ( transition <ToState> | reject <Reason> | no transition )
+  | [ set <Field> = <Expr> ] [ <CollectionMutation> ] ( transition <ToState> | reject <Reason> | no transition )
 )+
 
 <Expr> := <Literal|<FieldName>|<EventName>.<ArgName>>
+        | <Collection>.count | <Collection>.min | <Collection>.max | <Collection>.peek
+        | <Collection> contains <Expr>
 <Literal> := <null|true|false|number|string>
+<CollectionMutation> :=
+    add <SetField> <Expr>
+  | remove <SetField> <Expr>
+  | enqueue <QueueField> <Expr>
+  | dequeue <QueueField>
+  | push <StackField> <Expr>
+  | pop <StackField>
+  | clear <CollectionField>
 ```
 
 Canonical constraints:
@@ -165,11 +181,115 @@ Block-authoring equivalent (same semantics):
 - If no guard matches, configured block outcome is applied.
 - Transition sets execute only on accepted fire-path transitions.
 
-### Set/Expression Design Decisions (Locked)
+### Collection Types Design Decisions
+
+Status: **Design phase — not yet implemented.**
+
+#### Locked decisions
+
+- Three collection types: `set<T>`, `queue<T>`, `stack<T>`.
+- `map<K,V>` is out — too much language surface, breaks the declarative boundary.
+- Valid inner types: `number`, `string`, `boolean`. No nullable inner types (`set<number?>` is invalid). No `set<null>`. No nesting (`set<set<number>>` is invalid).
+- Generic `<T>` syntax for declarations; parser validates inner type at declaration time.
+- Collections always start empty — no array literal syntax. Pre-population is done through the runtime API (`CreateInstance`), not DSL declarations.
+- `set<T>` is backed by a sorted structure (`SortedSet<T>`) — this is a semantic guarantee for determinism, not an implementation detail.
+- `queue<T>` is FIFO-ordered. `stack<T>` is LIFO-ordered. Both allow duplicate elements.
+
+#### Determinism contract
+
+For any state machine instance with state S, data D (including all scalar and collection fields), receiving event E with arguments A: f(S, D, E, A) = (S', D', O). Same inputs always produce the same outputs, regardless of execution platform, prior mutation history, or serialization round-trips.
+
+#### Operations surface
+
+Mutation statements (same level as `set`, `transition`, etc.):
+
+| Statement | `set<T>` | `queue<T>` | `stack<T>` | Behavior |
+|---|---|---|---|---|
+| `add <Collection> <Expr>` | Yes | — | — | Insert; no-op if duplicate (idempotent) |
+| `remove <Collection> <Expr>` | Yes | — | — | Remove by value; no-op if absent (idempotent) |
+| `enqueue <Collection> <Expr>` | — | Yes | — | Append to back; always succeeds |
+| `dequeue <Collection>` | — | Yes | — | Remove from front; fails if empty |
+| `push <Collection> <Expr>` | — | — | Yes | Add to top; always succeeds |
+| `pop <Collection>` | — | — | Yes | Remove from top; fails if empty |
+| `clear <Collection>` | Yes | Yes | Yes | Remove all elements (idempotent) |
+
+Properties (dot-access, no parentheses):
+
+| Property | Types | Returns | Valid in guards? | Valid in `set` RHS? |
+|---|---|---|---|---|
+| `count` | All | number | Yes | Yes |
+| `min` | `set<T>` | T | No (fails if empty) | Yes |
+| `max` | `set<T>` | T | No (fails if empty) | Yes |
+| `peek` | `queue<T>`, `stack<T>` | T | No (fails if empty) | Yes |
+
+Operators:
+
+| Expression | Types | Returns | Valid in guards? | Valid in `set` RHS? |
+|---|---|---|---|---|
+| `<Collection> contains <Expr>` | All | boolean | Yes | Yes |
+
+**No function-call syntax.** The DSL surface uses properties (dot-access) and operators (infix keywords) only.
+
+#### Element-returning expressions restricted to `set` RHS
+
+Properties that return an element (`min`, `max`, `peek`) are valid only on the right side of `set` assignments, not in guard expressions. Reasoning: element-returning operations can fail (empty collection), and a failing guard is semantically ambiguous (does the branch not match, or is it an error?). In `set` RHS, failure is unambiguous: the branch body fails, atomic rollback occurs.
+
+Correct pattern:
+```text
+if PendingFloors.count > 0
+    set TargetFloor = PendingFloors.min
+    transition Moving
+```
+
+#### Failure semantics
+
+- Writes are lenient: `add` of a duplicate, `remove` of a missing value, and `clear` on an empty collection are no-ops.
+- Reads are strict: `dequeue`/`pop` on an empty collection and `min`/`max`/`peek` on an empty collection fail the branch. Due to atomic batch semantics, all mutations in that branch are rolled back.
+
+#### Read-your-writes
+
+Collection mutations within a branch body participate in the working copy, consistent with scalar `set` semantics. After `add PendingFloors 5`, subsequent references to `PendingFloors.count` or `PendingFloors contains 5` in the same branch body reflect the addition.
+
+#### Serialization
+
+- `set<T>`: serializes as a sorted JSON array; deserialization reconstructs sorted order, duplicates silently dropped.
+- `queue<T>`: serializes as an ordered JSON array (front = index 0).
+- `stack<T>`: serializes as an ordered JSON array (top = last index).
+- Round-trip fidelity guaranteed: serialize → deserialize → serialize produces identical output.
+
+#### Cross-collection operations
+
+No direct collection-to-collection operations. Use a scalar intermediary:
+```text
+set NextApprover = ApprovalChain.peek
+dequeue ApprovalChain
+push CompletedApprovers NextApprover
+```
+
+#### `dequeue`/`pop` are statements, not expressions
+
+Read with `peek`, remove separately. Keeps mutation at statement level and queries as pure expressions.
+
+#### Decision pending: directional set queries (`above`/`below`)
+
+Sorted sets naturally support directional nearest-neighbor queries (e.g., "smallest element greater than X"). This enables patterns like elevator SCAN algorithms. Multiple syntax options were explored:
+
+1. `above`/`below` as infix filter operators with `.min`/`.max` on the result: `(PendingFloors above CurrentFloor).min`
+2. Comparison operators as set filters: `(PendingFloors > CurrentFloor).min`
+3. Trailing modifier on property: `PendingFloors.min above CurrentFloor`
+4. Slice syntax: `PendingFloors[> CurrentFloor].min`
+5. Named views: `view FloorsAbove = PendingFloors > CurrentFloor`
+6. Several other options considered.
+
+All options introduce syntax cost (new keywords, filter expressions, or parameterized properties). The core concern is that element-returning filtered queries either need function-call syntax (which the DSL avoids) or introduce new expression composition patterns.
+
+**Current decision**: deferred. `min`/`max` cover the majority of real use cases. The directional query pattern can be revisited once collection types are implemented and real usage patterns emerge. For now, authors can approximate directional behavior using `min`/`max` with a `MovingUp` boolean to select the appropriate branch.
+
+### Set/Expression Design Decisions (Locked — Scalars)
 
 Status:
 
-- The following choices are design-locked for the next set/expression expansion.
+- The following choices are design-locked for the scalar set/expression system.
 - Phase 1 parser/model foundation is implemented: set expressions parse into a DSL expression AST and transitions retain ordered set-assignment lists.
 - Phase 2 shared evaluator integration is implemented: guards and set expressions evaluate through the shared AST-based expression evaluator.
 - Phase 3 runtime execution is implemented: set assignments evaluate in declaration order on a working copy (read-your-writes) and commit atomically.

@@ -17,6 +17,7 @@ StateMachine is a .NET DSL-driven state/workflow engine focused on deterministic
 - Inspector preview now exchanges live `snapshot`/`fire`/`reset`/`inspect` requests through the language server (`stateMachine/preview/request`) instead of only local mock data. The `inspect` action re-evaluates a single event with user-supplied arguments, enabling real-time guard feedback as the user types.
 - Inspector preview layout uses a single unified ELK layered layout with state-machine-tuned options (top-down direction, spline edge routing, model-order cycle breaking, feedback edges for cycles, inside self-loops, inline edge labels, DSL declaration-order node ordering), dynamic per-state node sizing, and responsive viewBox. Reject and no-transition terminal rules are excluded from the diagram graph.
 - CLI host has been removed in this branch (hard cut); editor + language server are the active runtime surfaces.
+- **Collection types** (`set<T>`, `queue<T>`, `stack<T>`) are in design phase with locked decisions documented in `docs/DesignNotes.md`. Implementation has not started. Directional set queries (`above`/`below`) are deferred pending real usage data.
 
 ## Quick Start (2 minutes)
 
@@ -152,27 +153,48 @@ event <EventName>
 
 <ScalarType> := string | number | boolean | null
 
+# Collection field declarations (design phase — not yet implemented)
+set<T> <FieldName>                  # sorted unique set, always starts empty
+queue<T> <FieldName>                # FIFO ordered, allows duplicates, always starts empty
+stack<T> <FieldName>                # LIFO ordered, allows duplicates, always starts empty
+<T> := number | string | boolean    # no nullable inner types, no nesting
+
 from <any|StateA[,StateB...]> on <EventName>
 (
     if <GuardExpr>
       { set <Field> = <Expr> }
+      { <CollectionMutation> }
       ( transition <ToState> | no transition )
 
   | else if <GuardExpr>
       { set <Field> = <Expr> }
+      { <CollectionMutation> }
       ( transition <ToState> | no transition )
 
   | else
       { set <Field> = <Expr> }
+      { <CollectionMutation> }
       ( transition <ToState> | reject "<Reason>" | no transition )
 
   | { set <Field> = <Expr> }
+    { <CollectionMutation> }
     ( transition <ToState> | reject "<Reason>" | no transition )
 )+
 
 <Expr> := <Literal> | <FieldName> | <EventName>.<ArgName> | ( <Expr> ) | !<Expr> | -<Expr> | <Expr> <BinaryOp> <Expr>
+        | <Collection>.count | <Collection>.min | <Collection>.max | <Collection>.peek
+        | <Collection> contains <Expr>
 
 <BinaryOp> := + | - | * | / | % | == | != | < | <= | > | >= | && | ||
+
+<CollectionMutation> :=
+    add <SetField> <Expr>
+  | remove <SetField> <Expr>
+  | enqueue <QueueField> <Expr>
+  | dequeue <QueueField>
+  | push <StackField> <Expr>
+  | pop <StackField>
+  | clear <CollectionField>
 
 <Literal> := null | true | false | <number> | <string>
 ```
@@ -197,6 +219,12 @@ Constraints:
 - Top-level data fields may declare literal defaults using `<Field> = <Literal>`.
 - Defaults are applied when creating instances and can be overridden by caller-supplied instance data.
 - Non-nullable top-level data fields must declare defaults.
+- Collection mutation statements (`add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`) are valid only inside `from ... on ...` branch bodies, at the same level as `set`. Each mutation verb is valid only on its matching collection kind (parser rejects mismatches).
+- Collection properties: `.count` (all types, returns number, valid in guards and `set` RHS), `.min`/`.max` (`set<T>` only, returns element, `set` RHS only), `.peek` (`queue<T>`/`stack<T>` only, returns element, `set` RHS only).
+- `contains` is an infix boolean operator: `<Collection> contains <Expr>` (valid in guards and `set` RHS).
+- Element-returning properties (`.min`, `.max`, `.peek`) fail on empty collections, triggering atomic branch rollback.
+- Collection mutations are lenient for writes (`add` duplicate → no-op, `remove` missing → no-op) but strict for reads (`dequeue`/`pop` on empty → branch failure and rollback).
+- No function-call syntax. No nullable inner types. No collection nesting. No array literals. No `map<K,V>`.
 - Unsupported syntax: `states ...`, `events ...`, and legacy inline form `transition A -> B on E ...`.
 
 ## DSL Cookbook
@@ -329,6 +357,101 @@ from Active on Pause
 from FlashingRed on Advance
   set CycleCount = CycleCount + 1
   no transition
+```
+
+13) Collection: sorted set with add/remove/min (design phase — not yet implemented)
+
+```text
+set<number> PendingFloors
+
+from Idle on RequestFloor
+  if RequestFloor.Floor >= 1 && RequestFloor.Floor <= TotalFloors
+    add PendingFloors RequestFloor.Floor
+    transition Moving
+  else
+    reject "Invalid floor"
+
+from Moving on FloorReached
+  remove PendingFloors CurrentFloor
+  set CurrentFloor = TargetFloor
+  transition DoorsOpen
+
+from DoorsOpen on CloseDoors
+  if !Overloaded && PendingFloors.count > 0
+    set TargetFloor = PendingFloors.min
+    transition Moving
+  else if !Overloaded
+    transition Idle
+  else
+    reject "Cannot close doors while overloaded"
+```
+
+14) Collection: queue with enqueue/dequeue/peek (design phase — not yet implemented)
+
+```text
+queue<string> ApprovalChain
+
+from Submitted on AssignApprover
+  enqueue ApprovalChain Approver.Name
+  no transition
+
+from AwaitingApproval on Approve
+  if ApprovalChain.count > 1
+    set LastApprover = ApprovalChain.peek
+    dequeue ApprovalChain
+    no transition
+  else
+    dequeue ApprovalChain
+    transition Approved
+```
+
+15) Collection: stack with push/pop/peek (design phase — not yet implemented)
+
+```text
+stack<string> BreadcrumbTrail
+
+from Exploring on EnterRoom
+  push BreadcrumbTrail CurrentRoom
+  set CurrentRoom = EnterRoom.RoomName
+  transition Exploring
+
+from Exploring on Backtrack
+  if BreadcrumbTrail.count > 0
+    set CurrentRoom = BreadcrumbTrail.peek
+    pop BreadcrumbTrail
+    no transition
+  else
+    reject "No rooms to backtrack to"
+```
+
+16) Collection: contains operator in guards (design phase — not yet implemented)
+
+```text
+from Idle on RequestFloor
+  if PendingFloors contains RequestFloor.Floor
+    reject "Floor already requested"
+  else
+    add PendingFloors RequestFloor.Floor
+    transition Moving
+```
+
+17) Collection: cross-collection transfer via scalar intermediary (design phase — not yet implemented)
+
+```text
+queue<string> PendingReviewers
+stack<string> CompletedReviewers
+
+from AwaitingReview on CompleteReview
+  if PendingReviewers.count > 1
+    set Reviewer = PendingReviewers.peek
+    dequeue PendingReviewers
+    push CompletedReviewers Reviewer
+    no transition
+  else
+    set Reviewer = PendingReviewers.peek
+    dequeue PendingReviewers
+    push CompletedReviewers Reviewer
+    transition FullyReviewed
 ```
 
 ## Instance JSON Example
