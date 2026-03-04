@@ -73,7 +73,27 @@ Rules use the same expression grammar as guards and `set` expressions. All opera
 
 ### Field rule scope restriction
 
-A field-indented rule may only reference the field it is declared under. If the expression references any other identifier, the parser rejects it with a clear error: *"Field rule may only reference its own field; use a top-level rule for cross-field constraints."*
+A field-indented rule may only reference the field it is declared under, its dotted properties (e.g., `.count`), and literal constants. If the expression references any other field identifier, the parser rejects it with a clear error: *"Field rule may only reference its own field; use a top-level rule for cross-field constraints."*
+
+What is permitted in a field rule expression:
+- The declaring field itself (`Balance`, `Tags`)
+- Dotted properties of the declaring field (`.count`, `contains`)
+- Literal constants (`0`, `"Admin"`, `true`, `null`)
+
+What is rejected:
+- Any other field identifier
+
+Examples:
+
+```text
+number Balance = 0
+  rule Balance >= 0 "Must be non-negative"                   # ✓ own field + literal
+
+set<string> RequiredRoles
+  rule RequiredRoles contains "Admin" "Must include Admin"   # ✓ own field + literal
+  rule RequiredRoles.count <= 10 "Too many roles"            # ✓ own field property + literal
+  rule RequiredRoles.count <= MaxRoles "..."                 # ✗ references another field
+```
 
 Rationale: a rule indented under a field implies it is *about* that field. Referencing other fields from that position is misleading. Cross-field constraints belong in top-level rules where the multi-field nature is visible.
 
@@ -133,9 +153,15 @@ Rules may reference collection properties that are valid in guard expressions:
 - `.count` (all collection types, returns number) — valid in rules
 - `contains` (infix boolean operator) — valid in rules
 
+Collection field rules (indented under the collection declaration) follow the same scope restriction as scalar field rules — they may reference the declaring collection, its properties, and literal constants:
+
 ```text
+set<string> Approvers
+  rule Approvers contains "Admin" "Must include Admin approver"  # ✓ field rule
+  rule Approvers.count >= 1 "Need at least one approver"         # ✓ field rule
+
 queue<string> ApprovalChain
-rule ApprovalChain.count <= 10 "Too many approvers"
+rule ApprovalChain.count <= 10 "Too many approvers"              # ✓ top-level rule
 ```
 
 Element-returning properties (`.min`, `.max`, `.peek`) are **excluded** from rules, consistent with their exclusion from guard expressions. Failure on empty is ambiguous in rule context.
@@ -161,6 +187,16 @@ state Paid initial
 
 Caller-supplied overrides at `CreateInstance` are validated at runtime.
 
+### Rules do not have access to current state
+
+Rule expressions cannot reference the current state of the machine. State-awareness is expressed through state rule *attachment* (indenting under a state declaration), not through a variable or identifier.
+
+If you need "when in state X, field Y must be Z", use a state rule on state X — don't try to express it as a top-level rule with a state reference. This keeps the separation clean: data rules constrain data, state rules constrain entry.
+
+### Rules and `from any` transitions
+
+`from any on Event` expands to every declared state. If the transition targets a state with entry rules, those rules apply regardless of whether the transition was declared as `from any` or `from SpecificState`. The pipeline checks the *target state*, not the source of the transition declaration.
+
 ## Evaluation Pipeline
 
 ```text
@@ -181,84 +217,49 @@ Event rules  →  Guard evaluation  →  Set execution  →  Field/top-level rul
 - If inspect simulates set assignments on a scratch copy, field/top-level/state rules can be checked against the simulated result
 - This gives a full preview: "would this fire succeed or fail, and why?"
 
-## Compile-Time Null Safety (Cross-Cutting — Not Rules-Specific)
+## Nullable Behaviour in Rules
 
-### Principle
+Rules inherit the general compile-time null safety model (cross-branch narrowing, strict null checking across all expression sites). No rules-specific null semantics are needed — the same infrastructure applies.
 
-**Nullable means "you must prove it's not null before using it in any operation that doesn't accept null."**
+### How it works for each rule position
 
-The only operations that accept null are `== null`, `!= null`, and assignment to a nullable target. Everything else — arithmetic, comparison, boolean logic, string concat, collection mutation — requires the author to narrow the value first. This applies uniformly across all expression sites: guards, `set` expressions, rules, and collection mutations.
-
-This is the same principle as C#'s nullable reference types or TypeScript's strict null checks, applied to the DSL's expression surface.
-
-### Current state
-
-The language server already implements null-narrowing for guards:
-- `if RetryCount != null && RetryCount > 0` — narrowed correctly, no diagnostic
-- `if RetryCount > 0` — flagged: `operator '>' requires numeric operands` (because `RetryCount` is `number?`)
-- `set Value = RetryCount` inside a `if RetryCount != null` branch — accepted (narrowed by guard)
-- `set Value = RetryCount` without guard — flagged: type mismatch (nullable → non-nullable)
-
-Cross-branch narrowing (applying guard negation to `else`/`else if` branches) is a known gap.
-
-### Goal: uniform enforcement everywhere
-
-Every expression site should apply the same null analysis:
-
-| Site | Expression type | Check |
-|---|---|---|
-| Guard (`if`/`else if`) | Boolean | Nullable in comparison/arithmetic/boolean without narrowing → error |
-| `set` RHS | Value | Nullable in arithmetic/concat without narrowing → error; nullable → non-nullable target → error |
-| Field rule | Boolean | Nullable without null handling → error |
-| Top-level rule | Boolean | Nullable without null handling → error |
-| State rule | Boolean | Nullable without null handling → error |
-| Event rule | Boolean | Nullable event arg without null handling → error |
-| Collection mutation value | Value | Nullable value into non-nullable-inner-type collection → error |
-| `contains` operand | Value | Nullable is valid here (`contains null` is a legitimate question) |
-
-### Error vs. warning classification
-
-**Error-level (provably wrong at runtime):**
-- Nullable in arithmetic (`+`, `-`, `*`, `/`, `%`) without narrowing
-- Nullable in comparison (`<`, `<=`, `>`, `>=`) without narrowing
-- Nullable in boolean logic (`&&`, `||`) as a non-check operand without narrowing
-- Nullable in string concat without narrowing
-- Nullable assigned to non-nullable `set` target without narrowing
-- Nullable value in `add`/`enqueue`/`push` on a non-nullable-inner-type collection
-- Nullable in rule expression without explicit null handling
-
-**Warning-level (likely unintentional):**
-- Rule on a nullable field without `== null ||` escape — the rule will fail whenever the field is null, which may be surprising
-
-### Correct patterns
+**Field rules** — the declaring field's nullability is known. If the field is nullable, the rule expression must handle null explicitly:
 
 ```text
-number? RetryCount
-
-# Guard — narrow before use
-if RetryCount != null && RetryCount > 0        # ✓
-if RetryCount > 0                               # ✗ error
-
-# Set — narrow by guard context
-if RetryCount != null
-  set Value = RetryCount                        # ✓ (narrowed by guard)
-set Value = RetryCount                          # ✗ error (no guard)
-
-# Field rule — explicit null handling
 number? Balance
-  rule Balance == null || Balance >= 0 "..."    # ✓
-  rule Balance >= 0 "..."                       # ✗ error
-
-# Event rule — same pattern
-event Submit
-  number? Priority
-  rule Priority == null || Priority > 0 "..."  # ✓
-  rule Priority > 0 "..."                       # ✗ error
+  rule Balance == null || Balance >= 0 "Balance must be null or non-negative"  # ✓
+  rule Balance >= 0 "..."                                                       # ✗ compile-time error
 ```
 
-### Implementation scope
+The language server flags the second form at parse/analysis time because `Balance` is `number?` and `>=` requires numeric operands.
 
-The null safety principle is **cross-cutting** — it applies to guards, sets, rules, and collection mutations uniformly. It should be implemented as a shared analysis pass in the language server, not as separate logic per expression site. The expression evaluator and static analyzer share the same narrowing infrastructure.
+**Top-level rules** — same analysis. All referenced fields' nullability is known from their declarations:
+
+```text
+number? Paid
+number TotalDue = 0
+rule Paid == null || Paid <= TotalDue "Cannot overpay"   # ✓
+rule Paid <= TotalDue "..."                               # ✗ compile-time error (Paid is nullable)
+```
+
+**State rules** — same analysis against instance data field declarations.
+
+**Event rules** — same analysis against event argument declarations:
+
+```text
+event Submit
+  number? Priority
+  rule Priority == null || Priority > 0 "Priority must be positive if provided"  # ✓
+  rule Priority > 0 "..."                                                         # ✗ compile-time error
+```
+
+### Compile-time vs. runtime
+
+The language server catches nullable-without-narrowing errors at **compile time** (as diagnostics in the editor). At **runtime**, if a nullable field is null and a rule expression evaluates it in a non-null-safe operation, the expression fails and the rule violation reason is reported — consistent with guard and set expression failure semantics.
+
+### Practical guidance
+
+The DSL already pushes authors toward non-nullable fields with defaults. For fields that genuinely need to be nullable, the `== null ||` pattern in rules is the correct and only way to express "null is acceptable." This is intentional — the author must decide whether null is a valid state for the constraint.
 
 ## Future: Static Analysis Opportunities
 
@@ -267,6 +268,5 @@ The rule model enables language-server analysis that can be explored in future w
 - **Warn** when a transition targets a state whose entry rules cannot possibly be satisfied by the transition's `set` assignments
 - **Warn** when a `set` assignment can provably violate a field rule or top-level rule
 - **Hint** when a guard already covers what a rule would catch (redundant but harmless)
-- Cross-branch null narrowing (applying guard negation to `else`/`else if` branches and across if/else-if chains)
 
 These are tooling enhancements, not runtime behavior, and do not need to be designed or implemented with the initial rule system.
