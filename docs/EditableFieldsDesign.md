@@ -4,7 +4,7 @@ Date: 2026-03-04
 
 Status: **Design phase — not yet implemented.**
 
-Depends on: **Rules** (docs/RulesDesign.md) — rules must be implemented first. Rules are the safety net that makes direct field editing viable without the event pipeline's structural protection.
+Depends on: **Rules** (docs/RulesDesign.md) — ✅ rules are now implemented. The prerequisite dependency is satisfied. Rules enforce data invariants on every mutation regardless of path, making direct field editing safe.
 
 ## Overview
 

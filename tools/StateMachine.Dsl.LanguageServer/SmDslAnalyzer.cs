@@ -449,7 +449,140 @@ internal sealed class SmDslAnalyzer
             });
         }
 
+        // Validate rules
+        ValidateRuleDiagnostics(machine, lines, dataFieldKinds, eventArgKinds, collectionFieldMap, diagnostics);
+
         return diagnostics;
+    }
+
+    private static void ValidateRuleDiagnostics(
+        DslMachine machine,
+        string[] lines,
+        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
+        IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
+        IReadOnlyDictionary<string, DslCollectionFieldContract> collectionFieldMap,
+        List<Diagnostic> diagnostics)
+    {
+        // Symbols for data fields (field rules and top-level rules scope)
+        var dataSymbols = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);
+        foreach (var col in machine.CollectionFields)
+        {
+            dataSymbols[$"{col.Name}.count"] = StaticValueKind.Number;
+        }
+
+        // Field rules: validate expression against single-field scope
+        foreach (var field in machine.DataFields)
+        {
+            if (field.Rules is null) continue;
+            var fieldSymbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal)
+            {
+                [field.Name] = dataFieldKinds.TryGetValue(field.Name, out var fk) ? fk : StaticValueKind.None
+            };
+            foreach (var rule in field.Rules)
+            {
+                var lineIndex = Math.Max(0, rule.SourceLine - 1);
+                ValidateExpression(rule.ExpressionText, lineIndex, fieldSymbols, StaticValueKind.Boolean, $"field rule on '{field.Name}'", diagnostics, lines);
+            }
+        }
+
+        // Collection field rules: validate expression against single-collection scope
+        foreach (var col in machine.CollectionFields)
+        {
+            if (col.Rules is null) continue;
+            var colSymbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal)
+            {
+                [$"{col.Name}.count"] = StaticValueKind.Number
+            };
+            foreach (var rule in col.Rules)
+            {
+                var lineIndex = Math.Max(0, rule.SourceLine - 1);
+                ValidateExpression(rule.ExpressionText, lineIndex, colSymbols, StaticValueKind.Boolean, $"collection rule on '{col.Name}'", diagnostics, lines);
+            }
+        }
+
+        // Top-level rules: validate against all data fields
+        if (machine.TopLevelRules is not null)
+        {
+            foreach (var rule in machine.TopLevelRules)
+            {
+                var lineIndex = Math.Max(0, rule.SourceLine - 1);
+                ValidateExpression(rule.ExpressionText, lineIndex, dataSymbols, StaticValueKind.Boolean, "top-level rule", diagnostics, lines);
+            }
+        }
+
+        // State rules: validate against all data fields
+        if (machine.StateRules is not null)
+        {
+            foreach (var kvp in machine.StateRules)
+            {
+                foreach (var rule in kvp.Value)
+                {
+                    var lineIndex = Math.Max(0, rule.SourceLine - 1);
+                    ValidateExpression(rule.ExpressionText, lineIndex, dataSymbols, StaticValueKind.Boolean, $"state rule on '{kvp.Key}'", diagnostics, lines);
+                }
+            }
+        }
+
+        // Event rules: validate against event arg scope only
+        foreach (var evt in machine.Events)
+        {
+            if (evt.Rules is null) continue;
+            var evtSymbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
+            foreach (var arg in evt.Args)
+            {
+                var argKind = arg.Type switch
+                {
+                    DslScalarType.String => StaticValueKind.String,
+                    DslScalarType.Number => StaticValueKind.Number,
+                    DslScalarType.Boolean => StaticValueKind.Boolean,
+                    _ => StaticValueKind.None
+                };
+                if (arg.IsNullable) argKind |= StaticValueKind.Null;
+                evtSymbols[$"{evt.Name}.{arg.Name}"] = argKind;
+                evtSymbols[arg.Name] = argKind;
+            }
+
+            foreach (var rule in evt.Rules)
+            {
+                var lineIndex = Math.Max(0, rule.SourceLine - 1);
+                ValidateExpression(rule.ExpressionText, lineIndex, evtSymbols, StaticValueKind.Boolean, $"event rule on '{evt.Name}'", diagnostics, lines);
+            }
+        }
+
+        // Warn about states with entry rules that are never targeted by any transition
+        if (machine.StateRules is not null)
+        {
+            var targetedStates = new HashSet<string>(machine.Transitions.Select(t => t.ToState), StringComparer.Ordinal);
+            foreach (var stateWithRules in machine.StateRules.Keys)
+            {
+                if (!targetedStates.Contains(stateWithRules))
+                {
+                    // Find the state line in the source
+                    var stateLineIdx = FindStateLine(lines, stateWithRules);
+                    var lineLen = stateLineIdx < lines.Length ? lines[stateLineIdx].Length : 1;
+                    diagnostics.Add(new Diagnostic
+                    {
+                        Severity = DiagnosticSeverity.Warning,
+                        Message = $"State '{stateWithRules}' has entry rules but no transition targets it — entry rules are never checked.",
+                        Source = "state-machine-dsl",
+                        Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                            new Position(stateLineIdx, 0),
+                            new Position(stateLineIdx, Math.Max(1, lineLen)))
+                    });
+                }
+            }
+        }
+    }
+
+    private static int FindStateLine(string[] lines, string stateName)
+    {
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var trimmed = lines[i].TrimStart();
+            if (trimmed.StartsWith($"state {stateName}", StringComparison.Ordinal))
+                return i;
+        }
+        return 0;
     }
 
     private static Dictionary<string, StaticValueKind> BuildSymbolKinds(
@@ -1188,7 +1321,8 @@ internal sealed class SmDslAnalyzer
         new CompletionItem { Label = "push", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "pop", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "clear", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "contains", Kind = CompletionItemKind.Keyword }
+        new CompletionItem { Label = "contains", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "rule", Kind = CompletionItemKind.Keyword }
     ];
 
     private static readonly IReadOnlyList<CompletionItem> ExpressionOperatorItems =

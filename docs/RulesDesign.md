@@ -2,7 +2,7 @@
 
 Date: 2026-03-03
 
-Status: **Design phase — not yet implemented.**
+Status: **Implemented.** Parser, compiler, runtime, and language server all support rules. See implementation in `src/StateMachine/Dsl/StateMachineDslParser.cs`, `StateMachineDslRuntime.cs`, and `tools/StateMachine.Dsl.LanguageServer/SmDslAnalyzer.cs`. Covered by `test/StateMachine.Tests/DslRulesTests.cs`.
 
 ## Overview
 

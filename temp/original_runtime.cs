@@ -55,13 +55,6 @@ public sealed class DslWorkflowDefinition
     private readonly Dictionary<string, Dictionary<string, DslFieldContract>> _eventArgContractMap;
     private readonly IGuardEvaluator _guardEvaluator;
 
-    // Rules storage
-    private readonly IReadOnlyList<DslRule> _topLevelRules;
-    private readonly IReadOnlyList<DslRule> _allFieldRules; // field rules from all data fields
-    private readonly IReadOnlyList<DslRule> _allCollectionRules; // field rules from collection fields
-    private readonly IReadOnlyDictionary<string, IReadOnlyList<DslRule>> _stateRules;
-    private readonly IReadOnlyDictionary<string, IReadOnlyList<DslRule>> _eventRules;
-
     public string Name { get; }
     public IReadOnlyList<string> States { get; }
     public string InitialState { get; }
@@ -104,22 +97,6 @@ public sealed class DslWorkflowDefinition
                 evt => evt.Name,
                 evt => evt.Args.ToDictionary(a => a.Name, a => a, StringComparer.Ordinal),
                 StringComparer.Ordinal);
-
-        // Flatten rules for runtime access
-        _topLevelRules = machine.TopLevelRules ?? Array.Empty<DslRule>();
-        _allFieldRules = machine.DataFields
-            .Where(f => f.Rules is not null)
-            .SelectMany(f => f.Rules!)
-            .ToArray();
-        _allCollectionRules = machine.CollectionFields
-            .Where(f => f.Rules is not null)
-            .SelectMany(f => f.Rules!)
-            .ToArray();
-        _stateRules = machine.StateRules
-            ?? (IReadOnlyDictionary<string, IReadOnlyList<DslRule>>)new Dictionary<string, IReadOnlyList<DslRule>>(StringComparer.Ordinal);
-        _eventRules = machine.Events
-            .Where(e => e.Rules is not null && e.Rules.Count > 0)
-            .ToDictionary(e => e.Name, e => e.Rules!, StringComparer.Ordinal);
     }
 
     public DslWorkflowInstance CreateInstance(
@@ -219,12 +196,6 @@ public sealed class DslWorkflowDefinition
         IReadOnlyDictionary<string, object?>? eventArguments = null)
     {
         var evaluationData = BuildDirectEvaluationData(eventName, eventArguments);
-
-        // Check event rules first
-        var eventRuleViolations = EvaluateEventRules(eventName, evaluationData);
-        if (eventRuleViolations.Count > 0)
-            return DslInspectionResult.Rejected(currentState, eventName, eventRuleViolations);
-
         var resolution = ResolveTransition(currentState, eventName, evaluationData);
 
         return resolution.Kind switch
@@ -251,66 +222,11 @@ public sealed class DslWorkflowDefinition
         if (!compatibility.IsCompatible)
             return DslInspectionResult.NotDefined(instance.CurrentState, eventName, compatibility.Reason!);
 
-        // Inspect is a discovery API — it intentionally accepts calls with missing/partial event arguments
-        // so callers can determine required args via RequiredEventArgumentKeys before firing.
-        // Full argument validation happens in Fire().
-        if (eventArguments != null && !TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
+        if (!TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
             return DslInspectionResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
 
         var evaluationArguments = BuildEvaluationData(instance.InstanceData, eventName, eventArguments);
-
-        // Check event rules — only when caller provides event arguments.
-        // When eventArguments is null this is a pure discovery call; event rules cannot be
-        // evaluated without their required inputs, and RequiredEventArgumentKeys will inform
-        // the caller which args are needed before firing.
-        if (eventArguments != null)
-        {
-            var eventRuleViolations = EvaluateEventRules(eventName, evaluationArguments);
-            if (eventRuleViolations.Count > 0)
-                return DslInspectionResult.Rejected(instance.CurrentState, eventName, eventRuleViolations);
-        }
-
-        var resolution = ResolveTransition(instance.CurrentState, eventName, evaluationArguments);
-        if (resolution.Kind == TransitionResolutionKind.NotDefined)
-            return DslInspectionResult.NotDefined(instance.CurrentState, eventName, resolution.NotDefinedReason!);
-
-        if (resolution.Kind == TransitionResolutionKind.NoTransition)
-            return DslInspectionResult.NoTransition(instance.CurrentState, eventName);
-
-        if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.Transition is null)
-            return DslInspectionResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
-
-        // Simulate set assignments and check field/top-level/state rules
-        var simulatedData = new Dictionary<string, object?>(instance.InstanceData, StringComparer.Ordinal);
-        var simulatedCollections = CloneCollections(simulatedData);
-
-        foreach (var assignment in resolution.Transition.SetAssignments)
-        {
-            var ctx = BuildEvaluationDataWithCollections(simulatedData, simulatedCollections, eventName, eventArguments);
-            var eval = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, ctx);
-            if (eval.Success)
-                simulatedData[assignment.Key] = eval.Value;
-        }
-
-        if (resolution.Transition.CollectionMutations is { } mutations)
-            ExecuteCollectionMutations(mutations, simulatedCollections, simulatedData, eventName, eventArguments);
-
-        CommitCollections(simulatedData, simulatedCollections);
-
-        var dataRuleViolations = EvaluateDataRules(simulatedData);
-        if (dataRuleViolations.Count > 0)
-            return DslInspectionResult.Rejected(instance.CurrentState, eventName, dataRuleViolations);
-
-        var targetState = resolution.Transition.ToState;
-        var stateRuleViolations = EvaluateStateRules(targetState, simulatedData);
-        if (stateRuleViolations.Count > 0)
-            return DslInspectionResult.Rejected(instance.CurrentState, eventName, stateRuleViolations);
-
-        return DslInspectionResult.Accepted(
-            instance.CurrentState,
-            eventName,
-            targetState,
-            GetRequiredEventArgumentKeys(eventName));
+        return Inspect(instance.CurrentState, eventName, evaluationArguments);
     }
 
     public DslFireResult Fire(
@@ -347,13 +263,6 @@ public sealed class DslWorkflowDefinition
             return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
 
         var evaluationArguments = BuildEvaluationData(instance.InstanceData, eventName, eventArguments);
-
-        // Stage 1: Event rules (checked before guard evaluation)
-        var eventRuleViolations = EvaluateEventRules(eventName, evaluationArguments);
-        if (eventRuleViolations.Count > 0)
-            return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, eventRuleViolations);
-
-        // Stage 2: Guard evaluation (resolve transition)
         var resolution = ResolveTransition(instance.CurrentState, eventName, evaluationArguments);
         if (resolution.Kind == TransitionResolutionKind.NotDefined)
             return DslInstanceFireResult.NotDefined(instance.CurrentState, eventName, new[] { resolution.NotDefinedReason! });
@@ -392,8 +301,6 @@ public sealed class DslWorkflowDefinition
             // Commit working collections back to data
             CommitCollections(noTransitionData, workingCollections);
 
-            // Note: no-transition does NOT trigger state rules
-
             var noTransitionUpdated = instance with
             {
                 LastEvent = eventName,
@@ -407,7 +314,6 @@ public sealed class DslWorkflowDefinition
         if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.Transition is null)
             return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
 
-        // Stage 3: Set execution (on working copy)
         var updatedData = new Dictionary<string, object?>(instance.InstanceData, StringComparer.Ordinal);
 
         // Deep-clone collections for working copy
@@ -434,29 +340,18 @@ public sealed class DslWorkflowDefinition
                 return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { mutationError });
         }
 
-        // Commit working collections to updatedData for rule evaluation
+        // Commit working collections back to data
         CommitCollections(updatedData, transitionCollections);
-
-        // Stage 4: Field and top-level rules (checked against post-set data; rollback on failure)
-        var dataRuleViolations = EvaluateDataRules(updatedData);
-        if (dataRuleViolations.Count > 0)
-            return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, dataRuleViolations);
-
-        // Stage 5: State rules (only checked on state transition, including self-transitions)
-        var targetState = resolution.Transition.ToState;
-        var stateRuleViolations = EvaluateStateRules(targetState, updatedData);
-        if (stateRuleViolations.Count > 0)
-            return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, stateRuleViolations);
 
         var updated = instance with
         {
-            CurrentState = targetState,
+            CurrentState = resolution.Transition.ToState,
             LastEvent = eventName,
             UpdatedAt = DateTimeOffset.UtcNow,
             InstanceData = updatedData
         };
 
-        return DslInstanceFireResult.Accepted(instance.CurrentState, eventName, targetState, updated);
+        return DslInstanceFireResult.Accepted(instance.CurrentState, eventName, resolution.Transition.ToState, updated);
     }
 
     private TransitionResolution ResolveTransition(
@@ -595,13 +490,7 @@ public sealed class DslWorkflowDefinition
         if (eventArguments is not null)
         {
             foreach (var kvp in eventArguments)
-            {
-                // Inject prefixed form unconditionally; inject bare form only if it
-                // does not shadow an existing instance data field (instance data takes precedence).
                 evaluation[$"{eventName}.{kvp.Key}"] = kvp.Value;
-                if (!kvp.Key.Contains('.', StringComparison.Ordinal) && !instanceData.ContainsKey(kvp.Key))
-                    evaluation[kvp.Key] = kvp.Value;
-            }
         }
 
         // Inject default values for any declared args not supplied by caller.
@@ -613,17 +502,9 @@ public sealed class DslWorkflowDefinition
                 if (!evaluation.ContainsKey(key))
                 {
                     if (arg.HasDefaultValue)
-                    {
                         evaluation[key] = arg.DefaultValue;
-                        if (!instanceData.ContainsKey(arg.Name))
-                            evaluation[arg.Name] = arg.DefaultValue;
-                    }
                     else if (arg.IsNullable)
-                    {
                         evaluation[key] = null;
-                        if (!instanceData.ContainsKey(arg.Name))
-                            evaluation[arg.Name] = null;
-                    }
                 }
             }
         }
@@ -695,13 +576,7 @@ public sealed class DslWorkflowDefinition
         if (eventArguments is not null)
         {
             foreach (var kvp in eventArguments)
-            {
-                // Inject prefixed form unconditionally; inject bare form only if it
-                // does not shadow an existing data field (data takes precedence).
                 evaluation[$"{eventName}.{kvp.Key}"] = kvp.Value;
-                if (!kvp.Key.Contains('.', StringComparison.Ordinal) && !data.ContainsKey(kvp.Key))
-                    evaluation[kvp.Key] = kvp.Value;
-            }
         }
 
         // Inject default values for any declared args not supplied by caller.
@@ -713,82 +588,14 @@ public sealed class DslWorkflowDefinition
                 if (!evaluation.ContainsKey(key))
                 {
                     if (arg.HasDefaultValue)
-                    {
                         evaluation[key] = arg.DefaultValue;
-                        if (!data.ContainsKey(arg.Name))
-                            evaluation[arg.Name] = arg.DefaultValue;
-                    }
                     else if (arg.IsNullable)
-                    {
                         evaluation[key] = null;
-                        if (!data.ContainsKey(arg.Name))
-                            evaluation[arg.Name] = null;
-                    }
                 }
             }
         }
 
         return evaluation;
-    }
-
-    // ---- Rule evaluation helpers ----
-
-    private IReadOnlyList<string> EvaluateEventRules(string eventName, IReadOnlyDictionary<string, object?> evaluationData)
-    {
-        if (!_eventRules.TryGetValue(eventName, out var rules) || rules.Count == 0)
-            return Array.Empty<string>();
-
-        var violations = new List<string>();
-        foreach (var rule in rules)
-        {
-            var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, evaluationData);
-            if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                violations.Add(rule.Reason);
-        }
-        return violations;
-    }
-
-    private IReadOnlyList<string> EvaluateDataRules(IReadOnlyDictionary<string, object?> data)
-    {
-        var violations = new List<string>();
-
-        foreach (var rule in _allFieldRules)
-        {
-            var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
-            if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                violations.Add(rule.Reason);
-        }
-
-        foreach (var rule in _allCollectionRules)
-        {
-            var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
-            if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                violations.Add(rule.Reason);
-        }
-
-        foreach (var rule in _topLevelRules)
-        {
-            var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
-            if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                violations.Add(rule.Reason);
-        }
-
-        return violations;
-    }
-
-    private IReadOnlyList<string> EvaluateStateRules(string state, IReadOnlyDictionary<string, object?> data)
-    {
-        if (!_stateRules.TryGetValue(state, out var rules) || rules.Count == 0)
-            return Array.Empty<string>();
-
-        var violations = new List<string>();
-        foreach (var rule in rules)
-        {
-            var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
-            if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                violations.Add(rule.Reason);
-        }
-        return violations;
     }
 
     private Dictionary<string, CollectionValue> CloneCollections(Dictionary<string, object?> data)
@@ -1052,197 +859,7 @@ public static class DslWorkflowCompiler
         if (!machine.States.Contains(machine.InitialState, StringComparer.Ordinal))
             throw new InvalidOperationException($"Initial state '{machine.InitialState}' is not defined in workflow '{machine.Name}'.");
 
-        // Compile-time rule validations
-        ValidateRulesAtCompileTime(machine);
-
         return new DslWorkflowDefinition(machine, guardEvaluator ?? new DefaultGuardEvaluator());
-    }
-
-    private static void ValidateRulesAtCompileTime(DslMachine machine)
-    {
-        // Build initial instance data (using field defaults)
-        var defaultData = BuildDefaultData(machine);
-
-        // 1. Validate field rules against default values
-        foreach (var field in machine.DataFields)
-        {
-            if (field.Rules is null || field.Rules.Count == 0)
-                continue;
-
-            // Only check at compile time when there is an explicit default value to validate against.
-            // Nullable fields without defaults have no fixed initial value to check here.
-            if (!field.HasDefaultValue)
-                continue;
-
-            foreach (var rule in field.Rules)
-            {
-                var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
-                if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException($"Line {rule.SourceLine}: compile-time rule violation: rule \"{rule.Reason}\" on field '{field.Name}' is violated by the field's default value.");
-            }
-        }
-
-        // 2. Validate collection rules at creation (collections start empty; count=0, contains=false)
-        foreach (var col in machine.CollectionFields)
-        {
-            if (col.Rules is null || col.Rules.Count == 0)
-                continue;
-
-            var colCtx = new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                [$"__collection__{col.Name}"] = new CollectionValue(col.CollectionKind, col.InnerType)
-            };
-            // Also add empty collection proxy for collection identifier expressions
-            foreach (var pair in defaultData)
-                colCtx[pair.Key] = pair.Value;
-
-            foreach (var rule in col.Rules)
-            {
-                var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, colCtx);
-                if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException($"Line {rule.SourceLine}: compile-time rule violation: rule \"{rule.Reason}\" on collection field '{col.Name}' is violated at creation (collection starts empty).");
-            }
-        }
-
-        // 3. Validate top-level rules against default values
-        if (machine.TopLevelRules is not null)
-        {
-            foreach (var rule in machine.TopLevelRules)
-            {
-                var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
-                if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException($"Line {rule.SourceLine}: compile-time rule violation: top-level rule \"{rule.Reason}\" is violated by default field values.");
-            }
-        }
-
-        // 4. Validate initial state entry rules against default data
-        if (machine.StateRules is not null && machine.StateRules.TryGetValue(machine.InitialState, out var initialStateRules))
-        {
-            foreach (var rule in initialStateRules)
-            {
-                var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
-                if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException($"Line {rule.SourceLine}: compile-time rule violation: state rule \"{rule.Reason}\" on initial state '{machine.InitialState}' is violated by default data.");
-            }
-        }
-
-        // 5. Validate event rules against event argument defaults
-        foreach (var evt in machine.Events)
-        {
-            if (evt.Rules is null || evt.Rules.Count == 0)
-                continue;
-
-            var eventDefaults = new Dictionary<string, object?>(StringComparer.Ordinal);
-            bool allArgsHaveDefaults = true;
-            foreach (var arg in evt.Args)
-            {
-                if (arg.HasDefaultValue)
-                {
-                    // Inject both bare and prefixed forms, matching BuildDirectEvaluationData
-                    eventDefaults[arg.Name] = arg.DefaultValue;
-                    eventDefaults[$"{evt.Name}.{arg.Name}"] = arg.DefaultValue;
-                }
-                else if (arg.IsNullable)
-                {
-                    eventDefaults[arg.Name] = null;
-                    eventDefaults[$"{evt.Name}.{arg.Name}"] = null;
-                }
-                else
-                {
-                    allArgsHaveDefaults = false;
-                    break;
-                }
-            }
-
-            if (!allArgsHaveDefaults)
-                continue;
-
-            foreach (var rule in evt.Rules)
-            {
-                var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, eventDefaults);
-                if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException($"Line {rule.SourceLine}: compile-time rule violation: event rule \"{rule.Reason}\" on event '{evt.Name}' is violated by default argument values.");
-            }
-        }
-
-        // 6. Warn about untargeted states with entry rules (emitted as compile-time warning via InvalidOperationException hint)
-        // This is a warning not an error per design. We'll skip throwing but leave as a comment for future diagnostics.
-        // 7. Validate literal set assignments against field and top-level rules
-        ValidateLiteralSetAssignments(machine, defaultData);
-    }
-
-    private static void ValidateLiteralSetAssignments(DslMachine machine, IReadOnlyDictionary<string, object?> defaultData)
-    {
-        var fieldRuleMap = machine.DataFields
-            .Where(f => f.Rules is not null && f.Rules.Count > 0)
-            .ToDictionary(f => f.Name, f => f.Rules!, StringComparer.Ordinal);
-
-        var topLevelRules = machine.TopLevelRules ?? Array.Empty<DslRule>();
-
-        void CheckLiteralAssignment(DslSetAssignment assignment)
-        {
-            // Try to evaluate the assignment expression as a constant (no field references needed).
-            // This catches literal numbers, strings, bools, null, and also constant expressions like -1.
-            var constantEval = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, EmptyInstanceData.Instance);
-            if (!constantEval.Success)
-                return; // Expression depends on runtime data — cannot check at compile time
-
-            var assignedValue = constantEval.Value;
-
-            if (!fieldRuleMap.TryGetValue(assignment.Key, out var fieldRules) && topLevelRules.Count == 0)
-                return;
-
-            // Build data context with the constant value in place of the field's default
-            var ctx = new Dictionary<string, object?>(defaultData, StringComparer.Ordinal)
-            {
-                [assignment.Key] = assignedValue
-            };
-
-            if (fieldRuleMap.TryGetValue(assignment.Key, out fieldRules))
-            {
-                foreach (var rule in fieldRules)
-                {
-                    var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, ctx);
-                    if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                        throw new InvalidOperationException($"Line {assignment.SourceLine}: literal assignment 'set {assignment.Key} = {assignment.ExpressionText}' violates rule \"{rule.Reason}\" on field '{assignment.Key}'.");
-                }
-            }
-
-            foreach (var rule in topLevelRules)
-            {
-                var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, ctx);
-                if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException($"Line {assignment.SourceLine}: literal assignment 'set {assignment.Key} = {assignment.ExpressionText}' violates top-level rule \"{rule.Reason}\".");
-            }
-        }
-
-        foreach (var transition in machine.Transitions)
-        {
-            foreach (var assignment in transition.SetAssignments)
-                CheckLiteralAssignment(assignment);
-        }
-
-        foreach (var terminalRule in machine.TerminalRules)
-        {
-            if (terminalRule.SetAssignments is null) continue;
-            foreach (var assignment in terminalRule.SetAssignments)
-                CheckLiteralAssignment(assignment);
-        }
-    }
-
-    private static IReadOnlyDictionary<string, object?> BuildDefaultData(DslMachine machine)
-    {
-        var data = new Dictionary<string, object?>(StringComparer.Ordinal);
-        foreach (var field in machine.DataFields)
-        {
-            if (field.HasDefaultValue)
-                data[field.Name] = field.DefaultValue;
-        }
-        foreach (var col in machine.CollectionFields)
-        {
-            data[$"__collection__{col.Name}"] = new CollectionValue(col.CollectionKind, col.InnerType);
-        }
-        return data;
     }
 }
 

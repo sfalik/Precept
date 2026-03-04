@@ -1,7 +1,7 @@
 # State Diagram Layout Redesign — Options Analysis
 
-> **Status:** Design-phase — no option selected yet  
-> **Date:** 2026-03-03  
+> **Status:** Implemented — Option B (Fix ELK) selected and implemented. See `tools/StateMachine.Dsl.VsCode/src/extension.ts` and `tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html`.  
+> **Decision date:** 2026-03-03  
 > **Scope:** Inspector Preview diagram rendering in the VS Code extension
 
 ---
@@ -712,9 +712,23 @@ Everything from `getElkEngine()` through `normalizeLayoutBounds()` plus `createO
 
 ---
 
-## Recommendation
+## Decision
 
-**Option B (Fix ELK)** is recommended for this project because:
+**Option B (Fix ELK) was selected and implemented** (2026-03-03). All seven sub-steps (B1–B7) are complete:
+
+- Removed the force-directed optimizer and all compensatory post-processing (~425 lines deleted from `extension.ts`)
+- ELK edge routing data flows through to the webview intact
+- Catmull-Rom → cubic Bézier spline conversion in the webview replaces hand-coded Bézier heuristics
+- ELK options tuned for state machines: top-down direction, SPLINES routing, `feedbackEdges`, `insideSelfLoops`, `edgeLabels.inline`, `considerModelOrder`
+- Dynamic node sizing (8.5px char width, 36px horizontal padding, 80px minimum, 40px height)
+- Responsive viewBox from ELK-computed dimensions with 50px padding, no min-size clamping
+- `drawDiagram()` architecture preserved; no structural refactor beyond removing dead code
+
+The rationale below explains why this option was chosen over the alternatives.
+
+## Original Recommendation
+
+**Option B (Fix ELK)** was recommended for this project because:
 
 1. It preserves the animation system, which is a significant differentiator for the Inspector Preview.
 2. It preserves full control over semantic styling (enabled/blocked/muted edges), which is core to the Inspector's value.

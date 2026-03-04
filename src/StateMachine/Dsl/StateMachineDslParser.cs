@@ -61,6 +61,9 @@ public static class StateMachineDslParser
         "^transition\\s+(?<to>[A-Za-z_][A-Za-z0-9_]*)$",
         RegexOptions.Compiled);
     private static readonly Regex RejectRegex = new("^reject\\s+(?<reason>.+)$", RegexOptions.Compiled);
+    private static readonly Regex RuleRegex = new(
+        "^rule\\s+(?<expr>.+?)\\s+\"(?<reason>[^\"]+)\"\\s*$",
+        RegexOptions.Compiled);
 
     public static DslMachine Parse(string text)
     {
@@ -75,6 +78,8 @@ public static class StateMachineDslParser
         var terminalRules = new List<DslTerminalRule>();
         var dataFields = new List<DslFieldContract>();
         var collectionFields = new List<DslCollectionFieldContract>();
+        var topLevelRules = new List<DslRule>();
+        var stateRules = new Dictionary<string, List<DslRule>>(StringComparer.Ordinal);
 
         var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
         int? firstContentLineNumber = null;
@@ -121,7 +126,7 @@ public static class StateMachineDslParser
                     initialState = stateName;
                 }
 
-                i++;
+                ParseStateDeclaration(lines, ref i, stateName, stateRules);
                 continue;
             }
 
@@ -165,8 +170,8 @@ public static class StateMachineDslParser
                 };
                 var innerType = ParseScalarType(collectionFieldMatch.Groups["inner"].Value);
 
-                collectionFields.Add(new DslCollectionFieldContract(fieldName, collectionKind, innerType));
-                i++;
+                var collectionFieldRules = ParseFieldRules(lines, ref i, fieldName, isCollection: true);
+                collectionFields.Add(new DslCollectionFieldContract(fieldName, collectionKind, innerType, collectionFieldRules.Count > 0 ? collectionFieldRules : null));
                 continue;
             }
 
@@ -190,13 +195,42 @@ public static class StateMachineDslParser
                     ? ParseFieldDefaultLiteral(dataFieldMatch.Groups["default"].Value.Trim(), fieldType, isNullable, fieldName, i + 1)
                     : null;
 
+                var fieldRules = ParseFieldRules(lines, ref i, fieldName, isCollection: false);
+
                 dataFields.Add(new DslFieldContract(
                     fieldName,
                     fieldType,
                     isNullable,
                     hasDefaultValue,
-                    defaultValue));
+                    defaultValue,
+                    fieldRules.Count > 0 ? fieldRules : null));
 
+                continue;
+            }
+
+            // Top-level rule (appears after referenced fields, before from/on blocks)
+            var topLevelRuleMatch = RuleRegex.Match(line);
+            if (topLevelRuleMatch.Success)
+            {
+                var ruleExprText = topLevelRuleMatch.Groups["expr"].Value.Trim();
+                var ruleReason = topLevelRuleMatch.Groups["reason"].Value;
+                var exprStartCol = raw.IndexOf(ruleExprText, StringComparison.Ordinal);
+                if (exprStartCol < 0) exprStartCol = line.IndexOf(ruleExprText, StringComparison.Ordinal);
+                var exprEndCol = exprStartCol + ruleExprText.Length;
+                var reasonStartCol = raw.LastIndexOf('"') - ruleReason.Length;
+                if (reasonStartCol < 0) reasonStartCol = exprEndCol;
+                var reasonEndCol = reasonStartCol + ruleReason.Length;
+
+                // Validate no forward references — only fields already declared are allowed
+                var declaredNames = new HashSet<string>(dataFields.Select(f => f.Name).Concat(collectionFields.Select(f => f.Name)), StringComparer.Ordinal);
+                ValidateRuleScope(ruleExprText, i + 1, declaredNames, allowedIdentifiers: null, scopeDescription: "top-level rule");
+
+                DslExpression ruleExpr;
+                try { ruleExpr = DslExpressionParser.Parse(ruleExprText); }
+                catch (InvalidOperationException ex)
+                { throw new InvalidOperationException($"Line {i + 1}: invalid rule expression '{ruleExprText}'. {ex.Message}"); }
+
+                topLevelRules.Add(new DslRule(ruleExprText, ruleExpr, ruleReason, i + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
                 i++;
                 continue;
             }
@@ -237,7 +271,16 @@ public static class StateMachineDslParser
 
         ValidateReferences(states, events, transitions, terminalRules, dataFields, collectionFields);
 
-        return new DslMachine(name, states, initialState, events, transitions, terminalRules, dataFields, collectionFields);
+        var stateRulesFinal = stateRules.Count == 0
+            ? null
+            : (IReadOnlyDictionary<string, IReadOnlyList<DslRule>>)stateRules.ToDictionary(
+                kvp => kvp.Key,
+                kvp => (IReadOnlyList<DslRule>)kvp.Value,
+                StringComparer.Ordinal);
+
+        return new DslMachine(name, states, initialState, events, transitions, terminalRules, dataFields, collectionFields,
+            topLevelRules.Count > 0 ? topLevelRules : null,
+            stateRulesFinal);
     }
 
     private static void ParseEventDeclaration(
@@ -251,6 +294,7 @@ public static class StateMachineDslParser
 
         var headerIndent = GetIndentation(lines[index]);
         var args = new List<DslFieldContract>();
+        var eventRules = new List<DslRule>();
 
         index++;
         while (index < lines.Length)
@@ -266,6 +310,31 @@ public static class StateMachineDslParser
             var indent = GetIndentation(raw);
             if (indent <= headerIndent)
                 break;
+
+            // Event-level rules: indented under event, scope is event args only
+            var eventRuleMatch = RuleRegex.Match(line);
+            if (eventRuleMatch.Success)
+            {
+                var ruleExprText = eventRuleMatch.Groups["expr"].Value.Trim();
+                var ruleReason = eventRuleMatch.Groups["reason"].Value;
+                var argNames = new HashSet<string>(args.Select(a => a.Name), StringComparer.Ordinal);
+                // Event rules may only reference event arg identifiers (prefixed or bare)
+                ValidateEventRuleScope(ruleExprText, index + 1, argNames, eventName);
+
+                DslExpression ruleExpr;
+                try { ruleExpr = DslExpressionParser.Parse(ruleExprText); }
+                catch (InvalidOperationException ex)
+                { throw new InvalidOperationException($"Line {index + 1}: invalid rule expression '{ruleExprText}'. {ex.Message}"); }
+
+                var exprStartCol = raw.IndexOf(ruleExprText, StringComparison.Ordinal);
+                if (exprStartCol < 0) exprStartCol = line.IndexOf(ruleExprText, StringComparison.Ordinal);
+                var exprEndCol = exprStartCol + ruleExprText.Length;
+                var reasonStartCol = exprEndCol;
+                var reasonEndCol = reasonStartCol + ruleReason.Length;
+                eventRules.Add(new DslRule(ruleExprText, ruleExpr, ruleReason, index + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
+                index++;
+                continue;
+            }
 
             var fieldMatch = EventArgFieldRegex.Match(line);
             if (!fieldMatch.Success)
@@ -291,7 +360,262 @@ public static class StateMachineDslParser
             index++;
         }
 
-        events.Add(new DslEvent(eventName, args));
+        events.Add(new DslEvent(eventName, args, eventRules.Count > 0 ? eventRules : null));
+    }
+
+    /// <summary>
+    /// Advances <paramref name="index"/> past the state header line and collects any indented
+    /// <c>rule</c> lines that follow. Non-rule indented content causes a parse error.
+    /// </summary>
+    private static void ParseStateDeclaration(
+        string[] lines,
+        ref int index,
+        string stateName,
+        Dictionary<string, List<DslRule>> stateRules)
+    {
+        var headerIndent = GetIndentation(lines[index]);
+        index++;
+
+        var rules = new List<DslRule>();
+        while (index < lines.Length)
+        {
+            var raw = lines[index];
+            var line = StripInlineComment(raw.Trim());
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
+            {
+                index++;
+                continue;
+            }
+
+            var indent = GetIndentation(raw);
+            if (indent <= headerIndent)
+                break;
+
+            var ruleMatch = RuleRegex.Match(line);
+            if (!ruleMatch.Success)
+            {
+                // Not a rule line — stop consuming state body; outer parser will handle this line.
+                break;
+            }
+
+            var ruleExprText = ruleMatch.Groups["expr"].Value.Trim();
+            var ruleReason = ruleMatch.Groups["reason"].Value;
+            var exprStartCol = raw.IndexOf(ruleExprText, StringComparison.Ordinal);
+            if (exprStartCol < 0) exprStartCol = line.IndexOf(ruleExprText, StringComparison.Ordinal);
+            var exprEndCol = exprStartCol + ruleExprText.Length;
+            var reasonStartCol = exprEndCol;
+            var reasonEndCol = reasonStartCol + ruleReason.Length;
+
+            DslExpression ruleExpr;
+            try { ruleExpr = DslExpressionParser.Parse(ruleExprText); }
+            catch (InvalidOperationException ex)
+            { throw new InvalidOperationException($"Line {index + 1}: invalid rule expression '{ruleExprText}'. {ex.Message}"); }
+
+            rules.Add(new DslRule(ruleExprText, ruleExpr, ruleReason, index + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
+            index++;
+        }
+
+        if (rules.Count > 0)
+            stateRules[stateName] = rules;
+    }
+
+    /// <summary>
+    /// Reads rule lines indented under a field declaration (scalar or collection).
+    /// Validates field rule scope restriction (only the owning field is allowed).
+    /// Leaves <paramref name="index"/> pointing at the next non-rule line.
+    /// </summary>
+    private static List<DslRule> ParseFieldRules(string[] lines, ref int index, string owningField, bool isCollection)
+    {
+        var rules = new List<DslRule>();
+        var headerIndent = GetIndentation(lines[index]);
+        index++; // advance past the field line
+
+        while (index < lines.Length)
+        {
+            var raw = lines[index];
+            var line = StripInlineComment(raw.Trim());
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
+            {
+                index++;
+                continue;
+            }
+
+            var indent = GetIndentation(raw);
+            if (indent <= headerIndent)
+                break;
+
+            var ruleMatch = RuleRegex.Match(line);
+            if (!ruleMatch.Success)
+                throw new InvalidOperationException($"Line {index + 1}: only 'rule' statements are allowed indented under a field declaration.");
+
+            var ruleExprText = ruleMatch.Groups["expr"].Value.Trim();
+            var ruleReason = ruleMatch.Groups["reason"].Value;
+
+            // Scope restriction: only the declaring field, its dotted properties, and literals
+            var allowed = new HashSet<string>(StringComparer.Ordinal) { owningField };
+            ValidateRuleScope(ruleExprText, index + 1, allowed, allowedIdentifiers: null, scopeDescription: null, fieldRuleOwner: owningField);
+
+            DslExpression ruleExpr;
+            try { ruleExpr = DslExpressionParser.Parse(ruleExprText); }
+            catch (InvalidOperationException ex)
+            { throw new InvalidOperationException($"Line {index + 1}: invalid rule expression '{ruleExprText}'. {ex.Message}"); }
+
+            var exprStartCol = raw.IndexOf(ruleExprText, StringComparison.Ordinal);
+            if (exprStartCol < 0) exprStartCol = line.IndexOf(ruleExprText, StringComparison.Ordinal);
+            var exprEndCol = exprStartCol + ruleExprText.Length;
+            var reasonStartCol = exprEndCol;
+            var reasonEndCol = reasonStartCol + ruleReason.Length;
+
+            rules.Add(new DslRule(ruleExprText, ruleExpr, ruleReason, index + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
+            index++;
+        }
+
+        return rules;
+    }
+
+    /// <summary>
+    /// Validates that a rule expression only references identifiers in <paramref name="allowedSet"/>
+    /// (and their dotted members) plus literals.
+    /// When <paramref name="fieldRuleOwner"/> is set, any identifier other than the owner (or its dotted properties)
+    /// is rejected with the field-rule-specific message.
+    /// </summary>
+    private static void ValidateRuleScope(
+        string expressionText,
+        int lineNumber,
+        HashSet<string> allowedSet,
+        HashSet<string>? allowedIdentifiers,
+        string? scopeDescription,
+        string? fieldRuleOwner = null)
+    {
+        DslExpression parsed;
+        try { parsed = DslExpressionParser.Parse(expressionText); }
+        catch { return; } // parse errors are reported separately
+
+        ValidateRuleScopeNode(parsed, lineNumber, allowedSet, allowedIdentifiers, scopeDescription, fieldRuleOwner);
+    }
+
+    private static void ValidateRuleScopeNode(
+        DslExpression expr,
+        int lineNumber,
+        HashSet<string> allowedSet,
+        HashSet<string>? allowedIdentifiers,
+        string? scopeDescription,
+        string? fieldRuleOwner)
+    {
+        switch (expr)
+        {
+            case DslIdentifierExpression id:
+                // The base identifier name is always the lookup key (member is a property of the base)
+                var baseName = id.Name;
+                if (allowedSet.Contains(baseName, StringComparer.Ordinal))
+                    return;
+                if (allowedIdentifiers is not null && allowedIdentifiers.Contains(baseName, StringComparer.Ordinal))
+                    return;
+                if (fieldRuleOwner is not null)
+                    throw new InvalidOperationException($"Line {lineNumber}: field rule may only reference its own field '{fieldRuleOwner}'; use a top-level rule for cross-field constraints. (offending identifier: '{baseName}')");
+                if (scopeDescription is not null)
+                    throw new InvalidOperationException($"Line {lineNumber}: {scopeDescription} references undeclared field '{baseName}'.");
+                break;
+            case DslLiteralExpression:
+                return;
+            case DslUnaryExpression unary:
+                ValidateRuleScopeNode(unary.Operand, lineNumber, allowedSet, allowedIdentifiers, scopeDescription, fieldRuleOwner);
+                break;
+            case DslBinaryExpression binary:
+                ValidateRuleScopeNode(binary.Left, lineNumber, allowedSet, allowedIdentifiers, scopeDescription, fieldRuleOwner);
+                ValidateRuleScopeNode(binary.Right, lineNumber, allowedSet, allowedIdentifiers, scopeDescription, fieldRuleOwner);
+                break;
+            case DslParenthesizedExpression paren:
+                ValidateRuleScopeNode(paren.Inner, lineNumber, allowedSet, allowedIdentifiers, scopeDescription, fieldRuleOwner);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Validates that an event rule only references event arg identifiers (bare or prefixed with EventName.).
+    /// </summary>
+    private static void ValidateEventRuleScope(
+        string expressionText,
+        int lineNumber,
+        HashSet<string> argNames,
+        string eventName)
+    {
+        DslExpression parsed;
+        try { parsed = DslExpressionParser.Parse(expressionText); }
+        catch { return; }
+
+        ValidateEventRuleScopeNode(parsed, lineNumber, argNames, eventName);
+    }
+
+    private static void ValidateEventRuleScopeNode(
+        DslExpression expr,
+        int lineNumber,
+        HashSet<string> argNames,
+        string eventName)
+    {
+        switch (expr)
+        {
+            case DslIdentifierExpression id:
+                // Accept: EventName.ArgName  (Name=eventName, Member=argName)
+                if (string.Equals(id.Name, eventName, StringComparison.Ordinal) && id.Member is not null)
+                {
+                    if (!argNames.Contains(id.Member, StringComparer.Ordinal))
+                        throw new InvalidOperationException(
+                            $"Line {lineNumber}: event rule may only reference event argument identifiers; '{id.Name}.{id.Member}' is not a declared argument for event '{eventName}'.");
+                    return;
+                }
+                // Accept: bare ArgName  (Name=argName, no member)
+                if (id.Member is null && argNames.Contains(id.Name, StringComparer.Ordinal))
+                    return;
+                // Accept: ArgName.property  (Name=argName, Member=some property)
+                if (id.Member is not null && argNames.Contains(id.Name, StringComparer.Ordinal))
+                    return;
+                // Otherwise: reject
+                var displayName = id.Member is not null ? $"{id.Name}.{id.Member}" : id.Name;
+                throw new InvalidOperationException(
+                    $"Line {lineNumber}: event rule may only reference event argument identifiers; '{displayName}' is not a declared argument for event '{eventName}'.");
+            case DslLiteralExpression:
+                return;
+            case DslUnaryExpression unary:
+                ValidateEventRuleScopeNode(unary.Operand, lineNumber, argNames, eventName);
+                break;
+            case DslBinaryExpression binary:
+                ValidateEventRuleScopeNode(binary.Left, lineNumber, argNames, eventName);
+                ValidateEventRuleScopeNode(binary.Right, lineNumber, argNames, eventName);
+                break;
+            case DslParenthesizedExpression paren:
+                ValidateEventRuleScopeNode(paren.Inner, lineNumber, argNames, eventName);
+                break;
+        }
+    }
+
+    /// <summary>Collects all identifier base names referenced in an expression (not dotted members).</summary>
+    private static void CollectIdentifiers(DslExpression expression, out HashSet<string> names)
+    {
+        names = new HashSet<string>(StringComparer.Ordinal);
+        CollectIdentifiersInto(expression, names);
+    }
+
+    private static void CollectIdentifiersInto(DslExpression expression, HashSet<string> names)
+    {
+        switch (expression)
+        {
+            case DslIdentifierExpression id:
+                names.Add(id.Name);
+                break;
+            case DslLiteralExpression:
+                break;
+            case DslUnaryExpression unary:
+                CollectIdentifiersInto(unary.Operand, names);
+                break;
+            case DslBinaryExpression binary:
+                CollectIdentifiersInto(binary.Left, names);
+                CollectIdentifiersInto(binary.Right, names);
+                break;
+            case DslParenthesizedExpression paren:
+                CollectIdentifiersInto(paren.Inner, names);
+                break;
+        }
     }
 
     private static void ParseFromOnBlock(

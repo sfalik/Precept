@@ -10,23 +10,41 @@ public sealed record DslMachine(
     IReadOnlyList<DslTransition> Transitions,
     IReadOnlyList<DslTerminalRule> TerminalRules,
     IReadOnlyList<DslFieldContract> DataFields,
-    IReadOnlyList<DslCollectionFieldContract> CollectionFields);
+    IReadOnlyList<DslCollectionFieldContract> CollectionFields,
+    IReadOnlyList<DslRule>? TopLevelRules = null,
+    IReadOnlyDictionary<string, IReadOnlyList<DslRule>>? StateRules = null);
 
 public sealed record DslEvent(
     string Name,
-    IReadOnlyList<DslFieldContract> Args);
+    IReadOnlyList<DslFieldContract> Args,
+    IReadOnlyList<DslRule>? Rules = null);
 
 public sealed record DslFieldContract(
     string Name,
     DslScalarType Type,
     bool IsNullable,
     bool HasDefaultValue = false,
-    object? DefaultValue = null);
+    object? DefaultValue = null,
+    IReadOnlyList<DslRule>? Rules = null);
 
 public sealed record DslCollectionFieldContract(
     string Name,
     DslCollectionKind CollectionKind,
-    DslScalarType InnerType);
+    DslScalarType InnerType,
+    IReadOnlyList<DslRule>? Rules = null);
+
+/// <summary>
+/// A declarative boolean constraint declared with the <c>rule</c> keyword.
+/// </summary>
+public sealed record DslRule(
+    string ExpressionText,
+    DslExpression Expression,
+    string Reason,
+    int SourceLine,
+    int ExpressionStartColumn,
+    int ExpressionEndColumn,
+    int ReasonStartColumn,
+    int ReasonEndColumn);
 
 public enum DslCollectionKind
 {

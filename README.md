@@ -85,6 +85,7 @@ The two paths coexist safely because rules (declarative invariants like `rule Ba
 - CLI host has been removed in this branch (hard cut); editor + language server are the active runtime surfaces.
 - **Collection types** (`set<T>`, `queue<T>`, `stack<T>`) are implemented with full parser, runtime, and language-server support. Declarations, mutations (`add`/`remove`/`enqueue`/`dequeue`/`push`/`pop`/`clear`), guard properties (`.count`/`.min`/`.max`/`.peek`), and the `contains` operator are all functional. Directional set queries (`above`/`below`) remain deferred pending real usage data.
 - **Language-server null-flow diagnostics** perform both intra-expression narrowing (`&&`/`||`/`!` within a single guard) and cross-branch narrowing: when guarded branches form an `if`/`else if`/`else` chain, prior guard negations are accumulated so later branches see a progressively narrowed type environment (e.g. after `if X == null → no transition`, the `else if` and `else` branches see `X` as non-nullable). Collection mutation value expressions (`add`, `enqueue`, `push`) are type-checked against the collection's inner type with the same narrowed symbols as `set` assignments; `dequeue`/`pop into` target types are validated against the collection's inner type.
+- **Rules** (`rule <Expr> "<Reason>"`) are implemented across all four attachment positions — field, top-level, state, and event. Field rules guard a single field's invariant; top-level rules express cross-field constraints; state rules enforce entry contracts when transitioning into a state (including self-transitions); event rules validate event arguments before guard evaluation. Compile-time checks catch literal-value violations and empty-initial-state rule failures. Runtime enforcement runs after `Fire` commits all `set` assignments and collection mutations; `Inspect` simulates rule evaluation read-only. See [docs/RulesDesign.md](docs/RulesDesign.md) for the full design.
 
 ## Quick Start (2 minutes)
 
@@ -210,13 +211,19 @@ state Idle initial  # Inline comment — # outside a string literal starts a com
 machine <Name>
 
 state <StateName> [initial]
+[ rule <BooleanExpr> "<Reason>" ]         # state rules — indented under a state
 
 event <EventName>
 [ <ScalarType>[?] <ArgName> [= <Literal>] { <ArgDecl> } ]
+[ rule <BooleanExpr> "<Reason>" ]         # event rules — may only reference event args
 
 <ScalarType>[?] <FieldName>
+[ rule <BooleanExpr> "<Reason>" ]         # field rules — may only reference the field itself
 
 <ScalarType>[?] <FieldName> [= <Literal>]
+[ rule <BooleanExpr> "<Reason>" ]         # field rules — may only reference the field itself
+
+rule <BooleanExpr> "<Reason>"             # top-level rules — reference any data fields above
 
 <ScalarType> := string | number | boolean | null
 
@@ -294,6 +301,22 @@ Constraints:
 - Collection mutations are lenient for writes (`add` duplicate → no-op, `remove` missing → no-op) but strict for reads (`dequeue`/`pop` on empty → branch failure and rollback).
 - No function-call syntax. No nullable inner types. No collection nesting. No array literals. No `map<K,V>`.
 - Unsupported syntax: `states ...`, `events ...`, and legacy inline form `transition A -> B on E ...`.
+
+**Rule constraints:**
+
+- `rule <BooleanExpr> "<Reason>"` is the same syntax in all four positions.
+- **Field rules** (indented under a scalar field declaration) may only reference the declaring field and its dotted properties (e.g., `.count`). Any other identifier is a parse error: *"Field rule may only reference its own field; use a top-level rule for cross-field constraints."*
+- **Top-level rules** (unindented, after field declarations, before `state` declarations) may reference any data field declared above them.
+- **State rules** (indented under a `state` declaration) may reference any data field. They are evaluated whenever the machine enters that state, including self-transitions.
+- **Event rules** (indented under an `event` declaration, after arg declarations) may only reference event arguments for that event. Accessing instance data fields in an event rule is a parse error.
+- A field rule with a default value that violates its own rule is a compile-time error.
+- A state rule that would be violated by the initial state's default data is a compile-time error.
+- A `set` assignment (literal RHS only) that provably violates a field rule is a compile-time error.
+- At runtime, all field rules and top-level rules are evaluated after `Fire` commits all `set` assignments and collection mutations. If any rule is violated, the transition is rejected and the instance is not updated (full rollback).
+- State rules are evaluated after data rules against the target state. If violated, the transition is rejected.
+- Event rules are evaluated before guard evaluation. If violated, the transition is rejected immediately.
+- `Inspect` evaluates all rules read-only: it simulates `set` assignments, checks all rule positions, and returns `Rejected` if any rule would be violated — without mutating any persisted state.
+- When `Inspect` is called without event arguments (discovery mode), event rules are not evaluated; `RequiredEventArgumentKeys` reports which args are needed before firing.
 
 ### Null Safety
 
@@ -670,6 +693,67 @@ from AwaitingReview on CompleteReview
     push CompletedReviewers Reviewer
     transition FullyReviewed
 ```
+
+18) Field rule — single-field value bound
+
+```text
+number Balance = 0
+  rule Balance >= 0 "Balance must not go negative"
+```
+
+Checked after every `Fire` that touches `Balance`. If any `set Balance = ...` would make it negative, the transition is rejected and rolled back. Compile-time check catches a literal default that violates its own rule (e.g., `number Balance = 0` with `rule Balance >= 10` is a compile error).
+
+19) Top-level rule — cross-field invariant
+
+```text
+number Quantity = 0
+number UnitPrice = 0
+number TotalPrice = 0
+
+rule Quantity * UnitPrice == TotalPrice "Price must be consistent"
+```
+
+Top-level rules are evaluated after field rules, after every `Fire`. They may reference any data field declared above them.
+
+20) State rule — entry contract
+
+```text
+number AmountPaid = 0
+
+state Paid
+  rule AmountPaid > 0 "Must have paid before entering Paid state"
+
+from Draft on Checkout
+  set AmountPaid = Checkout.PaymentAmount
+  transition Paid
+```
+
+If `Checkout.PaymentAmount = 0`, the state rule `AmountPaid > 0` blocks entry into `Paid`. The machine stays in `Draft` and the caller sees a `Rejected` result. State rules also apply on self-transitions.
+
+21) Event rule — input validation before guards
+
+```text
+event Pay
+  number Amount
+  string? Note
+  rule Amount > 0 "Payment amount must be positive"
+
+from Active on Pay
+  set Balance = Balance - Pay.Amount
+  transition Active
+```
+
+Event rules run before any guard is checked. A `Pay` event with `Amount = -10` is rejected immediately. `Inspect` without args (discovery mode) skips event rules and returns `RequiredEventArgumentKeys: ["Amount"]`.
+
+22) Multiple rules, all violations collected
+
+```text
+number Balance = 0
+  rule Balance >= 0 "Balance must not go negative"
+  rule Balance <= 1000000 "Balance cannot exceed one million"
+```
+
+All rules are evaluated independently; all violations are collected and reported together in the fire result's `Reasons` list.
 
 ## Instance JSON Example
 

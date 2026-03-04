@@ -6,7 +6,7 @@ When making any code, interface, test, or behavior change, keep documentation in
 
 ### Source of Truth
 
-- `docs/DesignNotes.md` is the canonical design decision record.
+- designs in `docs` are the canonical design decision records.
 - `README.md` is the public project narrative and usage guide.
 - If they diverge, update both so they agree before completing the task.
 
@@ -32,7 +32,7 @@ Do not leave aspirational claims as if implemented. If behavior is planned but n
 3. Did tests move from skipped to active (or vice versa)?
    - If yes, update README current-status wording.
 4. Did any design decision change?
-   - If yes, update `docs/DesignNotes.md` and any corresponding README section.
+   - If yes, update corresponding design in `docs` and any corresponding README section.
 5. Did sample files change?
    - If yes, ensure `README.md` is updated accordingly.
 
@@ -53,7 +53,6 @@ Maintain a concise "Current Status" section in `README.md` that reflects:
 - what is implemented now
 - what remains stubbed/pending
 - current concurrency model
-- role/status of legacy `FiniteStateMachine`
 
 Update this section whenever those facts change.
 

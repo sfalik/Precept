@@ -129,13 +129,18 @@ state Idle initial  # Inline comment — # outside a double-quoted string litera
 
 machine <Name>
 state <StateName> [initial]
+[ rule <BooleanExpr> "<Reason>" ]         # state rules — indented under a state; all data fields in scope
 <StateDecl> := initial
 
 event <EventName>
 [ <string|number|boolean|null>[?] <ArgName> [= <Literal>] { <ArgDecl> } ]
+[ rule <BooleanExpr> "<Reason>" ]         # event rules — may only reference event args for this event
 
 <string|number|boolean|null>[?] <FieldName> { <FieldDecl> }
 <string|number|boolean|null>[?] <FieldName> [= <Literal>]
+[ rule <BooleanExpr> "<Reason>" ]         # field rules — may only reference the declaring field
+
+rule <BooleanExpr> "<Reason>"             # top-level rules — reference any data fields declared above
 
 # Collection field declarations
 set<T> <FieldName>                  # sorted unique set, always starts empty
@@ -184,6 +189,17 @@ Canonical constraints:
 - Non-nullable event args with a default use the default when the caller omits them.
 - Nullable event args are always optional; if omitted, they default to `null` or the declared default.
 - Unsupported syntax: `states ...`, `events ...`, and legacy inline form `transition A -> B on E ...`.
+
+**Rule constraints** (Status: *Implemented*):
+
+- `rule <BooleanExpr> "<Reason>"` is the same syntax in all four positions.
+- **Field rules** (indented under a scalar field declaration) scope to the declaring field only. Referencing any other identifier is a parse error.
+- **Top-level rules** (unindented, between field declarations and `state` declarations) reference any data field declared above them.
+- **State rules** (indented under a `state` declaration) reference any data field. Evaluated on every entry to that state, including self-transitions.
+- **Event rules** (indented under an `event` declaration, after arg declarations) reference only event arguments for that event. Instance data refs are a parse error.
+- Compile-time checks: literal default that violates its own field rule → error; initial state data that violates a state rule → error; literal `set` RHS that provably violates a field rule → error.
+- Runtime: field and top-level rules checked after all `set`/mutation commits; state rules checked against target state. Any violation → full rollback + `Rejected` result.
+- `Inspect` (discovery mode, no event args): event rules are skipped; `RequiredEventArgumentKeys` reports which args are needed.
 
 Block-authoring equivalent (same semantics):
 
@@ -471,13 +487,14 @@ Validation constraints:
 
 ## Test Status
 
-- Active tests include `test/StateMachine.Tests/DslWorkflowTests.cs`, `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslSetParsingTests.cs`, `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`, `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs`, and `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerCollectionMutationTests.cs`.
+- Active tests include `test/StateMachine.Tests/DslWorkflowTests.cs`, `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslSetParsingTests.cs`, `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`, `test/StateMachine.Tests/DslCollectionTests.cs`, `test/StateMachine.Tests/DslRulesTests.cs`, `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs`, and `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerCollectionMutationTests.cs`.
 - Guard/expression test coverage includes: boolean guards, comparisons, string/null equality, numeric runtime type coercion, unsupported-expression rejection, reason aggregation, expression AST parsing precedence/invalid syntax diagnostics, lexer edge cases, set-branch parsing constraints, and runtime evaluator operator/short-circuit behavior.
 - Language-server null-narrowing coverage includes: single-expression `&&`/`||` narrowing, cross-branch narrowing across ordered if/else-if/else chains, set-assignment validation under narrowed types, and collection mutation value type checking.
 
 ## Next Steps
 
 1. Add packaging/publishing automation for the VS Code extension client.
+2. Editable fields (docs/EditableFieldsDesign.md) — prerequisite rules feature is now implemented; editable fields are the logical next feature.
 
 ## Guard Evaluation + Event-Argument Model (Current)
 
