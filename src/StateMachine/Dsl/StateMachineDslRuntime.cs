@@ -263,9 +263,12 @@ public sealed class DslWorkflowDefinition
         // When eventArguments is null this is a pure discovery call; event rules cannot be
         // evaluated without their required inputs, and RequiredEventArgumentKeys will inform
         // the caller which args are needed before firing.
+        // Event rules are evaluated against an args-only context so machine field values with
+        // the same name as an event arg cannot shadow the arg value (e.g. CreditScore field
+        // must not override the Submit.CreditScore argument when evaluating an event rule).
         if (eventArguments != null)
         {
-            var eventRuleViolations = EvaluateEventRules(eventName, evaluationArguments);
+            var eventRuleViolations = EvaluateEventRules(eventName, BuildDirectEvaluationData(eventName, eventArguments));
             if (eventRuleViolations.Count > 0)
                 return DslInspectionResult.Rejected(instance.CurrentState, eventName, eventRuleViolations);
         }
@@ -349,7 +352,9 @@ public sealed class DslWorkflowDefinition
         var evaluationArguments = BuildEvaluationData(instance.InstanceData, eventName, eventArguments);
 
         // Stage 1: Event rules (checked before guard evaluation)
-        var eventRuleViolations = EvaluateEventRules(eventName, evaluationArguments);
+        // Use an args-only context so machine fields with the same name as an event arg cannot
+        // shadow the arg value (e.g. CreditScore field must not override Submit.CreditScore).
+        var eventRuleViolations = EvaluateEventRules(eventName, BuildDirectEvaluationData(eventName, eventArguments));
         if (eventRuleViolations.Count > 0)
             return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, eventRuleViolations);
 
