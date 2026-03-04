@@ -92,7 +92,7 @@ Rules separate these two concerns:
 
 This separation is not merely organizational. It changes the failure model: a guard that doesn't match simply means a different branch fires (or the event is blocked). A rule that fails means the committed data would violate an invariant, so all mutations are atomically rolled back. Guards are routing; rules are protection.
 
-Rules use the same expression grammar as guards and `set` expressions — one grammar, one evaluator, four scoped positions (field, top-level, state, event). No new operators, no new syntax. The scope restrictions are intentional: field rules can only reference their own field (cross-field constraints belong in top-level rules where the multi-field nature is visible), event rules can only reference event arguments (so they validate inputs, not state). See docs/RulesDesign.md for the full design.
+Rules use the same expression grammar as guards and `set` expressions — one grammar, one evaluator, four scoped positions (field, top-level, state, event). No new operators, no new syntax. The scope restrictions are intentional: field rules can only reference their own field (cross-field constraints belong in top-level rules where the multi-field nature is visible), event rules can only reference event arguments (so they validate inputs, not state). This scope restriction is enforced at runtime by evaluating event rules against an args-only context — machine field values are never injected, so a machine field that shares a bare name with an event argument cannot shadow the argument value during event rule evaluation. See docs/RulesDesign.md for the full design.
 
 #### Rules as prerequisite for the broader design
 

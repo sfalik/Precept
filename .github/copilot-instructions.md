@@ -122,6 +122,10 @@ Update this section whenever those facts change.
 
 When providing design-option responses, include concrete usage examples to illustrate the implementation and clarify the context of the options presented.
 
+## DSL Authoring (Non-Negotiable)
+
+Before writing or editing any `.sm` file or any DSL snippet, read `docs/DesignNotes.md § DSL Syntax Contract (Current)` in full. That section is the single authoritative grammar reference. Do not rely on memory or inference — read it first, then write.
+
 ## Deliverable Expectation
 
 Unless explicitly told not to, include documentation synchronization as part of every relevant code change.

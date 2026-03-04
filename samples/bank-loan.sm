@@ -9,14 +9,14 @@ number MissedPayments = 0
 	rule MissedPayments >= 0 "Missed payments cannot be negative"
 boolean CollateralVerified = false
 string? OfficerName = null
+string? DisbursementAccount = null
 
 rule ApprovedAmount <= RequestedAmount "Approved amount must not exceed requested amount"
 
-state Applied initial
+state Apply initial
 state UnderReview
 state Approved
 state Disbursed
-	rule CollateralVerified || CreditScore >= 700 "Collateral must be verified or credit score must be at least 700"
 state Repaying
 state PaidOff
 state Defaulted
@@ -30,6 +30,7 @@ event Submit
 
 event AssignOfficer
 	string OfficerName
+		rule OfficerName != "" "Officer name is required"
 
 event VerifyCollateral
 
@@ -41,6 +42,8 @@ event Reject
 	string Reason
 
 event Disburse
+	string AccountNumber
+		rule AccountNumber != "" "Disbursement account number is required"
 
 event MakePayment
 	number Amount
@@ -48,7 +51,7 @@ event MakePayment
 
 event MissPayment
 
-from Applied on Submit
+from Apply on Submit
 	set RequestedAmount = Submit.Amount
 	set CreditScore = Submit.CreditScore
 	transition UnderReview
@@ -58,22 +61,29 @@ from UnderReview on AssignOfficer
 	no transition
 
 from UnderReview on VerifyCollateral
-	set CollateralVerified = true
-	no transition
+	if !CollateralVerified
+		set CollateralVerified = true
+		no transition
+	else
+		reject "Collateral has already been verified"
 
 from UnderReview on Approve
-	if Approve.ApprovedAmount <= RequestedAmount
+	if (CollateralVerified || CreditScore >= 700) && Approve.ApprovedAmount <= RequestedAmount
 		set ApprovedAmount = Approve.ApprovedAmount
 		set RemainingBalance = Approve.ApprovedAmount
 		transition Approved
 	else
-		reject "Approved amount must not exceed requested amount"
+		reject "Collateral must be verified or credit score must be at least 700, and approved amount must not exceed requested amount"
 
 from UnderReview on Reject
 	transition Rejected
 
 from Approved on Disburse
-	transition Disbursed
+	if OfficerName != null
+		set DisbursementAccount = Disburse.AccountNumber
+		transition Disbursed
+	else
+		reject "A loan officer must be assigned before disbursement"
 
 from Disbursed on MakePayment
 	if RemainingBalance > 0

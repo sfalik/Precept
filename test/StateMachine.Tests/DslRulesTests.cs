@@ -619,6 +619,37 @@ public class DslRulesTests
         result.Reasons.Should().Contain(r => r.Contains("Fee must be non-negative", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Fire_EventRule_EventArgNameShadowsMachineField_ArgValueIsUsed()
+    {
+        // Regression: event arg has the same bare name as a machine field (e.g. CreditScore).
+        // The event rule must evaluate against the supplied arg value, not the machine field value.
+        // Previously the machine field (= 0) shadowed the arg (= 500) and the rule falsely failed.
+        const string dsl = """
+            machine Test
+            number CreditScore = 0
+            state Apply initial
+            state UnderReview
+            event Submit
+              number CreditScore
+                rule CreditScore >= 300 "Credit score must be at least 300"
+            from Apply on Submit
+              transition UnderReview
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("Apply", new Dictionary<string, object?> { ["CreditScore"] = 0.0 });
+
+        // Arg value 500 satisfies the rule even though the machine field is 0
+        var passing = workflow.Fire(instance, "Submit", new Dictionary<string, object?> { ["CreditScore"] = 500.0 });
+        passing.IsAccepted.Should().BeTrue();
+
+        // Arg value 100 violates the rule
+        var failing = workflow.Fire(instance, "Submit", new Dictionary<string, object?> { ["CreditScore"] = 100.0 });
+        failing.IsAccepted.Should().BeFalse();
+        failing.Reasons.Should().ContainSingle(r => r.Contains("Credit score must be at least 300", StringComparison.Ordinal));
+    }
+
     // ========================================================================================
     // RUNTIME — field rules (checked after set execution)
     // ========================================================================================
@@ -1196,6 +1227,34 @@ public class DslRulesTests
 
         result.IsAccepted.Should().BeTrue();
         result.TargetState.Should().Be("Done");
+    }
+
+    [Fact]
+    public void Inspect_EventRule_EventArgNameShadowsMachineField_ArgValueIsUsed()
+    {
+        // Regression: event arg has the same bare name as a machine field.
+        // Inspect must evaluate the event rule against the arg value, not the machine field value.
+        const string dsl = """
+            machine Test
+            number CreditScore = 0
+            state Apply initial
+            state UnderReview
+            event Submit
+              number CreditScore
+                rule CreditScore >= 300 "Credit score must be at least 300"
+            from Apply on Submit
+              transition UnderReview
+            """;
+
+        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var instance = workflow.CreateInstance("Apply", new Dictionary<string, object?> { ["CreditScore"] = 0.0 });
+
+        var passing = workflow.Inspect(instance, "Submit", new Dictionary<string, object?> { ["CreditScore"] = 500.0 });
+        passing.IsAccepted.Should().BeTrue();
+
+        var failing = workflow.Inspect(instance, "Submit", new Dictionary<string, object?> { ["CreditScore"] = 100.0 });
+        failing.IsAccepted.Should().BeFalse();
+        failing.Reasons.Should().ContainSingle(r => r.Contains("Credit score must be at least 300", StringComparison.Ordinal));
     }
 
     [Fact]
