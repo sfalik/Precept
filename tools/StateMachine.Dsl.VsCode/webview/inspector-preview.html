@@ -232,9 +232,9 @@
 
     .event-entry {
       display: flex;
-      align-items: center;
+      align-items: stretch;
       gap: 6px;
-      padding: 2px 0;
+      padding: 10px 0 2px;
       min-width: 0;
     }
 
@@ -244,11 +244,11 @@
 
     .event-content {
       display: flex;
-      align-items: center;
+      align-items: stretch;
       gap: 6px;
       flex: 1;
       min-width: 0;
-      overflow: hidden;
+      overflow: visible;
       margin-left: 8px;
     }
 
@@ -330,23 +330,106 @@
     .event-args-inline {
       display: flex;
       flex-wrap: nowrap;
-      align-items: center;
+      align-items: stretch;
       gap: 6px;
       min-width: 0;
       overflow-x: auto;
-      overflow-y: hidden;
+      overflow-y: visible;
     }
 
-    .event-args-inline input {
-      width: 120px;
+    .arg-field {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      align-self: stretch;
       border: 1px solid var(--border);
-      border-radius: 0;
+      min-width: 70px;
+      max-width: 140px;
+    }
+
+    .arg-field.is-null input {
+      opacity: 0.3;
+    }
+
+    .arg-null-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 11px;
+      padding: 0 4px 0 0;
+      margin: 0;
+      cursor: pointer;
+      line-height: 1;
+      flex-shrink: 0;
+      opacity: 0.5;
+    }
+
+    .arg-null-btn:hover {
+      opacity: 1;
+      color: var(--err);
+    }
+
+    .arg-field.is-null .arg-null-btn {
+      opacity: 0.25;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .arg-label {
+      position: absolute;
+      top: -5px;
+      left: 6px;
       background: #1f2125;
+      font-size: 9px;
+      color: var(--muted);
+      padding: 0 2px;
+      line-height: 1;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .event-args-inline input[type="text"] {
+      width: 100%;
+      border: none;
+      background: transparent;
       color: var(--text);
-      padding: 3px 8px;
+      padding: 3px 6px;
       font: inherit;
       font-size: 11px;
       outline: none;
+      box-sizing: border-box;
+    }
+
+    .arg-field.boolean {
+      min-width: auto;
+      max-width: none;
+    }
+
+    .bool-seg {
+      flex: 1;
+      border: none;
+      border-left: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: 10px;
+      padding: 0 7px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .bool-seg:first-of-type {
+      border-left: none;
+    }
+
+    .bool-seg.active {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.08);
+    }
+      transform: translate(-50%, -50%);
+      font-size: 9px;
+      color: var(--ok);
+      line-height: 1;
     }
 
     #diagram {
@@ -2095,11 +2178,27 @@
                 const userVal = eventArgValues[arg.name];
                 const displayVal = userVal !== undefined ? userVal : (arg.hasDefaultValue ? formatArgDefault(arg.defaultValue) : '');
                 const placeholder = arg.hasDefaultValue
-                  ? `${arg.name} (=${formatArgDefault(arg.defaultValue)})`
+                  ? formatArgDefault(arg.defaultValue)
                   : arg.isNullable
-                    ? `${arg.name} (optional)`
-                    : arg.name;
-                return `<input data-event="${eventName}" data-event-arg="${arg.name}" type="text" placeholder="${placeholder}" value="${displayVal.toString().replace(/"/g, '&quot;')}">`;
+                    ? 'optional'
+                    : '';
+                const isNull = arg.isNullable && (userVal === null || (userVal === undefined && !arg.hasDefaultValue));
+                const nullClass = isNull ? ' is-null' : '';
+                const nullBtn = arg.isNullable
+                  ? `<button class="arg-null-btn" data-event="${eventName}" data-event-arg="${arg.name}" type="button" title="Set to null">×</button>`
+                  : '';
+                if (arg.type === 'boolean' && !arg.isNullable) {
+                  const trueActive = displayVal === 'true' || displayVal === true ? ' active' : '';
+                  const falseActive = displayVal === 'false' || displayVal === false ? ' active' : '';
+                  return `<span class="arg-field boolean"><span class="arg-label">${arg.name}</span><button class="bool-seg${trueActive}" data-event="${eventName}" data-event-arg="${arg.name}" data-val="true" type="button">true</button><button class="bool-seg${falseActive}" data-event="${eventName}" data-event-arg="${arg.name}" data-val="false" type="button">false</button></span>`;
+                }
+                if (arg.type === 'boolean' && arg.isNullable) {
+                  const trueActive = !isNull && (displayVal === 'true' || displayVal === true) ? ' active' : '';
+                  const falseActive = !isNull && (displayVal === 'false' || displayVal === false) ? ' active' : '';
+                  return `<span class="arg-field boolean${nullClass}"><span class="arg-label">${arg.name}</span><button class="bool-seg${trueActive}" data-event="${eventName}" data-event-arg="${arg.name}" data-val="true" type="button">true</button><button class="bool-seg${falseActive}" data-event="${eventName}" data-event-arg="${arg.name}" data-val="false" type="button">false</button>${nullBtn}</span>`;
+                }
+                const textVal = isNull ? '' : displayVal.toString();
+                return `<span class="arg-field${nullClass}"><span class="arg-label">${arg.name}</span><input data-event="${eventName}" data-event-arg="${arg.name}" type="text" placeholder="${isNull ? 'null' : placeholder}" value="${textVal.replace(/"/g, '&quot;')}">${nullBtn}</span>`;
               }).join('')}</span>`
             : '';
           const reasonText = getEvaluationReason(evaluation);
@@ -2150,7 +2249,35 @@
         });
       });
 
-      eventBar.querySelectorAll('input[data-event-arg]').forEach((input) => {
+      eventBar.querySelectorAll('.arg-null-btn').forEach((btn) => {
+        const ownerEventName = btn.dataset.event;
+        const argName = btn.dataset.eventArg;
+        btn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          eventArgValues[argName] = null;
+          hoveredEventName = ownerEventName;
+          inspectEventOnServer(ownerEventName);
+          suppressArgBlur = true;
+          renderEventBar();
+          suppressArgBlur = false;
+        });
+      });
+
+      eventBar.querySelectorAll('.bool-seg').forEach((seg) => {
+        const ownerEventName = seg.dataset.event;
+        const argName = seg.dataset.eventArg;
+        seg.addEventListener('click', (event) => {
+          event.stopPropagation();
+          eventArgValues[argName] = seg.dataset.val;
+          hoveredEventName = ownerEventName;
+          inspectEventOnServer(ownerEventName);
+          suppressArgBlur = true;
+          renderEventBar();
+          suppressArgBlur = false;
+        });
+      });
+
+      eventBar.querySelectorAll('input[type="text"][data-event-arg]').forEach((input) => {
         const ownerEventName = input.dataset.event;
 
         input.addEventListener('mouseenter', (event) => {

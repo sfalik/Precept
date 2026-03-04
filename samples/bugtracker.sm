@@ -1,0 +1,72 @@
+machine BugTracker
+
+state Triage initial
+state InProgress
+state InReview
+state Resolved
+state Closed
+
+string? Assignee = null
+number Priority = 3
+boolean IsBlocked = false
+string? BlockReason = null
+
+event Assign
+	string User
+
+event Block
+	string Reason
+
+event Unblock
+
+event StartWork
+
+event SubmitReview
+
+event Approve
+	number Score = 100
+
+event Resolve
+
+event Close
+
+from any on Block
+	if Block.Reason != ""
+		set IsBlocked = true
+		set BlockReason = Block.Reason
+		no transition
+	else
+		reject "Block reason is required"
+
+from any on Unblock
+	set IsBlocked = false
+	set BlockReason = null
+	no transition
+
+from any on Assign
+	set Assignee = Assign.User
+	no transition
+
+from Triage on StartWork
+	if !IsBlocked && Assignee != null
+		transition InProgress
+	else
+		reject "Cannot start work: must have an assignee and not be blocked"
+
+from InProgress on SubmitReview
+	if !IsBlocked
+		transition InReview
+	else
+		reject "Cannot review a blocked issue"
+
+from InReview on Approve
+	if Approve.Score < 70
+		transition InProgress
+	else if Approve.Score >= 90
+		set Priority = 1
+		transition Resolved
+	else
+		transition Resolved
+
+from Resolved on Close
+	transition Closed

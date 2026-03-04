@@ -40,7 +40,8 @@
     "commands": [
       {
         "command": "stateMachineDsl.openInspectorPreview",
-        "title": "StateMachine DSL: Open Inspector Preview"
+        "title": "StateMachine DSL: Open Inspector Preview",
+        "icon": "$(open-preview)"
       }
     ],
     "menus": {
@@ -58,6 +59,14 @@
         }
       ]
     },
+    "keybindings": [
+      {
+        "command": "stateMachineDsl.openInspectorPreview",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "editorLangId == state-machine-dsl"
+      }
+    ],
     "configuration": {
       "title": "StateMachine DSL Preview",
       "properties": {

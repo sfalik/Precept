@@ -202,6 +202,10 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
 
     private static SmPreviewSnapshot BuildSnapshot(PreviewSession session)
     {
+        var eventDeclarationOrder = session.Machine.Events
+            .Select((e, i) => (e.Name, i))
+            .ToDictionary(x => x.Name, x => x.i, StringComparer.Ordinal);
+
         var outgoingEventNames = session.Machine.Transitions
             .Where(t => string.Equals(t.FromState, session.Instance.CurrentState, StringComparison.Ordinal))
             .Select(t => t.EventName)
@@ -210,7 +214,8 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
                     .Where(r => string.Equals(r.FromState, session.Instance.CurrentState, StringComparison.Ordinal))
                     .Select(r => r.EventName))
             .Distinct(StringComparer.Ordinal)
-            .OrderBy(n => n, StringComparer.Ordinal)
+            .OrderBy(n => eventDeclarationOrder.TryGetValue(n, out var idx) ? idx : int.MaxValue)
+            .ThenBy(n => n, StringComparer.Ordinal)
             .ToArray();
 
         var events = outgoingEventNames

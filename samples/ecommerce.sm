@@ -1,0 +1,68 @@
+machine ECommerceOrder
+
+state Shopping initial
+state Checkout
+state Paid
+state Shipped
+state Cancelled
+
+number TotalItems = 0
+number TotalCost = 0
+boolean IsGuest = true
+string? PromoCode = null
+
+event AddItem
+	number Count
+	number Price
+
+event ApplyPromo
+	string Code
+	number Discount
+
+event Login
+
+event Pay
+	number Amount
+
+event Ship
+
+event Cancel
+	string Reason
+
+from Shopping on AddItem
+	if AddItem.Count > 0
+		set TotalItems = TotalItems + AddItem.Count
+		set TotalCost = TotalCost + (AddItem.Price * AddItem.Count)
+		no transition
+	else
+		reject "Must add at least one item"
+
+from Shopping on ApplyPromo
+	if PromoCode == null && ApplyPromo.Discount < TotalCost
+		set PromoCode = ApplyPromo.Code
+		set TotalCost = TotalCost - ApplyPromo.Discount
+		no transition
+	else
+		reject "Promo code already applied or discount exceeds order total"
+
+from Shopping on Login
+	set IsGuest = false
+	no transition
+
+from Shopping on Pay
+	if TotalItems > 0 && Pay.Amount == TotalCost
+		transition Paid
+	else
+		reject "Cannot checkout: cart is empty or payment amount is incorrect"
+
+from Paid on Ship
+	if TotalItems > 0
+		transition Shipped
+	else
+		reject "Nothing to ship"
+
+from Shopping, Checkout, Paid on Cancel
+	if Cancel.Reason != ""
+		transition Cancelled
+	else
+		reject "Cancellation reason required"

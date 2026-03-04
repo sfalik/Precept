@@ -1,0 +1,58 @@
+machine SmartHomeAlarm
+
+number FaultCount = 0
+string? LastFaultSensor = null
+boolean IsNightMode = false
+number MasterPin = 1234
+
+state Disarmed initial
+state ArmingDelay
+state ArmedAway
+state ArmedStay
+state Triggered
+
+event Arm
+	boolean IsAway = false
+	boolean NightMode = false
+	number Pin
+
+event Disarm
+	number Pin
+
+event SensorTripped
+	string SensorName
+	boolean IsPerimeter
+
+event DelayTimerExpired
+
+from Disarmed on Arm
+	if Arm.Pin == MasterPin && Arm.IsAway
+		set IsNightMode = false
+		transition ArmingDelay
+	else if Arm.Pin == MasterPin
+		set IsNightMode = Arm.NightMode
+		transition ArmedStay
+	else
+		reject "Invalid PIN"
+
+from ArmingDelay on DelayTimerExpired
+	transition ArmedAway
+
+from ArmedStay on SensorTripped
+	if SensorTripped.IsPerimeter || IsNightMode
+		set FaultCount = FaultCount + 1
+		set LastFaultSensor = SensorTripped.SensorName
+		transition Triggered
+	else
+		no transition
+
+from ArmedAway on SensorTripped
+	set FaultCount = FaultCount + 1
+	set LastFaultSensor = SensorTripped.SensorName
+	transition Triggered
+
+from any on Disarm
+	if Disarm.Pin == MasterPin
+		transition Disarmed
+	else
+		reject "Invalid PIN"
