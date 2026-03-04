@@ -58,7 +58,8 @@ public sealed record DslParenthesizedExpression(DslExpression Inner) : DslExpres
 public sealed record DslSetAssignment(
     string Key,
     string ExpressionText,
-    DslExpression Expression);
+    DslExpression Expression,
+    int SourceLine = 0);
 
 public sealed record DslCollectionMutation(
     DslCollectionMutationVerb Verb,
@@ -85,7 +86,9 @@ public sealed record DslTransition(
     string? GuardExpression,
     IReadOnlyList<DslSetAssignment> SetAssignments,
     int Order = 0,
-    IReadOnlyList<DslCollectionMutation>? CollectionMutations = null);
+    IReadOnlyList<DslCollectionMutation>? CollectionMutations = null,
+    int SourceLine = 0,
+    int TargetLine = 0);
 
 public sealed record DslTerminalRule(
     string FromState,
@@ -95,7 +98,8 @@ public sealed record DslTerminalRule(
     string? GuardExpression = null,
     IReadOnlyList<DslSetAssignment>? SetAssignments = null,
     int Order = 0,
-    IReadOnlyList<DslCollectionMutation>? CollectionMutations = null);
+    IReadOnlyList<DslCollectionMutation>? CollectionMutations = null,
+    int SourceLine = 0);
 
 public enum DslTerminalKind
 {

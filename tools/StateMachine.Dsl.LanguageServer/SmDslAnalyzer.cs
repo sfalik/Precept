@@ -335,12 +335,15 @@ internal sealed class SmDslAnalyzer
         var searchLine = 0;
         foreach (var transition in machine.Transitions)
         {
+            searchLine = Math.Max(0, transition.SourceLine - 1);
+            var fallbackLine = Math.Max(0, transition.SourceLine - 1);
+
             var transitionSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, transition.EventName, machine.CollectionFields);
             IReadOnlyDictionary<string, StaticValueKind> setSymbols = transitionSymbols;
 
             if (!string.IsNullOrWhiteSpace(transition.GuardExpression))
             {
-                var guardLine = FindGuardLine(lines, ref searchLine, transition.GuardExpression!);
+                var guardLine = FindGuardLine(lines, ref searchLine, transition.GuardExpression!, fallbackLine);
                 ValidateExpression(
                     transition.GuardExpression!,
                     guardLine,
@@ -356,7 +359,8 @@ internal sealed class SmDslAnalyzer
 
             foreach (var assignment in transition.SetAssignments)
             {
-                var assignmentLine = FindSetLine(lines, ref searchLine, assignment.Key, assignment.ExpressionText);
+                var assignmentFallback = assignment.SourceLine > 0 ? assignment.SourceLine - 1 : fallbackLine;
+                var assignmentLine = FindSetLine(lines, ref searchLine, assignment.Key, assignment.ExpressionText, assignmentFallback);
                 if (!dataFieldKinds.TryGetValue(assignment.Key, out var targetKind))
                     continue;
 
@@ -373,12 +377,15 @@ internal sealed class SmDslAnalyzer
 
         foreach (var terminalRule in machine.TerminalRules)
         {
+            searchLine = Math.Max(0, terminalRule.SourceLine - 1);
+            var fallbackLine = Math.Max(0, terminalRule.SourceLine - 1);
+
             var terminalSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, terminalRule.EventName, machine.CollectionFields);
             IReadOnlyDictionary<string, StaticValueKind> terminalSetSymbols = terminalSymbols;
 
             if (!string.IsNullOrWhiteSpace(terminalRule.GuardExpression))
             {
-                var guardLine = FindGuardLine(lines, ref searchLine, terminalRule.GuardExpression!);
+                var guardLine = FindGuardLine(lines, ref searchLine, terminalRule.GuardExpression!, fallbackLine);
                 ValidateExpression(
                     terminalRule.GuardExpression!,
                     guardLine,
@@ -396,7 +403,8 @@ internal sealed class SmDslAnalyzer
             {
                 foreach (var assignment in terminalRule.SetAssignments)
                 {
-                    var assignmentLine = FindSetLine(lines, ref searchLine, assignment.Key, assignment.ExpressionText);
+                    var assignmentFallback = assignment.SourceLine > 0 ? assignment.SourceLine - 1 : fallbackLine;
+                    var assignmentLine = FindSetLine(lines, ref searchLine, assignment.Key, assignment.ExpressionText, assignmentFallback);
                     if (!dataFieldKinds.TryGetValue(assignment.Key, out var targetKind))
                         continue;
 
@@ -884,7 +892,7 @@ internal sealed class SmDslAnalyzer
         return true;
     }
 
-    private static int FindGuardLine(string[] lines, ref int searchLine, string guardExpression)
+    private static int FindGuardLine(string[] lines, ref int searchLine, string guardExpression, int fallbackLine = 0)
     {
         for (var i = Math.Max(0, searchLine); i < lines.Length; i++)
         {
@@ -910,10 +918,10 @@ internal sealed class SmDslAnalyzer
             }
         }
 
-        return 0;
+        return fallbackLine;
     }
 
-    private static int FindSetLine(string[] lines, ref int searchLine, string key, string expression)
+    private static int FindSetLine(string[] lines, ref int searchLine, string key, string expression, int fallbackLine = 0)
     {
         for (var i = Math.Max(0, searchLine); i < lines.Length; i++)
         {
@@ -930,7 +938,7 @@ internal sealed class SmDslAnalyzer
             }
         }
 
-        return 0;
+        return fallbackLine;
     }
 
     private static string Normalized(string text)

@@ -6,6 +6,8 @@ boolean CustomerConfirmed = false
 boolean EscalatedOnce = false
 string? ResolutionSummary = null
 number ReopenCount = 0
+# Ordered pool of available agents; Assign dequeues the next one
+queue<string> AgentPool
 
 state Open initial
 state Assigned
@@ -16,8 +18,12 @@ state Resolved
 state Closed
 state Reopened
 
-event Assign
+# Add an agent to the back of the assignment pool
+event RegisterAgent
 	string AgentName
+
+# Dequeues the next agent from the pool; set priority for this ticket
+event Assign
 	number Priority = 3
 
 event StartWork
@@ -41,11 +47,21 @@ event Close
 event Reopen
 	string Reason
 
+from any on RegisterAgent
+	if RegisterAgent.AgentName != ""
+		enqueue AgentPool RegisterAgent.AgentName
+		no transition
+	else
+		reject "Agent name is required"
+
 from Open on Assign
-	if Assign.Priority >= 1 && Assign.Priority <= 5
-		set AssignedAgent = Assign.AgentName
+	if Assign.Priority >= 1 && Assign.Priority <= 5 && AgentPool.count > 0
+		set AssignedAgent = AgentPool.peek
+		dequeue AgentPool
 		set Priority = Assign.Priority
 		transition Assigned
+	else if AgentPool.count == 0
+		reject "No agents available in the pool"
 	else
 		reject "Priority must be between 1 and 5"
 
@@ -90,9 +106,12 @@ from Resolved, Closed on Reopen
 		reject "Ticket cannot be reopened more than three times"
 
 from Reopened on Assign
-	if Assign.Priority >= 1 && Assign.Priority <= 5
-		set AssignedAgent = Assign.AgentName
+	if Assign.Priority >= 1 && Assign.Priority <= 5 && AgentPool.count > 0
+		set AssignedAgent = AgentPool.peek
+		dequeue AgentPool
 		set Priority = Assign.Priority
 		transition Assigned
+	else if AgentPool.count == 0
+		reject "No agents available in the pool"
 	else
 		reject "Priority must be between 1 and 5"

@@ -456,6 +456,13 @@ Validation constraints:
 - Runtime supports persisted instance creation and instance-based `Inspect(...)` / `Fire(...)`.
 - `tools/StateMachine.Dsl.LanguageServer` provides LSP stdio diagnostics/completion MVP for `.sm` files.
 - LSP diagnostics run parser/compiler validation on document open/change/save and map parser `Line N:` failures to line-scoped diagnostics.
+- `DslTransition` and `DslTerminalRule` model records carry a `SourceLine` property (0 = unknown) recorded by the parser at the `from … on …` header line. `ValidateReferences` uses these to emit `Line N:` prefixes on all reference errors (unknown state/event/field), enabling the language server to squiggle the exact offending `from … on …` line rather than always falling back to line 0.
+- `DslTransition` also carries `TargetLine` (the `transition <State>` inner line), used by `ValidateReferences` to point unknown-target-state errors at the correct line inside the block rather than the header.
+- `DslSetAssignment` carries `SourceLine` (the `set <Key> = <Expr>` line), used by both `ValidateReferences` (unknown field) and the analyzer's `FindSetLine` fallback so set-expression squiggles land on the correct line.
+- The parser tracks `firstContentLineNumber` and `lastStateLineNumber` during the main parse loop; post-loop errors (missing `machine`, no states, no initial marker) now include a `Line N:` prefix so the language server places the diagnostic on the first relevant line instead of 0:0.
+- Duplicate unguarded outcome validation now points to the second (duplicate) rule's `SourceLine` rather than having no line context.
+- `SmDslAnalyzer.GetSemanticDiagnostics` now resets the guard/set text-search cursor per-rule to `rule.SourceLine - 1` instead of advancing monotonically from 0, fixing cases where interleaved or reversed rules caused the search to overshoot the actual guard/set line.
+- `FindGuardLine` and `FindSetLine` now accept a `fallbackLine` parameter; on a text-match miss they return the fallback (the `from … on …` header line) instead of line 0.
 - LSP completion includes DSL keywords plus contextual state/event suggestions (`from`, `transition`, `on`).
 - LSP completion includes contextual guard suggestions for `if`/`else if` (data fields, operators/literals, and current-event argument references).
 - LSP completion includes contextual set suggestions (data-field target names before `=`, expression suggestions after `=`).

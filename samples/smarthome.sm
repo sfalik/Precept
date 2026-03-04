@@ -1,7 +1,7 @@
 machine SmartHomeAlarm
 
-number FaultCount = 0
-string? LastFaultSensor = null
+# Push each tripped sensor name; use .peek for last sensor, .count for fault total
+stack<string> TriggeredSensors
 boolean IsNightMode = false
 number MasterPin = 1234
 
@@ -40,19 +40,18 @@ from ArmingDelay on DelayTimerExpired
 
 from ArmedStay on SensorTripped
 	if SensorTripped.IsPerimeter || IsNightMode
-		set FaultCount = FaultCount + 1
-		set LastFaultSensor = SensorTripped.SensorName
+		push TriggeredSensors SensorTripped.SensorName
 		transition Triggered
 	else
 		no transition
 
 from ArmedAway on SensorTripped
-	set FaultCount = FaultCount + 1
-	set LastFaultSensor = SensorTripped.SensorName
+	push TriggeredSensors SensorTripped.SensorName
 	transition Triggered
 
 from any on Disarm
 	if Disarm.Pin == MasterPin
+		clear TriggeredSensors
 		transition Disarmed
 	else
 		reject "Invalid PIN"

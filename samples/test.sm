@@ -1,26 +1,26 @@
 machine Test
 
+string? LastAdded
+string? LastRemoved
+queue<string> Names
+
 state Start initial
-state One
-state Two
-state Three
-state Four
 state End
 
-event Next
-event Reset
+event add
+    string Name
+event remove
 
+from Start on add
+ if add.Name != ""
+    enqueue Names add.Name
+    no transition
+ else
+    reject "Name cannot be empty"
 
-from Start on Next
-    transition One
-from One on Next
-    transition Two
-from Two on Next
-    transition Three
-from Three on Next 
-    transition Four
-from Four on Next
-    transition End
-
-from End on Reset
-    transition Start
+from Start on remove
+    if Names.count > 0
+        dequeue Names into LastRemoved
+        no transition
+    else
+        transition End

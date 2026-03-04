@@ -1,11 +1,13 @@
 machine DocumentSigning
 
 string? DocumentTitle = null
-number SignaturesRequired = 0
-number SignaturesCollected = 0
 boolean LegalReviewPassed = false
 boolean ExpiryExtended = false
 string? VoidReason = null
+# Signatories yet to sign; transition to FullySigned when this set empties
+set<string> PendingSignatories
+# Signatories who have recorded their signature
+set<string> CollectedSignatures
 
 state Draft initial
 state AwaitingLegalReview
@@ -16,18 +18,21 @@ state Executed
 state Expired
 state Voided
 
+# Add required signatories before submitting for review
+event AddSignatory
+	string Name
+
 event SubmitForReview
 	string DocumentTitle
-	number SignaturesRequired
 
 event ApproveLegalReview
 
 event RejectLegalReview
 	string Reason
 
-event SendForSigning
-
+# Each call records one signatory by name
 event RecordSignature
+	string SignatoryName
 
 event ExpireDocument
 
@@ -38,13 +43,19 @@ event Execute
 event Void
 	string Reason
 
+from Draft on AddSignatory
+	if AddSignatory.Name != ""
+		add PendingSignatories AddSignatory.Name
+		no transition
+	else
+		reject "Signatory name is required"
+
 from Draft on SubmitForReview
-	if SubmitForReview.SignaturesRequired > 0 && SubmitForReview.DocumentTitle != ""
+	if SubmitForReview.DocumentTitle != "" && PendingSignatories.count > 0
 		set DocumentTitle = SubmitForReview.DocumentTitle
-		set SignaturesRequired = SubmitForReview.SignaturesRequired
 		transition AwaitingLegalReview
 	else
-		reject "Document title and at least one required signature must be provided"
+		reject "Document title is required and at least one signatory must be added first"
 
 from AwaitingLegalReview on ApproveLegalReview
 	set LegalReviewPassed = true
@@ -53,21 +64,18 @@ from AwaitingLegalReview on ApproveLegalReview
 from AwaitingLegalReview on RejectLegalReview
 	transition Draft
 
-from AwaitingSignatures on RecordSignature
-	if SignaturesCollected + 1 >= SignaturesRequired
-		set SignaturesCollected = SignaturesCollected + 1
+# When the last pending signatory signs, move to FullySigned; otherwise PartialSigned
+from AwaitingSignatures, PartialSigned on RecordSignature
+	if PendingSignatories contains RecordSignature.SignatoryName && PendingSignatories.count == 1
+		remove PendingSignatories RecordSignature.SignatoryName
+		add CollectedSignatures RecordSignature.SignatoryName
 		transition FullySigned
-	else
-		set SignaturesCollected = SignaturesCollected + 1
+	else if PendingSignatories contains RecordSignature.SignatoryName
+		remove PendingSignatories RecordSignature.SignatoryName
+		add CollectedSignatures RecordSignature.SignatoryName
 		transition PartialSigned
-
-from PartialSigned on RecordSignature
-	if SignaturesCollected + 1 >= SignaturesRequired
-		set SignaturesCollected = SignaturesCollected + 1
-		transition FullySigned
 	else
-		set SignaturesCollected = SignaturesCollected + 1
-		no transition
+		reject "Signatory is not on the pending list or has already signed"
 
 from AwaitingSignatures, PartialSigned on ExpireDocument
 	transition Expired
