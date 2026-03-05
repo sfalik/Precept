@@ -1,14 +1,1 @@
-using StateMachine.Dsl;
-var text = System.IO.File.ReadAllText("../../samples/trafficlight.sm");
-try
-{
-    var machine = StateMachineDslParser.Parse(text);
-    var def = DslWorkflowCompiler.Compile(machine);
-    var instance = def.CreateInstance(def.InitialState);
-    Console.WriteLine($"OK name={def.Name} initial={def.InitialState} current={instance.CurrentState} states={def.States.Count}");
-}
-catch (Exception ex)
-{
-    Console.WriteLine("ERR " + ex.Message);
-    Environment.Exit(1);
-}
+using System; using System.IO; using StateMachine.Dsl; class Program { static void Main() { try { var txt = File.ReadAllText("C:/Users/Shane.Falik/source/repos/StateMachine/samples/bank-loan.sm"); var machine = StateMachineDslParser.Parse(txt); var workflow = DslWorkflowCompiler.Compile(machine); Console.WriteLine("Compiled!"); } catch (Exception e) { Console.WriteLine("ERROR: " + e.Message); } } }

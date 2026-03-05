@@ -40,7 +40,7 @@ internal sealed class SmSemanticTokensHandler : SemanticTokensHandlerBase
     // Dotted event arg reference: EventName.ArgName in expression positions
     private static readonly Regex EventArgRefRegex = new("\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     // Variable identifiers in expression lines (after set =, if/else if, rule keyword, or collection mutation value)
-    private static readonly Regex ExpressionLineRegex = new("^\\s*(?:if|else\\s+if|set\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=|rule|(?:add|remove|push|enqueue)\\s+[A-Za-z_][A-Za-z0-9_]*)\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex ExpressionLineRegex = new("^\\s*(?:if|else\\s+if|set\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=|rule|(?:add|remove|push|enqueue)\\s+[A-Za-z_][A-Za-z0-9_]*|from\\s+(?:any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+when)\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex IdentifierInExprRegex = new("\\b([A-Za-z_][A-Za-z0-9_]*)\\b", RegexOptions.Compiled);
 
     private static readonly string[] KeywordTokens =
@@ -49,7 +49,7 @@ internal sealed class SmSemanticTokensHandler : SemanticTokensHandlerBase
         "transition", "set", "reject", "rule", "reason", "no", "any",
         "true", "false", "null", "string", "number", "boolean",
         "add", "remove", "enqueue", "dequeue", "push", "pop", "clear",
-        "contains", "queue", "stack", "into", "above", "below"
+        "contains", "queue", "stack", "into", "above", "below", "when"
     ];
 
     protected override SemanticTokensRegistrationOptions CreateRegistrationOptions(SemanticTokensCapability capability, ClientCapabilities clientCapabilities)

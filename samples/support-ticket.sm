@@ -75,13 +75,11 @@ from InProgress on RequestCustomerInfo
 from any on CustomerReply
 	no transition
 
-from InProgress, PendingCustomer on Escalate
-	if !EscalatedOnce
-		set EscalatedOnce = true
-		set Priority = 1
-		transition Escalated
-	else
-		reject "Ticket has already been escalated once"
+# Escalate is only applicable the first time; once escalated it becomes NotApplicable
+from InProgress, PendingCustomer on Escalate when !EscalatedOnce
+        set EscalatedOnce = true
+        set Priority = 1
+        transition Escalated
 
 from InProgress, Escalated on Resolve
 	set ResolutionSummary = Resolve.Summary
@@ -94,14 +92,12 @@ from Resolved on ConfirmResolution
 from Resolved on Close
 	transition Closed
 
-from Resolved, Closed on Reopen
-	if ReopenCount < 3
-		set ReopenCount = ReopenCount + 1
-		set ResolutionSummary = null
-		set CustomerConfirmed = false
-		transition Reopened
-	else
-		reject "Ticket cannot be reopened more than three times"
+# Reopen is only applicable while under the three-reopen cap
+from Resolved, Closed on Reopen when ReopenCount < 3
+        set ReopenCount = ReopenCount + 1
+        set ResolutionSummary = null
+        set CustomerConfirmed = false
+        transition Reopened
 
 from Reopened on Assign
 	if AgentPool.count > 0

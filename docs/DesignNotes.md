@@ -202,6 +202,7 @@ All diagnostic sites upgraded from line-level to column-precise squiggles:
 - Webview viewBox is set responsively from ELK-computed graph dimensions with 50px padding per side (minimum 600×300); no content-bounds normalization or clamping is applied.
 - The preview webview now calls a custom LSP endpoint (`stateMachine/preview/request`) for `snapshot`, `fire`, `reset`, `replay`, and `inspect` actions. The `inspect` action re-evaluates a single event with caller-supplied arguments so the webview gets real-time guard status without local duplication of guard logic.
 - Inspector webview behavior is intentionally "click-now" oriented: for events with declared arguments, the webview sends all declared arg keys on `inspect`/`fire` (blank when the user has not typed a value yet), and after each snapshot it performs an immediate per-event inspect refresh so initial status colors match immediate click outcomes.
+- Events whose current live outcome is `NotApplicable` (i.e., the `when` guard is false) are hidden from the event dock entirely. They are still inspected on every refresh cycle so they reappear automatically when the `when` condition becomes true again.
 - Argument construction in the inspector webview is DSL-contract strict: user-entered values are normalized to declared scalar types, nullable unset args are sent as `null`, declared defaults are sent when untouched, and required-without-default args are sent as blank placeholders. The preview handler no longer converts blank strings to `null`; it only performs JSON-shape/type coercion.
 - Inspector webview exposes a single explicit lifecycle control: `Reset` issues `reset` to create a fresh instance at the machine's initial state with DSL defaults.
 - The preview endpoint is bound through a typed JSON-RPC request handler (`IJsonRpcRequestHandler<SmPreviewRequest, SmPreviewResponse>`) with the method contract declared on `SmPreviewRequest` via `[Method("stateMachine/preview/request")]` so registration is discoverable at runtime.
@@ -398,7 +399,7 @@ queue<T> <FieldName>                # FIFO ordered, allows duplicates, always st
 stack<T> <FieldName>                # LIFO ordered, allows duplicates, always starts empty
 <T> := number | string | boolean    # no nullable inner types, no nesting
 
-from <any|StateA[,StateB...]> on <EventName>
+from <any|StateA[,StateB...]> on <EventName> [when <BooleanExpr>]
 (
     if <Guard> [ set <Field> = <Expr> ] [ <CollectionMutation> ] ( transition <ToState> | no transition )
   | else if <Guard> [ set <Field> = <Expr> ] [ <CollectionMutation> ] ( transition <ToState> | no transition )
@@ -423,6 +424,7 @@ from <any|StateA[,StateB...]> on <EventName>
 Canonical constraints:
 
 - `()+` means one-or-more lines in a `from ... on ...` body.
+- `when <BooleanExpr>` is an optional transition-level precondition on the `from ... on ...` header. If it evaluates to `false` at runtime, the entire block is skipped with outcome `NotApplicable`. The `when` guard is evaluated before any branch predicates. The language server narrows null-uncertainty symbols within the block scope when `when` is present (e.g. `when X != null` makes `X` non-nullable for all branches).
 - Exactly one `state` declaration must include `initial`.
 - `event` declarations are optional. A machine with no events is syntactically valid. The language server emits a `Hint` diagnostic on the `machine` line when no events are declared, as such a machine cannot respond to any input.
 - `if` and `else if` must end with `transition <State>` or `no transition`.

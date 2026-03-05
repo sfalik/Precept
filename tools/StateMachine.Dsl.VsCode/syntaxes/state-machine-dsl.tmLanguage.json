@@ -135,7 +135,7 @@
       "patterns": [
         {
           "name": "keyword.control.state-machine-dsl",
-          "match": "\\b(machine|state|event|from|on|if|else|initial)\\b"
+          "match": "\\b(machine|state|event|from|on|if|else|initial|when)\\b"
         }
       ]
     },

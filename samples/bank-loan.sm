@@ -12,7 +12,6 @@ string? OfficerName = null
 string? DisbursementAccount = null
 string? RejectionReason = null
 
-rule ApprovedAmount <= RequestedAmount "Approved amount must not exceed requested amount"
 
 state Apply initial
 state UnderReview
@@ -70,7 +69,7 @@ from UnderReview on AssignOfficer
 	else
 		reject "A loan officer is already assigned"
 
-from UnderReview on VerifyCollateral
+from UnderReview on VerifyCollateral when !CollateralVerified
 	if !CollateralVerified
 		set CollateralVerified = true
 		no transition
@@ -83,7 +82,7 @@ from UnderReview on Approve
 		set RemainingBalance = Approve.ApprovedAmount
 		transition Approved
 	else
-		reject "Approval requires collateral verification or credit score >= 700, and approved amount must not exceed requested amount"
+		reject "Approval requires collateral verification or credit score >= 700"
 
 from UnderReview on Reject
 	set RejectionReason = Reject.Reason

@@ -57,15 +57,16 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         var coercedArgs = CoerceEventArgs(session.Machine, request.EventName!, request.Args);
         var inspect = session.Definition.Inspect(session.Instance, request.EventName!, coercedArgs);
         var evt = session.Machine.Events.FirstOrDefault(e => string.Equals(e.Name, request.EventName, StringComparison.Ordinal));
-        var args = (evt?.Args ?? Array.Empty<DslFieldContract>())
+        var args = (evt?.Args ?? Array.Empty<DslEventArg>())
             .Select(arg => new SmPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable, arg.HasDefaultValue, arg.DefaultValue))
             .ToArray();
 
         var outcome = inspect.Outcome switch
         {
-            DslOutcomeKind.Enabled => "enabled",
-            DslOutcomeKind.NoTransition => "noTransition",
-            DslOutcomeKind.Blocked => "blocked",
+            DslOutcomeKind.Accepted => "enabled",
+            DslOutcomeKind.AcceptedInPlace => "noTransition",
+            DslOutcomeKind.Rejected => "blocked",
+            DslOutcomeKind.NotApplicable => "notApplicable",
             _ => "undefined"
         };
 
@@ -94,7 +95,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         if (fire.UpdatedInstance is not null)
             session.Instance = fire.UpdatedInstance;
 
-        if (!fire.IsAccepted)
+        if (fire.Outcome is not (DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace))
         {
             var reason = fire.Reasons.FirstOrDefault() ?? $"Event '{request.EventName}' did not fire.";
             return new SmPreviewResponse(false, Error: reason, Errors: fire.Reasons, Snapshot: BuildSnapshot(session));
@@ -127,7 +128,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         {
             var coercedStepArgs = CoerceEventArgs(session.Machine, step.EventName, step.Args);
             var fire = session.Definition.Fire(session.Instance, step.EventName, coercedStepArgs);
-            if (fire.IsAccepted && fire.UpdatedInstance is not null)
+            if ((fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace) && fire.UpdatedInstance is not null)
             {
                 session.Instance = fire.UpdatedInstance;
                 messages.Add($"{step.EventName}: {fire.PreviousState} -> {fire.NewState}");
@@ -209,10 +210,6 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         var outgoingEventNames = session.Machine.Transitions
             .Where(t => string.Equals(t.FromState, session.Instance.CurrentState, StringComparison.Ordinal))
             .Select(t => t.EventName)
-            .Concat(
-                session.Machine.TerminalRules
-                    .Where(r => string.Equals(r.FromState, session.Instance.CurrentState, StringComparison.Ordinal))
-                    .Select(r => r.EventName))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(n => eventDeclarationOrder.TryGetValue(n, out var idx) ? idx : int.MaxValue)
             .ThenBy(n => n, StringComparer.Ordinal)
@@ -223,15 +220,15 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
             {
                 var inspect = session.Definition.Inspect(session.Instance, eventName);
                 var evt = session.Machine.Events.FirstOrDefault(e => string.Equals(e.Name, eventName, StringComparison.Ordinal));
-                var args = (evt?.Args ?? Array.Empty<DslFieldContract>())
+                var args = (evt?.Args ?? Array.Empty<DslEventArg>())
                     .Select(arg => new SmPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable, arg.HasDefaultValue, arg.DefaultValue))
                     .ToArray();
 
                 var outcome = inspect.Outcome switch
                 {
-                    DslOutcomeKind.Enabled => "enabled",
-                    DslOutcomeKind.NoTransition => "noTransition",
-                    DslOutcomeKind.Blocked => "blocked",
+                    DslOutcomeKind.Accepted => "enabled",
+                    DslOutcomeKind.AcceptedInPlace => "noTransition",
+                    DslOutcomeKind.Rejected => "blocked",
                     _ => "undefined"
                 };
 
@@ -245,9 +242,18 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
             .ToArray();
 
         var transitions = session.Machine.Transitions
-            .Select(t => new SmPreviewTransition(t.FromState, t.ToState, t.EventName, t.GuardExpression, "transition"))
-            .Concat(session.Machine.TerminalRules
-                .Select(r => new SmPreviewTransition(r.FromState, r.FromState, r.EventName, r.GuardExpression, r.Kind.ToString().ToLowerInvariant())))
+            .SelectMany(t => t.Clauses.Select(clause => new SmPreviewTransition(
+                t.FromState,
+                clause.Outcome is DslStateTransition st ? st.TargetState : t.FromState,
+                t.EventName,
+                clause.Predicate ?? t.Predicate,
+                clause.Outcome switch
+                {
+                    DslStateTransition => "transition",
+                    DslNoTransition => "noTransition",
+                    DslRejection => "reject",
+                    _ => "transition"
+                })))
             .ToArray();
 
         var diagnostics = SmTextDocumentSyncHandler.SharedAnalyzer.GetDiagnostics(session.Uri)
@@ -261,7 +267,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         var activeRuleViolations = session.Definition.EvaluateCurrentRules(session.Instance);
 
         var ruleDefinitions = new List<SmPreviewRuleInfo>();
-        foreach (var field in session.Machine.DataFields.Where(f => f.Rules is not null))
+        foreach (var field in session.Machine.Fields.Where(f => f.Rules is not null))
             foreach (var rule in field.Rules!)
                 ruleDefinitions.Add(new SmPreviewRuleInfo($"field:{field.Name}", rule.ExpressionText, rule.Reason));
         foreach (var field in session.Machine.CollectionFields.Where(f => f.Rules is not null))
@@ -269,9 +275,9 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
                 ruleDefinitions.Add(new SmPreviewRuleInfo($"field:{field.Name}", rule.ExpressionText, rule.Reason));
         foreach (var rule in session.Machine.TopLevelRules ?? Array.Empty<DslRule>())
             ruleDefinitions.Add(new SmPreviewRuleInfo("topLevel", rule.ExpressionText, rule.Reason));
-        foreach (var (stateName, stateRuleList) in session.Machine.StateRules ?? (IReadOnlyDictionary<string, IReadOnlyList<DslRule>>)new Dictionary<string, IReadOnlyList<DslRule>>())
-            foreach (var rule in stateRuleList)
-                ruleDefinitions.Add(new SmPreviewRuleInfo($"state:{stateName}", rule.ExpressionText, rule.Reason));
+        foreach (var state in session.Machine.States.Where(s => s.Rules is not null && s.Rules.Count > 0))
+            foreach (var rule in state.Rules!)
+                ruleDefinitions.Add(new SmPreviewRuleInfo($"state:{state.Name}", rule.ExpressionText, rule.Reason));
         foreach (var evt in session.Machine.Events.Where(e => e.Rules is not null && e.Rules.Count > 0))
             foreach (var rule in evt.Rules!)
                 ruleDefinitions.Add(new SmPreviewRuleInfo($"event:{evt.Name}", rule.ExpressionText, rule.Reason));
@@ -355,7 +361,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         return coerced;
     }
 
-    private static object? CoerceValue(object? value, DslFieldContract contract)
+    private static object? CoerceValue(object? value, DslEventArg contract)
     {
         // Unwrap JsonElement from System.Text.Json deserialization.
         if (value is JsonElement jsonElement)

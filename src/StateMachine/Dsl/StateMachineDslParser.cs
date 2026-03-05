@@ -24,7 +24,7 @@ public static class StateMachineDslParser
         "^transition\\s+(?<from>[A-Za-z_][A-Za-z0-9_]*)\\s*->\\s*(?<to>[A-Za-z_][A-Za-z0-9_]*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+set\\s+(?<setKey>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<setExpr>.+))?$",
         RegexOptions.Compiled);
     private static readonly Regex FromOnRegex = new(
-        "^from\\s+(?<from>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)$",
+        "^from\\s+(?<from>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+when\\s+(?<when>.+))?$",
         RegexOptions.Compiled);
     private static readonly Regex IfRegex = new(
         "^if\\s+(?<guard>.+?)(?:\\s+reason\\s+\"(?<reason>[^\"]+)\")?$",
@@ -71,15 +71,13 @@ public static class StateMachineDslParser
             throw new InvalidOperationException("DSL input is empty.");
 
         string? name = null;
-        string? initialState = null;
-        var states = new List<string>();
+        DslState? initialState = null;
+        var states = new List<DslState>();
         var events = new List<DslEvent>();
         var transitions = new List<DslTransition>();
-        var terminalRules = new List<DslTerminalRule>();
-        var dataFields = new List<DslFieldContract>();
-        var collectionFields = new List<DslCollectionFieldContract>();
+        var dataFields = new List<DslField>();
+        var collectionFields = new List<DslCollectionField>();
         var topLevelRules = new List<DslRule>();
-        var stateRules = new Dictionary<string, List<DslRule>>(StringComparer.Ordinal);
         var seenFromOnPairs = new HashSet<(string State, string Event)>();
 
         var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
@@ -113,21 +111,21 @@ public static class StateMachineDslParser
             if (stateMatch.Success)
             {
                 string stateName = stateMatch.Groups["name"].Value;
-                if (states.Contains(stateName, StringComparer.Ordinal))
+                if (states.Any(s => string.Equals(s.Name, stateName, StringComparison.Ordinal)))
                     throw new InvalidOperationException($"Line {i + 1}: duplicate state '{stateName}'.");
 
                 lastStateLineNumber = i + 1;
-                states.Add(stateName);
+                var dslState = ParseStateDeclaration(lines, ref i, stateName);
+                states.Add(dslState);
 
                 if (stateMatch.Groups["initial"].Success)
                 {
                     if (initialState is not null)
-                        throw new InvalidOperationException($"Line {i + 1}: duplicate initial state marker. '{initialState}' is already marked initial.");
+                        throw new InvalidOperationException($"Line {i}: duplicate initial state marker. '{initialState.Name}' is already marked initial.");
 
-                    initialState = stateName;
+                    initialState = dslState;
                 }
 
-                ParseStateDeclaration(lines, ref i, stateName, stateRules);
                 continue;
             }
 
@@ -172,7 +170,7 @@ public static class StateMachineDslParser
                 var innerType = ParseScalarType(collectionFieldMatch.Groups["inner"].Value);
 
                 var collectionFieldRules = ParseFieldRules(lines, ref i, fieldName, isCollection: true);
-                collectionFields.Add(new DslCollectionFieldContract(fieldName, collectionKind, innerType, collectionFieldRules.Count > 0 ? collectionFieldRules : null));
+                collectionFields.Add(new DslCollectionField(fieldName, collectionKind, innerType, collectionFieldRules.Count > 0 ? collectionFieldRules : null));
                 continue;
             }
 
@@ -198,7 +196,7 @@ public static class StateMachineDslParser
 
                 var fieldRules = ParseFieldRules(lines, ref i, fieldName, isCollection: false);
 
-                dataFields.Add(new DslFieldContract(
+                dataFields.Add(new DslField(
                     fieldName,
                     fieldType,
                     isNullable,
@@ -243,7 +241,7 @@ public static class StateMachineDslParser
                 var fromToken = fromOnMatch.Groups["from"].Value.Trim();
                 var onEvent = fromOnMatch.Groups["event"].Value.Trim();
                 var sourceStatesForCheck = fromToken.Equals("any", StringComparison.Ordinal)
-                    ? states.ToList()
+                    ? states.Select(s => s.Name).ToList()
                     : fromToken.Split(',').Select(s => s.Trim()).ToList();
                 foreach (var st in sourceStatesForCheck)
                 {
@@ -258,7 +256,6 @@ public static class StateMachineDslParser
                     fromOnMatch,
                     states,
                     transitions,
-                    terminalRules,
                     collectionFields,
                     dataFields);
                 continue;
@@ -283,18 +280,10 @@ public static class StateMachineDslParser
         if (initialState is null)
             throw new InvalidOperationException($"Line {lastStateLineNumber}: Exactly one state must be marked initial. Use 'state <Name> initial'.");
 
-        ValidateReferences(states, events, transitions, terminalRules, dataFields, collectionFields);
+        ValidateReferences(states, events, transitions, dataFields, collectionFields);
 
-        var stateRulesFinal = stateRules.Count == 0
-            ? null
-            : (IReadOnlyDictionary<string, IReadOnlyList<DslRule>>)stateRules.ToDictionary(
-                kvp => kvp.Key,
-                kvp => (IReadOnlyList<DslRule>)kvp.Value,
-                StringComparer.Ordinal);
-
-        return new DslMachine(name, states, initialState, events, transitions, terminalRules, dataFields, collectionFields,
-            topLevelRules.Count > 0 ? topLevelRules : null,
-            stateRulesFinal);
+        return new DslMachine(name, states, initialState, events, transitions, dataFields, collectionFields,
+            topLevelRules.Count > 0 ? topLevelRules : null);
     }
 
     private static void ParseEventDeclaration(
@@ -307,7 +296,7 @@ public static class StateMachineDslParser
             throw new InvalidOperationException($"Line {index + 1}: duplicate event '{eventName}'.");
 
         var headerIndent = GetIndentation(lines[index]);
-        var args = new List<DslFieldContract>();
+        var args = new List<DslEventArg>();
         var eventRules = new List<DslRule>();
 
         index++;
@@ -332,6 +321,7 @@ public static class StateMachineDslParser
                 var ruleExprText = eventRuleMatch.Groups["expr"].Value.Trim();
                 var ruleReason = eventRuleMatch.Groups["reason"].Value;
                 var argNames = new HashSet<string>(args.Select(a => a.Name), StringComparer.Ordinal);
+                // Event rules may only reference event arg identifiers (prefixed or bare)
                 // Event rules may only reference event arg identifiers (prefixed or bare)
                 ValidateEventRuleScope(ruleExprText, index + 1, argNames, eventName);
 
@@ -365,7 +355,7 @@ public static class StateMachineDslParser
                 ? ParseFieldDefaultLiteral(fieldMatch.Groups["default"].Value.Trim(), argType, argIsNullable, fieldName, index + 1)
                 : null;
 
-            args.Add(new DslFieldContract(
+            args.Add(new DslEventArg(
                 fieldName,
                 argType,
                 argIsNullable,
@@ -381,11 +371,10 @@ public static class StateMachineDslParser
     /// Advances <paramref name="index"/> past the state header line and collects any indented
     /// <c>rule</c> lines that follow. Non-rule indented content causes a parse error.
     /// </summary>
-    private static void ParseStateDeclaration(
+    private static DslState ParseStateDeclaration(
         string[] lines,
         ref int index,
-        string stateName,
-        Dictionary<string, List<DslRule>> stateRules)
+        string stateName)
     {
         var headerIndent = GetIndentation(lines[index]);
         index++;
@@ -429,8 +418,7 @@ public static class StateMachineDslParser
             index++;
         }
 
-        if (rules.Count > 0)
-            stateRules[stateName] = rules;
+        return new DslState(stateName, rules.Count > 0 ? rules : null);
     }
 
     /// <summary>
@@ -636,34 +624,40 @@ public static class StateMachineDslParser
         string[] lines,
         ref int index,
         Match fromOnMatch,
-        IReadOnlyList<string> declaredStates,
+        IReadOnlyList<DslState> declaredStates,
         ICollection<DslTransition> transitions,
-        ICollection<DslTerminalRule> terminalRules,
-        IReadOnlyList<DslCollectionFieldContract> collectionFields,
-        IReadOnlyList<DslFieldContract> dataFields)
+        IReadOnlyList<DslCollectionField> collectionFields,
+        IReadOnlyList<DslField> dataFields)
     {
         var headerRaw = lines[index];
         var headerIndent = GetIndentation(headerRaw);
         var headerLineNumber = index + 1;
         var fromToken = fromOnMatch.Groups["from"].Value.Trim();
         var eventName = fromOnMatch.Groups["event"].Value.Trim();
+        var whenText = fromOnMatch.Groups["when"].Success ? fromOnMatch.Groups["when"].Value.Trim() : null;
 
         var sourceStates = fromToken.Equals("any", StringComparison.Ordinal)
-            ? declaredStates.ToList()
+            ? declaredStates.Select(s => s.Name).ToList()
             : ParseIdentifierList(fromToken, index + 1, "state");
 
         if (sourceStates.Count == 0)
             throw new InvalidOperationException($"Line {index + 1}: 'from any' requires states to be declared first.");
 
-        var blockBranches = new List<DslTransition>();
-        var blockTerminalRules = new List<DslTerminalRule>();
-        var branchOrder = 0;
-        bool reachedTerminalStatement = false;
-        bool hasIfChain = false;
-        bool hasElseBranch = false;
+        // Parse optional 'when' predicate
+        DslExpression? whenAst = null;
+        if (whenText is not null)
+        {
+            try { whenAst = DslExpressionParser.Parse(whenText); }
+            catch (InvalidOperationException ex)
+            { throw new InvalidOperationException($"Line {index + 1}: invalid 'when' expression '{whenText}'. {ex.Message}"); }
+        }
 
+        var clauses = new List<DslClause>();
         var pendingSets = new List<DslSetAssignment>();
         var pendingMutations = new List<DslCollectionMutation>();
+        bool reachedOutcome = false;
+        bool hasIfChain = false;
+        bool hasElseBranch = false;
 
         index++;
         while (index < lines.Length)
@@ -680,7 +674,7 @@ public static class StateMachineDslParser
             if (indent <= headerIndent)
                 break;
 
-            if (reachedTerminalStatement)
+            if (reachedOutcome)
                 throw new InvalidOperationException($"Line {index + 1}: no statements are allowed after an outcome statement in a from/on block.");
 
             var ifMatch = IfRegex.Match(line);
@@ -693,19 +687,9 @@ public static class StateMachineDslParser
                     throw new InvalidOperationException($"Line {index + 1}: use 'else if' to continue an existing if-chain.");
 
                 hasIfChain = true;
-                ParseGuardedTransitionBranch(
-                    lines,
-                    ref index,
-                    indent,
-                    sourceStates,
-                    eventName,
-                    blockBranches,
-                    blockTerminalRules,
-                    ref branchOrder,
-                    ifMatch.Groups["guard"].Value.Trim(),
-                    collectionFields,
-                    dataFields,
-                    headerLineNumber);
+                var clauseSourceLine = index + 1;
+                var clause = ParseGuardedClause(lines, ref index, indent, ifMatch.Groups["guard"].Value.Trim(), clauseSourceLine, collectionFields, dataFields);
+                clauses.Add(clause);
                 continue;
             }
 
@@ -721,19 +705,9 @@ public static class StateMachineDslParser
                 if (hasElseBranch)
                     throw new InvalidOperationException($"Line {index + 1}: 'else if' is not allowed after 'else'.");
 
-                ParseGuardedTransitionBranch(
-                    lines,
-                    ref index,
-                    indent,
-                    sourceStates,
-                    eventName,
-                    blockBranches,
-                    blockTerminalRules,
-                    ref branchOrder,
-                    elseIfMatch.Groups["guard"].Value.Trim(),
-                    collectionFields,
-                    dataFields,
-                    headerLineNumber);
+                var clauseSourceLine = index + 1;
+                var clause = ParseGuardedClause(lines, ref index, indent, elseIfMatch.Groups["guard"].Value.Trim(), clauseSourceLine, collectionFields, dataFields);
+                clauses.Add(clause);
                 continue;
             }
 
@@ -746,20 +720,10 @@ public static class StateMachineDslParser
                     throw new InvalidOperationException($"Line {index + 1}: duplicate 'else' is not allowed.");
 
                 hasElseBranch = true;
-                ParseOutcomeBranch(
-                    lines,
-                    ref index,
-                    indent,
-                    sourceStates,
-                    eventName,
-                    blockBranches,
-                    blockTerminalRules,
-                    ref branchOrder,
-                    collectionFields,
-                    dataFields,
-                    headerLineNumber);
-
-                reachedTerminalStatement = true;
+                var clauseSourceLine = index + 1;
+                var clause = ParseElseClause(lines, ref index, indent, clauseSourceLine, collectionFields, dataFields);
+                clauses.Add(clause);
+                reachedOutcome = true;
                 continue;
             }
 
@@ -789,25 +753,17 @@ public static class StateMachineDslParser
                 if (hasIfChain && !hasElseBranch)
                     throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
                 var targetState = simpleTransitionAtBlock.Groups["to"].Value.Trim();
-                var targetLineNumber = index + 1;
-                foreach (var sourceState in sourceStates)
-                {
-                    blockBranches.Add(new DslTransition(
-                        sourceState,
-                        targetState,
-                        eventName,
-                        null,
-                        pendingSets.ToArray(),
-                        branchOrder,
-                        pendingMutations.Count > 0 ? pendingMutations.ToArray() : null,
-                        headerLineNumber,
-                        targetLineNumber));
-                }
-                branchOrder++;
-
+                var outcomeLineNumber = index + 1;
+                clauses.Add(new DslClause(
+                    new DslStateTransition(targetState),
+                    pendingSets.Count > 0 ? pendingSets.ToArray() : Array.Empty<DslSetAssignment>(),
+                    outcomeLineNumber,
+                    null,
+                    null,
+                    pendingMutations.Count > 0 ? pendingMutations.ToArray() : null));
                 pendingSets.Clear();
                 pendingMutations.Clear();
-                reachedTerminalStatement = true;
+                reachedOutcome = true;
                 index++;
                 continue;
             }
@@ -816,13 +772,17 @@ public static class StateMachineDslParser
             {
                 if (hasIfChain && !hasElseBranch)
                     throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
-                foreach (var sourceState in sourceStates)
-                    blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, DslTerminalKind.NoTransition, null, null, pendingSets.Count > 0 ? pendingSets.ToArray() : null, branchOrder, pendingMutations.Count > 0 ? pendingMutations.ToArray() : null, headerLineNumber));
-
+                var outcomeLineNumber = index + 1;
+                clauses.Add(new DslClause(
+                    new DslNoTransition(),
+                    pendingSets.Count > 0 ? pendingSets.ToArray() : Array.Empty<DslSetAssignment>(),
+                    outcomeLineNumber,
+                    null,
+                    null,
+                    pendingMutations.Count > 0 ? pendingMutations.ToArray() : null));
                 pendingSets.Clear();
                 pendingMutations.Clear();
-                branchOrder++;
-                reachedTerminalStatement = true;
+                reachedOutcome = true;
                 index++;
                 continue;
             }
@@ -833,11 +793,15 @@ public static class StateMachineDslParser
                 if (hasIfChain && !hasElseBranch)
                     throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
                 var reason = Unquote(rejectMatch.Groups["reason"].Value.Trim());
-                foreach (var sourceState in sourceStates)
-                    blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, DslTerminalKind.Reject, reason, null, null, branchOrder, null, headerLineNumber));
-
-                branchOrder++;
-                reachedTerminalStatement = true;
+                var outcomeLineNumber = index + 1;
+                clauses.Add(new DslClause(
+                    new DslRejection(reason),
+                    Array.Empty<DslSetAssignment>(),
+                    outcomeLineNumber,
+                    null,
+                    null,
+                    null));
+                reachedOutcome = true;
                 index++;
                 continue;
             }
@@ -848,35 +812,36 @@ public static class StateMachineDslParser
         if (pendingSets.Count > 0 || pendingMutations.Count > 0)
             throw new InvalidOperationException($"Line {index}: set requires a following transition.");
 
-        if (!reachedTerminalStatement)
+        if (!reachedOutcome)
             throw new InvalidOperationException($"Line {index}: from/on block must end with an outcome statement: transition <State>, reject <reason>, or no transition.");
 
-        foreach (var branch in blockBranches)
-            transitions.Add(branch);
+        var clauseList = (IReadOnlyList<DslClause>)clauses.AsReadOnly();
 
-        foreach (var terminalRule in blockTerminalRules)
-            terminalRules.Add(terminalRule);
+        foreach (var sourceState in sourceStates)
+        {
+            transitions.Add(new DslTransition(
+                sourceState,
+                eventName,
+                clauseList,
+                headerLineNumber,
+                whenText,
+                whenAst));
+        }
     }
 
-    private static void ParseGuardedTransitionBranch(
+    private static DslClause ParseGuardedClause(
         string[] lines,
         ref int index,
         int branchHeaderIndent,
-        IReadOnlyList<string> sourceStates,
-        string eventName,
-        ICollection<DslTransition> blockBranches,
-        ICollection<DslTerminalRule> blockTerminalRules,
-        ref int branchOrder,
         string guardExpression,
-        IReadOnlyList<DslCollectionFieldContract> collectionFields,
-        IReadOnlyList<DslFieldContract> dataFields,
-        int sourceLineNumber = 0)
+        int clauseSourceLine,
+        IReadOnlyList<DslCollectionField> collectionFields,
+        IReadOnlyList<DslField> dataFields)
     {
         var branchSets = new List<DslSetAssignment>();
         var branchMutations = new List<DslCollectionMutation>();
-        string? branchTargetState = null;
-        int branchTargetLine = 0;
-        bool hasNoTransitionOutcome = false;
+        DslClauseOutcome? outcome = null;
+        bool reachedOutcome = false;
 
         index++;
         while (index < lines.Length)
@@ -892,6 +857,9 @@ public static class StateMachineDslParser
             var nestedIndent = GetIndentation(nestedRaw);
             if (nestedIndent <= branchHeaderIndent)
                 break;
+
+            if (reachedOutcome)
+                throw new InvalidOperationException($"Line {index + 1}: no statements are allowed after an outcome statement in an if-branch.");
 
             var setMatch = SetRegex.Match(nestedLine);
             if (setMatch.Success)
@@ -912,21 +880,22 @@ public static class StateMachineDslParser
             var transitionMatch = SimpleTransitionRegex.Match(nestedLine);
             if (transitionMatch.Success)
             {
-                if (branchTargetState is not null || hasNoTransitionOutcome)
+                if (outcome is not null)
                     throw new InvalidOperationException($"Line {index + 1}: only one outcome statement is allowed in an if-branch.");
 
-                branchTargetState = transitionMatch.Groups["to"].Value.Trim();
-                branchTargetLine = index + 1;
+                outcome = new DslStateTransition(transitionMatch.Groups["to"].Value.Trim());
+                reachedOutcome = true;
                 index++;
                 continue;
             }
 
             if (nestedLine.Equals("no transition", StringComparison.Ordinal))
             {
-                if (branchTargetState is not null || hasNoTransitionOutcome)
+                if (outcome is not null)
                     throw new InvalidOperationException($"Line {index + 1}: only one outcome statement is allowed in an if-branch.");
 
-                hasNoTransitionOutcome = true;
+                outcome = new DslNoTransition();
+                reachedOutcome = true;
                 index++;
                 continue;
             }
@@ -937,55 +906,34 @@ public static class StateMachineDslParser
             throw new InvalidOperationException($"Line {index + 1}: expected 'set <Key> = <Expr>', collection mutation, 'transition <State>', or 'no transition' inside if-branch.");
         }
 
-        if (string.IsNullOrWhiteSpace(branchTargetState) && !hasNoTransitionOutcome)
+        if (outcome is null)
             throw new InvalidOperationException($"Line {index}: if/else if branch requires 'transition <State>' or 'no transition'.");
 
-        if (hasNoTransitionOutcome)
-        {
-            foreach (var sourceState in sourceStates)
-                blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, DslTerminalKind.NoTransition, null, guardExpression, branchSets.Count > 0 ? branchSets.ToArray() : null, branchOrder, branchMutations.Count > 0 ? branchMutations.ToArray() : null, sourceLineNumber));
+        DslExpression? guardAst = null;
+        try { guardAst = DslExpressionParser.Parse(guardExpression); }
+        catch { /* parse errors reported separately in analyzer */ }
 
-            branchOrder++;
-            return;
-        }
-
-        foreach (var sourceState in sourceStates)
-        {
-            blockBranches.Add(new DslTransition(
-                sourceState,
-                branchTargetState!,
-                eventName,
-                guardExpression,
-                branchSets.ToArray(),
-                branchOrder,
-                branchMutations.Count > 0 ? branchMutations.ToArray() : null,
-                sourceLineNumber,
-                branchTargetLine));
-        }
-
-        branchOrder++;
+        return new DslClause(
+            outcome,
+            branchSets.Count > 0 ? (IReadOnlyList<DslSetAssignment>)branchSets.ToArray() : Array.Empty<DslSetAssignment>(),
+            clauseSourceLine,
+            guardExpression,
+            guardAst,
+            branchMutations.Count > 0 ? branchMutations.ToArray() : null);
     }
 
-    private static void ParseOutcomeBranch(
+    private static DslClause ParseElseClause(
         string[] lines,
         ref int index,
         int branchHeaderIndent,
-        IReadOnlyList<string> sourceStates,
-        string eventName,
-        ICollection<DslTransition> blockBranches,
-        ICollection<DslTerminalRule> blockTerminalRules,
-        ref int branchOrder,
-        IReadOnlyList<DslCollectionFieldContract> collectionFields,
-        IReadOnlyList<DslFieldContract> dataFields,
-        int sourceLineNumber = 0)
+        int clauseSourceLine,
+        IReadOnlyList<DslCollectionField> collectionFields,
+        IReadOnlyList<DslField> dataFields)
     {
         var branchSets = new List<DslSetAssignment>();
         var branchMutations = new List<DslCollectionMutation>();
-        string? branchTargetState = null;
-        int branchTargetLine = 0;
-        DslTerminalKind? branchTerminalKind = null;
-        string? branchTerminalReason = null;
-        bool branchReachedOutcome = false;
+        DslClauseOutcome? outcome = null;
+        bool reachedOutcome = false;
 
         index++;
         while (index < lines.Length)
@@ -1002,7 +950,7 @@ public static class StateMachineDslParser
             if (nestedIndent <= branchHeaderIndent)
                 break;
 
-            if (branchReachedOutcome)
+            if (reachedOutcome)
                 throw new InvalidOperationException($"Line {index + 1}: no statements are allowed after an outcome statement in an else-branch.");
 
             var setMatch = SetRegex.Match(nestedLine);
@@ -1024,18 +972,16 @@ public static class StateMachineDslParser
             var transitionMatch = SimpleTransitionRegex.Match(nestedLine);
             if (transitionMatch.Success)
             {
-                branchTargetState = transitionMatch.Groups["to"].Value.Trim();
-                branchTargetLine = index + 1;
-                branchReachedOutcome = true;
+                outcome = new DslStateTransition(transitionMatch.Groups["to"].Value.Trim());
+                reachedOutcome = true;
                 index++;
                 continue;
             }
 
             if (nestedLine.Equals("no transition", StringComparison.Ordinal))
             {
-                branchTerminalKind = DslTerminalKind.NoTransition;
-                branchTerminalReason = null;
-                branchReachedOutcome = true;
+                outcome = new DslNoTransition();
+                reachedOutcome = true;
                 index++;
                 continue;
             }
@@ -1043,9 +989,8 @@ public static class StateMachineDslParser
             var rejectMatch = RejectRegex.Match(nestedLine);
             if (rejectMatch.Success)
             {
-                branchTerminalKind = DslTerminalKind.Reject;
-                branchTerminalReason = Unquote(rejectMatch.Groups["reason"].Value.Trim());
-                branchReachedOutcome = true;
+                outcome = new DslRejection(Unquote(rejectMatch.Groups["reason"].Value.Trim()));
+                reachedOutcome = true;
                 index++;
                 continue;
             }
@@ -1053,41 +998,23 @@ public static class StateMachineDslParser
             throw new InvalidOperationException($"Line {index + 1}: expected an outcome statement inside else-branch.");
         }
 
-        if (!branchReachedOutcome)
+        if (!reachedOutcome)
             throw new InvalidOperationException($"Line {index}: else branch requires an outcome statement.");
 
-        if (branchTargetState is not null)
-        {
-            foreach (var sourceState in sourceStates)
-            {
-                blockBranches.Add(new DslTransition(
-                    sourceState,
-                    branchTargetState,
-                    eventName,
-                    null,
-                    branchSets.ToArray(),
-                    branchOrder,
-                    branchMutations.Count > 0 ? branchMutations.ToArray() : null,
-                    sourceLineNumber,
-                    branchTargetLine));
-            }
-
-            branchOrder++;
-
-            return;
-        }
-
-        foreach (var sourceState in sourceStates)
-            blockTerminalRules.Add(new DslTerminalRule(sourceState, eventName, branchTerminalKind!.Value, branchTerminalReason, null, branchSets.Count > 0 ? branchSets.ToArray() : null, branchOrder, branchMutations.Count > 0 ? branchMutations.ToArray() : null, sourceLineNumber));
-
-        branchOrder++;
+        return new DslClause(
+            outcome!,
+            branchSets.Count > 0 ? (IReadOnlyList<DslSetAssignment>)branchSets.ToArray() : Array.Empty<DslSetAssignment>(),
+            clauseSourceLine,
+            null,
+            null,
+            branchMutations.Count > 0 ? branchMutations.ToArray() : null);
     }
 
     private static DslCollectionMutation? TryParseCollectionMutation(
         string line,
         int lineNumber,
-        IReadOnlyList<DslCollectionFieldContract> collectionFields,
-        IReadOnlyList<DslFieldContract> dataFields)
+        IReadOnlyList<DslCollectionField> collectionFields,
+        IReadOnlyList<DslField> dataFields)
     {
         // Try each mutation verb
         var addMatch = AddRegex.Match(line);
@@ -1139,7 +1066,7 @@ public static class StateMachineDslParser
         string fieldName,
         string expressionText,
         int lineNumber,
-        IReadOnlyList<DslCollectionFieldContract> collectionFields,
+        IReadOnlyList<DslCollectionField> collectionFields,
         DslCollectionKind requiredKind)
     {
         var field = collectionFields.FirstOrDefault(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal));
@@ -1164,9 +1091,9 @@ public static class StateMachineDslParser
         DslCollectionMutationVerb verb,
         string fieldName,
         int lineNumber,
-        IReadOnlyList<DslCollectionFieldContract> collectionFields,
+        IReadOnlyList<DslCollectionField> collectionFields,
         DslCollectionKind requiredKind,
-        IReadOnlyList<DslFieldContract> dataFields,
+        IReadOnlyList<DslField> dataFields,
         string? intoFieldName = null)
     {
         var field = collectionFields.FirstOrDefault(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal));
@@ -1332,77 +1259,47 @@ public static class StateMachineDslParser
     }
 
     private static void ValidateReferences(
-        IReadOnlyCollection<string> states,
+        IReadOnlyCollection<DslState> states,
         IReadOnlyCollection<DslEvent> events,
         IReadOnlyCollection<DslTransition> transitions,
-        IReadOnlyCollection<DslTerminalRule> terminalRules,
-        IReadOnlyCollection<DslFieldContract> dataFields,
-        IReadOnlyCollection<DslCollectionFieldContract> collectionFields)
+        IReadOnlyCollection<DslField> dataFields,
+        IReadOnlyCollection<DslCollectionField> collectionFields)
     {
-        var stateSet = new HashSet<string>(states, StringComparer.Ordinal);
+        var stateSet = new HashSet<string>(states.Select(s => s.Name), StringComparer.Ordinal);
         var eventSet = new HashSet<string>(events.Select(e => e.Name), StringComparer.Ordinal);
 
         foreach (var transition in transitions)
         {
             var tPrefix = transition.SourceLine > 0 ? $"Line {transition.SourceLine}: " : string.Empty;
-            var tTargetPrefix = transition.TargetLine > 0 ? $"Line {transition.TargetLine}: " : tPrefix;
 
             if (!stateSet.Contains(transition.FromState))
                 throw new InvalidOperationException($"{tPrefix}Transition references unknown source state '{transition.FromState}'.");
 
-            if (!stateSet.Contains(transition.ToState))
-                throw new InvalidOperationException($"{tTargetPrefix}Transition references unknown target state '{transition.ToState}'.");
-
             if (!eventSet.Contains(transition.EventName))
                 throw new InvalidOperationException($"{tPrefix}Transition references unknown event '{transition.EventName}'.");
 
-            foreach (var assignment in transition.SetAssignments)
+            foreach (var clause in transition.Clauses)
             {
-                if (dataFields.Count == 0)
-                    continue;
+                var cPrefix = clause.SourceLine > 0 ? $"Line {clause.SourceLine}: " : tPrefix;
 
-                var aPrefix = assignment.SourceLine > 0 ? $"Line {assignment.SourceLine}: " : tPrefix;
-                var knownDataField = dataFields.Any(f => string.Equals(f.Name, assignment.Key, StringComparison.Ordinal));
-                if (!knownDataField)
-                    throw new InvalidOperationException($"{aPrefix}Transition '{transition.FromState} -> {transition.ToState}' on '{transition.EventName}' assigns unknown data field '{assignment.Key}'.");
-            }
-        }
-
-        var terminalGroups = terminalRules.GroupBy(rule => (rule.FromState, rule.EventName));
-        foreach (var terminalGroup in terminalGroups)
-        {
-            var unguardedRules = new List<DslTerminalRule>();
-            foreach (var terminalRule in terminalGroup)
-            {
-                var rPrefix = terminalRule.SourceLine > 0 ? $"Line {terminalRule.SourceLine}: " : string.Empty;
-
-                if (!stateSet.Contains(terminalRule.FromState))
-                    throw new InvalidOperationException($"{rPrefix}Terminal rule references unknown source state '{terminalRule.FromState}'.");
-
-                if (!eventSet.Contains(terminalRule.EventName))
-                    throw new InvalidOperationException($"{rPrefix}Terminal rule references unknown event '{terminalRule.EventName}'.");
-
-                if (string.IsNullOrWhiteSpace(terminalRule.GuardExpression))
-                    unguardedRules.Add(terminalRule);
-
-                if (terminalRule.Kind == DslTerminalKind.Reject && string.IsNullOrWhiteSpace(terminalRule.Reason))
-                    throw new InvalidOperationException($"{rPrefix}Terminal reject rule for state '{terminalRule.FromState}' and event '{terminalRule.EventName}' requires a reason.");
-
-                if (terminalRule.Order < 0)
-                    throw new InvalidOperationException($"{rPrefix}Terminal rule for state '{terminalRule.FromState}' and event '{terminalRule.EventName}' has invalid order '{terminalRule.Order}'.");
-
-                if (terminalRule.SetAssignments is not null)
+                if (clause.Outcome is DslStateTransition st)
                 {
-                    foreach (var assignment in terminalRule.SetAssignments)
-                    {
-                        if (dataFields.Count == 0)
-                            continue;
+                    if (!stateSet.Contains(st.TargetState))
+                        throw new InvalidOperationException($"{cPrefix}Transition references unknown target state '{st.TargetState}'.");
+                }
 
-                        var aPrefix = assignment.SourceLine > 0 ? $"Line {assignment.SourceLine}: " : rPrefix;
-                        var knownDataField = dataFields.Any(f => string.Equals(f.Name, assignment.Key, StringComparison.Ordinal));
-                        if (!knownDataField)
-                            throw new InvalidOperationException($"{aPrefix}Terminal rule for state '{terminalRule.FromState}' on '{terminalRule.EventName}' assigns unknown data field '{assignment.Key}'.");
-                    }
+                if (clause.Outcome is DslRejection rej && string.IsNullOrWhiteSpace(rej.Reason))
+                    throw new InvalidOperationException($"{cPrefix}Reject outcome requires a reason.");
+
+                foreach (var assignment in clause.SetAssignments)
+                {
+                    if (dataFields.Count == 0)
+                        continue;
+
+                    var aPrefix = assignment.SourceLine > 0 ? $"Line {assignment.SourceLine}: " : cPrefix;
+                    var knownDataField = dataFields.Any(f => string.Equals(f.Name, assignment.Key, StringComparison.Ordinal));
+                    if (!knownDataField)
+                        throw new InvalidOperationException($"{aPrefix}Transition '{transition.FromState}' on '{transition.EventName}' assigns unknown data field '{assignment.Key}'.");
                 }
             }
         }

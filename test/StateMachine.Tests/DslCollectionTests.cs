@@ -111,9 +111,9 @@ public class DslCollectionParsingTests
 
         var machine = StateMachineDslParser.Parse(dsl);
 
-        var transition = machine.Transitions.Single(t => t.ToState == "Active");
-        transition.CollectionMutations.Should().ContainSingle();
-        var mut = transition.CollectionMutations![0];
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        clause.CollectionMutations.Should().ContainSingle();
+        var mut = clause.CollectionMutations![0];
         mut.Verb.Should().Be(DslCollectionMutationVerb.Add);
         mut.TargetField.Should().Be("Floors");
         mut.ExpressionText.Should().Be("5");
@@ -135,9 +135,9 @@ public class DslCollectionParsingTests
 
         var machine = StateMachineDslParser.Parse(dsl);
 
-        var transition = machine.Transitions.Single(t => t.ToState == "Active");
-        transition.CollectionMutations.Should().ContainSingle();
-        var mut = transition.CollectionMutations![0];
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        clause.CollectionMutations.Should().ContainSingle();
+        var mut = clause.CollectionMutations![0];
         mut.Verb.Should().Be(DslCollectionMutationVerb.Remove);
         mut.TargetField.Should().Be("Floors");
     }
@@ -158,9 +158,9 @@ public class DslCollectionParsingTests
 
         var machine = StateMachineDslParser.Parse(dsl);
 
-        var transition = machine.Transitions.Single(t => t.ToState == "Active");
-        transition.CollectionMutations.Should().ContainSingle();
-        var mut = transition.CollectionMutations![0];
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        clause.CollectionMutations.Should().ContainSingle();
+        var mut = clause.CollectionMutations![0];
         mut.Verb.Should().Be(DslCollectionMutationVerb.Enqueue);
         mut.TargetField.Should().Be("Tasks");
     }
@@ -181,9 +181,9 @@ public class DslCollectionParsingTests
 
         var machine = StateMachineDslParser.Parse(dsl);
 
-        var transition = machine.Transitions.Single(t => t.ToState == "Active");
-        transition.CollectionMutations.Should().ContainSingle();
-        var mut = transition.CollectionMutations![0];
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        clause.CollectionMutations.Should().ContainSingle();
+        var mut = clause.CollectionMutations![0];
         mut.Verb.Should().Be(DslCollectionMutationVerb.Dequeue);
         mut.TargetField.Should().Be("Tasks");
         mut.ExpressionText.Should().BeNull();
@@ -205,9 +205,9 @@ public class DslCollectionParsingTests
 
         var machine = StateMachineDslParser.Parse(dsl);
 
-        var transition = machine.Transitions.Single(t => t.ToState == "Active");
-        transition.CollectionMutations.Should().ContainSingle();
-        var mut = transition.CollectionMutations![0];
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        clause.CollectionMutations.Should().ContainSingle();
+        var mut = clause.CollectionMutations![0];
         mut.Verb.Should().Be(DslCollectionMutationVerb.Push);
         mut.TargetField.Should().Be("History");
     }
@@ -228,9 +228,9 @@ public class DslCollectionParsingTests
 
         var machine = StateMachineDslParser.Parse(dsl);
 
-        var transition = machine.Transitions.Single(t => t.ToState == "Active");
-        transition.CollectionMutations.Should().ContainSingle();
-        var mut = transition.CollectionMutations![0];
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        clause.CollectionMutations.Should().ContainSingle();
+        var mut = clause.CollectionMutations![0];
         mut.Verb.Should().Be(DslCollectionMutationVerb.Pop);
         mut.TargetField.Should().Be("History");
     }
@@ -251,9 +251,9 @@ public class DslCollectionParsingTests
 
         var machine = StateMachineDslParser.Parse(dsl);
 
-        var transition = machine.Transitions.Single(t => t.ToState == "Active");
-        transition.CollectionMutations.Should().ContainSingle();
-        var mut = transition.CollectionMutations![0];
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        clause.CollectionMutations.Should().ContainSingle();
+        var mut = clause.CollectionMutations![0];
         mut.Verb.Should().Be(DslCollectionMutationVerb.Clear);
         mut.TargetField.Should().Be("Floors");
     }
@@ -355,14 +355,14 @@ public class DslCollectionParsingTests
 
         var machine = StateMachineDslParser.Parse(dsl);
 
-        var transition = machine.Transitions.Single(t => t.ToState == "Active");
-        transition.CollectionMutations.Should().HaveCount(3);
-        transition.CollectionMutations![0].Verb.Should().Be(DslCollectionMutationVerb.Add);
-        transition.CollectionMutations![0].ExpressionText.Should().Be("3");
-        transition.CollectionMutations![1].Verb.Should().Be(DslCollectionMutationVerb.Add);
-        transition.CollectionMutations![1].ExpressionText.Should().Be("5");
-        transition.CollectionMutations![2].Verb.Should().Be(DslCollectionMutationVerb.Remove);
-        transition.CollectionMutations![2].ExpressionText.Should().Be("1");
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        clause.CollectionMutations.Should().HaveCount(3);
+        clause.CollectionMutations![0].Verb.Should().Be(DslCollectionMutationVerb.Add);
+        clause.CollectionMutations![0].ExpressionText.Should().Be("3");
+        clause.CollectionMutations![1].Verb.Should().Be(DslCollectionMutationVerb.Add);
+        clause.CollectionMutations![1].ExpressionText.Should().Be("5");
+        clause.CollectionMutations![2].Verb.Should().Be(DslCollectionMutationVerb.Remove);
+        clause.CollectionMutations![2].ExpressionText.Should().Be("1");
     }
 
     [Fact]
@@ -385,11 +385,10 @@ public class DslCollectionParsingTests
 
         var machine = StateMachineDslParser.Parse(dsl);
 
-        machine.TerminalRules.Should().ContainSingle();
-        var rule = machine.TerminalRules[0];
-        rule.Kind.Should().Be(DslTerminalKind.NoTransition);
-        rule.CollectionMutations.Should().ContainSingle();
-        rule.CollectionMutations![0].Verb.Should().Be(DslCollectionMutationVerb.Add);
+        machine.Transitions.Should().ContainSingle();
+        var noTransClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is DslNoTransition);
+        noTransClause.CollectionMutations.Should().ContainSingle();
+        noTransClause.CollectionMutations![0].Verb.Should().Be(DslCollectionMutationVerb.Add);
     }
 
     [Fact]
@@ -409,9 +408,9 @@ public class DslCollectionParsingTests
 
         var machine = StateMachineDslParser.Parse(dsl);
 
-        var transition = machine.Transitions.Single(t => t.ToState == "Active");
-        transition.CollectionMutations.Should().ContainSingle();
-        transition.CollectionMutations![0].ExpressionText.Should().Be("Target");
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        clause.CollectionMutations.Should().ContainSingle();
+        clause.CollectionMutations![0].ExpressionText.Should().Be("Target");
     }
 }
 
@@ -436,7 +435,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        fire.IsAccepted.Should().BeTrue();
+        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance.Should().NotBeNull();
         var collection = fire.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
         collection.Should().NotBeNull();
@@ -469,12 +468,12 @@ public class DslCollectionRuntimeTests
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Step1");
-        fire1.IsAccepted.Should().BeTrue();
+        (fire1.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col1 = fire1.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
         col1!.Count.Should().Be(3);
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance, "Step2");
-        fire2.IsAccepted.Should().BeTrue();
+        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col2 = fire2.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
         col2!.Count.Should().Be(2);
         col2.Contains(5d).Should().BeFalse();
@@ -506,12 +505,12 @@ public class DslCollectionRuntimeTests
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Enq");
-        fire1.IsAccepted.Should().BeTrue();
+        (fire1.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col1 = fire1.UpdatedInstance!.InstanceData["__collection__Tasks"] as CollectionValue;
         col1!.Count.Should().Be(2);
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance, "Deq");
-        fire2.IsAccepted.Should().BeTrue();
+        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col2 = fire2.UpdatedInstance!.InstanceData["__collection__Tasks"] as CollectionValue;
         col2!.Count.Should().Be(1);
         // "first" was dequeued, "second" remains
@@ -542,13 +541,13 @@ public class DslCollectionRuntimeTests
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Push");
-        fire1.IsAccepted.Should().BeTrue();
+        (fire1.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col1 = fire1.UpdatedInstance!.InstanceData["__collection__History"] as CollectionValue;
         col1!.Count.Should().Be(2);
         col1.Peek().Should().Be(20d);
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance, "Pop");
-        fire2.IsAccepted.Should().BeTrue();
+        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col2 = fire2.UpdatedInstance!.InstanceData["__collection__History"] as CollectionValue;
         col2!.Count.Should().Be(1);
         col2.Peek().Should().Be(10d);
@@ -605,7 +604,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Deq");
 
-        fire.IsAccepted.Should().BeFalse();
+        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle().Which.Should().Contain("empty queue");
     }
 
@@ -628,7 +627,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Pop");
 
-        fire.IsAccepted.Should().BeFalse();
+        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle().Which.Should().Contain("empty stack");
     }
 
@@ -659,7 +658,7 @@ public class DslCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        fire2.IsAccepted.Should().BeTrue();
+        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -690,7 +689,7 @@ public class DslCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        fire2.IsAccepted.Should().BeFalse();
+        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
     }
 
     [Fact]
@@ -721,7 +720,7 @@ public class DslCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        fire2.IsAccepted.Should().BeTrue();
+        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -754,7 +753,7 @@ public class DslCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        fire2.IsAccepted.Should().BeTrue();
+        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -787,7 +786,7 @@ public class DslCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        fire2.IsAccepted.Should().BeTrue();
+        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -819,7 +818,7 @@ public class DslCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        fire2.IsAccepted.Should().BeTrue();
+        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -851,7 +850,7 @@ public class DslCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        fire2.IsAccepted.Should().BeTrue();
+        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -875,7 +874,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        fire.IsAccepted.Should().BeTrue();
+        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col = fire.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
         col!.Contains(5d).Should().BeTrue();
     }
@@ -900,7 +899,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Request", new Dictionary<string, object?> { ["Floor"] = 7 });
 
-        fire.IsAccepted.Should().BeTrue();
+        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col = fire.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
         col!.Contains(7d).Should().BeTrue();
     }
@@ -923,7 +922,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        fire.Outcome.Should().Be(DslOutcomeKind.NoTransition);
+        fire.Outcome.Should().Be(DslOutcomeKind.AcceptedInPlace);
         fire.UpdatedInstance.Should().NotBeNull();
         var col = fire.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
         col!.Count.Should().Be(1);
@@ -951,7 +950,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        fire.IsAccepted.Should().BeTrue();
+        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["Count"].Should().Be(1d);
         var col = fire.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
         col!.Contains(3d).Should().BeTrue();
@@ -982,10 +981,10 @@ public class DslCollectionRuntimeTests
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Go");
-        fire1.IsAccepted.Should().BeTrue();
+        (fire1.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Go");
-        fire2.IsAccepted.Should().BeTrue();
+        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire2.NewState.Should().Be("C");
         var col = fire2.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
         col!.Count.Should().Be(2);
@@ -1039,7 +1038,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        fire.IsAccepted.Should().BeTrue();
+        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col = fire.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
         col!.Count.Should().Be(1);
     }
@@ -1066,7 +1065,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        fire.IsAccepted.Should().BeTrue();
+        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col = fire.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
         col!.Min().Should().Be(1d);
         col.Max().Should().Be(7d);
@@ -1095,7 +1094,7 @@ public class DslCollectionRuntimeTests
         var fire = workflow.Fire(instance, "Go");
 
         // Second dequeue on empty queue should reject
-        fire.IsAccepted.Should().BeFalse();
+        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
         // Original instance should be unmodified
         var col = instance.InstanceData["__collection__Tasks"] as CollectionValue;
         col!.Count.Should().Be(0);

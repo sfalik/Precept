@@ -20,8 +20,9 @@ internal static class DslExpressionTestHelper
 
         var machine = StateMachineDslParser.Parse(dsl);
         machine.Transitions.Should().ContainSingle();
-        machine.Transitions[0].SetAssignments.Should().ContainSingle();
-        return machine.Transitions[0].SetAssignments[0].Expression;
+        machine.Transitions[0].Clauses.Should().ContainSingle();
+        machine.Transitions[0].Clauses[0].SetAssignments.Should().ContainSingle();
+        return machine.Transitions[0].Clauses[0].SetAssignments[0].Expression;
     }
 
     internal static System.Action ParseFirstSetExpressionAction(string expressionText)

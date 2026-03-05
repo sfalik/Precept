@@ -1,0 +1,75 @@
+machine LoanApplication
+
+# Core Data Fields
+string ApplicantName = "Jane Doe"
+  rule ApplicantName != "" "Applicant name cannot be empty"
+
+number AmountRequested = 250000
+  rule AmountRequested >= 1000 "Minimum loan amount is $1,000"
+  rule AmountRequested <= 1000000 "Maximum loan amount is $1,000,000"
+
+number CreditScore = 720
+  rule CreditScore >= 300 "Credit score must be valid (300+)"
+
+string? RejectionReason
+string? ApprovedBy
+
+# Complex Data Structure
+set<string> MissingDocuments
+
+# States
+state Draft initial
+state UnderReview
+  # State entry rule enforces constraints upon entering this phase
+  rule CreditScore >= 600 "Credit score too low for active review phase"
+
+state Approved
+  rule ApprovedBy != null "An approved loan must have an approver"
+
+state Rejected
+  rule RejectionReason != null "A rejected loan must have a mapped reason"
+
+# Events
+event Submit
+  string SubmittedBy = "System"
+
+event Reject
+  string Reason
+    rule Reason != "" "Must provide a rejection reason"
+
+event RequestDocument
+  string DocumentName
+
+event ReceiveDocument
+  string DocumentName
+
+event Approve
+  string UnderwriterName
+
+# Rules / Transitions
+from Draft on RequestDocument
+  add MissingDocuments RequestDocument.DocumentName
+  no transition
+
+from Draft on ReceiveDocument
+  remove MissingDocuments ReceiveDocument.DocumentName
+  no transition
+
+from Draft on Submit
+  if MissingDocuments.count == 0
+    transition UnderReview
+  else
+    reject "Cannot submit while documents are missing"
+
+from UnderReview on Reject
+  set RejectionReason = Reject.Reason
+  transition Rejected
+
+from UnderReview on Approve
+  if CreditScore >= 650
+    set ApprovedBy = Approve.UnderwriterName
+    transition Approved
+  else
+    reject "Requires manual exception for credit scores under 650"
+
+

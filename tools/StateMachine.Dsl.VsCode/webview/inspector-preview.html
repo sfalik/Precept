@@ -1511,7 +1511,7 @@
       const outgoingEvents = getUniqueOutgoingEvents(currentState);
       for (const eventName of outgoingEvents) {
         const evaluation = evaluateEvent(currentState, eventName);
-        if (evaluation.kind === 'undefined') {
+        if (evaluation.kind === 'undefined' || evaluation.kind === 'notApplicable') {
           continue;
         }
 
@@ -1568,6 +1568,10 @@
               reasons: liveStatus.reasons,
               meta: 'runtime blocked'
             };
+          }
+
+          if (liveStatus.outcome === 'notapplicable') {
+            return { kind: 'notApplicable', meta: 'runtime not applicable (when guard is false)' };
           }
 
           return {
@@ -1690,6 +1694,8 @@
         if (glyph) {
           glyph.textContent = '✖';
         }
+      } else if (evaluation.kind === 'notApplicable') {
+        // notApplicable buttons are filtered out of renderEventBar; this branch is a no-op safety net
       } else if (evaluation.kind === 'undefined') {
         button.classList.add('undefined');
         if (glyph) {
@@ -2357,7 +2363,8 @@
 
     function renderEventBar() {
       const selectedEventName = getSelectedEventName();
-      const events = getOrderedCurrentEvents();
+      const events = getOrderedCurrentEvents()
+        .filter((eventName) => evaluateEvent(currentState, eventName).kind !== 'notApplicable');
 
       if (events.length === 0) {
         eventBar.innerHTML = '<span class="muted">No events available from current state.</span>';
@@ -2452,7 +2459,7 @@
           selectEvent(eventName);
 
           const evaluation = evaluateEvent(currentState, eventName);
-          if (evaluation.kind === 'undefined') {
+          if (evaluation.kind === 'undefined' || evaluation.kind === 'notApplicable') {
             renderAll();
             return;
           }

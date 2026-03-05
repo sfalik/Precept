@@ -4,22 +4,31 @@ namespace StateMachine.Dsl;
 
 public sealed record DslMachine(
     string Name,
-    IReadOnlyList<string> States,
-    string InitialState,
+    IReadOnlyList<DslState> States,
+    DslState InitialState,
     IReadOnlyList<DslEvent> Events,
     IReadOnlyList<DslTransition> Transitions,
-    IReadOnlyList<DslTerminalRule> TerminalRules,
-    IReadOnlyList<DslFieldContract> DataFields,
-    IReadOnlyList<DslCollectionFieldContract> CollectionFields,
-    IReadOnlyList<DslRule>? TopLevelRules = null,
-    IReadOnlyDictionary<string, IReadOnlyList<DslRule>>? StateRules = null);
+    IReadOnlyList<DslField> Fields,
+    IReadOnlyList<DslCollectionField> CollectionFields,
+    IReadOnlyList<DslRule>? TopLevelRules = null);
+
+public sealed record DslState(
+    string Name,
+    IReadOnlyList<DslRule>? Rules = null);
 
 public sealed record DslEvent(
     string Name,
-    IReadOnlyList<DslFieldContract> Args,
+    IReadOnlyList<DslEventArg> Args,
     IReadOnlyList<DslRule>? Rules = null);
 
-public sealed record DslFieldContract(
+public sealed record DslEventArg(
+    string Name,
+    DslScalarType Type,
+    bool IsNullable,
+    bool HasDefaultValue = false,
+    object? DefaultValue = null);
+
+public sealed record DslField(
     string Name,
     DslScalarType Type,
     bool IsNullable,
@@ -27,7 +36,7 @@ public sealed record DslFieldContract(
     object? DefaultValue = null,
     IReadOnlyList<DslRule>? Rules = null);
 
-public sealed record DslCollectionFieldContract(
+public sealed record DslCollectionField(
     string Name,
     DslCollectionKind CollectionKind,
     DslScalarType InnerType,
@@ -77,14 +86,19 @@ public sealed record DslSetAssignment(
     string Key,
     string ExpressionText,
     DslExpression Expression,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    int ExpressionStartColumn = 0,
+    int ExpressionEndColumn = 0);
 
 public sealed record DslCollectionMutation(
     DslCollectionMutationVerb Verb,
     string TargetField,
     string? ExpressionText,
     DslExpression? Expression,
-    string? IntoField = null);
+    string? IntoField = null,
+    int SourceLine = 0,
+    int ExpressionStartColumn = 0,
+    int ExpressionEndColumn = 0);
 
 public enum DslCollectionMutationVerb
 {
@@ -97,30 +111,37 @@ public enum DslCollectionMutationVerb
     Clear
 }
 
+/// <summary>
+/// Represents a complete <c>from &lt;State&gt; on &lt;Event&gt; [when &lt;Expr&gt;]</c> block.
+/// One instance per (FromState, EventName) pair.
+/// </summary>
 public sealed record DslTransition(
     string FromState,
-    string ToState,
     string EventName,
-    string? GuardExpression,
-    IReadOnlyList<DslSetAssignment> SetAssignments,
-    int Order = 0,
-    IReadOnlyList<DslCollectionMutation>? CollectionMutations = null,
+    IReadOnlyList<DslClause> Clauses,
     int SourceLine = 0,
-    int TargetLine = 0);
+    string? Predicate = null,
+    DslExpression? PredicateAst = null);
 
-public sealed record DslTerminalRule(
-    string FromState,
-    string EventName,
-    DslTerminalKind Kind,
-    string? Reason,
-    string? GuardExpression = null,
-    IReadOnlyList<DslSetAssignment>? SetAssignments = null,
-    int Order = 0,
-    IReadOnlyList<DslCollectionMutation>? CollectionMutations = null,
-    int SourceLine = 0);
+/// <summary>
+/// Represents one <c>if</c> / <c>else if</c> / <c>else</c> / unguarded branch within a <c>from…on</c> block.
+/// </summary>
+public sealed record DslClause(
+    DslClauseOutcome Outcome,
+    IReadOnlyList<DslSetAssignment> SetAssignments,
+    int SourceLine = 0,
+    string? Predicate = null,
+    DslExpression? PredicateAst = null,
+    IReadOnlyList<DslCollectionMutation>? CollectionMutations = null);
 
-public enum DslTerminalKind
-{
-    Reject,
-    NoTransition
-}
+/// <summary>Abstract base for the three possible outcomes of a <see cref="DslClause"/>.</summary>
+public abstract record DslClauseOutcome;
+
+/// <summary>The <c>transition &lt;State&gt;</c> outcome — moves to a new state.</summary>
+public sealed record DslStateTransition(string TargetState) : DslClauseOutcome;
+
+/// <summary>The <c>reject</c> outcome — event is explicitly rejected.</summary>
+public sealed record DslRejection(string? Reason = null) : DslClauseOutcome;
+
+/// <summary>The <c>no transition</c> outcome — event is accepted but state does not change.</summary>
+public sealed record DslNoTransition : DslClauseOutcome;

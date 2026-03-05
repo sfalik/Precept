@@ -4,99 +4,46 @@ using System.Linq;
 
 namespace StateMachine.Dsl;
 
-public interface IGuardEvaluator
-{
-    GuardEvaluationResult Evaluate(string expression, IReadOnlyDictionary<string, object?> data);
-}
-
-public sealed record GuardEvaluationResult(bool IsPassed, string? FailureReason)
-{
-    public static GuardEvaluationResult Passed() => new(true, null);
-    public static GuardEvaluationResult Failed(string reason) => new(false, reason);
-}
-
-internal sealed class DefaultGuardEvaluator : IGuardEvaluator
-{
-    public GuardEvaluationResult Evaluate(string expression, IReadOnlyDictionary<string, object?> data)
-    {
-        if (string.IsNullOrWhiteSpace(expression))
-            return GuardEvaluationResult.Passed();
-
-        var trimmed = expression.Trim();
-        DslExpression parsed;
-        try
-        {
-            parsed = DslExpressionParser.Parse(trimmed);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return GuardEvaluationResult.Failed($"Guard '{trimmed}' failed: {ex.Message}");
-        }
-
-        var evaluation = DslExpressionRuntimeEvaluator.Evaluate(parsed, data);
-        if (!evaluation.Success)
-            return GuardEvaluationResult.Failed($"Guard '{trimmed}' failed: {evaluation.Error}");
-
-        if (evaluation.Value is not bool result)
-            return GuardEvaluationResult.Failed($"Guard '{trimmed}' failed: expression must evaluate to boolean.");
-
-        return result
-            ? GuardEvaluationResult.Passed()
-            : GuardEvaluationResult.Failed($"Guard '{trimmed}' failed.");
-    }
-}
-
 public sealed class DslWorkflowDefinition
 {
-    private readonly Dictionary<(string State, string Event), List<DslTransition>> _transitionMap;
-    private readonly Dictionary<(string State, string Event), List<DslTerminalRule>> _terminalRuleMap;
-    private readonly Dictionary<string, DslFieldContract> _dataContractMap;
-    private readonly Dictionary<string, DslCollectionFieldContract> _collectionContractMap;
-    private readonly Dictionary<string, Dictionary<string, DslFieldContract>> _eventArgContractMap;
-    private readonly IGuardEvaluator _guardEvaluator;
+    private readonly Dictionary<(string State, string Event), DslTransition> _transitionMap;
+    private readonly Dictionary<string, DslField> _fieldMap;
+    private readonly Dictionary<string, DslCollectionField> _collectionFieldMap;
+    private readonly Dictionary<string, Dictionary<string, DslEventArg>> _eventArgContractMap;
 
     // Rules storage
     private readonly IReadOnlyList<DslRule> _topLevelRules;
-    private readonly IReadOnlyList<DslRule> _allFieldRules; // field rules from all data fields
-    private readonly IReadOnlyList<DslRule> _allCollectionRules; // field rules from collection fields
-    private readonly IReadOnlyDictionary<string, IReadOnlyList<DslRule>> _stateRules;
+    private readonly IReadOnlyList<DslRule> _allFieldRules;
+    private readonly IReadOnlyList<DslRule> _allCollectionRules;
+    private readonly IReadOnlyDictionary<string, IReadOnlyList<DslRule>> _stateRuleMap;
     private readonly IReadOnlyDictionary<string, IReadOnlyList<DslRule>> _eventRules;
 
     public string Name { get; }
     public IReadOnlyList<string> States { get; }
     public string InitialState { get; }
     public IReadOnlyList<DslEvent> Events { get; }
-    public IReadOnlyList<DslFieldContract> DataFields { get; }
-    public IReadOnlyList<DslCollectionFieldContract> CollectionFields { get; }
+    public IReadOnlyList<DslField> Fields { get; }
+    public IReadOnlyList<DslCollectionField> CollectionFields { get; }
 
-    internal DslWorkflowDefinition(DslMachine machine, IGuardEvaluator guardEvaluator)
+    internal DslWorkflowDefinition(DslMachine machine)
     {
         Name = machine.Name;
-        States = machine.States;
-        InitialState = machine.InitialState;
+        States = machine.States.Select(s => s.Name).ToArray();
+        InitialState = machine.InitialState.Name;
         Events = machine.Events;
-        DataFields = machine.DataFields;
+        Fields = machine.Fields;
         CollectionFields = machine.CollectionFields;
-        _guardEvaluator = guardEvaluator;
 
         _transitionMap = machine.Transitions
-            .GroupBy(t => (t.FromState, t.EventName))
             .ToDictionary(
-                g => (g.Key.FromState, g.Key.EventName),
-                g => g.ToList(),
+                t => (t.FromState, t.EventName),
+                t => t,
                 EqualityComparer<(string State, string Event)>.Default);
 
-        _terminalRuleMap = machine.TerminalRules
-            .GroupBy(rule => (rule.FromState, rule.EventName))
-            .ToDictionary(
-                g => (g.Key.FromState, g.Key.EventName),
-                g => g.OrderBy(r => r.Order).ToList(),
-                EqualityComparer<(string State, string Event)>.Default);
-
-        _dataContractMap = machine.DataFields
+        _fieldMap = machine.Fields
             .ToDictionary(f => f.Name, f => f, StringComparer.Ordinal);
 
-        _collectionContractMap = machine.CollectionFields
+        _collectionFieldMap = machine.CollectionFields
             .ToDictionary(f => f.Name, f => f, StringComparer.Ordinal);
 
         _eventArgContractMap = machine.Events
@@ -107,7 +54,7 @@ public sealed class DslWorkflowDefinition
 
         // Flatten rules for runtime access
         _topLevelRules = machine.TopLevelRules ?? Array.Empty<DslRule>();
-        _allFieldRules = machine.DataFields
+        _allFieldRules = machine.Fields
             .Where(f => f.Rules is not null)
             .SelectMany(f => f.Rules!)
             .ToArray();
@@ -115,8 +62,9 @@ public sealed class DslWorkflowDefinition
             .Where(f => f.Rules is not null)
             .SelectMany(f => f.Rules!)
             .ToArray();
-        _stateRules = machine.StateRules
-            ?? (IReadOnlyDictionary<string, IReadOnlyList<DslRule>>)new Dictionary<string, IReadOnlyList<DslRule>>(StringComparer.Ordinal);
+        _stateRuleMap = machine.States
+            .Where(s => s.Rules is not null && s.Rules.Count > 0)
+            .ToDictionary(s => s.Name, s => s.Rules!, StringComparer.Ordinal);
         _eventRules = machine.Events
             .Where(e => e.Rules is not null && e.Rules.Count > 0)
             .ToDictionary(e => e.Name, e => e.Rules!, StringComparer.Ordinal);
@@ -150,13 +98,13 @@ public sealed class DslWorkflowDefinition
 
     private IReadOnlyDictionary<string, object?> BuildInitialInstanceData(IReadOnlyDictionary<string, object?>? instanceData)
     {
-        var hasDefaults = DataFields.Any(field => field.HasDefaultValue);
+        var hasDefaults = Fields.Any(field => field.HasDefaultValue);
         var hasCollections = CollectionFields.Count > 0;
         if (!hasDefaults && !hasCollections && instanceData is null)
             return EmptyInstanceData.Instance;
 
         var merged = new Dictionary<string, object?>(StringComparer.Ordinal);
-        foreach (var field in DataFields)
+        foreach (var field in Fields)
         {
             if (field.HasDefaultValue)
                 merged[field.Name] = field.DefaultValue;
@@ -174,7 +122,7 @@ public sealed class DslWorkflowDefinition
             foreach (var pair in instanceData)
             {
                 // If caller provides a list for a collection field, load it
-                if (_collectionContractMap.TryGetValue(pair.Key, out var collContract) && pair.Value is System.Collections.IEnumerable enumerable && pair.Value is not string)
+                if (_collectionFieldMap.TryGetValue(pair.Key, out var collContract) && pair.Value is System.Collections.IEnumerable enumerable && pair.Value is not string)
                 {
                     var collectionKey = $"__collection__{pair.Key}";
                     var collection = new CollectionValue(collContract.CollectionKind, collContract.InnerType);
@@ -232,11 +180,10 @@ public sealed class DslWorkflowDefinition
             TransitionResolutionKind.Accepted => DslInspectionResult.Accepted(
                 currentState,
                 eventName,
-                resolution.Transition!.ToState,
+                ((DslStateTransition)resolution.Clause!.Outcome).TargetState,
                 GetRequiredEventArgumentKeys(eventName)),
-            TransitionResolutionKind.NoTransition => DslInspectionResult.NoTransition(
-                currentState,
-                eventName),
+            TransitionResolutionKind.NotApplicable => DslInspectionResult.NotApplicable(currentState, eventName),
+            TransitionResolutionKind.NoTransition => DslInspectionResult.AcceptedInPlace(currentState, eventName),
             TransitionResolutionKind.NotDefined => DslInspectionResult.NotDefined(currentState, eventName, resolution.NotDefinedReason!),
             _ => DslInspectionResult.Rejected(currentState, eventName, resolution.Reasons)
         };
@@ -251,6 +198,20 @@ public sealed class DslWorkflowDefinition
         if (!compatibility.IsCompatible)
             return DslInspectionResult.NotDefined(instance.CurrentState, eventName, compatibility.Reason!);
 
+        // Fast-path: if this (state, event) pair has a 'when' predicate, evaluate it using only
+        // instance data before doing argument validation. This ensures callers who omit event
+        // arguments (e.g. bulk discover-mode refresh) still get NotApplicable — not Rejected —
+        // when the 'when' guard is false. The 'when' predicate typically references machine fields
+        // only, so evaluating without event args is correct and safe.
+        if (_transitionMap.TryGetValue((instance.CurrentState, eventName), out var preCheckTransition) &&
+            preCheckTransition.PredicateAst is not null)
+        {
+            var instanceOnlyContext = BuildEvaluationData(instance.InstanceData, eventName, null);
+            var whenResult = DslExpressionRuntimeEvaluator.Evaluate(preCheckTransition.PredicateAst, instanceOnlyContext);
+            if (!whenResult.Success || whenResult.Value is not bool whenBool || !whenBool)
+                return DslInspectionResult.NotApplicable(instance.CurrentState, eventName);
+        }
+
         // Inspect is a discovery API — it intentionally accepts calls with missing/partial event arguments
         // so callers can determine required args via RequiredEventArgumentKeys before firing.
         // Full argument validation happens in Fire().
@@ -260,12 +221,6 @@ public sealed class DslWorkflowDefinition
         var evaluationArguments = BuildEvaluationData(instance.InstanceData, eventName, eventArguments);
 
         // Check event rules — only when caller provides event arguments.
-        // When eventArguments is null this is a pure discovery call; event rules cannot be
-        // evaluated without their required inputs, and RequiredEventArgumentKeys will inform
-        // the caller which args are needed before firing.
-        // Event rules are evaluated against an args-only context so machine field values with
-        // the same name as an event arg cannot shadow the arg value (e.g. CreditScore field
-        // must not override the Submit.CreditScore argument when evaluating an event rule).
         if (eventArguments != null)
         {
             var eventRuleViolations = EvaluateEventRules(eventName, BuildDirectEvaluationData(eventName, eventArguments));
@@ -277,17 +232,20 @@ public sealed class DslWorkflowDefinition
         if (resolution.Kind == TransitionResolutionKind.NotDefined)
             return DslInspectionResult.NotDefined(instance.CurrentState, eventName, resolution.NotDefinedReason!);
 
-        if (resolution.Kind == TransitionResolutionKind.NoTransition)
-            return DslInspectionResult.NoTransition(instance.CurrentState, eventName);
+        if (resolution.Kind == TransitionResolutionKind.NotApplicable)
+            return DslInspectionResult.NotApplicable(instance.CurrentState, eventName);
 
-        if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.Transition is null)
+        if (resolution.Kind == TransitionResolutionKind.NoTransition)
+            return DslInspectionResult.AcceptedInPlace(instance.CurrentState, eventName);
+
+        if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.Clause is null)
             return DslInspectionResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
 
         // Simulate set assignments and check field/top-level/state rules
         var simulatedData = new Dictionary<string, object?>(instance.InstanceData, StringComparer.Ordinal);
         var simulatedCollections = CloneCollections(simulatedData);
 
-        foreach (var assignment in resolution.Transition.SetAssignments)
+        foreach (var assignment in resolution.Clause.SetAssignments)
         {
             var ctx = BuildEvaluationDataWithCollections(simulatedData, simulatedCollections, eventName, eventArguments);
             var eval = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, ctx);
@@ -295,7 +253,7 @@ public sealed class DslWorkflowDefinition
                 simulatedData[assignment.Key] = eval.Value;
         }
 
-        if (resolution.Transition.CollectionMutations is { } mutations)
+        if (resolution.Clause.CollectionMutations is { } mutations)
             ExecuteCollectionMutations(mutations, simulatedCollections, simulatedData, eventName, eventArguments);
 
         CommitCollections(simulatedData, simulatedCollections);
@@ -304,7 +262,7 @@ public sealed class DslWorkflowDefinition
         if (dataRuleViolations.Count > 0)
             return DslInspectionResult.Rejected(instance.CurrentState, eventName, dataRuleViolations);
 
-        var targetState = resolution.Transition.ToState;
+        var targetState = ((DslStateTransition)resolution.Clause.Outcome).TargetState;
         var stateRuleViolations = EvaluateStateRules(targetState, simulatedData);
         if (stateRuleViolations.Count > 0)
             return DslInspectionResult.Rejected(instance.CurrentState, eventName, stateRuleViolations);
@@ -322,13 +280,13 @@ public sealed class DslWorkflowDefinition
         IReadOnlyDictionary<string, object?>? eventArguments = null)
     {
         var inspection = Inspect(currentState, eventName, eventArguments);
-        if (!inspection.IsDefined)
+        if (inspection.Outcome == DslOutcomeKind.NotDefined)
             return DslFireResult.NotDefined(currentState, eventName, inspection.Reasons);
 
-        if (inspection.Outcome == DslOutcomeKind.NoTransition)
-            return DslFireResult.NoTransition(currentState, eventName);
+        if (inspection.Outcome == DslOutcomeKind.AcceptedInPlace)
+            return DslFireResult.AcceptedInPlace(currentState, eventName);
 
-        if (!inspection.IsAccepted || inspection.TargetState is null)
+        if (inspection.Outcome != DslOutcomeKind.Accepted || inspection.TargetState is null)
             return DslFireResult.Rejected(currentState, eventName, inspection.Reasons);
 
         return DslFireResult.Accepted(currentState, eventName, inspection.TargetState);
@@ -363,6 +321,9 @@ public sealed class DslWorkflowDefinition
         if (resolution.Kind == TransitionResolutionKind.NotDefined)
             return DslInstanceFireResult.NotDefined(instance.CurrentState, eventName, new[] { resolution.NotDefinedReason! });
 
+        if (resolution.Kind == TransitionResolutionKind.NotApplicable)
+            return DslInstanceFireResult.NotApplicable(instance.CurrentState, eventName);
+
         if (resolution.Kind == TransitionResolutionKind.NoTransition)
         {
             var noTransitionData = new Dictionary<string, object?>(instance.InstanceData, StringComparer.Ordinal);
@@ -370,7 +331,7 @@ public sealed class DslWorkflowDefinition
             // Deep-clone collections for working copy
             var workingCollections = CloneCollections(noTransitionData);
 
-            if (resolution.TerminalRule?.SetAssignments is { } noTransitionSets)
+            if (resolution.Clause?.SetAssignments is { } noTransitionSets)
             {
                 foreach (var assignment in noTransitionSets)
                 {
@@ -387,7 +348,7 @@ public sealed class DslWorkflowDefinition
             }
 
             // Execute collection mutations
-            if (resolution.TerminalRule?.CollectionMutations is { } noTransitionMutations)
+            if (resolution.Clause?.CollectionMutations is { } noTransitionMutations)
             {
                 var mutationError = ExecuteCollectionMutations(noTransitionMutations, workingCollections, noTransitionData, eventName, eventArguments);
                 if (mutationError is not null)
@@ -406,10 +367,10 @@ public sealed class DslWorkflowDefinition
                 InstanceData = noTransitionData
             };
 
-            return DslInstanceFireResult.NoTransition(instance.CurrentState, eventName, noTransitionUpdated);
+            return DslInstanceFireResult.AcceptedInPlace(instance.CurrentState, eventName, noTransitionUpdated);
         }
 
-        if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.Transition is null)
+        if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.Clause is null)
             return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
 
         // Stage 3: Set execution (on working copy)
@@ -418,7 +379,7 @@ public sealed class DslWorkflowDefinition
         // Deep-clone collections for working copy
         var transitionCollections = CloneCollections(updatedData);
 
-        foreach (var assignment in resolution.Transition.SetAssignments)
+        foreach (var assignment in resolution.Clause.SetAssignments)
         {
             var assignmentContext = BuildEvaluationDataWithCollections(updatedData, transitionCollections, eventName, eventArguments);
             var assignmentEvaluation = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, assignmentContext);
@@ -432,7 +393,7 @@ public sealed class DslWorkflowDefinition
         }
 
         // Execute collection mutations
-        if (resolution.Transition.CollectionMutations is { } transitionMutations)
+        if (resolution.Clause.CollectionMutations is { } transitionMutations)
         {
             var mutationError = ExecuteCollectionMutations(transitionMutations, transitionCollections, updatedData, eventName, eventArguments);
             if (mutationError is not null)
@@ -448,7 +409,7 @@ public sealed class DslWorkflowDefinition
             return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, dataRuleViolations);
 
         // Stage 5: State rules (only checked on state transition, including self-transitions)
-        var targetState = resolution.Transition.ToState;
+        var targetState = ((DslStateTransition)resolution.Clause.Outcome).TargetState;
         var stateRuleViolations = EvaluateStateRules(targetState, updatedData);
         if (stateRuleViolations.Count > 0)
             return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, stateRuleViolations);
@@ -493,86 +454,86 @@ public sealed class DslWorkflowDefinition
         if (!Events.Any(e => e.Name.Equals(eventName, StringComparison.Ordinal)))
             return TransitionResolution.NotDefined($"Unknown event '{eventName}'.");
 
-        _transitionMap.TryGetValue((currentState, eventName), out var transitions);
-        _terminalRuleMap.TryGetValue((currentState, eventName), out var terminalRules);
-
-        var hasTransitions = transitions is not null && transitions.Count > 0;
-        var hasTerminalRules = terminalRules is not null && terminalRules.Count > 0;
-
-        if (!hasTransitions && !hasTerminalRules)
+        if (!_transitionMap.TryGetValue((currentState, eventName), out var transition))
             return TransitionResolution.NotDefined($"No transition for '{eventName}' from '{currentState}'.");
 
-        var orderedOutcomes = new List<OutcomeCandidate>();
-        if (hasTransitions)
+        // Evaluate 'when' predicate — if false, the entire block is not applicable
+        if (transition.PredicateAst is not null)
         {
-            foreach (var transition in transitions!)
-                orderedOutcomes.Add(OutcomeCandidate.FromTransition(transition));
+            var whenResult = DslExpressionRuntimeEvaluator.Evaluate(transition.PredicateAst, evaluationData);
+            if (!whenResult.Success || whenResult.Value is not bool whenBool || !whenBool)
+                return TransitionResolution.NotApplicable();
         }
-
-        if (hasTerminalRules)
-        {
-            foreach (var terminalRule in terminalRules!)
-                orderedOutcomes.Add(OutcomeCandidate.FromTerminal(terminalRule));
-        }
-
-        orderedOutcomes.Sort((left, right) => left.Order.CompareTo(right.Order));
 
         var reasons = new List<string>();
-        foreach (var candidate in orderedOutcomes)
+        foreach (var clause in transition.Clauses)
         {
-            if (candidate.Transition is not null)
+            // Evaluate clause guard predicate (if/else if)
+            if (clause.PredicateAst is not null)
             {
-                var transition = candidate.Transition;
-                if (string.IsNullOrWhiteSpace(transition.GuardExpression))
-                    return TransitionResolution.Accepted(transition);
-
-                var evaluation = _guardEvaluator.Evaluate(transition.GuardExpression, evaluationData);
-                if (evaluation.IsPassed)
-                    return TransitionResolution.Accepted(transition);
-
-                reasons.Add(
-                    evaluation.FailureReason
-                    ?? $"Guard '{transition.GuardExpression}' failed.");
-
+                var guardResult = DslExpressionRuntimeEvaluator.Evaluate(clause.PredicateAst, evaluationData);
+                if (!guardResult.Success || guardResult.Value is not bool guardBool || !guardBool)
+                {
+                    reasons.Add(clause.Predicate is not null
+                        ? $"Guard '{clause.Predicate}' failed."
+                        : "Guard failed.");
+                    continue;
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(clause.Predicate))
+            {
+                // Predicate text is set but AST is null (parse failure) — guard cannot be evaluated, skip clause.
+                reasons.Add($"Guard '{clause.Predicate}' could not be evaluated.");
                 continue;
             }
 
-            if (candidate.TerminalRule is null)
-                continue;
-
-            var terminalRule = candidate.TerminalRule;
-            if (string.IsNullOrWhiteSpace(terminalRule.GuardExpression))
-                return ResolveTerminal(currentState, eventName, terminalRule, reasons);
-
-            var terminalEvaluation = _guardEvaluator.Evaluate(terminalRule.GuardExpression, evaluationData);
-            if (terminalEvaluation.IsPassed)
-                return ResolveTerminal(currentState, eventName, terminalRule, reasons);
-
-            reasons.Add(
-                terminalEvaluation.FailureReason
-                ?? $"Guard '{terminalRule.GuardExpression}' failed.");
+            // Clause predicate passed (or no predicate — unguarded/else)
+            return clause.Outcome switch
+            {
+                DslStateTransition => TransitionResolution.Accepted(clause),
+                DslNoTransition => TransitionResolution.NoTransition(clause),
+                DslRejection rej => TransitionResolution.Rejected(new[]
+                {
+                    string.IsNullOrWhiteSpace(rej.Reason)
+                        ? (reasons.FirstOrDefault() ?? $"No transition for '{eventName}' from '{currentState}'.")
+                        : rej.Reason!
+                }),
+                _ => TransitionResolution.Rejected(reasons)
+            };
         }
 
         return TransitionResolution.Rejected(reasons);
     }
 
-    private static TransitionResolution ResolveTerminal(
-        string currentState,
-        string eventName,
-        DslTerminalRule terminalRule,
-        IReadOnlyList<string> guardFailureReasons)
+    private enum TransitionResolutionKind
     {
-        return terminalRule.Kind switch
-        {
-            DslTerminalKind.NoTransition => TransitionResolution.NoTransition(terminalRule),
-            DslTerminalKind.Reject => TransitionResolution.Rejected(new[]
-            {
-                string.IsNullOrWhiteSpace(terminalRule.Reason)
-                    ? (guardFailureReasons.FirstOrDefault() ?? $"No transition for '{eventName}' from '{currentState}'.")
-                    : terminalRule.Reason!
-            }),
-            _ => TransitionResolution.Rejected(guardFailureReasons)
-        };
+        Accepted,
+        Rejected,
+        NotDefined,
+        NoTransition,
+        NotApplicable
+    }
+
+    private sealed record TransitionResolution(
+        TransitionResolutionKind Kind,
+        DslClause? Clause,
+        string? NotDefinedReason,
+        IReadOnlyList<string> Reasons)
+    {
+        internal static TransitionResolution Accepted(DslClause clause) =>
+            new(TransitionResolutionKind.Accepted, clause, null, Array.Empty<string>());
+
+        internal static TransitionResolution Rejected(IReadOnlyList<string> reasons) =>
+            new(TransitionResolutionKind.Rejected, null, null, reasons);
+
+        internal static TransitionResolution NotDefined(string reason) =>
+            new(TransitionResolutionKind.NotDefined, null, reason, new[] { reason });
+
+        internal static TransitionResolution NoTransition(DslClause clause) =>
+            new(TransitionResolutionKind.NoTransition, clause, null, Array.Empty<string>());
+
+        internal static TransitionResolution NotApplicable() =>
+            new(TransitionResolutionKind.NotApplicable, null, null, Array.Empty<string>());
     }
 
     private IReadOnlyList<string> GetRequiredEventArgumentKeys(string eventName)
@@ -597,7 +558,7 @@ public sealed class DslWorkflowDefinition
             evaluation[kvp.Key] = kvp.Value;
 
         // Inject collection backing values so guards can reference .count, .min, etc.
-        foreach (var col in _collectionContractMap.Values)
+        foreach (var col in _collectionFieldMap.Values)
         {
             var backingKey = $"__collection__{col.Name}";
             if (instanceData.TryGetValue(backingKey, out var existing) && existing is CollectionValue)
@@ -796,7 +757,7 @@ public sealed class DslWorkflowDefinition
 
     private IReadOnlyList<string> EvaluateStateRules(string state, IReadOnlyDictionary<string, object?> data)
     {
-        if (!_stateRules.TryGetValue(state, out var rules) || rules.Count == 0)
+        if (!_stateRuleMap.TryGetValue(state, out var rules) || rules.Count == 0)
             return Array.Empty<string>();
 
         var violations = new List<string>();
@@ -812,7 +773,7 @@ public sealed class DslWorkflowDefinition
     private Dictionary<string, CollectionValue> CloneCollections(Dictionary<string, object?> data)
     {
         var clones = new Dictionary<string, CollectionValue>(StringComparer.Ordinal);
-        foreach (var col in _collectionContractMap.Values)
+        foreach (var col in _collectionFieldMap.Values)
         {
             var backingKey = $"__collection__{col.Name}";
             if (data.TryGetValue(backingKey, out var val) && val is CollectionValue cv)
@@ -889,7 +850,7 @@ public sealed class DslWorkflowDefinition
 
     private bool TryValidateDataContract(IReadOnlyDictionary<string, object?> data, out string error)
     {
-        if (_dataContractMap.Count == 0 && _collectionContractMap.Count == 0)
+        if (_fieldMap.Count == 0 && _collectionFieldMap.Count == 0)
         {
             error = string.Empty;
             return true;
@@ -901,14 +862,14 @@ public sealed class DslWorkflowDefinition
             if (key.StartsWith("__collection__", StringComparison.Ordinal))
                 continue;
 
-            if (!_dataContractMap.ContainsKey(key))
+            if (!_fieldMap.ContainsKey(key))
             {
                 error = $"Data validation failed: unknown data field '{key}'.";
                 return false;
             }
         }
 
-        foreach (var field in _dataContractMap.Values)
+        foreach (var field in _fieldMap.Values)
         {
             if (!data.TryGetValue(field.Name, out var value))
             {
@@ -921,7 +882,7 @@ public sealed class DslWorkflowDefinition
                 continue;
             }
 
-            if (!TryValidateScalarValue(field, value, out error))
+            if (!TryValidateScalarValue(field.Name, field.Type, field.IsNullable, value, out error))
                 return false;
         }
 
@@ -959,7 +920,7 @@ public sealed class DslWorkflowDefinition
                 return false;
             }
 
-            if (!TryValidateScalarValue(arg, value, out error))
+            if (!TryValidateScalarValue(arg.Name, arg.Type, arg.IsNullable, value, out error))
             {
                 error = $"Event argument validation failed: {error}";
                 return false;
@@ -972,26 +933,26 @@ public sealed class DslWorkflowDefinition
 
     private bool TryValidateAssignedValue(string dataFieldName, object? value, out string error)
     {
-        if (!_dataContractMap.TryGetValue(dataFieldName, out var contract))
+        if (!_fieldMap.TryGetValue(dataFieldName, out var contract))
         {
             error = string.Empty;
             return true;
         }
 
-        if (TryValidateScalarValue(contract, value, out error))
+        if (TryValidateScalarValue(contract.Name, contract.Type, contract.IsNullable, value, out error))
             return true;
 
         error = $"Data assignment failed: {error}";
         return false;
     }
 
-    private static bool TryValidateScalarValue(DslFieldContract contract, object? value, out string error)
+    private static bool TryValidateScalarValue(string name, DslScalarType type, bool isNullable, object? value, out string? error)
     {
         if (value is null)
         {
-            if (!contract.IsNullable)
+            if (!isNullable)
             {
-                error = $"'{contract.Name}' does not allow null values.";
+                error = $"'{name}' does not allow null values.";
                 return false;
             }
 
@@ -999,7 +960,7 @@ public sealed class DslWorkflowDefinition
             return true;
         }
 
-        bool typeMatches = contract.Type switch
+        bool typeMatches = type switch
         {
             DslScalarType.String => value is string,
             DslScalarType.Boolean => value is bool,
@@ -1010,7 +971,7 @@ public sealed class DslWorkflowDefinition
 
         if (!typeMatches)
         {
-            error = $"'{contract.Name}' expects {contract.Type.ToString().ToLowerInvariant()} value.";
+            error = $"'{name}' expects {type.ToString().ToLowerInvariant()} value.";
             return false;
         }
 
@@ -1018,62 +979,25 @@ public sealed class DslWorkflowDefinition
         return true;
     }
 
-    private enum TransitionResolutionKind
-    {
-        Accepted,
-        Rejected,
-        NotDefined,
-        NoTransition
-    }
-
-    private sealed record TransitionResolution(
-        TransitionResolutionKind Kind,
-        DslTransition? Transition,
-        DslTerminalRule? TerminalRule,
-        string? NotDefinedReason,
-        IReadOnlyList<string> Reasons)
-    {
-        internal static TransitionResolution Accepted(DslTransition transition) =>
-            new(TransitionResolutionKind.Accepted, transition, null, null, Array.Empty<string>());
-
-        internal static TransitionResolution Rejected(IReadOnlyList<string> reasons) =>
-            new(TransitionResolutionKind.Rejected, null, null, null, reasons);
-
-        internal static TransitionResolution NotDefined(string reason) =>
-            new(TransitionResolutionKind.NotDefined, null, null, reason, new[] { reason });
-
-        internal static TransitionResolution NoTransition(DslTerminalRule terminalRule) =>
-            new(TransitionResolutionKind.NoTransition, null, terminalRule, null, Array.Empty<string>());
-    }
-
-    private sealed record OutcomeCandidate(int Order, DslTransition? Transition, DslTerminalRule? TerminalRule)
-    {
-        internal static OutcomeCandidate FromTransition(DslTransition transition) =>
-            new(transition.Order, transition, null);
-
-        internal static OutcomeCandidate FromTerminal(DslTerminalRule terminalRule) =>
-            new(terminalRule.Order, null, terminalRule);
-    }
-
 }
 
 public static class DslWorkflowCompiler
 {
-    public static DslWorkflowDefinition Compile(DslMachine machine, IGuardEvaluator? guardEvaluator = null)
+    public static DslWorkflowDefinition Compile(DslMachine machine)
     {
         if (machine is null)
             throw new ArgumentNullException(nameof(machine));
 
-        if (string.IsNullOrWhiteSpace(machine.InitialState))
+        if (string.IsNullOrWhiteSpace(machine.InitialState.Name))
             throw new InvalidOperationException("Exactly one state must be marked initial. Use 'state <Name> initial'.");
 
-        if (!machine.States.Contains(machine.InitialState, StringComparer.Ordinal))
-            throw new InvalidOperationException($"Initial state '{machine.InitialState}' is not defined in workflow '{machine.Name}'.");
+        if (!machine.States.Contains(machine.InitialState))
+            throw new InvalidOperationException($"Initial state '{machine.InitialState.Name}' is not defined in workflow '{machine.Name}'.");
 
         // Compile-time rule validations
         ValidateRulesAtCompileTime(machine);
 
-        return new DslWorkflowDefinition(machine, guardEvaluator ?? new DefaultGuardEvaluator());
+        return new DslWorkflowDefinition(machine);
     }
 
     private static void ValidateRulesAtCompileTime(DslMachine machine)
@@ -1082,7 +1006,7 @@ public static class DslWorkflowCompiler
         var defaultData = BuildDefaultData(machine);
 
         // 1. Validate field rules against default values
-        foreach (var field in machine.DataFields)
+        foreach (var field in machine.Fields)
         {
             if (field.Rules is null || field.Rules.Count == 0)
                 continue;
@@ -1134,7 +1058,8 @@ public static class DslWorkflowCompiler
         }
 
         // 4. Validate initial state entry rules against default data
-        if (machine.StateRules is not null && machine.StateRules.TryGetValue(machine.InitialState, out var initialStateRules))
+        var initialStateRules = machine.InitialState.Rules;
+        if (initialStateRules is not null)
         {
             foreach (var rule in initialStateRules)
             {
@@ -1191,7 +1116,7 @@ public static class DslWorkflowCompiler
 
     private static void ValidateLiteralSetAssignments(DslMachine machine, IReadOnlyDictionary<string, object?> defaultData)
     {
-        var fieldRuleMap = machine.DataFields
+        var fieldRuleMap = machine.Fields
             .Where(f => f.Rules is not null && f.Rules.Count > 0)
             .ToDictionary(f => f.Name, f => f.Rules!, StringComparer.Ordinal);
 
@@ -1236,22 +1161,18 @@ public static class DslWorkflowCompiler
 
         foreach (var transition in machine.Transitions)
         {
-            foreach (var assignment in transition.SetAssignments)
-                CheckLiteralAssignment(assignment);
-        }
-
-        foreach (var terminalRule in machine.TerminalRules)
-        {
-            if (terminalRule.SetAssignments is null) continue;
-            foreach (var assignment in terminalRule.SetAssignments)
-                CheckLiteralAssignment(assignment);
+            foreach (var clause in transition.Clauses)
+            {
+                foreach (var assignment in clause.SetAssignments)
+                    CheckLiteralAssignment(assignment);
+            }
         }
     }
 
     private static IReadOnlyDictionary<string, object?> BuildDefaultData(DslMachine machine)
     {
         var data = new Dictionary<string, object?>(StringComparer.Ordinal);
-        foreach (var field in machine.DataFields)
+        foreach (var field in machine.Fields)
         {
             if (field.HasDefaultValue)
                 data[field.Name] = field.DefaultValue;
@@ -1298,8 +1219,6 @@ internal sealed class EmptyInstanceData : IReadOnlyDictionary<string, object?>
 
 public sealed record DslInspectionResult(
     DslOutcomeKind Outcome,
-    bool IsDefined,
-    bool IsAccepted,
     string CurrentState,
     string EventName,
     string? TargetState,
@@ -1307,44 +1226,46 @@ public sealed record DslInspectionResult(
     IReadOnlyList<string> Reasons)
 {
     internal static DslInspectionResult Accepted(string state, string evt, string target, IReadOnlyList<string> requiredEventArgumentKeys) =>
-        new(DslOutcomeKind.Enabled, true, true, state, evt, target, requiredEventArgumentKeys, Array.Empty<string>());
+        new(DslOutcomeKind.Accepted, state, evt, target, requiredEventArgumentKeys, Array.Empty<string>());
 
-    internal static DslInspectionResult NoTransition(string state, string evt) =>
-        new(DslOutcomeKind.NoTransition, true, true, state, evt, state, Array.Empty<string>(), Array.Empty<string>());
+    internal static DslInspectionResult AcceptedInPlace(string state, string evt) =>
+        new(DslOutcomeKind.AcceptedInPlace, state, evt, state, Array.Empty<string>(), Array.Empty<string>());
 
     internal static DslInspectionResult NotDefined(string state, string evt, string reason) =>
-        new(DslOutcomeKind.Undefined, false, false, state, evt, null, Array.Empty<string>(), new[] { reason });
+        new(DslOutcomeKind.NotDefined, state, evt, null, Array.Empty<string>(), new[] { reason });
+
+    internal static DslInspectionResult NotApplicable(string state, string evt) =>
+        new(DslOutcomeKind.NotApplicable, state, evt, null, Array.Empty<string>(), Array.Empty<string>());
 
     internal static DslInspectionResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(DslOutcomeKind.Blocked, true, false, state, evt, null, Array.Empty<string>(), reasons);
+        new(DslOutcomeKind.Rejected, state, evt, null, Array.Empty<string>(), reasons);
 }
 
 public sealed record DslFireResult(
     DslOutcomeKind Outcome,
-    bool IsDefined,
-    bool IsAccepted,
     string CurrentState,
     string EventName,
     string? NewState,
     IReadOnlyList<string> Reasons)
 {
     internal static DslFireResult Accepted(string state, string evt, string newState) =>
-        new(DslOutcomeKind.Enabled, true, true, state, evt, newState, Array.Empty<string>());
+        new(DslOutcomeKind.Accepted, state, evt, newState, Array.Empty<string>());
 
-    internal static DslFireResult NoTransition(string state, string evt) =>
-        new(DslOutcomeKind.NoTransition, true, true, state, evt, state, Array.Empty<string>());
+    internal static DslFireResult AcceptedInPlace(string state, string evt) =>
+        new(DslOutcomeKind.AcceptedInPlace, state, evt, state, Array.Empty<string>());
 
     internal static DslFireResult NotDefined(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(DslOutcomeKind.Undefined, false, false, state, evt, null, reasons);
+        new(DslOutcomeKind.NotDefined, state, evt, null, reasons);
+
+    internal static DslFireResult NotApplicable(string state, string evt) =>
+        new(DslOutcomeKind.NotApplicable, state, evt, null, Array.Empty<string>());
 
     internal static DslFireResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(DslOutcomeKind.Blocked, true, false, state, evt, null, reasons);
+        new(DslOutcomeKind.Rejected, state, evt, null, reasons);
 }
 
 public sealed record DslInstanceFireResult(
     DslOutcomeKind Outcome,
-    bool IsDefined,
-    bool IsAccepted,
     string PreviousState,
     string EventName,
     string? NewState,
@@ -1352,22 +1273,26 @@ public sealed record DslInstanceFireResult(
     DslWorkflowInstance? UpdatedInstance)
 {
     internal static DslInstanceFireResult Accepted(string state, string evt, string newState, DslWorkflowInstance updated) =>
-        new(DslOutcomeKind.Enabled, true, true, state, evt, newState, Array.Empty<string>(), updated);
+        new(DslOutcomeKind.Accepted, state, evt, newState, Array.Empty<string>(), updated);
 
-    internal static DslInstanceFireResult NoTransition(string state, string evt, DslWorkflowInstance updated) =>
-        new(DslOutcomeKind.NoTransition, true, true, state, evt, state, Array.Empty<string>(), updated);
+    internal static DslInstanceFireResult AcceptedInPlace(string state, string evt, DslWorkflowInstance updated) =>
+        new(DslOutcomeKind.AcceptedInPlace, state, evt, state, Array.Empty<string>(), updated);
 
     internal static DslInstanceFireResult NotDefined(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(DslOutcomeKind.Undefined, false, false, state, evt, null, reasons, null);
+        new(DslOutcomeKind.NotDefined, state, evt, null, reasons, null);
+
+    internal static DslInstanceFireResult NotApplicable(string state, string evt) =>
+        new(DslOutcomeKind.NotApplicable, state, evt, null, Array.Empty<string>(), null);
 
     internal static DslInstanceFireResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(DslOutcomeKind.Blocked, true, false, state, evt, null, reasons, null);
+        new(DslOutcomeKind.Rejected, state, evt, null, reasons, null);
 }
 
 public enum DslOutcomeKind
 {
-    Undefined,
-    Blocked,
-    Enabled,
-    NoTransition
+    NotDefined,
+    NotApplicable,
+    Rejected,
+    Accepted,
+    AcceptedInPlace
 }

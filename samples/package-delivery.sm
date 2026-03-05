@@ -51,7 +51,9 @@ from OutForDelivery on AttemptDelivery
 		set DeliveryAttempts = DeliveryAttempts + 1
 		transition DeliveryFailed
 
-from DeliveryFailed on LoadForDelivery
+# Once all three attempts are exhausted the package must be returned; further
+# delivery loads are NotApplicable and MarkReturned becomes the only valid path.
+from DeliveryFailed on LoadForDelivery when DeliveryAttempts < 3
 	transition OutForDelivery
 
 from DeliveryFailed on MarkReturned

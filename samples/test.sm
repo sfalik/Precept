@@ -1,39 +1,68 @@
-machine Test
+machine BankAccount
 
-number balance = 0
-number overdraftLimit = 100
+number Balance = 500
+  rule Balance >= -500 "Balance may not exceed overdraft limit of $500"
 
-rule balance >= 0 - overdraftLimit "Balance must be within overdraft limit"
-
-state GoodStanding initial
+# States
+state Active initial
 state Overdrawn
+state Suspended
 
+# Events
 event Deposit
-    number Amount
-        rule Amount > 0 "Deposit amount must be positive"
+  number Amount
+    rule Amount > 0 "Deposit amount must be positive"
+
 event Withdraw
-    number Amount
-        rule Amount > 0 "Withdraw amount must be positive"
+  number Amount
+    rule Amount > 0 "Withdrawal amount must be positive"
 
-from GoodStanding on Deposit   
-    set balance = balance + Deposit.Amount
+event Suspend
+event Resume
+
+# ── Transitions ─────────────────────────────────────────────────────────────
+
+from Active on Deposit
+  set Balance = Balance + Deposit.Amount
+  no transition
+
+# Withdraw is only applicable when there is a positive balance to draw from;
+# Balance = 0 makes the event NotApplicable rather than Rejected.
+from Active on Withdraw when Balance > 0
+  if Balance - Withdraw.Amount >= 0
+    set Balance = Balance - Withdraw.Amount
     no transition
-
-from GoodStanding on Withdraw
-    if balance - Withdraw.Amount >= 0 
-        set balance = balance - Withdraw.Amount
-        no transition
-    else
-        set balance = balance - Withdraw.Amount
-        transition Overdrawn
+  else
+    set Balance = Balance - Withdraw.Amount
+    transition Overdrawn
 
 from Overdrawn on Deposit
-    if balance + Deposit.Amount >= 0 
-        set balance = balance + Deposit.Amount
-        transition GoodStanding
-    else
-        set balance = balance + Deposit.Amount
-        no transition
+  if Balance + Deposit.Amount >= 0
+    set Balance = Balance + Deposit.Amount
+    transition Active
+  else
+    set Balance = Balance + Deposit.Amount
+    no transition
 
-from Overdrawn on Withdraw
-    reject "Cannot withdraw from an overdrawn account"
+# Suspend / Resume
+from Active,Overdrawn on Suspend
+  transition Suspended
+
+from Suspended on Resume
+  transition Active
+
+# ── Expected manual test outcomes ────────────────────────────────────────────
+#
+# Starting state: Active, Balance=500
+#
+# 1. Deposit { Amount: 100 }   → AcceptedInPlace,  Balance=600, state Active
+# 2. Withdraw { Amount: 200 }  → AcceptedInPlace,  Balance=400, state Active
+# 3. Withdraw { Amount: 450 }  → Accepted (→Overdrawn), Balance=-50
+# 4. Deposit { Amount: 30 }   → AcceptedInPlace,  Balance=-20  (still Overdrawn)
+# 5. Deposit { Amount: 20 }   → Accepted (→Active), Balance=0
+# 6. Withdraw { Amount: 10 }  → NotApplicable  (Balance=0, when Balance > 0 is false)
+# 7. Deposit { Amount: 100 }  → AcceptedInPlace,  Balance=100
+# 8. Withdraw { Amount: 200 } → Rejected  (Amount > Balance, rule fires)
+# 9. Suspend {}               → Accepted (→Suspended)
+# 10. Deposit { Amount: 50 }  → NotDefined  (no transition from Suspended)
+# 11. Resume {}               → Accepted (→Active), Balance=100

@@ -86,6 +86,7 @@ The two paths coexist safely because rules (declarative invariants like `rule Ba
 - **Collection types** (`set<T>`, `queue<T>`, `stack<T>`) are implemented with full parser, runtime, and language-server support. Declarations, mutations (`add`/`remove`/`enqueue`/`dequeue`/`push`/`pop`/`clear`), guard properties (`.count`/`.min`/`.max`/`.peek`), and the `contains` operator are all functional. Directional set queries (`above`/`below`) remain deferred pending real usage data.
 - **Language-server null-flow diagnostics** perform both intra-expression narrowing (`&&`/`||`/`!` within a single guard) and cross-branch narrowing: when guarded branches form an `if`/`else if`/`else` chain, prior guard negations are accumulated so later branches see a progressively narrowed type environment (e.g. after `if X == null → no transition`, the `else if` and `else` branches see `X` as non-nullable). Collection mutation value expressions (`add`, `enqueue`, `push`) are type-checked against the collection's inner type with the same narrowed symbols as `set` assignments; `dequeue`/`pop into` target types are validated against the collection's inner type.
 - **Rules** (`rule <Expr> "<Reason>"`) are implemented across all four attachment positions — field, top-level, state, and event. Field rules guard a single field's invariant; top-level rules express cross-field constraints; state rules enforce entry contracts when transitioning into a state (including self-transitions); event rules validate event arguments before guard evaluation. Compile-time checks catch literal-value violations and empty-initial-state rule failures. Runtime enforcement runs after `Fire` commits all `set` assignments and collection mutations; `Inspect` simulates rule evaluation read-only. See [docs/RulesDesign.md](docs/RulesDesign.md) for the full design.
+- **`when` precondition on `from ... on ...` blocks**: `from <State> on <Event> when <Expr>` is fully implemented across parser, runtime, language-server diagnostics (with null narrowing within the block scope), completions, syntax highlighting, and the inspector preview. When the `when` predicate is `false` the entire block is skipped with outcome `NotApplicable`; this is distinct from `Rejected` and does not foreclose handling by another block for the same event. In the inspector preview, events whose current live outcome is `NotApplicable` are hidden from the event dock entirely (they remain inspectable and re-appear if the `when` condition becomes true again).
 - **Preview panel rules awareness**: the inspector preview panel now surfaces rule information in the data overlay. Active rule violations on the current instance are displayed in an amber banner above the data table. Fields that carry `rule` declarations show a ⚠ icon with a tooltip containing the rule expression and reason. States that have entry rules show a badge indicating how many state rules apply on entry. When a fire is rejected by multiple rules simultaneously, all failure reasons are listed in the error feedback. `SmPreviewSnapshot` now carries `ActiveRuleViolations` (null when none) and `RuleDefinitions` (null when the machine has no rules). `SmPreviewResponse` now carries `Errors` (full list of all fire failure reasons) alongside the existing `Error` (first reason, kept for backward compatibility).
 
 ## Quick Start (2 minutes)
@@ -110,9 +111,8 @@ Then press `F5`, open a `.sm` file, and run `StateMachine DSL: Open Inspector Pr
 
 - **Workflow definition**: immutable compiled DSL (`DslWorkflowDefinition`).
 - **Instance**: persisted runtime state + data (`DslWorkflowInstance`).
-- **Inspect**: side-effect free transition preview (`──▷`, ASCII fallback: `-->`) with `Undefined | Blocked | NoTransition | Enabled` outcome; interactive compact output phrases `Undefined` as `no transition from <State>`.
-- Undefined display wording is FSM-oriented: unknown events are shown as `unknown event`, while known events unavailable from the current state are shown as `no transition from <State>`.
-- **Fire**: applies state change and transition data assignments. `NoTransition` outcomes execute `set` assignments but do not change state.
+- **Inspect**: side-effect free transition preview. Possible outcomes: `Accepted` (transition will fire), `AcceptedInPlace` (`no transition` path — event acknowledged, data mutated, state unchanged), `Rejected` (guard or rule blocks), `NotApplicable` (`when` predicate false — block skipped), `NotDefined` (unknown state, event, or no `from...on...` block for the pair). `RequiredEventArgumentKeys` reports which event args are needed.
+- **Fire**: applies state change and data mutations. Returns the same outcome discriminant as `Inspect`. `AcceptedInPlace` commits `set` assignments and collection mutations without changing state. Any runtime failure (rule violation, empty-collection read) triggers full rollback.
 - **Event arguments**: optional per-call JSON object for inspect/fire.
 - **Instance data**: persisted data loaded from/saved to instance JSON.
 
@@ -196,19 +196,19 @@ Ready-to-use `.sm` files covering a range of domains and DSL features.
 
 | File | Scenario | Key Features |
 |---|---|---|
-| [`samples/test.sm`](samples/test.sm) | Bank-account style balance transitions | Compact top-level + event rule example (`balance` limit, positive deposit/withdraw amounts) |
+| [`samples/test.sm`](samples/test.sm) | Bank-account with Active/Overdrawn/Suspended states | `when Balance > 0` guards Withdraw — zero balance makes the event `NotApplicable` rather than `Rejected`; balance rules + positive-amount event rules |
 | [`samples/trafficlight.sm`](samples/trafficlight.sm) | Traffic-light controller with emergency flashing mode | Field rules (`VehiclesWaiting`, `CycleCount`) + event rules (`Emergency`, `VehiclesArrive`) |
 | [`samples/ecommerce.sm`](samples/ecommerce.sm) | E-commerce order lifecycle (shopping → paid → shipped/cancelled) | Event arg validation moved to event rules (`AddItem`, `Cancel`) + cart total arithmetic |
 | [`samples/bugtracker.sm`](samples/bugtracker.sm) | Bug tracker (triage → in progress → review → resolved → closed) | State entry rule (`InProgress` requires assignee) + event rule (`Block.Reason`) |
 | [`samples/smarthome.sm`](samples/smarthome.sm) | Home security system (disarmed → arming delay → armed → triggered) | Stack mutations (`push`/`clear`) + event rule (`SensorTripped.SensorName`) |
 | [`samples/hotel-booking.sm`](samples/hotel-booking.sm) | Hotel reservation lifecycle | Field non-negative rules (`NightsBooked`, `RatePerNight`, `TotalCharge`) + event rules (`Reserve`, `Cancel`) |
-| [`samples/package-delivery.sm`](samples/package-delivery.sm) | Parcel delivery with retry and return flow | Attempt-count field rule + return-reason event rule with retry branching |
+| [`samples/package-delivery.sm`](samples/package-delivery.sm) | Parcel delivery with retry and return flow | `when DeliveryAttempts < 3` makes `LoadForDelivery` `NotApplicable` once attempts are exhausted, leaving `MarkReturned` as the only remaining path; attempt-count field rule + return-reason event rule |
 | [`samples/job-application.sm`](samples/job-application.sm) | Hiring pipeline (submitted → interviews → offer → hired/rejected) | Score/salary field rules + state entry rule (`Hired` requires background clear) |
 | [`samples/bank-loan.sm`](samples/bank-loan.sm) | Loan origination and repayment lifecycle | All rule positions: field, top-level, state, and event |
 | [`samples/subscription.sm`](samples/subscription.sm) | SaaS billing lifecycle (free/trial/active/past-due/suspended/cancelled) | Event-rule-driven input validation + state rule for active-plan integrity |
 | [`samples/patient-admission.sm`](samples/patient-admission.sm) | Patient flow (registered → triaged → admitted → treatment → discharge/transfer) | State entry rule on `Admitted` plus progression via `UpdateProgress` |
 | [`samples/restaurant-order.sm`](samples/restaurant-order.sm) | Restaurant order lifecycle (seated → ordering → prep → served → paid) | Payment state contract (`Paid` requires `PaymentReceived`) + event rules (`SeatGuests`, `AddItem`, `ProcessPayment`) |
-| [`samples/support-ticket.sm`](samples/support-ticket.sm) | Support ticket with escalation and reopen loop | Queue-based assignment (`enqueue`/`dequeue`) + field/state/event rules (`Priority`, `Assigned`, `Resolve`) |
+| [`samples/support-ticket.sm`](samples/support-ticket.sm) | Support ticket with escalation and reopen loop | `when !EscalatedOnce` and `when ReopenCount < 3` make Escalate/Reopen `NotApplicable` once their structural caps are reached; queue-based assignment (`enqueue`/`dequeue`) + field/state/event rules (`Priority`, `Assigned`, `Resolve`) |
 | [`samples/document-signing.sm`](samples/document-signing.sm) | Multi-party document signing workflow | Collection-driven transitions with state rules (`PendingSignatories.count`) and event rules (`Void`, `SubmitForReview`) |
 | [`samples/vending-machine.sm`](samples/vending-machine.sm) | Coin-operated vending machine | Monetary field rules (`CreditCents`, `SelectedItemPrice`) + state rule on `Dispensing` |
 | [`samples/elevator.sm`](samples/elevator.sm) | Elevator controller with door lifecycle and emergency halt | Range constraints via field/top-level rules + set-driven floor-request routing |
@@ -245,7 +245,7 @@ queue<T> <FieldName>                # FIFO ordered, allows duplicates, always st
 stack<T> <FieldName>                # LIFO ordered, allows duplicates, always starts empty
 <T> := number | string | boolean    # no nullable inner types, no nesting
 
-from <any|StateA[,StateB...]> on <EventName>
+from <any|StateA[,StateB...]> on <EventName> [when <GuardExpr>]
 (
     if <GuardExpr>
       { set <Field> = <Expr> }
@@ -288,6 +288,7 @@ from <any|StateA[,StateB...]> on <EventName>
 Constraints:
 
 - `()+` means one-or-more branch lines in a `from ... on ...` body.
+- `when <GuardExpr>` is an optional transition-level precondition on the `from ... on ...` header line. If the `when` predicate evaluates to `false`, the entire block is skipped with outcome `NotApplicable`. This is distinct from `Rejected`: the instance is not mutated, no reason is emitted, and another `from ... on ...` block for the same event (e.g. via `from any on ...`) could still handle it.
 - Exactly one `state` declaration must include `initial`.
 - `event` declarations are optional. A machine with no events is syntactically valid but behaviorally inert; the language server emits a hint when no events are declared.
 - `if` and `else if` branches must end in exactly one outcome: `transition <ToState>` or `no transition`.
@@ -639,7 +640,59 @@ from Active on Retry
     reject "No retries remaining"
 ```
 
-After the first branch rejects on `null`, all following `else if` and `else` branches are statically known to execute only when `RetryCount` is non-null. `RetryCount > 0` and `set Attempts = RetryCount` require no additional null guard — the analyzer enforces this across the branch chain. Removing the `if RetryCount == null` branch causes the editor to squiggle `RetryCount > 0` in the next branch.
+After the first branch rejects on `null`, all following `else if` and `else` branches are statically known to execute only when `RetryCount` is non-null.
+
+20) `when` precondition — skip the entire block when a top-level guard is false
+
+`when` is an optional precondition on the `from ... on ...` header. When it evaluates to `false`, the whole block is bypassed with outcome `NotApplicable` — no branch runs, no mutation occurs. This is distinct from `Rejected`: it signals that the event simply does not apply to the current state of the data, not that it was attempted and blocked. In the inspector preview, `NotApplicable` events are hidden from the event dock entirely.
+
+**Boolean flag — event only available when a condition holds:**
+
+```text
+boolean IsVip = false
+string? DiscountCode
+
+from Active on ApplyDiscount when IsVip
+  if ApplyDiscount.Code != ""
+    set DiscountCode = ApplyDiscount.Code
+    no transition
+  else
+    reject "Discount code required"
+```
+
+When `IsVip` is `false`, `ApplyDiscount` is `NotApplicable`. The `if`/`else` branch never runs.
+
+**Structural ceiling — event exhausts its allowed uses:**
+
+```text
+number ReopenCount = 0
+  rule ReopenCount >= 0 "Reopen count cannot be negative"
+
+from Resolved, Closed on Reopen when ReopenCount < 3
+  set ReopenCount = ReopenCount + 1
+  set ResolutionSummary = null
+  transition Reopened
+```
+
+Once `ReopenCount` reaches 3, `Reopen` becomes `NotApplicable` for this instance — the option structurally ceases to exist. The alternative (`if/else reject`) would keep the button visible and return a rejection message. `when` is the better fit because no per-call decision is being made; the event is categorically inapplicable after the cap is reached.
+
+**Numeric precondition — event not meaningful at a particular data value:**
+
+```text
+number Balance = 0
+
+from Active on Withdraw when Balance > 0
+  if Balance - Withdraw.Amount >= 0
+    set Balance = Balance - Withdraw.Amount
+    no transition
+  else
+    set Balance = Balance - Withdraw.Amount
+    transition Overdrawn
+```
+
+With `Balance = 0` there is nothing to withdraw, so the event is `NotApplicable`. A positive balance lets it through to normal argument validation and guard routing.
+
+The language server analyzer narrows null-uncertainty within the block scope when `when` constrains a nullable field (e.g. `when X != null` makes `X` non-nullable inside all branches of that block).
 
 ```text
 queue<string> ApprovalChain

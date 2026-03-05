@@ -14,7 +14,7 @@ internal sealed class SmDslAnalyzer
     private static readonly Regex EventRegex = new("^\\s*event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex DataFieldRegex = new("^\\s*(?:string|number|boolean|null)\\??\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\s*=\\s*.+)?\\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EventArgRegex = new("^\\s*(?:string|number|boolean|null)\\??\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\s*=\\s*.+)?\\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex FromOnRegex = new("^\\s*from\\s+(?<from>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)\\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex FromOnRegex = new("^\\s*from\\s+(?<from>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EventMemberPrefixRegex = new("(?<event>[A-Za-z_][A-Za-z0-9_]*)\\.$", RegexOptions.Compiled);
     private static readonly Regex SetLineRegex = new("^\\s*set\\s+(?<key>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<expr>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex CollectionDeclRegex = new("^\\s*(?:set|queue|stack)<(?:number|string|boolean)>\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -148,6 +148,14 @@ internal sealed class SmDslAnalyzer
 
         if (Regex.IsMatch(beforeCursor, "^\\s*set\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*[^\\n]*$", RegexOptions.IgnoreCase))
             return BuildExpressionCompletions(dataFields, currentEvent, eventArgs, collectionFields);
+
+        // After "from <State> on <Event> when ", suggest expression completions
+        if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+\\S+\\s+on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+when\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+            return BuildGuardCompletions(dataFields, collectionFields, currentEvent, eventArgs);
+
+        // After "from <State> on <Event> " (trailing space, nothing else), suggest "when"
+        if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+\\S+\\s+on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
+            return [new CompletionItem { Label = "when", Kind = CompletionItemKind.Keyword }];
 
         if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+[^\\n]*\\s+on(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
             return BuildItems(events, CompletionItemKind.Event);
@@ -349,7 +357,7 @@ internal sealed class SmDslAnalyzer
     private static IReadOnlyList<Diagnostic> GetSemanticDiagnostics(DslMachine machine, string[] lines)
     {
         var diagnostics = new List<Diagnostic>();
-        var dataFieldKinds = machine.DataFields.ToDictionary(
+        var dataFieldKinds = machine.Fields.ToDictionary(
             field => field.Name,
             MapFieldContractKind,
             StringComparer.Ordinal);
@@ -367,49 +375,47 @@ internal sealed class SmDslAnalyzer
             c => c,
             StringComparer.Ordinal);
 
-        // Build a unified candidate list from transitions and terminal rules so we can
-        // apply cross-branch null narrowing within each (FromState, EventName) group.
-        var allCandidates = new List<(string FromState, string EventName, int Order, string? GuardExpression,
-            IReadOnlyList<DslSetAssignment> SetAssignments, IReadOnlyList<DslCollectionMutation>? CollectionMutations, int SourceLine)>();
-
+        // Process each transition (one per (FromState, EventName) pair), iterating clauses in order
+        // so that prior-branch guard negations are accumulated for subsequent branches.
         foreach (var transition in machine.Transitions)
-            allCandidates.Add((transition.FromState, transition.EventName, transition.Order,
-                transition.GuardExpression, transition.SetAssignments,
-                transition.CollectionMutations, transition.SourceLine));
-
-        foreach (var terminalRule in machine.TerminalRules)
-            allCandidates.Add((terminalRule.FromState, terminalRule.EventName, terminalRule.Order,
-                terminalRule.GuardExpression, terminalRule.SetAssignments ?? [],
-                terminalRule.CollectionMutations, terminalRule.SourceLine));
-
-        // Group by (FromState, EventName) and process each group in Order so that prior-branch
-        // guard negations are accumulated into the symbols for subsequent branches.
-        var groups = allCandidates
-            .GroupBy(c => (c.FromState, c.EventName))
-            .Select(g => g.OrderBy(c => c.Order).ToList());
-
-        foreach (var group in groups)
         {
-            var eventName = group[0].EventName;
+            var eventName = transition.EventName;
             var baseSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, eventName, machine.CollectionFields);
 
-            // branchSymbols accumulates negations of prior guards so later branches see a
-            // progressively narrowed view (e.g. after "if X == null / reject", else-if sees X as non-null).
-            IReadOnlyDictionary<string, StaticValueKind> branchSymbols = baseSymbols;
-
-            foreach (var candidate in group)
+            // Validate the transition-level `when` predicate if present
+            if (!string.IsNullOrWhiteSpace(transition.Predicate))
             {
-                var searchLine = Math.Max(0, candidate.SourceLine - 1);
-                var fallbackLine = Math.Max(0, candidate.SourceLine - 1);
+                var whenLine = Math.Max(0, transition.SourceLine - 1);
+                ValidateExpression(
+                    transition.Predicate!,
+                    whenLine,
+                    baseSymbols,
+                    expectedKind: StaticValueKind.Boolean,
+                    expectedLabel: "when predicate",
+                    diagnostics,
+                    lines);
+            }
+
+            // branchSymbols starts as baseSymbols narrowed by the 'when' predicate (if any):
+            // within the block, 'when' is true, so identifiers can be narrowed accordingly.
+            // The 'false' (NotApplicable) path has no code to validate — no narrowing needed there.
+            IReadOnlyDictionary<string, StaticValueKind> branchSymbols = transition.PredicateAst is not null
+                ? ApplyNarrowing(transition.PredicateAst, baseSymbols, assumeTrue: true)
+                : baseSymbols;
+
+            foreach (var clause in transition.Clauses)
+            {
+                var searchLine = Math.Max(0, clause.SourceLine - 1);
+                var fallbackLine = Math.Max(0, clause.SourceLine - 1);
 
                 // setSymbols is used for set-assignment and mutation validation within this branch.
                 IReadOnlyDictionary<string, StaticValueKind> setSymbols = branchSymbols;
 
-                if (!string.IsNullOrWhiteSpace(candidate.GuardExpression))
+                if (!string.IsNullOrWhiteSpace(clause.Predicate))
                 {
-                    var guardLine = FindGuardLine(lines, ref searchLine, candidate.GuardExpression!, fallbackLine);
+                    var guardLine = FindGuardLine(lines, ref searchLine, clause.Predicate!, fallbackLine);
                     ValidateExpression(
-                        candidate.GuardExpression!,
+                        clause.Predicate!,
                         guardLine,
                         branchSymbols,
                         expectedKind: StaticValueKind.Boolean,
@@ -417,7 +423,7 @@ internal sealed class SmDslAnalyzer
                         diagnostics,
                         lines);
 
-                    if (TryParseExpression(candidate.GuardExpression!, out var parsedGuard, out _))
+                    if (TryParseExpression(clause.Predicate!, out var parsedGuard, out _))
                     {
                         // Within this branch the guard is true — narrow symbols for set/mutation validation.
                         setSymbols = ApplyNarrowing(parsedGuard!, branchSymbols, assumeTrue: true);
@@ -426,7 +432,7 @@ internal sealed class SmDslAnalyzer
                     }
                 }
 
-                foreach (var assignment in candidate.SetAssignments)
+                foreach (var assignment in clause.SetAssignments)
                 {
                     var assignmentFallback = assignment.SourceLine > 0 ? assignment.SourceLine - 1 : fallbackLine;
                     var assignmentLine = FindSetLine(lines, ref searchLine, assignment.Key, assignment.ExpressionText, assignmentFallback);
@@ -444,7 +450,7 @@ internal sealed class SmDslAnalyzer
                 }
 
                 ValidateCollectionMutations(
-                    candidate.CollectionMutations,
+                    clause.CollectionMutations,
                     setSymbols,
                     dataFieldKinds,
                     collectionFieldMap,
@@ -490,7 +496,7 @@ internal sealed class SmDslAnalyzer
         string[] lines,
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
-        IReadOnlyDictionary<string, DslCollectionFieldContract> collectionFieldMap,
+        IReadOnlyDictionary<string, DslCollectionField> collectionFieldMap,
         List<Diagnostic> diagnostics)
     {
         // Symbols for data fields (field rules and top-level rules scope)
@@ -501,7 +507,7 @@ internal sealed class SmDslAnalyzer
         }
 
         // Field rules: validate expression against single-field scope
-        foreach (var field in machine.DataFields)
+        foreach (var field in machine.Fields)
         {
             if (field.Rules is null) continue;
             var fieldSymbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal)
@@ -541,15 +547,13 @@ internal sealed class SmDslAnalyzer
         }
 
         // State rules: validate against all data fields
-        if (machine.StateRules is not null)
+        foreach (var state in machine.States)
         {
-            foreach (var kvp in machine.StateRules)
+            if (state.Rules is null) continue;
+            foreach (var rule in state.Rules)
             {
-                foreach (var rule in kvp.Value)
-                {
-                    var lineIndex = Math.Max(0, rule.SourceLine - 1);
-                    ValidateExpression(rule.ExpressionText, lineIndex, dataSymbols, StaticValueKind.Boolean, $"state rule on '{kvp.Key}'", diagnostics, lines);
-                }
+                var lineIndex = Math.Max(0, rule.SourceLine - 1);
+                ValidateExpression(rule.ExpressionText, lineIndex, dataSymbols, StaticValueKind.Boolean, $"state rule on '{state.Name}'", diagnostics, lines);
             }
         }
 
@@ -580,20 +584,27 @@ internal sealed class SmDslAnalyzer
         }
 
         // Warn about states with entry rules that are never targeted by any transition
-        if (machine.StateRules is not null)
+        var statesWithRules = machine.States.Where(s => s.Rules is not null && s.Rules.Count > 0).ToList();
+        if (statesWithRules.Count > 0)
         {
-            var targetedStates = new HashSet<string>(machine.Transitions.Select(t => t.ToState), StringComparer.Ordinal);
-            foreach (var stateWithRules in machine.StateRules.Keys)
+            var targetedStates = new HashSet<string>(
+                machine.Transitions
+                    .SelectMany(t => t.Clauses)
+                    .Select(c => c.Outcome)
+                    .OfType<DslStateTransition>()
+                    .Select(st => st.TargetState),
+                StringComparer.Ordinal);
+            foreach (var state in statesWithRules)
             {
-                if (!targetedStates.Contains(stateWithRules))
+                if (!targetedStates.Contains(state.Name))
                 {
                     // Find the state line in the source
-                    var stateLineIdx = FindStateLine(lines, stateWithRules);
+                    var stateLineIdx = FindStateLine(lines, state.Name);
                     var lineLen = stateLineIdx < lines.Length ? lines[stateLineIdx].Length : 1;
                     diagnostics.Add(new Diagnostic
                     {
                         Severity = DiagnosticSeverity.Warning,
-                        Message = $"State '{stateWithRules}' has entry rules but no transition targets it — entry rules are never checked.",
+                        Message = $"State '{state.Name}' has entry rules but no transition targets it — entry rules are never checked.",
                         Source = "state-machine-dsl",
                         Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
                             new Position(stateLineIdx, 0),
@@ -619,7 +630,7 @@ internal sealed class SmDslAnalyzer
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         string eventName,
-        IReadOnlyList<DslCollectionFieldContract>? collectionFields = null)
+        IReadOnlyList<DslCollectionField>? collectionFields = null)
     {
         var symbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
         foreach (var pair in dataFieldKinds)
@@ -1018,7 +1029,7 @@ internal sealed class SmDslAnalyzer
         IReadOnlyList<DslCollectionMutation>? mutations,
         IReadOnlyDictionary<string, StaticValueKind> symbols,
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
-        IReadOnlyDictionary<string, DslCollectionFieldContract> collectionFieldMap,
+        IReadOnlyDictionary<string, DslCollectionField> collectionFieldMap,
         ref int searchLine,
         int fallbackLine,
         List<Diagnostic> diagnostics,
@@ -1220,9 +1231,13 @@ internal sealed class SmDslAnalyzer
         };
     }
 
-    private static StaticValueKind MapFieldContractKind(DslFieldContract field)
+    private static StaticValueKind MapFieldContractKind(DslField field) => MapKind(field.Type, field.IsNullable);
+
+    private static StaticValueKind MapFieldContractKind(DslEventArg arg) => MapKind(arg.Type, arg.IsNullable);
+
+    private static StaticValueKind MapKind(DslScalarType type, bool isNullable)
     {
-        var kind = field.Type switch
+        var kind = type switch
         {
             DslScalarType.String => StaticValueKind.String,
             DslScalarType.Number => StaticValueKind.Number,
@@ -1231,7 +1246,7 @@ internal sealed class SmDslAnalyzer
             _ => StaticValueKind.None
         };
 
-        if (field.IsNullable)
+        if (isNullable)
             kind |= StaticValueKind.Null;
 
         return kind;
@@ -1356,7 +1371,8 @@ internal sealed class SmDslAnalyzer
         new CompletionItem { Label = "above", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "below", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "reason", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "rule", Kind = CompletionItemKind.Keyword }
+        new CompletionItem { Label = "rule", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "when", Kind = CompletionItemKind.Keyword }
     ];
 
     private static readonly IReadOnlyList<CompletionItem> ExpressionOperatorItems =

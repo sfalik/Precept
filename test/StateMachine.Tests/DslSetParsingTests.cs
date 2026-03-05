@@ -27,12 +27,10 @@ public class DslSetParsingTests
 
         var machine = StateMachineDslParser.Parse(dsl);
 
-        machine.TerminalRules.Should().ContainSingle();
-        var rule = machine.TerminalRules[0];
-        rule.Kind.Should().Be(DslTerminalKind.NoTransition);
-        rule.SetAssignments.Should().NotBeNull();
-        rule.SetAssignments!.Should().ContainSingle();
-        rule.SetAssignments![0].Key.Should().Be("Count");
+        machine.Transitions.Should().ContainSingle();
+        var noTransClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is DslNoTransition);
+        noTransClause.SetAssignments.Should().ContainSingle();
+        noTransClause.SetAssignments[0].Key.Should().Be("Count");
     }
 
     [Fact]
@@ -95,10 +93,10 @@ public class DslSetParsingTests
 
         var machine = StateMachineDslParser.Parse(dsl);
 
-        machine.Transitions.Should().ContainSingle(t => t.ToState == "Red");
-        var transition = machine.Transitions.Single(t => t.ToState == "Red");
-        transition.SetAssignments.Should().HaveCount(2);
-        transition.SetAssignments[0].Key.Should().Be("Count");
-        transition.SetAssignments[1].Key.Should().Be("Label");
+        machine.Transitions.Should().ContainSingle();
+        var elseClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is DslStateTransition st && st.TargetState == "Red");
+        elseClause.SetAssignments.Should().HaveCount(2);
+        elseClause.SetAssignments[0].Key.Should().Be("Count");
+        elseClause.SetAssignments[1].Key.Should().Be("Label");
     }
 }
