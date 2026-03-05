@@ -1,4 +1,4 @@
-machine PatientAdmission
+precept PatientAdmission
 
 string? PatientName = null
 string? Ward = null

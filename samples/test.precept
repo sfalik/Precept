@@ -1,4 +1,4 @@
-machine BankAccount
+precept BankAccount
 
 number Balance = 500
   rule Balance >= -500 "Balance may not exceed overdraft limit of $500"

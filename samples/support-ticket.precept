@@ -1,4 +1,4 @@
-machine SupportTicket
+precept SupportTicket
 
 string? AssignedAgent = null
 number Priority = 3

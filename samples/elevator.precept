@@ -1,4 +1,4 @@
-machine Elevator
+precept Elevator
 
 # Persistent data
 number CurrentFloor = 1

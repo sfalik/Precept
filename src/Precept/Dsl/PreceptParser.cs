@@ -7,7 +7,7 @@ namespace Precept;
 
 public static class PreceptParser
 {
-    private static readonly Regex MachineRegex = new("^machine\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
+    private static readonly Regex MachineRegex = new("^precept\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
     private static readonly Regex StateRegex = new("^state\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+(?<initial>initial))?$", RegexOptions.Compiled);
     private static readonly Regex EventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
     private static readonly Regex TypedEventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*\\((?<arg>[A-Za-z_][A-Za-z0-9_<>., ]*)\\)$", RegexOptions.Compiled);
@@ -100,7 +100,7 @@ public static class PreceptParser
             if (machineMatch.Success)
             {
                 if (name != null)
-                    throw new InvalidOperationException($"Line {i + 1}: machine already declared.");
+                    throw new InvalidOperationException($"Line {i + 1}: precept already declared.");
 
                 name = machineMatch.Groups["name"].Value;
                 i++;
@@ -272,7 +272,7 @@ public static class PreceptParser
         }
 
         if (name == null)
-            throw new InvalidOperationException($"Line {firstContentLineNumber ?? 1}: Missing 'machine <Name>' declaration.");
+            throw new InvalidOperationException($"Line {firstContentLineNumber ?? 1}: Missing 'precept <Name>' declaration.");
 
         if (states.Count == 0)
             throw new InvalidOperationException($"Line {firstContentLineNumber ?? 1}: At least one state must be declared.");

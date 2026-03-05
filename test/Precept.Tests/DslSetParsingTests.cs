@@ -12,7 +12,7 @@ public class DslSetParsingTests
     public void Parse_IfBranch_WithSetAndNoTransition_PreservesAssignments()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             number Count = 0
             state Red initial
             state Green
@@ -37,7 +37,7 @@ public class DslSetParsingTests
     public void Parse_BlockSetWithoutOutcome_Throws()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             number Count = 0
             state Red initial
             state Green
@@ -56,7 +56,7 @@ public class DslSetParsingTests
     public void Parse_TransitionWithUnknownSetField_Throws()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             number Count = 0
             state Red initial
             state Green
@@ -76,7 +76,7 @@ public class DslSetParsingTests
     public void Parse_ElseBranch_WithTwoSets_PreservesOrder()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             number Count = 0
             string Label = ""
             state Red initial

@@ -21,7 +21,7 @@ public class DslRulesTests
     public void Parse_FieldRule_AttachedToField()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 0
               rule Balance >= 0 "Must be non-negative"
             state Idle initial
@@ -39,7 +39,7 @@ public class DslRulesTests
     public void Parse_FieldRule_MultipleRulesOnSameField()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Rating = 1
               rule Rating >= 1 "Too low"
               rule Rating <= 5 "Too high"
@@ -58,7 +58,7 @@ public class DslRulesTests
     public void Parse_TopLevelRule_AttachedToMachine()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Quantity = 0
             number Total = 0
             rule Quantity >= 0 "Quantity must be non-negative"
@@ -76,7 +76,7 @@ public class DslRulesTests
     public void Parse_TopLevelRule_MultipleRules()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 100
             number Limit = 1000
             rule Balance >= 0 "Balance must not go negative"
@@ -93,7 +93,7 @@ public class DslRulesTests
     public void Parse_StateRule_AttachedToState()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number AmountPaid = 0
             state Idle initial
             state Paid
@@ -112,7 +112,7 @@ public class DslRulesTests
     public void Parse_StateRule_MultipleStatesWithRules()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Score = 0
             state A initial
               rule Score >= 0 "Non-negative in A"
@@ -131,7 +131,7 @@ public class DslRulesTests
     public void Parse_EventRule_AttachedToEvent()
     {
         const string dsl = """
-            machine Test
+            precept Test
             state Idle initial
             event Pay
               number Amount
@@ -150,7 +150,7 @@ public class DslRulesTests
     public void Parse_EventRule_ReferencingPrefixedArgName()
     {
         const string dsl = """
-            machine Test
+            precept Test
             state Idle initial
             event Pay
               number Amount
@@ -168,7 +168,7 @@ public class DslRulesTests
     public void Parse_CollectionFieldRule_AttachedToCollection()
     {
         const string dsl = """
-            machine Test
+            precept Test
             set<string> Approvers
               rule Approvers.count >= 1 "Need at least one approver"
             state Idle initial
@@ -186,7 +186,7 @@ public class DslRulesTests
     public void Parse_FieldRule_SourceLineIsCorrect()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 0
               rule Balance >= 0 "Must be non-negative"
             state Idle initial
@@ -206,7 +206,7 @@ public class DslRulesTests
     public void Parse_FieldRule_ReferencingAnotherField_Throws()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 100
             number Limit = 1000
               rule Balance <= Limit "Cannot exceed limit"
@@ -223,7 +223,7 @@ public class DslRulesTests
     public void Parse_FieldRule_ReferencingOwnField_IsAllowed()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 0
               rule Balance >= 0 "Must be non-negative"
             state Idle initial
@@ -238,7 +238,7 @@ public class DslRulesTests
     public void Parse_FieldRule_DottedPropertyOfOwnField_IsAllowed()
     {
         const string dsl = """
-            machine Test
+            precept Test
             set<string> Tags
               rule Tags.count <= 10 "Too many tags"
             state Idle initial
@@ -253,7 +253,7 @@ public class DslRulesTests
     public void Parse_EventRule_ReferencingInstanceDataField_Throws()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 100
             state Idle initial
             event Pay
@@ -271,7 +271,7 @@ public class DslRulesTests
     public void Parse_EventRule_ReferencingOnlyEventArgs_IsAllowed()
     {
         const string dsl = """
-            machine Test
+            precept Test
             state Idle initial
             event Pay
               number Amount
@@ -293,7 +293,7 @@ public class DslRulesTests
     {
         // Balance starts at 0, which violates rule >= 10
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 0
               rule Balance >= 10 "Balance must be at least 10"
             state Idle initial
@@ -309,7 +309,7 @@ public class DslRulesTests
     public void Compile_FieldRule_DefaultValueSatisfiesRule_Succeeds()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 100
               rule Balance >= 0 "Must be non-negative"
             state Idle initial
@@ -324,7 +324,7 @@ public class DslRulesTests
     public void Compile_TopLevelRule_DefaultValueViolatesRule_Throws()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Quantity = 0
             number UnitPrice = 10
             number TotalPrice = 999
@@ -342,7 +342,7 @@ public class DslRulesTests
     public void Compile_TopLevelRule_DefaultValuesSatisfyRule_Succeeds()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 100
             number Limit = 1000
             rule Balance <= Limit "Cannot exceed limit"
@@ -358,7 +358,7 @@ public class DslRulesTests
     public void Compile_InitialStateRule_ViolatedByDefaultData_Throws()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number AmountPaid = 0
             state Paid initial
               rule AmountPaid > 0 "Must have paid"
@@ -374,7 +374,7 @@ public class DslRulesTests
     public void Compile_NonInitialStateRule_NotCheckedAtCompileTime_Succeeds()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number AmountPaid = 0
             state Idle initial
             state Paid
@@ -393,7 +393,7 @@ public class DslRulesTests
     public void Compile_CollectionRule_ViolatedAtCreation_Throws()
     {
         const string dsl = """
-            machine Test
+            precept Test
             set<string> Approvers
               rule Approvers.count >= 1 "Need at least one approver"
             state Idle initial
@@ -409,7 +409,7 @@ public class DslRulesTests
     public void Compile_CollectionRule_SatisfiedAtCreation_Succeeds()
     {
         const string dsl = """
-            machine Test
+            precept Test
             set<string> Tags
               rule Tags.count <= 10 "Too many tags"
             state Idle initial
@@ -424,7 +424,7 @@ public class DslRulesTests
     public void Compile_EventRule_DefaultArgValueViolatesRule_Throws()
     {
         const string dsl = """
-            machine Test
+            precept Test
             state Idle initial
             event Submit
               number Priority = 0
@@ -441,7 +441,7 @@ public class DslRulesTests
     public void Compile_EventRule_AllArgsHaveDefaultsAndPass_Succeeds()
     {
         const string dsl = """
-            machine Test
+            precept Test
             state Idle initial
             event Submit
               number Priority = 1
@@ -457,7 +457,7 @@ public class DslRulesTests
     public void Compile_EventRule_RequiredArgNotDefaulted_SkipsCompileTimeCheck_Succeeds()
     {
         const string dsl = """
-            machine Test
+            precept Test
             state Idle initial
             event Submit
               number Priority
@@ -474,7 +474,7 @@ public class DslRulesTests
     public void Compile_LiteralSetAssignment_ViolatesFieldRule_Throws()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 100
               rule Balance >= 0 "Must be non-negative"
             state Active initial
@@ -494,7 +494,7 @@ public class DslRulesTests
     public void Compile_LiteralSetAssignment_SatisfiesFieldRule_Succeeds()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 100
               rule Balance >= 0 "Must be non-negative"
             state Active initial
@@ -517,7 +517,7 @@ public class DslRulesTests
     public void Fire_EventRule_Violated_IsBlocked()
     {
         const string dsl = """
-            machine Test
+            precept Test
             state Idle initial
             state Done
             event Pay
@@ -541,7 +541,7 @@ public class DslRulesTests
     public void Fire_EventRule_Satisfied_IsAccepted()
     {
         const string dsl = """
-            machine Test
+            precept Test
             state Idle initial
             state Done
             event Pay
@@ -565,7 +565,7 @@ public class DslRulesTests
     {
         // Even when the guard would reject, event rules are reported first
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 0
             state Idle initial
             state Done
@@ -592,7 +592,7 @@ public class DslRulesTests
     public void Fire_EventRule_MultipleViolations_AllReported()
     {
         const string dsl = """
-            machine Test
+            precept Test
             state Idle initial
             state Done
             event Transfer
@@ -626,7 +626,7 @@ public class DslRulesTests
         // The event rule must evaluate against the supplied arg value, not the machine field value.
         // Previously the machine field (= 0) shadowed the arg (= 500) and the rule falsely failed.
         const string dsl = """
-            machine Test
+            precept Test
             number CreditScore = 0
             state Apply initial
             state UnderReview
@@ -658,7 +658,7 @@ public class DslRulesTests
     public void Fire_FieldRule_ViolatedAfterSetExecution_IsBlocked()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 100
               rule Balance >= 0 "Balance must not go negative"
             state Active initial
@@ -683,7 +683,7 @@ public class DslRulesTests
     public void Fire_FieldRule_Satisfied_CommitsAndAccepts()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 100
               rule Balance >= 0 "Balance must not go negative"
             state Active initial
@@ -707,7 +707,7 @@ public class DslRulesTests
     public void Fire_FieldRule_Violated_SetMutationsRolledBack()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 100
               rule Balance >= 0 "Balance must not go negative"
             number TransactionCount = 0
@@ -738,7 +738,7 @@ public class DslRulesTests
     public void Fire_FieldRule_MultipleViolations_AllReported()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 100
               rule Balance >= 0 "Balance must not go negative"
             number Quantity = 5
@@ -780,7 +780,7 @@ public class DslRulesTests
     public void Fire_TopLevelRule_ViolatedAfterSets_IsBlocked()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Quantity = 5
             number UnitPrice = 10
             number TotalPrice = 50
@@ -811,7 +811,7 @@ public class DslRulesTests
     public void Fire_TopLevelRule_Satisfied_IsAccepted()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Quantity = 5
             number UnitPrice = 10
             number TotalPrice = 50
@@ -853,7 +853,7 @@ public class DslRulesTests
     public void Fire_StateRule_ViolatedOnEntry_IsBlocked()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number AmountPaid = 0
             state Draft initial
             state Paid
@@ -878,7 +878,7 @@ public class DslRulesTests
     public void Fire_StateRule_Satisfied_IsAccepted()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number AmountPaid = 0
             state Draft initial
             state Paid
@@ -904,7 +904,7 @@ public class DslRulesTests
     {
         // Self-transition means we are 'entering' the same state — state rules apply
         const string dsl = """
-            machine Test
+            precept Test
             number Score = 10
             state Active initial
               rule Score > 0 "Score must be positive while active"
@@ -930,7 +930,7 @@ public class DslRulesTests
         // State rules on a state are NOT checked when the outcome is 'no transition'.
         // We use a transition to a different state to set up, then verify no-transition doesn't check source state rules.
         const string dsl = """
-            machine Test
+            precept Test
             number Score = 5
             state Lobby initial
             state Active
@@ -972,7 +972,7 @@ public class DslRulesTests
     public void Fire_RulesOrder_EventRulesCheckedBeforeGuard()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 0
             state Idle initial
             state Done
@@ -1003,7 +1003,7 @@ public class DslRulesTests
     {
         // Field rule should see the post-set value, not the pre-set value
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 100
               rule Balance >= 0 "Must be non-negative"
             state Active initial
@@ -1033,7 +1033,7 @@ public class DslRulesTests
         // A dynamic expression that keeps a field within its rule passes at runtime.
         // Compile time skips validation because the expression is not a constant.
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 100
               rule Balance >= 0 "Balance must not go negative"
             state Active initial
@@ -1059,7 +1059,7 @@ public class DslRulesTests
     {
         // Field rule violation through a dynamic expression (not caught at compile time)
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 100
               rule Balance >= 0 "Balance must not go negative"
             state Active initial
@@ -1086,7 +1086,7 @@ public class DslRulesTests
         // Field with nullable type set to null via dynamic expression.
         // Rule uses explicit null check: passes when Balance is null.
         const string dsl = """
-            machine Test
+            precept Test
             number? Balance = 100
               rule Balance == null || Balance >= 0 "Balance must be null or non-negative"
             state Active initial
@@ -1117,7 +1117,7 @@ public class DslRulesTests
     {
         // A rule requiring count <= 2, but mutation adds a 3rd item
         const string dsl = """
-            machine Test
+            precept Test
             set<string> Tags
               rule Tags.count <= 2 "Too many tags"
             state Active initial
@@ -1151,7 +1151,7 @@ public class DslRulesTests
     public void Fire_FromAny_StateRules_ApplyToTargetState()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number AmountPaid = 0
             state Draft initial
             state Review
@@ -1186,7 +1186,7 @@ public class DslRulesTests
     public void Inspect_EventRule_Violated_IsBlocked()
     {
         const string dsl = """
-            machine Test
+            precept Test
             state Idle initial
             state Done
             event Pay
@@ -1210,7 +1210,7 @@ public class DslRulesTests
     public void Inspect_EventRule_Satisfied_IsAccepted()
     {
         const string dsl = """
-            machine Test
+            precept Test
             state Idle initial
             state Done
             event Pay
@@ -1235,7 +1235,7 @@ public class DslRulesTests
         // Regression: event arg has the same bare name as a machine field.
         // Inspect must evaluate the event rule against the arg value, not the machine field value.
         const string dsl = """
-            machine Test
+            precept Test
             number CreditScore = 0
             state Apply initial
             state UnderReview
@@ -1261,7 +1261,7 @@ public class DslRulesTests
     public void Inspect_FieldRule_SimulatedViolation_IsBlocked()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 100
               rule Balance >= 0 "Balance must not go negative"
             state Active initial
@@ -1285,7 +1285,7 @@ public class DslRulesTests
     public void Inspect_StateRule_SimulatedViolation_IsBlocked()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number AmountPaid = 0
             state Draft initial
             state Paid
@@ -1310,7 +1310,7 @@ public class DslRulesTests
     public void Inspect_WithoutEventArgs_ReturnsRequiredKeys()
     {
         const string dsl = """
-            machine Test
+            precept Test
             state Idle initial
             state Done
             event Pay
@@ -1340,7 +1340,7 @@ public class DslRulesTests
     public void Inspect_Stateless_EventRule_Violated_IsBlocked()
     {
         const string dsl = """
-            machine Test
+            precept Test
             state Idle initial
             state Done
             event Pay
@@ -1366,7 +1366,7 @@ public class DslRulesTests
     public void Parse_NoRules_MachineHasNullTopLevelRules()
     {
         const string dsl = """
-            machine Test
+            precept Test
             number Balance = 0
             state Idle initial
             """;
@@ -1382,7 +1382,7 @@ public class DslRulesTests
     public void Parse_NoRules_EventHasNullRules()
     {
         const string dsl = """
-            machine Test
+            precept Test
             state Idle initial
             event Go
               number Value

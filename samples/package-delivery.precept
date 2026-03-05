@@ -1,4 +1,4 @@
-machine PackageDelivery
+precept PackageDelivery
 
 string? CurrentLocation = null
 boolean RequiresSignature = false

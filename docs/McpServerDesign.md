@@ -1,23 +1,23 @@
-# StateMachine DSL MCP Server Design
+# Precept MCP Server Design
 
 ## Purpose
 
-An MCP (Model Context Protocol) server that exposes DSL parsing, validation, structural analysis, and runtime simulation as tools callable by Copilot (and any other MCP host). This enables semantic understanding of `.sm` files beyond what plain text reading provides.
+An MCP (Model Context Protocol) server that exposes DSL parsing, validation, structural analysis, and runtime execution as tools callable by Copilot (and any other MCP host). This enables semantic understanding of `.precept` files beyond what plain text reading provides.
 
 ## Project Location
 
 ```
-tools/StateMachine.Dsl.Mcp/
+tools/Precept.Mcp/
     Program.cs
     Tools/
         ValidateTool.cs
         DescribeTool.cs
         ReachabilityTool.cs
-        SimulateTool.cs
-    StateMachine.Dsl.Mcp.csproj
+        ExecuteTool.cs
+    Precept.Mcp.csproj
 ```
 
-References `src/StateMachine/StateMachine.csproj` directly — all parsing, compilation, and runtime execution reuse the existing implementation unchanged.
+References `src/Precept/Precept.csproj` directly — all parsing, compilation, and runtime execution reuse the existing implementation unchanged.
 
 ## SDK
 
@@ -34,14 +34,14 @@ Transport: **stdio** (default for local MCP servers launched by VS Code).
 
 ## Tools
 
-### 1. `sm_validate`
+### 1. `precept_validate`
 
-**Purpose:** Parse and compile a `.sm` file. Returns structured diagnostics. This is the primary correctness gate — equivalent to reading the VS Code Problems panel but without requiring the extension to be running.
+**Purpose:** Parse and compile a `.precept` file. Returns structured diagnostics. This is the primary correctness gate — equivalent to reading the VS Code Problems panel but without requiring the extension to be running.
 
 **Input:**
 ```json
 {
-  "path": "samples/bugtracker.sm"
+  "path": "samples/bugtracker.precept"
 }
 ```
 
@@ -66,18 +66,18 @@ Transport: **stdio** (default for local MCP servers launched by VS Code).
 }
 ```
 
-**Implementation:** `DslWorkflowParser.Parse(text)` + `DslWorkflowCompiler.Compile(model)`. Catches `InvalidOperationException` / `ArgumentException` thrown by the compiler and maps them to diagnostics using the existing `LineErrorRegex` already present in `SmDslAnalyzer`.
+**Implementation:** `PreceptParser.Parse(text)` + `PreceptCompiler.Compile(model)`. Catches `InvalidOperationException` / `ArgumentException` thrown by the compiler and maps them to diagnostics using the existing `LineErrorRegex` already present in `SmDslAnalyzer`.
 
 ---
 
-### 2. `sm_describe`
+### 2. `precept_describe`
 
 **Purpose:** Return the full structure of a machine as typed JSON — states, fields, events with their args, and the transition table. Lets Copilot reason about the machine's shape without re-parsing text.
 
 **Input:**
 ```json
 {
-  "path": "samples/bugtracker.sm"
+  "path": "samples/bugtracker.precept"
 }
 ```
 
@@ -109,18 +109,18 @@ Transport: **stdio** (default for local MCP servers launched by VS Code).
 }
 ```
 
-**Implementation:** Walks `DslWorkflowModel` records directly — no runtime needed.
+**Implementation:** Walks `DslWorkflowModel` records directly (`DslState`, `DslField`, `DslCollectionField`, `DslEvent`, `DslTransition`) — no runtime needed.
 
 ---
 
-### 3. `sm_reachability`
+### 3. `precept_reachability`
 
 **Purpose:** Graph analysis of the state machine. Identifies structural problems that are valid DSL but semantically suspect.
 
 **Input:**
 ```json
 {
-  "path": "samples/bugtracker.sm"
+  "path": "samples/bugtracker.precept"
 }
 ```
 
@@ -144,18 +144,18 @@ Fields:
 - **`orphanedEvents`** — events declared but referenced in zero `from … on` blocks.
 - **`warnings`** — human-readable descriptions of any of the above when non-empty.
 
-**Implementation:** Build a directed graph from `DslWorkflowModel.Transitions` where edges are `(FromState → TargetState)` for all `DslStateTransition` outcomes. Run BFS from `InitialState`. Compare `DslWorkflowModel.States` against visited set. Detect orphaned events by diffing `DslWorkflowModel.Events` against `DslWorkflowModel.Transitions`.
+**Implementation:** Build a directed graph from `DslWorkflowModel.Transitions` where edges are `(FromState → TargetState)` for all `DslStateTransition` outcomes. Run BFS from `DslWorkflowModel.InitialState`. Compare `DslWorkflowModel.States` against visited set. Detect orphaned events by diffing `DslWorkflowModel.Events` against `DslWorkflowModel.Transitions`.
 
 ---
 
-### 4. `sm_simulate`
+### 4. `precept_execute`
 
 **Purpose:** Execute a sequence of events against a machine starting from a given state and instance data snapshot. Returns step-by-step outcomes. Lets Copilot verify that a scenario it describes or edits actually works at runtime.
 
 **Input:**
 ```json
 {
-  "path": "samples/bugtracker.sm",
+  "path": "samples/bugtracker.precept",
   "initialData": {
     "Assignee": null,
     "Priority": 3,
@@ -190,21 +190,21 @@ Fields:
 }
 ```
 
-If a step fails (Rejected, NotDefined, NotApplicable), simulation stops and `abortedAt` is set to that step number with an explanation.
+If a step fails (Rejected, NotDefined, NotApplicable), execution stops and `abortedAt` is set to that step number with an explanation.
 
-**Implementation:** `DslWorkflowEngine.CreateInstance(initialData)` then `engine.Fire(instance, event, args)` in a loop, threading the updated instance through each step. Maps `DslFireResult` outcome kinds to outcome strings.
+**Implementation:** `PreceptEngine.CreateInstance(initialData)` then `engine.Fire(instance, event, args)` in a loop, threading the updated `DslWorkflowInstance` through each step. Maps `DslFireResult` outcome kinds to outcome strings.
 
 ---
 
 ## Registration in VS Code
 
-`tools/StateMachine.Dsl.VsCode/package.json` would gain an MCP server entry:
+`tools/Precept.VsCode/package.json` would gain an MCP server entry:
 
 ```json
 "mcpServers": {
-  "statemachine-dsl": {
+  "precept": {
     "command": "dotnet",
-    "args": ["run", "--project", "${workspaceFolder}/tools/StateMachine.Dsl.Mcp"],
+    "args": ["run", "--project", "${workspaceFolder}/tools/Precept.Mcp"],
     "type": "stdio"
   }
 }
@@ -216,7 +216,7 @@ This makes all four tools available to Copilot in agent mode without any additio
 
 ## Build Order
 
-`StateMachine.Dsl.Mcp.csproj` sits alongside the language server in `tools/` and is included in `StateMachine.slnx`. It depends only on `StateMachine.csproj` — not on the language server project.
+`Precept.Mcp.csproj` sits alongside the language server in `tools/` and is included in `Precept.slnx`. It depends only on `Precept.csproj` — not on the language server project.
 
 ---
 
@@ -225,4 +225,4 @@ This makes all four tools available to Copilot in agent mode without any additio
 - Hot-reload / file watching (Copilot calls tools on demand)
 - Multi-file / import resolution (not a DSL feature)
 - Authentication / remote transport (stdio is sufficient for local VS Code use)
-- A `sm_fix` tool (auto-correction is out of scope; validation + describe + simulate provide enough signal for Copilot to self-correct)
+- A `precept_fix` tool (auto-correction is out of scope; validation + describe + execute provide enough signal for Copilot to self-correct)

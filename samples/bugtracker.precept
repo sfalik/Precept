@@ -1,4 +1,4 @@
-machine BugTracker
+precept BugTracker
 
 state Triage initial
 state Open

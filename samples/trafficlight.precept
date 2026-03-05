@@ -1,4 +1,4 @@
-machine TrafficLight
+precept TrafficLight
 
 number VehiclesWaiting = 1
 	rule VehiclesWaiting >= 0 "Vehicles waiting cannot be negative"

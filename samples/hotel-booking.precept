@@ -1,4 +1,4 @@
-machine HotelBooking
+precept HotelBooking
 
 string? GuestName = null
 number NightsBooked = 0

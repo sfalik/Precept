@@ -119,7 +119,7 @@ Then press `F5`, open a `.sm` file, and run `StateMachine DSL: Open Inspector Pr
 ## DSL Example
 
 ```text
-machine TrafficLight
+precept TrafficLight
 
 number VehiclesWaiting = 0
   rule VehiclesWaiting >= 0 "Vehicles waiting cannot be negative"
@@ -220,7 +220,7 @@ Ready-to-use `.sm` files covering a range of domains and DSL features.
 state Idle initial  # Inline comment — # outside a string literal starts a comment;
                     # everything from that # to end of line is ignored
 
-machine <Name>
+precept <Name>
 
 state <StateName> [initial]
 [ rule <BooleanExpr> "<Reason>" ]         # state rules — indented under a state
@@ -290,7 +290,7 @@ Constraints:
 - `()+` means one-or-more branch lines in a `from ... on ...` body.
 - `when <GuardExpr>` is an optional transition-level precondition on the `from ... on ...` header line. If the `when` predicate evaluates to `false`, the entire block is skipped with outcome `NotApplicable`. This is distinct from `Rejected`: the instance is not mutated, no reason is emitted, and another `from ... on ...` block for the same event (e.g. via `from any on ...`) could still handle it.
 - Exactly one `state` declaration must include `initial`.
-- `event` declarations are optional. A machine with no events is syntactically valid but behaviorally inert; the language server emits a hint when no events are declared.
+- `event` declarations are optional. A precept with no events is syntactically valid but behaviorally inert; the language server emits a hint when no events are declared.
 - `if` and `else if` branches must end in exactly one outcome: `transition <ToState>` or `no transition`.
 - `else` (or unguarded body) must end in exactly one outcome: `transition`, `reject`, or `no transition`.
 - After an `if`/`else if` chain, a fallback **must** use `else`; a bare block-level outcome after a chain is a parse error.

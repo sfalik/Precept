@@ -17,7 +17,7 @@ public class SmDslAnalyzerCollectionMutationTests
     {
         // string? Value cannot be added to set<string> because inner type is non-nullable string.
         const string text = """
-            machine M
+            precept M
             string? Value
             set<string> Tags
             state A initial
@@ -40,7 +40,7 @@ public class SmDslAnalyzerCollectionMutationTests
     {
         // Inside "if Value != null" the guard narrows string? to string, so the push is valid.
         const string text = """
-            machine M
+            precept M
             string? Value
             stack<string> History
             state A initial
@@ -64,7 +64,7 @@ public class SmDslAnalyzerCollectionMutationTests
     {
         // Literal 42 is number; set<string> inner type is string — mismatch.
         const string text = """
-            machine M
+            precept M
             set<string> Tags
             state A initial
             state B
@@ -87,7 +87,7 @@ public class SmDslAnalyzerCollectionMutationTests
     {
         // queue<string> inner type is string; target field is number — mismatch.
         const string text = """
-            machine M
+            precept M
             number Target = 0
             queue<string> Names
             state A initial
@@ -110,7 +110,7 @@ public class SmDslAnalyzerCollectionMutationTests
     {
         // queue<string> inner type is string; target field is string — valid.
         const string text = """
-            machine M
+            precept M
             string LastName = ""
             queue<string> Names
             state A initial
@@ -132,7 +132,7 @@ public class SmDslAnalyzerCollectionMutationTests
         // In the else branch, string? Value is narrowed to string (non-nullable) by the prior null guard,
         // so add Tags Value in the else branch should be valid.
         const string text = """
-            machine M
+            precept M
             string? Value
             set<string> Tags
             state A initial

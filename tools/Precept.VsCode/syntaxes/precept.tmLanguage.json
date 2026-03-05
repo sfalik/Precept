@@ -64,14 +64,14 @@
     "machineDeclaration": {
       "patterns": [
         {
-          "name": "meta.declaration.machine.state-machine-dsl",
-          "match": "^(\\s*)(machine)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
+          "name": "meta.declaration.precept.precept-dsl",
+          "match": "^(\\s*)(precept)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "2": {
               "name": "keyword.control.state-machine-dsl"
             },
             "4": {
-              "name": "entity.name.type.machine.state-machine-dsl"
+              "name": "entity.name.type.precept.precept-dsl"
             }
           }
         }

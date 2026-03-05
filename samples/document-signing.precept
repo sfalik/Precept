@@ -1,4 +1,4 @@
-machine DocumentSigning
+precept DocumentSigning
 
 state Draft initial
 state AwaitingLegalReview

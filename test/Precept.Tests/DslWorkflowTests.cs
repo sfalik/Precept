@@ -13,7 +13,7 @@ public class DslWorkflowTests
     public void Parse_And_Compile_UnguardedTransition_IsAccepted()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             event Advance
@@ -37,7 +37,7 @@ public class DslWorkflowTests
     public void Parse_MachineWithNoEvents_IsValid()
     {
         const string dsl = """
-            machine Minimal
+            precept Minimal
             state Idle initial
             """;
 
@@ -53,7 +53,7 @@ public class DslWorkflowTests
     public void Compile_MachineWithNoEvents_Succeeds()
     {
         const string dsl = """
-            machine Minimal
+            precept Minimal
             state Idle initial
             """;
 
@@ -68,7 +68,7 @@ public class DslWorkflowTests
     public void Inspect_Outcome_Maps_To_Undefined_Blocked_Enabled()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             event Advance
@@ -94,7 +94,7 @@ public class DslWorkflowTests
     public void Inspect_GuardedTransition_WithMatchingData_IsAccepted()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             event Advance
@@ -120,7 +120,7 @@ public class DslWorkflowTests
     public void Inspect_GuardedTransition_WithNonMatchingData_IsRejected()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             event Advance
@@ -146,7 +146,7 @@ public class DslWorkflowTests
     public void Inspect_GuardedTransition_WithoutRequiredDataKey_IsRejectedWithReason()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             event Advance
@@ -170,7 +170,7 @@ public class DslWorkflowTests
     public void Inspect_GuardedTransition_WithWrongDataType_IsRejectedWithReason()
     {
         const string dsl = """
-            machine FeatureFlag
+            precept FeatureFlag
             boolean IsEnabled = false
             state Disabled initial
             state Enabled
@@ -196,7 +196,7 @@ public class DslWorkflowTests
     public void Inspect_MultipleGuardedTransitions_AllFail_AggregatesReasons()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             state Yellow
@@ -228,7 +228,7 @@ public class DslWorkflowTests
     public void Inspect_IfBranch_NoTransition_Is_Allowed_And_Produces_NoTransition_When_Matched()
     {
         const string dsl = """
-            machine Route
+            precept Route
             boolean Hold = false
             state Red initial
             state Green
@@ -257,7 +257,7 @@ public class DslWorkflowTests
     public void Inspect_ElseIf_NoTransition_Is_Allowed_And_Preserves_Branch_Order()
     {
         const string dsl = """
-            machine Route
+            precept Route
             boolean PreferStop = false
             boolean PreferAlpha = false
             state Source initial
@@ -299,7 +299,7 @@ public class DslWorkflowTests
     public void Inspect_StringEqualityGuard_WithQuotedLiteral_IsAccepted()
     {
         const string dsl = """
-            machine FeatureMode
+            precept FeatureMode
             state Draft initial
             state Live
             event Publish
@@ -324,7 +324,7 @@ public class DslWorkflowTests
     public void Inspect_NullEqualityGuard_IsAccepted_WhenDataValueIsNull()
     {
         const string dsl = """
-            machine Tickets
+            precept Tickets
             state Open initial
             state Pending
             event Escalate
@@ -349,7 +349,7 @@ public class DslWorkflowTests
     public void Inspect_NumericComparison_HandlesMixedNumericRuntimeTypes()
     {
         const string dsl = """
-            machine Throughput
+            precept Throughput
             state Low initial
             state High
             event Scale
@@ -374,7 +374,7 @@ public class DslWorkflowTests
     public void Inspect_LogicalGuardExpression_IsAccepted_WhenTrue()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             state A initial
             state B
             event Go
@@ -403,7 +403,7 @@ public class DslWorkflowTests
     public void Inspect_InvalidGuardExpression_UsesConfiguredReason()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             state A initial
             state B
             event Go
@@ -432,7 +432,7 @@ public class DslWorkflowTests
     public void Fire_GuardedTransition_WithData_AcceptsAndReturnsNewState()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             event Advance
@@ -458,7 +458,7 @@ public class DslWorkflowTests
     public void CreateInstance_Then_Fire_UpdatesPersistableInstance()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             event Advance
@@ -486,7 +486,7 @@ public class DslWorkflowTests
     public void Fire_Instance_AppliesTransitionDataAssignment_Literal()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             event Advance
@@ -510,7 +510,7 @@ public class DslWorkflowTests
     public void Fire_Instance_AppliesTransitionDataAssignment_FromEventArgument()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state FlashingRed
             event Emergency
@@ -534,7 +534,7 @@ public class DslWorkflowTests
     public void Fire_Instance_DataAssignment_FromMissingEventArgument_IsRejected()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state FlashingRed
             event Emergency
@@ -558,7 +558,7 @@ public class DslWorkflowTests
     public void Fire_Instance_DataAssignment_FromInstanceDataReference_IsAccepted()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
                 number CarsWaiting = 0
@@ -586,7 +586,7 @@ public class DslWorkflowTests
     public void Fire_Instance_MultipleSets_AreAppliedInOrder_WithReadYourWrites()
     {
         const string dsl = """
-            machine Counters
+            precept Counters
             number CarsWaiting = 0
             number LastCarsWaiting = 0
             state Red initial
@@ -617,7 +617,7 @@ public class DslWorkflowTests
     public void Fire_Instance_MultipleSets_Failure_RollsBackBatch()
     {
         const string dsl = """
-            machine Counters
+            precept Counters
             number CarsWaiting = 0
             number LastCarsWaiting = 0
             state Red initial
@@ -650,7 +650,7 @@ public class DslWorkflowTests
     public void Fire_Instance_DataAssignment_ArithmeticExpression_IsAccepted()
     {
         const string dsl = """
-            machine Counters
+            precept Counters
             number CarsWaiting = 0
             number NextCarsWaiting = 0
             state Red initial
@@ -678,7 +678,7 @@ public class DslWorkflowTests
     public void Fire_Instance_DataAssignment_StringConcatExpression_IsAccepted()
     {
         const string dsl = """
-            machine Alerts
+            precept Alerts
             string Prefix = ""
             string Message = ""
             state Red initial
@@ -707,7 +707,7 @@ public class DslWorkflowTests
     public void Fire_Instance_DataAssignment_StringConcat_WithNullOperand_IsRejected()
     {
         const string dsl = """
-            machine Alerts
+            precept Alerts
             string Prefix = ""
             string? ReasonText
             string Message = ""
@@ -738,7 +738,7 @@ public class DslWorkflowTests
     public void Parse_TypedEventArguments_AreRejected()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             event Advance(AdvanceArgs)
@@ -757,7 +757,7 @@ public class DslWorkflowTests
     public void Fire_Instance_DataAssignment_WithEventPrefix_IsAccepted()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state FlashingRed
             event Emergency
@@ -783,7 +783,7 @@ public class DslWorkflowTests
     public void Inspect_AcceptedTransition_InfersRequiredEventArgumentKeys()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state FlashingRed
             event Emergency
@@ -807,7 +807,7 @@ public class DslWorkflowTests
     public void Fire_Instance_DataAssignment_ReservedBooleanLiterals_AreAppliedAsLiterals()
     {
         const string dsl = """
-            machine Flags
+            precept Flags
             state Off initial
             state On
             event Enable
@@ -836,7 +836,7 @@ public class DslWorkflowTests
     public void Fire_Instance_DataAssignment_ReservedNullLiteral_IsAppliedAsLiteral()
     {
         const string dsl = """
-            machine Notes
+            precept Notes
             state Open initial
             state Cleared
             event Clear
@@ -858,7 +858,7 @@ public class DslWorkflowTests
     public void Inspect_Instance_DoesNotApplyTransitionDataAssignment()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             event Advance
@@ -881,7 +881,7 @@ public class DslWorkflowTests
     public void Inspect_Instance_EventArgs_DoNotMergeWithSnapshot()
     {
         const string dsl = """
-            machine FeatureFlag
+            precept FeatureFlag
             state Disabled initial
             state Enabled
             event Evaluate
@@ -913,7 +913,7 @@ public class DslWorkflowTests
     public void Inspect_Instance_WithWorkflowMismatch_IsNotDefinedWithReason()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             event Advance
@@ -940,7 +940,7 @@ public class DslWorkflowTests
     public void Fire_AcceptedTransition_ReturnsNewState()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Green initial
             state Yellow
             event Advance
@@ -962,7 +962,7 @@ public class DslWorkflowTests
     public void Fire_UndefinedTransition_ReturnsNotDefined()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             event Advance
@@ -984,7 +984,7 @@ public class DslWorkflowTests
     public void Parse_DuplicateState_Throws()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Red
             event Advance
@@ -1002,7 +1002,7 @@ public class DslWorkflowTests
     public void Parse_Transition_WithGuardAndDataAssignment_IsAccepted()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             event Advance
@@ -1030,7 +1030,7 @@ public class DslWorkflowTests
     public void Parse_FromOnBlock_WithMultipleSets_PreservesAssignmentOrder()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             event Advance
@@ -1054,7 +1054,7 @@ public class DslWorkflowTests
     public void Parse_GuardedTransition_WithoutReason_IsRejected()
     {
         const string dsl = """
-            machine TrafficLight
+            precept TrafficLight
             state Red initial
             state Green
             event Advance
@@ -1072,7 +1072,7 @@ public class DslWorkflowTests
         public void Parse_FromOnBlock_WithReject_ParsesOutcomeRule()
         {
                 const string dsl = """
-                        machine TrafficLight
+                        precept TrafficLight
                         state Red initial
                         state Green
                         event Advance
@@ -1096,7 +1096,7 @@ public class DslWorkflowTests
         public void Inspect_FromOnBlock_AllGuardsFail_UsesOutcomeRejectReason()
         {
                 const string dsl = """
-                        machine TrafficLight
+                        precept TrafficLight
                         state Red initial
                         state Green
                         event Advance
@@ -1121,7 +1121,7 @@ public class DslWorkflowTests
         public void Inspect_FromOnBlock_NoTransitionOutcome_IsNoTransition()
         {
                 const string dsl = """
-                        machine TrafficLight
+                        precept TrafficLight
                         state Red initial
                         state Green
                         event Advance
@@ -1146,7 +1146,7 @@ public class DslWorkflowTests
         public void Parse_FromAny_ExpandsToAllStates()
         {
                 const string dsl = """
-                        machine TrafficLight
+                        precept TrafficLight
                         state Red initial
                         state Green
                         state Yellow
@@ -1171,7 +1171,7 @@ public class DslWorkflowTests
         public void Parse_FromOnBlock_WithoutOutcome_IsRejected()
         {
             const string dsl = """
-                machine TrafficLight
+                precept TrafficLight
                 state Red initial
                 state Green
                 event Advance
@@ -1189,7 +1189,7 @@ public class DslWorkflowTests
         public void Parse_IfChain_WithBlockLevelFallback_WithoutElse_Throws()
         {
             const string dsl = """
-                machine TrafficLight
+                precept TrafficLight
                 state Red initial
                 state Green
                 event Advance
@@ -1210,7 +1210,7 @@ public class DslWorkflowTests
         public void Parse_ElseIfChain_WithBlockLevelFallback_WithoutElse_Throws()
         {
             const string dsl = """
-                machine TrafficLight
+                precept TrafficLight
                 state Red initial
                 state Green
                 state Yellow
@@ -1234,7 +1234,7 @@ public class DslWorkflowTests
             public void Parse_DuplicateOutcomeRule_ForSameFromOn_IsRejected()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     state Red initial
                     state Green
                     event Advance
@@ -1257,7 +1257,7 @@ public class DslWorkflowTests
             public void Parse_FromOnBlock_StatementAfterOutcomeTransition_IsRejected()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     state Yellow initial
                     state Red
                     event Advance
@@ -1278,7 +1278,7 @@ public class DslWorkflowTests
             public void Inspect_FromOnBlock_ElseIfChain_SelectsFirstMatchingBranch()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     state Red initial
                     state Green
                     state Yellow
@@ -1307,7 +1307,7 @@ public class DslWorkflowTests
             public void Parse_FromOnBlock_UnknownBranchKeyword_IsRejected()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     state Red initial
                     state Green
                     event Advance
@@ -1329,7 +1329,7 @@ public class DslWorkflowTests
             public void Parse_IfBlock_WithReason_IsRejected()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     state Red initial
                     state Green
                     event Advance
@@ -1351,7 +1351,7 @@ public class DslWorkflowTests
             public void Parse_SetStatement_IsAccepted()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     number CarsWaiting = 0
                     state Red initial
                     state Green
@@ -1373,7 +1373,7 @@ public class DslWorkflowTests
             public void Parse_DataField_DefaultLiteral_IsAccepted()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     number CarsWaiting = 3
                     string? Note = null
                     state Red initial
@@ -1397,7 +1397,7 @@ public class DslWorkflowTests
             public void Parse_DataField_DefaultMustBeLiteral_IsRejected()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     number CarsWaiting = OtherCount + 1
                     state Red initial
                     state Green
@@ -1418,7 +1418,7 @@ public class DslWorkflowTests
             public void Parse_DataField_DefaultTypeMismatch_IsRejected()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     number CarsWaiting = "three"
                     state Red initial
                     state Green
@@ -1439,7 +1439,7 @@ public class DslWorkflowTests
             public void Parse_NonNullableDataField_WithoutDefault_IsRejected()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     number CarsWaiting
                     state Red initial
                     state Green
@@ -1460,7 +1460,7 @@ public class DslWorkflowTests
             public void Parse_NullableDataField_WithoutDefault_IsAccepted()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     string? Note
                     state Red initial
                     state Green
@@ -1482,7 +1482,7 @@ public class DslWorkflowTests
             public void Parse_MissingInitialState_IsRejected()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     state Red
                     state Green
                     event Advance
@@ -1502,7 +1502,7 @@ public class DslWorkflowTests
             public void Parse_DuplicateInitialStateMarkers_AreRejected()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     state Red initial
                     state Green initial
                     event Advance
@@ -1522,7 +1522,7 @@ public class DslWorkflowTests
             public void Parse_StatesPluralDeclaration_IsRejected()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     states Red, Green
                     event Advance
                     from Red on Advance
@@ -1540,7 +1540,7 @@ public class DslWorkflowTests
             public void Parse_EventsPluralDeclaration_IsRejected()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     state Red initial
                     state Green
                     events Advance
@@ -1559,7 +1559,7 @@ public class DslWorkflowTests
             public void CreateInstance_WithoutData_UsesDeclaredFieldDefaults()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     number CarsWaiting = 0
                     string? Note = null
                     state Red initial
@@ -1582,7 +1582,7 @@ public class DslWorkflowTests
             public void CreateInstance_ProvidedData_OverridesDeclaredDefaults()
             {
                 const string dsl = """
-                    machine TrafficLight
+                    precept TrafficLight
                     number CarsWaiting = 0
                     state Red initial
                     state Green
@@ -1603,7 +1603,7 @@ public class DslWorkflowTests
     public void Parse_EventArg_WithDefault_IsAccepted()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             state A initial
             event Submit
                 string Reason = "none"
@@ -1623,7 +1623,7 @@ public class DslWorkflowTests
     public void Parse_NullableEventArg_WithDefault_IsAccepted()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             state A initial
             event Submit
                 string? Reason = "fallback"
@@ -1643,7 +1643,7 @@ public class DslWorkflowTests
     public void Parse_NullableEventArg_WithNullDefault_IsAccepted()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             state A initial
             event Submit
                 string? Reason = null
@@ -1661,7 +1661,7 @@ public class DslWorkflowTests
     public void Parse_NonNullableEventArg_WithoutDefault_IsAccepted()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             state A initial
             event Submit
                 string Reason
@@ -1680,7 +1680,7 @@ public class DslWorkflowTests
     public void Parse_NullableEventArg_WithoutDefault_IsAccepted()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             state A initial
             event Submit
                 string? Reason
@@ -1698,7 +1698,7 @@ public class DslWorkflowTests
     public void Parse_EventArg_NumberDefault_IsAccepted()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             state A initial
             event Submit
                 number Priority = 5
@@ -1716,7 +1716,7 @@ public class DslWorkflowTests
     public void Parse_EventArg_BooleanDefault_IsAccepted()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             state A initial
             event Submit
                 boolean Urgent = false
@@ -1734,7 +1734,7 @@ public class DslWorkflowTests
     public void Parse_NonNullableEventArg_WithNullDefault_IsRejected()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             state A initial
             event Submit
                 string Reason = null
@@ -1751,7 +1751,7 @@ public class DslWorkflowTests
     public void Fire_NonNullableEventArg_WithDefault_OmittedByCaller_UsesDefault()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             string? LastReason
             state A initial
             event Submit
@@ -1774,7 +1774,7 @@ public class DslWorkflowTests
     public void Fire_NonNullableEventArg_WithDefault_SuppliedByCaller_UsesSupplied()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             string? LastReason
             state A initial
             event Submit
@@ -1797,7 +1797,7 @@ public class DslWorkflowTests
     public void Fire_NullableEventArg_WithDefault_OmittedByCaller_UsesDefault()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             string? LastReason
             state A initial
             event Submit
@@ -1820,7 +1820,7 @@ public class DslWorkflowTests
     public void Fire_NullableEventArg_WithoutDefault_OmittedByCaller_UsesNull()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             string? LastReason
             state A initial
             event Submit
@@ -1843,7 +1843,7 @@ public class DslWorkflowTests
     public void Fire_NonNullableEventArg_WithoutDefault_OmittedByCaller_IsRejected()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             state A initial
             event Submit
                 string Reason
@@ -1864,7 +1864,7 @@ public class DslWorkflowTests
     public void Inspect_RequiredEventArgumentKeys_ExcludesArgsWithDefaults()
     {
         const string dsl = """
-            machine Workflow
+            precept Workflow
             state A initial
             state B
             event Submit
@@ -1889,7 +1889,7 @@ public class DslWorkflowTests
     public void Parse_DuplicateFromOnBlock_ThrowsParseError()
     {
         const string dsl = """
-            machine M
+            precept M
             state A initial
             state B
             event Submit
@@ -1909,7 +1909,7 @@ public class DslWorkflowTests
     public void Parse_FromAny_ThenSpecificState_ThrowsDuplicateError()
     {
         const string dsl = """
-            machine M
+            precept M
             state A initial
             state B
             event Submit
@@ -1929,7 +1929,7 @@ public class DslWorkflowTests
     public void Parse_CommaList_ThenOverlappingState_ThrowsDuplicateError()
     {
         const string dsl = """
-            machine M
+            precept M
             state A initial
             state B
             state C
@@ -1950,7 +1950,7 @@ public class DslWorkflowTests
     public void Parse_DifferentStates_SameEvent_IsValid()
     {
         const string dsl = """
-            machine M
+            precept M
             state A initial
             state B
             event Submit
@@ -1969,7 +1969,7 @@ public class DslWorkflowTests
     public void Parse_SameState_DifferentEvents_IsValid()
     {
         const string dsl = """
-            machine M
+            precept M
             state A initial
             state B
             event EventX
@@ -1993,7 +1993,7 @@ public class DslWorkflowTests
     public void Inspect_Instance_WhenPredicateFalse_ReturnsNotApplicable_WithNoEventArgs()
     {
         const string dsl = """
-            machine BankAccount
+            precept BankAccount
             boolean Frozen = false
             state Active initial
             event Deposit
@@ -2022,7 +2022,7 @@ public class DslWorkflowTests
     public void Inspect_Instance_WhenPredicateTrue_ValidatesArgsNormally()
     {
         const string dsl = """
-            machine BankAccount
+            precept BankAccount
             boolean Frozen = false
             state Active initial
             event Deposit

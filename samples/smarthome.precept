@@ -1,4 +1,4 @@
-machine SmartHomeAlarm
+precept SmartHomeAlarm
 
 # Push each tripped sensor name; use .peek for last sensor, .count for fault total
 stack<string> TriggeredSensors

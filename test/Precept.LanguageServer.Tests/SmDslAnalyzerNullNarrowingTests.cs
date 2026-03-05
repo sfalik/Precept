@@ -14,7 +14,7 @@ public class SmDslAnalyzerNullNarrowingTests
     public void Diagnostics_Guard_NullCheckAndNumericComparison_UsesNarrowedType()
     {
         const string text = """
-            machine M
+            precept M
             number? RetryCount
             state A initial
             state B
@@ -35,7 +35,7 @@ public class SmDslAnalyzerNullNarrowingTests
     public void Diagnostics_Guard_NullCheckOrNumericComparison_UsesNarrowedType()
     {
         const string text = """
-            machine M
+            precept M
             number? RetryCount
             state A initial
             state B
@@ -56,7 +56,7 @@ public class SmDslAnalyzerNullNarrowingTests
     public void Diagnostics_Guard_NullableNumericWithoutNarrowing_FailsComparison()
     {
         const string text = """
-            machine M
+            precept M
             number? RetryCount
             state A initial
             state B
@@ -78,7 +78,7 @@ public class SmDslAnalyzerNullNarrowingTests
     public void Diagnostics_Set_NullableValueAssignedToNonNullableTarget_Fails()
     {
         const string text = """
-            machine M
+            precept M
             number Value = 0
             number? RetryCount
             state A initial
@@ -99,7 +99,7 @@ public class SmDslAnalyzerNullNarrowingTests
     public void Diagnostics_Set_NullableValueNarrowedByGuard_AssignsCleanly()
     {
         const string text = """
-            machine M
+            precept M
             number Value = 0
             number? RetryCount
             state A initial
@@ -126,7 +126,7 @@ public class SmDslAnalyzerNullNarrowingTests
         // After "if RetryCount == null -> no transition", the else-if should see RetryCount as number
         // (not number?), so "RetryCount > 0" must not produce a false-positive diagnostic.
         const string text = """
-            machine M
+            precept M
             number? RetryCount
             state A initial
             state B
@@ -151,7 +151,7 @@ public class SmDslAnalyzerNullNarrowingTests
         // After "if RetryCount == null -> no transition", the else branch sees RetryCount as number
         // (not number?). "set Value = RetryCount" in the else branch must not be flagged.
         const string text = """
-            machine M
+            precept M
             number Value = 0
             number? RetryCount
             state A initial
@@ -176,7 +176,7 @@ public class SmDslAnalyzerNullNarrowingTests
         // Full three-branch chain: if null/no-transition, else if positive/transition, else/no-transition.
         // Each branch should validate cleanly with cross-branch narrowing applied.
         const string text = """
-            machine M
+            precept M
             number? X
             state A initial
             state B
@@ -201,7 +201,7 @@ public class SmDslAnalyzerNullNarrowingTests
         // "if SomeFlag" does not narrow Item's nullability, so the else-if should still see
         // Item as number? and flag "Item > 0" as an error.
         const string text = """
-            machine M
+            precept M
             boolean SomeFlag = true
             number? Item
             state A initial

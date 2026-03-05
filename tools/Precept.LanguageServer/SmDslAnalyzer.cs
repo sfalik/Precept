@@ -466,7 +466,7 @@ internal sealed class SmDslAnalyzer
             var machineLine = 0;
             for (var li = 0; li < lines.Length; li++)
             {
-                if (lines[li].TrimStart().StartsWith("machine ", StringComparison.Ordinal))
+                if (lines[li].TrimStart().StartsWith("precept ", StringComparison.Ordinal))
                 {
                     machineLine = li;
                     break;
@@ -477,7 +477,7 @@ internal sealed class SmDslAnalyzer
             diagnostics.Add(new Diagnostic
             {
                 Severity = DiagnosticSeverity.Hint,
-                Message = "Machine has no events declared. It cannot respond to any input.",
+                Message = "Precept has no events declared. It cannot respond to any input.",
                 Source = "state-machine-dsl",
                 Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
                     new Position(machineLine, 0),
@@ -1333,7 +1333,7 @@ internal sealed class SmDslAnalyzer
 
     private static readonly IReadOnlyList<CompletionItem> KeywordItems =
     [
-        new CompletionItem { Label = "machine", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "precept", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "state", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "initial", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "event", Kind = CompletionItemKind.Keyword },

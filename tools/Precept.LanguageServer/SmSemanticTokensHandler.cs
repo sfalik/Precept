@@ -30,7 +30,7 @@ internal sealed class SmSemanticTokensHandler : SemanticTokensHandlerBase
     private static readonly Regex NumberRegex = new("\\b\\d+(?:\\.\\d+)?\\b", RegexOptions.Compiled);
     private static readonly Regex OperatorRegex = new("==|!=|>=|<=|&&|\\|\\||[+\\-*/%]|>|<|=|!", RegexOptions.Compiled);
 
-    private static readonly Regex MachineDeclRegex = new("^(\\s*)machine\\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
+    private static readonly Regex MachineDeclRegex = new("^(\\s*)precept\\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex StateDeclRegex = new("^(\\s*)state\\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex EventDeclRegex = new("^(\\s*)event\\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex FromOnRegex = new("^(\\s*)from\\s+(any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
@@ -45,7 +45,7 @@ internal sealed class SmSemanticTokensHandler : SemanticTokensHandlerBase
 
     private static readonly string[] KeywordTokens =
     [
-        "machine", "state", "initial", "event", "from", "on", "if", "else",
+        "precept", "state", "initial", "event", "from", "on", "if", "else",
         "transition", "set", "reject", "rule", "reason", "no", "any",
         "true", "false", "null", "string", "number", "boolean",
         "add", "remove", "enqueue", "dequeue", "push", "pop", "clear",

@@ -443,7 +443,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
         var normalizedDeclarations = AddDefaultsForNonNullableFields(declarations);
 
         var dsl = $$"""
-            machine Calc
+            precept Calc
             {{normalizedDeclarations}}
             state A initial
             state B
@@ -509,7 +509,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
     private static DslEventInspectionResult InspectForGuard(string guardExpression, IReadOnlyDictionary<string, object?> data)
     {
         var dsl = $$"""
-            machine Guards
+            precept Guards
             boolean Flag = false
             boolean OtherFlag = false
             state A initial

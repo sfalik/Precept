@@ -1,4 +1,4 @@
-machine JobApplication
+precept JobApplication
 
 string? CandidateName = null
 number PhoneScore = 0

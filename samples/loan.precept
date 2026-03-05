@@ -1,4 +1,4 @@
-machine LoanApplication
+precept LoanApplication
 
 # Core Data Fields
 string ApplicantName = "Jane Doe"

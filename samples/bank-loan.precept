@@ -1,4 +1,4 @@
-machine BankLoan
+precept BankLoan
 
 number RequestedAmount = 0
 number ApprovedAmount = 0

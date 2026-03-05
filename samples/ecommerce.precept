@@ -1,4 +1,4 @@
-machine ECommerceOrder
+precept ECommerceOrder
 
 state Pending initial
 state PaymentFailed

@@ -381,7 +381,7 @@ Canonical linear form:
 state Idle initial  # Inline comment — # outside a double-quoted string literal
                     # starts a comment; everything from that # to end of line is ignored
 
-machine <Name>
+precept <Name>
 state <StateName> [initial]
 [ rule <BooleanExpr> "<Reason>" ]         # state rules — indented under a state; all data fields in scope
 <StateDecl> := initial
@@ -429,7 +429,7 @@ Canonical constraints:
 - `()+` means one-or-more lines in a `from ... on ...` body.
 - `when <BooleanExpr>` is an optional transition-level precondition on the `from ... on ...` header. If it evaluates to `false` at runtime, the entire block is skipped with outcome `NotApplicable`. The `when` guard is evaluated before any branch predicates. The language server narrows null-uncertainty symbols within the block scope when `when` is present (e.g. `when X != null` makes `X` non-nullable for all branches).
 - Exactly one `state` declaration must include `initial`.
-- `event` declarations are optional. A machine with no events is syntactically valid. The language server emits a `Hint` diagnostic on the `machine` line when no events are declared, as such a machine cannot respond to any input.
+- `event` declarations are optional. A precept with no events is syntactically valid. The language server emits a `Hint` diagnostic on the `precept` line when no events are declared, as such a precept cannot respond to any input.
 - `if` and `else if` must end with `transition <State>` or `no transition`.
 - `else` may end with `transition`, `reject`, or `no transition`.
 - After an `if`/`else if` chain, a fallback **must** use `else`; a bare block-level outcome after a chain is a parse error.
@@ -681,7 +681,7 @@ The DSL supports explicit contracts while keeping declaration style consistent:
 Form:
 
 ```text
-machine <MachineName>
+precept <MachineName>
 
 state <StateName>
 state <StateName>

@@ -1,4 +1,4 @@
-machine Subscription
+precept Subscription
 
 string? PlanName = null
 number MonthlyPrice = 0

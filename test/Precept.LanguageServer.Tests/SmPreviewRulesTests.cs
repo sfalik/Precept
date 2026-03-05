@@ -24,7 +24,7 @@ public class SmPreviewRulesTests
     public void EvaluateCurrentRules_ReturnsEmpty_WhenNoRulesViolated()
     {
         const string dsl = """
-            machine M
+            precept M
             number Balance = 100
               rule Balance >= 0 "Balance must not go negative"
             state A initial
@@ -47,7 +47,7 @@ public class SmPreviewRulesTests
     public void EvaluateCurrentRules_ReturnsAllReasons_WhenMultipleRulesViolatedSimultaneously()
     {
         const string dsl = """
-            machine M
+            precept M
             number Balance = 100
               rule Balance >= 0 "Balance must not go negative"
             number Quantity = 1
@@ -79,7 +79,7 @@ public class SmPreviewRulesTests
     public async Task Snapshot_IncludesRuleDefinitions_WhenMachineHasRules()
     {
         const string dsl = """
-            machine M
+            precept M
             number Balance = 100
               rule Balance >= 0 "Balance must not go negative"
             state A initial
@@ -108,7 +108,7 @@ public class SmPreviewRulesTests
     public async Task Snapshot_ActiveRuleViolations_IsNullOrEmpty_WhenInitialDataSatisfiesRules()
     {
         const string dsl = """
-            machine M
+            precept M
             number Balance = 100
               rule Balance >= 0 "Balance must not go negative"
             state A initial
@@ -138,7 +138,7 @@ public class SmPreviewRulesTests
     {
         // Both Balance and Quantity field rules are violated by firingReduce with a large Amount.
         const string dsl = """
-            machine M
+            precept M
             number Balance = 100
               rule Balance >= 0 "Balance must not go negative"
             number Quantity = 1
@@ -182,7 +182,7 @@ public class SmPreviewRulesTests
         // Reproduces the test.sm scenario: balance=0, overdraftLimit=100, withdraw 500.
         // The top-level rule "balance >= 0 - overdraftLimit" is violated after simulation.
         const string dsl = """
-            machine Test
+            precept Test
             number balance = 0
             number overdraftLimit = 100
             rule balance >= 0 - overdraftLimit "Balance must be within overdraft limit"
@@ -224,7 +224,7 @@ public class SmPreviewRulesTests
     {
         // With amount=30, balance stays at −30 which is >= −100, rule passes.
         const string dsl = """
-            machine Test
+            precept Test
             number balance = 0
             number overdraftLimit = 100
             rule balance >= 0 - overdraftLimit "Balance must be within overdraft limit"

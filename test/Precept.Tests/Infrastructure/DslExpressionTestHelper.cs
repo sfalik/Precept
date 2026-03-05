@@ -8,7 +8,7 @@ internal static class DslExpressionTestHelper
     internal static DslExpression ParseFirstSetExpression(string expressionText)
     {
         var dsl = $$"""
-            machine Parser
+            precept Parser
             number Value = 0
             event Advance
             state Red initial

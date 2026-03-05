@@ -1,4 +1,4 @@
-machine RestaurantOrder
+precept RestaurantOrder
 
 number TableNumber = 0
 number ItemCount = 0

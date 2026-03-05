@@ -13,7 +13,7 @@ public class DslCollectionParsingTests
     public void Parse_SetDeclaration_CorrectCollectionKindAndInnerType()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state Idle initial
             """;
@@ -31,7 +31,7 @@ public class DslCollectionParsingTests
     public void Parse_QueueDeclaration_CorrectCollectionKindAndInnerType()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             queue<string> Messages
             state Idle initial
             """;
@@ -49,7 +49,7 @@ public class DslCollectionParsingTests
     public void Parse_StackDeclaration_CorrectCollectionKindAndInnerType()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             stack<boolean> Flags
             state Idle initial
             """;
@@ -67,7 +67,7 @@ public class DslCollectionParsingTests
     public void Parse_DuplicateCollectionName_Throws()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Items
             set<number> Items
             state Idle initial
@@ -83,7 +83,7 @@ public class DslCollectionParsingTests
     public void Parse_CollectionNameConflictsWithDataField_Throws()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             number Items = 0
             set<number> Items
             state Idle initial
@@ -99,7 +99,7 @@ public class DslCollectionParsingTests
     public void Parse_AddMutation_OnSet()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state Idle initial
             state Active
@@ -123,7 +123,7 @@ public class DslCollectionParsingTests
     public void Parse_RemoveMutation_OnSet()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state Idle initial
             state Active
@@ -146,7 +146,7 @@ public class DslCollectionParsingTests
     public void Parse_EnqueueMutation_OnQueue()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             queue<string> Tasks
             state Idle initial
             state Active
@@ -169,7 +169,7 @@ public class DslCollectionParsingTests
     public void Parse_DequeueMutation_OnQueue()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             queue<string> Tasks
             state Idle initial
             state Active
@@ -193,7 +193,7 @@ public class DslCollectionParsingTests
     public void Parse_PushMutation_OnStack()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             stack<number> History
             state Idle initial
             state Active
@@ -216,7 +216,7 @@ public class DslCollectionParsingTests
     public void Parse_PopMutation_OnStack()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             stack<number> History
             state Idle initial
             state Active
@@ -239,7 +239,7 @@ public class DslCollectionParsingTests
     public void Parse_ClearMutation_OnSet()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state Idle initial
             state Active
@@ -262,7 +262,7 @@ public class DslCollectionParsingTests
     public void Parse_EnqueueOnSet_Throws()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Items
             state Idle initial
             state Active
@@ -282,7 +282,7 @@ public class DslCollectionParsingTests
     public void Parse_PushOnQueue_Throws()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             queue<number> Items
             state Idle initial
             state Active
@@ -302,7 +302,7 @@ public class DslCollectionParsingTests
     public void Parse_AddOnQueue_Throws()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             queue<number> Items
             state Idle initial
             state Active
@@ -322,7 +322,7 @@ public class DslCollectionParsingTests
     public void Parse_MutationOnUnknownCollection_Throws()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             state Idle initial
             state Active
             event Go
@@ -341,7 +341,7 @@ public class DslCollectionParsingTests
     public void Parse_MultipleMutations_PreservesOrder()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state Idle initial
             state Active
@@ -369,7 +369,7 @@ public class DslCollectionParsingTests
     public void Parse_MutationInIfBranch_WithNoTransition()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             number Count = 0
             state Idle initial
@@ -395,7 +395,7 @@ public class DslCollectionParsingTests
     public void Parse_MutationWithExpressionReferringToDataField()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             number Target = 5
             state Idle initial
@@ -420,7 +420,7 @@ public class DslCollectionRuntimeTests
     public void Fire_AddToSet_CollectionContainsValue()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state Idle initial
             state Active
@@ -447,7 +447,7 @@ public class DslCollectionRuntimeTests
     public void Fire_AddAndRemoveFromSet_CollectionReflectsBoth()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state A initial
             state B
@@ -485,7 +485,7 @@ public class DslCollectionRuntimeTests
     public void Fire_EnqueueAndDequeue_FIFO()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             queue<string> Tasks
             state A initial
             state B
@@ -521,7 +521,7 @@ public class DslCollectionRuntimeTests
     public void Fire_PushAndPop_LIFO()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             stack<number> History
             state A initial
             state B
@@ -557,7 +557,7 @@ public class DslCollectionRuntimeTests
     public void Fire_ClearCollection_EmptiesIt()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state A initial
             state B
@@ -589,7 +589,7 @@ public class DslCollectionRuntimeTests
     public void Fire_DequeueFromEmpty_RejectsTransition()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             queue<string> Tasks
             state A initial
             state B
@@ -612,7 +612,7 @@ public class DslCollectionRuntimeTests
     public void Fire_PopFromEmpty_RejectsTransition()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             stack<number> History
             state A initial
             state B
@@ -635,7 +635,7 @@ public class DslCollectionRuntimeTests
     public void Guard_ContainsExpression_AllowsTransition()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state A initial
             state B
@@ -666,7 +666,7 @@ public class DslCollectionRuntimeTests
     public void Guard_ContainsExpression_BlocksTransition()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state A initial
             state B
@@ -696,7 +696,7 @@ public class DslCollectionRuntimeTests
     public void Guard_CollectionCountProperty_Works()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state A initial
             state B
@@ -728,7 +728,7 @@ public class DslCollectionRuntimeTests
     public void Guard_CollectionMinProperty_Works()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state A initial
             state B
@@ -761,7 +761,7 @@ public class DslCollectionRuntimeTests
     public void Guard_CollectionMaxProperty_Works()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state A initial
             state B
@@ -794,7 +794,7 @@ public class DslCollectionRuntimeTests
     public void Guard_QueuePeekProperty_ShowsFront()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             queue<string> Tasks
             state A initial
             state B
@@ -826,7 +826,7 @@ public class DslCollectionRuntimeTests
     public void Guard_StackPeekProperty_ShowsTop()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             stack<number> History
             state A initial
             state B
@@ -858,7 +858,7 @@ public class DslCollectionRuntimeTests
     public void Fire_MutationWithExpression_EvaluatesExpression()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             number Target = 5
             state A initial
@@ -883,7 +883,7 @@ public class DslCollectionRuntimeTests
     public void Fire_MutationWithEventArgExpression()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state A initial
             state B
@@ -908,7 +908,7 @@ public class DslCollectionRuntimeTests
     public void Fire_NoTransition_WithMutations_AppliesMutations()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state A initial
             event Go
@@ -933,7 +933,7 @@ public class DslCollectionRuntimeTests
     public void Fire_SetWithMixedSetAssignmentsAndMutations()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             number Count = 0
             state A initial
@@ -960,7 +960,7 @@ public class DslCollectionRuntimeTests
     public void Fire_ReadYourWrites_MutationsVisibleInSubsequentGuards()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state A initial
             state B
@@ -994,7 +994,7 @@ public class DslCollectionRuntimeTests
     public void CreateInstance_CollectionsInitializedEmpty()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             queue<string> Tasks
             stack<boolean> Flags
@@ -1022,7 +1022,7 @@ public class DslCollectionRuntimeTests
     public void Fire_AddDuplicateToSet_NoDuplication()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state A initial
             state B
@@ -1047,7 +1047,7 @@ public class DslCollectionRuntimeTests
     public void Fire_SetSortedOrder_MinMaxCorrect()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             set<number> Floors
             state A initial
             state B
@@ -1076,7 +1076,7 @@ public class DslCollectionRuntimeTests
     public void Fire_AtomicRollback_FailedMutationDoesNotModifyOriginal()
     {
         const string dsl = """
-            machine Sample
+            precept Sample
             queue<string> Tasks
             state A initial
             state B

@@ -1,4 +1,4 @@
-machine VendingMachine
+precept VendingMachine
 
 number CreditCents = 0
 	rule CreditCents >= 0 "Credit cannot be negative"
