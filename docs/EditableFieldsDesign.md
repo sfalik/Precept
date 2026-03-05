@@ -509,7 +509,7 @@ The preview handler adds an `"update"` action (parallel to `"fire"`):
 ```json
 {
   "action": "update",
-  "uri": "file:///path/to/file.sm",
+  "uri": "file:///path/to/file.precept",
   "patches": [
     { "field": "Notes", "op": "set", "value": "Updated notes" },
     { "field": "Tags", "op": "add", "value": "urgent" },
@@ -592,7 +592,7 @@ Tests: add comprehensive tests covering edit block parsing, multi-state edit blo
 
 Documentation: update docs/DesignNotes.md DSL Syntax Contract section to include edit block syntax. Update README.md DSL Syntax Reference, DSL Cookbook, and Status sections. Update docs/EditableFieldsDesign.md status from design phase to implemented.
 
-Syntax highlighting grammar sync (non-negotiable — do not skip): update `tools/StateMachine.Dsl.VsCode/syntaxes/state-machine-dsl.tmLanguage.json` for every new DSL construct introduced by this feature. Apply the Grammar Sync Checklist from `.github/copilot-instructions.md` in full. At minimum, the following changes are required for this feature:
+Syntax highlighting grammar sync (non-negotiable — do not skip): update `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` for every new DSL construct introduced by this feature. Apply the Grammar Sync Checklist from `.github/copilot-instructions.md` in full. At minimum, the following changes are required for this feature:
 
 1. **Declaration form** — add a `fromEditHeader` pattern matching `^(\s*)(from)(\s+)(any|StateList)(\s+)(edit)` so that `from` and `edit` are colored as control/action keywords and the state list gets entity coloring, consistent with the existing `fromOnHeader` pattern.
 2. **Keyword** — add `edit` to the `controlKeywords` alternation so it is highlighted wherever it appears.
@@ -610,4 +610,4 @@ Intellisense sync (non-negotiable — do not skip): apply the Intellisense Sync 
 5. **Semantic token for edit header** — add a regex to `HighlightNamedSymbols` matching the `from … edit` header line and push the state list tokens as `type` and `edit` as `keyword`.
 6. **`ExpressionLineRegex`** — edit block bodies do not contain expressions (only bare field names), so no update to `ExpressionLineRegex` is needed.
 
-Build with dotnet build from repo root. Run tests in test/StateMachine.Tests/ and test/StateMachine.Dsl.LanguageServer.Tests/. Make sure all existing tests still pass.
+Build with dotnet build from repo root. Run tests in test/Precept.Tests/ and test/Precept.LanguageServer.Tests/. Make sure all existing tests still pass.

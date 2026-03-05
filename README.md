@@ -1,12 +1,12 @@
-# StateMachine 🚦
+# Precept 🚦
 
-StateMachine is a .NET DSL-driven state/workflow engine focused on deterministic transition evaluation and persisted instance state.
+Precept is a .NET DSL-driven state/workflow engine focused on deterministic transition evaluation and persisted instance state.
 
 ## Why this project
 
-StateMachine is for applications where entities move through explicit, long-lived lifecycles: support tickets, orders, approvals, onboarding flows, loan pipelines, or any process where "what state are we in and what can happen next" must be clear and consistent.
+Precept is for applications where entities move through explicit, long-lived lifecycles: support tickets, orders, approvals, onboarding flows, loan pipelines, or any process where "what state are we in and what can happen next" must be clear and consistent.
 
-Most teams start these workflows as scattered `if`/`switch` logic across handlers and services. That works at first, then drifts: states become implicit, transition rules are duplicated, and nobody can easily answer why an action is enabled in one case and blocked in another. StateMachine exists to make that lifecycle explicit, executable, and reviewable in one place.
+Most teams start these workflows as scattered `if`/`switch` logic across handlers and services. That works at first, then drifts: states become implicit, transition rules are duplicated, and nobody can easily answer why an action is enabled in one case and blocked in another. Precept exists to make that lifecycle explicit, executable, and reviewable in one place.
 
 The design philosophy is driven by that goal, not by language novelty:
 
@@ -16,11 +16,11 @@ The design philosophy is driven by that goal, not by language novelty:
 - **Integrity over partial success**: transitions are atomic, so branch mutations either all commit or all roll back.
 - **Declarative workflow over embedded programming language**: the DSL intentionally models lifecycle rules, while complex computation stays in host code.
 
-In practice, this library is a good fit when you need auditable workflow behavior that both developers and domain stakeholders can read. The `.sm` file becomes both runtime contract and living documentation, while persisted instances and explicit event arguments make integration straightforward for APIs, UIs, and background processing.
+In practice, this library is a good fit when you need auditable workflow behavior that both developers and domain stakeholders can read. The `.precept` file becomes both runtime contract and living documentation, while persisted instances and explicit event arguments make integration straightforward for APIs, UIs, and background processing.
 
 ## Design Philosophy
 
-StateMachine's DSL is shaped by a small number of principles that come up repeatedly when deciding what to add, what to reject, and how new features should behave.
+Precept's DSL is shaped by a small number of principles that come up repeatedly when deciding what to add, what to reject, and how new features should behave.
 
 ### Expressions are pure; statements mutate
 
@@ -79,8 +79,8 @@ The two paths coexist safely because rules (declarative invariants like `rule Ba
 ## Current Status
 
 - DSL parser/compiler/runtime is implemented and used by the language server for editor diagnostics and preview execution.
-- VS Code extension is implemented with automatic `.sm` language-client activation plus inspector preview panels per file.
-- Inspector preview now exchanges live `snapshot`/`fire`/`reset`/`inspect` requests through the language server (`stateMachine/preview/request`) instead of only local mock data. In the inspector webview, declared event arguments are always sent using DSL-aware semantics (typed user values, explicit `null` for nullable unset args, defaults when declared, and blank for required-without-default), so event status reflects what would happen if the user clicks now; as the user types, `inspect` re-evaluates that same argument set in real time. Server-side preview coercion no longer rewrites blank strings to `null`. Snapshot sync from current `.sm` text is automatic on edit/save/reveal; the toolbar exposes a single lifecycle action, `Reset`, which reinitializes the preview instance to initial state and DSL defaults.
+- VS Code extension is implemented with automatic `.precept` language-client activation plus inspector preview panels per file.
+- Inspector preview now exchanges live `snapshot`/`fire`/`reset`/`inspect` requests through the language server (`precept/preview/request`) instead of only local mock data. In the inspector webview, declared event arguments are always sent using DSL-aware semantics (typed user values, explicit `null` for nullable unset args, defaults when declared, and blank for required-without-default), so event status reflects what would happen if the user clicks now; as the user types, `inspect` re-evaluates that same argument set in real time. Server-side preview coercion no longer rewrites blank strings to `null`. Snapshot sync from current `.precept` text is automatic on edit/save/reveal; the toolbar exposes a single lifecycle action, `Reset`, which reinitializes the preview instance to initial state and DSL defaults.
 - Inspector preview layout uses a single unified ELK layered layout with state-machine-tuned options (top-down direction, spline edge routing, model-order cycle breaking, feedback edges for cycles, inside self-loops, inline edge labels, DSL declaration-order node ordering), dynamic per-state node sizing, and responsive viewBox. Reject and no-transition terminal rules are excluded from the diagram graph.
 - CLI host has been removed in this branch (hard cut); editor + language server are the active runtime surfaces.
 - **Collection types** (`set<T>`, `queue<T>`, `stack<T>`) are implemented with full parser, runtime, and language-server support. Declarations, mutations (`add`/`remove`/`enqueue`/`dequeue`/`push`/`pop`/`clear`), guard properties (`.count`/`.min`/`.max`/`.peek`), and the `contains` operator are all functional. Directional set queries (`above`/`below`) remain deferred pending real usage data.
@@ -94,22 +94,22 @@ The two paths coexist safely because rules (declarative invariants like `rule Ba
 Run the language server:
 
 ```sh
-dotnet run --project tools/StateMachine.Dsl.LanguageServer
+dotnet run --project tools/Precept.LanguageServer
 ```
 
 Run the VS Code extension locally:
 
 ```sh
-cd tools/StateMachine.Dsl.VsCode
+cd tools/Precept.VsCode
 npm install
 npm run compile
 ```
 
-Then press `F5`, open a `.sm` file, and run `StateMachine DSL: Open Inspector Preview`.
+Then press `F5`, open a `.precept` file, and run `Open Preview`.
 
 ## Core Concepts
 
-- **Workflow definition**: immutable compiled DSL (`DslWorkflowEngine`).
+- **Workflow definition**: immutable compiled DSL (`PreceptEngine`).
 - **Instance**: persisted runtime state + data (`DslWorkflowInstance`).
 - **Inspect**: side-effect free transition preview. Possible outcomes: `Accepted` (transition will fire), `AcceptedInPlace` (`no transition` path — event acknowledged, data mutated, state unchanged), `Rejected` (guard or rule blocks), `NotApplicable` (`when` predicate false — block skipped), `NotDefined` (unknown state, event, or no `from...on...` block for the pair). `RequiredEventArgumentKeys` reports which event args are needed.
 - **Fire**: applies state change and data mutations. Returns the same outcome discriminant as `Inspect`. `AcceptedInPlace` commits `set` assignments and collection mutations without changing state. Any runtime failure (rule violation, empty-collection read) triggers full rollback.
@@ -188,30 +188,30 @@ from FlashingRed on ClearEmergency
   transition Red
 ```
 
-The full file (with block comments) is at [`samples/trafficlight.sm`](samples/trafficlight.sm).
+The full file (with block comments) is at [`samples/trafficlight.precept`](samples/trafficlight.precept).
 
 ## Samples
 
-Ready-to-use `.sm` files covering a range of domains and DSL features.
+Ready-to-use `.precept` files covering a range of domains and DSL features.
 
 | File | Scenario | Key Features |
 |---|---|---|
-| [`samples/test.sm`](samples/test.sm) | Bank-account with Active/Overdrawn/Suspended states | `when Balance > 0` guards Withdraw — zero balance makes the event `NotApplicable` rather than `Rejected`; balance rules + positive-amount event rules |
-| [`samples/trafficlight.sm`](samples/trafficlight.sm) | Traffic-light controller with emergency flashing mode | Field rules (`VehiclesWaiting`, `CycleCount`) + event rules (`Emergency`, `VehiclesArrive`) |
-| [`samples/ecommerce.sm`](samples/ecommerce.sm) | E-commerce order lifecycle (shopping → paid → shipped/cancelled) | Event arg validation moved to event rules (`AddItem`, `Cancel`) + cart total arithmetic |
-| [`samples/bugtracker.sm`](samples/bugtracker.sm) | Bug tracker (triage → in progress → review → resolved → closed) | State entry rule (`InProgress` requires assignee) + event rule (`Block.Reason`) |
-| [`samples/smarthome.sm`](samples/smarthome.sm) | Home security system (disarmed → arming delay → armed → triggered) | Stack mutations (`push`/`clear`) + event rule (`SensorTripped.SensorName`) |
-| [`samples/hotel-booking.sm`](samples/hotel-booking.sm) | Hotel reservation lifecycle | Field non-negative rules (`NightsBooked`, `RatePerNight`, `TotalCharge`) + event rules (`Reserve`, `Cancel`) |
-| [`samples/package-delivery.sm`](samples/package-delivery.sm) | Parcel delivery with retry and return flow | `when DeliveryAttempts < 3` makes `LoadForDelivery` `NotApplicable` once attempts are exhausted, leaving `MarkReturned` as the only remaining path; attempt-count field rule + return-reason event rule |
-| [`samples/job-application.sm`](samples/job-application.sm) | Hiring pipeline (submitted → interviews → offer → hired/rejected) | Score/salary field rules + state entry rule (`Hired` requires background clear) |
-| [`samples/bank-loan.sm`](samples/bank-loan.sm) | Loan origination and repayment lifecycle | All rule positions: field, top-level, state, and event |
-| [`samples/subscription.sm`](samples/subscription.sm) | SaaS billing lifecycle (free/trial/active/past-due/suspended/cancelled) | Event-rule-driven input validation + state rule for active-plan integrity |
-| [`samples/patient-admission.sm`](samples/patient-admission.sm) | Patient flow (registered → triaged → admitted → treatment → discharge/transfer) | State entry rule on `Admitted` plus progression via `UpdateProgress` |
-| [`samples/restaurant-order.sm`](samples/restaurant-order.sm) | Restaurant order lifecycle (seated → ordering → prep → served → paid) | Payment state contract (`Paid` requires `PaymentReceived`) + event rules (`SeatGuests`, `AddItem`, `ProcessPayment`) |
-| [`samples/support-ticket.sm`](samples/support-ticket.sm) | Support ticket with escalation and reopen loop | `when !EscalatedOnce` and `when ReopenCount < 3` make Escalate/Reopen `NotApplicable` once their structural caps are reached; queue-based assignment (`enqueue`/`dequeue`) + field/state/event rules (`Priority`, `Assigned`, `Resolve`) |
-| [`samples/document-signing.sm`](samples/document-signing.sm) | Multi-party document signing workflow | Collection-driven transitions with state rules (`PendingSignatories.count`) and event rules (`Void`, `SubmitForReview`) |
-| [`samples/vending-machine.sm`](samples/vending-machine.sm) | Coin-operated vending machine | Monetary field rules (`CreditCents`, `SelectedItemPrice`) + state rule on `Dispensing` |
-| [`samples/elevator.sm`](samples/elevator.sm) | Elevator controller with door lifecycle and emergency halt | Range constraints via field/top-level rules + set-driven floor-request routing |
+| [`samples/test.precept`](samples/test.precept) | Bank-account with Active/Overdrawn/Suspended states | `when Balance > 0` guards Withdraw — zero balance makes the event `NotApplicable` rather than `Rejected`; balance rules + positive-amount event rules |
+| [`samples/trafficlight.precept`](samples/trafficlight.precept) | Traffic-light controller with emergency flashing mode | Field rules (`VehiclesWaiting`, `CycleCount`) + event rules (`Emergency`, `VehiclesArrive`) |
+| [`samples/ecommerce.precept`](samples/ecommerce.precept) | E-commerce order lifecycle (shopping → paid → shipped/cancelled) | Event arg validation moved to event rules (`AddItem`, `Cancel`) + cart total arithmetic |
+| [`samples/bugtracker.precept`](samples/bugtracker.precept) | Bug tracker (triage → in progress → review → resolved → closed) | State entry rule (`InProgress` requires assignee) + event rule (`Block.Reason`) |
+| [`samples/smarthome.precept`](samples/smarthome.precept) | Home security system (disarmed → arming delay → armed → triggered) | Stack mutations (`push`/`clear`) + event rule (`SensorTripped.SensorName`) |
+| [`samples/hotel-booking.precept`](samples/hotel-booking.precept) | Hotel reservation lifecycle | Field non-negative rules (`NightsBooked`, `RatePerNight`, `TotalCharge`) + event rules (`Reserve`, `Cancel`) |
+| [`samples/package-delivery.precept`](samples/package-delivery.precept) | Parcel delivery with retry and return flow | `when DeliveryAttempts < 3` makes `LoadForDelivery` `NotApplicable` once attempts are exhausted, leaving `MarkReturned` as the only remaining path; attempt-count field rule + return-reason event rule |
+| [`samples/job-application.precept`](samples/job-application.precept) | Hiring pipeline (submitted → interviews → offer → hired/rejected) | Score/salary field rules + state entry rule (`Hired` requires background clear) |
+| [`samples/bank-loan.precept`](samples/bank-loan.precept) | Loan origination and repayment lifecycle | All rule positions: field, top-level, state, and event |
+| [`samples/subscription.precept`](samples/subscription.precept) | SaaS billing lifecycle (free/trial/active/past-due/suspended/cancelled) | Event-rule-driven input validation + state rule for active-plan integrity |
+| [`samples/patient-admission.precept`](samples/patient-admission.precept) | Patient flow (registered → triaged → admitted → treatment → discharge/transfer) | State entry rule on `Admitted` plus progression via `UpdateProgress` |
+| [`samples/restaurant-order.precept`](samples/restaurant-order.precept) | Restaurant order lifecycle (seated → ordering → prep → served → paid) | Payment state contract (`Paid` requires `PaymentReceived`) + event rules (`SeatGuests`, `AddItem`, `ProcessPayment`) |
+| [`samples/support-ticket.precept`](samples/support-ticket.precept) | Support ticket with escalation and reopen loop | `when !EscalatedOnce` and `when ReopenCount < 3` make Escalate/Reopen `NotApplicable` once their structural caps are reached; queue-based assignment (`enqueue`/`dequeue`) + field/state/event rules (`Priority`, `Assigned`, `Resolve`) |
+| [`samples/document-signing.precept`](samples/document-signing.precept) | Multi-party document signing workflow | Collection-driven transitions with state rules (`PendingSignatories.count`) and event rules (`Void`, `SubmitForReview`) |
+| [`samples/vending-machine.precept`](samples/vending-machine.precept) | Coin-operated vending machine | Monetary field rules (`CreditCents`, `SelectedItemPrice`) + state rule on `Dispensing` |
+| [`samples/elevator.precept`](samples/elevator.precept) | Elevator controller with door lifecycle and emergency halt | Range constraints via field/top-level rules + set-driven floor-request routing |
 
 ## DSL Syntax Reference
 
@@ -841,17 +841,17 @@ All rules are evaluated independently; all violations are collected and reported
 
 Project:
 
-- `tools/StateMachine.Dsl.LanguageServer`
+- `tools/Precept.LanguageServer`
 
 Run manually over stdio:
 
 ```sh
-dotnet run --project tools/StateMachine.Dsl.LanguageServer
+dotnet run --project tools/Precept.LanguageServer
 ```
 
 Current MVP capabilities:
 
-- Parses/compiles `.sm` documents on open/change/save and publishes diagnostics.
+- Parses/compiles `.precept` documents on open/change/save and publishes diagnostics.
 - Converts parser `Line N:` failures into line-scoped LSP error diagnostics.
 - Provides completion items for DSL keywords.
 - Provides contextual completion for known `state` names (`from`, `transition`) and known `event` names (`on`).
@@ -864,18 +864,18 @@ Current MVP capabilities:
 Notes:
 
 - Server transport is stdio and is ready for editor-client wiring.
-- This repository now includes a local VS Code client extension for automatic `.sm` activation.
+- This repository now includes a local VS Code client extension for automatic `.precept` activation.
 
 ## VS Code Client Extension (MVP)
 
 Project:
 
-- `tools/StateMachine.Dsl.VsCode`
+- `tools/Precept.VsCode`
 
 Setup:
 
 ```sh
-cd tools/StateMachine.Dsl.VsCode
+cd tools/Precept.VsCode
 npm install
 npm run compile
 ```
@@ -883,7 +883,7 @@ npm run compile
 Local package (no publishing/CI):
 
 ```sh
-cd tools/StateMachine.Dsl.VsCode
+cd tools/Precept.VsCode
 npm run package:local
 code --install-extension .\state-machine-dsl-vscode-0.0.1.vsix
 ```
@@ -891,7 +891,7 @@ code --install-extension .\state-machine-dsl-vscode-0.0.1.vsix
 One-command local update loop (package + install):
 
 ```sh
-cd tools/StateMachine.Dsl.VsCode
+cd tools/Precept.VsCode
 npm run loop:local
 ```
 
@@ -902,11 +902,11 @@ Fast inner-loop (no VSIX package/install):
 - Start TypeScript watch once:
 
 ```sh
-cd tools/StateMachine.Dsl.VsCode
+cd tools/Precept.VsCode
 npm run dev:watch
 ```
 
-- In VS Code, press `F5` and select `Extension (StateMachine DSL) Fast Dev`.
+- In VS Code, press `F5` and select the extension host launch profile for Precept.
 - Keep watch running while iterating; reload the Extension Development Host window to pick up changes quickly.
 
 In-IDE trigger (no terminal typing):
@@ -916,35 +916,35 @@ In-IDE trigger (no terminal typing):
 
 Run/debug in VS Code:
 
-- Press `F5` and select `Extension (StateMachine DSL)`.
-- Open a `.sm` file in the Extension Development Host to auto-start the language server client.
+- Press `F5` and select the extension host launch profile.
+- Open a `.precept` file in the Extension Development Host to auto-start the language server client.
 - Client startup in Extension Development Host does not require opening a workspace folder first.
-- For locally installed VSIX testing, open either the repository root (`StateMachine`) or `tools/StateMachine.Dsl.VsCode` so the extension can resolve `tools/StateMachine.Dsl.LanguageServer/StateMachine.Dsl.LanguageServer.csproj`.
-- `.sm` files include TextMate syntax highlighting (keywords, declarations, strings, numbers, operators, comments).
+- For locally installed VSIX testing, open either the repository root (`Precept`) or `tools/Precept.VsCode` so the extension can resolve `tools/Precept.LanguageServer/Precept.LanguageServer.csproj`.
+- `.precept` files include TextMate syntax highlighting (keywords, declarations, strings, numbers, operators, comments).
 - Semantic highlighting is enabled (`semanticHighlighting`) and enriched by language-server semantic tokens.
-- Local packaging uses `npm run package:local` and emits a `.vsix` in `tools/StateMachine.Dsl.VsCode`.
+-- Local packaging uses `npm run package:local` and emits a `.vsix` in `tools/Precept.VsCode`.
 - Fast local iteration uses `npm run loop:local` to package and force-install the latest VSIX.
 - Local VSIX packaging includes language-client runtime dependencies (`node_modules`) required for extension activation.
 - Local VSIX packaging also includes webview assets under `webview/` required by inspector preview.
-- Inspector preview can be opened from command palette via `StateMachine DSL: Open Inspector Preview` while editing a `.sm` file.
-- Preview opens as dedicated webview panels per `.sm` file (independent panel/session per file URI).
-- Preview panels request live snapshots from the language server and refresh from unsaved in-memory `.sm` edits as the document changes.
-- Preview also refreshes on `.sm` save and when an existing panel is re-focused/revealed.
+- Inspector preview can be opened from command palette via `Open Preview` while editing a `.precept` file.
+- Preview opens as dedicated webview panels per `.precept` file (independent panel/session per file URI).
+- Preview panels request live snapshots from the language server and refresh from unsaved in-memory `.precept` edits as the document changes.
+- Preview also refreshes on `.precept` save and when an existing panel is re-focused/revealed.
 - Snapshot updates are sequence-ordered so stale async responses cannot overwrite newer in-memory edits.
 - Preview webview accepts both camelCase and PascalCase snapshot payload keys for robust host/runtime compatibility.
 - `Reload` requests a fresh live snapshot (with a short retry) from the current in-memory editor buffer; it does not require saving first.
 - Preview event actions (`fire`, `reset`, `replay`) are executed via the language server runtime session for that file.
-- The language server binds preview requests with a typed JSON-RPC request handler and declares `[Method("stateMachine/preview/request")]` on `SmPreviewRequest` to ensure runtime method registration.
+- The language server binds preview requests with a typed JSON-RPC request handler and declares `[Method("precept/preview/request")]` on `SmPreviewRequest` to ensure runtime method registration.
 
 Troubleshooting completion/diagnostics:
 
-- Open `View: Output` and select `StateMachine DSL` to inspect language-client startup logs and server path resolution.
+- Open `View: Output` and select `Precept` to inspect language-client startup logs and server path resolution.
 
 ### Inspector Preview UI (Current)
 
-- Runtime preview uses `tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html`, which is the production webview sourcing all state from language-server snapshots. The file contains no hardcoded demo data and requires the VS Code extension host to function.
-- Mock reference remains intact at `tools/StateMachine.Dsl.VsCode/mockups/interactive-inspector-mockup.html` and is not used as the runtime source file.
-- State graph/events/data visuals follow the mock-style presentation while `snapshot`/`fire`/`reset`/`replay` requests execute against the real `.sm` runtime session.
+-- Runtime preview uses `tools/Precept.VsCode/webview/inspector-preview.html`, which is the production webview sourcing all state from language-server snapshots. The file contains no hardcoded demo data and requires the VS Code extension host to function.
+-- Mock reference remains intact at `tools/Precept.VsCode/mockups/interactive-inspector-mockup.html` and is not used as the runtime source file.
+-- State graph/events/data visuals follow the mock-style presentation while `snapshot`/`fire`/`reset`/`replay` requests execute against the real `.precept` runtime session.
 - Runtime layout uses a single unified ELK layered graph computed in the extension host and attached as `snapshot.layout` (`nodes` with per-node `width`/`height`, `edges` with ELK-routed bend-point arrays, `width`, `height`).
 - ELK options are state-machine-tuned: top-down direction, spline edge routing, model-order cycle breaking, feedback edges for cycle handling, inside self-loops, inline edge labels, network-simplex node placement, and DSL declaration-order node/port ordering.
 - Reject and no-transition terminal rules are excluded from the layout graph and diagram edges; only real state-change transitions are rendered.
@@ -952,7 +952,7 @@ Troubleshooting completion/diagnostics:
 - Edge paths use Catmull-Rom to cubic Bézier spline conversion for smooth curves from ELK bend points.
 - Webview viewBox is set responsively from ELK-computed graph dimensions with 50px padding per side (minimum 600×300).
 - If ELK layout data is missing or empty, the diagram shows an error message instead of attempting a fallback layout.
-- Supported runtime actions are `snapshot` (reload), `fire`, `reset`, and `replay` via `stateMachine/preview/request`.
+-- Supported runtime actions are `snapshot` (reload), `fire`, `reset`, and `replay` via `precept/preview/request`.
 - `Reload` requests a fresh runtime snapshot from the current in-memory editor text.
 - Activity log lines are sourced from runtime responses (including replay messages and snapshot failures).
 
@@ -969,7 +969,7 @@ Exit codes:
 
 Implemented now:
 
-- Line-based DSL parser/runtime in `src/StateMachine/Dsl/*`
+- Line-based DSL parser/runtime in `src/Precept/Dsl/*`
 - Explicit `data` contracts and event argument contracts (scalar-only)
 - Instance-first runtime APIs (`CreateInstance`, `Inspect`, `Fire`)
 - Guard evaluation with rejection reasons
@@ -977,15 +977,15 @@ Implemented now:
 - Set parser/model foundation for B-v1: transitions now carry ordered set-assignment lists and set expressions parse into an expression AST.
 - Shared AST expression evaluator now drives guard evaluation and set expression execution.
 - Atomic ordered multi-set execution is implemented on fire-path updates with read-your-writes and all-or-nothing commit semantics.
-- Active test coverage in `test/StateMachine.Tests/DslWorkflowTests.cs`
-- Active parser/runtime coverage also includes expression AST parsing/edge-case diagnostics, set parsing coverage, and runtime evaluator operator/short-circuit behavior in `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslSetParsingTests.cs`, and `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`.
-- Language-server analyzer coverage now includes null-flow narrowing diagnostics tests in `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs`.
-- Language server MVP in `tools/StateMachine.Dsl.LanguageServer` (stdio diagnostics + completion)
-- Language server MVP in `tools/StateMachine.Dsl.LanguageServer` (stdio diagnostics + completion + semantic tokens)
+- Active test coverage in `test/Precept.Tests/DslWorkflowTests.cs`
+- Active parser/runtime coverage also includes expression AST parsing/edge-case diagnostics, set parsing coverage, and runtime evaluator operator/short-circuit behavior in `test/Precept.Tests/DslExpressionParserTests.cs`, `test/Precept.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/Precept.Tests/DslSetParsingTests.cs`, and `test/Precept.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`.
+- Language-server analyzer coverage now includes null-flow narrowing diagnostics tests in `test/Precept.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs`.
+- Language server MVP in `tools/Precept.LanguageServer` (stdio diagnostics + completion)
+- Language server MVP in `tools/Precept.LanguageServer` (stdio diagnostics + completion + semantic tokens)
 - Language server semantic diagnostics now validate expression operator/type compatibility, set-target type compatibility, and null-flow narrowing for explicit null checks in `&&`/`||` guard paths.
 - Language server completion now includes operator-aware suggestions in guard and set-expression contexts.
-- VS Code client MVP in `tools/StateMachine.Dsl.VsCode` (auto-start for `.sm` files)
-- VS Code client contributes TextMate syntax highlighting for `.sm` files
+- VS Code client MVP in `tools/Precept.VsCode` (auto-start for `.precept` files)
+- VS Code client contributes TextMate syntax highlighting for `.precept` files
 
 Pending:
 
@@ -1054,23 +1054,23 @@ This workspace recommends official .NET extensions via `.vscode/extensions.json`
 - `ms-dotnettools.csharp`
 - `ms-dotnettools.vscode-dotnet-runtime`
 
-Press `F5` and choose `Extension (StateMachine DSL)` to run the extension host.
+Press `F5` and choose the Precept extension host launch profile.
 
 ## Repository Layout
 
 ```text
-src/StateMachine/
+src/Precept/
     Dsl/
-        StateMachineDslModel.cs
-        StateMachineDslParser.cs
-        StateMachineDslRuntime.cs
+        PreceptModel.cs
+        PreceptParser.cs
+        PreceptRuntime.cs
 
-tools/StateMachine.Dsl.LanguageServer/
+tools/Precept.LanguageServer/
     Program.cs
 
-tools/StateMachine.Dsl.VsCode/
+tools/Precept.VsCode/
   src/extension.ts
 
-test/StateMachine.Tests/
+test/Precept.Tests/
     DslWorkflowTests.cs
 ```

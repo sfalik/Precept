@@ -1,5 +1,5 @@
 using StateMachine.Dsl;
-var text = System.IO.File.ReadAllText("../../../../samples/trafficlight.sm");
+var text = System.IO.File.ReadAllText("../../../../samples/trafficlight.precept");
 try
 {
     var machine = DslWorkflowParser.Parse(text);

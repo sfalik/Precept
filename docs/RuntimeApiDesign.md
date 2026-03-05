@@ -1,63 +1,63 @@
 # Runtime API Design
 
-This document describes the current public API surface of the `StateMachine.Dsl` runtime — the three static/sealed types that together form the complete usage contract.
+This document describes the current public API surface of the `Precept` runtime — the three static/sealed types that together form the complete usage contract.
 
 ## Overview
 
 The runtime is a three-step pipeline:
 
 ```
-.sm text  ──►  DslWorkflowParser.Parse()  ──►  DslWorkflowModel
-DslWorkflowModel  ──►  DslWorkflowCompiler.Compile()  ──►  DslWorkflowEngine
-DslWorkflowEngine  ──►  CreateInstance()  ──►  DslWorkflowInstance (mutable over time)
+.precept text  ──►  PreceptParser.Parse()  ──►  DslWorkflowModel
+DslWorkflowModel  ──►  PreceptCompiler.Compile()  ──►  PreceptEngine
+PreceptEngine  ──►  CreateInstance()  ──►  DslWorkflowInstance (mutable over time)
 ```
 
 All three steps are pure functions. No hidden state is accumulated outside the values returned by each step.
 
 ---
 
-## Step 1 — Parsing: `DslWorkflowParser`
+## Step 1 — Parsing: `PreceptParser`
 
 ```csharp
-public static class DslWorkflowParser
+public static class PreceptParser
 {
     public static DslWorkflowModel Parse(string text)
 }
 ```
 
-Parses a `.sm` DSL text string into a `DslWorkflowModel` record tree. Throws `InvalidOperationException` on syntax errors. The returned `DslWorkflowModel` is a passive, immutable parse tree — it carries no behavior and performs no validation beyond what the parser itself enforces.
+Parses a `.precept` DSL text string into a `DslWorkflowModel` record tree. Throws `InvalidOperationException` on syntax errors. The returned `DslWorkflowModel` is a passive, immutable parse tree — it carries no behavior and performs no validation beyond what the parser itself enforces.
 
 ---
 
-## Step 2 — Compilation: `DslWorkflowCompiler`
+## Step 2 — Compilation: `PreceptCompiler`
 
 ```csharp
-public static class DslWorkflowCompiler
+public static class PreceptCompiler
 {
-    public static DslWorkflowEngine Compile(DslWorkflowModel model)
+    public static PreceptEngine Compile(DslWorkflowModel model)
 }
 ```
 
-Compiles a `DslWorkflowModel` into an immutable `DslWorkflowEngine`. Compilation performs semantic validation:
+Compiles a `DslWorkflowModel` into an immutable `PreceptEngine`. Compilation performs semantic validation:
 
 - All state names referenced in transitions exist.
 - All event names referenced in transitions exist.
 - All field names referenced in `set` assignments exist.
 - All literal `set` assignments satisfy field rules and top-level rules.
 
-Throws `InvalidOperationException` with a descriptive message if any check fails. Once compilation succeeds, the returned `DslWorkflowEngine` is guaranteed to be internally consistent.
+Throws `InvalidOperationException` with a descriptive message if any check fails. Once compilation succeeds, the returned `PreceptEngine` is guaranteed to be internally consistent.
 
 ---
 
-## Step 3 — Engine: `DslWorkflowEngine`
+## Step 3 — Engine: `PreceptEngine`
 
-The immutable compiled engine. One `DslWorkflowEngine` instance represents one workflow definition and can be shared freely across threads and requests.
+The immutable compiled engine. One `PreceptEngine` instance represents one workflow definition and can be shared freely across threads and requests.
 
 ### Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `Name` | `string` | Workflow name as declared with `machine`. |
+| `Name` | `string` | Workflow name as declared with `precept`. |
 | `States` | `IReadOnlyList<string>` | All declared state names in declaration order. |
 | `InitialState` | `string` | The state marked `initial`. |
 | `Events` | `IReadOnlyList<DslEvent>` | All declared events with their argument contracts. |
@@ -288,7 +288,7 @@ public sealed record DslCompatibilityResult(bool IsCompatible, string? Reason)
 
 ## Concurrency Model
 
-`DslWorkflowEngine` is immutable and thread-safe after construction — share one engine instance across all requests.
+`PreceptEngine` is immutable and thread-safe after construction — share one engine instance across all requests.
 
 `DslWorkflowInstance` is an immutable record — share or store freely. Do not mutate `InstanceData` after construction.
 
@@ -300,8 +300,8 @@ All coordination for concurrent reads and writes to persisted instance storage (
 
 ```csharp
 // 1. One-time startup
-var model  = DslWorkflowParser.Parse(File.ReadAllText("loan.sm"));
-var engine = DslWorkflowCompiler.Compile(model);
+var model  = PreceptParser.Parse(File.ReadAllText("loan.precept"));
+var engine = PreceptCompiler.Compile(model);
 
 // 2. Per-request — create or load instance
 var instance = engine.CreateInstance();
@@ -335,7 +335,7 @@ else
 
 ## Model Types (Parse Tree)
 
-The following types are returned by `DslWorkflowParser.Parse` and consumed by `DslWorkflowCompiler.Compile`. They are not normally needed by callers of the engine directly.
+The following types are returned by `PreceptParser.Parse` and consumed by `PreceptCompiler.Compile`. They are not normally needed by callers of the engine directly.
 
 | Type | Description |
 |------|-------------|

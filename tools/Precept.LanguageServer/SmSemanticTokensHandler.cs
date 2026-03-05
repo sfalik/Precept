@@ -8,7 +8,7 @@ namespace Precept.LanguageServer;
 
 internal sealed class SmSemanticTokensHandler : SemanticTokensHandlerBase
 {
-    private static readonly TextDocumentSelector Selector = TextDocumentSelector.ForPattern("**/*.sm");
+    private static readonly TextDocumentSelector Selector = TextDocumentSelector.ForPattern("**/*.precept");
 
     private static readonly SemanticTokensLegend Legend = new()
     {

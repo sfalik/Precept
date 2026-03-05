@@ -1,4 +1,4 @@
-# StateMachine Design Notes
+# Precept Design Notes
 
 Date: 2026-02-24
 
@@ -8,7 +8,7 @@ This document tracks current design decisions for the active implementation on t
 
 Implementation focus is the DSL runtime path:
 
-- parse `.sm` definitions
+- parse `.precept` definitions
 - validate semantic correctness
 - execute inspection/fire against a compiled in-memory workflow definition
 
@@ -191,11 +191,11 @@ All diagnostic sites upgraded from line-level to column-precise squiggles:
 
 ## Editor-First Preview Integration (Current)
 
-- The VS Code extension now includes an inspector preview command (`StateMachine DSL: Open Inspector Preview`).
-- Preview is implemented as dedicated webview panels keyed per `.sm` file URI (one panel/session per file).
+- The VS Code extension now includes an inspector preview command (Command Palette: `Open Preview`, command id `precept.openPreview`).
+- Preview is implemented as dedicated webview panels keyed per `.precept` file URI (one panel/session per file).
 - This chooses the editor-first option where each file can maintain independent preview context without active-editor multiplexing.
-- Preview UI is loaded from `tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html` and uses the mock-style visual shell with a live runtime bridge.
-- The reference mock file remains at `tools/StateMachine.Dsl.VsCode/mockups/interactive-inspector-mockup.html`; runtime panel behavior is driven by the webview copy.
+- Preview UI is loaded from `tools/Precept.VsCode/webview/inspector-preview.html` and uses the mock-style visual shell with a live runtime bridge.
+- The reference mock file remains at `tools/Precept.VsCode/mockups/interactive-inspector-mockup.html`; runtime panel behavior is driven by the webview copy.
 - Runtime diagram layout uses a single unified ELK layered layout computed in the extension host and attached as `snapshot.layout` (`nodes` with per-node `width`/`height`, `edges` with ELK-routed bend-point arrays, `width`, `height`).
 - ELK options are state-machine-tuned: top-down direction (`elk.direction: DOWN`), spline edge routing (`elk.edgeRouting: SPLINES`), greedy cycle breaking, feedback edges for cycle handling, inside self-loops, inline edge labels, network-simplex node placement, and DSL declaration-order node/port ordering.
 - Reject and no-transition terminal rules are excluded from the ELK layout graph and webview diagram edges; only real state-change transitions produce edges. Terminal rules remain in the transitions array for event discovery and evaluation logic.
@@ -203,12 +203,12 @@ All diagnostic sites upgraded from line-level to column-precise squiggles:
 - No post-processing passes are applied (no stabilization, deconfliction, ingress bands, or normalization); ELK handles crossing minimization, self-loops, backward edges, and parallel edges directly.
 - Runtime webview consumes ELK geometry (node positions/sizes and edge bend-point arrays) and converts edge points to smooth Catmull-Rom → cubic Bézier spline paths.
 - Webview viewBox is set responsively from ELK-computed graph dimensions with 50px padding per side (minimum 600×300); no content-bounds normalization or clamping is applied.
-- The preview webview now calls a custom LSP endpoint (`stateMachine/preview/request`) for `snapshot`, `fire`, `reset`, `replay`, and `inspect` actions. The `inspect` action re-evaluates a single event with caller-supplied arguments so the webview gets real-time guard status without local duplication of guard logic.
+- The preview webview now calls a custom LSP endpoint (`precept/preview/request`) for `snapshot`, `fire`, `reset`, `replay`, and `inspect` actions. The `inspect` action re-evaluates a single event with caller-supplied arguments so the webview gets real-time guard status without local duplication of guard logic.
 - Inspector webview behavior is intentionally "click-now" oriented: for events with declared arguments, the webview sends all declared arg keys on `inspect`/`fire` (blank when the user has not typed a value yet), and after each snapshot it performs an immediate per-event inspect refresh so initial status colors match immediate click outcomes.
 - Events whose current live outcome is `NotApplicable` (i.e., the `when` guard is false) are hidden from the event dock entirely. They are still inspected on every refresh cycle so they reappear automatically when the `when` condition becomes true again.
 - Argument construction in the inspector webview is DSL-contract strict: user-entered values are normalized to declared scalar types, nullable unset args are sent as `null`, declared defaults are sent when untouched, and required-without-default args are sent as blank placeholders. The preview handler no longer converts blank strings to `null`; it only performs JSON-shape/type coercion.
 - Inspector webview exposes a single explicit lifecycle control: `Reset` issues `reset` to create a fresh instance at the machine's initial state with DSL defaults.
-- The preview endpoint is bound through a typed JSON-RPC request handler (`IJsonRpcRequestHandler<SmPreviewRequest, SmPreviewResponse>`) with the method contract declared on `SmPreviewRequest` via `[Method("stateMachine/preview/request")]` so registration is discoverable at runtime.
+- The preview endpoint is bound through a typed JSON-RPC request handler (`IJsonRpcRequestHandler<SmPreviewRequest, SmPreviewResponse>`) with the method contract declared on `SmPreviewRequest` via `[Method("precept/preview/request")]` so registration is discoverable at runtime.
 - Language server preview sessions are in-memory and keyed by document URI; each session keeps parsed/compiled definition and current instance state.
 - The extension pushes updated snapshots to an open file panel on document change, keeping preview content aligned with current editor text.
 - Extension refreshes preview snapshots on document change, save, and panel re-focus/reveal for recovery from stale panel state.
@@ -221,7 +221,7 @@ All diagnostic sites upgraded from line-level to column-precise squiggles:
 - Replay responses include `replayMessages`; the preview renders them as a compact transcript in the event dock.
 - Snapshot request failures are surfaced in the same transcript area.
 - Extension packaging must include `webview/inspector-preview.html` so installed VSIX preview panels can render.
-- Local extension development supports a fast watch loop (`npm run dev:watch` / task `extension: watch`) plus launch profile `Extension (StateMachine DSL) Fast Dev` to avoid VSIX repackaging on each edit.
+- Local extension development supports a fast watch loop (`npm run dev:watch` / task `extension: watch`) plus a VS Code Extension Host launch profile (see `.vscode/launch.json`) to avoid VSIX repackaging on each edit.
 
 ### Preview Fire-Animation Ordering (Deferred)
 
@@ -709,14 +709,14 @@ Validation constraints:
 
 ## Implemented Components
 
-- `StateMachine.Dsl.DslWorkflowModel` parse tree (was `DslMachine`)
-- `StateMachine.Dsl.DslWorkflowParser` — `DslWorkflowParser.Parse(text)` returns `DslWorkflowModel` (was `StateMachineDslParser`)
-- `StateMachine.Dsl.DslWorkflowCompiler` — `Compile(DslWorkflowModel)` returns `DslWorkflowEngine`
-- `StateMachine.Dsl.DslWorkflowEngine` — immutable compiled engine (was `DslWorkflowDefinition`)
-- `StateMachine.Dsl.DslWorkflowInstance` persisted instance model
+- `Precept.DslWorkflowModel` parse tree (was `DslMachine`)
+- `Precept.PreceptParser` — `PreceptParser.Parse(text)` returns `DslWorkflowModel`
+- `Precept.PreceptCompiler` — `Compile(DslWorkflowModel)` returns `PreceptEngine`
+- `Precept.PreceptEngine` — immutable compiled engine
+- `Precept.DslWorkflowInstance` persisted instance model
 - Result types: `DslEventInspectionResult`, `DslInspectionResult` (aggregate), `DslFireResult`, `DslCompatibilityResult`
-- `tools/StateMachine.Dsl.LanguageServer` (LSP diagnostics/completion/semantic tokens + preview request handler)
-- `tools/StateMachine.Dsl.VsCode` (language client + inspector preview webview)
+- `tools/Precept.LanguageServer` (LSP diagnostics/completion/semantic tokens + preview request handler)
+- `tools/Precept.VsCode` (language client + inspector preview webview)
 
 ## Current Runtime Semantics
 
@@ -737,7 +737,7 @@ Validation constraints:
 
 ## Concurrency Model (Current)
 
-- `DslWorkflowEngine` is immutable after compile.
+- `PreceptEngine` is immutable after compile.
 - Runtime does not maintain hidden mutable process state; state progresses through returned `DslWorkflowInstance` values.
 - Any coordination for concurrently reading/writing persisted instance files is outside runtime scope and must be handled by the caller.
 
@@ -747,7 +747,7 @@ Validation constraints:
 
 ## Test Status
 
-- Active tests include `test/StateMachine.Tests/DslWorkflowTests.cs`, `test/StateMachine.Tests/DslExpressionParserTests.cs`, `test/StateMachine.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/StateMachine.Tests/DslSetParsingTests.cs`, `test/StateMachine.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`, `test/StateMachine.Tests/DslCollectionTests.cs`, `test/StateMachine.Tests/DslRulesTests.cs`, `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs`, and `test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerCollectionMutationTests.cs`.
+- Active tests include `test/Precept.Tests/DslWorkflowTests.cs`, `test/Precept.Tests/DslExpressionParserTests.cs`, `test/Precept.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/Precept.Tests/DslSetParsingTests.cs`, `test/Precept.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`, `test/Precept.Tests/DslCollectionTests.cs`, `test/Precept.Tests/DslRulesTests.cs`, `test/Precept.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs`, and `test/Precept.LanguageServer.Tests/SmDslAnalyzerCollectionMutationTests.cs`.
 - Guard/expression test coverage includes: boolean guards, comparisons, string/null equality, numeric runtime type coercion, unsupported-expression rejection, reason aggregation, expression AST parsing precedence/invalid syntax diagnostics, lexer edge cases, set-branch parsing constraints, and runtime evaluator operator/short-circuit behavior.
 - Language-server null-narrowing coverage includes: single-expression `&&`/`||` narrowing, cross-branch narrowing across ordered if/else-if/else chains, set-assignment validation under narrowed types, and collection mutation value type checking.
 
@@ -773,7 +773,7 @@ Validation constraints:
 - Top-level typed declarations define persisted instance-data scalar contracts.
 - Inline typed event arguments (`event Name(Type)`) are rejected; use indented event argument declarations instead.
 - Runtime supports persisted instance creation and instance-based `Inspect(...)` / `Fire(...)`.
-- `tools/StateMachine.Dsl.LanguageServer` provides LSP stdio diagnostics/completion MVP for `.sm` files.
+- `tools/Precept.LanguageServer` provides LSP stdio diagnostics/completion MVP for `.precept` files.
 - LSP diagnostics run parser/compiler validation on document open/change/save and map parser `Line N:` failures to line-scoped diagnostics.
 - `DslTransition` and `DslTerminalRule` model records carry a `SourceLine` property (0 = unknown) recorded by the parser at the `from … on …` header line. `ValidateReferences` uses these to emit `Line N:` prefixes on all reference errors (unknown state/event/field), enabling the language server to squiggle the exact offending `from … on …` line rather than always falling back to line 0.
 - `DslTransition` also carries `TargetLine` (the `transition <State>` inner line), used by `ValidateReferences` to point unknown-target-state errors at the correct line inside the block rather than the header.
@@ -790,19 +790,19 @@ Validation constraints:
 - LSP completion includes event-argument member suggestions after `<EventName>.` in guard/set expressions.
 - LSP completion includes snippet-style templates for common branch/outcome patterns (`from ... on ...`, `if/else if/else`, `transition`, `reject`, `no transition`, and `set`).
 - LSP semantic tokens provide role-aware highlighting for keywords, state/event symbols, variable identifiers, strings, numbers, operators, and comments.
-- `tools/StateMachine.Dsl.VsCode` provides a VS Code client MVP that auto-starts the language server for `.sm` files.
+- `tools/Precept.VsCode` provides a VS Code client MVP that auto-starts the language server for `.precept` files.
 - VS Code client startup resolves the language-server project relative to extension location and does not require a workspace folder in Extension Development Host.
-- VS Code client startup for locally installed VSIX resolves the language-server project from current workspace folder paths (repo root or `tools/StateMachine.Dsl.VsCode`) with extension-path fallback for Extension Development Host.
-- VS Code client contributes TextMate grammar-based syntax highlighting for `.sm` files.
-- The TextMate grammar is at `tools/StateMachine.Dsl.VsCode/syntaxes/state-machine-dsl.tmLanguage.json`. It must be kept in sync with the DSL parser whenever keywords, statement forms, operators, or type names change. Patterns are ordered: declarations → dotted event-arg refs → field declarations → control keywords → type keywords → action keywords → operators → boolean/null constants → numbers → identifier catch-all → strings. Multi-character operators must appear before single-character operators in the operators block.
-- Completions are implemented in `tools/StateMachine.Dsl.LanguageServer/SmDslAnalyzer.cs` (`GetCompletions`, `KeywordItems`, context-specific branches, snippet lists). It must be kept in sync with the DSL parser: every new keyword goes into `KeywordItems`; every new statement position that has a distinct valid completion set needs a regex branch in `GetCompletions`.
-- Semantic tokens are implemented in `tools/StateMachine.Dsl.LanguageServer/SmSemanticTokensHandler.cs` (`KeywordTokens`, `HighlightNamedSymbols`, `OperatorRegex`, `ExpressionLineRegex`). It must be kept in sync with the DSL parser: every new keyword goes into `KeywordTokens`; new declaration header forms go into `HighlightNamedSymbols`; new operators go into `OperatorRegex` (multi-char first); new expression-containing line prefixes go into `ExpressionLineRegex`.
+- VS Code client startup for locally installed VSIX resolves the language-server project from current workspace folder paths (repo root or `tools/Precept.VsCode`) with extension-path fallback for Extension Development Host.
+- VS Code client contributes TextMate grammar-based syntax highlighting for `.precept` files.
+- The TextMate grammar is at `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`. It must be kept in sync with the DSL parser whenever keywords, statement forms, operators, or type names change. Patterns are ordered: declarations → dotted event-arg refs → field declarations → control keywords → type keywords → action keywords → operators → boolean/null constants → numbers → identifier catch-all → strings. Multi-character operators must appear before single-character operators in the operators block.
+- Completions are implemented in `tools/Precept.LanguageServer/SmDslAnalyzer.cs` (`GetCompletions`, `KeywordItems`, context-specific branches, snippet lists). It must be kept in sync with the DSL parser: every new keyword goes into `KeywordItems`; every new statement position that has a distinct valid completion set needs a regex branch in `GetCompletions`.
+- Semantic tokens are implemented in `tools/Precept.LanguageServer/SmSemanticTokensHandler.cs` (`KeywordTokens`, `HighlightNamedSymbols`, `OperatorRegex`, `ExpressionLineRegex`). It must be kept in sync with the DSL parser: every new keyword goes into `KeywordTokens`; new declaration header forms go into `HighlightNamedSymbols`; new operators go into `OperatorRegex` (multi-char first); new expression-containing line prefixes go into `ExpressionLineRegex`.
 - Apply the Grammar Sync Checklist and Intellisense Sync Checklist from `.github/copilot-instructions.md` for every DSL change.
-- VS Code client supports local-only VSIX packaging via `npm run package:local` in `tools/StateMachine.Dsl.VsCode`.
+- VS Code client supports local-only VSIX packaging via `npm run package:local` in `tools/Precept.VsCode`.
 - Local VSIX packaging includes language-client runtime dependencies so activation works after install.
-- VS Code client supports a local package+install loop via `npm run loop:local` in `tools/StateMachine.Dsl.VsCode`.
-- VS Code client activates from `workspaceContains:**/*.sm` plus language contribution activation and writes startup diagnostics to the `StateMachine DSL` output channel.
-- Repository includes runnable DSL examples such as `samples/trafficlight.sm`.
+- VS Code client supports a local package+install loop via `npm run loop:local` in `tools/Precept.VsCode`.
+- VS Code client activates from `workspaceContains:**/*.precept` plus language contribution activation and writes startup diagnostics to the `Precept` output channel.
+- Repository includes runnable DSL examples such as `samples/trafficlight.precept`.
 
 Supported default guard forms:
 

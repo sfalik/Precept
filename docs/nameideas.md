@@ -60,7 +60,7 @@ The library enforces that **state and data change together, only through transit
 
 ## The "Precept" Decision (March 2026)
 
-As the project evolved to include data bound to state, atomic mutations, `edit` fields, and most importantly, top-level and field-level `rule` invariants, "StateMachine" began to undersell the scope. It is no longer just a state machine—it is a **deterministic entity lifecycle engine**.
+As the project evolved to include data bound to state, atomic mutations, `edit` fields, and most importantly, top-level and field-level `rule` invariants, the original name began to undersell the scope. It is no longer just a state machine—it is a **deterministic entity lifecycle engine**.
 
 We have decided to center the next phase of the project around the name **Precept**.
 
@@ -70,12 +70,12 @@ We have decided to center the next phase of the project around the name **Precep
 ### The Philosophical Alignment
 * **The Engine is a Guardian:** By wrapping state, data, and transitions together into a single cohesive unit, the engine strictly enforces the *precepts* of an entity. 
 * **Rules are Precepts:** The introduction of the `rule` keyword (`rule Balance >= 0`) literally defines precepts that cannot be violated, whether moving through a transition or executing a direct data `edit`.
-* **Domain Integrity over Plumbing:** "StateMachine" implies low-level infrastructure (nodes, edges, switches). "Precept" elevates the conversation to business domain integrity. The DSL file acts as the comprehensive constitution—the absolute precepts—for an entity's lifecycle.
+* **Domain Integrity over Plumbing:** The old branding implied low-level infrastructure (nodes, edges, switches). "Precept" elevates the conversation to business domain integrity. The DSL file acts as the comprehensive constitution—the absolute precepts—for an entity's lifecycle.
 * **Compliance & Predictability:** The engine's core guarantees—atomic transitions, determinism, and inspect-before-fire—all exist to uphold the defined precepts without side effects.
 
 ### Proposed Nomenclature Shift (For Future Migration)
 * **Project Name:** `Precept`
 * **Core Metaphor:** Developers write the "lifecycle precepts" for an entity (e.g., an Order, a Support Ticket).
-* **Namespaces:** `StateMachine.*` → `Precept.*` (e.g., `Precept.Runtime`, `Precept.LanguageServer`)
+* **Namespaces:** `Precept.*` (e.g., `Precept.Runtime`, `Precept.LanguageServer`)
 * **Core Types:** `DslMachine` → `PreceptDefinition` or `PreceptMachine`, `DslWorkflowInstance` → `PreceptInstance`.
-* **File Extension:** Evaluate if `.sm` should become `.precept` or `.prc`.
+* **File Extension:** Evaluate if `.precept` should remain, or if a shorter extension like `.prc` is preferable.

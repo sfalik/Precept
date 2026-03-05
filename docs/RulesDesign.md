@@ -2,11 +2,11 @@
 
 Date: 2026-03-03
 
-Status: **Implemented.** Parser, compiler, runtime, and language server all support rules. See implementation in `src/StateMachine/Dsl/StateMachineDslParser.cs`, `StateMachineDslRuntime.cs`, and `tools/StateMachine.Dsl.LanguageServer/SmDslAnalyzer.cs`. Covered by `test/StateMachine.Tests/DslRulesTests.cs`.
+Status: **Implemented.** Parser, compiler, runtime, and language server all support rules. See implementation in `src/Precept/Dsl/PreceptParser.cs`, `src/Precept/Dsl/PreceptRuntime.cs`, and `tools/Precept.LanguageServer/SmDslAnalyzer.cs`. Covered by `test/Precept.Tests/DslRulesTests.cs`.
 
 ## Overview
 
-Rules are declarative boolean constraints that protect data integrity across a state machine. They use the existing expression grammar (`&&`, `||`, `!`, comparisons, arithmetic, parentheses) and are checked automatically — authors declare constraints once rather than repeating guards in every transition.
+Rules are declarative boolean constraints that protect data integrity across a workflow. They use the existing expression grammar (`&&`, `||`, `!`, comparisons, arithmetic, parentheses) and are checked automatically — authors declare constraints once rather than repeating guards in every transition.
 
 ## Motivation
 
@@ -36,7 +36,7 @@ Identical in all four positions. The expression grammar is the same as guards an
 ### Examples
 
 ```text
-machine OrderWorkflow
+precept OrderWorkflow
 
 # Field rules — single-field bounds, indented under the field
 number Balance = 0
@@ -378,12 +378,12 @@ Compile-time checks to implement. Validate field rules and top-level rules again
 
 Inspect semantics: event rules are checked during inspect. If inspect simulates set assignments on scratch data, field/top-level/state rules should be checked against the simulated result for full preview.
 
-Implementation layers. Model: add a DslRule record to StateMachineDslModel.cs to hold expression, reason string, source line, and position metadata (expression start/end columns, reason start/end columns) sufficient for precise diagnostic spans. Extend DslMachine, DslFieldContract, DslCollectionFieldContract, DslEvent, and state declarations to carry rule lists. Parser: extend StateMachineDslParser.cs to parse "rule Expr Reason" lines in all four positions (field-indented, top-level, state-indented, event-indented). Capture character-precise column spans for the expression and reason string during tokenisation. Enforce scope restrictions at parse time. Compiler: extend DslWorkflowCompiler to store rules on the compiled DslWorkflowDefinition. Implement all compile-time validations (defaults, collection empty state, event arg defaults, literal set assignments, untargeted states, tautologies). Runtime: extend DslWorkflowDefinition.Fire and DslWorkflowDefinition.Inspect to evaluate rules at the correct pipeline stages. Implement atomic rollback on rule violation. Language server: extend SmDslAnalyzer to validate rule expressions with correct scope and null checking. All diagnostics must report line numbers and character-precise ranges so the editor renders squigglies on the exact offending token or sub-expression, not the whole line. Add completions and semantic tokens for rule keyword and expressions.
+Implementation layers. Model: add a `DslRule` record to `PreceptModel.cs` to hold expression, reason string, source line, and position metadata (expression start/end columns, reason start/end columns) sufficient for precise diagnostic spans. Extend `DslWorkflowModel`, `DslFieldContract`, `DslCollectionFieldContract`, `DslEvent`, and state declarations to carry rule lists. Parser: extend `PreceptParser.cs` to parse `rule <Expr> <Reason>` lines in all four positions (field-indented, top-level, state-indented, event-indented). Capture character-precise column spans for the expression and reason string during tokenisation. Enforce scope restrictions at parse time. Compiler: extend `PreceptCompiler` to store rules on the compiled workflow model and implement all compile-time validations (defaults, collection empty state, event arg defaults, literal set assignments, untargeted states, tautologies). Runtime: extend `PreceptEngine.Inspect` and `PreceptEngine.Fire` to evaluate rules at the correct pipeline stages and implement atomic rollback on rule violation. Language server: extend `SmDslAnalyzer` to validate rule expressions with correct scope and null checking. All diagnostics must report line numbers and character-precise ranges so the editor renders squigglies on the exact offending token or sub-expression, not the whole line. Add completions and semantic tokens for `rule` keyword and expressions.
 
 Tests: add comprehensive tests covering each rule position, scope restrictions, compile-time validations, runtime fire behavior with rule violations, inspect behavior with rules, null handling in rules, collection rules, self-transition state rule triggering, no-transition not triggering state rules, multiple violation collection, and from-any with state rules.
 
-Documentation: update docs/DesignNotes.md DSL Syntax Contract section to include rule syntax. Update README.md DSL Syntax Reference, DSL Cookbook, and Status sections. Update docs/RulesDesign.md status from design phase to implemented. Update `tools/StateMachine.Dsl.VsCode/syntaxes/state-machine-dsl.tmLanguage.json` to add/update grammar patterns for any new keywords or constructs.
+Documentation: update docs/DesignNotes.md DSL Syntax Contract section to include rule syntax. Update README.md DSL Syntax Reference, DSL Cookbook, and Status sections. Update docs/RulesDesign.md status from design phase to implemented. Update `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` to add/update grammar patterns for any new keywords or constructs.
 
 Intelligence sync (non-negotiable — do not skip): apply the Intellisense Sync Checklist from `.github/copilot-instructions.md` for every new keyword or construct introduced by this feature. At minimum: add `rule` to `KeywordItems` and `KeywordTokens`; add a context-specific completion branch for `^\s*rule\s+` that offers field/arg identifiers and operators (same scope as `if` guards); ensure `ExpressionLineRegex` in `SmSemanticTokensHandler` matches `rule` lines so identifier references in rule expressions receive `variable` token coloring.
 
-Build with dotnet build from repo root. Run tests in test/StateMachine.Tests/ and test/StateMachine.Dsl.LanguageServer.Tests/. Make sure all existing tests still pass.
+Build with dotnet build from repo root. Run tests in test/Precept.Tests/ and test/Precept.LanguageServer.Tests/. Make sure all existing tests still pass.

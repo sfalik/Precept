@@ -8,7 +8,7 @@ namespace Precept.LanguageServer;
 
 internal sealed class SmCompletionHandler : CompletionHandlerBase
 {
-    private static readonly TextDocumentSelector Selector = TextDocumentSelector.ForPattern("**/*.sm");
+    private static readonly TextDocumentSelector Selector = TextDocumentSelector.ForPattern("**/*.precept");
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken cancellationToken)
     {

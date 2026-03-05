@@ -12,10 +12,10 @@ Status: **Design phase — not yet implemented.**
 
 The previous CLI host was removed. The only remaining runtime surface is the VS Code language server preview panel (`SmPreviewHandler`). This leaves two gaps:
 
-1. **Automated testing** — no way to drive event sequences against sample `.sm` files from a terminal or CI pipeline.
+1. **Automated testing** — no way to drive event sequences against sample `.precept` files from a terminal or CI pipeline.
 2. **Shell-level exploration** — no way to inspect/fire/query a machine without the editor open.
 
-A dedicated CLI closes both gaps while keeping the runtime library (`StateMachine.Dsl`) free of presentation concerns.
+A dedicated CLI closes both gaps while keeping the runtime library (`Precept`) free of presentation concerns.
 
 ## Design Principles
 
@@ -35,7 +35,7 @@ The CLI must not duplicate domain logic that belongs in the runtime. During the 
 
 | Aspect | REPL | One-shot |
 |--------|------|----------|
-| Invocation | `smcli --file path.sm` | `smcli --file path.sm <command> [args]` |
+| Invocation | `precept --file path.precept` | `precept --file path.precept <command> [args]` |
 | Strictness | Non-strict (blocked/undefined print warning, continue) | Strict (non-zero exit code on blocked/undefined) |
 | Output style | Human-readable, colorized | JSON on stdout |
 | Prompting | Interactive prompts for missing args | No prompting; missing args → error |
@@ -53,7 +53,7 @@ The CLI must not duplicate domain logic that belongs in the runtime. During the 
 
 | Option | Description |
 |--------|-------------|
-| `--file <path.sm>` | Path to `.sm` definition file (required) |
+| `--file <path.precept>` | Path to `.precept` definition file (required) |
 | `--no-color` | Disable ANSI color output |
 | `--verbose` | Show additional diagnostic information |
 
@@ -148,7 +148,7 @@ Example: `TrafficLight[Red]>`
 | 0 | Success (event accepted or query completed) |
 | 1 | Blocked / rejected |
 | 2 | Undefined (unknown state or event) |
-| 3 | Parse / compile error in `.sm` file |
+| 3 | Parse / compile error in `.precept` file |
 | 4 | Runtime or input error (bad JSON, file not found) |
 
 ### One-shot Data Flow
@@ -163,7 +163,7 @@ When stdin is not a TTY and no explicit `data load` is given, stdin is read as J
 
 ## Runtime API Extensions
 
-These methods are available on `DslWorkflowEngine` in `src/StateMachine/Dsl/StateMachineDslRuntime.cs` to keep the CLI (and `SmPreviewHandler`) free of domain logic.
+These methods are available on `PreceptEngine` in `src/Precept/Dsl/PreceptRuntime.cs` to keep the CLI (and `SmPreviewHandler`) free of domain logic.
 
 ### `Inspect(instance)` aggregate
 
@@ -226,13 +226,13 @@ public DslWorkflowInstance CreateInstance(IReadOnlyDictionary&lt;string, object?
 ### Project Location
 
 ```
-tools/StateMachine.Dsl.Cli/
-├── StateMachine.Dsl.Cli.csproj
+tools/Precept.Cli/
+├── Precept.Cli.csproj
 ├── Program.cs
 └── ...
 ```
 
-References `src/StateMachine/StateMachine.csproj` as a project reference.
+References `src/Precept/Precept.csproj` as a project reference.
 
 ---
 
@@ -262,7 +262,7 @@ Each line is interpreted as if typed at the REPL prompt. Blank lines and `#` com
 
 | CLI surface | Runtime entry point | Return type |
 |-------------|-------------------|-------------|
-| Load `.sm` file | `DslWorkflowParser.Parse(text)` | `DslWorkflowModel` |
+| Load `.precept` file | `PreceptParser.Parse(text)` | `DslWorkflowModel` |
 | Compile | `DslWorkflowCompiler.Compile(model)` | `DslWorkflowEngine` |
 | Create instance | `engine.CreateInstance(data?)` | `DslWorkflowInstance` |
 | `state` | `instance.CurrentState` | `string` |
@@ -291,14 +291,14 @@ Each line is interpreted as if typed at the REPL prompt. Blank lines and `#` com
 
 ---
 
-Implement the `smcli` CLI tool for the StateMachine DSL runtime. Work through the tasks in order. Do not skip ahead. After each phase, run `dotnet build` and fix any errors before proceeding.
+Implement the `precept` CLI tool for the Precept runtime. Work through the tasks in order. Do not skip ahead. After each phase, run `dotnet build` and fix any errors before proceeding.
 
-**Repository:** `c:\Users\Shane.Falik\source\repos\StateMachine`
+**Repository:** `c:\Users\Shane.Falik\source\repos\Precept`
 **Design doc:** `docs/CliDesign.md` — read this in full before starting.
 
 ### Phase 1 — Runtime API verification
 
-The following runtime methods are already implemented on `DslWorkflowEngine` in `src/StateMachine/Dsl/StateMachineDslRuntime.cs`. Verify they behave as documented before building the CLI layer.
+The following runtime methods are already implemented on `PreceptEngine` in `src/Precept/Dsl/PreceptRuntime.cs`. Verify they behave as documented before building the CLI layer.
 
 **`Inspect(DslWorkflowInstance instance) → DslInspectionResult`**
 Evaluates all events for the current instance state in one call. Use `.Events` (list of `DslEventInspectionResult`) to drive the REPL events display and `events` command output.
@@ -316,7 +316,7 @@ After verifying these methods, run the full test suite (`dotnet test`) and confi
 
 ### Phase 2 — SmPreviewHandler refactor
 
-Simplify `tools/StateMachine.Dsl.LanguageServer/SmPreviewHandler.cs` to use the new runtime methods. Do not change any behavior — this is a pure refactor.
+Simplify `tools/Precept.LanguageServer/SmPreviewHandler.cs` to use the new runtime methods. Do not change any behavior — this is a pure refactor.
 
 - Replace the `outgoingEventNames` filtering block in `BuildSnapshot` with `session.Engine.Inspect(session.Instance)` aggregate (already done — `SmPreviewHandler` is updated).
 - Replace all calls to the private `CoerceEventArgs` method with `session.Engine.CoerceEventArguments(eventName, args)` (already done).
@@ -326,19 +326,19 @@ Build and run all existing tests after this phase.
 
 ### Phase 3 — CLI project scaffold
 
-Create `tools/StateMachine.Dsl.Cli/StateMachine.Dsl.Cli.csproj`:
+Create `tools/Precept.Cli/Precept.Cli.csproj`:
 - Target `net10.0`, `Exe` output type.
-- Project reference to `../../src/StateMachine/StateMachine.csproj`.
+- Project reference to `../../src/Precept/Precept.csproj`.
 - NuGet references: `System.CommandLine` (prerelease), `Spectre.Console`, `Spectre.Console.Json`, `RadLine`.
-- Add to `StateMachine.slnx`.
+- Add to `Precept.slnx`.
 
 ### Phase 4 — CLI implementation
 
-Implement `tools/StateMachine.Dsl.Cli/Program.cs` and supporting files. Follow the thin-host principle: **no domain logic in CLI files** — only argument parsing, `definition.Method()` calls, and output formatting.
+Implement `tools/Precept.Cli/Program.cs` and supporting files. Follow the thin-host principle: **no domain logic in CLI files** — only argument parsing, `definition.Method()` calls, and output formatting.
 
 **Global setup:**
 - Parse `--file <path>` (required), `--no-color`, `--verbose` using `System.CommandLine`.
-- On startup: read `.sm` file, call `DslWorkflowParser.Parse`, `DslWorkflowCompiler.Compile`, `engine.CreateInstance()`. On parse/compile error, write to stderr and exit with code 3.
+- On startup: read `.precept` file, call `PreceptParser.Parse`, `PreceptCompiler.Compile`, `engine.CreateInstance()`. On parse/compile error, write to stderr and exit with code 3.
 - Detect mode: if a subcommand is present → one-shot; otherwise → REPL.
 
 **REPL mode:**
@@ -370,6 +370,6 @@ Implement `tools/StateMachine.Dsl.Cli/Program.cs` and supporting files. Follow t
 
 ### Phase 5 — Integration test
 
-Run the CLI against every `.sm` file in `samples/` using the script format from `samples/traffic.script.txt`. For each sample, at minimum: load the machine, print `state`, print `events`, inspect each available event, fire at least one enabled event, print the new state. Report any failures.
+Run the CLI against every `.precept` file in `samples/` using the script format from `samples/traffic.script.txt`. For each sample, at minimum: load the workflow, print `state`, print `events`, inspect each available event, fire at least one enabled event, print the new state. Report any failures.
 
-Replay `samples/traffic.script.txt` against `samples/trafficlight.sm` and verify it completes with exit code 0.
+Replay `samples/traffic.script.txt` against `samples/trafficlight.precept` and verify it completes with exit code 0.

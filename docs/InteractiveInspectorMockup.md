@@ -1,11 +1,11 @@
 # Interactive Inspector Mockup (Option 4)
 
-Goal: validate UX for executing `.sm` transitions from a VS Code side panel before building runtime integration.
+Goal: validate UX for executing `.precept` transitions from a VS Code side panel before building runtime integration.
 
 ## Panel Layout (concept)
 
 - Header
-  - Machine file: `samples/trafficlight.sm`
+  - Precept file: `samples/trafficlight.precept`
   - Session state: `Connected`
   - Actions: `Reset`, `Save Instance`
 - Main surface
@@ -32,7 +32,7 @@ Goal: validate UX for executing `.sm` transitions from a VS Code side panel befo
 
 ## Example Interaction
 
-1. Open `.sm` file and start inspector session.
+1. Open `.precept` file and start inspector session.
 2. Panel shows current state `Red` and selectable transition lines in the diagram.
 3. Hover `Emergency` in the bottom event list to highlight emergency paths.
 4. Enter event args directly in the inline fields beside `Emergency`:

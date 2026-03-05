@@ -12,7 +12,7 @@ internal sealed class SmTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 {
     internal static readonly SmDslAnalyzer SharedAnalyzer = new();
 
-    private static readonly TextDocumentSelector Selector = TextDocumentSelector.ForPattern("**/*.sm");
+    private static readonly TextDocumentSelector Selector = TextDocumentSelector.ForPattern("**/*.precept");
 
     private readonly ILanguageServerFacade _router;
 

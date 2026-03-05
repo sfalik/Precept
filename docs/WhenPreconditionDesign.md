@@ -12,7 +12,7 @@ The DSL currently has two ways an event can be "not available" in a given state:
 1. **Structurally undefined** — No `from <CurrentState> on <Event>` block exists. `Inspect` returns `IsDefined=false`, `Outcome=Undefined`. The event simply doesn't exist for that state.
 2. **Runtime rejected** — The `from` block exists and is entered, but an inner branch rejects. `Inspect` returns `IsDefined=true`, `IsAccepted=false`, `Outcome=Blocked` with a reason. The event appears available but fails on fire.
 
-There is no way to express "this event is structurally defined for this state, but should be treated as unavailable when a field-level condition is false." Consider this real example from [bank-loan.sm](../samples/bank-loan.sm):
+There is no way to express "this event is structurally defined for this state, but should be treated as unavailable when a field-level condition is false." Consider this real example from [bank-loan.precept](../samples/bank-loan.precept):
 
 ```
 from UnderReview on VerifyCollateral
@@ -174,7 +174,7 @@ This mirrors the Inspect path. The `when` evaluation is a pre-filter on the cand
 
 ## Architecture Impact: Where the Hook Points Are
 
-### 1. Model Layer — `StateMachineDslModel.cs`
+### 1. Model Layer — `PreceptModel.cs`
 
 **`DslTransition` record** gains an optional `WhenGuardExpression` field:
 
@@ -223,7 +223,7 @@ public enum DslOutcomeKind
 
 **Result records** (`DslInspectionResult`, `DslFireResult`, `DslInstanceFireResult`) gain `IsApplicable` field and a new factory method.
 
-### 2. Parser — `StateMachineDslParser.cs`
+### 2. Parser — `PreceptParser.cs`
 
 **`FromOnRegex`** must be extended to capture an optional `when <Guard>`:
 
@@ -245,7 +245,7 @@ New:
 
 **Validation in `ValidateReferences`**: Ensure the `when` expression references only declared data fields and collection field properties.
 
-### 3. Runtime — `StateMachineDslRuntime.cs`
+### 3. Runtime — `PreceptRuntime.cs`
 
 **`ResolveTransition`** is the critical method. Currently it:
 1. Looks up `_transitionMap[(currentState, eventName)]` and `_terminalRuleMap[(currentState, eventName)]`.
@@ -390,12 +390,12 @@ Where `<Guard>` follows the same expression grammar as `if` guards, with the res
 
 | Component | Complexity | Notes |
 |---|---|---|
-| `StateMachineDslModel.cs` | Low | Add optional field to 2 records, extend 1 enum, extend 3 result records |
-| `StateMachineDslParser.cs` | Medium | Extend regex, extract/validate `when` expression, scope validation |
-| `StateMachineDslRuntime.cs` | Medium | Pre-filter logic in `ResolveTransition`, new outcome mapping in Inspect/Fire |
+| `PreceptModel.cs` | Low | Add optional field to 2 records, extend 1 enum, extend 3 result records |
+| `PreceptParser.cs` | Medium | Extend regex, extract/validate `when` expression, scope validation |
+| `PreceptRuntime.cs` | Medium | Pre-filter logic in `ResolveTransition`, new outcome mapping in Inspect/Fire |
 | `SmDslAnalyzer.cs` | Medium | Regex update, `when` diagnostics, completions, scope validation |
 | `SmSemanticTokensHandler.cs` | Low | Regex update, keyword addition, expression highlighting |
-| `state-machine-dsl.tmLanguage.json` | Low | Extend `fromOnHeader` pattern |
+| `precept.tmLanguage.json` | Low | Extend `fromOnHeader` pattern |
 | `SmPreviewHandler.cs` | Low | Map new outcome string |
 | `SmPreviewProtocol.cs` | Low | Document new outcome value |
 | `inspector-preview.html` | Medium | New status styling, behavior, glyph, diagram edge rendering |
@@ -445,24 +445,24 @@ Con: Tooling cannot distinguish "event doesn't exist in this state" from "event 
 
 | File | Change Description |
 |---|---|
-| [src/StateMachine/Dsl/StateMachineDslModel.cs](../src/StateMachine/Dsl/StateMachineDslModel.cs) | Add `WhenGuardExpression` to `DslTransition` and `DslTerminalRule`. Add `NotApplicable` to `DslOutcomeKind`. |
-| [src/StateMachine/Dsl/StateMachineDslParser.cs](../src/StateMachine/Dsl/StateMachineDslParser.cs) | Extend `FromOnRegex` for `when`. Extract and validate `when` guard in `ParseFromOnBlock`. Add scope validation (no event args). Update `ValidateReferences` for `when` expressions. |
-| [src/StateMachine/Dsl/StateMachineDslRuntime.cs](../src/StateMachine/Dsl/StateMachineDslRuntime.cs) | Add `NotApplicable` to `TransitionResolutionKind`. Pre-filter candidates in `ResolveTransition`. Add `NotApplicable` factory methods to `DslInspectionResult`, `DslFireResult`, `DslInstanceFireResult`. Add `IsApplicable` property to result records. |
-| [src/StateMachine/Dsl/DslExpressionParser.cs](../src/StateMachine/Dsl/DslExpressionParser.cs) | No change — `when` expressions use the existing expression grammar. |
-| [src/StateMachine/Dsl/DslExpressionRuntimeEvaluator.cs](../src/StateMachine/Dsl/DslExpressionRuntimeEvaluator.cs) | No change — `when` expressions evaluate through the existing evaluator. |
-| [tools/StateMachine.Dsl.LanguageServer/SmDslAnalyzer.cs](../tools/StateMachine.Dsl.LanguageServer/SmDslAnalyzer.cs) | Extend `FromOnRegex`. Add `when` diagnostics (boolean type, scope). Add `when` keyword to completions. Update `from/on` snippet. Add expression completions after `when`. |
-| [tools/StateMachine.Dsl.LanguageServer/SmSemanticTokensHandler.cs](../tools/StateMachine.Dsl.LanguageServer/SmSemanticTokensHandler.cs) | Extend `FromOnRegex`. Add `when` to `KeywordTokens`. Highlight `when` expression identifiers. |
-| [tools/StateMachine.Dsl.LanguageServer/SmPreviewHandler.cs](../tools/StateMachine.Dsl.LanguageServer/SmPreviewHandler.cs) | Map `NotApplicable` → `"notApplicable"` in snapshot builder. |
-| [tools/StateMachine.Dsl.LanguageServer/SmPreviewProtocol.cs](../tools/StateMachine.Dsl.LanguageServer/SmPreviewProtocol.cs) | Document new `"notApplicable"` outcome value. |
-| [tools/StateMachine.Dsl.VsCode/syntaxes/state-machine-dsl.tmLanguage.json](../tools/StateMachine.Dsl.VsCode/syntaxes/state-machine-dsl.tmLanguage.json) | Extend `fromOnHeader` pattern to match `when <guard>`. Add `when` to `controlKeywords`. |
-| [tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html](../tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html) | Handle `"notApplicable"` status: CSS class, glyph, behavior (non-clickable, show reason), optional dashed diagram edges. |
-| [test/StateMachine.Tests/DslWorkflowTests.cs](../test/StateMachine.Tests/DslWorkflowTests.cs) | Add tests: `when` parsing, inspect/fire with `when` true/false, multiple blocks with/without `when`, `when` + `from any`, `from any` with mixed `when`. |
-| [test/StateMachine.Tests/DslSetParsingTests.cs](../test/StateMachine.Tests/DslSetParsingTests.cs) | Add parsing tests for `when` expression extraction, error cases (event arg refs in `when`). |
-| [test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs](../test/StateMachine.Dsl.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs) | Add tests: `when` null narrowing interaction with inner guards. |
-| [test/StateMachine.Dsl.LanguageServer.Tests/SmPreviewRulesTests.cs](../test/StateMachine.Dsl.LanguageServer.Tests/SmPreviewRulesTests.cs) | Add tests: preview snapshot with `when`-suppressed events. |
+| [src/Precept/Dsl/PreceptModel.cs](../src/Precept/Dsl/PreceptModel.cs) | Wire `when` predicate storage on `DslTransition` and surface `NotApplicable` in outcomes. |
+| [src/Precept/Dsl/PreceptParser.cs](../src/Precept/Dsl/PreceptParser.cs) | Extend `FromOnRegex` for `when`. Extract and validate `when` guard in `ParseFromOnBlock`. Add scope validation (no event args). Update reference validation for `when` expressions. |
+| [src/Precept/Dsl/PreceptRuntime.cs](../src/Precept/Dsl/PreceptRuntime.cs) | Evaluate `when` preconditions and return `NotApplicable` when false. |
+| [src/Precept/Dsl/PreceptExpressionParser.cs](../src/Precept/Dsl/PreceptExpressionParser.cs) | No change — `when` expressions use the existing expression grammar. |
+| [src/Precept/Dsl/PreceptExpressionEvaluator.cs](../src/Precept/Dsl/PreceptExpressionEvaluator.cs) | No change — `when` expressions evaluate through the existing evaluator. |
+| [tools/Precept.LanguageServer/SmDslAnalyzer.cs](../tools/Precept.LanguageServer/SmDslAnalyzer.cs) | Extend `FromOnRegex`. Add `when` diagnostics (boolean type, scope). Add `when` keyword to completions. Update `from/on` snippet. Add expression completions after `when`. |
+| [tools/Precept.LanguageServer/SmSemanticTokensHandler.cs](../tools/Precept.LanguageServer/SmSemanticTokensHandler.cs) | Extend `FromOnRegex`. Add `when` to `KeywordTokens`. Highlight `when` expression identifiers. |
+| [tools/Precept.LanguageServer/SmPreviewHandler.cs](../tools/Precept.LanguageServer/SmPreviewHandler.cs) | Map `NotApplicable` → `"notApplicable"` in snapshot builder. |
+| [tools/Precept.LanguageServer/SmPreviewProtocol.cs](../tools/Precept.LanguageServer/SmPreviewProtocol.cs) | Document new `"notApplicable"` outcome value. |
+| [tools/Precept.VsCode/syntaxes/precept.tmLanguage.json](../tools/Precept.VsCode/syntaxes/precept.tmLanguage.json) | Extend `fromOnHeader` pattern to match `when <guard>`. Add `when` to control keywords. |
+| [tools/Precept.VsCode/webview/inspector-preview.html](../tools/Precept.VsCode/webview/inspector-preview.html) | Handle `"notApplicable"` status: UI behavior (non-clickable, show reason), optional diagram edge styling. |
+| [test/Precept.Tests/DslWorkflowTests.cs](../test/Precept.Tests/DslWorkflowTests.cs) | Add tests: `when` parsing, inspect/fire with `when` true/false, multiple blocks with/without `when`, `when` + `from any`, `from any` with mixed `when`. |
+| [test/Precept.Tests/DslSetParsingTests.cs](../test/Precept.Tests/DslSetParsingTests.cs) | Add parsing tests for `when` expression extraction, error cases (event arg refs in `when`). |
+| [test/Precept.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs](../test/Precept.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs) | Add tests: `when` null narrowing interaction with inner guards. |
+| [test/Precept.LanguageServer.Tests/SmPreviewRulesTests.cs](../test/Precept.LanguageServer.Tests/SmPreviewRulesTests.cs) | Add tests: preview snapshot with `when`-suppressed events. |
 | [README.md](../README.md) | Update DSL Syntax Reference, DSL Cookbook, behavior/exception table, current-status. |
 | [docs/DesignNotes.md](../docs/DesignNotes.md) | Update DSL Syntax Contract with `when` clause. Add design decision record. |
-| [samples/bank-loan.sm](../samples/bank-loan.sm) | Refactor `VerifyCollateral` (and potentially `Approve`, `Disburse`) to use `when`. |
+| [samples/bank-loan.precept](../samples/bank-loan.precept) | Refactor `VerifyCollateral` (and potentially `Approve`, `Disburse`) to use `when`. |
 
 ## Concerns and Risks
 
@@ -474,4 +474,4 @@ Con: Tooling cannot distinguish "event doesn't exist in this state" from "event 
 
 4. **Inspector preview performance**: Each event now requires evaluating a `when` guard in addition to the existing inspect call. Since `when` guards are simple boolean expressions against instance data (no event args), the overhead is negligible.
 
-5. **Backward compatibility**: Adding `when` is pure additive syntax. Existing `.sm` files without `when` clauses parse and behave identically. The new `NotApplicable` outcome kind is only produced when `when` guards are present.
+5. **Backward compatibility**: Adding `when` is pure additive syntax. Existing `.precept` files without `when` clauses parse and behave identically. The new `NotApplicable` outcome kind is only produced when `when` guards are present.

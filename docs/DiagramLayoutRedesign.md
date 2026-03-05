@@ -1,6 +1,6 @@
 # State Diagram Layout Redesign — Options Analysis
 
-> **Status:** Implemented — Option B (Fix ELK) selected and implemented. See `tools/StateMachine.Dsl.VsCode/src/extension.ts` and `tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html`.  
+> **Status:** Implemented — Option B (Fix ELK) selected and implemented. See `tools/Precept.VsCode/src/extension.ts` and `tools/Precept.VsCode/webview/inspector-preview.html`.  
 > **Decision date:** 2026-03-03  
 > **Scope:** Inspector Preview diagram rendering in the VS Code extension
 
@@ -12,9 +12,9 @@ The diagram pipeline has three layers:
 
 | Layer | File | Role |
 |---|---|---|
-| **1. ELK layout** | `tools/StateMachine.Dsl.VsCode/src/extension.ts` (lines 325–492) | Computes node positions and edge routing via `elkjs` layered algorithm |
-| **2. Post-processing** | `tools/StateMachine.Dsl.VsCode/src/extension.ts` (lines 493–760) | Force-directed "organic" re-layout, layout stabilization, parallel-edge deconfliction, bounds normalization |
-| **3. SVG rendering** | `tools/StateMachine.Dsl.VsCode/webview/inspector-preview.html` (lines 1614–2390) | Builds SVG via string concatenation with custom edge routing, annotations, and state-change animation |
+| **1. ELK layout** | `tools/Precept.VsCode/src/extension.ts` | Computes node positions and edge routing via `elkjs` layered algorithm |
+| **2. Post-processing** | `tools/Precept.VsCode/src/extension.ts` | Force-directed "organic" re-layout, layout stabilization, parallel-edge deconfliction, bounds normalization |
+| **3. SVG rendering** | `tools/Precept.VsCode/webview/inspector-preview.html` | Builds SVG via string concatenation with custom edge routing, annotations, and state-change animation |
 
 ### Identified Problems
 
@@ -160,7 +160,7 @@ function snapshotToMermaid(snapshot: SnapshotData): string {
   });
 
   async function renderDiagram(mermaidText, evaluations) {
-    const { svg } = await mermaid.render('sm-diagram', mermaidText);
+    const { svg } = await mermaid.render('precept-diagram', mermaidText);
     const diagramEl = document.getElementById('diagram-container');
     diagramEl.innerHTML = svg;
 
@@ -174,7 +174,7 @@ function snapshotToMermaid(snapshot: SnapshotData): string {
     for (const group of nodeGroups) {
       const text = group.querySelector('text')?.textContent?.trim();
       if (text === currentState) {
-        group.classList.add('sm-active');
+        group.classList.add('precept-active');
       }
     }
 
@@ -184,19 +184,19 @@ function snapshotToMermaid(snapshot: SnapshotData): string {
       const label = edge.querySelector('text')?.textContent?.trim();
       const evaluation = evaluations[label];
       if (evaluation?.kind === 'enabled') {
-        edge.classList.add('sm-enabled');
+        edge.classList.add('precept-enabled');
       } else if (evaluation?.kind === 'blocked') {
-        edge.classList.add('sm-blocked');
+        edge.classList.add('precept-blocked');
       }
     }
   }
 </script>
 
 <style>
-  .sm-active rect { fill: var(--ok) !important; stroke: var(--ok) !important; }
-  .sm-active text { fill: var(--bg) !important; font-weight: 700 !important; }
-  .sm-enabled path { stroke: var(--edge) !important; }
-  .sm-blocked path { stroke: var(--edge-error) !important; stroke-dasharray: 5 4; }
+  .precept-active rect { fill: var(--ok) !important; stroke: var(--ok) !important; }
+  .precept-active text { fill: var(--bg) !important; font-weight: 700 !important; }
+  .precept-enabled path { stroke: var(--edge) !important; }
+  .precept-blocked path { stroke: var(--edge-error) !important; stroke-dasharray: 5 4; }
 </style>
 ```
 
@@ -496,7 +496,7 @@ Replace `elkjs` with [`@dagrejs/dagre`](https://github.com/dagrejs/dagre), the s
 #### C1. Replace `elkjs` with `@dagrejs/dagre`
 
 ```bash
-cd tools/StateMachine.Dsl.VsCode
+cd tools/Precept.VsCode
 npm uninstall elkjs
 npm install @dagrejs/dagre
 ```
