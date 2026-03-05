@@ -1,20 +1,32 @@
 machine BugTracker
 
 state Triage initial
+state Open
+	rule Assignee != null "Must have an assignee when open"
 state InProgress
 	rule Assignee != null "Must have an assignee to be in progress"
+state Blocked
+	rule Assignee != null "Must have an assignee while blocked"
+	rule BlockReason != null "Blocked state requires a block reason"
 state InReview
 state Resolved
+	rule Resolution != null "Resolved state requires a resolution"
 state Closed
 
 string? Assignee = null
 number Priority = 3
 	rule Priority >= 1 && Priority <= 5 "Priority must be between 1 and 5"
-boolean IsBlocked = false
 string? BlockReason = null
+string? Resolution = null
 
 event Assign
 	string User
+
+event Prioritize
+	number Level
+		rule Level >= 1 && Level <= 5 "Priority level must be between 1 and 5"
+
+event StartWork
 
 event Block
 	string Reason
@@ -22,51 +34,60 @@ event Block
 
 event Unblock
 
-event StartWork
-
 event SubmitReview
 
-event Approve
-	number Score = 100
+event RequestChanges
 
-event Resolve
+event Approve
+
+event WontFix
+	string Reason
+		rule Reason != "" "Resolution reason is required"
+
+event Reopen
 
 event Close
 
-from any on Block
-	set IsBlocked = true
-	set BlockReason = Block.Reason
-	no transition
+from Triage on Assign
+	set Assignee = Assign.User
+	transition Open
 
-from any on Unblock
-	set IsBlocked = false
-	set BlockReason = null
-	no transition
+from Triage on WontFix
+	set Resolution = WontFix.Reason
+	transition Closed
 
-from any on Assign
+from Open, InProgress, Blocked on Assign
 	set Assignee = Assign.User
 	no transition
 
-from Triage on StartWork
-	if !IsBlocked && Assignee != null
-		transition InProgress
-	else
-		reject "Cannot start work: must have an assignee and not be blocked"
+from Open on StartWork
+	transition InProgress
+
+from InProgress on Block
+	set BlockReason = Block.Reason
+	transition Blocked
 
 from InProgress on SubmitReview
-	if !IsBlocked
-		transition InReview
-	else
-		reject "Cannot review a blocked issue"
+	transition InReview
+
+from Blocked on Unblock
+	set BlockReason = null
+	transition InProgress
+
+from InReview on RequestChanges
+	transition InProgress
 
 from InReview on Approve
-	if Approve.Score < 70
-		transition InProgress
-	else if Approve.Score >= 90
-		set Priority = 1
-		transition Resolved
-	else
-		transition Resolved
+	set Resolution = "Approved"
+	transition Resolved
+
+from Resolved on Reopen
+	set Resolution = null
+	transition Open
 
 from Resolved on Close
 	transition Closed
+
+from any on Prioritize
+	set Priority = Prioritize.Level
+	no transition

@@ -1,5 +1,9 @@
 # Copilot Instructions for StateMachine
 
+## DSL Sample Files (.sm)
+
+`.sm` files are DSL source files interpreted directly by the runtime — they are **not** compiled by the C# build pipeline. Never run `dotnet build` or `dotnet run` to validate a `.sm` file. Correctness is checked by reading the file against the DSL Syntax Contract in `docs/DesignNotes.md`.
+
 ## Documentation Sync Is Mandatory
 
 When making any code, interface, test, or behavior change, keep documentation in sync in the same edit pass.

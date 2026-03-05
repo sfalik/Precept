@@ -67,7 +67,7 @@ from FlashingRed on ClearEmergency
 	transition Red
 
 # Emergency preemption: requires a reason to record why it was activated
-from any on Emergency
+from any on Emergency when Emergency.Reason != null
 	set EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason
 	transition FlashingRed
 

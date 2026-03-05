@@ -1,67 +1,81 @@
 machine ECommerceOrder
 
-state Shopping initial
-state Checkout
+state Pending initial
+state PaymentFailed
 state Paid
 state Shipped
+state Delivered
 state Cancelled
+state Refunded
 
-number TotalItems = 0
-	rule TotalItems >= 0 "Total items cannot be negative"
-number TotalCost = 0
-	rule TotalCost >= 0 "Total cost cannot be negative"
-boolean IsGuest = true
-string? PromoCode = null
-
-event AddItem
-	number Count
-		rule Count > 0 "Must add at least one item"
-	number Price
-		rule Price > 0 "Item price must be positive"
-
-event ApplyPromo
-	string Code
-	number Discount
-
-event Login
+number OrderTotal = 0
+	rule OrderTotal >= 0 "Order total cannot be negative"
+number ItemCount = 0
+	rule ItemCount >= 0 "Item count cannot be negative"
+string? TrackingNumber = null
+string? CancellationReason = null
+string? RefundReason = null
+boolean RefundIssued = false
 
 event Pay
 	number Amount
 
+event FailPayment
+	string Reason
+		rule Reason != "" "Failure reason is required"
+
+event RetryPayment
+	number Amount
+
 event Ship
+	string TrackingNumber
+		rule TrackingNumber != "" "Tracking number is required"
+
+event Deliver
 
 event Cancel
 	string Reason
-		rule Reason != "" "Cancellation reason required"
+		rule Reason != "" "Cancellation reason is required"
 
-from Shopping on AddItem
-	set TotalItems = TotalItems + AddItem.Count
-	set TotalCost = TotalCost + (AddItem.Price * AddItem.Count)
-	no transition
+event Refund
+	string Reason
+		rule Reason != "" "Refund reason is required"
 
-from Shopping on ApplyPromo
-	if PromoCode == null && ApplyPromo.Discount < TotalCost
-		set PromoCode = ApplyPromo.Code
-		set TotalCost = TotalCost - ApplyPromo.Discount
-		no transition
-	else
-		reject "Promo code already applied or discount exceeds order total"
-
-from Shopping on Login
-	set IsGuest = false
-	no transition
-
-from Shopping on Pay
-	if TotalItems > 0 && Pay.Amount == TotalCost
+from Pending on Pay
+	if Pay.Amount == OrderTotal
 		transition Paid
 	else
-		reject "Cannot checkout: cart is empty or payment amount is incorrect"
+		reject "Payment amount does not match order total"
+
+from Pending on FailPayment
+	transition PaymentFailed
+
+from PaymentFailed on RetryPayment
+	if RetryPayment.Amount == OrderTotal
+		transition Paid
+	else
+		reject "Payment amount does not match order total"
 
 from Paid on Ship
-	if TotalItems > 0
-		transition Shipped
-	else
-		reject "Nothing to ship"
+	set TrackingNumber = Ship.TrackingNumber
+	transition Shipped
 
-from Shopping, Checkout, Paid on Cancel
+from Shipped on Deliver
+	transition Delivered
+
+from Pending, PaymentFailed on Cancel
+	set CancellationReason = Cancel.Reason
 	transition Cancelled
+
+# Post-payment cancellations require a refund
+from Paid, Shipped on Cancel
+	set CancellationReason = Cancel.Reason
+	transition Refunded
+
+from Refunded on Refund
+	if !RefundIssued
+		set RefundReason = Refund.Reason
+		set RefundIssued = true
+		no transition
+	else
+		reject "Refund has already been issued"

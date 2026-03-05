@@ -1,18 +1,9 @@
 machine DocumentSigning
 
-string? DocumentTitle = null
-boolean LegalReviewPassed = false
-boolean ExpiryExtended = false
-string? VoidReason = null
-# Signatories yet to sign; transition to FullySigned when this set empties
-set<string> PendingSignatories
-# Signatories who have recorded their signature
-set<string> CollectedSignatures
-
 state Draft initial
 state AwaitingLegalReview
-state AwaitingSignatures
-state PartialSigned
+state Signing
+	rule PendingSignatories.count > 0 "Must have pending signatories while signing"
 state FullySigned
 	rule PendingSignatories.count == 0 "All signatories must have signed"
 	rule CollectedSignatures.count > 0 "At least one signature must be collected"
@@ -21,19 +12,30 @@ state Executed
 state Expired
 state Voided
 
+string? DocumentTitle = null
+boolean LegalReviewPassed = false
+boolean ExpiryExtended = false
+string? RejectionReason = null
+string? VoidReason = null
+# Signatories yet to sign; transitions to FullySigned when this set empties
+set<string> PendingSignatories
+# Signatories who have recorded their signature
+set<string> CollectedSignatures
+
 # Add required signatories before submitting for review
 event AddSignatory
 	string Name
 		rule Name != "" "Signatory name is required"
 
 event SubmitForReview
-	string DocumentTitle
-		rule DocumentTitle != "" "Document title is required"
+	string Title
+		rule Title != "" "Document title is required"
 
 event ApproveLegalReview
 
 event RejectLegalReview
 	string Reason
+		rule Reason != "" "Rejection reason is required"
 
 # Each call records one signatory by name
 event RecordSignature
@@ -55,20 +57,24 @@ from Draft on AddSignatory
 
 from Draft on SubmitForReview
 	if PendingSignatories.count > 0
-		set DocumentTitle = SubmitForReview.DocumentTitle
+		set DocumentTitle = SubmitForReview.Title
+		set RejectionReason = null
 		transition AwaitingLegalReview
 	else
-		reject "At least one signatory must be added first"
+		reject "At least one signatory must be added before submitting"
 
 from AwaitingLegalReview on ApproveLegalReview
 	set LegalReviewPassed = true
-	transition AwaitingSignatures
+	set RejectionReason = null
+	transition Signing
 
 from AwaitingLegalReview on RejectLegalReview
+	set LegalReviewPassed = false
+	set RejectionReason = RejectLegalReview.Reason
 	transition Draft
 
-# When the last pending signatory signs, move to FullySigned; otherwise PartialSigned
-from AwaitingSignatures, PartialSigned on RecordSignature
+# When the last pending signatory signs, move to FullySigned; otherwise stay in Signing
+from Signing on RecordSignature
 	if PendingSignatories contains RecordSignature.SignatoryName && PendingSignatories.count == 1
 		remove PendingSignatories RecordSignature.SignatoryName
 		add CollectedSignatures RecordSignature.SignatoryName
@@ -76,23 +82,23 @@ from AwaitingSignatures, PartialSigned on RecordSignature
 	else if PendingSignatories contains RecordSignature.SignatoryName
 		remove PendingSignatories RecordSignature.SignatoryName
 		add CollectedSignatures RecordSignature.SignatoryName
-		transition PartialSigned
+		no transition
 	else
 		reject "Signatory is not on the pending list or has already signed"
 
-from AwaitingSignatures, PartialSigned on ExpireDocument
+from Signing on ExpireDocument
 	transition Expired
 
 from Expired on ExtendExpiry
 	if !ExpiryExtended
 		set ExpiryExtended = true
-		transition AwaitingSignatures
+		transition Signing
 	else
 		reject "Expiry can only be extended once"
 
 from FullySigned on Execute
 	transition Executed
 
-from Draft, AwaitingLegalReview, AwaitingSignatures, PartialSigned on Void
+from Draft, AwaitingLegalReview, Signing, FullySigned, Expired on Void
 	set VoidReason = Void.Reason
 	transition Voided
