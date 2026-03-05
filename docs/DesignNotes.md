@@ -12,6 +12,180 @@ Implementation focus is the DSL runtime path:
 - validate semantic correctness
 - execute inspection/fire against a compiled in-memory workflow definition
 
+## Model Refactor Design (Locked)
+
+Status: **Design complete — pending implementation.**
+
+This section records all locked design decisions for the combined model restructure, `when` precondition feature, outcome renaming, and diagnostic precision improvements. Nothing here should be changed without a deliberate design decision.
+
+---
+
+### Model Hierarchy
+
+The new canonical model hierarchy, in DSL-declaration order:
+
+```
+DslMachine
+├── DslField              (<type> <Name> [= <default>])
+│   └── DslRule           (rule <Expr> "<Reason>")
+├── DslCollectionField    (set<T>|queue<T>|stack<T> <Name>)
+│   └── DslRule           (rule <Expr> "<Reason>")
+├── DslRule               (top-level rule <Expr> "<Reason>")
+├── DslState              (state <Name> [initial])
+│   └── DslRule           (rule <Expr> "<Reason>")
+├── DslEvent              (event <Name>)
+│   ├── DslEventArg       (<type> <Name> [= <default>])
+│   └── DslRule           (rule <Expr> "<Reason>")
+└── DslTransition         (from <State> on <Event> [when <Expr>])
+    └── DslClause         (if|else if|else)
+        ├── DslClauseOutcome
+        │   ├── DslStateTransition   (transition <State>)
+        │   ├── DslRejection         (reject "<Reason>")
+        │   └── DslNoTransition      (no transition)
+        ├── DslSetAssignment         (set <Key> = <Expr>)
+        └── DslCollectionMutation    (add|remove|enqueue|...)
+```
+
+---
+
+### Type-by-Type Decisions
+
+#### `DslMachine`
+- `States : IReadOnlyList<DslState>` — replaces `IReadOnlyList<string>`
+- `InitialState : DslState` — typed reference into `States`, not a string; derivable but kept as a convenience property
+- `Transitions : IReadOnlyList<DslTransition>` — single list; `TerminalRules` list removed
+- `DataFields` renamed to `Fields : IReadOnlyList<DslField>`
+- `CollectionFields : IReadOnlyList<DslCollectionField>`
+- `StateRules : IReadOnlyDictionary<string, IReadOnlyList<DslRule>>` removed — rules now live on `DslState.Rules`
+- `TopLevelRules : IReadOnlyList<DslRule>?` — unchanged
+
+#### `DslState` (new)
+- `Name : string`
+- `Rules : IReadOnlyList<DslRule>?`
+- No `IsInitial` bool — the authoritative source is `DslMachine.InitialState` (reference equality check)
+
+#### `DslField` (renamed from `DslFieldContract`)
+- Carries `Rules : IReadOnlyList<DslRule>?`
+- Used only for `DslMachine.Fields` (persistent instance data)
+
+#### `DslCollectionField` (renamed from `DslCollectionFieldContract`)
+- Carries `Rules : IReadOnlyList<DslRule>?`
+
+#### `DslEventArg` (split from `DslFieldContract`)
+- Used only for `DslEvent.Args`
+- No `Rules` property — event rules are on `DslEvent`, not individual args
+- Properties: `Name`, `Type`, `IsNullable`, `HasDefaultValue`, `DefaultValue`
+
+#### `DslTransition` (was: `from…on` block — reclaimed name)
+- Represents the entire `from <State> on <Event> [when <Expr>]` block
+- `FromState : string`
+- `EventName : string`
+- `Predicate : string?` — raw `when` expression text; null if no `when` clause
+- `PredicateAst : DslExpression?` — parsed AST; null if no `when` clause
+- `Clauses : IReadOnlyList<DslClause>`
+- `SourceLine : int`
+- One `DslTransition` per `(FromState, EventName)` pair — uniqueness enforced by parser
+
+#### `DslClause`
+- Represents one `if` / `else if` / `else` branch
+- `Predicate : string?` — raw guard expression text; null for `else`
+- `PredicateAst : DslExpression?` — parsed AST; null for `else`
+- `Outcome : DslClauseOutcome`
+- `SetAssignments : IReadOnlyList<DslSetAssignment>`
+- `CollectionMutations : IReadOnlyList<DslCollectionMutation>?`
+- `SourceLine : int`
+- No `Order` property — list position is the authoritative order
+
+#### `DslClauseOutcome` (abstract base — new)
+Three concrete subtypes, all nouns:
+- `DslStateTransition(TargetState : string)` — the `transition <State>` outcome
+- `DslRejection(Reason : string?)` — the `reject` outcome
+- `DslNoTransition` — the `no transition` outcome
+
+#### `DslSetAssignment`
+- Added: `ExpressionStartColumn : int`, `ExpressionEndColumn : int`
+- `SourceLine` already present
+
+#### `DslCollectionMutation`
+- Added: `SourceLine : int`, `ExpressionStartColumn : int`, `ExpressionEndColumn : int`
+
+#### `DslTerminalRule` / `DslTerminalKind` (removed)
+Fully replaced by `DslClause` + `DslClauseOutcome`.
+
+---
+
+### `when` Precondition Feature
+
+- Syntax: `from <State> on <Event> when <Expr>`
+- `when` guard is stored as `DslTransition.Predicate` / `PredicateAst`
+- When the `when` predicate evaluates to `false` at runtime, the entire block is skipped with outcome `NotApplicable`
+- `if`/`else if` branches inside the block cannot use `reject` (only `else` can); this constraint is unchanged
+- One `from…on` block per `(State, Event)` pair — parser enforces uniqueness with a clear error
+
+---
+
+### Outcome Renaming
+
+`DslOutcomeKind` values, renamed for consistency and clarity:
+
+| Old | New | Meaning |
+|---|---|---|
+| `Undefined` | `NotDefined` | Event not registered for this state |
+| *(new)* | `NotApplicable` | `when` predicate false — block skipped |
+| `Blocked` | `Rejected` | Explicit `reject` branch taken, or rule violation |
+| `Enabled` | `Accepted` | Transition executed; state changed |
+| `NoTransition` | `AcceptedInPlace` | Event accepted but no state change |
+
+`TransitionResolutionKind` (private) already uses `NotDefined` and `Rejected` — public enum now matches.
+
+---
+
+### Result Record Changes
+
+`DslInspectionResult`, `DslFireResult`, `DslInstanceFireResult`:
+- `bool IsDefined` removed — derivable as `Outcome != NotDefined`
+- `bool IsAccepted` removed — derivable as `Outcome is Accepted or AcceptedInPlace`
+- `NotApplicable` factory methods added to all three
+- Factory method `NoTransition(...)` renamed to `AcceptedInPlace(...)` on all three
+
+---
+
+### Guard Infrastructure Removal
+
+- `IGuardEvaluator` interface removed
+- `DefaultGuardEvaluator` class removed
+- `GuardEvaluationResult` record removed
+- Guard expressions are no longer re-parsed at runtime — `DslClause.PredicateAst` (and `DslTransition.PredicateAst` for `when`) are evaluated directly by `DslExpressionRuntimeEvaluator`
+- `DslWorkflowCompiler.Compile` no longer accepts an `IGuardEvaluator?` parameter
+
+---
+
+### Analyzer: `when` Null Narrowing
+
+When processing a `DslTransition` with a non-null `Predicate`:
+
+1. Apply `ApplyNarrowing(predicateAst, baseSymbols, assumeTrue: true)` to produce `blockSymbols`
+2. Use `blockSymbols` as the starting `branchSymbols` for the clause loop (not `baseSymbols`)
+3. Clause-guard negations accumulate across clauses from `blockSymbols` as before
+4. The `false` path of the `when` predicate (the `NotApplicable` path) has no code to validate — no narrowing needed there
+
+---
+
+### Diagnostic Precision (Column-Level)
+
+All diagnostic sites upgraded from line-level to column-precise squiggles:
+
+| Construct | Model fields | Action |
+|---|---|---|
+| `DslRule` | `ExpressionStartColumn`, `ExpressionEndColumn`, `ReasonStartColumn`, `ReasonEndColumn` already present | Wire into `ValidateExpression` — add `CreateColumnDiagnostic` helper |
+| `DslSetAssignment` | `ExpressionStartColumn`, `ExpressionEndColumn` (new) | Parser captures; analyzer uses instead of `FindSetLine` |
+| `DslCollectionMutation` | `SourceLine`, `ExpressionStartColumn`, `ExpressionEndColumn` (all new) | Parser captures; `FindMutationLine` eliminated |
+| Guard / `when` predicate | Column derivable from `Predicate` text position on `DslClause.SourceLine` / `DslTransition.SourceLine` | Parser captures start column; `FindGuardLine` eliminated |
+
+`CreateLineDiagnostic` kept for parser-level errors where no column data is available.
+
+---
+
 ## Editor-First Preview Integration (Current)
 
 - The VS Code extension now includes an inspector preview command (`StateMachine DSL: Open Inspector Preview`).

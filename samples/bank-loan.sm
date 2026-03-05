@@ -10,6 +10,7 @@ number MissedPayments = 0
 boolean CollateralVerified = false
 string? OfficerName = null
 string? DisbursementAccount = null
+string? RejectionReason = null
 
 rule ApprovedAmount <= RequestedAmount "Approved amount must not exceed requested amount"
 
@@ -21,6 +22,7 @@ state Repaying
 state PaidOff
 state Defaulted
 state Rejected
+state Cancelled
 
 event Submit
 	number Amount
@@ -41,6 +43,8 @@ event Approve
 event Reject
 	string Reason
 
+event Withdraw
+
 event Disburse
 	string AccountNumber
 		rule AccountNumber != "" "Disbursement account number is required"
@@ -56,9 +60,15 @@ from Apply on Submit
 	set CreditScore = Submit.CreditScore
 	transition UnderReview
 
+from Apply on Withdraw
+	transition Cancelled
+
 from UnderReview on AssignOfficer
-	set OfficerName = AssignOfficer.OfficerName
-	no transition
+	if OfficerName == null
+		set OfficerName = AssignOfficer.OfficerName
+		no transition
+	else
+		reject "A loan officer is already assigned"
 
 from UnderReview on VerifyCollateral
 	if !CollateralVerified
@@ -73,10 +83,17 @@ from UnderReview on Approve
 		set RemainingBalance = Approve.ApprovedAmount
 		transition Approved
 	else
-		reject "Collateral must be verified or credit score must be at least 700, and approved amount must not exceed requested amount"
+		reject "Approval requires collateral verification or credit score >= 700, and approved amount must not exceed requested amount"
 
 from UnderReview on Reject
+	set RejectionReason = Reject.Reason
 	transition Rejected
+
+from UnderReview on Withdraw
+	transition Cancelled
+
+from Approved on Withdraw
+	transition Cancelled
 
 from Approved on Disburse
 	if OfficerName != null
@@ -86,22 +103,39 @@ from Approved on Disburse
 		reject "A loan officer must be assigned before disbursement"
 
 from Disbursed on MakePayment
-	if RemainingBalance > 0
+	if MakePayment.Amount < RemainingBalance
 		set RemainingBalance = RemainingBalance - MakePayment.Amount
+		set MissedPayments = 0
 		transition Repaying
-	else
-		reject "No remaining balance"
-
-from Repaying on MakePayment
-	if MakePayment.Amount >= RemainingBalance
+	else if MakePayment.Amount == RemainingBalance
 		set RemainingBalance = 0
+		set MissedPayments = 0
 		transition PaidOff
 	else
-		set RemainingBalance = RemainingBalance - MakePayment.Amount
+		reject "Payment amount exceeds remaining balance"
+
+from Disbursed on MissPayment
+	if MissedPayments >= 1
+		set MissedPayments = MissedPayments + 1
+		transition Defaulted
+	else
+		set MissedPayments = MissedPayments + 1
 		no transition
 
+from Repaying on MakePayment
+	if MakePayment.Amount < RemainingBalance
+		set RemainingBalance = RemainingBalance - MakePayment.Amount
+		set MissedPayments = 0
+		no transition
+	else if MakePayment.Amount == RemainingBalance
+		set RemainingBalance = 0
+		set MissedPayments = 0
+		transition PaidOff
+	else
+		reject "Payment amount exceeds remaining balance"
+
 from Repaying on MissPayment
-	if MissedPayments >= 2
+	if MissedPayments >= 1
 		set MissedPayments = MissedPayments + 1
 		transition Defaulted
 	else
