@@ -587,3 +587,22 @@ These files/components are not modified:
 | 8. TextMate grammar | ~100 | Low |
 | 9. Documentation | ~300 | Low |
 | **Total** | **~3,250** | |
+
+---
+
+## Implementation Prompt
+
+Use this prompt to begin implementation in a new Copilot Chat session:
+
+> Implement the Precept language redesign described in `docs/PreceptLanguageDesign.md`, following the phased plan in `docs/PreceptLanguageImplementationPlan.md`.
+>
+> Start by reading both documents in full. Then:
+>
+> 1. Create a new branch `feature/language-redesign` from the current HEAD.
+> 2. Execute the phases in order (0 through 9), committing at each checkpoint.
+> 3. Each phase must end with `dotnet build` passing before moving to the next.
+> 4. Follow the "tokenize once, consume everywhere" principle — the Superpower `TokenList<PreceptToken>` is the shared foundation for the parser, language server semantic tokens, completions, and diagnostics.
+> 5. Preserve the files listed in the Preserve List — do not modify `PreceptExpressionEvaluator.cs`, the `DslExpression` record hierarchy, `DslWorkflowInstance`, `DslFireResult`, or any file under `tools/Precept.VsCode/src/`.
+> 6. Follow the project's copilot-instructions (`.github/copilot-instructions.md`) for documentation sync, grammar sync, intellisense sync, and syntax highlighting sync — these are non-negotiable.
+>
+> Begin with Phase 0: create the branch and add the Superpower NuGet package.
