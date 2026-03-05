@@ -18,7 +18,7 @@ public class DslCollectionParsingTests
             state Idle initial
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         machine.CollectionFields.Should().ContainSingle();
         var field = machine.CollectionFields[0];
@@ -36,7 +36,7 @@ public class DslCollectionParsingTests
             state Idle initial
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         machine.CollectionFields.Should().ContainSingle();
         var field = machine.CollectionFields[0];
@@ -54,7 +54,7 @@ public class DslCollectionParsingTests
             state Idle initial
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         machine.CollectionFields.Should().ContainSingle();
         var field = machine.CollectionFields[0];
@@ -73,7 +73,7 @@ public class DslCollectionParsingTests
             state Idle initial
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*Duplicate*Items*");
@@ -89,7 +89,7 @@ public class DslCollectionParsingTests
             state Idle initial
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*Duplicate*Items*");
@@ -109,7 +109,7 @@ public class DslCollectionParsingTests
                 transition Active
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
@@ -133,7 +133,7 @@ public class DslCollectionParsingTests
                 transition Active
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
@@ -156,7 +156,7 @@ public class DslCollectionParsingTests
                 transition Active
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
@@ -179,7 +179,7 @@ public class DslCollectionParsingTests
                 transition Active
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
@@ -203,7 +203,7 @@ public class DslCollectionParsingTests
                 transition Active
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
@@ -226,7 +226,7 @@ public class DslCollectionParsingTests
                 transition Active
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
@@ -249,7 +249,7 @@ public class DslCollectionParsingTests
                 transition Active
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
@@ -272,7 +272,7 @@ public class DslCollectionParsingTests
                 transition Active
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*enqueue*set*");
@@ -292,7 +292,7 @@ public class DslCollectionParsingTests
                 transition Active
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*push*queue*");
@@ -312,7 +312,7 @@ public class DslCollectionParsingTests
                 transition Active
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*add*queue*");
@@ -331,7 +331,7 @@ public class DslCollectionParsingTests
                 transition Active
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*unknown collection*Missing*");
@@ -353,7 +353,7 @@ public class DslCollectionParsingTests
                 transition Active
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().HaveCount(3);
@@ -383,7 +383,7 @@ public class DslCollectionParsingTests
                     transition Active
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         machine.Transitions.Should().ContainSingle();
         var noTransClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is DslNoTransition);
@@ -406,7 +406,7 @@ public class DslCollectionParsingTests
                 transition Active
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
@@ -430,14 +430,14 @@ public class DslCollectionRuntimeTests
                 transition Active
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire = workflow.Fire(instance, "Go");
 
         (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance.Should().NotBeNull();
-        var collection = fire.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
+        var collection = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         collection.Should().NotBeNull();
         collection!.Count.Should().Be(1);
         collection.Contains(3d).Should().BeTrue();
@@ -464,17 +464,17 @@ public class DslCollectionRuntimeTests
                 transition C
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Step1");
         (fire1.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
-        var col1 = fire1.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
+        var col1 = fire1.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col1!.Count.Should().Be(3);
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance, "Step2");
         (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
-        var col2 = fire2.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
+        var col2 = fire2.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col2!.Count.Should().Be(2);
         col2.Contains(5d).Should().BeFalse();
         col2.Contains(3d).Should().BeTrue();
@@ -501,20 +501,20 @@ public class DslCollectionRuntimeTests
                 transition C
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Enq");
         (fire1.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
-        var col1 = fire1.UpdatedInstance!.InstanceData["__collection__Tasks"] as CollectionValue;
+        var col1 = fire1.UpdatedInstance!.InstanceData["Tasks"] as List<object>;
         col1!.Count.Should().Be(2);
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance, "Deq");
         (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
-        var col2 = fire2.UpdatedInstance!.InstanceData["__collection__Tasks"] as CollectionValue;
+        var col2 = fire2.UpdatedInstance!.InstanceData["Tasks"] as List<object>;
         col2!.Count.Should().Be(1);
         // "first" was dequeued, "second" remains
-        col2.Peek().Should().Be("second");
+        col2[0].Should().Be("second");
     }
 
     [Fact]
@@ -537,20 +537,20 @@ public class DslCollectionRuntimeTests
                 transition C
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Push");
         (fire1.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
-        var col1 = fire1.UpdatedInstance!.InstanceData["__collection__History"] as CollectionValue;
+        var col1 = fire1.UpdatedInstance!.InstanceData["History"] as List<object>;
         col1!.Count.Should().Be(2);
-        col1.Peek().Should().Be(20d);
+        col1[^1].Should().Be(20d);
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance, "Pop");
         (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
-        var col2 = fire2.UpdatedInstance!.InstanceData["__collection__History"] as CollectionValue;
+        var col2 = fire2.UpdatedInstance!.InstanceData["History"] as List<object>;
         col2!.Count.Should().Be(1);
-        col2.Peek().Should().Be(10d);
+        col2[^1].Should().Be(10d);
     }
 
     [Fact]
@@ -573,15 +573,15 @@ public class DslCollectionRuntimeTests
                 transition C
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Add");
-        var col1 = fire1.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
+        var col1 = fire1.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col1!.Count.Should().Be(2);
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance, "Reset");
-        var col2 = fire2.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
+        var col2 = fire2.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col2!.Count.Should().Be(0);
     }
 
@@ -599,7 +599,7 @@ public class DslCollectionRuntimeTests
                 transition B
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire = workflow.Fire(instance, "Deq");
@@ -622,7 +622,7 @@ public class DslCollectionRuntimeTests
                 transition B
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire = workflow.Fire(instance, "Pop");
@@ -652,7 +652,7 @@ public class DslCollectionRuntimeTests
                     reject "not found"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Add");
@@ -683,7 +683,7 @@ public class DslCollectionRuntimeTests
                     reject "not found"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Add");
@@ -714,7 +714,7 @@ public class DslCollectionRuntimeTests
                     reject "too few"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Add");
@@ -747,7 +747,7 @@ public class DslCollectionRuntimeTests
                     reject "wrong min"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Add");
@@ -780,7 +780,7 @@ public class DslCollectionRuntimeTests
                     reject "wrong max"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Add");
@@ -812,7 +812,7 @@ public class DslCollectionRuntimeTests
                     reject "wrong peek"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Add");
@@ -844,7 +844,7 @@ public class DslCollectionRuntimeTests
                     reject "wrong peek"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Add");
@@ -869,13 +869,13 @@ public class DslCollectionRuntimeTests
                 transition B
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire = workflow.Fire(instance, "Go");
 
         (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
-        var col = fire.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
+        var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Contains(5d).Should().BeTrue();
     }
 
@@ -894,13 +894,13 @@ public class DslCollectionRuntimeTests
                 transition B
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire = workflow.Fire(instance, "Request", new Dictionary<string, object?> { ["Floor"] = 7 });
 
         (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
-        var col = fire.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
+        var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Contains(7d).Should().BeTrue();
     }
 
@@ -917,14 +917,14 @@ public class DslCollectionRuntimeTests
                 no transition
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire = workflow.Fire(instance, "Go");
 
         fire.Outcome.Should().Be(DslOutcomeKind.AcceptedInPlace);
         fire.UpdatedInstance.Should().NotBeNull();
-        var col = fire.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
+        var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Count.Should().Be(1);
         col.Contains(3d).Should().BeTrue();
     }
@@ -945,14 +945,14 @@ public class DslCollectionRuntimeTests
                 transition B
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire = workflow.Fire(instance, "Go");
 
         (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["Count"].Should().Be(1d);
-        var col = fire.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
+        var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Contains(3d).Should().BeTrue();
     }
 
@@ -977,7 +977,7 @@ public class DslCollectionRuntimeTests
                     reject "wrong count"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Go");
@@ -986,7 +986,7 @@ public class DslCollectionRuntimeTests
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Go");
         (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire2.NewState.Should().Be("C");
-        var col = fire2.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
+        var col = fire2.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Count.Should().Be(2);
     }
 
@@ -1001,12 +1001,12 @@ public class DslCollectionRuntimeTests
             state Idle initial
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
-        var floors = instance.InstanceData["__collection__Floors"] as CollectionValue;
-        var tasks = instance.InstanceData["__collection__Tasks"] as CollectionValue;
-        var flags = instance.InstanceData["__collection__Flags"] as CollectionValue;
+        var floors = instance.InstanceData["Floors"] as List<object>;
+        var tasks = instance.InstanceData["Tasks"] as List<object>;
+        var flags = instance.InstanceData["Flags"] as List<object>;
 
         floors.Should().NotBeNull();
         floors!.Count.Should().Be(0);
@@ -1033,13 +1033,13 @@ public class DslCollectionRuntimeTests
                 transition B
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire = workflow.Fire(instance, "Go");
 
         (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
-        var col = fire.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
+        var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Count.Should().Be(1);
     }
 
@@ -1060,14 +1060,14 @@ public class DslCollectionRuntimeTests
                 transition B
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire = workflow.Fire(instance, "Go");
 
         (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
-        var col = fire.UpdatedInstance!.InstanceData["__collection__Floors"] as CollectionValue;
-        col!.Min().Should().Be(1d);
+        var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
+        col!.OfType<double>().DefaultIfEmpty(double.NaN).Min().Should().Be(1d);
         col.Max().Should().Be(7d);
         col.Count.Should().Be(4);
     }
@@ -1088,7 +1088,7 @@ public class DslCollectionRuntimeTests
                 transition B
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance();
 
         var fire = workflow.Fire(instance, "Go");
@@ -1096,7 +1096,7 @@ public class DslCollectionRuntimeTests
         // Second dequeue on empty queue should reject
         (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
         // Original instance should be unmodified
-        var col = instance.InstanceData["__collection__Tasks"] as CollectionValue;
+        var col = instance.InstanceData["Tasks"] as List<object>;
         col!.Count.Should().Be(0);
     }
 }

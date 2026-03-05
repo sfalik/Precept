@@ -25,7 +25,7 @@ public class DslSetParsingTests
                     transition Green
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         machine.Transitions.Should().ContainSingle();
         var noTransClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is DslNoTransition);
@@ -46,7 +46,7 @@ public class DslSetParsingTests
                 set Count = Count + 1
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*set requires a following transition*");
@@ -66,7 +66,7 @@ public class DslSetParsingTests
                 transition Green
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*assigns unknown data field 'MissingField'*");
@@ -91,7 +91,7 @@ public class DslSetParsingTests
                     transition Red
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         machine.Transitions.Should().ContainSingle();
         var elseClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is DslStateTransition st && st.TargetState == "Red");

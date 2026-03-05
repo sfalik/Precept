@@ -18,7 +18,7 @@ internal static class DslExpressionTestHelper
                 transition Green
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
         machine.Transitions.Should().ContainSingle();
         machine.Transitions[0].Clauses.Should().ContainSingle();
         machine.Transitions[0].Clauses[0].SetAssignments.Should().ContainSingle();

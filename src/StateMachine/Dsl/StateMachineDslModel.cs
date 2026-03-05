@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace StateMachine.Dsl;
 
-public sealed record DslMachine(
+public sealed record DslWorkflowModel(
     string Name,
     IReadOnlyList<DslState> States,
     DslState InitialState,

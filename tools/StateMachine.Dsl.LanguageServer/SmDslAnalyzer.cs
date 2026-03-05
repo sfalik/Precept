@@ -18,7 +18,7 @@ internal sealed class SmDslAnalyzer
     private static readonly Regex EventMemberPrefixRegex = new("(?<event>[A-Za-z_][A-Za-z0-9_]*)\\.$", RegexOptions.Compiled);
     private static readonly Regex SetLineRegex = new("^\\s*set\\s+(?<key>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<expr>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex CollectionDeclRegex = new("^\\s*(?:set|queue|stack)<(?:number|string|boolean)>\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly MethodInfo? ExpressionParseMethod = typeof(DslMachine).Assembly
+    private static readonly MethodInfo? ExpressionParseMethod = typeof(DslWorkflowModel).Assembly
         .GetType("StateMachine.Dsl.DslExpressionParser", throwOnError: false)
         ?.GetMethod(
             "Parse",
@@ -47,10 +47,10 @@ internal sealed class SmDslAnalyzer
 
         try
         {
-            var machine = StateMachineDslParser.Parse(text);
-            DslWorkflowCompiler.Compile(machine);
+            var model = DslWorkflowParser.Parse(text);
+            DslWorkflowCompiler.Compile(model);
 
-            var diagnostics = GetSemanticDiagnostics(machine, lines);
+            var diagnostics = GetSemanticDiagnostics(model, lines);
             return diagnostics.Count == 0 ? Array.Empty<Diagnostic>() : diagnostics;
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
@@ -354,15 +354,15 @@ internal sealed class SmDslAnalyzer
             .OrderBy(item => item.Label, StringComparer.Ordinal)
             .ToArray();
 
-    private static IReadOnlyList<Diagnostic> GetSemanticDiagnostics(DslMachine machine, string[] lines)
+    private static IReadOnlyList<Diagnostic> GetSemanticDiagnostics(DslWorkflowModel model, string[] lines)
     {
         var diagnostics = new List<Diagnostic>();
-        var dataFieldKinds = machine.Fields.ToDictionary(
+        var dataFieldKinds = model.Fields.ToDictionary(
             field => field.Name,
             MapFieldContractKind,
             StringComparer.Ordinal);
 
-        var eventArgKinds = machine.Events.ToDictionary(
+        var eventArgKinds = model.Events.ToDictionary(
             evt => evt.Name,
             evt => evt.Args.ToDictionary(
                 arg => arg.Name,
@@ -370,17 +370,17 @@ internal sealed class SmDslAnalyzer
                 StringComparer.Ordinal),
             StringComparer.Ordinal);
 
-        var collectionFieldMap = machine.CollectionFields.ToDictionary(
+        var collectionFieldMap = model.CollectionFields.ToDictionary(
             c => c.Name,
             c => c,
             StringComparer.Ordinal);
 
         // Process each transition (one per (FromState, EventName) pair), iterating clauses in order
         // so that prior-branch guard negations are accumulated for subsequent branches.
-        foreach (var transition in machine.Transitions)
+        foreach (var transition in model.Transitions)
         {
             var eventName = transition.EventName;
-            var baseSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, eventName, machine.CollectionFields);
+            var baseSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, eventName, model.CollectionFields);
 
             // Validate the transition-level `when` predicate if present
             if (!string.IsNullOrWhiteSpace(transition.Predicate))
@@ -461,7 +461,7 @@ internal sealed class SmDslAnalyzer
             }
         }
 
-        if (machine.Events.Count == 0)
+        if (model.Events.Count == 0)
         {
             var machineLine = 0;
             for (var li = 0; li < lines.Length; li++)
@@ -486,13 +486,13 @@ internal sealed class SmDslAnalyzer
         }
 
         // Validate rules
-        ValidateRuleDiagnostics(machine, lines, dataFieldKinds, eventArgKinds, collectionFieldMap, diagnostics);
+        ValidateRuleDiagnostics(model, lines, dataFieldKinds, eventArgKinds, collectionFieldMap, diagnostics);
 
         return diagnostics;
     }
 
     private static void ValidateRuleDiagnostics(
-        DslMachine machine,
+        DslWorkflowModel model,
         string[] lines,
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
@@ -501,13 +501,13 @@ internal sealed class SmDslAnalyzer
     {
         // Symbols for data fields (field rules and top-level rules scope)
         var dataSymbols = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);
-        foreach (var col in machine.CollectionFields)
+        foreach (var col in model.CollectionFields)
         {
             dataSymbols[$"{col.Name}.count"] = StaticValueKind.Number;
         }
 
         // Field rules: validate expression against single-field scope
-        foreach (var field in machine.Fields)
+        foreach (var field in model.Fields)
         {
             if (field.Rules is null) continue;
             var fieldSymbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal)
@@ -522,7 +522,7 @@ internal sealed class SmDslAnalyzer
         }
 
         // Collection field rules: validate expression against single-collection scope
-        foreach (var col in machine.CollectionFields)
+        foreach (var col in model.CollectionFields)
         {
             if (col.Rules is null) continue;
             var colSymbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal)
@@ -537,9 +537,9 @@ internal sealed class SmDslAnalyzer
         }
 
         // Top-level rules: validate against all data fields
-        if (machine.TopLevelRules is not null)
+        if (model.TopLevelRules is not null)
         {
-            foreach (var rule in machine.TopLevelRules)
+            foreach (var rule in model.TopLevelRules)
             {
                 var lineIndex = Math.Max(0, rule.SourceLine - 1);
                 ValidateExpression(rule.ExpressionText, lineIndex, dataSymbols, StaticValueKind.Boolean, "top-level rule", diagnostics, lines);
@@ -547,7 +547,7 @@ internal sealed class SmDslAnalyzer
         }
 
         // State rules: validate against all data fields
-        foreach (var state in machine.States)
+        foreach (var state in model.States)
         {
             if (state.Rules is null) continue;
             foreach (var rule in state.Rules)
@@ -558,7 +558,7 @@ internal sealed class SmDslAnalyzer
         }
 
         // Event rules: validate against event arg scope only
-        foreach (var evt in machine.Events)
+        foreach (var evt in model.Events)
         {
             if (evt.Rules is null) continue;
             var evtSymbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
@@ -584,11 +584,11 @@ internal sealed class SmDslAnalyzer
         }
 
         // Warn about states with entry rules that are never targeted by any transition
-        var statesWithRules = machine.States.Where(s => s.Rules is not null && s.Rules.Count > 0).ToList();
+        var statesWithRules = model.States.Where(s => s.Rules is not null && s.Rules.Count > 0).ToList();
         if (statesWithRules.Count > 0)
         {
             var targetedStates = new HashSet<string>(
-                machine.Transitions
+                model.Transitions
                     .SelectMany(t => t.Clauses)
                     .Select(c => c.Outcome)
                     .OfType<DslStateTransition>()

@@ -149,15 +149,58 @@ The compiler validates edit blocks at compile time:
 - **Duplicate field in same block**: a field listed twice in the same `edit` block is a warning.
 - **No fields**: an `edit` block with no field names is a parse error.
 
-## Runtime API
+## Model Extension
 
-### `Update(patch)`
+### `DslEditBlock` record
 
-A single new method on the workflow instance:
+The parser produces one `DslEditBlock` per `(FromState, FieldNames)` grouping:
 
 ```csharp
-DslInstanceUpdateResult Update(Action<IUpdatePatchBuilder> patch)
+public sealed record DslEditBlock(
+    string FromState,
+    IReadOnlyList<string> FieldNames,
+    int SourceLine = 0);
 ```
+
+When `from any edit` is used, the parser expands `any` into one `DslEditBlock` per declared state (same expansion pattern as `from any on Event`). When `from State1, State2 edit` is used, the parser creates one `DslEditBlock` per listed state.
+
+### `DslWorkflowModel` extension
+
+```csharp
+public sealed record DslWorkflowModel(
+    string Name,
+    IReadOnlyList<DslState> States,
+    DslState InitialState,
+    IReadOnlyList<DslEvent> Events,
+    IReadOnlyList<DslTransition> Transitions,
+    IReadOnlyList<DslField> Fields,
+    IReadOnlyList<DslCollectionField> CollectionFields,
+    IReadOnlyList<DslRule>? TopLevelRules = null,
+    IReadOnlyList<DslEditBlock>? EditBlocks = null);  // <-- NEW
+```
+
+### `DslWorkflowEngine` — editability map
+
+At compile time, `DslWorkflowEngine` builds an internal editability map:
+
+```csharp
+private readonly IReadOnlyDictionary<string, HashSet<string>> _editableFieldsByState;
+// Key: state name → Value: set of editable field names (union of all matching edit blocks)
+```
+
+This precomputed map makes `Update` validation O(1) per field.
+
+## Runtime API
+
+### `Update(instance, patch)`
+
+A single new method on `DslWorkflowEngine`, following the same instance-parameter pattern as `Fire`:
+
+```csharp
+DslUpdateResult Update(DslWorkflowInstance instance, Action<IUpdatePatchBuilder> patch)
+```
+
+The caller passes the current instance; `Update` returns a result containing the updated instance (or null on failure). Instances remain immutable records — `Update` returns a new instance via `with` expression, just like `Fire`.
 
 The patch builder exposes typed operations for each supported field kind:
 
@@ -190,7 +233,11 @@ public interface IUpdatePatchBuilder
 ### Usage example
 
 ```csharp
-var result = instance.Update(patch => patch
+var model = DslWorkflowParser.Parse(dslText);
+var engine = DslWorkflowCompiler.Compile(model);
+var instance = engine.CreateInstance();
+
+var result = engine.Update(instance, patch => patch
     .Set("Notes", "Customer called back — issue is intermittent")
     .Set("Priority", 1)
     .Add("Tags", "urgent")
@@ -199,7 +246,7 @@ var result = instance.Update(patch => patch
 
 if (result.Outcome == UpdateOutcome.Updated)
 {
-    // Commit persisted instance
+    instance = result.UpdatedInstance!; // new immutable instance with updated data
 }
 ```
 
@@ -213,7 +260,7 @@ When `Update` is called, the runtime executes the following steps in order:
 
 3. **Atomic mutation** — Apply all patch operations to a working copy of instance data, in declaration order within the patch. This is the same working-copy pattern used by `set` assignments in transitions.
 
-4. **Rules evaluation** — Evaluate field rules, top-level rules, and current-state entry rules against the post-mutation working copy. If any rule fails, all mutations are rolled back and the outcome is `Blocked` with violated rule reasons.
+4. **Rules evaluation** — Evaluate field rules, top-level rules, and the current state's rules against the post-mutation working copy. If any rule fails, all mutations are rolled back and the outcome is `Blocked` with violated rule reasons. (Note: the current state's rules are checked because the data must remain valid for the state we're in, even though no state entry occurs.)
 
 5. **Commit** — If all validations pass, the working copy replaces the live instance data.
 
@@ -230,14 +277,14 @@ public enum UpdateOutcome
 ```
 
 ```csharp
-public record DslInstanceUpdateResult(
+public sealed record DslUpdateResult(
     UpdateOutcome Outcome,
     IReadOnlyList<string> Reasons,
     DslWorkflowInstance? UpdatedInstance  // null when not Updated
 );
 ```
 
-`Updated` is a new outcome kind — distinct from `Enabled` (which implies a lifecycle event was processed). The caller sees "data was edited" vs. "an event was fired" as different categories.
+`Updated` is a new outcome kind — distinct from `Accepted` (which implies a lifecycle event was processed). The caller sees "data was edited" vs. "an event was fired" as different categories. `UpdateOutcome` is a separate enum from `DslOutcomeKind` because `Update` and `Fire` are fundamentally different operations with different outcome semantics.
 
 ### Patch conflict rules
 
@@ -259,14 +306,24 @@ Both share the same rules evaluation infrastructure. A field modified by `Update
 
 ## Inspect Integration
 
-### Extended Inspect response
+### Editable fields on the aggregate `Inspect` result
 
-`Inspect` is extended to include editable field information alongside event/transition status. No new `GetEditable` endpoint — the existing inspect call returns everything the UI needs.
+The engine already has an aggregate `Inspect(instance)` method that returns `DslInspectionResult(CurrentState, InstanceData, Events[])` — a full snapshot for rendering an inspector view. Editable field information is state-level, not event-level — it answers "what fields can be edited in this state?" regardless of any event context. This makes it a natural extension of the aggregate inspect result.
 
-The inspect response includes an `EditableFields` collection for the current state:
+Extend `DslInspectionResult` with an `EditableFields` collection:
 
 ```csharp
-public record DslEditableFieldInfo(
+public sealed record DslInspectionResult(
+    string CurrentState,
+    IReadOnlyDictionary<string, object?> InstanceData,
+    IReadOnlyList<DslEventInspectionResult> Events,
+    IReadOnlyList<DslEditableFieldInfo>? EditableFields = null);  // <-- NEW
+```
+
+Each entry provides enough metadata for the host to render edit controls:
+
+```csharp
+public sealed record DslEditableFieldInfo(
     string FieldName,
     string FieldType,        // "string", "number", "boolean", "set<string>", etc.
     bool IsNullable,
@@ -275,11 +332,22 @@ public record DslEditableFieldInfo(
 );
 ```
 
-This gives the host application (or preview UI) enough information to render an edit form pre-populated with current values, type-appropriate input controls, and editability scope.
+When no edit blocks are declared, `EditableFields` is `null`. Otherwise, it contains the effective editable field set for the instance's current state (the union of all matching `from ... edit` blocks), pre-populated with current values.
+
+This gives the host application (or preview UI) enough information to render an edit form with type-appropriate input controls and editability scope — all from a single `engine.Inspect(instance)` call.
 
 ### Inspect does not simulate Update
 
-Unlike event inspection (which simulates guard evaluation and set assignments), inspect does not simulate update operations. It reports *what is editable* — the host decides what to change and calls `Update` with a concrete patch.
+Unlike event inspection (which simulates guard evaluation and set assignments), the editable fields list does not simulate update operations. It reports *what is editable* — the host decides what to change and calls `Update` with a concrete patch.
+
+### Relationship to per-event Inspect
+
+The per-event `Inspect(instance, eventName)` returns `DslEventInspectionResult` and is unchanged. The aggregate `Inspect(instance)` now also carries editable field metadata. Both answer different questions:
+
+- **Per-event Inspect**: "What happens if I fire this event?"
+- **Aggregate Inspect `EditableFields`**: "What data can I edit in this state?"
+
+The preview handler calls aggregate `Inspect` once and receives both event statuses and editable field info in one result.
 
 ## Full Example
 
@@ -354,39 +422,45 @@ from Resolved edit
 
 ```csharp
 // Create and compile
-var machine = StateMachineDslParser.Parse(dslText);
-var definition = DslWorkflowCompiler.Compile(machine);
-var instance = definition.CreateInstance();
+DslWorkflowModel model = DslWorkflowParser.Parse(dslText);
+DslWorkflowEngine engine = DslWorkflowCompiler.Compile(model);
+DslWorkflowInstance instance = engine.CreateInstance();
 
 // Lifecycle: assign a technician (event pipeline)
-var fireResult = instance.Fire("Assign", new Dictionary<string, object?>
+DslFireResult fireResult = engine.Fire(instance, "Assign", new Dictionary<string, object?>
 {
     ["Technician"] = "Alice"
 });
-// fireResult.Outcome == Enabled, state => InProgress
+// fireResult.Outcome == Accepted, state => InProgress
+instance = fireResult.UpdatedInstance!;
 
 // Data editing: update notes and priority (no event needed)
-var editResult = instance.Update(patch => patch
+DslUpdateResult editResult = engine.Update(instance, patch => patch
     .Set("Notes", "Customer prefers morning appointments")
     .Set("Priority", 1)
     .Add("Tags", "urgent")
 );
 // editResult.Outcome == Updated, state unchanged (InProgress)
+instance = editResult.UpdatedInstance!;
 
-// Inspect: see what's editable, what events are available
-var inspection = instance.Inspect();
-// inspection.EditableFields => [Notes, Priority, Tags, Description, EstimatedHours, AssignedTo]
-// inspection.Events => [Resolve] (with guard status)
+// Full snapshot: events + editable fields in one call
+DslInspectionResult snapshot = engine.Inspect(instance);
+// snapshot.EditableFields => [Notes, Priority, Tags, Description, EstimatedHours, AssignedTo]
+// snapshot.Events => per-event inspection results for all relevant events
+
+// Per-event inspect: see what happens if we fire a specific event
+DslEventInspectionResult inspectResolve = engine.Inspect(instance, "Resolve");
+// inspectResolve.Outcome == Accepted (with guard status)
 
 // Rules enforcement: priority out of range
-var badEdit = instance.Update(patch => patch
+DslUpdateResult badEdit = engine.Update(instance, patch => patch
     .Set("Priority", 99)
 );
 // badEdit.Outcome == Blocked
 // badEdit.Reasons => ["Priority must be between 1 and 5"]
 
 // Not editable in current state
-var wrongState = instance.Update(patch => patch
+DslUpdateResult wrongState = engine.Update(instance, patch => patch
     .Set("ResolutionSummary", "Fixed it")
 );
 // wrongState.Outcome == NotAllowed
@@ -406,13 +480,73 @@ The edit block adds one new production to the DSL grammar:
 
 The `edit` keyword is a new reserved word. It appears only in the `from ... edit` position — it cannot be used as a field name, state name, or event name.
 
+## Preview Protocol Extension
+
+### Snapshot: `EditableFields` collection
+
+The `SmPreviewSnapshot` record is extended with an `EditableFields` collection:
+
+```csharp
+internal sealed record SmPreviewSnapshot(
+    // ... existing fields ...
+    IReadOnlyList<SmPreviewEditableField>? EditableFields = null);
+
+internal sealed record SmPreviewEditableField(
+    string Name,
+    string Type,           // "string", "number", "boolean", "set<string>", etc.
+    bool IsNullable,
+    object? CurrentValue,
+    string? CollectionType // null for scalars; "set", "queue", "stack" for collections
+);
+```
+
+The preview handler reads `EditableFields` from the aggregate `engine.Inspect(instance)` result and maps each `DslEditableFieldInfo` to an `SmPreviewEditableField` record in the snapshot.
+
+### New `"update"` action
+
+The preview handler adds an `"update"` action (parallel to `"fire"`):
+
+```json
+{
+  "action": "update",
+  "uri": "file:///path/to/file.sm",
+  "patches": [
+    { "field": "Notes", "op": "set", "value": "Updated notes" },
+    { "field": "Tags", "op": "add", "value": "urgent" },
+    { "field": "Priority", "op": "set", "value": 1 }
+  ]
+}
+```
+
+The `patches` array is translated to `IUpdatePatchBuilder` calls. On success, the preview handler updates the session instance and returns a fresh snapshot.
+
+### `SmPreviewRequest` extension
+
+```csharp
+internal sealed record SmPreviewRequest(
+    string Action,
+    DocumentUri Uri,
+    string? Text = null,
+    string? EventName = null,
+    IReadOnlyDictionary<string, object?>? Args = null,
+    IReadOnlyList<SmPreviewReplayStep>? Steps = null,
+    IReadOnlyList<SmPreviewPatchOp>? Patches = null);  // <-- NEW
+
+internal sealed record SmPreviewPatchOp(
+    string Field,
+    string Op,       // "set", "add", "remove", "enqueue", "dequeue", "push", "pop", "replace", "clear"
+    object? Value);  // null for dequeue, pop, clear
+```
+
 ## Language Server Impact
 
 ### Parser
 
-- Recognize `edit` after `from <states>` as an alternative to `on <event>`.
+- Add `FromEditRegex` to recognize `from <states> edit` as a new block form (parallel to `FromOnRegex`).
 - Parse indented field names as the edit block body.
 - Report errors for unknown fields, unknown states, empty blocks.
+- Call `ParseIdentifierList` for multi-state expansion (same as `ParseFromOnBlock`).
+- Generate one `DslEditBlock` per source state.
 
 ### Analyzer
 
@@ -436,23 +570,25 @@ The following prompt can be pasted into a new session to implement the editable 
 
 ---
 
-Implement the editable fields feature for the state machine DSL as specified in docs/EditableFieldsDesign.md. This is a full-stack implementation across parser, model, compiler, runtime, language server, and documentation. Read docs/EditableFieldsDesign.md thoroughly before starting — it is the complete design spec. This feature depends on the rules feature (docs/RulesDesign.md) being implemented first.
+Implement the editable fields feature for the state machine DSL as specified in docs/EditableFieldsDesign.md. This is a full-stack implementation across parser, model, compiler, runtime, language server, and documentation. Read docs/EditableFieldsDesign.md thoroughly before starting — it is the complete design spec. Also read docs/RuntimeApiDesign.md for the current public API surface and naming conventions. This feature depends on the rules feature (docs/RulesDesign.md) being implemented first.
 
-Summary of what editable fields are: a way to declare subsets of instance data fields as directly modifiable in specific states, without going through the event pipeline. The DSL syntax is `from <any|State1,State2> edit` with indented field names. The runtime exposes `Update(patch)` for host applications to modify editable fields with full type checking and rules enforcement.
+Summary of what editable fields are: a way to declare subsets of instance data fields as directly modifiable in specific states, without going through the event pipeline. The DSL syntax is `from <any|State1,State2> edit` with indented field names. The runtime exposes `engine.Update(instance, patch)` for host applications to modify editable fields with full type checking and rules enforcement.
 
 DSL syntax: `from <any|StateA[,StateB...]> edit` followed by indented lines each containing a single field name. Block-form only, no inline syntax. Multi-state comma-separated lists are supported (same as transition blocks). `from any edit` makes fields editable in all states. Multiple edit blocks are additive — the effective editable set for a state is the union of all matching blocks.
 
 Compiler validations: unknown field names in edit blocks are errors. Unknown state names are errors. Empty edit blocks (no field names) are parse errors. Duplicate field in same block is a warning. `edit` is a new reserved word.
 
-Runtime API: add `Update(Action<IUpdatePatchBuilder> patch)` method to DslWorkflowDefinition or the instance type. The patch builder supports `Set` for scalars, `Add`/`Remove` for sets, `Enqueue`/`Dequeue` for queues, `Push`/`Pop` for stacks, `Replace` and `Clear` for all collections. Validation sequence: editability check (is field editable in current state?), type check (does value match declared type?), atomic mutation on working copy, rules evaluation (field rules, top-level rules, current-state entry rules), commit or rollback. Outcomes: `Updated` (success), `NotAllowed` (field not editable in current state), `Blocked` (rules violated), `Invalid` (type mismatch, unknown field, patch conflict). Patch conflicts detected at build time: duplicate Set on same scalar, Replace + granular op on same collection, Set on collection field, granular op on scalar field. Update never triggers state transitions. Update and Fire are independent.
+Model: add `DslEditBlock(string FromState, IReadOnlyList<string> FieldNames, int SourceLine = 0)` record. Add `IReadOnlyList<DslEditBlock>? EditBlocks = null` to `DslWorkflowModel`. The parser expands `from any edit` into one `DslEditBlock` per declared state, and `from State1, State2 edit` into one per listed state (same expansion pattern as transitions).
 
-Inspect integration: extend the existing Inspect response to include an `EditableFields` collection with field name, field type, nullability, current value, and collection type info. No new GetEditable endpoint.
+Runtime API: add `Update(DslWorkflowInstance instance, Action<IUpdatePatchBuilder> patch)` method on `DslWorkflowEngine`, returning `DslUpdateResult`. The patch builder supports `Set` for scalars, `Add`/`Remove` for sets, `Enqueue`/`Dequeue` for queues, `Push`/`Pop` for stacks, `Replace` and `Clear` for all collections. Validation sequence: editability check (is field editable in current state?), type check (does value match declared type?), atomic mutation on working copy, rules evaluation (field rules, top-level rules, current-state rules), commit or rollback. Outcomes: `Updated` (success), `NotAllowed` (field not editable in current state), `Blocked` (rules violated), `Invalid` (type mismatch, unknown field, patch conflict). Patch conflicts detected at build time: duplicate Set on same scalar, Replace + granular op on same collection, Set on collection field, granular op on scalar field. Update never triggers state transitions. Update and Fire are independent. `DslUpdateResult` mirrors `DslFireResult` naming convention: `DslUpdateResult(UpdateOutcome Outcome, IReadOnlyList<string> Reasons, DslWorkflowInstance? UpdatedInstance)`.
+
+Inspect integration: extend the aggregate `DslInspectionResult` with an `IReadOnlyList<DslEditableFieldInfo>? EditableFields = null` property. `DslEditableFieldInfo` has `FieldName`, `FieldType`, `IsNullable`, `CurrentValue`, `CollectionType`. The aggregate `engine.Inspect(instance)` now returns event statuses AND editable field info in one call. No separate `GetEditableFields` method — this is folded into the aggregate inspect result.
 
 Language server: recognize `edit` after `from <states>` as alternative to `on <event>`. Parse indented field names. Validate field and state references. Suggest `edit` in completions after `from <states>`. Suggest field names inside edit block body. Highlight `edit` keyword and field references with semantic tokens.
 
-Preview UI needs to be updated to support editing of fields inline in the data panel according to the definition defining which fields are editable for the current state.  While editing, the rules should be checked and the input box highlighted red when rules are violated.
+Preview UI needs to be updated to support editing of fields inline in the data panel according to the engine defining which fields are editable for the current state. While editing, the rules should be checked and the input box highlighted red when rules are violated.
 
-Tests: add comprehensive tests covering edit block parsing, multi-state edit blocks, `from any edit`, additive semantics across overlapping blocks, Update API with scalar fields, Update with collection fields (all types), editability enforcement per state, type checking, rules enforcement on update, atomic rollback on rule violation, patch conflict detection, inspect editable fields response, and coexistence of edit blocks with event transitions.
+Tests: add comprehensive tests covering edit block parsing, multi-state edit blocks, `from any edit`, additive semantics across overlapping blocks, Update API with scalar fields, Update with collection fields (all types), editability enforcement per state, type checking, rules enforcement on update, atomic rollback on rule violation, patch conflict detection, inspect editable fields in aggregate result, and coexistence of edit blocks with event transitions.
 
 Documentation: update docs/DesignNotes.md DSL Syntax Contract section to include edit block syntax. Update README.md DSL Syntax Reference, DSL Cookbook, and Status sections. Update docs/EditableFieldsDesign.md status from design phase to implemented.
 
@@ -465,7 +601,7 @@ Syntax highlighting grammar sync (non-negotiable — do not skip): update `tools
 
 Verify the grammar file is valid JSON after changes by parsing it. Confirm that `edit` does not accidentally color identifiers that happen to start with the substring — word-boundary anchors (`\b`) are required.
 
-Intelligence sync (non-negotiable — do not skip): apply the Intellisense Sync Checklist from `.github/copilot-instructions.md` in full. At minimum, the following changes are required for this feature:
+Intellisense sync (non-negotiable — do not skip): apply the Intellisense Sync Checklist from `.github/copilot-instructions.md` in full. At minimum, the following changes are required for this feature:
 
 1. **`KeywordItems`** — add `edit` to `KeywordItems` in `SmDslAnalyzer.cs`.
 2. **`KeywordTokens`** — add `edit` to `KeywordTokens` in `SmSemanticTokensHandler.cs`.

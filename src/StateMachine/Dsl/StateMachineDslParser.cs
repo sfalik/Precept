@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace StateMachine.Dsl;
 
-public static class StateMachineDslParser
+public static class DslWorkflowParser
 {
     private static readonly Regex MachineRegex = new("^machine\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
     private static readonly Regex StateRegex = new("^state\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+(?<initial>initial))?$", RegexOptions.Compiled);
@@ -65,7 +65,7 @@ public static class StateMachineDslParser
         "^rule\\s+(?<expr>.+?)\\s+\"(?<reason>[^\"]+)\"\\s*$",
         RegexOptions.Compiled);
 
-    public static DslMachine Parse(string text)
+    public static DslWorkflowModel Parse(string text)
     {
         if (string.IsNullOrWhiteSpace(text))
             throw new InvalidOperationException("DSL input is empty.");
@@ -282,7 +282,7 @@ public static class StateMachineDslParser
 
         ValidateReferences(states, events, transitions, dataFields, collectionFields);
 
-        return new DslMachine(name, states, initialState, events, transitions, dataFields, collectionFields,
+        return new DslWorkflowModel(name, states, initialState, events, transitions, dataFields, collectionFields,
             topLevelRules.Count > 0 ? topLevelRules : null);
     }
 

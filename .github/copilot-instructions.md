@@ -2,7 +2,13 @@
 
 ## DSL Sample Files (.sm)
 
-`.sm` files are DSL source files interpreted directly by the runtime — they are **not** compiled by the C# build pipeline. Never run `dotnet build` or `dotnet run` to validate a `.sm` file. Correctness is checked by reading the file against the DSL Syntax Contract in `docs/DesignNotes.md`.
+`.sm` files are DSL source files interpreted directly by the runtime — they are **not** compiled by the C# build pipeline. Never run `dotnet build` or `dotnet run` to validate a `.sm` file.
+
+To check a `.sm` file for errors:
+1. Use the `get_errors` tool on the `.sm` file path — this reads the VS Code Problems panel, which is populated by the DSL language server.
+2. Cross-check the file against the DSL Syntax Contract in `docs/DesignNotes.md`.
+
+Do not invoke any terminal command to validate `.sm` files.
 
 ## Documentation Sync Is Mandatory
 

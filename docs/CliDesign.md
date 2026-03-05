@@ -6,7 +6,7 @@ Status: **Design phase — not yet implemented.**
 
 ## Overview
 
-`smcli` is a thin command-line host for the DSL runtime. It supports two execution modes: an interactive REPL for exploration and one-shot commands for scripting. The CLI itself contains **zero domain logic** — all workflow semantics live in `DslWorkflowDefinition` methods, and the CLI is pure I/O, formatting, and argument parsing.
+`smcli` is a thin command-line host for the DSL runtime. It supports two execution modes: an interactive REPL for exploration and one-shot commands for scripting. The CLI itself contains **zero domain logic** — all workflow semantics live in `DslWorkflowEngine` methods, and the CLI is pure I/O, formatting, and argument parsing.
 
 ## Motivation
 
@@ -25,11 +25,11 @@ The CLI must not duplicate domain logic that belongs in the runtime. During the 
 
 | Logic | Where it lives today | Problem |
 |-------|---------------------|---------|
-| Available-event filtering | `SmPreviewHandler.BuildSnapshot` — filters `machine.Transitions` + `machine.TerminalRules` by current state | Both CLI and LSP need this; transition map is private |
-| Event argument coercion | `SmPreviewHandler.CoerceEventArgs` — converts JSON strings/JsonElement to runtime types | Both CLI and LSP need this; contract map is private |
-| Instance data serialization | Scattered — `__collection__` key convention, `CollectionValue.ToSerializableList()` | Internal storage detail leaks to consumers |
+| Available-event filtering | `SmPreviewHandler.BuildSnapshot` — now uses `engine.Inspect(instance)` aggregate | Both CLI and LSP need this; now exposed via the aggregate |
+| Event argument coercion | `engine.CoerceEventArguments(eventName, args)` — converts JSON/untyped values to runtime types | Now a public engine method |
+| Instance data serialization | `instance.InstanceData` — clean `IReadOnlyDictionary<string, object?>` with `List<object>` for collections; no internal keys exposed | Clean public format is now standard |
 
-**Resolution:** Push these into `DslWorkflowDefinition` as public methods (see [Runtime API Extensions](#runtime-api-extensions)). The CLI then calls `definition.Method()` for every operation and only handles formatting.
+**Resolution:** These are now available on `DslWorkflowEngine` as public methods (see [Runtime API Extensions](#runtime-api-extensions)). The CLI then calls `engine.Method()` for every operation and only handles formatting.
 
 ### Mode separation
 
@@ -72,23 +72,23 @@ Print events available from the current state with their outcome status.
 
 - **REPL:** Formatted list with outcome indicators (enabled/blocked/undefined/noTransition).
 - **One-shot:** JSON array of event objects.
-- **Runtime API:** `definition.GetAvailableEvents(instance.CurrentState)` + `definition.Inspect(instance, eventName)` for each.
+- **Runtime API:** `engine.Inspect(instance)` — use `.Events` list for outcomes per event.
 
 #### `inspect <event> [json]`
 
 Non-mutating evaluation of an event against the current instance.
 
-- **REPL (no json):** Prompt for each required event argument using field metadata from `definition.Events[n].Args`.
+- **REPL (no json):** Prompt for each required event argument using field metadata from `engine.Events[n].Args`.
 - **REPL (with json):** Parse inline JSON as event arguments.
 - **One-shot:** JSON argument object required (or empty `{}` for no-arg events).
-- **Runtime API:** `definition.Inspect(instance, eventName, coercedArgs)`
+- **Runtime API:** `engine.Inspect(instance, eventName, coercedArgs)`
 - **Output:** Outcome, target state (if accepted), reasons (if blocked/rejected), required argument keys.
 
 #### `fire <event> [json]`
 
 Mutating event execution. Same argument handling as `inspect`.
 
-- **Runtime API:** `definition.Fire(instance, eventName, coercedArgs)` — update `instance = result.UpdatedInstance` on success.
+- **Runtime API:** `engine.Fire(instance, eventName, coercedArgs)` — update `instance = result.UpdatedInstance` on success.
 - **Output:** Outcome, previous state → new state (if accepted), reasons (if blocked/rejected).
 - **REPL prompt update:** `MachineName[NewState]>` after successful fire.
 
@@ -98,7 +98,7 @@ Print the current instance data.
 
 - **REPL:** Pretty-printed, colorized JSON.
 - **One-shot:** JSON to stdout.
-- **Runtime API:** `definition.SerializeInstanceData(instance)` — returns clean dictionary with collection fields as arrays, no `__collection__` prefix.
+- **Runtime API:** `instance.InstanceData` — clean `IReadOnlyDictionary<string, object?>` with `List<object>` for collections, no `__collection__` prefix.
 
 #### `data load [@path | json]`
 
@@ -106,8 +106,8 @@ Reset and hydrate the instance with provided data.
 
 - **`@path`:** Read JSON from file.
 - **Inline json:** Parse directly.
-- **REPL (no argument):** Prompt field-by-field using `definition.DataFields` and `definition.CollectionFields` metadata.
-- **Runtime API:** `definition.DeserializeInstanceData(parsed)` → `definition.CreateInstance(deserialized)`.
+- **REPL (no argument):** Prompt field-by-field using `engine.Fields` and `engine.CollectionFields` metadata.
+- **Runtime API:** `engine.CreateInstance(parsed)` — accepts a clean dictionary with `List<object>` for collections.
 
 #### `data save [@path]`
 
@@ -115,7 +115,7 @@ Write current instance data as JSON.
 
 - **`@path`:** Write to file.
 - **No argument:** Write to stdout.
-- **Runtime API:** `definition.SerializeInstanceData(instance)` → JSON serialize.
+- **Runtime API:** JSON serialize `instance.InstanceData` directly.
 
 #### `rules`
 
@@ -123,7 +123,7 @@ Evaluate all current rules against the instance.
 
 - **REPL:** List of violated rules with reasons, or "All rules satisfied."
 - **One-shot:** JSON array of violation strings.
-- **Runtime API:** `definition.EvaluateCurrentRules(instance)`
+- **Runtime API:** `engine.CheckCompatibility(instance)` (runs rule evaluation)
 
 #### `help`
 
@@ -163,85 +163,54 @@ When stdin is not a TTY and no explicit `data load` is given, stdin is read as J
 
 ## Runtime API Extensions
 
-These methods will be added to `DslWorkflowDefinition` in `src/StateMachine/Dsl/StateMachineDslRuntime.cs` to keep the CLI (and `SmPreviewHandler`) free of domain logic.
+These methods are available on `DslWorkflowEngine` in `src/StateMachine/Dsl/StateMachineDslRuntime.cs` to keep the CLI (and `SmPreviewHandler`) free of domain logic.
 
-### `GetAvailableEvents`
+### `Inspect(instance)` aggregate
 
-```csharp
-/// <summary>
-/// Returns the distinct event names that have at least one transition or terminal rule
-/// from the specified state, ordered by event declaration order.
-/// </summary>
-public IReadOnlyList<string> GetAvailableEvents(string state)
-```
-
-Uses the existing private `_transitionMap` and `_terminalRuleMap` to find events reachable from the given state. Orders by declaration position in `Events`.
-
-**Consumers:** CLI `events` command, `SmPreviewHandler.BuildSnapshot`.
+Returns `DslInspectionResult` with `CurrentState`, clean `InstanceData`, and `Events : IReadOnlyList<DslEventInspectionResult>` — all events evaluated in one call. This replaces the former `GetAvailableEvents` proposal.
 
 ### `CoerceEventArguments`
 
 ```csharp
 /// <summary>
-/// Coerces raw event argument values (strings from CLI input, JsonElement from JSON parsing)
-/// to the runtime types declared in the event's argument contract.
-/// Returns null if input is null.
+/// Coerces raw event argument values (e.g. JsonElement from JSON deserialization)
+/// to the declared scalar types for the given event.
+/// Returns null if args is null.
 /// </summary>
-public IReadOnlyDictionary<string, object?>? CoerceEventArguments(
-    string eventName,
-    IReadOnlyDictionary<string, object?>? args)
+public IReadOnlyDictionary<string, object?>? CoerceEventArguments(string eventName, IReadOnlyDictionary<string, object?>? args)
 ```
 
-Walks each argument, looks up the `DslFieldContract` in `_eventArgContractMap`, and coerces:
-- String → `double` for `DslScalarType.Number`
-- String → `bool` for `DslScalarType.Boolean`
-- `JsonElement` → unwrapped primitive
-- Passthrough for already-correct types
+Uses `_eventArgContractMap` internally to look up declared argument types per event.
 
 **Consumers:** CLI `inspect`/`fire` argument handling, `SmPreviewHandler.HandleFire`/`HandleInspect`.
 
-### `SerializeInstanceData`
+### `CheckCompatibility`
 
 ```csharp
 /// <summary>
-/// Returns a clean dictionary suitable for JSON serialization. Collection fields stored
-/// internally under __collection__ keys are remapped to their declared field names with
-/// values converted to List&lt;object&gt; via ToSerializableList().
+/// Validates schema compatibility and evaluates all current rules against the instance.
+/// Returns DslCompatibilityResult(IsCompatible, Reason?).
 /// </summary>
-public Dictionary<string, object?> SerializeInstanceData(DslWorkflowInstance instance)
+public DslCompatibilityResult CheckCompatibility(DslWorkflowInstance instance)
 ```
 
-Encapsulates the `__collection__` internal keying convention so consumers never see it.
+**Consumers:** CLI `rules` command.
 
-**Consumers:** CLI `data`/`data save`, `SmPreviewHandler.BuildSnapshot` data payload.
-
-### `DeserializeInstanceData`
+### `CreateInstance`
 
 ```csharp
 /// <summary>
-/// Takes a flat dictionary (as from JSON deserialization) where collection fields are
-/// represented as arrays, and returns a dictionary with CollectionValue objects under
-/// __collection__ keys, suitable for passing to CreateInstance().
+/// Creates a new DslWorkflowInstance from a clean data dictionary.
+/// Collections should be List&lt;object&gt; under their plain field names (no __collection__ prefix).
 /// </summary>
-public IReadOnlyDictionary<string, object?> DeserializeInstanceData(
-    IDictionary<string, object?> data)
+public DslWorkflowInstance CreateInstance(IReadOnlyDictionary&lt;string, object?&gt;? data = null)
 ```
 
-The inverse of `SerializeInstanceData`. Recognizes collection field names, creates `CollectionValue` instances, and loads items via `LoadFrom()`.
+`instance.InstanceData` always returns a clean dictionary — no internal keys exposed.
 
-**Consumers:** CLI `data load`, any future host that needs to hydrate from JSON.
+**Consumers:** CLI `data load`, REPL startup.
 
-### Impact on SmPreviewHandler
-
-Once these four methods exist, `SmPreviewHandler` can be simplified:
-
-| Current code | Replacement |
-|-------------|-------------|
-| `outgoingEventNames` filtering block (~15 lines) | `definition.GetAvailableEvents(instance.CurrentState)` |
-| `CoerceEventArgs` method (~40 lines) | `definition.CoerceEventArguments(eventName, args)` |
-| `BuildSnapshot` data copy line | `definition.SerializeInstanceData(instance)` |
-
-Total reduction: ~60–80 lines of duplicated logic removed from `SmPreviewHandler`.
+### Impact on SmPreviewHandler (already applied)
 
 ---
 
@@ -293,19 +262,18 @@ Each line is interpreted as if typed at the REPL prompt. Blank lines and `#` com
 
 | CLI surface | Runtime entry point | Return type |
 |-------------|-------------------|-------------|
-| Load `.sm` file | `StateMachineDslParser.Parse(text)` | `DslMachine` |
-| Compile | `DslWorkflowCompiler.Compile(machine)` | `DslWorkflowDefinition` |
-| Create instance | `definition.CreateInstance(data?)` | `DslWorkflowInstance` |
+| Load `.sm` file | `DslWorkflowParser.Parse(text)` | `DslWorkflowModel` |
+| Compile | `DslWorkflowCompiler.Compile(model)` | `DslWorkflowEngine` |
+| Create instance | `engine.CreateInstance(data?)` | `DslWorkflowInstance` |
 | `state` | `instance.CurrentState` | `string` |
-| `events` | `definition.GetAvailableEvents(state)` | `IReadOnlyList<string>` |
-| `inspect` | `definition.Inspect(instance, event, args?)` | `DslInspectionResult` |
-| `fire` | `definition.Fire(instance, event, args?)` | `DslInstanceFireResult` |
-| `data` | `definition.SerializeInstanceData(instance)` | `Dictionary<string, object?>` |
-| `data load` | `definition.DeserializeInstanceData(json)` → `definition.CreateInstance(data)` | `DslWorkflowInstance` |
-| `data save` | `definition.SerializeInstanceData(instance)` | `Dictionary<string, object?>` |
-| `rules` | `definition.EvaluateCurrentRules(instance)` | `IReadOnlyList<string>` |
-| Compatibility | `definition.CheckCompatibility(instance)` | `DslInstanceCompatibilityResult` |
-| Coerce args | `definition.CoerceEventArguments(event, args)` | `IReadOnlyDictionary<string, object?>?` |
+| `events` + outcomes | `engine.Inspect(instance)` | `DslInspectionResult` (`.Events` list) |
+| `inspect` | `engine.Inspect(instance, event, args?)` | `DslEventInspectionResult` |
+| `fire` | `engine.Fire(instance, event, args?)` | `DslFireResult` (`.UpdatedInstance`) |
+| `data` | `instance.InstanceData` | `IReadOnlyDictionary<string, object?>` |
+| `data load` | `engine.CreateInstance(data)` | `DslWorkflowInstance` |
+| `rules` | `engine.CheckCompatibility(instance)` (includes rules) | `DslCompatibilityResult` |
+| Compatibility | `engine.CheckCompatibility(instance)` | `DslCompatibilityResult` |
+| Coerce args | `engine.CoerceEventArguments(event, args)` | `IReadOnlyDictionary<string, object?>?` |
 
 ---
 
@@ -328,41 +296,31 @@ Implement the `smcli` CLI tool for the StateMachine DSL runtime. Work through th
 **Repository:** `c:\Users\Shane.Falik\source\repos\StateMachine`
 **Design doc:** `docs/CliDesign.md` — read this in full before starting.
 
-### Phase 1 — Runtime API extensions
+### Phase 1 — Runtime API verification
 
-Add four public methods to `DslWorkflowDefinition` in `src/StateMachine/Dsl/StateMachineDslRuntime.cs`. Do not change any existing method signatures or behavior.
+The following runtime methods are already implemented on `DslWorkflowEngine` in `src/StateMachine/Dsl/StateMachineDslRuntime.cs`. Verify they behave as documented before building the CLI layer.
 
-**`GetAvailableEvents(string state) → IReadOnlyList<string>`**
-Return distinct event names that have at least one entry in `_transitionMap` or `_terminalRuleMap` for the given state. Order results by declaration position in the `Events` list (use the list index as sort key), then alphabetically as a tiebreak. If the state is unknown, return an empty list.
+**`Inspect(DslWorkflowInstance instance) → DslInspectionResult`**
+Evaluates all events for the current instance state in one call. Use `.Events` (list of `DslEventInspectionResult`) to drive the REPL events display and `events` command output.
 
 **`CoerceEventArguments(string eventName, IReadOnlyDictionary<string, object?>? args) → IReadOnlyDictionary<string, object?>?`**
-Return `null` if `args` is null. Look up each argument key in `_eventArgContractMap[eventName]` to get its `DslFieldContract`. Coerce values as follows:
-- If the value is `System.Text.Json.JsonElement`, unwrap it: String→string, Number→double, True/False→bool, Null→null.
-- After unwrapping, coerce to the declared `DslScalarType`: Number→`Convert.ToDouble`, Boolean→`bool` (handle "true"/"false" strings), String→`ToString()`, Null→`null`.
-- Unknown argument keys pass through unchanged.
-- This method must not throw; return the input value unchanged if coercion is impossible.
+Return `null` if `args` is null. Coerces raw values (including `JsonElement`) to the declared scalar types for the event's arguments. Unknown keys pass through unchanged. Does not throw.
 
-**`SerializeInstanceData(DslWorkflowInstance instance) → Dictionary<string, object?>`**
-Return a clean dictionary for JSON serialization. Walk `instance.InstanceData`:
-- Keys matching `__collection__<name>` → remap to `<name>`, call `(CollectionValue)value).ToSerializableList()`.
-- All other keys → pass through as-is.
-The result contains no `__collection__` keys.
+**`CheckCompatibility(DslWorkflowInstance instance) → DslCompatibilityResult`**
+Validates schema compatibility and evaluates all current rules. Use for the `rules` command.
 
-**`DeserializeInstanceData(IDictionary<string, object?> data) → IReadOnlyDictionary<string, object?>`**
-Inverse of `SerializeInstanceData`. For each key in `data`:
-- If the key matches a name in `CollectionFields` and the value is `IEnumerable` (but not string) → create a `CollectionValue(kind, innerType)`, call `LoadFrom(items)`, store under `__collection__<name>`.
-- Otherwise → store the key/value directly.
-Returns a new `Dictionary<string, object?>` with `StringComparer.Ordinal`.
+**`CreateInstance(IReadOnlyDictionary<string, object?>? data) → DslWorkflowInstance`**
+Creates a new instance with clean field data. Collections are `List<object>` in `instance.InstanceData` — no `__collection__` prefix keys.
 
-After adding these methods, add corresponding tests in `test/StateMachine.Tests/` — verify `GetAvailableEvents` returns correct events per state, `CoerceEventArguments` handles string-to-number and JsonElement unwrapping, `SerializeInstanceData` round-trips through `DeserializeInstanceData` for a machine with both scalar and collection fields.
+After verifying these methods, run the full test suite (`dotnet test`) and confirm all tests pass before proceeding.
 
 ### Phase 2 — SmPreviewHandler refactor
 
 Simplify `tools/StateMachine.Dsl.LanguageServer/SmPreviewHandler.cs` to use the new runtime methods. Do not change any behavior — this is a pure refactor.
 
-- Replace the `outgoingEventNames` filtering block in `BuildSnapshot` with `session.Definition.GetAvailableEvents(session.Instance.CurrentState)`.
-- Replace all calls to the private `CoerceEventArgs` method with `session.Definition.CoerceEventArguments(eventName, args)`. Delete the private `CoerceEventArgs`, `CoerceValue`, `CoerceToNumber`, `CoerceToBoolean`, and `UnwrapJsonElement` methods from `SmPreviewHandler`.
-- Replace the `new Dictionary<string, object?>(session.Instance.InstanceData, ...)` line in `BuildSnapshot` with `session.Definition.SerializeInstanceData(session.Instance)`.
+- Replace the `outgoingEventNames` filtering block in `BuildSnapshot` with `session.Engine.Inspect(session.Instance)` aggregate (already done — `SmPreviewHandler` is updated).
+- Replace all calls to the private `CoerceEventArgs` method with `session.Engine.CoerceEventArguments(eventName, args)` (already done).
+- Instance data is already clean in `session.Instance.InstanceData` — no conversion needed.
 
 Build and run all existing tests after this phase.
 
@@ -380,7 +338,7 @@ Implement `tools/StateMachine.Dsl.Cli/Program.cs` and supporting files. Follow t
 
 **Global setup:**
 - Parse `--file <path>` (required), `--no-color`, `--verbose` using `System.CommandLine`.
-- On startup: read `.sm` file, call `StateMachineDslParser.Parse`, `DslWorkflowCompiler.Compile`, `definition.CreateInstance()`. On parse/compile error, write to stderr and exit with code 3.
+- On startup: read `.sm` file, call `DslWorkflowParser.Parse`, `DslWorkflowCompiler.Compile`, `engine.CreateInstance()`. On parse/compile error, write to stderr and exit with code 3.
 - Detect mode: if a subcommand is present → one-shot; otherwise → REPL.
 
 **REPL mode:**
@@ -389,24 +347,24 @@ Implement `tools/StateMachine.Dsl.Cli/Program.cs` and supporting files. Follow t
 - Parse each line as `command [arg] [json]`. Blank lines and `#`-prefixed lines are ignored.
 - On blocked/undefined outcome: print warning, do not exit.
 - Commands: `state`, `events`, `inspect <event> [json]`, `fire <event> [json]`, `data`, `data load [@path|json]`, `data save [@path]`, `rules`, `help`, `exit`.
-- When `inspect` or `fire` is given without a JSON argument, prompt for each required event argument interactively using `Spectre.Console`'s `Ask<T>` (use `definition.Events` to find arg names/types, skip nullable args the user leaves blank).
+- When `inspect` or `fire` is given without a JSON argument, prompt for each required event argument interactively using `Spectre.Console`'s `Ask<T>` (use `engine.Events` to find arg names/types, skip nullable args the user leaves blank).
 
 **One-shot mode:**
-- If stdin is not a TTY, read it as JSON and call `definition.DeserializeInstanceData` + `definition.CreateInstance` to hydrate the instance before running the command.
+- If stdin is not a TTY, read it as JSON and call `engine.CreateInstance(data)` to hydrate the instance before running the command.
 - Serialize output as JSON to stdout using `System.Text.Json.JsonSerializer` with `WriteIndented = true`.
 - Exit with the appropriate code (0–4) based on the outcome.
 
 **Output formatting (REPL):**
 - `state` → plain text line.
-- `events` → formatted list; prefix each event with a colored indicator: green `●` for enabled, yellow `●` for noTransition, red `●` for blocked, dim `○` for undefined.
+- `events` → formatted list; prefix each event with a colored indicator from `engine.Inspect(instance).Events`: green `●` for `Accepted`, yellow `●` for `AcceptedInPlace`, red `●` for `Rejected`, dim `○` for `NotDefined`/`NotApplicable`.
 - `inspect`/`fire` → outcome line (colored), target/previous→new state, reasons list if non-empty.
 - `data` → use `Spectre.Console.Json` for pretty-printed colorized JSON.
 - `rules` → violations as a red list, or green "All rules satisfied."
 
 **Exit code mapping:**
-- `DslOutcomeKind.Enabled` or `NoTransition` → 0
-- `DslOutcomeKind.Blocked` → 1
-- `DslOutcomeKind.Undefined` → 2
+- `DslOutcomeKind.Accepted` or `AcceptedInPlace` → 0
+- `DslOutcomeKind.Rejected` → 1
+- `DslOutcomeKind.NotDefined` → 2
 - Parse/compile error → 3
 - Runtime or input error → 4
 

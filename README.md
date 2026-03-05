@@ -109,7 +109,7 @@ Then press `F5`, open a `.sm` file, and run `StateMachine DSL: Open Inspector Pr
 
 ## Core Concepts
 
-- **Workflow definition**: immutable compiled DSL (`DslWorkflowDefinition`).
+- **Workflow definition**: immutable compiled DSL (`DslWorkflowEngine`).
 - **Instance**: persisted runtime state + data (`DslWorkflowInstance`).
 - **Inspect**: side-effect free transition preview. Possible outcomes: `Accepted` (transition will fire), `AcceptedInPlace` (`no transition` path — event acknowledged, data mutated, state unchanged), `Rejected` (guard or rule blocks), `NotApplicable` (`when` predicate false — block skipped), `NotDefined` (unknown state, event, or no `from...on...` block for the pair). `RequiredEventArgumentKeys` reports which event args are needed.
 - **Fire**: applies state change and data mutations. Returns the same outcome discriminant as `Inspect`. `AcceptedInPlace` commits `set` assignments and collection mutations without changing state. Any runtime failure (rule violation, empty-collection read) triggers full rollback.

@@ -14,7 +14,7 @@ Implementation focus is the DSL runtime path:
 
 ## Model Refactor Design (Locked)
 
-Status: **Design complete — pending implementation.**
+Status: **Implemented.**
 
 This section records all locked design decisions for the combined model restructure, `when` precondition feature, outcome renaming, and diagnostic precision improvements. Nothing here should be changed without a deliberate design decision.
 
@@ -25,7 +25,7 @@ This section records all locked design decisions for the combined model restruct
 The new canonical model hierarchy, in DSL-declaration order:
 
 ```
-DslMachine
+DslWorkflowModel
 ├── DslField              (<type> <Name> [= <default>])
 │   └── DslRule           (rule <Expr> "<Reason>")
 ├── DslCollectionField    (set<T>|queue<T>|stack<T> <Name>)
@@ -50,7 +50,7 @@ DslMachine
 
 ### Type-by-Type Decisions
 
-#### `DslMachine`
+#### `DslWorkflowModel` (was `DslMachine`)
 - `States : IReadOnlyList<DslState>` — replaces `IReadOnlyList<string>`
 - `InitialState : DslState` — typed reference into `States`, not a string; derivable but kept as a convenience property
 - `Transitions : IReadOnlyList<DslTransition>` — single list; `TerminalRules` list removed
@@ -62,11 +62,11 @@ DslMachine
 #### `DslState` (new)
 - `Name : string`
 - `Rules : IReadOnlyList<DslRule>?`
-- No `IsInitial` bool — the authoritative source is `DslMachine.InitialState` (reference equality check)
+- No `IsInitial` bool — the authoritative source is `DslWorkflowModel.InitialState` (reference equality check)
 
 #### `DslField` (renamed from `DslFieldContract`)
 - Carries `Rules : IReadOnlyList<DslRule>?`
-- Used only for `DslMachine.Fields` (persistent instance data)
+- Used only for `DslWorkflowModel.Fields` (persistent instance data)
 
 #### `DslCollectionField` (renamed from `DslCollectionFieldContract`)
 - Carries `Rules : IReadOnlyList<DslRule>?`
@@ -142,11 +142,14 @@ Fully replaced by `DslClause` + `DslClauseOutcome`.
 
 ### Result Record Changes
 
-`DslInspectionResult`, `DslFireResult`, `DslInstanceFireResult`:
-- `bool IsDefined` removed — derivable as `Outcome != NotDefined`
-- `bool IsAccepted` removed — derivable as `Outcome is Accepted or AcceptedInPlace`
-- `NotApplicable` factory methods added to all three
-- Factory method `NoTransition(...)` renamed to `AcceptedInPlace(...)` on all three
+Result records implemented:
+- `DslEventInspectionResult` — per-event inspect result (was `DslInspectionResult`)
+- `DslInspectionResult` — new aggregate: `CurrentState`, `InstanceData`, `Events : IReadOnlyList<DslEventInspectionResult>`
+- `DslFireResult` — fire result with `UpdatedInstance : DslWorkflowInstance?` (replaces old stateless form + `DslInstanceFireResult`)
+- `DslCompatibilityResult` — compatibility check result (was `DslInstanceCompatibilityResult`)
+- `bool IsDefined` removed from all — derivable as `Outcome != NotDefined`
+- `bool IsAccepted` removed from all — derivable as `Outcome is Accepted or AcceptedInPlace`
+- Factory method `NoTransition(...)` renamed to `AcceptedInPlace(...)` across the board
 
 ---
 
@@ -706,30 +709,35 @@ Validation constraints:
 
 ## Implemented Components
 
-- `StateMachine.Dsl.DslMachine` model
-- `StateMachine.Dsl.StateMachineDslParser`
-- `StateMachine.Dsl.DslWorkflowCompiler`
-- `StateMachine.Dsl.DslWorkflowDefinition`
+- `StateMachine.Dsl.DslWorkflowModel` parse tree (was `DslMachine`)
+- `StateMachine.Dsl.DslWorkflowParser` — `DslWorkflowParser.Parse(text)` returns `DslWorkflowModel` (was `StateMachineDslParser`)
+- `StateMachine.Dsl.DslWorkflowCompiler` — `Compile(DslWorkflowModel)` returns `DslWorkflowEngine`
+- `StateMachine.Dsl.DslWorkflowEngine` — immutable compiled engine (was `DslWorkflowDefinition`)
 - `StateMachine.Dsl.DslWorkflowInstance` persisted instance model
-- Instance result/compatibility types: `DslInstanceCompatibilityResult`, `DslInstanceFireResult`
+- Result types: `DslEventInspectionResult`, `DslInspectionResult` (aggregate), `DslFireResult`, `DslCompatibilityResult`
 - `tools/StateMachine.Dsl.LanguageServer` (LSP diagnostics/completion/semantic tokens + preview request handler)
 - `tools/StateMachine.Dsl.VsCode` (language client + inspector preview webview)
 
 ## Current Runtime Semantics
 
-- Undefined state/event/transition resolves to outcome `Undefined`
-- Unguarded transitions resolve to outcome `Enabled` and return a target/new state
+- Undefined state/event/transition resolves to outcome `NotDefined`
+- Unguarded transitions resolve to outcome `Accepted` and return a target/new state
 - Guarded transitions are evaluated at runtime against optional event arguments; if provided, they are used for that call without mutating persisted instance data
 - `from ... on ...` blocks support ordered `if`/`else if`/`else` branches and end with an outcome statement: `transition <State>`, `reject "<message>"`, or `no transition`.
 - Statements are not allowed after an outcome statement in a block.
-- Transition data assignments are evaluated/applied only during `Enabled` or `NoTransition` `Fire(...)` calls
-- If one guarded transition evaluates `true`, inspection/fire is `Enabled` and returns target/new state
-- If all guarded transitions evaluate `false`, terminal `reject` returns `Blocked` with the configured reason; terminal `no transition` returns `NoTransition` (`IsDefined = true`, state unchanged, `set` assignments execute on fire)
+- Transition data assignments are evaluated/applied only during `Accepted` or `AcceptedInPlace` `Fire(...)` calls
+- If a `when` predicate evaluates to `false`, the entire block is skipped with outcome `NotApplicable`
+- If one guarded transition evaluates `true`, inspection/fire is `Accepted` and returns target/new state
+- If all guarded transitions evaluate `false`, terminal `reject` returns `Rejected` with the configured reason; terminal `no transition` returns `AcceptedInPlace` (state unchanged, `set` assignments execute on fire)
 - Instance-based inspect/fire validates workflow name compatibility before evaluating transitions
+- `Inspect(instance)` returns a `DslInspectionResult` aggregate with `CurrentState`, clean `InstanceData`, and `Events` — all events evaluated in one call
+- `Fire(instance, eventName)` returns `DslFireResult` with `UpdatedInstance : DslWorkflowInstance?`; on failure the instance is unchanged (full rollback)
+- `CoerceEventArguments(eventName, args?)` coerces raw JSON/untyped values to the correct scalar types
+- `CheckCompatibility(instance)` validates schema compatibility and runs all current rules
 
 ## Concurrency Model (Current)
 
-- `DslWorkflowDefinition` is immutable after compile.
+- `DslWorkflowEngine` is immutable after compile.
 - Runtime does not maintain hidden mutable process state; state progresses through returned `DslWorkflowInstance` values.
 - Any coordination for concurrently reading/writing persisted instance files is outside runtime scope and must be handled by the caller.
 
@@ -750,9 +758,10 @@ Validation constraints:
 
 ## Guard Evaluation + Event-Argument Model (Current)
 
-- Runtime uses `IGuardEvaluator` with a default implementation (`DefaultGuardEvaluator`).
-- `DslWorkflowCompiler.Compile(...)` accepts an optional custom evaluator.
-- `Inspect(...)` and `Fire(...)` accept optional event arguments (`IReadOnlyDictionary<string, object?>`).
+- `IGuardEvaluator`, `DefaultGuardEvaluator`, and `GuardEvaluationResult` are removed — guard ASTs are evaluated directly by `DslExpressionRuntimeEvaluator`.
+- `DslWorkflowCompiler.Compile(DslWorkflowModel)` takes no optional evaluator parameter.
+- `Inspect(instance, eventName, args?)` and `Fire(instance, eventName, args?)` accept optional event arguments (`IReadOnlyDictionary<string, object?>`).
+- `Inspect(instance)` aggregate evaluates all events against the current instance in one call.
 - Inspect preview is eager: if available instance data (plus supplied event args, if any) is sufficient to resolve a concrete branch, preview shows that concrete target.
 - When multiple targets are defined for an event, inspect shows the event on the parent line and renders all possible targets on child lines; the currently reachable target uses preview arrow (`──▷`) and alternates use unreachable marker (`──✕`, ASCII: `--X`).
 - Missing required args only force ambiguous preview when guard logic references the missing arg(s).

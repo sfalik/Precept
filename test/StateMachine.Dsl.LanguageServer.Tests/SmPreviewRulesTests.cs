@@ -13,7 +13,7 @@ namespace StateMachine.Dsl.LanguageServer.Tests;
 
 /// <summary>
 /// Tests for rules-awareness in the preview layer:
-/// <c>EvaluateCurrentRules</c> on <c>DslWorkflowDefinition</c> and
+/// <c>EvaluateCurrentRules</c> on <c>DslWorkflowEngine</c> and
 /// the rule fields surfaced by <c>SmPreviewHandler</c> in snapshot and fire responses.
 /// </summary>
 public class SmPreviewRulesTests
@@ -34,7 +34,7 @@ public class SmPreviewRulesTests
               transition B
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
         var definition = DslWorkflowCompiler.Compile(machine);
         var instance = definition.CreateInstance();
 
@@ -58,7 +58,7 @@ public class SmPreviewRulesTests
               transition A
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
         var definition = DslWorkflowCompiler.Compile(machine);
 
         // CreateInstance does not check rule violations — it only validates types.

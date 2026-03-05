@@ -1,1 +1,1 @@
-using StateMachine.Dsl; using System.IO; var text = File.ReadAllText("samples/loan.sm"); try { StateMachineDslParser.Parse(text); Console.WriteLine("Parsed."); } catch (System.Exception e) { Console.WriteLine(e.Message); }
+using StateMachine.Dsl; using System.IO; var text = File.ReadAllText("samples/loan.sm"); try { DslWorkflowParser.Parse(text); Console.WriteLine("Parsed."); } catch (System.Exception e) { Console.WriteLine(e.Message); }

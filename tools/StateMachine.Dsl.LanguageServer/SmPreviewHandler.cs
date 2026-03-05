@@ -3,7 +3,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using StateMachine.Dsl;
 using System.Collections.Concurrent;
-using System.Text.Json;
 
 namespace StateMachine.Dsl.LanguageServer;
 
@@ -54,9 +53,9 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
             return new SmPreviewResponse(false, Error: sessionOrError.Error);
 
         var session = sessionOrError.Session;
-        var coercedArgs = CoerceEventArgs(session.Machine, request.EventName!, request.Args);
-        var inspect = session.Definition.Inspect(session.Instance, request.EventName!, coercedArgs);
-        var evt = session.Machine.Events.FirstOrDefault(e => string.Equals(e.Name, request.EventName, StringComparison.Ordinal));
+        var coercedArgs = session.Engine.CoerceEventArguments(request.EventName!, request.Args);
+        var inspect = session.Engine.Inspect(session.Instance, request.EventName!, coercedArgs);
+        var evt = session.Engine.Events.FirstOrDefault(e => string.Equals(e.Name, request.EventName, StringComparison.Ordinal));
         var args = (evt?.Args ?? Array.Empty<DslEventArg>())
             .Select(arg => new SmPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable, arg.HasDefaultValue, arg.DefaultValue))
             .ToArray();
@@ -90,8 +89,8 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
             return new SmPreviewResponse(false, Error: sessionOrError.Error);
 
         var session = sessionOrError.Session;
-        var coercedArgs = CoerceEventArgs(session.Machine, request.EventName!, request.Args);
-        var fire = session.Definition.Fire(session.Instance, request.EventName!, coercedArgs);
+        var coercedArgs = session.Engine.CoerceEventArguments(request.EventName!, request.Args);
+        var fire = session.Engine.Fire(session.Instance, request.EventName!, coercedArgs);
         if (fire.UpdatedInstance is not null)
             session.Instance = fire.UpdatedInstance;
 
@@ -111,7 +110,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
             return new SmPreviewResponse(false, Error: sessionOrError.Error);
 
         var session = sessionOrError.Session;
-        session.Instance = session.Definition.CreateInstance(session.Definition.InitialState);
+        session.Instance = session.Engine.CreateInstance();
         return new SmPreviewResponse(true, Snapshot: BuildSnapshot(session));
     }
 
@@ -126,8 +125,8 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
 
         foreach (var step in request.Steps ?? Array.Empty<SmPreviewReplayStep>())
         {
-            var coercedStepArgs = CoerceEventArgs(session.Machine, step.EventName, step.Args);
-            var fire = session.Definition.Fire(session.Instance, step.EventName, coercedStepArgs);
+            var coercedStepArgs = session.Engine.CoerceEventArguments(step.EventName, step.Args);
+            var fire = session.Engine.Fire(session.Instance, step.EventName, coercedStepArgs);
             if ((fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace) && fire.UpdatedInstance is not null)
             {
                 session.Instance = fire.UpdatedInstance;
@@ -152,12 +151,12 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
 
         SmTextDocumentSyncHandler.SharedAnalyzer.SetDocumentText(request.Uri, text);
 
-        DslMachine machine;
-        DslWorkflowDefinition definition;
+        DslWorkflowModel model;
+        DslWorkflowEngine engine;
         try
         {
-            machine = StateMachineDslParser.Parse(text);
-            definition = DslWorkflowCompiler.Compile(machine);
+            model = DslWorkflowParser.Parse(text);
+            engine = DslWorkflowCompiler.Compile(model);
         }
         catch (Exception ex)
         {
@@ -166,60 +165,49 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
 
         var session = Sessions.AddOrUpdate(
             key,
-            _ => CreateSession(request.Uri, text, machine, definition),
-            (_, existing) => UpdateSession(request.Uri, existing, text, machine, definition));
+            _ => CreateSession(request.Uri, text, model, engine),
+            (_, existing) => UpdateSession(request.Uri, existing, text, model, engine));
 
         return SessionResult.Ok(session);
     }
 
-    private static PreviewSession CreateSession(DocumentUri uri, string sourceText, DslMachine machine, DslWorkflowDefinition definition)
+    private static PreviewSession CreateSession(DocumentUri uri, string sourceText, DslWorkflowModel model, DslWorkflowEngine engine)
     {
-        var instance = definition.CreateInstance(definition.InitialState);
-        return new PreviewSession(uri, sourceText, machine, definition, instance);
+        var instance = engine.CreateInstance();
+        return new PreviewSession(uri, sourceText, model, engine, instance);
     }
 
     private static PreviewSession UpdateSession(
         DocumentUri uri,
         PreviewSession existing,
         string sourceText,
-        DslMachine machine,
-        DslWorkflowDefinition definition)
+        DslWorkflowModel model,
+        DslWorkflowEngine engine)
     {
         if (string.Equals(existing.SourceText, sourceText, StringComparison.Ordinal))
             return existing;
 
-        var compatibility = definition.CheckCompatibility(existing.Instance);
+        var compatibility = engine.CheckCompatibility(existing.Instance);
         var nextInstance = compatibility.IsCompatible
             ? existing.Instance
-            : definition.CreateInstance(definition.InitialState);
+            : engine.CreateInstance();
 
         existing.SourceText = sourceText;
         existing.Uri = uri;
-        existing.Machine = machine;
-        existing.Definition = definition;
+        existing.Model = model;
+        existing.Engine = engine;
         existing.Instance = nextInstance;
         return existing;
     }
 
     private static SmPreviewSnapshot BuildSnapshot(PreviewSession session)
     {
-        var eventDeclarationOrder = session.Machine.Events
-            .Select((e, i) => (e.Name, i))
-            .ToDictionary(x => x.Name, x => x.i, StringComparer.Ordinal);
+        var inspectionResult = session.Engine.Inspect(session.Instance);
 
-        var outgoingEventNames = session.Machine.Transitions
-            .Where(t => string.Equals(t.FromState, session.Instance.CurrentState, StringComparison.Ordinal))
-            .Select(t => t.EventName)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(n => eventDeclarationOrder.TryGetValue(n, out var idx) ? idx : int.MaxValue)
-            .ThenBy(n => n, StringComparer.Ordinal)
-            .ToArray();
-
-        var events = outgoingEventNames
-            .Select(eventName =>
+        var events = inspectionResult.Events
+            .Select(inspect =>
             {
-                var inspect = session.Definition.Inspect(session.Instance, eventName);
-                var evt = session.Machine.Events.FirstOrDefault(e => string.Equals(e.Name, eventName, StringComparison.Ordinal));
+                var evt = session.Engine.Events.FirstOrDefault(e => string.Equals(e.Name, inspect.EventName, StringComparison.Ordinal));
                 var args = (evt?.Args ?? Array.Empty<DslEventArg>())
                     .Select(arg => new SmPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable, arg.HasDefaultValue, arg.DefaultValue))
                     .ToArray();
@@ -232,16 +220,11 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
                     _ => "undefined"
                 };
 
-                return new SmPreviewEventStatus(
-                    eventName,
-                    outcome,
-                    inspect.TargetState,
-                    inspect.Reasons,
-                    args);
+                return new SmPreviewEventStatus(inspect.EventName, outcome, inspect.TargetState, inspect.Reasons, args);
             })
             .ToArray();
 
-        var transitions = session.Machine.Transitions
+        var transitions = session.Model.Transitions
             .SelectMany(t => t.Clauses.Select(clause => new SmPreviewTransition(
                 t.FromState,
                 clause.Outcome is DslStateTransition st ? st.TargetState : t.FromState,
@@ -264,33 +247,31 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
                 (int)d.Range.Start.Character))
             .ToArray();
 
-        var activeRuleViolations = session.Definition.EvaluateCurrentRules(session.Instance);
-
         var ruleDefinitions = new List<SmPreviewRuleInfo>();
-        foreach (var field in session.Machine.Fields.Where(f => f.Rules is not null))
+        foreach (var field in session.Engine.Fields.Where(f => f.Rules is not null))
             foreach (var rule in field.Rules!)
                 ruleDefinitions.Add(new SmPreviewRuleInfo($"field:{field.Name}", rule.ExpressionText, rule.Reason));
-        foreach (var field in session.Machine.CollectionFields.Where(f => f.Rules is not null))
+        foreach (var field in session.Engine.CollectionFields.Where(f => f.Rules is not null))
             foreach (var rule in field.Rules!)
                 ruleDefinitions.Add(new SmPreviewRuleInfo($"field:{field.Name}", rule.ExpressionText, rule.Reason));
-        foreach (var rule in session.Machine.TopLevelRules ?? Array.Empty<DslRule>())
+        foreach (var rule in session.Model.TopLevelRules ?? Array.Empty<DslRule>())
             ruleDefinitions.Add(new SmPreviewRuleInfo("topLevel", rule.ExpressionText, rule.Reason));
-        foreach (var state in session.Machine.States.Where(s => s.Rules is not null && s.Rules.Count > 0))
+        foreach (var state in session.Model.States.Where(s => s.Rules is not null && s.Rules.Count > 0))
             foreach (var rule in state.Rules!)
                 ruleDefinitions.Add(new SmPreviewRuleInfo($"state:{state.Name}", rule.ExpressionText, rule.Reason));
-        foreach (var evt in session.Machine.Events.Where(e => e.Rules is not null && e.Rules.Count > 0))
+        foreach (var evt in session.Engine.Events.Where(e => e.Rules is not null && e.Rules.Count > 0))
             foreach (var rule in evt.Rules!)
                 ruleDefinitions.Add(new SmPreviewRuleInfo($"event:{evt.Name}", rule.ExpressionText, rule.Reason));
 
         return new SmPreviewSnapshot(
-            session.Definition.Name,
+            session.Engine.Name,
             session.Instance.CurrentState,
-            session.Definition.States,
+            session.Engine.States,
             transitions,
             events,
             new Dictionary<string, object?>(session.Instance.InstanceData, StringComparer.Ordinal),
             diagnostics,
-            activeRuleViolations.Count > 0 ? activeRuleViolations : null,
+            null,
             ruleDefinitions.Count > 0 ? ruleDefinitions : null);
     }
 
@@ -306,19 +287,19 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
 
     private sealed class PreviewSession
     {
-        public PreviewSession(DocumentUri uri, string sourceText, DslMachine machine, DslWorkflowDefinition definition, DslWorkflowInstance instance)
+        public PreviewSession(DocumentUri uri, string sourceText, DslWorkflowModel model, DslWorkflowEngine engine, DslWorkflowInstance instance)
         {
             Uri = uri;
             SourceText = sourceText;
-            Machine = machine;
-            Definition = definition;
+            Model = model;
+            Engine = engine;
             Instance = instance;
         }
 
         public DocumentUri Uri { get; set; }
         public string SourceText { get; set; }
-        public DslMachine Machine { get; set; }
-        public DslWorkflowDefinition Definition { get; set; }
+        public DslWorkflowModel Model { get; set; }
+        public DslWorkflowEngine Engine { get; set; }
         public DslWorkflowInstance Instance { get; set; }
     }
 
@@ -328,97 +309,4 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         public static SessionResult Fail(string error) => new(false, error, null);
     }
 
-    /// <summary>
-    /// Coerces event argument values from their JSON-deserialized form (often strings from UI text inputs
-    /// or JsonElement from System.Text.Json) to the runtime types declared in the event contract.
-    /// </summary>
-    private static IReadOnlyDictionary<string, object?>? CoerceEventArgs(
-        DslMachine machine,
-        string eventName,
-        IReadOnlyDictionary<string, object?>? args)
-    {
-        if (args is null || args.Count == 0)
-            return args;
-
-        var eventDef = machine.Events.FirstOrDefault(e => string.Equals(e.Name, eventName, StringComparison.Ordinal));
-        if (eventDef is null || eventDef.Args.Count == 0)
-            return args;
-
-        var argContracts = eventDef.Args.ToDictionary(a => a.Name, a => a, StringComparer.Ordinal);
-        var coerced = new Dictionary<string, object?>(StringComparer.Ordinal);
-
-        foreach (var kvp in args)
-        {
-            if (!argContracts.TryGetValue(kvp.Key, out var contract))
-            {
-                coerced[kvp.Key] = kvp.Value;
-                continue;
-            }
-
-            coerced[kvp.Key] = CoerceValue(kvp.Value, contract);
-        }
-
-        return coerced;
-    }
-
-    private static object? CoerceValue(object? value, DslEventArg contract)
-    {
-        // Unwrap JsonElement from System.Text.Json deserialization.
-        if (value is JsonElement jsonElement)
-            value = UnwrapJsonElement(jsonElement);
-
-        // Already correct type or null.
-        if (value is null)
-            return null;
-
-        return contract.Type switch
-        {
-            DslScalarType.Number => CoerceToNumber(value),
-            DslScalarType.Boolean => CoerceToBoolean(value),
-            DslScalarType.String => value?.ToString(),
-            DslScalarType.Null => null,
-            _ => value
-        };
-    }
-
-    private static object? CoerceToNumber(object value)
-    {
-        if (value is double or float or int or long or decimal or byte or sbyte or short or ushort or uint or ulong)
-            return Convert.ToDouble(value);
-
-        if (value is string s && double.TryParse(s, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d))
-            return d;
-
-        return value; // Let runtime validation report the error.
-    }
-
-    private static object? CoerceToBoolean(object value)
-    {
-        if (value is bool)
-            return value;
-
-        if (value is string s)
-        {
-            if (string.Equals(s, "true", StringComparison.OrdinalIgnoreCase))
-                return true;
-            if (string.Equals(s, "false", StringComparison.OrdinalIgnoreCase))
-                return false;
-        }
-
-        return value; // Let runtime validation report the error.
-    }
-
-    private static object? UnwrapJsonElement(JsonElement element)
-    {
-        return element.ValueKind switch
-        {
-            JsonValueKind.String => element.GetString(),
-            JsonValueKind.Number => element.GetDouble(),
-            JsonValueKind.True => true,
-            JsonValueKind.False => false,
-            JsonValueKind.Null => null,
-            JsonValueKind.Undefined => null,
-            _ => element.GetRawText()
-        };
-    }
 }

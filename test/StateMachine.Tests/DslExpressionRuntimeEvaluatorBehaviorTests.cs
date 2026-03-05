@@ -433,7 +433,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
         fire.Reasons.Should().ContainSingle(r => r.Contains("operator '>' requires numeric operands", StringComparison.Ordinal));
     }
 
-    private static DslInstanceFireResult FireForSet(
+    private static DslFireResult FireForSet(
         string declarations,
         string targetField,
         string expression,
@@ -455,7 +455,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
               transition B
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("A", instanceData);
         return workflow.Fire(instance, "Go", eventArgs);
     }
@@ -506,7 +506,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
         return string.Join(Environment.NewLine, updated);
     }
 
-    private static DslInspectionResult InspectForGuard(string guardExpression, IReadOnlyDictionary<string, object?> data)
+    private static DslEventInspectionResult InspectForGuard(string guardExpression, IReadOnlyDictionary<string, object?> data)
     {
         var dsl = $$"""
             machine Guards
@@ -522,7 +522,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 reject "blocked"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
-        return workflow.Inspect("A", "Go", data);
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
+        return workflow.Inspect(workflow.CreateInstance("A", data), "Go");
     }
 }

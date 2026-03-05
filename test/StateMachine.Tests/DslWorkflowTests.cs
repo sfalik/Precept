@@ -21,10 +21,10 @@ public class DslWorkflowTests
                 transition Green
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
         var workflow = DslWorkflowCompiler.Compile(machine);
 
-        var inspection = workflow.Inspect("Red", "Advance");
+        var inspection = workflow.Inspect(workflow.CreateInstance("Red"), "Advance");
 
         (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
         (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
@@ -41,7 +41,7 @@ public class DslWorkflowTests
             state Idle initial
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         machine.Name.Should().Be("Minimal");
         machine.InitialState.Name.Should().Be("Idle");
@@ -57,7 +57,7 @@ public class DslWorkflowTests
             state Idle initial
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         workflow.InitialState.Should().Be("Idle");
         workflow.States.Should().ContainSingle().Which.Should().Be("Idle");
@@ -79,11 +79,11 @@ public class DslWorkflowTests
                     reject "Cars waiting required"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
-        var undefined = workflow.Inspect("Red", "MissingEvent");
-        var blocked = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["CarsWaiting"] = 0 });
-        var enabled = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["CarsWaiting"] = 2 });
+        var undefined = workflow.Inspect(workflow.CreateInstance("Red"), "MissingEvent");
+        var blocked = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 0 }), "Advance");
+        var enabled = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 2 }), "Advance");
 
         undefined.Outcome.Should().Be(DslOutcomeKind.NotDefined);
         blocked.Outcome.Should().Be(DslOutcomeKind.Rejected);
@@ -105,10 +105,10 @@ public class DslWorkflowTests
                     reject "Cars waiting required"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var data = new Dictionary<string, object?> { ["CarsWaiting"] = 2 };
 
-        var inspection = workflow.Inspect("Red", "Advance", data);
+        var inspection = workflow.Inspect(workflow.CreateInstance("Red", data), "Advance");
 
         (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
         (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
@@ -131,10 +131,10 @@ public class DslWorkflowTests
                     reject "Cars waiting required"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var data = new Dictionary<string, object?> { ["CarsWaiting"] = 0 };
 
-        var inspection = workflow.Inspect("Red", "Advance", data);
+        var inspection = workflow.Inspect(workflow.CreateInstance("Red", data), "Advance");
 
         (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
         (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
@@ -157,9 +157,9 @@ public class DslWorkflowTests
                     reject "Cars waiting required"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
-        var inspection = workflow.Inspect("Red", "Advance");
+        var inspection = workflow.Inspect(workflow.CreateInstance("Red"), "Advance");
 
         (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
         (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
@@ -182,10 +182,10 @@ public class DslWorkflowTests
                     reject "Feature must be enabled"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
-        var data = new Dictionary<string, object?> { ["IsEnabled"] = "yes" };
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
+        var data = new Dictionary<string, object?> { ["IsEnabled"] = false };
 
-        var inspection = workflow.Inspect("Disabled", "Evaluate", data);
+        var inspection = workflow.Inspect(workflow.CreateInstance("Disabled", data), "Evaluate");
 
         (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
         (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
@@ -210,14 +210,14 @@ public class DslWorkflowTests
                     reject "No eligible transition"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var data = new Dictionary<string, object?>
         {
             ["CarsWaiting"] = 0,
             ["IsManualOverride"] = false
         };
 
-        var inspection = workflow.Inspect("Red", "Advance", data);
+        var inspection = workflow.Inspect(workflow.CreateInstance("Red", data), "Advance");
 
         (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
         (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
@@ -240,10 +240,10 @@ public class DslWorkflowTests
                     transition Green
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
-        var noTransition = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["Hold"] = true });
-        var enabled = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["Hold"] = false });
+        var noTransition = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["Hold"] = true }), "Advance");
+        var enabled = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["Hold"] = false }), "Advance");
 
         noTransition.Outcome.Should().Be(DslOutcomeKind.AcceptedInPlace);
         (noTransition.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
@@ -273,19 +273,19 @@ public class DslWorkflowTests
                     transition Beta
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
-        var firstBranchWins = workflow.Inspect("Source", "Route", new Dictionary<string, object?>
+        var firstBranchWins = workflow.Inspect(workflow.CreateInstance("Source", new Dictionary<string, object?>
         {
             ["PreferStop"] = true,
             ["PreferAlpha"] = true
-        });
+        }), "Route");
 
-        var secondBranchWins = workflow.Inspect("Source", "Route", new Dictionary<string, object?>
+        var secondBranchWins = workflow.Inspect(workflow.CreateInstance("Source", new Dictionary<string, object?>
         {
             ["PreferStop"] = false,
             ["PreferAlpha"] = true
-        });
+        }), "Route");
 
         firstBranchWins.Outcome.Should().Be(DslOutcomeKind.AcceptedInPlace);
         (firstBranchWins.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
@@ -310,10 +310,10 @@ public class DslWorkflowTests
                     reject "Manual mode required"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var data = new Dictionary<string, object?> { ["Mode"] = "Manual" };
 
-        var inspection = workflow.Inspect("Draft", "Publish", data);
+        var inspection = workflow.Inspect(workflow.CreateInstance("Draft", data), "Publish");
 
         (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
         (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
@@ -335,10 +335,10 @@ public class DslWorkflowTests
                     reject "Assignee must be empty"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var data = new Dictionary<string, object?> { ["Assignee"] = null };
 
-        var inspection = workflow.Inspect("Open", "Escalate", data);
+        var inspection = workflow.Inspect(workflow.CreateInstance("Open", data), "Escalate");
 
         (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
         (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
@@ -360,10 +360,10 @@ public class DslWorkflowTests
                     reject "Qps threshold not met"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var data = new Dictionary<string, object?> { ["Qps"] = 100m };
 
-        var inspection = workflow.Inspect("Low", "Scale", data);
+        var inspection = workflow.Inspect(workflow.CreateInstance("Low", data), "Scale");
 
         (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
         (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
@@ -385,14 +385,14 @@ public class DslWorkflowTests
                     reject "Both flags must be true"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var data = new Dictionary<string, object?>
         {
             ["Flag"] = true,
             ["OtherFlag"] = true
         };
 
-        var inspection = workflow.Inspect("A", "Go", data);
+        var inspection = workflow.Inspect(workflow.CreateInstance("A", data), "Go");
 
         (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
         (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
@@ -414,14 +414,14 @@ public class DslWorkflowTests
                     reject "Both flags must be true"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var data = new Dictionary<string, object?>
         {
             ["Flag"] = true,
             ["OtherFlag"] = true
         };
 
-        var inspection = workflow.Inspect("A", "Go", data);
+        var inspection = workflow.Inspect(workflow.CreateInstance("A", data), "Go");
 
         (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
         (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
@@ -443,10 +443,10 @@ public class DslWorkflowTests
                     reject "Cars waiting required"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var data = new Dictionary<string, object?> { ["CarsWaiting"] = 3 };
 
-        var fire = workflow.Fire("Red", "Advance", data);
+        var fire = workflow.Fire(workflow.CreateInstance("Red", data), "Advance");
 
         (fire.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
         (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
@@ -469,7 +469,7 @@ public class DslWorkflowTests
                     reject "Cars waiting required"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 3 });
 
         var fire = workflow.Fire(instance, "Advance");
@@ -495,7 +495,7 @@ public class DslWorkflowTests
                 transition Green
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 3 });
 
         var fire = workflow.Fire(instance, "Advance");
@@ -519,7 +519,7 @@ public class DslWorkflowTests
                 transition FlashingRed
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>());
 
         var fire = workflow.Fire(instance, "Emergency", new Dictionary<string, object?> { ["Reason"] = "Accident" });
@@ -544,7 +544,7 @@ public class DslWorkflowTests
                 transition FlashingRed
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>());
 
         var fire = workflow.Fire(instance, "Emergency");
@@ -569,7 +569,7 @@ public class DslWorkflowTests
                 transition Green
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
         {
             ["CarsWaiting"] = 3d,
@@ -598,7 +598,7 @@ public class DslWorkflowTests
                 transition Green
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
         {
             ["CarsWaiting"] = 1d,
@@ -629,7 +629,7 @@ public class DslWorkflowTests
                 transition Green
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
         {
             ["CarsWaiting"] = 1d,
@@ -661,7 +661,7 @@ public class DslWorkflowTests
                 transition Green
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
         {
             ["CarsWaiting"] = 3d,
@@ -690,7 +690,7 @@ public class DslWorkflowTests
                 transition FlashingRed
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
         {
             ["Prefix"] = "Reason: ",
@@ -720,7 +720,7 @@ public class DslWorkflowTests
                 transition FlashingRed
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
         {
             ["Prefix"] = "Reason: ",
@@ -746,7 +746,7 @@ public class DslWorkflowTests
                 transition Green
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should()
             .Throw<InvalidOperationException>()
@@ -768,7 +768,7 @@ public class DslWorkflowTests
                 transition FlashingRed
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
         {
             ["EmergencyReason"] = null
@@ -793,7 +793,7 @@ public class DslWorkflowTests
                 transition FlashingRed
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>());
 
         var inspect = workflow.Inspect(instance, "Emergency");
@@ -820,7 +820,7 @@ public class DslWorkflowTests
                 transition Off
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var start = workflow.CreateInstance("Off", new Dictionary<string, object?>());
 
         var enabled = workflow.Fire(start, "Enable", new Dictionary<string, object?> { ["true"] = "not-used" });
@@ -845,7 +845,7 @@ public class DslWorkflowTests
                 transition Cleared
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Open", new Dictionary<string, object?> { ["Note"] = "Active" });
 
         var cleared = workflow.Fire(instance, "Clear", new Dictionary<string, object?> { ["null"] = "not-used" });
@@ -867,7 +867,7 @@ public class DslWorkflowTests
                 transition Green
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 3 });
 
         var inspect = workflow.Inspect(instance, "Advance");
@@ -892,7 +892,7 @@ public class DslWorkflowTests
                     reject "Feature must be enabled"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Disabled", new Dictionary<string, object?> { ["IsEnabled"] = false });
 
         var rejected = workflow.Inspect(instance, "Evaluate");
@@ -921,7 +921,7 @@ public class DslWorkflowTests
                 transition Green
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var incompatible = new DslWorkflowInstance(
             "OtherWorkflow",
             "Red",
@@ -948,9 +948,9 @@ public class DslWorkflowTests
                 transition Yellow
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
-        var fire = workflow.Fire("Green", "Advance");
+        var fire = workflow.Fire(workflow.CreateInstance("Green"), "Advance");
 
         (fire.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
         (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
@@ -970,9 +970,9 @@ public class DslWorkflowTests
                 transition Green
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
-        var fire = workflow.Fire("Green", "Advance");
+        var fire = workflow.Fire(workflow.CreateInstance("Green"), "Advance");
 
         fire.Outcome.Should().Be(DslOutcomeKind.NotDefined);
         (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
@@ -992,7 +992,7 @@ public class DslWorkflowTests
                 transition Red
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*duplicate state*");
@@ -1014,7 +1014,7 @@ public class DslWorkflowTests
                     reject "Cars waiting required"
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         machine.Transitions.Should().ContainSingle();
         var guardedClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is DslStateTransition);
@@ -1040,7 +1040,7 @@ public class DslWorkflowTests
                 transition Green
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         machine.Transitions.Should().ContainSingle();
         machine.Transitions[0].Clauses[0].SetAssignments.Should().HaveCount(2);
@@ -1061,7 +1061,7 @@ public class DslWorkflowTests
             transition Red -> Green on Advance reason "Cars waiting required"
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should()
             .Throw<InvalidOperationException>()
@@ -1083,7 +1083,7 @@ public class DslWorkflowTests
                                 reject "No cars waiting"
                         """;
 
-                var machine = StateMachineDslParser.Parse(dsl);
+                var machine = DslWorkflowParser.Parse(dsl);
 
                 machine.Transitions.Should().ContainSingle();
                 machine.Transitions[0].FromState.Should().Be("Red");
@@ -1107,9 +1107,9 @@ public class DslWorkflowTests
                                 reject "No cars waiting"
                         """;
 
-                var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+                var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
-                var inspection = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["CarsWaiting"] = 0 });
+                var inspection = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 0 }), "Advance");
 
                 (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
                 (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
@@ -1132,9 +1132,9 @@ public class DslWorkflowTests
                                 no transition
                         """;
 
-                var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+                var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
-                var inspection = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["CarsWaiting"] = 0 });
+                var inspection = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 0 }), "Advance");
 
                 (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
                 (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
@@ -1159,12 +1159,12 @@ public class DslWorkflowTests
                                 reject "Emergency reason is required"
                         """;
 
-                var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+                var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
                 var data = new Dictionary<string, object?> { ["Reason"] = "Accident" };
 
-                workflow.Inspect("Red", "Emergency", data).Outcome.Should().BeOneOf(DslOutcomeKind.Accepted, DslOutcomeKind.AcceptedInPlace);
-                workflow.Inspect("Green", "Emergency", data).Outcome.Should().BeOneOf(DslOutcomeKind.Accepted, DslOutcomeKind.AcceptedInPlace);
-                workflow.Inspect("Yellow", "Emergency", data).Outcome.Should().BeOneOf(DslOutcomeKind.Accepted, DslOutcomeKind.AcceptedInPlace);
+                workflow.Inspect(workflow.CreateInstance("Red"), "Emergency", data).Outcome.Should().BeOneOf(DslOutcomeKind.Accepted, DslOutcomeKind.AcceptedInPlace);
+                workflow.Inspect(workflow.CreateInstance("Green"), "Emergency", data).Outcome.Should().BeOneOf(DslOutcomeKind.Accepted, DslOutcomeKind.AcceptedInPlace);
+                workflow.Inspect(workflow.CreateInstance("Yellow"), "Emergency", data).Outcome.Should().BeOneOf(DslOutcomeKind.Accepted, DslOutcomeKind.AcceptedInPlace);
         }
 
         [Fact]
@@ -1178,7 +1178,7 @@ public class DslWorkflowTests
                 from Red on Advance
                 """;
 
-                var act = () => StateMachineDslParser.Parse(dsl);
+                var act = () => DslWorkflowParser.Parse(dsl);
 
                 act.Should()
                         .Throw<InvalidOperationException>()
@@ -1199,7 +1199,7 @@ public class DslWorkflowTests
                     reject "Cars waiting required"
                 """;
 
-            var act = () => StateMachineDslParser.Parse(dsl);
+            var act = () => DslWorkflowParser.Parse(dsl);
 
             act.Should()
                 .Throw<InvalidOperationException>()
@@ -1223,7 +1223,7 @@ public class DslWorkflowTests
                     reject "No cars waiting"
                 """;
 
-            var act = () => StateMachineDslParser.Parse(dsl);
+            var act = () => DslWorkflowParser.Parse(dsl);
 
             act.Should()
                 .Throw<InvalidOperationException>()
@@ -1246,7 +1246,7 @@ public class DslWorkflowTests
                                 reject "Second"
                     """;
 
-                var act = () => StateMachineDslParser.Parse(dsl);
+                var act = () => DslWorkflowParser.Parse(dsl);
 
                 act.Should()
                     .Throw<InvalidOperationException>()
@@ -1267,7 +1267,7 @@ public class DslWorkflowTests
                         no transition
                     """;
 
-                var act = () => StateMachineDslParser.Parse(dsl);
+                var act = () => DslWorkflowParser.Parse(dsl);
 
                 act.Should()
                     .Throw<InvalidOperationException>()
@@ -1293,12 +1293,12 @@ public class DslWorkflowTests
                             reject "No cars waiting"
                     """;
 
-                var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+                var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
-                workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["CarsWaiting"] = 5 }).TargetState.Should().Be("Green");
-                workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["CarsWaiting"] = 1 }).TargetState.Should().Be("Yellow");
+                workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 5 }), "Advance").TargetState.Should().Be("Green");
+                workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 1 }), "Advance").TargetState.Should().Be("Yellow");
 
-                var rejected = workflow.Inspect("Red", "Advance", new Dictionary<string, object?> { ["CarsWaiting"] = 0 });
+                var rejected = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 0 }), "Advance");
                 rejected.Outcome.Should().Be(DslOutcomeKind.Rejected);
                 rejected.Reasons.Should().ContainSingle("No cars waiting");
             }
@@ -1318,7 +1318,7 @@ public class DslWorkflowTests
                         reject "No cars waiting"
                     """;
 
-                var act = () => StateMachineDslParser.Parse(dsl);
+                var act = () => DslWorkflowParser.Parse(dsl);
 
                 act.Should()
                     .Throw<InvalidOperationException>()
@@ -1340,7 +1340,7 @@ public class DslWorkflowTests
                         reject "No cars waiting"
                     """;
 
-                var act = () => StateMachineDslParser.Parse(dsl);
+                var act = () => DslWorkflowParser.Parse(dsl);
 
                 act.Should()
                     .Throw<InvalidOperationException>()
@@ -1362,7 +1362,7 @@ public class DslWorkflowTests
                         transition Green
                     """;
 
-                var machine = StateMachineDslParser.Parse(dsl);
+                var machine = DslWorkflowParser.Parse(dsl);
 
                 machine.Transitions.Should().ContainSingle();
                 machine.Transitions[0].Clauses[0].SetAssignments.Should().ContainSingle();
@@ -1384,7 +1384,7 @@ public class DslWorkflowTests
                         transition Green
                     """;
 
-                var machine = StateMachineDslParser.Parse(dsl);
+                var machine = DslWorkflowParser.Parse(dsl);
 
                 machine.Fields.Should().HaveCount(2);
                 machine.Fields[0].HasDefaultValue.Should().BeTrue();
@@ -1407,7 +1407,7 @@ public class DslWorkflowTests
                         transition Green
                     """;
 
-                var act = () => StateMachineDslParser.Parse(dsl);
+                var act = () => DslWorkflowParser.Parse(dsl);
 
                 act.Should()
                     .Throw<InvalidOperationException>()
@@ -1428,7 +1428,7 @@ public class DslWorkflowTests
                         transition Green
                     """;
 
-                var act = () => StateMachineDslParser.Parse(dsl);
+                var act = () => DslWorkflowParser.Parse(dsl);
 
                 act.Should()
                     .Throw<InvalidOperationException>()
@@ -1449,7 +1449,7 @@ public class DslWorkflowTests
                         transition Green
                     """;
 
-                var act = () => StateMachineDslParser.Parse(dsl);
+                var act = () => DslWorkflowParser.Parse(dsl);
 
                 act.Should()
                     .Throw<InvalidOperationException>()
@@ -1470,7 +1470,7 @@ public class DslWorkflowTests
                         transition Green
                     """;
 
-                var machine = StateMachineDslParser.Parse(dsl);
+                var machine = DslWorkflowParser.Parse(dsl);
 
                 machine.Fields.Should().ContainSingle();
                 machine.Fields[0].Name.Should().Be("Note");
@@ -1491,7 +1491,7 @@ public class DslWorkflowTests
                         transition Green
                     """;
 
-                var act = () => StateMachineDslParser.Parse(dsl);
+                var act = () => DslWorkflowParser.Parse(dsl);
 
                 act.Should()
                     .Throw<InvalidOperationException>()
@@ -1511,7 +1511,7 @@ public class DslWorkflowTests
                         transition Green
                     """;
 
-                var act = () => StateMachineDslParser.Parse(dsl);
+                var act = () => DslWorkflowParser.Parse(dsl);
 
                 act.Should()
                     .Throw<InvalidOperationException>()
@@ -1529,7 +1529,7 @@ public class DslWorkflowTests
                         transition Green
                     """;
 
-                var act = () => StateMachineDslParser.Parse(dsl);
+                var act = () => DslWorkflowParser.Parse(dsl);
 
                 act.Should()
                     .Throw<InvalidOperationException>()
@@ -1548,7 +1548,7 @@ public class DslWorkflowTests
                         transition Green
                     """;
 
-                var act = () => StateMachineDslParser.Parse(dsl);
+                var act = () => DslWorkflowParser.Parse(dsl);
 
                 act.Should()
                     .Throw<InvalidOperationException>()
@@ -1570,7 +1570,7 @@ public class DslWorkflowTests
                         transition Green
                     """;
 
-                var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+                var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
                 var instance = workflow.CreateInstance("Red");
 
@@ -1592,7 +1592,7 @@ public class DslWorkflowTests
                         transition Green
                     """;
 
-                var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+                var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
                 var instance = workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 5d });
 
@@ -1611,7 +1611,7 @@ public class DslWorkflowTests
                 no transition
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
         var arg = machine.Events.Single().Args.Single();
         arg.Name.Should().Be("Reason");
         arg.HasDefaultValue.Should().BeTrue();
@@ -1631,7 +1631,7 @@ public class DslWorkflowTests
                 no transition
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
         var arg = machine.Events.Single().Args.Single();
         arg.Name.Should().Be("Reason");
         arg.HasDefaultValue.Should().BeTrue();
@@ -1651,7 +1651,7 @@ public class DslWorkflowTests
                 no transition
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
         var arg = machine.Events.Single().Args.Single();
         arg.HasDefaultValue.Should().BeTrue();
         arg.DefaultValue.Should().BeNull();
@@ -1669,7 +1669,7 @@ public class DslWorkflowTests
                 no transition
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
         var arg = machine.Events.Single().Args.Single();
         arg.Name.Should().Be("Reason");
         arg.HasDefaultValue.Should().BeFalse();
@@ -1688,7 +1688,7 @@ public class DslWorkflowTests
                 no transition
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
         var arg = machine.Events.Single().Args.Single();
         arg.HasDefaultValue.Should().BeFalse();
         arg.IsNullable.Should().BeTrue();
@@ -1706,7 +1706,7 @@ public class DslWorkflowTests
                 no transition
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
         var arg = machine.Events.Single().Args.Single();
         arg.HasDefaultValue.Should().BeTrue();
         arg.DefaultValue.Should().Be(5d);
@@ -1724,7 +1724,7 @@ public class DslWorkflowTests
                 no transition
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
         var arg = machine.Events.Single().Args.Single();
         arg.HasDefaultValue.Should().BeTrue();
         arg.DefaultValue.Should().Be(false);
@@ -1742,7 +1742,7 @@ public class DslWorkflowTests
                 no transition
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*default value*does not match*");
     }
@@ -1761,7 +1761,7 @@ public class DslWorkflowTests
                 no transition
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("A", new Dictionary<string, object?>());
 
         var fire = workflow.Fire(instance, "Submit");
@@ -1784,7 +1784,7 @@ public class DslWorkflowTests
                 no transition
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("A", new Dictionary<string, object?>());
 
         var fire = workflow.Fire(instance, "Submit", new Dictionary<string, object?> { ["Reason"] = "manual" });
@@ -1807,7 +1807,7 @@ public class DslWorkflowTests
                 no transition
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("A", new Dictionary<string, object?>());
 
         var fire = workflow.Fire(instance, "Submit");
@@ -1830,7 +1830,7 @@ public class DslWorkflowTests
                 no transition
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("A", new Dictionary<string, object?>());
 
         var fire = workflow.Fire(instance, "Submit");
@@ -1851,7 +1851,7 @@ public class DslWorkflowTests
                 no transition
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("A", new Dictionary<string, object?>());
 
         var fire = workflow.Fire(instance, "Submit");
@@ -1875,7 +1875,7 @@ public class DslWorkflowTests
                 transition B
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("A", new Dictionary<string, object?>());
 
         var inspect = workflow.Inspect(instance, "Submit");
@@ -1899,7 +1899,7 @@ public class DslWorkflowTests
                 transition B
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*duplicate 'from A on Submit' block*");
@@ -1919,7 +1919,7 @@ public class DslWorkflowTests
                 transition B
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*duplicate 'from A on Submit' block*");
@@ -1940,7 +1940,7 @@ public class DslWorkflowTests
                 transition A
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*duplicate 'from B on Submit' block*");
@@ -1960,7 +1960,7 @@ public class DslWorkflowTests
                 transition A
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().NotThrow();
     }
@@ -1980,7 +1980,7 @@ public class DslWorkflowTests
                 transition B
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().NotThrow();
     }
@@ -2002,7 +2002,7 @@ public class DslWorkflowTests
               no transition
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         // Frozen=true → 'when !Frozen' is false → NotApplicable regardless of args
         var frozen = workflow.CreateInstance("Active", new Dictionary<string, object?> { ["Frozen"] = true });
@@ -2031,7 +2031,7 @@ public class DslWorkflowTests
               no transition
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         // Frozen=false → 'when !Frozen' is true → falls through to normal arg validation
         var unfrozen = workflow.CreateInstance("Active", new Dictionary<string, object?> { ["Frozen"] = false });

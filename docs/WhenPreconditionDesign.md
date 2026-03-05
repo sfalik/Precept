@@ -1,7 +1,9 @@
 # Design: Conditional Event Availability via `when` Precondition
 
-**Status: Design Phase — Not Yet Implemented**
+**Status: Implemented**
 **Date: 2026-03-04**
+
+> **Note:** This design document was written before implementation. Some type names referenced below (e.g. `DslTerminalRule`, `IGuardEvaluator`, `IsDefined`, `IsAccepted`, `Outcome=Undefined`, `Outcome=Blocked`) predate the current API. See [RuntimeApiDesign.md](RuntimeApiDesign.md) for the current type names. The `when` feature is fully implemented in the parser, compiler, runtime, and language server. Outcome names are now `NotApplicable` (when precondition is false), `NotDefined`, `Rejected`, `Accepted`, `AcceptedInPlace` — see `DslOutcomeKind`.
 
 ## Motivation
 

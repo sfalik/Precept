@@ -46,7 +46,7 @@ internal sealed class DefaultGuardEvaluator : IGuardEvaluator
     }
 }
 
-public sealed class DslWorkflowDefinition
+public sealed class DslWorkflowEngine
 {
     private readonly Dictionary<(string State, string Event), List<DslTransition>> _transitionMap;
     private readonly Dictionary<(string State, string Event), List<DslTerminalRule>> _terminalRuleMap;
@@ -62,7 +62,7 @@ public sealed class DslWorkflowDefinition
     public IReadOnlyList<DslFieldContract> DataFields { get; }
     public IReadOnlyList<DslCollectionFieldContract> CollectionFields { get; }
 
-    internal DslWorkflowDefinition(DslMachine machine, IGuardEvaluator guardEvaluator)
+    internal DslWorkflowEngine(DslWorkflowModel machine, IGuardEvaluator guardEvaluator)
     {
         Name = machine.Name;
         States = machine.States;
@@ -173,21 +173,21 @@ public sealed class DslWorkflowDefinition
         return merged;
     }
 
-    public DslInstanceCompatibilityResult CheckCompatibility(DslWorkflowInstance instance)
+    public DslCompatibilityResult CheckCompatibility(DslWorkflowInstance instance)
     {
         if (!instance.WorkflowName.Equals(Name, StringComparison.Ordinal))
         {
-            return DslInstanceCompatibilityResult.NotCompatible(
+            return DslCompatibilityResult.NotCompatible(
                 $"Instance workflow '{instance.WorkflowName}' does not match compiled workflow '{Name}'.");
         }
 
         if (!States.Contains(instance.CurrentState, StringComparer.Ordinal))
-            return DslInstanceCompatibilityResult.NotCompatible($"Instance state '{instance.CurrentState}' is not defined in workflow '{Name}'.");
+            return DslCompatibilityResult.NotCompatible($"Instance state '{instance.CurrentState}' is not defined in workflow '{Name}'.");
 
         if (!TryValidateDataContract(instance.InstanceData, out var dataError))
-            return DslInstanceCompatibilityResult.NotCompatible(dataError);
+            return DslCompatibilityResult.NotCompatible(dataError);
 
-        return DslInstanceCompatibilityResult.Compatible();
+        return DslCompatibilityResult.Compatible();
     }
 
     public DslInspectionResult Inspect(
@@ -247,7 +247,7 @@ public sealed class DslWorkflowDefinition
         return DslFireResult.Accepted(currentState, eventName, inspection.TargetState);
     }
 
-    public DslInstanceFireResult Fire(
+    public DslFireResult Fire(
         DslWorkflowInstance instance,
         string eventName,
         IReadOnlyDictionary<string, object?>? eventArguments = null)
@@ -256,16 +256,16 @@ public sealed class DslWorkflowDefinition
         if (!compatibility.IsCompatible)
         {
             var reasons = new[] { compatibility.Reason! };
-            return DslInstanceFireResult.NotDefined(instance.CurrentState, eventName, reasons);
+            return DslFireResult.NotDefined(instance.CurrentState, eventName, reasons);
         }
 
         if (!TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
-            return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
+            return DslFireResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
 
         var evaluationArguments = BuildEvaluationData(instance.InstanceData, eventName, eventArguments);
         var resolution = ResolveTransition(instance.CurrentState, eventName, evaluationArguments);
         if (resolution.Kind == TransitionResolutionKind.NotDefined)
-            return DslInstanceFireResult.NotDefined(instance.CurrentState, eventName, new[] { resolution.NotDefinedReason! });
+            return DslFireResult.NotDefined(instance.CurrentState, eventName, new[] { resolution.NotDefinedReason! });
 
         if (resolution.Kind == TransitionResolutionKind.NoTransition)
         {
@@ -281,10 +281,10 @@ public sealed class DslWorkflowDefinition
                     var assignmentContext = BuildEvaluationDataWithCollections(noTransitionData, workingCollections, eventName, eventArguments);
                     var assignmentEvaluation = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, assignmentContext);
                     if (!assignmentEvaluation.Success)
-                        return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { $"Data assignment failed: {assignmentEvaluation.Error}" });
+                        return DslFireResult.Rejected(instance.CurrentState, eventName, new[] { $"Data assignment failed: {assignmentEvaluation.Error}" });
 
                     if (!TryValidateAssignedValue(assignment.Key, assignmentEvaluation.Value, out var contractError))
-                        return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { contractError! });
+                        return DslFireResult.Rejected(instance.CurrentState, eventName, new[] { contractError! });
 
                     noTransitionData[assignment.Key] = assignmentEvaluation.Value;
                 }
@@ -295,7 +295,7 @@ public sealed class DslWorkflowDefinition
             {
                 var mutationError = ExecuteCollectionMutations(noTransitionMutations, workingCollections, noTransitionData, eventName, eventArguments);
                 if (mutationError is not null)
-                    return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { mutationError });
+                    return DslFireResult.Rejected(instance.CurrentState, eventName, new[] { mutationError });
             }
 
             // Commit working collections back to data
@@ -308,11 +308,11 @@ public sealed class DslWorkflowDefinition
                 InstanceData = noTransitionData
             };
 
-            return DslInstanceFireResult.NoTransition(instance.CurrentState, eventName, noTransitionUpdated);
+            return DslFireResult.NoTransition(instance.CurrentState, eventName, noTransitionUpdated);
         }
 
         if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.Transition is null)
-            return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
+            return DslFireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
 
         var updatedData = new Dictionary<string, object?>(instance.InstanceData, StringComparer.Ordinal);
 
@@ -324,10 +324,10 @@ public sealed class DslWorkflowDefinition
             var assignmentContext = BuildEvaluationDataWithCollections(updatedData, transitionCollections, eventName, eventArguments);
             var assignmentEvaluation = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, assignmentContext);
             if (!assignmentEvaluation.Success)
-                return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { $"Data assignment failed: {assignmentEvaluation.Error}" });
+                return DslFireResult.Rejected(instance.CurrentState, eventName, new[] { $"Data assignment failed: {assignmentEvaluation.Error}" });
 
             if (!TryValidateAssignedValue(assignment.Key, assignmentEvaluation.Value, out var contractError))
-                return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { contractError! });
+                return DslFireResult.Rejected(instance.CurrentState, eventName, new[] { contractError! });
 
             updatedData[assignment.Key] = assignmentEvaluation.Value;
         }
@@ -337,7 +337,7 @@ public sealed class DslWorkflowDefinition
         {
             var mutationError = ExecuteCollectionMutations(transitionMutations, transitionCollections, updatedData, eventName, eventArguments);
             if (mutationError is not null)
-                return DslInstanceFireResult.Rejected(instance.CurrentState, eventName, new[] { mutationError });
+                return DslFireResult.Rejected(instance.CurrentState, eventName, new[] { mutationError });
         }
 
         // Commit working collections back to data
@@ -351,7 +351,7 @@ public sealed class DslWorkflowDefinition
             InstanceData = updatedData
         };
 
-        return DslInstanceFireResult.Accepted(instance.CurrentState, eventName, resolution.Transition.ToState, updated);
+        return DslFireResult.Accepted(instance.CurrentState, eventName, resolution.Transition.ToState, updated);
     }
 
     private TransitionResolution ResolveTransition(
@@ -848,7 +848,7 @@ public sealed class DslWorkflowDefinition
 
 public static class DslWorkflowCompiler
 {
-    public static DslWorkflowDefinition Compile(DslMachine machine, IGuardEvaluator? guardEvaluator = null)
+    public static DslWorkflowEngine Compile(DslWorkflowModel machine, IGuardEvaluator? guardEvaluator = null)
     {
         if (machine is null)
             throw new ArgumentNullException(nameof(machine));
@@ -859,7 +859,7 @@ public static class DslWorkflowCompiler
         if (!machine.States.Contains(machine.InitialState, StringComparer.Ordinal))
             throw new InvalidOperationException($"Initial state '{machine.InitialState}' is not defined in workflow '{machine.Name}'.");
 
-        return new DslWorkflowDefinition(machine, guardEvaluator ?? new DefaultGuardEvaluator());
+        return new DslWorkflowEngine(machine, guardEvaluator ?? new DefaultGuardEvaluator());
     }
 }
 
@@ -870,10 +870,10 @@ public sealed record DslWorkflowInstance(
     DateTimeOffset UpdatedAt,
     IReadOnlyDictionary<string, object?> InstanceData);
 
-public sealed record DslInstanceCompatibilityResult(bool IsCompatible, string? Reason)
+public sealed record DslCompatibilityResult(bool IsCompatible, string? Reason)
 {
-    internal static DslInstanceCompatibilityResult Compatible() => new(true, null);
-    internal static DslInstanceCompatibilityResult NotCompatible(string reason) => new(false, reason);
+    internal static DslCompatibilityResult Compatible() => new(true, null);
+    internal static DslCompatibilityResult NotCompatible(string reason) => new(false, reason);
 }
 
 internal sealed class EmptyInstanceData : IReadOnlyDictionary<string, object?>
@@ -940,7 +940,7 @@ public sealed record DslFireResult(
         new(DslOutcomeKind.Blocked, true, false, state, evt, null, reasons);
 }
 
-public sealed record DslInstanceFireResult(
+public sealed record DslFireResult(
     DslOutcomeKind Outcome,
     bool IsDefined,
     bool IsAccepted,
@@ -950,16 +950,16 @@ public sealed record DslInstanceFireResult(
     IReadOnlyList<string> Reasons,
     DslWorkflowInstance? UpdatedInstance)
 {
-    internal static DslInstanceFireResult Accepted(string state, string evt, string newState, DslWorkflowInstance updated) =>
+    internal static DslFireResult Accepted(string state, string evt, string newState, DslWorkflowInstance updated) =>
         new(DslOutcomeKind.Enabled, true, true, state, evt, newState, Array.Empty<string>(), updated);
 
-    internal static DslInstanceFireResult NoTransition(string state, string evt, DslWorkflowInstance updated) =>
+    internal static DslFireResult NoTransition(string state, string evt, DslWorkflowInstance updated) =>
         new(DslOutcomeKind.NoTransition, true, true, state, evt, state, Array.Empty<string>(), updated);
 
-    internal static DslInstanceFireResult NotDefined(string state, string evt, IReadOnlyList<string> reasons) =>
+    internal static DslFireResult NotDefined(string state, string evt, IReadOnlyList<string> reasons) =>
         new(DslOutcomeKind.Undefined, false, false, state, evt, null, reasons, null);
 
-    internal static DslInstanceFireResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
+    internal static DslFireResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
         new(DslOutcomeKind.Blocked, true, false, state, evt, null, reasons, null);
 }
 

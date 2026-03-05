@@ -27,7 +27,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         var balance = machine.Fields.Single(f => f.Name == "Balance");
         balance.Rules.Should().ContainSingle();
@@ -46,7 +46,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         var rating = machine.Fields.Single(f => f.Name == "Rating");
         rating.Rules.Should().HaveCount(2);
@@ -65,7 +65,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         machine.TopLevelRules.Should().ContainSingle();
         machine.TopLevelRules![0].ExpressionText.Should().Be("Quantity >= 0");
@@ -84,7 +84,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         machine.TopLevelRules.Should().HaveCount(2);
     }
@@ -100,7 +100,7 @@ public class DslRulesTests
               rule AmountPaid > 0 "Must have paid"
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         machine.States.Should().Contain(s => s.Name == "Paid" && s.Rules != null);
         machine.States.Single(s => s.Name == "Paid").Rules.Should().ContainSingle();
@@ -120,7 +120,7 @@ public class DslRulesTests
               rule Score >= 10 "Must be 10 in B"
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         machine.States.Count(s => s.Rules != null && s.Rules.Count > 0).Should().Be(2);
         machine.States.Single(s => s.Name == "A").Rules![0].Reason.Should().Be("Non-negative in A");
@@ -138,7 +138,7 @@ public class DslRulesTests
               rule Amount > 0 "Amount must be positive"
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         var payEvent = machine.Events.Single(e => e.Name == "Pay");
         payEvent.Rules.Should().ContainSingle();
@@ -157,7 +157,7 @@ public class DslRulesTests
               rule Pay.Amount > 0 "Amount must be positive"
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         var payEvent = machine.Events.Single(e => e.Name == "Pay");
         payEvent.Rules.Should().ContainSingle();
@@ -174,7 +174,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         var approvers = machine.CollectionFields.Single(f => f.Name == "Approvers");
         approvers.Rules.Should().ContainSingle();
@@ -192,7 +192,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         var rule = machine.Fields.Single(f => f.Name == "Balance").Rules![0];
         rule.SourceLine.Should().Be(3);
@@ -213,7 +213,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*field rule*own field*");
@@ -229,7 +229,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().NotThrow();
     }
@@ -244,7 +244,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().NotThrow();
     }
@@ -261,7 +261,7 @@ public class DslRulesTests
               rule Amount <= Balance "Cannot exceed balance"
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*event rule*event argument identifiers*");
@@ -279,7 +279,7 @@ public class DslRulesTests
               rule Amount > Discount "Amount must exceed discount"
             """;
 
-        var act = () => StateMachineDslParser.Parse(dsl);
+        var act = () => DslWorkflowParser.Parse(dsl);
 
         act.Should().NotThrow();
     }
@@ -299,7 +299,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var act = () => DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var act = () => DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*compile-time rule violation*Balance must be at least 10*");
@@ -315,7 +315,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var act = () => DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var act = () => DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         act.Should().NotThrow();
     }
@@ -332,7 +332,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var act = () => DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var act = () => DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*compile-time rule violation*Price must be consistent*");
@@ -349,7 +349,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var act = () => DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var act = () => DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         act.Should().NotThrow();
     }
@@ -364,7 +364,7 @@ public class DslRulesTests
               rule AmountPaid > 0 "Must have paid"
             """;
 
-        var act = () => DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var act = () => DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*compile-time rule violation*Must have paid*initial state*");
@@ -384,7 +384,7 @@ public class DslRulesTests
                 transition Paid
             """;
 
-        var act = () => DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var act = () => DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         act.Should().NotThrow();
     }
@@ -399,7 +399,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var act = () => DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var act = () => DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*compile-time rule violation*Need at least one approver*");
@@ -415,7 +415,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var act = () => DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var act = () => DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         act.Should().NotThrow();
     }
@@ -431,7 +431,7 @@ public class DslRulesTests
               rule Priority > 0 "Priority must be positive"
             """;
 
-        var act = () => DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var act = () => DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*compile-time rule violation*Priority must be positive*");
@@ -448,7 +448,7 @@ public class DslRulesTests
               rule Priority > 0 "Priority must be positive"
             """;
 
-        var act = () => DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var act = () => DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         act.Should().NotThrow();
     }
@@ -465,7 +465,7 @@ public class DslRulesTests
             """;
 
         // Cannot check at compile time because Priority has no default
-        var act = () => DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var act = () => DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         act.Should().NotThrow();
     }
@@ -484,7 +484,7 @@ public class DslRulesTests
               transition Active
             """;
 
-        var act = () => DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var act = () => DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*literal assignment*violates rule*Must be non-negative*");
@@ -504,7 +504,7 @@ public class DslRulesTests
               transition Active
             """;
 
-        var act = () => DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var act = () => DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
         act.Should().NotThrow();
     }
@@ -527,7 +527,7 @@ public class DslRulesTests
               transition Done
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Idle", new Dictionary<string, object?>());
 
         var result = workflow.Fire(instance, "Pay", new Dictionary<string, object?> { ["Amount"] = -10.0 });
@@ -551,7 +551,7 @@ public class DslRulesTests
               transition Done
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Idle", new Dictionary<string, object?>());
 
         var result = workflow.Fire(instance, "Pay", new Dictionary<string, object?> { ["Amount"] = 50.0 });
@@ -579,7 +579,7 @@ public class DslRulesTests
                 reject "Not enough balance"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Idle", new Dictionary<string, object?> { ["Balance"] = 0.0 });
 
         var result = workflow.Fire(instance, "Pay", new Dictionary<string, object?> { ["Amount"] = -5.0 });
@@ -604,7 +604,7 @@ public class DslRulesTests
               transition Done
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Idle", new Dictionary<string, object?>());
 
         var result = workflow.Fire(instance, "Transfer", new Dictionary<string, object?>
@@ -637,7 +637,7 @@ public class DslRulesTests
               transition UnderReview
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Apply", new Dictionary<string, object?> { ["CreditScore"] = 0.0 });
 
         // Arg value 500 satisfies the rule even though the machine field is 0
@@ -669,7 +669,7 @@ public class DslRulesTests
               transition Active
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Active", new Dictionary<string, object?> { ["Balance"] = 100.0 });
 
         var result = workflow.Fire(instance, "Debit", new Dictionary<string, object?> { ["Amount"] = 200.0 });
@@ -694,7 +694,7 @@ public class DslRulesTests
               transition Active
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Active", new Dictionary<string, object?> { ["Balance"] = 100.0 });
 
         var result = workflow.Fire(instance, "Debit", new Dictionary<string, object?> { ["Amount"] = 30.0 });
@@ -720,7 +720,7 @@ public class DslRulesTests
               transition Active
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Active", new Dictionary<string, object?>
         {
             ["Balance"] = 100.0,
@@ -753,7 +753,7 @@ public class DslRulesTests
               transition Active
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Active", new Dictionary<string, object?>
         {
             ["Balance"] = 100.0,
@@ -793,7 +793,7 @@ public class DslRulesTests
               transition Active
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Active", new Dictionary<string, object?>
         {
             ["Quantity"] = 5.0,
@@ -826,7 +826,7 @@ public class DslRulesTests
               transition Active
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Active", new Dictionary<string, object?>
         {
             ["Quantity"] = 5.0,
@@ -865,7 +865,7 @@ public class DslRulesTests
               transition Paid
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Draft", new Dictionary<string, object?> { ["AmountPaid"] = 0.0 });
 
         var result = workflow.Fire(instance, "Checkout", new Dictionary<string, object?> { ["Payment"] = 0.0 });
@@ -890,7 +890,7 @@ public class DslRulesTests
               transition Paid
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Draft", new Dictionary<string, object?> { ["AmountPaid"] = 0.0 });
 
         var result = workflow.Fire(instance, "Checkout", new Dictionary<string, object?> { ["Payment"] = 100.0 });
@@ -915,7 +915,7 @@ public class DslRulesTests
               transition Active
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Active", new Dictionary<string, object?> { ["Score"] = 10.0 });
 
         var result = workflow.Fire(instance, "Penalize", new Dictionary<string, object?> { ["Points"] = 15.0 });
@@ -946,7 +946,7 @@ public class DslRulesTests
               no transition
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         // Move to Active state first
         var enterResult = workflow.Fire(
             workflow.CreateInstance("Lobby", new Dictionary<string, object?> { ["Score"] = 5.0 }),
@@ -986,7 +986,7 @@ public class DslRulesTests
                 reject "Not enough balance"
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Idle", new Dictionary<string, object?> { ["Balance"] = 0.0 });
 
         // Both event rule AND guard would reject, but event rule is checked first
@@ -1013,7 +1013,7 @@ public class DslRulesTests
               transition Active
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Active", new Dictionary<string, object?> { ["Balance"] = 100.0 });
 
         // Setting to 0 satisfies Balance >= 0
@@ -1044,7 +1044,7 @@ public class DslRulesTests
               transition Active
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Active", new Dictionary<string, object?> { ["Balance"] = 100.0 });
 
         // Debit of 50 keeps Balance = 50, rule 'Balance >= 0' passes
@@ -1070,7 +1070,7 @@ public class DslRulesTests
               transition Active
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Active", new Dictionary<string, object?> { ["Balance"] = 50.0 });
 
         // Debiting 200 would make Balance = -150, violating the rule
@@ -1098,7 +1098,7 @@ public class DslRulesTests
             """;
 
         // compile must succeed: default value 100 satisfies 'null || 100 >= 0' = true
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Active", new Dictionary<string, object?> { ["Balance"] = 100.0 });
 
         // Setting Balance to null via nullable arg — 'Balance == null || Balance >= 0' passes
@@ -1128,7 +1128,7 @@ public class DslRulesTests
               transition Active
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Active");
 
         // Add first two tags
@@ -1164,7 +1164,7 @@ public class DslRulesTests
               transition Paid
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instanceDraft = workflow.CreateInstance("Draft", new Dictionary<string, object?> { ["AmountPaid"] = 0.0 });
         var instanceReview = workflow.CreateInstance("Review", new Dictionary<string, object?> { ["AmountPaid"] = 0.0 });
 
@@ -1196,7 +1196,7 @@ public class DslRulesTests
               transition Done
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Idle", new Dictionary<string, object?>());
 
         var result = workflow.Inspect(instance, "Pay", new Dictionary<string, object?> { ["Amount"] = -10.0 });
@@ -1220,7 +1220,7 @@ public class DslRulesTests
               transition Done
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Idle", new Dictionary<string, object?>());
 
         var result = workflow.Inspect(instance, "Pay", new Dictionary<string, object?> { ["Amount"] = 50.0 });
@@ -1246,7 +1246,7 @@ public class DslRulesTests
               transition UnderReview
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Apply", new Dictionary<string, object?> { ["CreditScore"] = 0.0 });
 
         var passing = workflow.Inspect(instance, "Submit", new Dictionary<string, object?> { ["CreditScore"] = 500.0 });
@@ -1272,7 +1272,7 @@ public class DslRulesTests
               transition Active
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Active", new Dictionary<string, object?> { ["Balance"] = 100.0 });
 
         var result = workflow.Inspect(instance, "Debit", new Dictionary<string, object?> { ["Amount"] = 200.0 });
@@ -1297,7 +1297,7 @@ public class DslRulesTests
               transition Paid
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Draft", new Dictionary<string, object?> { ["AmountPaid"] = 0.0 });
 
         var result = workflow.Inspect(instance, "Checkout", new Dictionary<string, object?> { ["Payment"] = 0.0 });
@@ -1322,7 +1322,7 @@ public class DslRulesTests
               transition Done
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
         var instance = workflow.CreateInstance("Idle", new Dictionary<string, object?>());
 
         // Calling inspect without args — should still return accepted (discovery) with RequiredEventArgumentKeys
@@ -1350,9 +1350,9 @@ public class DslRulesTests
               transition Done
             """;
 
-        var workflow = DslWorkflowCompiler.Compile(StateMachineDslParser.Parse(dsl));
+        var workflow = DslWorkflowCompiler.Compile(DslWorkflowParser.Parse(dsl));
 
-        var result = workflow.Inspect("Idle", "Pay", new Dictionary<string, object?> { ["Amount"] = -5.0 });
+        var result = workflow.Inspect(workflow.CreateInstance("Idle"), "Pay", new Dictionary<string, object?> { ["Amount"] = -5.0 });
 
         (result.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
         result.Reasons.Should().ContainSingle(r => r.Contains("Amount must be positive", StringComparison.Ordinal));
@@ -1371,7 +1371,7 @@ public class DslRulesTests
             state Idle initial
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         machine.TopLevelRules.Should().BeNull();
         machine.States.All(s => s.Rules == null).Should().BeTrue();
@@ -1388,7 +1388,7 @@ public class DslRulesTests
               number Value
             """;
 
-        var machine = StateMachineDslParser.Parse(dsl);
+        var machine = DslWorkflowParser.Parse(dsl);
 
         machine.Events[0].Rules.Should().BeNull();
     }

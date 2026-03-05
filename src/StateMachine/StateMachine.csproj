@@ -5,4 +5,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="StateMachine.Tests" />
+    <InternalsVisibleTo Include="StateMachine.Dsl.LanguageServer.Tests" />
+  </ItemGroup>
+
 </Project>
