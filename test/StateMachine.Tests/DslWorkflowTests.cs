@@ -1250,7 +1250,7 @@ public class DslWorkflowTests
 
                 act.Should()
                     .Throw<InvalidOperationException>()
-                    .WithMessage("*Duplicate unguarded outcome rule for state 'Red' and event 'Advance'*");
+                    .WithMessage("*duplicate 'from Red on Advance' block*");
             }
 
             [Fact]
@@ -1881,5 +1881,107 @@ public class DslWorkflowTests
         var inspect = workflow.Inspect(instance, "Submit");
 
         inspect.RequiredEventArgumentKeys.Should().ContainSingle().Which.Should().Be("Reason");
+    }
+
+    // ── Duplicate from/on block detection ─────────────────────────────────────
+
+    [Fact]
+    public void Parse_DuplicateFromOnBlock_ThrowsParseError()
+    {
+        const string dsl = """
+            machine M
+            state A initial
+            state B
+            event Submit
+            from A on Submit
+                transition B
+            from A on Submit
+                transition B
+            """;
+
+        var act = () => StateMachineDslParser.Parse(dsl);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*duplicate 'from A on Submit' block*");
+    }
+
+    [Fact]
+    public void Parse_FromAny_ThenSpecificState_ThrowsDuplicateError()
+    {
+        const string dsl = """
+            machine M
+            state A initial
+            state B
+            event Submit
+            from any on Submit
+                transition B
+            from A on Submit
+                transition B
+            """;
+
+        var act = () => StateMachineDslParser.Parse(dsl);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*duplicate 'from A on Submit' block*");
+    }
+
+    [Fact]
+    public void Parse_CommaList_ThenOverlappingState_ThrowsDuplicateError()
+    {
+        const string dsl = """
+            machine M
+            state A initial
+            state B
+            state C
+            event Submit
+            from A,B on Submit
+                transition C
+            from B on Submit
+                transition A
+            """;
+
+        var act = () => StateMachineDslParser.Parse(dsl);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*duplicate 'from B on Submit' block*");
+    }
+
+    [Fact]
+    public void Parse_DifferentStates_SameEvent_IsValid()
+    {
+        const string dsl = """
+            machine M
+            state A initial
+            state B
+            event Submit
+            from A on Submit
+                transition B
+            from B on Submit
+                transition A
+            """;
+
+        var act = () => StateMachineDslParser.Parse(dsl);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Parse_SameState_DifferentEvents_IsValid()
+    {
+        const string dsl = """
+            machine M
+            state A initial
+            state B
+            event EventX
+            event EventY
+            from A on EventX
+                transition B
+            from A on EventY
+                transition B
+            """;
+
+        var act = () => StateMachineDslParser.Parse(dsl);
+
+        act.Should().NotThrow();
     }
 }

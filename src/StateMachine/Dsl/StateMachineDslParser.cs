@@ -80,6 +80,7 @@ public static class StateMachineDslParser
         var collectionFields = new List<DslCollectionFieldContract>();
         var topLevelRules = new List<DslRule>();
         var stateRules = new Dictionary<string, List<DslRule>>(StringComparer.Ordinal);
+        var seenFromOnPairs = new HashSet<(string State, string Event)>();
 
         var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
         int? firstContentLineNumber = null;
@@ -238,6 +239,19 @@ public static class StateMachineDslParser
             var fromOnMatch = FromOnRegex.Match(line);
             if (fromOnMatch.Success)
             {
+                // Enforce uniqueness of (state, event) pairs before delegating to ParseFromOnBlock.
+                var fromToken = fromOnMatch.Groups["from"].Value.Trim();
+                var onEvent = fromOnMatch.Groups["event"].Value.Trim();
+                var sourceStatesForCheck = fromToken.Equals("any", StringComparison.Ordinal)
+                    ? states.ToList()
+                    : fromToken.Split(',').Select(s => s.Trim()).ToList();
+                foreach (var st in sourceStatesForCheck)
+                {
+                    if (!seenFromOnPairs.Add((st, onEvent)))
+                        throw new InvalidOperationException(
+                            $"Line {i + 1}: duplicate 'from {st} on {onEvent}' block. Each state+event combination must be handled in exactly one block.");
+                }
+
                 ParseFromOnBlock(
                     lines,
                     ref i,
@@ -1390,13 +1404,6 @@ public static class StateMachineDslParser
                             throw new InvalidOperationException($"{aPrefix}Terminal rule for state '{terminalRule.FromState}' on '{terminalRule.EventName}' assigns unknown data field '{assignment.Key}'.");
                     }
                 }
-            }
-
-            if (unguardedRules.Count > 1)
-            {
-                var dupRule = unguardedRules[1];
-                var dupPrefix = dupRule.SourceLine > 0 ? $"Line {dupRule.SourceLine}: " : string.Empty;
-                throw new InvalidOperationException($"{dupPrefix}Duplicate unguarded outcome rule for state '{terminalGroup.Key.FromState}' and event '{terminalGroup.Key.EventName}'.");
             }
         }
     }
