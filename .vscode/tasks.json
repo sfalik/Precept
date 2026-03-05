@@ -27,7 +27,7 @@
                 "loop:local"
             ],
             "options": {
-                "cwd": "${workspaceFolder}/tools/StateMachine.Dsl.VsCode"
+                "cwd": "${workspaceFolder}/tools/Precept.VsCode"
             },
             "problemMatcher": []
         },
@@ -40,7 +40,7 @@
                 "dev:watch"
             ],
             "options": {
-                "cwd": "${workspaceFolder}/tools/StateMachine.Dsl.VsCode"
+                "cwd": "${workspaceFolder}/tools/Precept.VsCode"
             },
             "isBackground": true,
             "problemMatcher": [

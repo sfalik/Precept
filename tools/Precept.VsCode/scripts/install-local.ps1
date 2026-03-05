@@ -1,5 +1,16 @@
 $ErrorActionPreference = "Stop"
 
+# Ensure Node/npm is on PATH (may be missing in pwsh-based VS Code task shells).
+$nodePaths = @(
+    "C:\Program Files\nodejs",
+    "$env:APPDATA\npm"
+)
+foreach ($p in $nodePaths) {
+    if ((Test-Path $p) -and ($env:PATH -notlike "*$p*")) {
+        $env:PATH = "$p;$env:PATH"
+    }
+}
+
 $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 $extensionRoot = Resolve-Path (Join-Path $scriptDirectory "..")
 Set-Location $extensionRoot

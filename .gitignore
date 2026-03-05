@@ -17,9 +17,9 @@
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# VS Code extension (StateMachine.Dsl.VsCode) generated files
-tools/StateMachine.Dsl.VsCode/node_modules/
-tools/StateMachine.Dsl.VsCode/out/
-tools/StateMachine.Dsl.VsCode/*.vsix
-tools/StateMachine.Dsl.VsCode/.vscode-test/
+# VS Code extension generated files
+tools/Precept.VsCode/node_modules/
+tools/Precept.VsCode/out/
+tools/Precept.VsCode/*.vsix
+tools/Precept.VsCode/.vscode-test/
 

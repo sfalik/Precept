@@ -1323,8 +1323,9 @@
         stateChangeAnimation = null;
         suppressHoverUntilAnimationComplete = false;
         renderAll();
-        // Snapshot already contains full event statuses from the aggregate Inspect call;
-        // no need to re-fetch them individually after a reset.
+        // Re-inspect with probe args so event rules on required string/number args are evaluated
+        // (the snapshot aggregate Inspect uses no args and skips event rule checks).
+        void refreshCurrentEventStatusesFromInspect();
       } else {
         showRowFeedback('Reset', `✖ ${response.error || 'Reset failed'}`, 'err');
       }
@@ -2599,9 +2600,10 @@
         showDataFieldToasts(changedKeys, beforeData, afterData);
         hoveredEventName = null;
         clearEventArgs();
-        // Snapshot already contains full event statuses from the aggregate Inspect call;
-        // no need to re-fetch them individually — that would just cause extra repaints.
         showRowFeedback(eventName, `✔ ${beforeState} → ${newState}`, 'ok');
+        // Re-inspect with probe args so event rules on required string args are evaluated
+        // (the snapshot aggregate Inspect uses no args and skips event rule checks).
+        void refreshCurrentEventStatusesFromInspect();
       });
 
       drawDiagram();

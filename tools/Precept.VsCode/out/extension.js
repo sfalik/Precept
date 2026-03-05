@@ -52,16 +52,16 @@ function nextSnapshotSequence(panel) {
     return next;
 }
 async function activate(context) {
-    const outputChannel = vscode.window.createOutputChannel("StateMachine DSL");
+    const outputChannel = vscode.window.createOutputChannel("Precept");
     context.subscriptions.push(outputChannel);
-    const openPreviewDisposable = vscode.commands.registerCommand("stateMachineDsl.openInspectorPreview", () => {
+    const openPreviewDisposable = vscode.commands.registerCommand("precept.openPreview", () => {
         void openInspectorPreviewPanel(context, outputChannel);
     });
     context.subscriptions.push(openPreviewDisposable);
     const projectPath = resolveLanguageServerProjectPath(context, outputChannel);
     if (!projectPath) {
         outputChannel.appendLine("Language server project not found.");
-        void vscode.window.showErrorMessage("StateMachine DSL: could not locate tools/StateMachine.Dsl.LanguageServer/StateMachine.Dsl.LanguageServer.csproj from the current workspace.");
+        void vscode.window.showErrorMessage("Precept: could not locate tools/Precept.LanguageServer/Precept.LanguageServer.csproj from the current workspace.");
         outputChannel.show(true);
         return;
     }
@@ -91,14 +91,14 @@ async function activate(context) {
         documentSelector: [
             {
                 scheme: "file",
-                language: "state-machine-dsl"
+                language: "precept"
             }
         ],
         synchronize: {
-            fileEvents: vscode.workspace.createFileSystemWatcher("**/*.sm")
+            fileEvents: vscode.workspace.createFileSystemWatcher("**/*.precept")
         }
     };
-    client = new node_1.LanguageClient("stateMachineDslLanguageServer", "StateMachine DSL Language Server", serverOptions, clientOptions);
+    client = new node_1.LanguageClient("preceptLanguageServer", "Precept Language Server", serverOptions, clientOptions);
     client.onDidChangeState((state) => {
         outputChannel.appendLine(`Language client state: ${state.oldState} -> ${state.newState}`);
     });
@@ -133,15 +133,15 @@ async function deactivate() {
     client = undefined;
 }
 function resolveLanguageServerProjectPath(context, output) {
-    const relativeProjectPath = path.join("tools", "StateMachine.Dsl.LanguageServer", "StateMachine.Dsl.LanguageServer.csproj");
+    const relativeProjectPath = path.join("tools", "Precept.LanguageServer", "Precept.LanguageServer.csproj");
     const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
     const candidates = [];
     for (const folder of workspaceFolders) {
         const workspaceRoot = folder.uri.fsPath;
         candidates.push(path.join(workspaceRoot, relativeProjectPath));
-        candidates.push(path.resolve(workspaceRoot, "..", "StateMachine.Dsl.LanguageServer", "StateMachine.Dsl.LanguageServer.csproj"));
+        candidates.push(path.resolve(workspaceRoot, "..", "Precept.LanguageServer", "Precept.LanguageServer.csproj"));
     }
-    candidates.push(path.resolve(context.extensionPath, "..", "StateMachine.Dsl.LanguageServer", "StateMachine.Dsl.LanguageServer.csproj"));
+    candidates.push(path.resolve(context.extensionPath, "..", "Precept.LanguageServer", "Precept.LanguageServer.csproj"));
     for (const candidate of candidates) {
         output.appendLine(`Server project candidate: ${candidate}`);
     }
@@ -149,8 +149,8 @@ function resolveLanguageServerProjectPath(context, output) {
 }
 async function openInspectorPreviewPanel(context, output) {
     const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document.languageId !== "state-machine-dsl") {
-        void vscode.window.showInformationMessage("Open a .sm file first to launch Inspector Preview.");
+    if (!editor || editor.document.languageId !== "precept") {
+        void vscode.window.showInformationMessage("Open a .precept file first to launch Preview.");
         return;
     }
     const document = editor.document;
@@ -161,7 +161,7 @@ async function openInspectorPreviewPanel(context, output) {
         await sendSnapshotToPanel(existingPanel, document, output);
         return;
     }
-    const panel = vscode.window.createWebviewPanel("stateMachineDslInspectorPreview", `Preview ${path.basename(document.fileName)}`, vscode.ViewColumn.Beside, {
+    const panel = vscode.window.createWebviewPanel("preceptPreview", `Preview ${path.basename(document.fileName)}`, vscode.ViewColumn.Beside, {
         enableScripts: true,
         retainContextWhenHidden: true
     });
@@ -265,7 +265,7 @@ function extractSnapshotTransitions(snapshot) {
 }
 function getPreviewLayoutMode() {
     const configured = vscode.workspace
-        .getConfiguration("stateMachineDsl.preview")
+        .getConfiguration("precept.preview")
         .get("layoutMode", "balanced");
     if (configured === "spacious" || configured === "compact" || configured === "orthogonal" || configured === "top-down" || configured === "balanced") {
         return configured;
@@ -411,7 +411,7 @@ async function sendPreviewRequest(request, output) {
         };
     }
     try {
-        const response = await client.sendRequest("stateMachine/preview/request", request);
+        const response = await client.sendRequest("precept/preview/request", request);
         return response;
     }
     catch (error) {
@@ -437,8 +437,8 @@ async function getInspectorPreviewHtml(context, output, filePath) {
         return rawHtml.replace(/__FILE_NAME__/g, displayFileName);
     }
     catch (error) {
-        output.appendLine(`Failed loading inspector preview HTML: ${String(error)}`);
-        return `<!doctype html><html><body style=\"background:#1e1e1e;color:#fff;font-family:Segoe UI,Arial,sans-serif;padding:16px\"><h2>Inspector Preview</h2><p>Failed to load preview template at:<br>${escapeHtml(previewTemplatePath)}</p></body></html>`;
+        output.appendLine(`Failed loading Preview HTML: ${String(error)}`);
+        return `<!doctype html><html><body style=\"background:#1e1e1e;color:#fff;font-family:Segoe UI,Arial,sans-serif;padding:16px\"><h2>Preview</h2><p>Failed to load preview template at:<br>${escapeHtml(previewTemplatePath)}</p></body></html>`;
     }
 }
 function escapeHtml(value) {
