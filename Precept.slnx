@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Project Path="src/Precept/Precept.csproj" />
+  <Project Path="test/Precept.LanguageServer.Tests/Precept.LanguageServer.Tests.csproj" />
+  <Project Path="test/Precept.Tests/Precept.Tests.csproj" />
+  <Project Path="tools/Precept.LanguageServer/Precept.LanguageServer.csproj" />
+</Solution>

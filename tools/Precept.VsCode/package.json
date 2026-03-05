@@ -1,0 +1,105 @@
+{
+  "name": "precept-vscode",
+  "displayName": "Precept",
+  "description": "VS Code extension for Precept .precept files with language server diagnostics, completions, and live preview.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "workspaceContains:**/*.sm"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "precept",
+        "aliases": [
+          "Precept",
+          "precept"
+        ],
+        "extensions": [
+          ".precept"
+        ],
+        "scopeName": "source.precept",
+        "semanticHighlighting": true,
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "precept",
+        "scopeName": "source.precept",
+        "path": "./syntaxes/precept.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "precept.openPreview",
+        "title": "Open Preview",
+        "icon": "$(open-preview)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "precept.openPreview",
+          "when": "resourceExtname == .precept",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "precept.openPreview",
+          "when": "editorLangId == precept"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "precept.openPreview",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "editorLangId == precept"
+      }
+    ],
+    "configuration": {
+      "title": "Precept Preview",
+      "properties": {
+        "precept.preview.layoutMode": {
+          "type": "string",
+          "enum": [
+            "spacious",
+            "balanced",
+            "compact",
+            "orthogonal",
+            "top-down"
+          ],
+          "default": "balanced",
+          "markdownDescription": "Layout preset for Inspector Preview graph rendering. `balanced` (default) is readability-first with compacted bounds; `spacious` opens larger gaps; `compact` reduces spacing further; `orthogonal` uses right-angle routing; `top-down` stacks layers vertically."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "dev:watch": "tsc -watch -p ./ --preserveWatchOutput",
+    "package:local": "npm run compile && npx @vscode/vsce package --allow-missing-repository",
+    "loop:local": "powershell -ExecutionPolicy Bypass -File ./scripts/install-local.ps1",
+    "vscode:prepublish": "npm run compile"
+  },
+  "dependencies": {
+    "elkjs": "^0.11.0",
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.24",
+    "@types/vscode": "^1.96.0",
+    "typescript": "^5.7.3"
+  }
+}
