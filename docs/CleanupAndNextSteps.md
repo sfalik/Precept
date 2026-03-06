@@ -19,6 +19,18 @@
 
 ---
 
+## Build Baseline (Pre-Cleanup)
+
+- **348 tests passing** — all in `test/Precept.Tests/` and `test/Precept.LanguageServer.Tests/`
+- **Build clean** — 0 errors, 0 warnings on core (`src/Precept/`, `test/`)
+- Language server build may report a DLL-lock error if the language server process is running — stop it first
+
+## Design Decision: Hard Cut (No Backward Compat)
+
+The backward-compat layer was explicitly rejected. The decision is a **hard cut** to the new language with full removal of all legacy tech debt. The old types were never shipped externally — there are no consumers to migrate. Every reference to `PreceptTransition`, `PreceptClause`, `PreceptRule`, `TopLevelRules`, or `.Rules` should be deleted, not wrapped.
+
+---
+
 ## Item 0 — Remove Legacy / Backward Compat Code
 
 ### Prompt
@@ -49,13 +61,17 @@ The work is:
 5. PreceptAnalyzer.cs — replace old model rule validation (TopLevelRules, state.Rules,
    event.Rules) with validation against new model types (Invariants, StateAsserts, EventAsserts).
 
-6. PreceptRulesTests.cs — delete this entire file. The 7 tests that use old model assertions
-   are either already covered in NewSyntaxParserTests/PreceptWorkflowTests or will be ported
-   in Item 3.
+6. PreceptRulesTests.cs — do NOT blindly delete. Follow the test handling instructions in
+   this document: analyze every test against surviving test files, port unique scenarios to
+   the appropriate file using new model assertions, confirm duplicates are truly covered,
+   then delete. Goal: zero test scenarios lost, zero duplicated tests kept.
 
 After each file change, build and run tests to catch cascading breaks. The goal is zero
 references to PreceptTransition, PreceptClause, PreceptRule, TopLevelRules, or .Rules
 anywhere in the codebase.
+
+Note: The tests in PreceptRulesTests.cs use NEW DSL syntax in their input strings but assert
+on OLD model properties. The DSL strings are fine — it's the assertions that need porting.
 ```
 
 ### Analysis
@@ -123,9 +139,37 @@ The parser currently dual-populates both new model types (`PreceptTransitionRow`
 | `state.Rules` validation | L709-723 | Replace with `model.StateAsserts` |
 | `evt.Rules` validation | L726-740 | Replace with `model.EventAsserts` |
 
-#### Test File to Delete
+#### Test File Handling: PreceptRulesTests.cs
 
-**PreceptRulesTests.cs** — 59 tests total. All use new DSL syntax in their input strings but assert on old model properties (`TopLevelRules`, `.Rules`). The runtime behavior they test is already covered by `NewSyntaxRuntimeTests.cs` (39 tests) and `PreceptWorkflowTests.cs` (90+ tests). The 21 edge-case scenarios that have gaps are ported in Item 3.
+**Key subtlety:** `PreceptRulesTests.cs` (59 tests) uses **new DSL syntax** in its input strings (e.g. `invariant ... because`, `field ... as ... default`) but **asserts on old model properties** (`TopLevelRules`, `.Rules`, `PreceptRule`). The DSL strings are correct — the assertions are what's broken.
+
+**Instructions for cleanup:**
+
+1. Before deleting, analyze every test in `PreceptRulesTests.cs` against the surviving test files
+2. For each test, determine if the **scenario** (not just the syntax) is already covered elsewhere
+3. If a scenario is unique, port it to the appropriate surviving test file using new model assertions
+4. If a scenario is duplicated, confirm the existing test covers the same edge case, then skip it
+5. Delete `PreceptRulesTests.cs` only after all unique scenarios are ported
+
+Goal: **zero test scenarios lost, zero duplicated test cases kept.**
+
+#### Test File Survival Map
+
+These test files survive Item 0 unchanged (all use new model types exclusively):
+
+| File | Tests | Content |
+|------|-------|---------|
+| `NewSyntaxParserTests.cs` | 62 | Parser output verification — new model types |
+| `NewSyntaxRuntimeTests.cs` | 39 | Runtime fire/inspect behavior |
+| `PreceptWorkflowTests.cs` | 90+ | End-to-end workflow scenarios |
+| `PreceptCollectionTests.cs` | ~30 | Collection type operations |
+| `PreceptSetParsingTests.cs` | 4 | Set parsing edge cases |
+| `PreceptExpressionParserTests.cs` | ~40 | Expression AST parsing |
+| `PreceptExpressionParserEdgeCaseTests.cs` | ~20 | Expression edge cases |
+| `PreceptExpressionRuntimeEvaluatorBehaviorTests.cs` | ~30 | Evaluator operator behavior |
+| `PreceptAnalyzerNullNarrowingTests.cs` | ~20 | Language server null narrowing |
+| `PreceptAnalyzerCollectionMutationTests.cs` | ~10 | Language server collection diagnostics |
+| `PreceptPreviewRulesTests.cs` | ~10 | Preview panel rule display |
 
 ---
 
