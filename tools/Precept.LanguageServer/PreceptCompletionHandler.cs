@@ -6,13 +6,13 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 
 namespace Precept.LanguageServer;
 
-internal sealed class SmCompletionHandler : CompletionHandlerBase
+internal sealed class PreceptCompletionHandler : CompletionHandlerBase
 {
     private static readonly TextDocumentSelector Selector = TextDocumentSelector.ForPattern("**/*.precept");
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken cancellationToken)
     {
-        var items = SmTextDocumentSyncHandler.SharedAnalyzer.GetCompletions(request.TextDocument.Uri, request.Position)
+        var items = PreceptTextDocumentSyncHandler.SharedAnalyzer.GetCompletions(request.TextDocument.Uri, request.Position)
             .ToArray();
 
         return Task.FromResult(new CompletionList(items, isIncomplete: false));

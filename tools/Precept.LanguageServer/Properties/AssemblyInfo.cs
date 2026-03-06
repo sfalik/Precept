@@ -1,3 +1,3 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("StateMachine.Dsl.LanguageServer.Tests")]
+[assembly: InternalsVisibleTo("Precept.LanguageServer.Tests")]

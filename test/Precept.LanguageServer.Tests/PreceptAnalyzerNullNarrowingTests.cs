@@ -224,7 +224,7 @@ public class PreceptAnalyzerNullNarrowingTests
 
     private static Diagnostic[] Analyze(string text)
     {
-        var analyzer = new SmDslAnalyzer();
+        var analyzer = new PreceptAnalyzer();
         var uri = DocumentUri.From($"file:///tmp/{Guid.NewGuid():N}.precept");
         analyzer.SetDocumentText(uri, text);
         return analyzer.GetDiagnostics(uri).ToArray();

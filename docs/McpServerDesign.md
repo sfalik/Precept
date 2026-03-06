@@ -68,7 +68,7 @@ Transport: **stdio** (default for local MCP servers launched by VS Code).
 }
 ```
 
-**Implementation:** `PreceptParser.Parse(text)` + `PreceptCompiler.Compile(model)`. Catches `InvalidOperationException` / `ArgumentException` thrown by the compiler and maps them to diagnostics using the existing `LineErrorRegex` already present in `SmDslAnalyzer`.
+**Implementation:** `PreceptParser.Parse(text)` + `PreceptCompiler.Compile(model)`. Catches `InvalidOperationException` / `ArgumentException` thrown by the compiler and maps them to diagnostics using the existing `LineErrorRegex` already present in `PreceptAnalyzer`.
 
 ---
 

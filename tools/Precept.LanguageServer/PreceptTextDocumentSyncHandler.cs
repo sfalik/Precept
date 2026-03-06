@@ -8,21 +8,21 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 
 namespace Precept.LanguageServer;
 
-internal sealed class SmTextDocumentSyncHandler : TextDocumentSyncHandlerBase
+internal sealed class PreceptTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 {
-    internal static readonly SmDslAnalyzer SharedAnalyzer = new();
+    internal static readonly PreceptAnalyzer SharedAnalyzer = new();
 
     private static readonly TextDocumentSelector Selector = TextDocumentSelector.ForPattern("**/*.precept");
 
     private readonly ILanguageServerFacade _router;
 
-    public SmTextDocumentSyncHandler(ILanguageServerFacade router)
+    public PreceptTextDocumentSyncHandler(ILanguageServerFacade router)
     {
         _router = router;
     }
 
     public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri uri)
-        => new(uri, "sm");
+        => new(uri, "precept");
 
     public override Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
     {

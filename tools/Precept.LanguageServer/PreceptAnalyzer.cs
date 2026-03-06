@@ -7,7 +7,7 @@ using Precept;
 
 namespace Precept.LanguageServer;
 
-internal sealed class SmDslAnalyzer
+internal sealed class PreceptAnalyzer
 {
     private static readonly Regex LineErrorRegex = new("^Line\\s+(?<line>\\d+)\\s*:\\s*(?<message>.+)$", RegexOptions.Compiled);
     private static readonly Regex StateRegex = new("^\\s*state\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
@@ -18,6 +18,15 @@ internal sealed class SmDslAnalyzer
     private static readonly Regex EventMemberPrefixRegex = new("(?<event>[A-Za-z_][A-Za-z0-9_]*)\\.$", RegexOptions.Compiled);
     private static readonly Regex SetLineRegex = new("^\\s*set\\s+(?<key>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<expr>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex CollectionDeclRegex = new("^\\s*(?:set|queue|stack)<(?:number|string|boolean)>\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    // ── New-syntax regex patterns ──────────────────────────────────────
+    // Match `field Name as string|number|boolean` (scalar fields in new syntax)
+    private static readonly Regex NewFieldDeclRegex = new("^\\s*field\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?:string|number|boolean)(?:\\s|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    // Match `field Name as set|queue|stack of type` (collection fields in new syntax)
+    private static readonly Regex NewCollectionFieldRegex = new("^\\s*field\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?:set|queue|stack)\\s+of\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    // Match `event Name with ...` (inline event args in new syntax)
+    private static readonly Regex NewEventWithArgsRegex = new("^\\s*event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+with\\s+(?<args>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     private static readonly MethodInfo? ExpressionParseMethod = typeof(PreceptDefinition).Assembly
         .GetType("Precept.PreceptLegacyExpressionParser", throwOnError: false)
         ?.GetMethod(
@@ -45,9 +54,32 @@ internal sealed class SmDslAnalyzer
 
         var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
 
+        // Use ParseWithDiagnostics for structured error reporting with position info
+        var (model, parseDiags) = PreceptParser.ParseWithDiagnostics(text);
+
+        if (parseDiags.Count > 0)
+        {
+            return parseDiags.Select(d =>
+            {
+                var lineIndex = Math.Max(0, d.Line - 1);
+                var lineLength = lineIndex < lines.Length ? lines[lineIndex].Length : 1;
+                return new Diagnostic
+                {
+                    Severity = DiagnosticSeverity.Error,
+                    Message = d.Message,
+                    Source = "precept",
+                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                        new Position(lineIndex, d.Column),
+                        new Position(lineIndex, Math.Max(d.Column + 1, lineLength)))
+                };
+            }).ToArray();
+        }
+
+        if (model is null)
+            return Array.Empty<Diagnostic>();
+
         try
         {
-            var model = PreceptParser.Parse(text);
             PreceptCompiler.Compile(model);
 
             var diagnostics = GetSemanticDiagnostics(model, lines);
@@ -77,7 +109,7 @@ internal sealed class SmDslAnalyzer
         var states = CollectIdentifiers(text, StateRegex);
         var events = CollectIdentifiers(text, EventRegex);
         var dataFields = CollectTopLevelDataFields(lines);
-        var collectionFields = CollectIdentifiers(text, CollectionDeclRegex);
+        var collectionFields = CollectAllCollectionFields(text, lines);
         var eventArgs = CollectEventArgs(lines);
         var currentEvent = FindCurrentEventName(lines, (int)position.Line);
 
@@ -153,9 +185,13 @@ internal sealed class SmDslAnalyzer
         if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+\\S+\\s+on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+when\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return BuildGuardCompletions(dataFields, collectionFields, currentEvent, eventArgs);
 
-        // After "from <State> on <Event> " (trailing space, nothing else), suggest "when"
+        // After "from <State> on <Event> " (trailing space, nothing else), suggest "when" and "->"
         if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+\\S+\\s+on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
-            return [new CompletionItem { Label = "when", Kind = CompletionItemKind.Keyword }];
+            return
+            [
+                new CompletionItem { Label = "when", Kind = CompletionItemKind.Keyword },
+                new CompletionItem { Label = "->", Kind = CompletionItemKind.Operator, Detail = "action/outcome pipeline" }
+            ];
 
         if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+[^\\n]*\\s+on(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
             return BuildItems(events, CompletionItemKind.Event);
@@ -167,9 +203,91 @@ internal sealed class SmDslAnalyzer
             return stateItems.Concat(KeywordItems.Where(item => item.Label == "on")).ToArray();
         }
 
+        // ── New-syntax: field declarations ──
+        // After "field Name as set|queue|stack of " → suggest scalar types
+        if (Regex.IsMatch(beforeCursor, "^\\s*field\\s+[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:set|queue|stack)\\s+of\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+            return ScalarTypeItems;
+
+        // After "field Name as " → suggest type keywords (string, number, boolean, set, queue, stack)
+        if (Regex.IsMatch(beforeCursor, "^\\s*field\\s+[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+            return TypeItems;
+
+        // After "field " (no "as" yet) → user is typing a field name, no suggestions
+        // Falls through to global keywords below
+
+        // ── New-syntax: invariant/assert expressions ──
+        // After "invariant " → suggest expression completions (field names, operators)
+        if (Regex.IsMatch(beforeCursor, "^\\s*invariant\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+            return DistinctAndSort(BuildGuardCompletions(dataFields, collectionFields, currentEvent, eventArgs));
+
+        // After "on EventName assert " → suggest expression completions (event args)
+        if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+assert\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+        {
+            var eventName = Regex.Match(beforeCursor, "^\\s*on\\s+(?<evt>[A-Za-z_][A-Za-z0-9_]*)").Groups["evt"].Value;
+            return BuildGuardCompletions(dataFields, collectionFields, eventName, eventArgs);
+        }
+
+        // After "on EventName " → suggest "assert"
+        if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
+            return [new CompletionItem { Label = "assert", Kind = CompletionItemKind.Keyword }];
+
+        // After "in/to StateName " → suggest assert, ->, edit (in only)
+        if (Regex.IsMatch(beforeCursor, "^\\s*in\\s+[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*\\s+$", RegexOptions.IgnoreCase))
+            return
+            [
+                new CompletionItem { Label = "assert", Kind = CompletionItemKind.Keyword },
+                new CompletionItem { Label = "edit", Kind = CompletionItemKind.Keyword },
+                new CompletionItem { Label = "->", Kind = CompletionItemKind.Operator, Detail = "action chain" }
+            ];
+
+        if (Regex.IsMatch(beforeCursor, "^\\s*to\\s+[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*\\s+$", RegexOptions.IgnoreCase))
+            return
+            [
+                new CompletionItem { Label = "assert", Kind = CompletionItemKind.Keyword },
+                new CompletionItem { Label = "->", Kind = CompletionItemKind.Operator, Detail = "action chain" }
+            ];
+
+        // After "in/to/from State assert " → expression completions
+        if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to|from)\\s+[^\\n]*\\s+assert\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+            return DistinctAndSort(BuildGuardCompletions(dataFields, collectionFields, currentEvent, eventArgs));
+
+        // After "because " → suggest string template
+        if (Regex.IsMatch(beforeCursor, "\\bbecause\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+            return [SnippetItem("because reason", "because \"${1:Reason}\"", "Constraint reason")];
+
+        // After "in State edit " → suggest field names
+        if (Regex.IsMatch(beforeCursor, "^\\s*in\\s+[^\\n]*\\s+edit\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+            return BuildItems(dataFields, CompletionItemKind.Field);
+
+        // After "event Name with ArgName as " → suggest type keywords
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+.*\\bas\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+            return ScalarTypeItems;
+
+        // After "event Name with " → user is typing arg name, no suggestions
+        // After "event Name " → suggest "with"
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
+            return
+            [
+                new CompletionItem { Label = "with", Kind = CompletionItemKind.Keyword },
+                new CompletionItem { Label = "initial", Kind = CompletionItemKind.Keyword }
+            ];
+
+        // After "of " → suggest scalar types (for collection type declarations)
+        if (Regex.IsMatch(beforeCursor, "\\bof\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+            return ScalarTypeItems;
+
+        // ── New-syntax: arrow pipeline ──
+        // After "-> " → suggest action/outcome keywords
+        if (beforeCursor.TrimEnd().EndsWith("->", StringComparison.Ordinal) ||
+            Regex.IsMatch(beforeCursor, "->\\s+$"))
+            return ArrowItems;
+
         // After "state <Name> ", suggest the "initial" keyword
         if (Regex.IsMatch(beforeCursor, "^\\s*state\\s+[A-Za-z_][A-Za-z0-9_]*\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return [new CompletionItem { Label = "initial", Kind = CompletionItemKind.Keyword }];
+
+        // After "event Name with ArgName as " is handled above in new-syntax section
+        // After "event Name " → suggest "with" is handled above in new-syntax section
 
         if (Regex.IsMatch(beforeCursor, "^\\s*transition(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
             return DistinctAndSort(BuildItems(states, CompletionItemKind.EnumMember).Concat(TransitionSnippetItems));
@@ -272,6 +390,15 @@ internal sealed class SmDslAnalyzer
 
             inEventArgs = false;
 
+            // New syntax: field Name as string|number|boolean (scalar only, not collection)
+            var newFieldMatch = NewFieldDeclRegex.Match(raw);
+            if (newFieldMatch.Success)
+            {
+                fields.Add(newFieldMatch.Groups["name"].Value);
+                continue;
+            }
+
+            // Old syntax: string? Name [= value]
             var match = DataFieldRegex.Match(raw);
             if (match.Success)
                 fields.Add(match.Groups["name"].Value);
@@ -301,6 +428,25 @@ internal sealed class SmDslAnalyzer
             if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("#", StringComparison.Ordinal))
                 continue;
 
+            // New syntax: event Name with ArgName as type, ArgName2 as type
+            var newEventWithMatch = NewEventWithArgsRegex.Match(raw);
+            if (newEventWithMatch.Success)
+            {
+                FlushCurrentEvent();
+                currentEvent = newEventWithMatch.Groups["name"].Value;
+                currentArgs = new List<string>();
+                inEvent = true;
+
+                // Parse inline args: "Count as number, Reason as string"
+                var argsText = newEventWithMatch.Groups["args"].Value;
+                foreach (Match argMatch in Regex.Matches(argsText, "\\b(?<argName>[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+", RegexOptions.IgnoreCase))
+                    currentArgs.Add(argMatch.Groups["argName"].Value);
+
+                FlushCurrentEvent();
+                inEvent = false;
+                continue;
+            }
+
             var eventMatch = EventRegex.Match(raw);
             if (eventMatch.Success)
             {
@@ -325,9 +471,9 @@ internal sealed class SmDslAnalyzer
                 continue;
             }
 
-            var argMatch = EventArgRegex.Match(raw);
-            if (argMatch.Success)
-                currentArgs.Add(argMatch.Groups["name"].Value);
+            var argMatch2 = EventArgRegex.Match(raw);
+            if (argMatch2.Success)
+                currentArgs.Add(argMatch2.Groups["name"].Value);
         }
 
         FlushCurrentEvent();
@@ -345,6 +491,29 @@ internal sealed class SmDslAnalyzer
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Collects collection field names from both old syntax (set&lt;T&gt; Name)
+    /// and new syntax (field Name as set of T).
+    /// </summary>
+    private static IReadOnlyList<string> CollectAllCollectionFields(string text, string[] lines)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+
+        // Old syntax: set<T> Name, queue<T> Name, stack<T> Name
+        foreach (var name in CollectIdentifiers(text, CollectionDeclRegex))
+            names.Add(name);
+
+        // New syntax: field Name as set|queue|stack of T
+        foreach (var line in lines)
+        {
+            var match = NewCollectionFieldRegex.Match(line);
+            if (match.Success)
+                names.Add(match.Groups["name"].Value);
+        }
+
+        return names.OrderBy(x => x, StringComparer.Ordinal).ToArray();
     }
 
     private static IReadOnlyList<CompletionItem> DistinctAndSort(IEnumerable<CompletionItem> items)
@@ -478,7 +647,7 @@ internal sealed class SmDslAnalyzer
             {
                 Severity = DiagnosticSeverity.Hint,
                 Message = "Precept has no events declared. It cannot respond to any input.",
-                Source = "state-machine-dsl",
+                Source = "precept",
                 Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
                     new Position(machineLine, 0),
                     new Position(machineLine, Math.Max(1, lineLength)))
@@ -605,7 +774,7 @@ internal sealed class SmDslAnalyzer
                     {
                         Severity = DiagnosticSeverity.Warning,
                         Message = $"State '{state.Name}' has entry rules but no transition targets it — entry rules are never checked.",
-                        Source = "state-machine-dsl",
+                        Source = "precept",
                         Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
                             new Position(stateLineIdx, 0),
                             new Position(stateLineIdx, Math.Max(1, lineLen)))
@@ -1224,7 +1393,7 @@ internal sealed class SmDslAnalyzer
         {
             Severity = DiagnosticSeverity.Error,
             Message = message,
-            Source = "state-machine-dsl",
+            Source = "precept",
             Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
                 new Position(safeLineIndex, 0),
                 new Position(safeLineIndex, Math.Max(1, lineLength)))
@@ -1302,7 +1471,7 @@ internal sealed class SmDslAnalyzer
             {
                 Severity = DiagnosticSeverity.Error,
                 Message = match.Groups["message"].Value,
-                Source = "state-machine-dsl",
+                Source = "precept",
                 Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
                     new Position(lineIndex, 0),
                     new Position(lineIndex, Math.Max(1, lineLength)))
@@ -1313,7 +1482,7 @@ internal sealed class SmDslAnalyzer
         {
             Severity = DiagnosticSeverity.Error,
             Message = message,
-            Source = "state-machine-dsl",
+            Source = "precept",
             Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
                 new Position(0, 0),
                 new Position(0, 1))
@@ -1333,32 +1502,33 @@ internal sealed class SmDslAnalyzer
 
     private static readonly IReadOnlyList<CompletionItem> KeywordItems =
     [
+        // Declarations
         new CompletionItem { Label = "precept", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "field", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "as", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "nullable", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "default", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "invariant", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "because", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "state", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "initial", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "event", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "with", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "assert", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "edit", Kind = CompletionItemKind.Keyword },
+        // Control
+        new CompletionItem { Label = "in", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "to", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "from", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "on", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "when", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "any", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "of", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "if", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "else if", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "else", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "transition", Kind = CompletionItemKind.Keyword },
+        // Actions
         new CompletionItem { Label = "set", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "reject", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "no transition", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "string", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "number", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "boolean", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "null", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "set<number>", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "set<string>", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "set<boolean>", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "queue<number>", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "queue<string>", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "queue<boolean>", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "stack<number>", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "stack<string>", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "stack<boolean>", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "add", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "remove", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "enqueue", Kind = CompletionItemKind.Keyword },
@@ -1366,13 +1536,21 @@ internal sealed class SmDslAnalyzer
         new CompletionItem { Label = "push", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "pop", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "clear", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "contains", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "into", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "above", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "below", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "reason", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "rule", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "when", Kind = CompletionItemKind.Keyword }
+        // Outcomes
+        new CompletionItem { Label = "transition", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "no transition", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "reject", Kind = CompletionItemKind.Keyword },
+        // Types
+        new CompletionItem { Label = "string", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "number", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "boolean", Kind = CompletionItemKind.Keyword },
+        // Literals
+        new CompletionItem { Label = "null", Kind = CompletionItemKind.Keyword },
+        // Operators
+        new CompletionItem { Label = "contains", Kind = CompletionItemKind.Keyword },
+        // Legacy (block-syntax) support
+        new CompletionItem { Label = "rule", Kind = CompletionItemKind.Keyword }
     ];
 
     private static readonly IReadOnlyList<CompletionItem> ExpressionOperatorItems =
@@ -1403,10 +1581,12 @@ internal sealed class SmDslAnalyzer
 
     private static readonly IReadOnlyList<CompletionItem> GlobalSnippetItems =
     [
-        SnippetItem("from/on block", "from ${1:any} on ${2:Event}\n  ${3:transition ${4:State}}", "DSL block"),
-        SnippetItem("if transition", "if ${1:condition}\n  transition ${2:State}", "Guard branch"),
-        SnippetItem("else if transition", "else if ${1:condition}\n  transition ${2:State}", "Guard branch"),
-        SnippetItem("else reject", "else\n  reject \"${1:Reason}\"", "Fallback branch")
+        SnippetItem("from/on row", "from ${1:any} on ${2:Event} -> ${3:transition ${4:State}}", "Transition row"),
+        SnippetItem("from/on with when", "from ${1:any} on ${2:Event} when ${3:guard} -> ${4:transition ${5:State}}", "Guarded transition row"),
+        SnippetItem("from/on with set", "from ${1:any} on ${2:Event} -> set ${3:Field} = ${4:value} -> transition ${5:State}", "Row with data assignment"),
+        SnippetItem("field declaration", "field ${1:Name} as ${2:string}", "Field declaration"),
+        SnippetItem("invariant", "invariant ${1:Expr} because \"${2:Reason}\"", "Global invariant"),
+        SnippetItem("event with args", "event ${1:Name} with ${2:Arg} as ${3:string}", "Event with arguments")
     ];
 
     private static readonly IReadOnlyList<CompletionItem> GuardSnippetItems =
@@ -1414,7 +1594,8 @@ internal sealed class SmDslAnalyzer
         SnippetItem("if ... transition", "if ${1:condition}\n  transition ${2:State}", "Guard branch"),
         SnippetItem("if ... no transition", "if ${1:condition}\n  no transition", "Guard branch"),
         SnippetItem("else if ... transition", "else if ${1:condition}\n  transition ${2:State}", "Guard branch"),
-        SnippetItem("else ... reject", "else\n  reject \"${1:Reason}\"", "Fallback branch")
+        SnippetItem("else ... reject", "else\n  reject \"${1:Reason}\"", "Fallback branch"),
+        SnippetItem("when guard row", "when ${1:guard} -> ${2:transition ${3:State}}", "Guarded row")
     ];
 
     private static readonly IReadOnlyList<CompletionItem> SetSnippetItems =
@@ -1427,6 +1608,44 @@ internal sealed class SmDslAnalyzer
         SnippetItem("transition state", "transition ${1:State}", "Transition"),
         SnippetItem("no transition", "no transition", "Terminal outcome"),
         SnippetItem("reject reason", "reject \"${1:Reason}\"", "Terminal outcome")
+    ];
+
+    // ── New-syntax item lists ──────────────────────────────────────────
+
+    /// <summary>Scalar type keywords for positions after "as" / "of" / event arg type.</summary>
+    private static readonly IReadOnlyList<CompletionItem> ScalarTypeItems =
+    [
+        new CompletionItem { Label = "string", Kind = CompletionItemKind.TypeParameter },
+        new CompletionItem { Label = "number", Kind = CompletionItemKind.TypeParameter },
+        new CompletionItem { Label = "boolean", Kind = CompletionItemKind.TypeParameter }
+    ];
+
+    /// <summary>All type keywords for positions after "field Name as" (scalar + collection).</summary>
+    private static readonly IReadOnlyList<CompletionItem> TypeItems =
+    [
+        new CompletionItem { Label = "string", Kind = CompletionItemKind.TypeParameter },
+        new CompletionItem { Label = "number", Kind = CompletionItemKind.TypeParameter },
+        new CompletionItem { Label = "boolean", Kind = CompletionItemKind.TypeParameter },
+        new CompletionItem { Label = "set", Kind = CompletionItemKind.TypeParameter, Detail = "Sorted unique set" },
+        new CompletionItem { Label = "queue", Kind = CompletionItemKind.TypeParameter, Detail = "FIFO ordered" },
+        new CompletionItem { Label = "stack", Kind = CompletionItemKind.TypeParameter, Detail = "LIFO ordered" },
+        new CompletionItem { Label = "nullable", Kind = CompletionItemKind.Keyword, Detail = "Makes field nullable" }
+    ];
+
+    /// <summary>Action/outcome keywords available after "->" in flat transition rows.</summary>
+    private static readonly IReadOnlyList<CompletionItem> ArrowItems =
+    [
+        new CompletionItem { Label = "set", Kind = CompletionItemKind.Keyword, Detail = "Data assignment" },
+        new CompletionItem { Label = "transition", Kind = CompletionItemKind.Keyword, Detail = "Transition to state" },
+        new CompletionItem { Label = "no transition", Kind = CompletionItemKind.Keyword, Detail = "Stay in current state" },
+        new CompletionItem { Label = "reject", Kind = CompletionItemKind.Keyword, Detail = "Reject event" },
+        new CompletionItem { Label = "add", Kind = CompletionItemKind.Keyword, Detail = "Add to set" },
+        new CompletionItem { Label = "remove", Kind = CompletionItemKind.Keyword, Detail = "Remove from set" },
+        new CompletionItem { Label = "enqueue", Kind = CompletionItemKind.Keyword, Detail = "Enqueue to queue" },
+        new CompletionItem { Label = "dequeue", Kind = CompletionItemKind.Keyword, Detail = "Dequeue from queue" },
+        new CompletionItem { Label = "push", Kind = CompletionItemKind.Keyword, Detail = "Push onto stack" },
+        new CompletionItem { Label = "pop", Kind = CompletionItemKind.Keyword, Detail = "Pop from stack" },
+        new CompletionItem { Label = "clear", Kind = CompletionItemKind.Keyword, Detail = "Clear collection" }
     ];
 
     private static CompletionItem SnippetItem(string label, string snippet, string detail)

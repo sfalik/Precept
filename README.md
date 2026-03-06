@@ -87,7 +87,7 @@ The two paths coexist safely because rules (declarative invariants like `rule Ba
 - **Language-server null-flow diagnostics** perform both intra-expression narrowing (`&&`/`||`/`!` within a single guard) and cross-branch narrowing: when guarded branches form an `if`/`else if`/`else` chain, prior guard negations are accumulated so later branches see a progressively narrowed type environment (e.g. after `if X == null → no transition`, the `else if` and `else` branches see `X` as non-nullable). Collection mutation value expressions (`add`, `enqueue`, `push`) are type-checked against the collection's inner type with the same narrowed symbols as `set` assignments; `dequeue`/`pop into` target types are validated against the collection's inner type.
 - **Rules** (`rule <Expr> "<Reason>"`) are implemented across all four attachment positions — field, top-level, state, and event. Field rules guard a single field's invariant; top-level rules express cross-field constraints; state rules enforce entry contracts when transitioning into a state (including self-transitions); event rules validate event arguments before guard evaluation. Compile-time checks catch literal-value violations and empty-initial-state rule failures. Runtime enforcement runs after `Fire` commits all `set` assignments and collection mutations; `Inspect` simulates rule evaluation read-only. See [docs/RulesDesign.md](docs/RulesDesign.md) for the full design.
 - **`when` precondition on `from ... on ...` blocks**: `from <State> on <Event> when <Expr>` is fully implemented across parser, runtime, language-server diagnostics (with null narrowing within the block scope), completions, syntax highlighting, and the inspector preview. When the `when` predicate is `false` the entire block is skipped with outcome `NotApplicable`; this is distinct from `Rejected` and does not foreclose handling by another block for the same event. In the inspector preview, events whose current live outcome is `NotApplicable` are hidden from the event dock entirely (they remain inspectable and re-appear if the `when` condition becomes true again).
-- **Preview panel rules awareness**: the inspector preview panel now surfaces rule information in the data overlay. Active rule violations on the current instance are displayed in an amber banner above the data table. Fields that carry `rule` declarations show a ⚠ icon with a tooltip containing the rule expression and reason. States that have entry rules show a badge indicating how many state rules apply on entry. When a fire is rejected by multiple rules simultaneously, all failure reasons are listed in the error feedback. `SmPreviewSnapshot` now carries `ActiveRuleViolations` (null when none) and `RuleDefinitions` (null when the machine has no rules). `SmPreviewResponse` now carries `Errors` (full list of all fire failure reasons) alongside the existing `Error` (first reason, kept for backward compatibility).
+- **Preview panel rules awareness**: the inspector preview panel now surfaces rule information in the data overlay. Active rule violations on the current instance are displayed in an amber banner above the data table. Fields that carry `rule` declarations show a ⚠ icon with a tooltip containing the rule expression and reason. States that have entry rules show a badge indicating how many state rules apply on entry. When a fire is rejected by multiple rules simultaneously, all failure reasons are listed in the error feedback. `PreceptPreviewSnapshot` now carries `ActiveRuleViolations` (null when none) and `RuleDefinitions` (null when the machine has no rules). `PreceptPreviewResponse` now carries `Errors` (full list of all fire failure reasons) alongside the existing `Error` (first reason, kept for backward compatibility).
 
 ## Quick Start (2 minutes)
 
@@ -885,7 +885,7 @@ Local package (no publishing/CI):
 ```sh
 cd tools/Precept.VsCode
 npm run package:local
-code --install-extension .\state-machine-dsl-vscode-0.0.1.vsix
+code --install-extension .\precept-vscode-0.0.1.vsix
 ```
 
 One-command local update loop (package + install):
@@ -934,7 +934,7 @@ Run/debug in VS Code:
 - Preview webview accepts both camelCase and PascalCase snapshot payload keys for robust host/runtime compatibility.
 - `Reload` requests a fresh live snapshot (with a short retry) from the current in-memory editor buffer; it does not require saving first.
 - Preview event actions (`fire`, `reset`, `replay`) are executed via the language server runtime session for that file.
-- The language server binds preview requests with a typed JSON-RPC request handler and declares `[Method("precept/preview/request")]` on `SmPreviewRequest` to ensure runtime method registration.
+- The language server binds preview requests with a typed JSON-RPC request handler and declares `[Method("precept/preview/request")]` on `PreceptPreviewRequest` to ensure runtime method registration.
 
 Troubleshooting completion/diagnostics:
 
@@ -979,7 +979,7 @@ Implemented now:
 - Atomic ordered multi-set execution is implemented on fire-path updates with read-your-writes and all-or-nothing commit semantics.
 - Active test coverage in `test/Precept.Tests/DslWorkflowTests.cs`
 - Active parser/runtime coverage also includes expression AST parsing/edge-case diagnostics, set parsing coverage, and runtime evaluator operator/short-circuit behavior in `test/Precept.Tests/DslExpressionParserTests.cs`, `test/Precept.Tests/DslExpressionParserEdgeCaseTests.cs`, `test/Precept.Tests/DslSetParsingTests.cs`, and `test/Precept.Tests/DslExpressionRuntimeEvaluatorBehaviorTests.cs`.
-- Language-server analyzer coverage now includes null-flow narrowing diagnostics tests in `test/Precept.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs`.
+- Language-server analyzer coverage now includes null-flow narrowing diagnostics tests in `test/Precept.LanguageServer.Tests/PreceptAnalyzerNullNarrowingTests.cs`.
 - Language server MVP in `tools/Precept.LanguageServer` (stdio diagnostics + completion)
 - Language server MVP in `tools/Precept.LanguageServer` (stdio diagnostics + completion + semantic tokens)
 - Language server semantic diagnostics now validate expression operator/type compatibility, set-target type compatibility, and null-flow narrowing for explicit null checks in `&&`/`||` guard paths.

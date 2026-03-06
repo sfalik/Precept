@@ -278,33 +278,33 @@ private enum TransitionResolutionKind
 
 ### 4. Language Server
 
-#### `SmDslAnalyzer.cs`
+#### `PreceptAnalyzer.cs`
 
 - **`FromOnRegex`** must match the `when` clause.
 - **`GetSemanticDiagnostics`**: The unified candidate list must carry the `WhenGuardExpression`. Validate `when` expressions (type-check: must be boolean, scope-check: no event args).
 - **`GetCompletions`**: After `on EventName` and space, suggest `when` as a keyword. After `when`, provide expression completions (data fields, operators) — same as guard completions but without event arg suggestions.
 - **Snippet**: Update the `from/on block` snippet to include optional `when`.
 
-#### `SmSemanticTokensHandler.cs`
+#### `PreceptSemanticTokensHandler.cs`
 
 - **`FromOnRegex`** must capture the `when` keyword and the guard expression.
 - **`HighlightNamedSymbols`**: When the `when` group matches, push `when` as a keyword token and highlight identifiers in the guard expression as variables.
 - **`KeywordTokens`**: Add `"when"`.
 
-#### `SmPreviewHandler.cs`
+#### `PreceptPreviewHandler.cs`
 
 - **`BuildSnapshot`**: The event status mapping must handle the new `NotApplicable` outcome:
-  - Map `DslOutcomeKind.NotApplicable` → `"notApplicable"` in the `SmPreviewEventStatus.Outcome` string.
+  - Map `DslOutcomeKind.NotApplicable` → `"notApplicable"` in the `PreceptPreviewEventStatus.Outcome` string.
 - **`HandleInspect`**: Same mapping.
 - **Event enumeration**: Continue to list events whose `from` blocks exist for the current state, even if `when` evaluates to false — the event is structurally defined, just not currently applicable.
 
-#### `SmPreviewProtocol.cs`
+#### `PreceptPreviewProtocol.cs`
 
-- **`SmPreviewEventStatus.Outcome`** string gains the `"notApplicable"` value.
+- **`PreceptPreviewEventStatus.Outcome`** string gains the `"notApplicable"` value.
 
 ### 5. VS Code Extension
 
-#### TextMate Grammar — `state-machine-dsl.tmLanguage.json`
+#### TextMate Grammar — `precept.tmLanguage.json`
 
 The `fromOnHeader` pattern must be extended to match the optional `when <guard>`:
 
@@ -312,7 +312,7 @@ Current pattern captures: `from <state> on <event>`
 New pattern captures: `from <state> on <event>` optionally followed by `when <guard>`
 
 New capture groups:
-- `when` keyword → `keyword.control.state-machine-dsl`
+- `when` keyword → `keyword.control.precept`
 - guard expression text → can remain unhighlighted at the TextMate level (semantic tokens handle the fine-grained highlighting)
 
 #### Inspector Preview Webview — `inspector-preview.html`
@@ -393,11 +393,11 @@ Where `<Guard>` follows the same expression grammar as `if` guards, with the res
 | `PreceptModel.cs` | Low | Add optional field to 2 records, extend 1 enum, extend 3 result records |
 | `PreceptParser.cs` | Medium | Extend regex, extract/validate `when` expression, scope validation |
 | `PreceptRuntime.cs` | Medium | Pre-filter logic in `ResolveTransition`, new outcome mapping in Inspect/Fire |
-| `SmDslAnalyzer.cs` | Medium | Regex update, `when` diagnostics, completions, scope validation |
-| `SmSemanticTokensHandler.cs` | Low | Regex update, keyword addition, expression highlighting |
+| `PreceptAnalyzer.cs` | Medium | Regex update, `when` diagnostics, completions, scope validation |
+| `PreceptSemanticTokensHandler.cs` | Low | Regex update, keyword addition, expression highlighting |
 | `precept.tmLanguage.json` | Low | Extend `fromOnHeader` pattern |
-| `SmPreviewHandler.cs` | Low | Map new outcome string |
-| `SmPreviewProtocol.cs` | Low | Document new outcome value |
+| `PreceptPreviewHandler.cs` | Low | Map new outcome string |
+| `PreceptPreviewProtocol.cs` | Low | Document new outcome value |
 | `inspector-preview.html` | Medium | New status styling, behavior, glyph, diagram edge rendering |
 | Tests | High | Parser, runtime, inspect, fire, rules interaction, preview |
 | `README.md` | Medium | Syntax reference, cookbook, behavior/exception table |
@@ -450,16 +450,16 @@ Con: Tooling cannot distinguish "event doesn't exist in this state" from "event 
 | [src/Precept/Dsl/PreceptRuntime.cs](../src/Precept/Dsl/PreceptRuntime.cs) | Evaluate `when` preconditions and return `NotApplicable` when false. |
 | [src/Precept/Dsl/PreceptExpressionParser.cs](../src/Precept/Dsl/PreceptExpressionParser.cs) | No change — `when` expressions use the existing expression grammar. |
 | [src/Precept/Dsl/PreceptExpressionEvaluator.cs](../src/Precept/Dsl/PreceptExpressionEvaluator.cs) | No change — `when` expressions evaluate through the existing evaluator. |
-| [tools/Precept.LanguageServer/SmDslAnalyzer.cs](../tools/Precept.LanguageServer/SmDslAnalyzer.cs) | Extend `FromOnRegex`. Add `when` diagnostics (boolean type, scope). Add `when` keyword to completions. Update `from/on` snippet. Add expression completions after `when`. |
-| [tools/Precept.LanguageServer/SmSemanticTokensHandler.cs](../tools/Precept.LanguageServer/SmSemanticTokensHandler.cs) | Extend `FromOnRegex`. Add `when` to `KeywordTokens`. Highlight `when` expression identifiers. |
-| [tools/Precept.LanguageServer/SmPreviewHandler.cs](../tools/Precept.LanguageServer/SmPreviewHandler.cs) | Map `NotApplicable` → `"notApplicable"` in snapshot builder. |
-| [tools/Precept.LanguageServer/SmPreviewProtocol.cs](../tools/Precept.LanguageServer/SmPreviewProtocol.cs) | Document new `"notApplicable"` outcome value. |
+| [tools/Precept.LanguageServer/PreceptAnalyzer.cs](../tools/Precept.LanguageServer/PreceptAnalyzer.cs) | Extend `FromOnRegex`. Add `when` diagnostics (boolean type, scope). Add `when` keyword to completions. Update `from/on` snippet. Add expression completions after `when`. |
+| [tools/Precept.LanguageServer/PreceptSemanticTokensHandler.cs](../tools/Precept.LanguageServer/PreceptSemanticTokensHandler.cs) | Extend `FromOnRegex`. Add `when` to `KeywordTokens`. Highlight `when` expression identifiers. |
+| [tools/Precept.LanguageServer/PreceptPreviewHandler.cs](../tools/Precept.LanguageServer/PreceptPreviewHandler.cs) | Map `NotApplicable` → `"notApplicable"` in snapshot builder. |
+| [tools/Precept.LanguageServer/PreceptPreviewProtocol.cs](../tools/Precept.LanguageServer/PreceptPreviewProtocol.cs) | Document new `"notApplicable"` outcome value. |
 | [tools/Precept.VsCode/syntaxes/precept.tmLanguage.json](../tools/Precept.VsCode/syntaxes/precept.tmLanguage.json) | Extend `fromOnHeader` pattern to match `when <guard>`. Add `when` to control keywords. |
 | [tools/Precept.VsCode/webview/inspector-preview.html](../tools/Precept.VsCode/webview/inspector-preview.html) | Handle `"notApplicable"` status: UI behavior (non-clickable, show reason), optional diagram edge styling. |
 | [test/Precept.Tests/DslWorkflowTests.cs](../test/Precept.Tests/DslWorkflowTests.cs) | Add tests: `when` parsing, inspect/fire with `when` true/false, multiple blocks with/without `when`, `when` + `from any`, `from any` with mixed `when`. |
 | [test/Precept.Tests/DslSetParsingTests.cs](../test/Precept.Tests/DslSetParsingTests.cs) | Add parsing tests for `when` expression extraction, error cases (event arg refs in `when`). |
-| [test/Precept.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs](../test/Precept.LanguageServer.Tests/SmDslAnalyzerNullNarrowingTests.cs) | Add tests: `when` null narrowing interaction with inner guards. |
-| [test/Precept.LanguageServer.Tests/SmPreviewRulesTests.cs](../test/Precept.LanguageServer.Tests/SmPreviewRulesTests.cs) | Add tests: preview snapshot with `when`-suppressed events. |
+| [test/Precept.LanguageServer.Tests/PreceptAnalyzerNullNarrowingTests.cs](../test/Precept.LanguageServer.Tests/PreceptAnalyzerNullNarrowingTests.cs) | Add tests: `when` null narrowing interaction with inner guards. |
+| [test/Precept.LanguageServer.Tests/PreceptPreviewRulesTests.cs](../test/Precept.LanguageServer.Tests/PreceptPreviewRulesTests.cs) | Add tests: preview snapshot with `when`-suppressed events. |
 | [README.md](../README.md) | Update DSL Syntax Reference, DSL Cookbook, behavior/exception table, current-status. |
 | [docs/DesignNotes.md](../docs/DesignNotes.md) | Update DSL Syntax Contract with `when` clause. Add design decision record. |
 | [samples/bank-loan.precept](../samples/bank-loan.precept) | Refactor `VerifyCollateral` (and potentially `Approve`, `Disburse`) to use `when`. |

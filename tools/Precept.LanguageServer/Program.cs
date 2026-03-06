@@ -11,10 +11,10 @@ internal static class Program
             options
                 .WithInput(Console.OpenStandardInput())
                 .WithOutput(Console.OpenStandardOutput())
-                .WithHandler<SmTextDocumentSyncHandler>()
-                .WithHandler<SmCompletionHandler>()
-                .WithHandler<SmSemanticTokensHandler>()
-                .WithHandler<SmPreviewHandler>();
+                .WithHandler<PreceptTextDocumentSyncHandler>()
+                .WithHandler<PreceptCompletionHandler>()
+                .WithHandler<PreceptSemanticTokensHandler>()
+                .WithHandler<PreceptPreviewHandler>();
         });
 
         await server.WaitForExit;

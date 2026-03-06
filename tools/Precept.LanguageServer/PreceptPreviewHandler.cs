@@ -6,16 +6,16 @@ using System.Collections.Concurrent;
 
 namespace Precept.LanguageServer;
 
-internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest, SmPreviewResponse>
+internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPreviewRequest, PreceptPreviewResponse>
 {
     private static readonly ConcurrentDictionary<string, PreviewSession> Sessions = new(StringComparer.Ordinal);
 
-    public Task<SmPreviewResponse> Handle(SmPreviewRequest request, CancellationToken cancellationToken)
+    public Task<PreceptPreviewResponse> Handle(PreceptPreviewRequest request, CancellationToken cancellationToken)
     {
         try
         {
             if (string.IsNullOrWhiteSpace(request.Action))
-                return Task.FromResult(new SmPreviewResponse(false, Error: "Missing action."));
+                return Task.FromResult(new PreceptPreviewResponse(false, Error: "Missing action."));
 
             var action = request.Action.Trim().ToLowerInvariant();
             return action switch
@@ -25,39 +25,39 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
                 "reset" => Task.FromResult(HandleReset(request)),
                 "replay" => Task.FromResult(HandleReplay(request)),
                 "inspect" => Task.FromResult(HandleInspect(request)),
-                _ => Task.FromResult(new SmPreviewResponse(false, Error: $"Unknown action '{request.Action}'."))
+                _ => Task.FromResult(new PreceptPreviewResponse(false, Error: $"Unknown action '{request.Action}'."))
             };
         }
         catch (Exception ex)
         {
-            return Task.FromResult(new SmPreviewResponse(false, Error: ex.Message));
+            return Task.FromResult(new PreceptPreviewResponse(false, Error: ex.Message));
         }
     }
 
-    private static SmPreviewResponse HandleSnapshot(SmPreviewRequest request)
+    private static PreceptPreviewResponse HandleSnapshot(PreceptPreviewRequest request)
     {
         var sessionOrError = EnsureSession(request);
         if (!sessionOrError.Success || sessionOrError.Session is null)
-            return new SmPreviewResponse(false, Error: sessionOrError.Error);
+            return new PreceptPreviewResponse(false, Error: sessionOrError.Error);
 
-        return new SmPreviewResponse(true, Snapshot: BuildSnapshot(sessionOrError.Session));
+        return new PreceptPreviewResponse(true, Snapshot: BuildSnapshot(sessionOrError.Session));
     }
 
-    private static SmPreviewResponse HandleInspect(SmPreviewRequest request)
+    private static PreceptPreviewResponse HandleInspect(PreceptPreviewRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.EventName))
-            return new SmPreviewResponse(false, Error: "Missing event name for inspect action.");
+            return new PreceptPreviewResponse(false, Error: "Missing event name for inspect action.");
 
         var sessionOrError = EnsureSession(request);
         if (!sessionOrError.Success || sessionOrError.Session is null)
-            return new SmPreviewResponse(false, Error: sessionOrError.Error);
+            return new PreceptPreviewResponse(false, Error: sessionOrError.Error);
 
         var session = sessionOrError.Session;
         var coercedArgs = session.Engine.CoerceEventArguments(request.EventName!, request.Args);
         var inspect = session.Engine.Inspect(session.Instance, request.EventName!, coercedArgs);
         var evt = session.Engine.Events.FirstOrDefault(e => string.Equals(e.Name, request.EventName, StringComparison.Ordinal));
         var args = (evt?.Args ?? Array.Empty<PreceptEventArg>())
-            .Select(arg => new SmPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable, arg.HasDefaultValue, arg.DefaultValue))
+            .Select(arg => new PreceptPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable, arg.HasDefaultValue, arg.DefaultValue))
             .ToArray();
 
         var outcome = inspect.Outcome switch
@@ -69,24 +69,24 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
             _ => "undefined"
         };
 
-        var eventStatus = new SmPreviewEventStatus(
+        var eventStatus = new PreceptPreviewEventStatus(
             request.EventName!,
             outcome,
             inspect.TargetState,
             inspect.Reasons,
             args);
 
-        return new SmPreviewResponse(true, InspectResult: eventStatus);
+        return new PreceptPreviewResponse(true, InspectResult: eventStatus);
     }
 
-    private static SmPreviewResponse HandleFire(SmPreviewRequest request)
+    private static PreceptPreviewResponse HandleFire(PreceptPreviewRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.EventName))
-            return new SmPreviewResponse(false, Error: "Missing event name for fire action.");
+            return new PreceptPreviewResponse(false, Error: "Missing event name for fire action.");
 
         var sessionOrError = EnsureSession(request);
         if (!sessionOrError.Success || sessionOrError.Session is null)
-            return new SmPreviewResponse(false, Error: sessionOrError.Error);
+            return new PreceptPreviewResponse(false, Error: sessionOrError.Error);
 
         var session = sessionOrError.Session;
         var coercedArgs = session.Engine.CoerceEventArguments(request.EventName!, request.Args);
@@ -97,33 +97,33 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         if (fire.Outcome is not (PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace))
         {
             var reason = fire.Reasons.FirstOrDefault() ?? $"Event '{request.EventName}' did not fire.";
-            return new SmPreviewResponse(false, Error: reason, Errors: fire.Reasons, Snapshot: BuildSnapshot(session));
+            return new PreceptPreviewResponse(false, Error: reason, Errors: fire.Reasons, Snapshot: BuildSnapshot(session));
         }
 
-        return new SmPreviewResponse(true, Snapshot: BuildSnapshot(session));
+        return new PreceptPreviewResponse(true, Snapshot: BuildSnapshot(session));
     }
 
-    private static SmPreviewResponse HandleReset(SmPreviewRequest request)
+    private static PreceptPreviewResponse HandleReset(PreceptPreviewRequest request)
     {
         var sessionOrError = EnsureSession(request);
         if (!sessionOrError.Success || sessionOrError.Session is null)
-            return new SmPreviewResponse(false, Error: sessionOrError.Error);
+            return new PreceptPreviewResponse(false, Error: sessionOrError.Error);
 
         var session = sessionOrError.Session;
         session.Instance = session.Engine.CreateInstance();
-        return new SmPreviewResponse(true, Snapshot: BuildSnapshot(session));
+        return new PreceptPreviewResponse(true, Snapshot: BuildSnapshot(session));
     }
 
-    private static SmPreviewResponse HandleReplay(SmPreviewRequest request)
+    private static PreceptPreviewResponse HandleReplay(PreceptPreviewRequest request)
     {
         var sessionOrError = EnsureSession(request);
         if (!sessionOrError.Success || sessionOrError.Session is null)
-            return new SmPreviewResponse(false, Error: sessionOrError.Error);
+            return new PreceptPreviewResponse(false, Error: sessionOrError.Error);
 
         var session = sessionOrError.Session;
         var messages = new List<string>();
 
-        foreach (var step in request.Steps ?? Array.Empty<SmPreviewReplayStep>())
+        foreach (var step in request.Steps ?? Array.Empty<PreceptPreviewReplayStep>())
         {
             var coercedStepArgs = session.Engine.CoerceEventArguments(step.EventName, step.Args);
             var fire = session.Engine.Fire(session.Instance, step.EventName, coercedStepArgs);
@@ -136,20 +136,20 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
 
             var reason = fire.Reasons.FirstOrDefault() ?? "blocked/undefined";
             messages.Add($"{step.EventName}: {reason}");
-            return new SmPreviewResponse(false, Error: reason, Snapshot: BuildSnapshot(session), ReplayMessages: messages);
+            return new PreceptPreviewResponse(false, Error: reason, Snapshot: BuildSnapshot(session), ReplayMessages: messages);
         }
 
-        return new SmPreviewResponse(true, Snapshot: BuildSnapshot(session), ReplayMessages: messages);
+        return new PreceptPreviewResponse(true, Snapshot: BuildSnapshot(session), ReplayMessages: messages);
     }
 
-    private static SessionResult EnsureSession(SmPreviewRequest request)
+    private static SessionResult EnsureSession(PreceptPreviewRequest request)
     {
         var key = request.Uri.ToString();
         var text = ResolveText(request);
         if (string.IsNullOrWhiteSpace(text))
             return SessionResult.Fail("No source text available for preview.");
 
-        SmTextDocumentSyncHandler.SharedAnalyzer.SetDocumentText(request.Uri, text);
+        PreceptTextDocumentSyncHandler.SharedAnalyzer.SetDocumentText(request.Uri, text);
 
         PreceptDefinition model;
         PreceptEngine engine;
@@ -200,7 +200,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         return existing;
     }
 
-    private static SmPreviewSnapshot BuildSnapshot(PreviewSession session)
+    private static PreceptPreviewSnapshot BuildSnapshot(PreviewSession session)
     {
         var inspectionResult = session.Engine.Inspect(session.Instance);
 
@@ -209,7 +209,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
             {
                 var evt = session.Engine.Events.FirstOrDefault(e => string.Equals(e.Name, inspect.EventName, StringComparison.Ordinal));
                 var args = (evt?.Args ?? Array.Empty<PreceptEventArg>())
-                    .Select(arg => new SmPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable, arg.HasDefaultValue, arg.DefaultValue))
+                    .Select(arg => new PreceptPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable, arg.HasDefaultValue, arg.DefaultValue))
                     .ToArray();
 
                 var outcome = inspect.Outcome switch
@@ -220,12 +220,12 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
                     _ => "undefined"
                 };
 
-                return new SmPreviewEventStatus(inspect.EventName, outcome, inspect.TargetState, inspect.Reasons, args);
+                return new PreceptPreviewEventStatus(inspect.EventName, outcome, inspect.TargetState, inspect.Reasons, args);
             })
             .ToArray();
 
         var transitions = session.Model.Transitions
-            .SelectMany(t => t.Clauses.Select(clause => new SmPreviewTransition(
+            .SelectMany(t => t.Clauses.Select(clause => new PreceptPreviewTransition(
                 t.FromState,
                 clause.Outcome is PreceptStateTransition st ? st.TargetState : t.FromState,
                 t.EventName,
@@ -239,31 +239,31 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
                 })))
             .ToArray();
 
-        var diagnostics = SmTextDocumentSyncHandler.SharedAnalyzer.GetDiagnostics(session.Uri)
-            .Select(d => new SmPreviewDiagnostic(
+        var diagnostics = PreceptTextDocumentSyncHandler.SharedAnalyzer.GetDiagnostics(session.Uri)
+            .Select(d => new PreceptPreviewDiagnostic(
                 d.Severity?.ToString() ?? "Info",
                 d.Message,
                 (int)d.Range.Start.Line,
                 (int)d.Range.Start.Character))
             .ToArray();
 
-        var ruleDefinitions = new List<SmPreviewRuleInfo>();
+        var ruleDefinitions = new List<PreceptPreviewRuleInfo>();
         foreach (var field in session.Engine.Fields.Where(f => f.Rules is not null))
             foreach (var rule in field.Rules!)
-                ruleDefinitions.Add(new SmPreviewRuleInfo($"field:{field.Name}", rule.ExpressionText, rule.Reason));
+                ruleDefinitions.Add(new PreceptPreviewRuleInfo($"field:{field.Name}", rule.ExpressionText, rule.Reason));
         foreach (var field in session.Engine.CollectionFields.Where(f => f.Rules is not null))
             foreach (var rule in field.Rules!)
-                ruleDefinitions.Add(new SmPreviewRuleInfo($"field:{field.Name}", rule.ExpressionText, rule.Reason));
+                ruleDefinitions.Add(new PreceptPreviewRuleInfo($"field:{field.Name}", rule.ExpressionText, rule.Reason));
         foreach (var rule in session.Model.TopLevelRules ?? Array.Empty<PreceptRule>())
-            ruleDefinitions.Add(new SmPreviewRuleInfo("topLevel", rule.ExpressionText, rule.Reason));
+            ruleDefinitions.Add(new PreceptPreviewRuleInfo("topLevel", rule.ExpressionText, rule.Reason));
         foreach (var state in session.Model.States.Where(s => s.Rules is not null && s.Rules.Count > 0))
             foreach (var rule in state.Rules!)
-                ruleDefinitions.Add(new SmPreviewRuleInfo($"state:{state.Name}", rule.ExpressionText, rule.Reason));
+                ruleDefinitions.Add(new PreceptPreviewRuleInfo($"state:{state.Name}", rule.ExpressionText, rule.Reason));
         foreach (var evt in session.Engine.Events.Where(e => e.Rules is not null && e.Rules.Count > 0))
             foreach (var rule in evt.Rules!)
-                ruleDefinitions.Add(new SmPreviewRuleInfo($"event:{evt.Name}", rule.ExpressionText, rule.Reason));
+                ruleDefinitions.Add(new PreceptPreviewRuleInfo($"event:{evt.Name}", rule.ExpressionText, rule.Reason));
 
-        return new SmPreviewSnapshot(
+        return new PreceptPreviewSnapshot(
             session.Engine.Name,
             session.Instance.CurrentState,
             session.Engine.States,
@@ -275,12 +275,12 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
             ruleDefinitions.Count > 0 ? ruleDefinitions : null);
     }
 
-    private static string ResolveText(SmPreviewRequest request)
+    private static string ResolveText(PreceptPreviewRequest request)
     {
         if (!string.IsNullOrWhiteSpace(request.Text))
             return request.Text;
 
-        return SmTextDocumentSyncHandler.SharedAnalyzer.TryGetDocumentText(request.Uri, out var text)
+        return PreceptTextDocumentSyncHandler.SharedAnalyzer.TryGetDocumentText(request.Uri, out var text)
             ? text
             : string.Empty;
     }

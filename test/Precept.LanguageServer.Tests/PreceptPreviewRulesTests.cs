@@ -14,7 +14,7 @@ namespace Precept.LanguageServer.Tests;
 /// <summary>
 /// Tests for rules-awareness in the preview layer:
 /// <c>EvaluateCurrentRules</c> on <c>PreceptEngine</c> and
-/// the rule fields surfaced by <c>SmPreviewHandler</c> in snapshot and fire responses.
+/// the rule fields surfaced by <c>PreceptPreviewHandler</c> in snapshot and fire responses.
 /// </summary>
 public class PreceptPreviewRulesTests
 {
@@ -73,7 +73,7 @@ public class PreceptPreviewRulesTests
         violations.Should().Contain("Quantity must stay positive");
     }
 
-    // ── SmPreviewHandler — snapshot includes RuleDefinitions ─────────────────
+    // ── PreceptPreviewHandler — snapshot includes RuleDefinitions ─────────────────
 
     [Fact]
     public async Task Snapshot_IncludesRuleDefinitions_WhenMachineHasRules()
@@ -90,7 +90,7 @@ public class PreceptPreviewRulesTests
             """;
 
         var (handler, uri) = CreateHandler();
-        var request = new SmPreviewRequest("snapshot", uri, Text: dsl);
+        var request = new PreceptPreviewRequest("snapshot", uri, Text: dsl);
         var response = await handler.Handle(request, CancellationToken.None);
 
         response.Success.Should().BeTrue();
@@ -119,7 +119,7 @@ public class PreceptPreviewRulesTests
             """;
 
         var (handler, uri) = CreateHandler();
-        var request = new SmPreviewRequest("snapshot", uri, Text: dsl);
+        var request = new PreceptPreviewRequest("snapshot", uri, Text: dsl);
         var response = await handler.Handle(request, CancellationToken.None);
 
         response.Success.Should().BeTrue();
@@ -131,7 +131,7 @@ public class PreceptPreviewRulesTests
         isEmpty.Should().BeTrue("the initial Balance of 100 satisfies the rule");
     }
 
-    // ── SmPreviewHandler — HandleFire returns all reasons in Errors ───────────
+    // ── PreceptPreviewHandler — HandleFire returns all reasons in Errors ───────────
 
     [Fact]
     public async Task HandleFire_BlockedByMultipleRules_ReturnsAllReasonsInErrors()
@@ -155,11 +155,11 @@ public class PreceptPreviewRulesTests
         var (handler, uri) = CreateHandler();
 
         // Seed the session with an initial snapshot request.
-        var snapshot = new SmPreviewRequest("snapshot", uri, Text: dsl);
+        var snapshot = new PreceptPreviewRequest("snapshot", uri, Text: dsl);
         await handler.Handle(snapshot, CancellationToken.None);
 
         // Amount = 200 → Balance goes to -100 (violates rule 1), Quantity goes to -199 (violates rule 2).
-        var fire = new SmPreviewRequest(
+        var fire = new PreceptPreviewRequest(
             "fire", uri, Text: dsl,
             EventName: "Reduce",
             Args: new Dictionary<string, object?> { ["Amount"] = 200.0 });
@@ -203,11 +203,11 @@ public class PreceptPreviewRulesTests
         var (handler, uri) = CreateHandler();
 
         // Seed session via snapshot.
-        await handler.Handle(new SmPreviewRequest("snapshot", uri, Text: dsl), CancellationToken.None);
+        await handler.Handle(new PreceptPreviewRequest("snapshot", uri, Text: dsl), CancellationToken.None);
 
         // Inspect Withdraw with amount=500 — should be blocked by the top-level rule.
         var response = await handler.Handle(
-            new SmPreviewRequest("inspect", uri, Text: dsl,
+            new PreceptPreviewRequest("inspect", uri, Text: dsl,
                 EventName: "Withdraw",
                 Args: new Dictionary<string, object?> { ["amount"] = 500.0 }),
             CancellationToken.None);
@@ -242,10 +242,10 @@ public class PreceptPreviewRulesTests
             """;
 
         var (handler, uri) = CreateHandler();
-        await handler.Handle(new SmPreviewRequest("snapshot", uri, Text: dsl), CancellationToken.None);
+        await handler.Handle(new PreceptPreviewRequest("snapshot", uri, Text: dsl), CancellationToken.None);
 
         var response = await handler.Handle(
-            new SmPreviewRequest("inspect", uri, Text: dsl,
+            new PreceptPreviewRequest("inspect", uri, Text: dsl,
                 EventName: "Withdraw",
                 Args: new Dictionary<string, object?> { ["amount"] = 30.0 }),
             CancellationToken.None);
@@ -258,9 +258,9 @@ public class PreceptPreviewRulesTests
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private static (SmPreviewHandler handler, DocumentUri uri) CreateHandler()
+    private static (PreceptPreviewHandler handler, DocumentUri uri) CreateHandler()
     {
-        var handler = new SmPreviewHandler();
+        var handler = new PreceptPreviewHandler();
         var uri = DocumentUri.From($"file:///tmp/preview-rules-test-{Guid.NewGuid():N}.precept");
         return (handler, uri);
     }

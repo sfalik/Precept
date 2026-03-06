@@ -1,4 +1,4 @@
-# Copilot Instructions for StateMachine
+# Copilot Instructions for Precept
 
 ## DSL Sample Files (.sm)
 
@@ -58,7 +58,7 @@ These sections must not contradict each other. If one is updated, all relevant s
 
 ## Syntax Highlighting Grammar Sync (Non-Negotiable)
 
-The TextMate grammar at `tools/StateMachine.Dsl.VsCode/syntaxes/state-machine-dsl.tmLanguage.json` must stay in sync with the DSL parser at `src/StateMachine/Dsl/StateMachineDslParser.cs`.
+The TextMate grammar at `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` must stay in sync with the DSL parser at `src/Precept/Dsl/PreceptParser.cs`.
 
 When any of the following change, update the grammar file in the same pass:
 
@@ -82,7 +82,7 @@ For every new or changed DSL construct, verify the grammar covers:
 
 ## Intellisense Sync (Non-Negotiable)
 
-The completions and semantic tokens in `tools/StateMachine.Dsl.LanguageServer/SmDslAnalyzer.cs` and `tools/StateMachine.Dsl.LanguageServer/SmSemanticTokensHandler.cs` must stay in sync with the DSL parser whenever the language surface changes.
+The completions and semantic tokens in `tools/Precept.LanguageServer/PreceptAnalyzer.cs` and `tools/Precept.LanguageServer/PreceptSemanticTokensHandler.cs` must stay in sync with the DSL parser whenever the language surface changes.
 
 When any of the following change, update both files in the same pass:
 
@@ -92,7 +92,7 @@ When any of the following change, update both files in the same pass:
 - New dotted accessor forms (e.g. `Collection.count`, `EventName.ArgName`)
 - New collection kinds or inner types
 
-### Completions Sync Checklist (`SmDslAnalyzer.cs`)
+### Completions Sync Checklist (`PreceptAnalyzer.cs`)
 
 For every new or changed DSL construct:
 
@@ -102,7 +102,7 @@ For every new or changed DSL construct:
 4. **Dotted member access** — if the new construct allows `Identifier.member` access, add it to the dot-trigger branch and the member suggestion list.
 5. **Snippets** — if the construct has a required structure, add a snippet to the relevant snippet list (`GlobalSnippetItems`, `GuardSnippetItems`, `SetSnippetItems`, `TransitionSnippetItems`).
 
-### Semantic Tokens Sync Checklist (`SmSemanticTokensHandler.cs`)
+### Semantic Tokens Sync Checklist (`PreceptSemanticTokensHandler.cs`)
 
 For every new or changed DSL construct:
 

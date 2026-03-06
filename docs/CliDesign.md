@@ -10,7 +10,7 @@ Status: **Design phase — not yet implemented.**
 
 ## Motivation
 
-The previous CLI host was removed. The only remaining runtime surface is the VS Code language server preview panel (`SmPreviewHandler`). This leaves two gaps:
+The previous CLI host was removed. The only remaining runtime surface is the VS Code language server preview panel (`PreceptPreviewHandler`). This leaves two gaps:
 
 1. **Automated testing** — no way to drive event sequences against sample `.precept` files from a terminal or CI pipeline.
 2. **Shell-level exploration** — no way to inspect/fire/query a machine without the editor open.
@@ -21,11 +21,11 @@ A dedicated CLI closes both gaps while keeping the runtime library (`Precept`) f
 
 ### Thin-host architecture
 
-The CLI must not duplicate domain logic that belongs in the runtime. During the API audit, three chunks of logic were identified as living in `SmPreviewHandler` that would need to be duplicated in the CLI:
+The CLI must not duplicate domain logic that belongs in the runtime. During the API audit, three chunks of logic were identified as living in `PreceptPreviewHandler` that would need to be duplicated in the CLI:
 
 | Logic | Where it lives today | Problem |
 |-------|---------------------|---------|
-| Available-event filtering | `SmPreviewHandler.BuildSnapshot` — now uses `engine.Inspect(instance)` aggregate | Both CLI and LSP need this; now exposed via the aggregate |
+| Available-event filtering | `PreceptPreviewHandler.BuildSnapshot` — now uses `engine.Inspect(instance)` aggregate | Both CLI and LSP need this; now exposed via the aggregate |
 | Event argument coercion | `engine.CoerceEventArguments(eventName, args)` — converts JSON/untyped values to runtime types | Now a public engine method |
 | Instance data serialization | `instance.InstanceData` — clean `IReadOnlyDictionary<string, object?>` with `List<object>` for collections; no internal keys exposed | Clean public format is now standard |
 
@@ -163,7 +163,7 @@ When stdin is not a TTY and no explicit `data load` is given, stdin is read as J
 
 ## Runtime API Extensions
 
-These methods are available on `PreceptEngine` in `src/Precept/Dsl/PreceptRuntime.cs` to keep the CLI (and `SmPreviewHandler`) free of domain logic.
+These methods are available on `PreceptEngine` in `src/Precept/Dsl/PreceptRuntime.cs` to keep the CLI (and `PreceptPreviewHandler`) free of domain logic.
 
 ### `Inspect(instance)` aggregate
 
@@ -182,7 +182,7 @@ public IReadOnlyDictionary<string, object?>? CoerceEventArguments(string eventNa
 
 Uses `_eventArgContractMap` internally to look up declared argument types per event.
 
-**Consumers:** CLI `inspect`/`fire` argument handling, `SmPreviewHandler.HandleFire`/`HandleInspect`.
+**Consumers:** CLI `inspect`/`fire` argument handling, `PreceptPreviewHandler.HandleFire`/`HandleInspect`.
 
 ### `CheckCompatibility`
 
@@ -210,7 +210,7 @@ public DslWorkflowInstance CreateInstance(IReadOnlyDictionary&lt;string, object?
 
 **Consumers:** CLI `data load`, REPL startup.
 
-### Impact on SmPreviewHandler (already applied)
+### Impact on PreceptPreviewHandler (already applied)
 
 ---
 
@@ -314,11 +314,11 @@ Creates a new instance with clean field data. Collections are `List<object>` in 
 
 After verifying these methods, run the full test suite (`dotnet test`) and confirm all tests pass before proceeding.
 
-### Phase 2 — SmPreviewHandler refactor
+### Phase 2 — PreceptPreviewHandler refactor
 
-Simplify `tools/Precept.LanguageServer/SmPreviewHandler.cs` to use the new runtime methods. Do not change any behavior — this is a pure refactor.
+Simplify `tools/Precept.LanguageServer/PreceptPreviewHandler.cs` to use the new runtime methods. Do not change any behavior — this is a pure refactor.
 
-- Replace the `outgoingEventNames` filtering block in `BuildSnapshot` with `session.Engine.Inspect(session.Instance)` aggregate (already done — `SmPreviewHandler` is updated).
+- Replace the `outgoingEventNames` filtering block in `BuildSnapshot` with `session.Engine.Inspect(session.Instance)` aggregate (already done — `PreceptPreviewHandler` is updated).
 - Replace all calls to the private `CoerceEventArgs` method with `session.Engine.CoerceEventArguments(eventName, args)` (already done).
 - Instance data is already clean in `session.Instance.InstanceData` — no conversion needed.
 

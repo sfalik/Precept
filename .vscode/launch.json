@@ -2,26 +2,26 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Extension (StateMachine DSL) Fast Dev",
+      "name": "Extension (Precept) Fast Dev",
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/tools/StateMachine.Dsl.VsCode"
+        "--extensionDevelopmentPath=${workspaceFolder}/tools/Precept.VsCode"
       ],
       "outFiles": [
-        "${workspaceFolder}/tools/StateMachine.Dsl.VsCode/out/**/*.js"
+        "${workspaceFolder}/tools/Precept.VsCode/out/**/*.js"
       ],
       "preLaunchTask": "extension: watch"
     },
     {
-      "name": "Extension (StateMachine DSL)",
+      "name": "Extension (Precept)",
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/tools/StateMachine.Dsl.VsCode"
+        "--extensionDevelopmentPath=${workspaceFolder}/tools/Precept.VsCode"
       ],
       "outFiles": [
-        "${workspaceFolder}/tools/StateMachine.Dsl.VsCode/out/**/*.js"
+        "${workspaceFolder}/tools/Precept.VsCode/out/**/*.js"
       ],
       "preLaunchTask": "build"
     }

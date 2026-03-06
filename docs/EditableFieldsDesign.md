@@ -465,14 +465,14 @@ The `edit` keyword is a new reserved word. It appears only in the `in ... edit` 
 
 ### Snapshot: `EditableFields` collection
 
-The `SmPreviewSnapshot` record is extended with an `EditableFields` collection:
+The `PreceptPreviewSnapshot` record is extended with an `EditableFields` collection:
 
 ```csharp
-internal sealed record SmPreviewSnapshot(
+internal sealed record PreceptPreviewSnapshot(
     // ... existing fields ...
-    IReadOnlyList<SmPreviewEditableField>? EditableFields = null);
+    IReadOnlyList<PreceptPreviewEditableField>? EditableFields = null);
 
-internal sealed record SmPreviewEditableField(
+internal sealed record PreceptPreviewEditableField(
     string Name,
     string Type,           // "string", "number", "boolean", "set<string>", etc.
     bool IsNullable,
@@ -481,7 +481,7 @@ internal sealed record SmPreviewEditableField(
 );
 ```
 
-The preview handler reads `EditableFields` from the aggregate `engine.Inspect(instance)` result and maps each `DslEditableFieldInfo` to an `SmPreviewEditableField` record in the snapshot.
+The preview handler reads `EditableFields` from the aggregate `engine.Inspect(instance)` result and maps each `DslEditableFieldInfo` to an `PreceptPreviewEditableField` record in the snapshot.
 
 ### New `"update"` action
 
@@ -501,19 +501,19 @@ The preview handler adds an `"update"` action (parallel to `"fire"`):
 
 The `patches` array is translated to `IUpdatePatchBuilder` calls. On success, the preview handler updates the session instance and returns a fresh snapshot.
 
-### `SmPreviewRequest` extension
+### `PreceptPreviewRequest` extension
 
 ```csharp
-internal sealed record SmPreviewRequest(
+internal sealed record PreceptPreviewRequest(
     string Action,
     DocumentUri Uri,
     string? Text = null,
     string? EventName = null,
     IReadOnlyDictionary<string, object?>? Args = null,
-    IReadOnlyList<SmPreviewReplayStep>? Steps = null,
-    IReadOnlyList<SmPreviewPatchOp>? Patches = null);  // <-- NEW
+    IReadOnlyList<PreceptPreviewReplayStep>? Steps = null,
+    IReadOnlyList<PreceptPreviewPatchOp>? Patches = null);  // <-- NEW
 
-internal sealed record SmPreviewPatchOp(
+internal sealed record PreceptPreviewPatchOp(
     string Field,
     string Op,       // "set", "add", "remove", "enqueue", "dequeue", "push", "pop", "replace", "clear"
     object? Value);  // null for dequeue, pop, clear
@@ -583,8 +583,8 @@ Verify the grammar file is valid JSON after changes by parsing it. Confirm that 
 
 Intellisense sync (non-negotiable — do not skip): apply the Intellisense Sync Checklist from `.github/copilot-instructions.md` in full. At minimum, the following changes are required for this feature:
 
-1. **`KeywordItems`** — add `edit` to `KeywordItems` in `SmDslAnalyzer.cs`.
-2. **`KeywordTokens`** — add `edit` to `KeywordTokens` in `SmSemanticTokensHandler.cs`.
+1. **`KeywordItems`** — add `edit` to `KeywordItems` in `PreceptAnalyzer.cs`.
+2. **`KeywordTokens`** — add `edit` to `KeywordTokens` in `PreceptSemanticTokensHandler.cs`.
 3. **Completion context for `in … edit` header** — add a regex branch in `GetCompletions` that detects `^\s*in\s+[^\n]+\s+edit(?:\s+[^\n]*)?$` and returns field name completions (the declared instance data fields are the valid completions after `edit`).
 4. **Semantic token for edit header** — add a regex to `HighlightNamedSymbols` matching the `in … edit` header line and push the state list tokens as `type` and `edit` as `keyword`.
 5. **`ExpressionLineRegex`** — edit declarations do not contain expressions (only field name lists), so no update to `ExpressionLineRegex` is needed.

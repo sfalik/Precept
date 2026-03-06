@@ -14,8 +14,8 @@ Language knowledge today is scattered across multiple components, each with its 
 | Parser (`PreceptParser.cs`) | Keywords, statement forms, constraints | 20+ compiled regexes, imperative code |
 | Expression parser (`PreceptExpressionParser.cs`) | Operators, precedence, identifier rules | Hand-written lexer + recursive descent |
 | Runtime (`PreceptRuntime.cs`) | Constraint enforcement, fire pipeline | Imperative validation code, ad-hoc error strings |
-| Semantic tokens (`SmSemanticTokensHandler.cs`) | Keyword lists, operator patterns | 12+ regex patterns per line |
-| Completions (`SmDslAnalyzer.cs`) | Keywords by context, identifier scoping | 8+ regex patterns for context detection |
+| Semantic tokens (`PreceptSemanticTokensHandler.cs`) | Keyword lists, operator patterns | 12+ regex patterns per line |
+| Completions (`PreceptAnalyzer.cs`) | Keywords by context, identifier scoping | 8+ regex patterns for context detection |
 | TextMate grammar (`precept.tmLanguage.json`) | Keyword alternations, operator patterns | JSON regex patterns |
 | Docs (`DesignNotes.md`, `README.md`) | Full syntax contract, constraint list | Prose |
 

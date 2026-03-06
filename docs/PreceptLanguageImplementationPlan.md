@@ -39,9 +39,9 @@ Superpower produces a `TokenList<PreceptToken>` with exact source spans (`Positi
 |---|---|---|
 | Parser (`PreceptParser.cs`) | 20+ compiled Regex, 1308 lines imperative | Superpower combinators on `TokenList<PreceptToken>` |
 | Expression parser (`PreceptExpressionParser.cs`) | Hand-written `Lexer` (224 lines) + recursive descent `Parser` | Superpower expression combinators on same token stream (no separate lexer) |
-| Semantic tokens (`SmSemanticTokensHandler.cs`) | 12 Regex per line | Walk `TokenList<PreceptToken>` — token kind → semantic token type |
-| Completions (`SmDslAnalyzer.cs`) | 8+ Regex for context detection | Token-at-cursor + previous-token lookup from `TokenList<PreceptToken>` |
-| Diagnostics (`SmDslAnalyzer.cs`) | Exception message regex parsing | Superpower parse errors with position + expected tokens → LSP `Diagnostic` |
+| Semantic tokens (`PreceptSemanticTokensHandler.cs`) | 12 Regex per line | Walk `TokenList<PreceptToken>` — token kind → semantic token type |
+| Completions (`PreceptAnalyzer.cs`) | 8+ Regex for context detection | Token-at-cursor + previous-token lookup from `TokenList<PreceptToken>` |
+| Diagnostics (`PreceptAnalyzer.cs`) | Exception message regex parsing | Superpower parse errors with position + expected tokens → LSP `Diagnostic` |
 | Preview handler | Calls `PreceptParser.Parse(text)` | Same — just a different parser behind the same API |
 
 ### Token stream as shared infrastructure
@@ -578,7 +578,7 @@ This is where the "tokenize once, consume everywhere" principle pays off most.
 Add a shared tokenization method in the analyzer or a dedicated utility:
 
 ```csharp
-// In SmDslAnalyzer or a new PreceptLspUtils
+// In PreceptAnalyzer or a new PreceptLspUtils
 internal static TokenList<PreceptToken>? TryTokenize(string text)
 {
     try { return PreceptTokenizer.Instance.Tokenize(text); }
@@ -588,7 +588,7 @@ internal static TokenList<PreceptToken>? TryTokenize(string text)
 
 The language server calls `TryTokenize()` once per document change and caches the result. Parser, semantic tokens, completions, and diagnostics all consume from this cached token list.
 
-### 7b. Semantic tokens (`SmSemanticTokensHandler.cs`) — rewrite
+### 7b. Semantic tokens (`PreceptSemanticTokensHandler.cs`) — rewrite
 
 **Current:** 12+ regex patterns matched per line, manually pushing semantic tokens.
 
@@ -634,7 +634,7 @@ Adding a new keyword to the `PreceptToken` enum with `[TokenCategory]` automatic
 
 Identifier classification (state name, event name, field name, variable) uses the parsed model or declaration-tracking from earlier tokens.
 
-### 7c. Completions (`SmDslAnalyzer.cs`) — rewrite
+### 7c. Completions (`PreceptAnalyzer.cs`) — rewrite
 
 **Current:** 8+ regex patterns to detect cursor context, manual identifier collection.
 
@@ -659,7 +659,7 @@ Identifier classification (state name, event name, field name, variable) uses th
 
 Statement-starting keyword ordering uses semantic context: what's already declared in the file determines priority (per design doc: fields first → states → events → transitions).
 
-### 7d. Diagnostics (`SmDslAnalyzer.cs`)
+### 7d. Diagnostics (`PreceptAnalyzer.cs`)
 
 **Current:** Try `PreceptParser.Parse()`, catch exception, regex-parse error message for line number.
 
@@ -680,7 +680,7 @@ The language server produces diagnostics with:
 
 This gives every error a stable, searchable code that appears in the Problems panel.
 
-### 7e. Preview handler (`SmPreviewHandler.cs`)
+### 7e. Preview handler (`PreceptPreviewHandler.cs`)
 
 Minimal changes — still calls `PreceptParser.Parse()` → `PreceptCompiler.Compile()` → engine methods. The parser API is the same; the implementation behind it changed.
 
@@ -777,7 +777,7 @@ The catalog infrastructure makes most manual sync checklists obsolete. Rewrite t
 | Intellisense Sync | **Remove entirely.** Completions and semantic tokens are now derived from `[TokenCategory]` attributes and `ConstructCatalog`. No manual sync needed — adding a token attribute automatically updates both. |
 | DSL Syntax Reference Sync | Keep, but update file paths (`PreceptLanguageDesign.md` is now the single grammar source) |
 | DSL Authoring | Keep, but reference `PreceptLanguageDesign.md` instead of `DesignNotes.md § DSL Syntax Contract` |
-| File paths throughout | `StateMachine.Dsl.VsCode` → `Precept.VsCode`; `StateMachineDslParser.cs` → `PreceptParser.cs`; `SmDslAnalyzer.cs` path update, etc. |
+| File paths throughout | `StateMachine.Dsl.VsCode` → `Precept.VsCode`; `StateMachineDslParser.cs` → `PreceptParser.cs`; `PreceptAnalyzer.cs` path update, etc. |
 
 Add these **new sections**:
 
@@ -814,11 +814,11 @@ Add these **new sections**:
 | `src/Precept/Dsl/PreceptRuntime.cs` | **Moderate edit** — new pipeline, transition lookup, assert evaluation | 4 |
 | `test/Precept.Tests/*.cs` | **Rewrite DSL strings** + add new tests | 5 |
 | `samples/*.precept` | **Rewrite all 18 files** | 6 |
-| `tools/Precept.LanguageServer/SmSemanticTokensHandler.cs` | **Full rewrite** — token-based | 7 |
-| `tools/Precept.LanguageServer/SmDslAnalyzer.cs` | **Major edit** — token-based completions + diagnostics | 7 |
-| `tools/Precept.LanguageServer/SmCompletionHandler.cs` | Minor (API unchanged) | 7 |
-| `tools/Precept.LanguageServer/SmPreviewHandler.cs` | Minor (API unchanged) | 7 |
-| `tools/Precept.LanguageServer/SmTextDocumentSyncHandler.cs` | Minor (add tokenization cache) | 7 |
+| `tools/Precept.LanguageServer/PreceptSemanticTokensHandler.cs` | **Full rewrite** — token-based | 7 |
+| `tools/Precept.LanguageServer/PreceptAnalyzer.cs` | **Major edit** — token-based completions + diagnostics | 7 |
+| `tools/Precept.LanguageServer/PreceptCompletionHandler.cs` | Minor (API unchanged) | 7 |
+| `tools/Precept.LanguageServer/PreceptPreviewHandler.cs` | Minor (API unchanged) | 7 |
+| `tools/Precept.LanguageServer/PreceptTextDocumentSyncHandler.cs` | Minor (add tokenization cache) | 7 |
 | `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` | **Major edit** — new patterns | 8 |
 | `README.md` | **Major edit** — syntax, examples, status | 9 |
 | `docs/DesignNotes.md` | **Moderate edit** — supersede or replace | 9 |
@@ -838,7 +838,7 @@ These files/components are not modified:
 - `CollectionValue` class
 - `test/Precept.Tests/Infrastructure/` — test infrastructure
 - `tools/Precept.VsCode/src/` — VS Code extension TypeScript (LSP client)
-- `tools/Precept.LanguageServer/SmPreviewProtocol.cs` — protocol records
+- `tools/Precept.LanguageServer/PreceptPreviewProtocol.cs` — protocol records
 - `tools/Precept.LanguageServer/Program.cs` — server bootstrapping
 
 ## Risk Points
