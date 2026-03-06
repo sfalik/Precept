@@ -10,7 +10,14 @@ public sealed record DslWorkflowModel(
     IReadOnlyList<DslTransition> Transitions,
     IReadOnlyList<DslField> Fields,
     IReadOnlyList<DslCollectionField> CollectionFields,
-    IReadOnlyList<DslRule>? TopLevelRules = null);
+    IReadOnlyList<DslRule>? TopLevelRules = null,
+    // ── New model properties (language redesign) ──
+    IReadOnlyList<DslInvariant>? Invariants = null,
+    IReadOnlyList<DslStateAssert>? StateAsserts = null,
+    IReadOnlyList<DslStateAction>? StateActions = null,
+    IReadOnlyList<DslEventAssert>? EventAsserts = null,
+    IReadOnlyList<DslTransitionRow>? TransitionRows = null,
+    IReadOnlyList<DslEditBlock>? EditBlocks = null);
 
 public sealed record DslState(
     string Name,
@@ -145,3 +152,87 @@ public sealed record DslRejection(string? Reason = null) : DslClauseOutcome;
 
 /// <summary>The <c>no transition</c> outcome — event is accepted but state does not change.</summary>
 public sealed record DslNoTransition : DslClauseOutcome;
+
+// ══════════════════════════════════════════════════════════════════════
+// New model records — language redesign
+// ══════════════════════════════════════════════════════════════════════
+
+/// <summary>Preposition for state asserts: <c>in</c>, <c>to</c>, <c>from</c>.</summary>
+public enum DslAssertPreposition
+{
+    /// <summary><c>in &lt;State&gt;</c> — while residing in the state (entry + AcceptedInPlace).</summary>
+    In,
+    /// <summary><c>to &lt;State&gt;</c> — crossing into the state (entry only).</summary>
+    To,
+    /// <summary><c>from &lt;State&gt;</c> — crossing out of the state (exit only).</summary>
+    From
+}
+
+/// <summary>
+/// A global data invariant: <c>invariant &lt;expr&gt; because "reason"</c>.
+/// Always holds, checked post-commit on every transition.
+/// </summary>
+public sealed record DslInvariant(
+    string ExpressionText,
+    DslExpression Expression,
+    string Reason,
+    int SourceLine = 0);
+
+/// <summary>
+/// A state-scoped assert: <c>in/to/from &lt;State&gt; assert &lt;expr&gt; because "reason"</c>.
+/// Temporal scope depends on <see cref="Preposition"/>.
+/// </summary>
+public sealed record DslStateAssert(
+    DslAssertPreposition Preposition,
+    string State,
+    string ExpressionText,
+    DslExpression Expression,
+    string Reason,
+    int SourceLine = 0);
+
+/// <summary>
+/// A state entry/exit action: <c>to/from &lt;State&gt; -&gt; &lt;actions&gt;</c>.
+/// Automatic mutations that fire on state change.
+/// </summary>
+public sealed record DslStateAction(
+    DslAssertPreposition Preposition,
+    string State,
+    IReadOnlyList<DslSetAssignment> SetAssignments,
+    IReadOnlyList<DslCollectionMutation>? CollectionMutations = null,
+    int SourceLine = 0);
+
+/// <summary>
+/// An event-scoped assert: <c>on &lt;Event&gt; assert &lt;expr&gt; because "reason"</c>.
+/// Arg-only validation, checked pre-transition.
+/// </summary>
+public sealed record DslEventAssert(
+    string EventName,
+    string ExpressionText,
+    DslExpression Expression,
+    string Reason,
+    int SourceLine = 0);
+
+/// <summary>
+/// A flat transition row: <c>from &lt;State&gt; on &lt;Event&gt; [when &lt;expr&gt;] [-&gt; actions]* -&gt; &lt;outcome&gt;</c>.
+/// Replaces <see cref="DslTransition"/> + <see cref="DslClause"/> with a self-contained row.
+/// Multiple rows for the same (State, Event) pair are evaluated top-to-bottom, first match wins.
+/// </summary>
+public sealed record DslTransitionRow(
+    string FromState,
+    string EventName,
+    DslClauseOutcome Outcome,
+    IReadOnlyList<DslSetAssignment> SetAssignments,
+    IReadOnlyList<DslCollectionMutation>? CollectionMutations = null,
+    string? WhenText = null,
+    DslExpression? WhenGuard = null,
+    int SourceLine = 0);
+
+/// <summary>
+/// Editable field declaration: <c>in &lt;State&gt; edit &lt;Field&gt;, &lt;Field&gt;</c>.
+/// Specifies which fields can be modified directly while residing in a state.
+/// Runtime <c>Update</c> API is deferred — model/parser included now.
+/// </summary>
+public sealed record DslEditBlock(
+    string State,
+    IReadOnlyList<string> FieldNames,
+    int SourceLine = 0);
