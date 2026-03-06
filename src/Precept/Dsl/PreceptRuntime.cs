@@ -6,17 +6,20 @@ namespace Precept;
 
 public sealed class PreceptEngine
 {
-    private readonly Dictionary<(string State, string Event), PreceptTransition> _transitionMap;
+    // Transition lookup: (State, Event) → ordered list of transition rows (first-match wins)
+    private readonly Dictionary<(string State, string Event), List<PreceptTransitionRow>> _transitionRowMap;
     private readonly Dictionary<string, PreceptField> _fieldMap;
     private readonly Dictionary<string, PreceptCollectionField> _collectionFieldMap;
     private readonly Dictionary<string, Dictionary<string, PreceptEventArg>> _eventArgContractMap;
 
-    // Rules storage
-    private readonly IReadOnlyList<PreceptRule> _topLevelRules;
-    private readonly IReadOnlyList<PreceptRule> _allFieldRules;
-    private readonly IReadOnlyList<PreceptRule> _allCollectionRules;
-    private readonly IReadOnlyDictionary<string, IReadOnlyList<PreceptRule>> _stateRuleMap;
-    private readonly IReadOnlyDictionary<string, IReadOnlyList<PreceptRule>> _eventRules;
+    // New constraint storage
+    private readonly IReadOnlyList<PreceptInvariant> _invariants;
+    private readonly IReadOnlyList<PreceptEventAssert> _eventAsserts;
+    private readonly Dictionary<string, List<PreceptEventAssert>> _eventAssertMap;
+    private readonly IReadOnlyList<PreceptStateAssert> _stateAsserts;
+    private readonly IReadOnlyList<PreceptStateAction> _stateActions;
+    private readonly Dictionary<(PreceptAssertPreposition Prep, string State), List<PreceptStateAssert>> _stateAssertMap;
+    private readonly Dictionary<(PreceptAssertPreposition Prep, string State), List<PreceptStateAction>> _stateActionMap;
 
     public string Name { get; }
     public IReadOnlyList<string> States { get; }
@@ -34,11 +37,40 @@ public sealed class PreceptEngine
         Fields = model.Fields;
         CollectionFields = model.CollectionFields;
 
-        _transitionMap = model.Transitions
-            .ToDictionary(
-                t => (t.FromState, t.EventName),
-                t => t,
-                EqualityComparer<(string State, string Event)>.Default);
+        // Build transition row map from new TransitionRows (preferred) or old Transitions (backward compat)
+        _transitionRowMap = new Dictionary<(string State, string Event), List<PreceptTransitionRow>>();
+        if (model.TransitionRows is { Count: > 0 })
+        {
+            foreach (var row in model.TransitionRows)
+            {
+                var key = (row.FromState, row.EventName);
+                if (!_transitionRowMap.TryGetValue(key, out var list))
+                {
+                    list = new List<PreceptTransitionRow>();
+                    _transitionRowMap[key] = list;
+                }
+                list.Add(row);
+            }
+        }
+        else
+        {
+            // Backward compat: convert old Transitions to TransitionRows
+            foreach (var t in model.Transitions)
+            {
+                var key = (t.FromState, t.EventName);
+                var rows = new List<PreceptTransitionRow>();
+                foreach (var clause in t.Clauses)
+                {
+                    rows.Add(new PreceptTransitionRow(
+                        t.FromState, t.EventName, clause.Outcome,
+                        clause.SetAssignments.ToList(),
+                        clause.CollectionMutations,
+                        clause.Predicate, clause.PredicateAst,
+                        clause.SourceLine));
+                }
+                _transitionRowMap[key] = rows;
+            }
+        }
 
         _fieldMap = model.Fields
             .ToDictionary(f => f.Name, f => f, StringComparer.Ordinal);
@@ -52,22 +84,49 @@ public sealed class PreceptEngine
                 evt => evt.Args.ToDictionary(a => a.Name, a => a, StringComparer.Ordinal),
                 StringComparer.Ordinal);
 
-        // Flatten rules for runtime access
-        _topLevelRules = model.TopLevelRules ?? Array.Empty<PreceptRule>();
-        _allFieldRules = model.Fields
-            .Where(f => f.Rules is not null)
-            .SelectMany(f => f.Rules!)
-            .ToArray();
-        _allCollectionRules = model.CollectionFields
-            .Where(f => f.Rules is not null)
-            .SelectMany(f => f.Rules!)
-            .ToArray();
-        _stateRuleMap = model.States
-            .Where(s => s.Rules is not null && s.Rules.Count > 0)
-            .ToDictionary(s => s.Name, s => s.Rules!, StringComparer.Ordinal);
-        _eventRules = model.Events
-            .Where(e => e.Rules is not null && e.Rules.Count > 0)
-            .ToDictionary(e => e.Name, e => e.Rules!, StringComparer.Ordinal);
+        // Invariants (replaces top-level rules + field rules + collection rules)
+        _invariants = model.Invariants ?? Array.Empty<PreceptInvariant>();
+
+        // Event asserts (replaces event rules)
+        _eventAsserts = model.EventAsserts ?? Array.Empty<PreceptEventAssert>();
+        _eventAssertMap = new Dictionary<string, List<PreceptEventAssert>>(StringComparer.Ordinal);
+        foreach (var ea in _eventAsserts)
+        {
+            if (!_eventAssertMap.TryGetValue(ea.EventName, out var list))
+            {
+                list = new List<PreceptEventAssert>();
+                _eventAssertMap[ea.EventName] = list;
+            }
+            list.Add(ea);
+        }
+
+        // State asserts (replaces state rules, now preposition-aware)
+        _stateAsserts = model.StateAsserts ?? Array.Empty<PreceptStateAssert>();
+        _stateAssertMap = new Dictionary<(PreceptAssertPreposition Prep, string State), List<PreceptStateAssert>>();
+        foreach (var sa in _stateAsserts)
+        {
+            var key = (sa.Preposition, sa.State);
+            if (!_stateAssertMap.TryGetValue(key, out var list))
+            {
+                list = new List<PreceptStateAssert>();
+                _stateAssertMap[key] = list;
+            }
+            list.Add(sa);
+        }
+
+        // State actions (entry/exit automatic mutations)
+        _stateActions = model.StateActions ?? Array.Empty<PreceptStateAction>();
+        _stateActionMap = new Dictionary<(PreceptAssertPreposition Prep, string State), List<PreceptStateAction>>();
+        foreach (var sa in _stateActions)
+        {
+            var key = (sa.Preposition, sa.State);
+            if (!_stateActionMap.TryGetValue(key, out var list))
+            {
+                list = new List<PreceptStateAction>();
+                _stateActionMap[key] = list;
+            }
+            list.Add(sa);
+        }
     }
 
     public PreceptInstance CreateInstance(
@@ -203,13 +262,11 @@ public sealed class PreceptEngine
         if (!TryValidateDataContract(instance.InstanceData, out var dataError))
             return PreceptCompatibilityResult.NotCompatible(dataError);
 
-        // Verify the instance satisfies all current rules (data rules + current state rules).
-        // A compiled definition guarantees rules pass at CreateInstance time; an externally loaded
-        // instance or one carried forward from an older definition version may not.
+        // Verify the instance satisfies all current constraints (invariants + state asserts).
         var internalData = HydrateInstanceData(instance.InstanceData);
         var ruleViolations = new List<string>();
-        ruleViolations.AddRange(EvaluateDataRules(internalData));
-        ruleViolations.AddRange(EvaluateStateRules(instance.CurrentState, internalData));
+        ruleViolations.AddRange(EvaluateInvariants(internalData));
+        ruleViolations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.In, instance.CurrentState, internalData));
         if (ruleViolations.Count > 0)
             return PreceptCompatibilityResult.NotCompatible(
                 $"Instance violates {ruleViolations.Count} rule(s): {string.Join("; ", ruleViolations)}");
@@ -224,10 +281,10 @@ public sealed class PreceptEngine
     {
         var evaluationData = BuildDirectEvaluationData(eventName, eventArguments);
 
-        // Check event rules first
-        var eventRuleViolations = EvaluateEventRules(eventName, evaluationData);
-        if (eventRuleViolations.Count > 0)
-            return PreceptEventInspectionResult.Rejected(currentState, eventName, eventRuleViolations);
+        // Check event asserts first
+        var eventAssertViolations = EvaluateEventAsserts(eventName, evaluationData);
+        if (eventAssertViolations.Count > 0)
+            return PreceptEventInspectionResult.Rejected(currentState, eventName, eventAssertViolations);
 
         var resolution = ResolveTransition(currentState, eventName, evaluationData);
 
@@ -236,7 +293,7 @@ public sealed class PreceptEngine
             TransitionResolutionKind.Accepted => PreceptEventInspectionResult.Accepted(
                 currentState,
                 eventName,
-                ((PreceptStateTransition)resolution.Clause!.Outcome).TargetState,
+                ((PreceptStateTransition)resolution.MatchedRow!.Outcome).TargetState,
                 GetRequiredEventArgumentKeys(eventName)),
             TransitionResolutionKind.NotApplicable => PreceptEventInspectionResult.NotApplicable(currentState, eventName),
             TransitionResolutionKind.NoTransition => PreceptEventInspectionResult.AcceptedInPlace(currentState, eventName),
@@ -257,34 +314,37 @@ public sealed class PreceptEngine
         // Hydrate clean InstanceData to internal format for engine evaluation
         var internalData = HydrateInstanceData(instance.InstanceData);
 
-        // Fast-path: if this (state, event) pair has a 'when' predicate, evaluate it using only
-        // instance data before doing argument validation. This ensures callers who omit event
-        // arguments (e.g. bulk discover-mode refresh) still get NotApplicable — not Rejected —
-        // when the 'when' guard is false. The 'when' predicate typically references machine fields
-        // only, so evaluating without event args is correct and safe.
-        if (_transitionMap.TryGetValue((instance.CurrentState, eventName), out var preCheckTransition) &&
-            preCheckTransition.PredicateAst is not null)
+        // Fast-path: if all rows for (state, event) have when guards, try evaluating without
+        // event args. If all guards fail → NotApplicable (avoids requiring event args for discovery).
+        if (_transitionRowMap.TryGetValue((instance.CurrentState, eventName), out var preCheckRows))
         {
-            var instanceOnlyContext = BuildEvaluationData(internalData, eventName, null);
-            var whenResult = PreceptExpressionRuntimeEvaluator.Evaluate(preCheckTransition.PredicateAst, instanceOnlyContext);
-            if (!whenResult.Success || whenResult.Value is not bool whenBool || !whenBool)
-                return PreceptEventInspectionResult.NotApplicable(instance.CurrentState, eventName);
+            bool allGuardsPresent = preCheckRows.All(r => r.WhenGuard is not null);
+            if (allGuardsPresent)
+            {
+                var instanceOnlyContext = BuildEvaluationData(internalData, eventName, null);
+                bool anyGuardPasses = preCheckRows.Any(r =>
+                {
+                    var whenResult = PreceptExpressionRuntimeEvaluator.Evaluate(r.WhenGuard!, instanceOnlyContext);
+                    return whenResult.Success && whenResult.Value is true;
+                });
+                if (!anyGuardPasses)
+                    return PreceptEventInspectionResult.NotApplicable(instance.CurrentState, eventName);
+            }
         }
 
         // Inspect is a discovery API — it intentionally accepts calls with missing/partial event arguments
         // so callers can determine required args via RequiredEventArgumentKeys before firing.
-        // Full argument validation happens in Fire().
         if (eventArguments != null && !TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
             return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
 
         var evaluationArguments = BuildEvaluationData(internalData, eventName, eventArguments);
 
-        // Check event rules — only when caller provides event arguments.
+        // Check event asserts — only when caller provides event arguments.
         if (eventArguments != null)
         {
-            var eventRuleViolations = EvaluateEventRules(eventName, BuildDirectEvaluationData(eventName, eventArguments));
-            if (eventRuleViolations.Count > 0)
-                return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, eventRuleViolations);
+            var eventAssertViolations = EvaluateEventAsserts(eventName, BuildDirectEvaluationData(eventName, eventArguments));
+            if (eventAssertViolations.Count > 0)
+                return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, eventAssertViolations);
         }
 
         var resolution = ResolveTransition(instance.CurrentState, eventName, evaluationArguments);
@@ -297,34 +357,42 @@ public sealed class PreceptEngine
         if (resolution.Kind == TransitionResolutionKind.NoTransition)
             return PreceptEventInspectionResult.AcceptedInPlace(instance.CurrentState, eventName);
 
-        if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.Clause is null)
+        if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.MatchedRow is null)
             return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
 
-        // Simulate set assignments and check field/top-level/state rules
+        var matchedRow = resolution.MatchedRow;
+        var targetState = ((PreceptStateTransition)matchedRow.Outcome).TargetState;
+
+        // Simulate full pipeline: exit actions → row mutations → entry actions
         var simulatedData = new Dictionary<string, object?>(internalData, StringComparer.Ordinal);
         var simulatedCollections = CloneCollections(simulatedData);
 
-        foreach (var assignment in resolution.Clause.SetAssignments)
+        // Exit actions
+        ExecuteStateActions(PreceptAssertPreposition.From, instance.CurrentState,
+            simulatedData, simulatedCollections, eventName, eventArguments);
+
+        // Row mutations
+        foreach (var assignment in matchedRow.SetAssignments)
         {
             var ctx = BuildEvaluationDataWithCollections(simulatedData, simulatedCollections, eventName, eventArguments);
             var eval = PreceptExpressionRuntimeEvaluator.Evaluate(assignment.Expression, ctx);
             if (eval.Success)
                 simulatedData[assignment.Key] = eval.Value;
         }
-
-        if (resolution.Clause.CollectionMutations is { } mutations)
+        if (matchedRow.CollectionMutations is { } mutations)
             ExecuteCollectionMutations(mutations, simulatedCollections, simulatedData, eventName, eventArguments);
+
+        // Entry actions
+        ExecuteStateActions(PreceptAssertPreposition.To, targetState,
+            simulatedData, simulatedCollections, eventName, eventArguments);
 
         CommitCollections(simulatedData, simulatedCollections);
 
-        var dataRuleViolations = EvaluateDataRules(simulatedData);
-        if (dataRuleViolations.Count > 0)
-            return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, dataRuleViolations);
-
-        var targetState = ((PreceptStateTransition)resolution.Clause.Outcome).TargetState;
-        var stateRuleViolations = EvaluateStateRules(targetState, simulatedData);
-        if (stateRuleViolations.Count > 0)
-            return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, stateRuleViolations);
+        // Validate invariants + state asserts
+        var violations = CollectValidationViolations(
+            instance.CurrentState, targetState, simulatedData);
+        if (violations.Count > 0)
+            return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, violations);
 
         return PreceptEventInspectionResult.Accepted(
             instance.CurrentState,
@@ -350,7 +418,7 @@ public sealed class PreceptEngine
             .Select((e, i) => (e.Name, i))
             .ToDictionary(x => x.Name, x => x.i, StringComparer.Ordinal);
 
-        var outgoingEventNames = _transitionMap.Keys
+        var outgoingEventNames = _transitionRowMap.Keys
             .Where(k => string.Equals(k.State, instance.CurrentState, StringComparison.Ordinal))
             .Select(k => k.Event)
             .Distinct(StringComparer.Ordinal)
@@ -465,14 +533,12 @@ public sealed class PreceptEngine
 
         var evaluationArguments = BuildEvaluationData(internalData, eventName, eventArguments);
 
-        // Stage 1: Event rules (checked before guard evaluation)
-        // Use an args-only context so machine fields with the same name as an event arg cannot
-        // shadow the arg value (e.g. CreditScore field must not override Submit.CreditScore).
-        var eventRuleViolations = EvaluateEventRules(eventName, BuildDirectEvaluationData(eventName, eventArguments));
-        if (eventRuleViolations.Count > 0)
-            return PreceptFireResult.Rejected(instance.CurrentState, eventName, eventRuleViolations);
+        // Stage 1: Event asserts (args-only context, pre-transition)
+        var eventAssertViolations = EvaluateEventAsserts(eventName, BuildDirectEvaluationData(eventName, eventArguments));
+        if (eventAssertViolations.Count > 0)
+            return PreceptFireResult.Rejected(instance.CurrentState, eventName, eventAssertViolations);
 
-        // Stage 2: Guard evaluation (resolve transition)
+        // Stage 2: First-match row selection
         var resolution = ResolveTransition(instance.CurrentState, eventName, evaluationArguments);
         if (resolution.Kind == TransitionResolutionKind.NotDefined)
             return PreceptFireResult.NotDefined(instance.CurrentState, eventName, new[] { resolution.NotDefinedReason! });
@@ -480,95 +546,62 @@ public sealed class PreceptEngine
         if (resolution.Kind == TransitionResolutionKind.NotApplicable)
             return PreceptFireResult.NotApplicable(instance.CurrentState, eventName);
 
-        if (resolution.Kind == TransitionResolutionKind.NoTransition)
+        if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.MatchedRow is null)
+            return PreceptFireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
+
+        var matchedRow = resolution.MatchedRow;
+        var updatedData = new Dictionary<string, object?>(internalData, StringComparer.Ordinal);
+        var workingCollections = CloneCollections(updatedData);
+
+        // ── No-transition branch ──
+        if (matchedRow.Outcome is PreceptNoTransition)
         {
-            var noTransitionData = new Dictionary<string, object?>(internalData, StringComparer.Ordinal);
+            // Row mutations only (no exit/entry actions for no-transition)
+            var mutError = ExecuteRowMutations(matchedRow, updatedData, workingCollections, eventName, eventArguments);
+            if (mutError is not null)
+                return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { mutError });
 
-            // Deep-clone collections for working copy
-            var workingCollections = CloneCollections(noTransitionData);
+            CommitCollections(updatedData, workingCollections);
 
-            if (resolution.Clause?.SetAssignments is { } noTransitionSets)
-            {
-                foreach (var assignment in noTransitionSets)
-                {
-                    var assignmentContext = BuildEvaluationDataWithCollections(noTransitionData, workingCollections, eventName, eventArguments);
-                    var assignmentEvaluation = PreceptExpressionRuntimeEvaluator.Evaluate(assignment.Expression, assignmentContext);
-                    if (!assignmentEvaluation.Success)
-                        return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { $"Data assignment failed: {assignmentEvaluation.Error}" });
-
-                    if (!TryValidateAssignedValue(assignment.Key, assignmentEvaluation.Value, out var contractError))
-                        return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { contractError! });
-
-                    noTransitionData[assignment.Key] = assignmentEvaluation.Value;
-                }
-            }
-
-            // Execute collection mutations
-            if (resolution.Clause?.CollectionMutations is { } noTransitionMutations)
-            {
-                var mutationError = ExecuteCollectionMutations(noTransitionMutations, workingCollections, noTransitionData, eventName, eventArguments);
-                if (mutationError is not null)
-                    return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { mutationError });
-            }
-
-            // Commit working collections back to data
-            CommitCollections(noTransitionData, workingCollections);
-
-            // Note: no-transition does NOT trigger state rules
+            // Validate: invariants + 'in' asserts for current state
+            var violations = new List<string>();
+            violations.AddRange(EvaluateInvariants(updatedData));
+            violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.In, instance.CurrentState, updatedData));
+            if (violations.Count > 0)
+                return PreceptFireResult.Rejected(instance.CurrentState, eventName, violations);
 
             var noTransitionUpdated = instance with
             {
                 LastEvent = eventName,
                 UpdatedAt = DateTimeOffset.UtcNow,
-                InstanceData = DehydrateData(noTransitionData)
+                InstanceData = DehydrateData(updatedData)
             };
-
             return PreceptFireResult.AcceptedInPlace(instance.CurrentState, eventName, noTransitionUpdated);
         }
 
-        if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.Clause is null)
-            return PreceptFireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
+        // ── Transition branch ──
+        var targetState = ((PreceptStateTransition)matchedRow.Outcome).TargetState;
 
-        // Stage 3: Set execution (on working copy)
-        var updatedData = new Dictionary<string, object?>(internalData, StringComparer.Ordinal);
+        // Stage 3: Exit actions (from <sourceState> -> ...)
+        ExecuteStateActions(PreceptAssertPreposition.From, instance.CurrentState,
+            updatedData, workingCollections, eventName, eventArguments);
 
-        // Deep-clone collections for working copy
-        var transitionCollections = CloneCollections(updatedData);
+        // Stage 4: Row mutations (set assignments + collection mutations)
+        var rowMutError = ExecuteRowMutations(matchedRow, updatedData, workingCollections, eventName, eventArguments);
+        if (rowMutError is not null)
+            return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { rowMutError });
 
-        foreach (var assignment in resolution.Clause.SetAssignments)
-        {
-            var assignmentContext = BuildEvaluationDataWithCollections(updatedData, transitionCollections, eventName, eventArguments);
-            var assignmentEvaluation = PreceptExpressionRuntimeEvaluator.Evaluate(assignment.Expression, assignmentContext);
-            if (!assignmentEvaluation.Success)
-                return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { $"Data assignment failed: {assignmentEvaluation.Error}" });
+        // Stage 5: Entry actions (to <targetState> -> ...)
+        ExecuteStateActions(PreceptAssertPreposition.To, targetState,
+            updatedData, workingCollections, eventName, eventArguments);
 
-            if (!TryValidateAssignedValue(assignment.Key, assignmentEvaluation.Value, out var contractError))
-                return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { contractError! });
+        CommitCollections(updatedData, workingCollections);
 
-            updatedData[assignment.Key] = assignmentEvaluation.Value;
-        }
-
-        // Execute collection mutations
-        if (resolution.Clause.CollectionMutations is { } transitionMutations)
-        {
-            var mutationError = ExecuteCollectionMutations(transitionMutations, transitionCollections, updatedData, eventName, eventArguments);
-            if (mutationError is not null)
-                return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { mutationError });
-        }
-
-        // Commit working collections to updatedData for rule evaluation
-        CommitCollections(updatedData, transitionCollections);
-
-        // Stage 4: Field and top-level rules (checked against post-set data; rollback on failure)
-        var dataRuleViolations = EvaluateDataRules(updatedData);
-        if (dataRuleViolations.Count > 0)
-            return PreceptFireResult.Rejected(instance.CurrentState, eventName, dataRuleViolations);
-
-        // Stage 5: State rules (only checked on state transition, including self-transitions)
-        var targetState = ((PreceptStateTransition)resolution.Clause.Outcome).TargetState;
-        var stateRuleViolations = EvaluateStateRules(targetState, updatedData);
-        if (stateRuleViolations.Count > 0)
-            return PreceptFireResult.Rejected(instance.CurrentState, eventName, stateRuleViolations);
+        // Stage 6: Validation (invariants + state asserts, collect-all)
+        var validationViolations = CollectValidationViolations(
+            instance.CurrentState, targetState, updatedData);
+        if (validationViolations.Count > 0)
+            return PreceptFireResult.Rejected(instance.CurrentState, eventName, validationViolations);
 
         var updated = instance with
         {
@@ -582,15 +615,14 @@ public sealed class PreceptEngine
     }
 
     /// <summary>
-    /// Evaluates all field rules, top-level rules, and the current state's entry rules against the
-    /// instance's current data. Returns a flat list of violated rule reason strings. An empty list
-    /// means all rules are satisfied. Never throws — violations are collected without short-circuiting.
+    /// Evaluates all invariants and the current state's 'in' asserts against the
+    /// instance's current data. Returns a flat list of violation reason strings.
     /// </summary>
     internal IReadOnlyList<string> EvaluateCurrentRules(PreceptInstance instance)
     {
         var violations = new List<string>();
-        violations.AddRange(EvaluateDataRules(instance.InstanceData));
-        violations.AddRange(EvaluateStateRules(instance.CurrentState, instance.InstanceData));
+        violations.AddRange(EvaluateInvariants(instance.InstanceData));
+        violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.In, instance.CurrentState, instance.InstanceData));
         return violations;
     }
 
@@ -610,44 +642,31 @@ public sealed class PreceptEngine
         if (!Events.Any(e => e.Name.Equals(eventName, StringComparison.Ordinal)))
             return TransitionResolution.NotDefined($"Unknown event '{eventName}'.");
 
-        if (!_transitionMap.TryGetValue((currentState, eventName), out var transition))
+        if (!_transitionRowMap.TryGetValue((currentState, eventName), out var rows) || rows.Count == 0)
             return TransitionResolution.NotDefined($"No transition for '{eventName}' from '{currentState}'.");
 
-        // Evaluate 'when' predicate — if false, the entire block is not applicable
-        if (transition.PredicateAst is not null)
-        {
-            var whenResult = PreceptExpressionRuntimeEvaluator.Evaluate(transition.PredicateAst, evaluationData);
-            if (!whenResult.Success || whenResult.Value is not bool whenBool || !whenBool)
-                return TransitionResolution.NotApplicable();
-        }
-
+        // First-match evaluation: iterate rows, evaluate each row's WhenGuard.
+        // First row whose guard passes (or has no guard) is the match.
         var reasons = new List<string>();
-        foreach (var clause in transition.Clauses)
+        foreach (var row in rows)
         {
-            // Evaluate clause guard predicate (if/else if)
-            if (clause.PredicateAst is not null)
+            if (row.WhenGuard is not null)
             {
-                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(clause.PredicateAst, evaluationData);
+                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(row.WhenGuard, evaluationData);
                 if (!guardResult.Success || guardResult.Value is not bool guardBool || !guardBool)
                 {
-                    reasons.Add(clause.Predicate is not null
-                        ? $"Guard '{clause.Predicate}' failed."
+                    reasons.Add(row.WhenText is not null
+                        ? $"Guard '{row.WhenText}' failed."
                         : "Guard failed.");
                     continue;
                 }
             }
-            else if (!string.IsNullOrWhiteSpace(clause.Predicate))
-            {
-                // Predicate text is set but AST is null (parse failure) — guard cannot be evaluated, skip clause.
-                reasons.Add($"Guard '{clause.Predicate}' could not be evaluated.");
-                continue;
-            }
 
-            // Clause predicate passed (or no predicate — unguarded/else)
-            return clause.Outcome switch
+            // Guard passed (or no guard — unguarded row)
+            return row.Outcome switch
             {
-                PreceptStateTransition => TransitionResolution.Accepted(clause),
-                PreceptNoTransition => TransitionResolution.NoTransition(clause),
+                PreceptStateTransition => TransitionResolution.Accepted(row),
+                PreceptNoTransition => TransitionResolution.NoTransition(row),
                 PreceptRejection rej => TransitionResolution.Rejected(new[]
                 {
                     string.IsNullOrWhiteSpace(rej.Reason)
@@ -658,6 +677,9 @@ public sealed class PreceptEngine
             };
         }
 
+        // No row matched — if all had guards, NotApplicable; otherwise Rejected.
+        if (rows.All(r => r.WhenGuard is not null))
+            return TransitionResolution.NotApplicable();
         return TransitionResolution.Rejected(reasons);
     }
 
@@ -672,12 +694,12 @@ public sealed class PreceptEngine
 
     private sealed record TransitionResolution(
         TransitionResolutionKind Kind,
-        PreceptClause? Clause,
+        PreceptTransitionRow? MatchedRow,
         string? NotDefinedReason,
         IReadOnlyList<string> Reasons)
     {
-        internal static TransitionResolution Accepted(PreceptClause clause) =>
-            new(TransitionResolutionKind.Accepted, clause, null, Array.Empty<string>());
+        internal static TransitionResolution Accepted(PreceptTransitionRow row) =>
+            new(TransitionResolutionKind.Accepted, row, null, Array.Empty<string>());
 
         internal static TransitionResolution Rejected(IReadOnlyList<string> reasons) =>
             new(TransitionResolutionKind.Rejected, null, null, reasons);
@@ -685,8 +707,8 @@ public sealed class PreceptEngine
         internal static TransitionResolution NotDefined(string reason) =>
             new(TransitionResolutionKind.NotDefined, null, reason, new[] { reason });
 
-        internal static TransitionResolution NoTransition(PreceptClause clause) =>
-            new(TransitionResolutionKind.NoTransition, clause, null, Array.Empty<string>());
+        internal static TransitionResolution NoTransition(PreceptTransitionRow row) =>
+            new(TransitionResolutionKind.NoTransition, row, null, Array.Empty<string>());
 
         internal static TransitionResolution NotApplicable() =>
             new(TransitionResolutionKind.NotApplicable, null, null, Array.Empty<string>());
@@ -866,64 +888,140 @@ public sealed class PreceptEngine
         return evaluation;
     }
 
-    // ---- Rule evaluation helpers ----
+    // ---- Constraint evaluation helpers ----
 
-    private IReadOnlyList<string> EvaluateEventRules(string eventName, IReadOnlyDictionary<string, object?> evaluationData)
+    private IReadOnlyList<string> EvaluateEventAsserts(string eventName, IReadOnlyDictionary<string, object?> evaluationData)
     {
-        if (!_eventRules.TryGetValue(eventName, out var rules) || rules.Count == 0)
+        if (!_eventAssertMap.TryGetValue(eventName, out var asserts) || asserts.Count == 0)
             return Array.Empty<string>();
 
         var violations = new List<string>();
-        foreach (var rule in rules)
+        foreach (var assert in asserts)
         {
-            var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, evaluationData);
+            var result = PreceptExpressionRuntimeEvaluator.Evaluate(assert.Expression, evaluationData);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                violations.Add(rule.Reason);
+                violations.Add(assert.Reason);
         }
         return violations;
     }
 
-    private IReadOnlyList<string> EvaluateDataRules(IReadOnlyDictionary<string, object?> data)
+    private IReadOnlyList<string> EvaluateInvariants(IReadOnlyDictionary<string, object?> data)
+    {
+        if (_invariants.Count == 0)
+            return Array.Empty<string>();
+
+        var violations = new List<string>();
+        foreach (var inv in _invariants)
+        {
+            var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, data);
+            if (!result.Success || result.Value is not bool boolVal || !boolVal)
+                violations.Add(inv.Reason);
+        }
+        return violations;
+    }
+
+    /// <summary>
+    /// Evaluates state asserts for a given preposition and state.
+    /// </summary>
+    private IReadOnlyList<string> EvaluateStateAsserts(
+        PreceptAssertPreposition preposition, string state, IReadOnlyDictionary<string, object?> data)
+    {
+        if (!_stateAssertMap.TryGetValue((preposition, state), out var asserts) || asserts.Count == 0)
+            return Array.Empty<string>();
+
+        var violations = new List<string>();
+        foreach (var assert in asserts)
+        {
+            var result = PreceptExpressionRuntimeEvaluator.Evaluate(assert.Expression, data);
+            if (!result.Success || result.Value is not bool boolVal || !boolVal)
+                violations.Add(assert.Reason);
+        }
+        return violations;
+    }
+
+    /// <summary>
+    /// Collects all validation violations post-mutation: invariants + preposition-aware state asserts.
+    /// </summary>
+    private IReadOnlyList<string> CollectValidationViolations(
+        string sourceState, string targetState, IReadOnlyDictionary<string, object?> data)
     {
         var violations = new List<string>();
 
-        foreach (var rule in _allFieldRules)
-        {
-            var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
-            if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                violations.Add(rule.Reason);
-        }
+        // Invariants (always)
+        violations.AddRange(EvaluateInvariants(data));
 
-        foreach (var rule in _allCollectionRules)
+        if (string.Equals(sourceState, targetState, StringComparison.Ordinal))
         {
-            var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
-            if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                violations.Add(rule.Reason);
+            // AcceptedInPlace / self-transition: evaluate 'in' asserts
+            violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.In, sourceState, data));
         }
-
-        foreach (var rule in _topLevelRules)
+        else
         {
-            var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
-            if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                violations.Add(rule.Reason);
+            // State transition: evaluate 'from' source + 'to' target + 'in' target
+            violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.From, sourceState, data));
+            violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.To, targetState, data));
+            violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.In, targetState, data));
         }
 
         return violations;
     }
 
-    private IReadOnlyList<string> EvaluateStateRules(string state, IReadOnlyDictionary<string, object?> data)
+    /// <summary>
+    /// Executes state entry/exit actions (automatic mutations).
+    /// </summary>
+    private void ExecuteStateActions(
+        PreceptAssertPreposition preposition, string state,
+        Dictionary<string, object?> data, Dictionary<string, CollectionValue> workingCollections,
+        string eventName, IReadOnlyDictionary<string, object?>? eventArguments)
     {
-        if (!_stateRuleMap.TryGetValue(state, out var rules) || rules.Count == 0)
-            return Array.Empty<string>();
+        if (!_stateActionMap.TryGetValue((preposition, state), out var actions))
+            return;
 
-        var violations = new List<string>();
-        foreach (var rule in rules)
+        foreach (var action in actions)
         {
-            var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
-            if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                violations.Add(rule.Reason);
+            foreach (var assignment in action.SetAssignments)
+            {
+                var ctx = BuildEvaluationDataWithCollections(data, workingCollections, eventName, eventArguments);
+                var eval = PreceptExpressionRuntimeEvaluator.Evaluate(assignment.Expression, ctx);
+                if (eval.Success)
+                    data[assignment.Key] = eval.Value;
+            }
+
+            if (action.CollectionMutations is { } mutations)
+                ExecuteCollectionMutations(mutations, workingCollections, data, eventName, eventArguments);
         }
-        return violations;
+    }
+
+    /// <summary>
+    /// Executes set assignments and collection mutations from a matched transition row.
+    /// Returns an error string on failure, null on success.
+    /// </summary>
+    private string? ExecuteRowMutations(
+        PreceptTransitionRow row,
+        Dictionary<string, object?> data, Dictionary<string, CollectionValue> workingCollections,
+        string eventName, IReadOnlyDictionary<string, object?>? eventArguments)
+    {
+        foreach (var assignment in row.SetAssignments)
+        {
+            var ctx = BuildEvaluationDataWithCollections(data, workingCollections, eventName, eventArguments);
+            var eval = PreceptExpressionRuntimeEvaluator.Evaluate(assignment.Expression, ctx);
+            if (!eval.Success)
+                return $"Data assignment failed: {eval.Error}";
+
+            if (!TryValidateAssignedValue(assignment.Key, eval.Value, out var contractError))
+                return contractError;
+
+            data[assignment.Key] = eval.Value;
+        }
+
+        if (row.CollectionMutations is { } mutations)
+        {
+            var mutError = ExecuteCollectionMutations(mutations, workingCollections, data, eventName, eventArguments);
+            if (mutError is not null)
+                return mutError;
+        }
+
+        return null;
     }
 
     private Dictionary<string, CollectionValue> CloneCollections(Dictionary<string, object?> data)
@@ -1150,94 +1248,207 @@ public static class PreceptCompiler
         if (!model.States.Contains(model.InitialState))
             throw new InvalidOperationException($"Initial state '{model.InitialState.Name}' is not defined in workflow '{model.Name}'.");
 
-        // Compile-time rule validations
-        ValidateRulesAtCompileTime(model);
+        // Compile-time constraint validations
+        ValidateConstraintsAtCompileTime(model);
 
         return new PreceptEngine(model);
     }
 
-    private static void ValidateRulesAtCompileTime(PreceptDefinition model)
+    private static void ValidateConstraintsAtCompileTime(PreceptDefinition model)
     {
-        // Build initial instance data (using field defaults)
         var defaultData = BuildDefaultData(model);
 
-        // 1. Validate field rules against default values
+        // 1. Validate invariants against default values
+        if (model.Invariants is { Count: > 0 })
+        {
+            foreach (var inv in model.Invariants)
+            {
+                var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, defaultData);
+                if (!result.Success || result.Value is not bool boolVal || !boolVal)
+                    throw new InvalidOperationException(
+                        $"Compile-time invariant violation: \"{inv.Reason}\" is violated by default field values.");
+            }
+        }
+
+        // 2. Validate initial state asserts (in + to) against default data
+        if (model.StateAsserts is { Count: > 0 })
+        {
+            var initialStateName = model.InitialState.Name;
+            foreach (var sa in model.StateAsserts)
+            {
+                if (!string.Equals(sa.State, initialStateName, StringComparison.Ordinal))
+                    continue;
+                if (sa.Preposition is not (PreceptAssertPreposition.In or PreceptAssertPreposition.To))
+                    continue;
+
+                var result = PreceptExpressionRuntimeEvaluator.Evaluate(sa.Expression, defaultData);
+                if (!result.Success || result.Value is not bool boolVal || !boolVal)
+                    throw new InvalidOperationException(
+                        $"Compile-time state assert violation: \"{sa.Reason}\" on initial state '{initialStateName}' is violated by default data.");
+            }
+        }
+
+        // 3. Validate event asserts against event argument defaults (when all args have defaults)
+        if (model.EventAsserts is { Count: > 0 })
+        {
+            var eventsByName = model.Events.ToDictionary(e => e.Name, e => e, StringComparer.Ordinal);
+            foreach (var ea in model.EventAsserts)
+            {
+                if (!eventsByName.TryGetValue(ea.EventName, out var evt))
+                    continue;
+
+                var eventDefaults = new Dictionary<string, object?>(StringComparer.Ordinal);
+                bool allArgsHaveDefaults = true;
+                foreach (var arg in evt.Args)
+                {
+                    if (arg.HasDefaultValue)
+                    {
+                        eventDefaults[arg.Name] = arg.DefaultValue;
+                        eventDefaults[$"{evt.Name}.{arg.Name}"] = arg.DefaultValue;
+                    }
+                    else if (arg.IsNullable)
+                    {
+                        eventDefaults[arg.Name] = null;
+                        eventDefaults[$"{evt.Name}.{arg.Name}"] = null;
+                    }
+                    else
+                    {
+                        allArgsHaveDefaults = false;
+                        break;
+                    }
+                }
+
+                if (!allArgsHaveDefaults)
+                    continue;
+
+                var result = PreceptExpressionRuntimeEvaluator.Evaluate(ea.Expression, eventDefaults);
+                if (!result.Success || result.Value is not bool boolVal || !boolVal)
+                    throw new InvalidOperationException(
+                        $"Compile-time event assert violation: \"{ea.Reason}\" on event '{ea.EventName}' is violated by default argument values.");
+            }
+        }
+
+        // 4. Validate literal set assignments against invariants
+        ValidateLiteralSetAssignments(model, defaultData);
+
+        // 5. Backward compat: validate old-style field/collection/top-level/state/event rules
+        ValidateLegacyRules(model, defaultData);
+    }
+
+    private static void ValidateLiteralSetAssignments(PreceptDefinition model, IReadOnlyDictionary<string, object?> defaultData)
+    {
+        var invariants = model.Invariants ?? Array.Empty<PreceptInvariant>();
+        if (invariants.Count == 0)
+            return;
+
+        void CheckLiteralAssignment(PreceptSetAssignment assignment)
+        {
+            var constantEval = PreceptExpressionRuntimeEvaluator.Evaluate(assignment.Expression, EmptyInstanceData.Instance);
+            if (!constantEval.Success)
+                return;
+
+            var ctx = new Dictionary<string, object?>(defaultData, StringComparer.Ordinal)
+            {
+                [assignment.Key] = constantEval.Value
+            };
+
+            foreach (var inv in invariants)
+            {
+                var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, ctx);
+                if (!result.Success || result.Value is not bool boolVal || !boolVal)
+                    throw new InvalidOperationException(
+                        $"Line {assignment.SourceLine}: literal assignment 'set {assignment.Key} = {assignment.ExpressionText}' violates invariant \"{inv.Reason}\".");
+            }
+        }
+
+        // Check assignments in transition rows
+        if (model.TransitionRows is { Count: > 0 })
+        {
+            foreach (var row in model.TransitionRows)
+                foreach (var assignment in row.SetAssignments)
+                    CheckLiteralAssignment(assignment);
+        }
+
+        // Backward compat: check assignments in old transitions
+        foreach (var transition in model.Transitions)
+            foreach (var clause in transition.Clauses)
+                foreach (var assignment in clause.SetAssignments)
+                    CheckLiteralAssignment(assignment);
+    }
+
+    /// <summary>
+    /// Backward compat: validates old-style per-field, per-collection, top-level, state, and event rules
+    /// from models created by the old parser.
+    /// </summary>
+    private static void ValidateLegacyRules(PreceptDefinition model, IReadOnlyDictionary<string, object?> defaultData)
+    {
+        // Field rules
         foreach (var field in model.Fields)
         {
-            if (field.Rules is null || field.Rules.Count == 0)
+            if (field.Rules is not { Count: > 0 } || !field.HasDefaultValue)
                 continue;
-
-            // Only check at compile time when there is an explicit default value to validate against.
-            // Nullable fields without defaults have no fixed initial value to check here.
-            if (!field.HasDefaultValue)
-                continue;
-
             foreach (var rule in field.Rules)
             {
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException($"Line {rule.SourceLine}: compile-time rule violation: rule \"{rule.Reason}\" on field '{field.Name}' is violated by the field's default value.");
+                    throw new InvalidOperationException(
+                        $"Line {rule.SourceLine}: compile-time rule violation: rule \"{rule.Reason}\" on field '{field.Name}' is violated by the field's default value.");
             }
         }
 
-        // 2. Validate collection rules at creation (collections start empty; count=0, contains=false)
+        // Collection rules  
         foreach (var col in model.CollectionFields)
         {
-            if (col.Rules is null || col.Rules.Count == 0)
+            if (col.Rules is not { Count: > 0 })
                 continue;
-
-            var colCtx = new Dictionary<string, object?>(StringComparer.Ordinal)
+            var colCtx = new Dictionary<string, object?>(defaultData, StringComparer.Ordinal)
             {
                 [$"__collection__{col.Name}"] = new CollectionValue(col.CollectionKind, col.InnerType)
             };
-            // Also add empty collection proxy for collection identifier expressions
-            foreach (var pair in defaultData)
-                colCtx[pair.Key] = pair.Value;
-
             foreach (var rule in col.Rules)
             {
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, colCtx);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException($"Line {rule.SourceLine}: compile-time rule violation: rule \"{rule.Reason}\" on collection field '{col.Name}' is violated at creation (collection starts empty).");
+                    throw new InvalidOperationException(
+                        $"Line {rule.SourceLine}: compile-time rule violation: rule \"{rule.Reason}\" on collection field '{col.Name}' is violated at creation.");
             }
         }
 
-        // 3. Validate top-level rules against default values
-        if (model.TopLevelRules is not null)
+        // Top-level rules
+        if (model.TopLevelRules is { Count: > 0 })
         {
             foreach (var rule in model.TopLevelRules)
             {
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException($"Line {rule.SourceLine}: compile-time rule violation: top-level rule \"{rule.Reason}\" is violated by default field values.");
+                    throw new InvalidOperationException(
+                        $"Line {rule.SourceLine}: compile-time rule violation: top-level rule \"{rule.Reason}\" is violated by default field values.");
             }
         }
 
-        // 4. Validate initial state entry rules against default data
-        var initialStateRules = model.InitialState.Rules;
-        if (initialStateRules is not null)
+        // State rules on initial state
+        if (model.InitialState.Rules is { Count: > 0 })
         {
-            foreach (var rule in initialStateRules)
+            foreach (var rule in model.InitialState.Rules)
             {
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException($"Line {rule.SourceLine}: compile-time rule violation: state rule \"{rule.Reason}\" on initial state '{model.InitialState}' is violated by default data.");
+                    throw new InvalidOperationException(
+                        $"Line {rule.SourceLine}: compile-time rule violation: state rule \"{rule.Reason}\" on initial state '{model.InitialState.Name}' is violated by default data.");
             }
         }
 
-        // 5. Validate event rules against event argument defaults
+        // Event rules
         foreach (var evt in model.Events)
         {
-            if (evt.Rules is null || evt.Rules.Count == 0)
+            if (evt.Rules is not { Count: > 0 })
                 continue;
-
             var eventDefaults = new Dictionary<string, object?>(StringComparer.Ordinal);
             bool allArgsHaveDefaults = true;
             foreach (var arg in evt.Args)
             {
                 if (arg.HasDefaultValue)
                 {
-                    // Inject both bare and prefixed forms, matching BuildDirectEvaluationData
                     eventDefaults[arg.Name] = arg.DefaultValue;
                     eventDefaults[$"{evt.Name}.{arg.Name}"] = arg.DefaultValue;
                 }
@@ -1246,81 +1457,15 @@ public static class PreceptCompiler
                     eventDefaults[arg.Name] = null;
                     eventDefaults[$"{evt.Name}.{arg.Name}"] = null;
                 }
-                else
-                {
-                    allArgsHaveDefaults = false;
-                    break;
-                }
+                else { allArgsHaveDefaults = false; break; }
             }
-
-            if (!allArgsHaveDefaults)
-                continue;
-
+            if (!allArgsHaveDefaults) continue;
             foreach (var rule in evt.Rules)
             {
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, eventDefaults);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException($"Line {rule.SourceLine}: compile-time rule violation: event rule \"{rule.Reason}\" on event '{evt.Name}' is violated by default argument values.");
-            }
-        }
-
-        // 6. Warn about untargeted states with entry rules (emitted as compile-time warning via InvalidOperationException hint)
-        // This is a warning not an error per design. We'll skip throwing but leave as a comment for future diagnostics.
-        // 7. Validate literal set assignments against field and top-level rules
-        ValidateLiteralSetAssignments(model, defaultData);
-    }
-
-    private static void ValidateLiteralSetAssignments(PreceptDefinition model, IReadOnlyDictionary<string, object?> defaultData)
-    {
-        var fieldRuleMap = model.Fields
-            .Where(f => f.Rules is not null && f.Rules.Count > 0)
-            .ToDictionary(f => f.Name, f => f.Rules!, StringComparer.Ordinal);
-
-        var topLevelRules = model.TopLevelRules ?? Array.Empty<PreceptRule>();
-
-        void CheckLiteralAssignment(PreceptSetAssignment assignment)
-        {
-            // Try to evaluate the assignment expression as a constant (no field references needed).
-            // This catches literal numbers, strings, bools, null, and also constant expressions like -1.
-            var constantEval = PreceptExpressionRuntimeEvaluator.Evaluate(assignment.Expression, EmptyInstanceData.Instance);
-            if (!constantEval.Success)
-                return; // Expression depends on runtime data — cannot check at compile time
-
-            var assignedValue = constantEval.Value;
-
-            if (!fieldRuleMap.TryGetValue(assignment.Key, out var fieldRules) && topLevelRules.Count == 0)
-                return;
-
-            // Build data context with the constant value in place of the field's default
-            var ctx = new Dictionary<string, object?>(defaultData, StringComparer.Ordinal)
-            {
-                [assignment.Key] = assignedValue
-            };
-
-            if (fieldRuleMap.TryGetValue(assignment.Key, out fieldRules))
-            {
-                foreach (var rule in fieldRules)
-                {
-                    var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, ctx);
-                    if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                        throw new InvalidOperationException($"Line {assignment.SourceLine}: literal assignment 'set {assignment.Key} = {assignment.ExpressionText}' violates rule \"{rule.Reason}\" on field '{assignment.Key}'.");
-                }
-            }
-
-            foreach (var rule in topLevelRules)
-            {
-                var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, ctx);
-                if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException($"Line {assignment.SourceLine}: literal assignment 'set {assignment.Key} = {assignment.ExpressionText}' violates top-level rule \"{rule.Reason}\".");
-            }
-        }
-
-        foreach (var transition in model.Transitions)
-        {
-            foreach (var clause in transition.Clauses)
-            {
-                foreach (var assignment in clause.SetAssignments)
-                    CheckLiteralAssignment(assignment);
+                    throw new InvalidOperationException(
+                        $"Line {rule.SourceLine}: compile-time rule violation: event rule \"{rule.Reason}\" on event '{evt.Name}' is violated by default argument values.");
             }
         }
     }
