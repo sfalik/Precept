@@ -4,9 +4,9 @@ using System.Globalization;
 
 namespace Precept;
 
-internal static class DslExpressionParser
+internal static class PreceptExpressionParser
 {
-    public static DslExpression Parse(string expression)
+    public static PreceptExpression Parse(string expression)
     {
         if (string.IsNullOrWhiteSpace(expression))
             throw new InvalidOperationException("expression is empty.");
@@ -30,119 +30,119 @@ internal static class DslExpressionParser
             _previous = new Token(TokenKind.End, string.Empty, null);
         }
 
-        internal DslExpression ParseExpression() => ParseOr();
+        internal PreceptExpression ParseExpression() => ParseOr();
 
-        private DslExpression ParseOr()
+        private PreceptExpression ParseOr()
         {
             var left = ParseAnd();
             while (Match(TokenKind.OrOr))
             {
                 var op = Previous().Text;
                 var right = ParseAnd();
-                left = new DslBinaryExpression(op, left, right);
+                left = new PreceptBinaryExpression(op, left, right);
             }
 
             return left;
         }
 
-        private DslExpression ParseAnd()
+        private PreceptExpression ParseAnd()
         {
             var left = ParseEquality();
             while (Match(TokenKind.AndAnd))
             {
                 var op = Previous().Text;
                 var right = ParseEquality();
-                left = new DslBinaryExpression(op, left, right);
+                left = new PreceptBinaryExpression(op, left, right);
             }
 
             return left;
         }
 
-        private DslExpression ParseEquality()
+        private PreceptExpression ParseEquality()
         {
             var left = ParseComparison();
             while (Match(TokenKind.EqualEqual) || Match(TokenKind.BangEqual))
             {
                 var op = Previous().Text;
                 var right = ParseComparison();
-                left = new DslBinaryExpression(op, left, right);
+                left = new PreceptBinaryExpression(op, left, right);
             }
 
             return left;
         }
 
-        private DslExpression ParseComparison()
+        private PreceptExpression ParseComparison()
         {
             var left = ParseTerm();
             while (Match(TokenKind.Greater) || Match(TokenKind.GreaterEqual) || Match(TokenKind.Less) || Match(TokenKind.LessEqual) || Match(TokenKind.Contains))
             {
                 var op = Previous().Text;
                 var right = ParseTerm();
-                left = new DslBinaryExpression(op, left, right);
+                left = new PreceptBinaryExpression(op, left, right);
             }
 
             return left;
         }
 
-        private DslExpression ParseTerm()
+        private PreceptExpression ParseTerm()
         {
             var left = ParseFactor();
             while (Match(TokenKind.Plus) || Match(TokenKind.Minus))
             {
                 var op = Previous().Text;
                 var right = ParseFactor();
-                left = new DslBinaryExpression(op, left, right);
+                left = new PreceptBinaryExpression(op, left, right);
             }
 
             return left;
         }
 
-        private DslExpression ParseFactor()
+        private PreceptExpression ParseFactor()
         {
             var left = ParseUnary();
             while (Match(TokenKind.Star) || Match(TokenKind.Slash) || Match(TokenKind.Percent))
             {
                 var op = Previous().Text;
                 var right = ParseUnary();
-                left = new DslBinaryExpression(op, left, right);
+                left = new PreceptBinaryExpression(op, left, right);
             }
 
             return left;
         }
 
-        private DslExpression ParseUnary()
+        private PreceptExpression ParseUnary()
         {
             if (Match(TokenKind.Bang) || Match(TokenKind.Minus))
             {
                 var op = Previous().Text;
                 var operand = ParseUnary();
-                return new DslUnaryExpression(op, operand);
+                return new PreceptUnaryExpression(op, operand);
             }
 
             return ParsePrimary();
         }
 
-        private DslExpression ParsePrimary()
+        private PreceptExpression ParsePrimary()
         {
             if (Match(TokenKind.Number))
             {
                 if (!double.TryParse(Previous().Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
                     throw Error("invalid number literal.");
 
-                return new DslLiteralExpression(number);
+                return new PreceptLiteralExpression(number);
             }
 
             if (Match(TokenKind.String))
-                return new DslLiteralExpression(Previous().Value);
+                return new PreceptLiteralExpression(Previous().Value);
 
             if (Match(TokenKind.True))
-                return new DslLiteralExpression(true);
+                return new PreceptLiteralExpression(true);
 
             if (Match(TokenKind.False))
-                return new DslLiteralExpression(false);
+                return new PreceptLiteralExpression(false);
 
             if (Match(TokenKind.Null))
-                return new DslLiteralExpression(null);
+                return new PreceptLiteralExpression(null);
 
             if (Match(TokenKind.Identifier))
             {
@@ -155,18 +155,18 @@ internal static class DslExpressionParser
                     var member = Previous().Text;
 
                     // Support chained dot access for collection properties like CollectionField.count
-                    // The first identifier.member is treated as a DslIdentifierExpression
-                    return new DslIdentifierExpression(identifier, member);
+                    // The first identifier.member is treated as a PreceptIdentifierExpression
+                    return new PreceptIdentifierExpression(identifier, member);
                 }
 
-                return new DslIdentifierExpression(identifier);
+                return new PreceptIdentifierExpression(identifier);
             }
 
             if (Match(TokenKind.LeftParen))
             {
                 var inner = ParseExpression();
                 Expect(TokenKind.RightParen);
-                return new DslParenthesizedExpression(inner);
+                return new PreceptParenthesizedExpression(inner);
             }
 
             throw Error($"unexpected token '{_current.Text}'.");

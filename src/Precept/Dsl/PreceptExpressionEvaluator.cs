@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace Precept;
 
-internal static class DslExpressionRuntimeEvaluator
+internal static class PreceptExpressionRuntimeEvaluator
 {
     internal sealed record EvaluationResult(bool Success, object? Value, string? Error)
     {
@@ -12,20 +12,20 @@ internal static class DslExpressionRuntimeEvaluator
         internal static EvaluationResult Fail(string error) => new(false, null, error);
     }
 
-    public static EvaluationResult Evaluate(DslExpression expression, IReadOnlyDictionary<string, object?> context)
+    public static EvaluationResult Evaluate(PreceptExpression expression, IReadOnlyDictionary<string, object?> context)
     {
         return expression switch
         {
-            DslLiteralExpression literal => EvaluationResult.Ok(literal.Value),
-            DslIdentifierExpression identifier => EvaluateIdentifier(identifier, context),
-            DslParenthesizedExpression parenthesized => Evaluate(parenthesized.Inner, context),
-            DslUnaryExpression unary => EvaluateUnary(unary, context),
-            DslBinaryExpression binary => EvaluateBinary(binary, context),
+            PreceptLiteralExpression literal => EvaluationResult.Ok(literal.Value),
+            PreceptIdentifierExpression identifier => EvaluateIdentifier(identifier, context),
+            PreceptParenthesizedExpression parenthesized => Evaluate(parenthesized.Inner, context),
+            PreceptUnaryExpression unary => EvaluateUnary(unary, context),
+            PreceptBinaryExpression binary => EvaluateBinary(binary, context),
             _ => EvaluationResult.Fail("unsupported expression node.")
         };
     }
 
-    private static EvaluationResult EvaluateIdentifier(DslIdentifierExpression identifier, IReadOnlyDictionary<string, object?> context)
+    private static EvaluationResult EvaluateIdentifier(PreceptIdentifierExpression identifier, IReadOnlyDictionary<string, object?> context)
     {
         // Handle collection property access: Collection.count, Collection.min, Collection.max, Collection.peek
         if (identifier.Member is not null)
@@ -36,17 +36,17 @@ internal static class DslExpressionRuntimeEvaluator
                 return identifier.Member switch
                 {
                     "count" => EvaluationResult.Ok((double)collection.Count),
-                    "min" => collection.Kind == DslCollectionKind.Set
+                    "min" => collection.Kind == PreceptCollectionKind.Set
                         ? (collection.Count > 0
                             ? EvaluationResult.Ok(collection.Min()!)
                             : EvaluationResult.Fail($"'{identifier.Name}.min' failed: set is empty."))
                         : EvaluationResult.Fail($"'{identifier.Name}.min' is only valid on set<T> fields."),
-                    "max" => collection.Kind == DslCollectionKind.Set
+                    "max" => collection.Kind == PreceptCollectionKind.Set
                         ? (collection.Count > 0
                             ? EvaluationResult.Ok(collection.Max()!)
                             : EvaluationResult.Fail($"'{identifier.Name}.max' failed: set is empty."))
                         : EvaluationResult.Fail($"'{identifier.Name}.max' is only valid on set<T> fields."),
-                    "peek" => collection.Kind is DslCollectionKind.Queue or DslCollectionKind.Stack
+                    "peek" => collection.Kind is PreceptCollectionKind.Queue or PreceptCollectionKind.Stack
                         ? (collection.Count > 0
                             ? EvaluationResult.Ok(collection.Peek()!)
                             : EvaluationResult.Fail($"'{identifier.Name}.peek' failed: collection is empty."))
@@ -63,7 +63,7 @@ internal static class DslExpressionRuntimeEvaluator
         return EvaluationResult.Ok(value);
     }
 
-    private static EvaluationResult EvaluateUnary(DslUnaryExpression unary, IReadOnlyDictionary<string, object?> context)
+    private static EvaluationResult EvaluateUnary(PreceptUnaryExpression unary, IReadOnlyDictionary<string, object?> context)
     {
         var operand = Evaluate(unary.Operand, context);
         if (!operand.Success)
@@ -81,7 +81,7 @@ internal static class DslExpressionRuntimeEvaluator
         };
     }
 
-    private static EvaluationResult EvaluateBinary(DslBinaryExpression binary, IReadOnlyDictionary<string, object?> context)
+    private static EvaluationResult EvaluateBinary(PreceptBinaryExpression binary, IReadOnlyDictionary<string, object?> context)
     {
         if (binary.Operator == "contains")
             return EvaluateContains(binary, context);
@@ -215,10 +215,10 @@ internal static class DslExpressionRuntimeEvaluator
         }
     }
 
-    private static EvaluationResult EvaluateContains(DslBinaryExpression binary, IReadOnlyDictionary<string, object?> context)
+    private static EvaluationResult EvaluateContains(PreceptBinaryExpression binary, IReadOnlyDictionary<string, object?> context)
     {
         // Left side must be a collection identifier
-        if (binary.Left is not DslIdentifierExpression collectionIdentifier || collectionIdentifier.Member is not null)
+        if (binary.Left is not PreceptIdentifierExpression collectionIdentifier || collectionIdentifier.Member is not null)
             return EvaluationResult.Fail("'contains' requires a collection field on the left side.");
 
         var collectionKey = $"__collection__{collectionIdentifier.Name}";
@@ -260,26 +260,26 @@ internal static class DslExpressionRuntimeEvaluator
 /// </summary>
 public sealed class CollectionValue
 {
-    public DslCollectionKind Kind { get; }
-    public DslScalarType InnerType { get; }
+    public PreceptCollectionKind Kind { get; }
+    public PreceptScalarType InnerType { get; }
 
     // set<T> backed by SortedSet keyed on IComparable
     private SortedSet<object>? _set;
     // queue<T> / stack<T> backed by List (front=0 for queue, top=last for stack)
     private List<object>? _list;
 
-    public CollectionValue(DslCollectionKind kind, DslScalarType innerType)
+    public CollectionValue(PreceptCollectionKind kind, PreceptScalarType innerType)
     {
         Kind = kind;
         InnerType = innerType;
 
-        if (kind == DslCollectionKind.Set)
+        if (kind == PreceptCollectionKind.Set)
             _set = new SortedSet<object>(CollectionComparer.Instance);
         else
             _list = new List<object>();
     }
 
-    private CollectionValue(DslCollectionKind kind, DslScalarType innerType, SortedSet<object>? set, List<object>? list)
+    private CollectionValue(PreceptCollectionKind kind, PreceptScalarType innerType, SortedSet<object>? set, List<object>? list)
     {
         Kind = kind;
         InnerType = innerType;
@@ -287,16 +287,16 @@ public sealed class CollectionValue
         _list = list;
     }
 
-    public int Count => Kind == DslCollectionKind.Set ? _set!.Count : _list!.Count;
+    public int Count => Kind == PreceptCollectionKind.Set ? _set!.Count : _list!.Count;
 
     public object? Min() => _set?.Min;
     public object? Max() => _set?.Max;
 
     public object? Peek()
     {
-        if (Kind == DslCollectionKind.Queue)
+        if (Kind == PreceptCollectionKind.Queue)
             return _list!.Count > 0 ? _list![0] : null;
-        if (Kind == DslCollectionKind.Stack)
+        if (Kind == PreceptCollectionKind.Stack)
             return _list!.Count > 0 ? _list![^1] : null;
         return null;
     }
@@ -306,7 +306,7 @@ public sealed class CollectionValue
         if (value is null) return false;
         var normalized = NormalizeValue(value);
 
-        if (Kind == DslCollectionKind.Set)
+        if (Kind == PreceptCollectionKind.Set)
             return _set!.Contains(normalized);
 
         return _list!.Any(item => CollectionComparer.Instance.Compare(item, normalized) == 0);
@@ -343,7 +343,7 @@ public sealed class CollectionValue
     /// <summary>Clear all elements.</summary>
     public void Clear()
     {
-        if (Kind == DslCollectionKind.Set)
+        if (Kind == PreceptCollectionKind.Set)
             _set!.Clear();
         else
             _list!.Clear();
@@ -352,7 +352,7 @@ public sealed class CollectionValue
     /// <summary>Deep-clone for working-copy semantics.</summary>
     public CollectionValue Clone()
     {
-        if (Kind == DslCollectionKind.Set)
+        if (Kind == PreceptCollectionKind.Set)
             return new CollectionValue(Kind, InnerType, new SortedSet<object>(_set!, CollectionComparer.Instance), null);
 
         return new CollectionValue(Kind, InnerType, null, new List<object>(_list!));
@@ -361,7 +361,7 @@ public sealed class CollectionValue
     /// <summary>Serialize to a list for JSON output.</summary>
     public List<object> ToSerializableList()
     {
-        if (Kind == DslCollectionKind.Set)
+        if (Kind == PreceptCollectionKind.Set)
             return _set!.ToList();
 
         return new List<object>(_list!);
@@ -370,7 +370,7 @@ public sealed class CollectionValue
     /// <summary>Populate from a deserialized list.</summary>
     public void LoadFrom(IEnumerable<object> items)
     {
-        if (Kind == DslCollectionKind.Set)
+        if (Kind == PreceptCollectionKind.Set)
         {
             _set!.Clear();
             foreach (var item in items)

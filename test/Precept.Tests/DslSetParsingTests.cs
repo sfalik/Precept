@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Precept.Tests;
 
-public class DslSetParsingTests
+public class PreceptSetParsingTests
 {
     [Fact]
     public void Parse_IfBranch_WithSetAndNoTransition_PreservesAssignments()
@@ -28,7 +28,7 @@ public class DslSetParsingTests
         var machine = PreceptParser.Parse(dsl);
 
         machine.Transitions.Should().ContainSingle();
-        var noTransClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is DslNoTransition);
+        var noTransClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is PreceptNoTransition);
         noTransClause.SetAssignments.Should().ContainSingle();
         noTransClause.SetAssignments[0].Key.Should().Be("Count");
     }
@@ -94,7 +94,7 @@ public class DslSetParsingTests
         var machine = PreceptParser.Parse(dsl);
 
         machine.Transitions.Should().ContainSingle();
-        var elseClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is DslStateTransition st && st.TargetState == "Red");
+        var elseClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is PreceptStateTransition st && st.TargetState == "Red");
         elseClause.SetAssignments.Should().HaveCount(2);
         elseClause.SetAssignments[0].Key.Should().Be("Count");
         elseClause.SetAssignments[1].Key.Should().Be("Label");

@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Precept.Tests;
 
-public class DslCollectionParsingTests
+public class PreceptCollectionParsingTests
 {
     [Fact]
     public void Parse_SetDeclaration_CorrectCollectionKindAndInnerType()
@@ -23,8 +23,8 @@ public class DslCollectionParsingTests
         machine.CollectionFields.Should().ContainSingle();
         var field = machine.CollectionFields[0];
         field.Name.Should().Be("Floors");
-        field.CollectionKind.Should().Be(DslCollectionKind.Set);
-        field.InnerType.Should().Be(DslScalarType.Number);
+        field.CollectionKind.Should().Be(PreceptCollectionKind.Set);
+        field.InnerType.Should().Be(PreceptScalarType.Number);
     }
 
     [Fact]
@@ -41,8 +41,8 @@ public class DslCollectionParsingTests
         machine.CollectionFields.Should().ContainSingle();
         var field = machine.CollectionFields[0];
         field.Name.Should().Be("Messages");
-        field.CollectionKind.Should().Be(DslCollectionKind.Queue);
-        field.InnerType.Should().Be(DslScalarType.String);
+        field.CollectionKind.Should().Be(PreceptCollectionKind.Queue);
+        field.InnerType.Should().Be(PreceptScalarType.String);
     }
 
     [Fact]
@@ -59,8 +59,8 @@ public class DslCollectionParsingTests
         machine.CollectionFields.Should().ContainSingle();
         var field = machine.CollectionFields[0];
         field.Name.Should().Be("Flags");
-        field.CollectionKind.Should().Be(DslCollectionKind.Stack);
-        field.InnerType.Should().Be(DslScalarType.Boolean);
+        field.CollectionKind.Should().Be(PreceptCollectionKind.Stack);
+        field.InnerType.Should().Be(PreceptScalarType.Boolean);
     }
 
     [Fact]
@@ -111,10 +111,10 @@ public class DslCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
         var mut = clause.CollectionMutations![0];
-        mut.Verb.Should().Be(DslCollectionMutationVerb.Add);
+        mut.Verb.Should().Be(PreceptCollectionMutationVerb.Add);
         mut.TargetField.Should().Be("Floors");
         mut.ExpressionText.Should().Be("5");
     }
@@ -135,10 +135,10 @@ public class DslCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
         var mut = clause.CollectionMutations![0];
-        mut.Verb.Should().Be(DslCollectionMutationVerb.Remove);
+        mut.Verb.Should().Be(PreceptCollectionMutationVerb.Remove);
         mut.TargetField.Should().Be("Floors");
     }
 
@@ -158,10 +158,10 @@ public class DslCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
         var mut = clause.CollectionMutations![0];
-        mut.Verb.Should().Be(DslCollectionMutationVerb.Enqueue);
+        mut.Verb.Should().Be(PreceptCollectionMutationVerb.Enqueue);
         mut.TargetField.Should().Be("Tasks");
     }
 
@@ -181,10 +181,10 @@ public class DslCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
         var mut = clause.CollectionMutations![0];
-        mut.Verb.Should().Be(DslCollectionMutationVerb.Dequeue);
+        mut.Verb.Should().Be(PreceptCollectionMutationVerb.Dequeue);
         mut.TargetField.Should().Be("Tasks");
         mut.ExpressionText.Should().BeNull();
     }
@@ -205,10 +205,10 @@ public class DslCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
         var mut = clause.CollectionMutations![0];
-        mut.Verb.Should().Be(DslCollectionMutationVerb.Push);
+        mut.Verb.Should().Be(PreceptCollectionMutationVerb.Push);
         mut.TargetField.Should().Be("History");
     }
 
@@ -228,10 +228,10 @@ public class DslCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
         var mut = clause.CollectionMutations![0];
-        mut.Verb.Should().Be(DslCollectionMutationVerb.Pop);
+        mut.Verb.Should().Be(PreceptCollectionMutationVerb.Pop);
         mut.TargetField.Should().Be("History");
     }
 
@@ -251,10 +251,10 @@ public class DslCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
         var mut = clause.CollectionMutations![0];
-        mut.Verb.Should().Be(DslCollectionMutationVerb.Clear);
+        mut.Verb.Should().Be(PreceptCollectionMutationVerb.Clear);
         mut.TargetField.Should().Be("Floors");
     }
 
@@ -355,13 +355,13 @@ public class DslCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().HaveCount(3);
-        clause.CollectionMutations![0].Verb.Should().Be(DslCollectionMutationVerb.Add);
+        clause.CollectionMutations![0].Verb.Should().Be(PreceptCollectionMutationVerb.Add);
         clause.CollectionMutations![0].ExpressionText.Should().Be("3");
-        clause.CollectionMutations![1].Verb.Should().Be(DslCollectionMutationVerb.Add);
+        clause.CollectionMutations![1].Verb.Should().Be(PreceptCollectionMutationVerb.Add);
         clause.CollectionMutations![1].ExpressionText.Should().Be("5");
-        clause.CollectionMutations![2].Verb.Should().Be(DslCollectionMutationVerb.Remove);
+        clause.CollectionMutations![2].Verb.Should().Be(PreceptCollectionMutationVerb.Remove);
         clause.CollectionMutations![2].ExpressionText.Should().Be("1");
     }
 
@@ -386,9 +386,9 @@ public class DslCollectionParsingTests
         var machine = PreceptParser.Parse(dsl);
 
         machine.Transitions.Should().ContainSingle();
-        var noTransClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is DslNoTransition);
+        var noTransClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is PreceptNoTransition);
         noTransClause.CollectionMutations.Should().ContainSingle();
-        noTransClause.CollectionMutations![0].Verb.Should().Be(DslCollectionMutationVerb.Add);
+        noTransClause.CollectionMutations![0].Verb.Should().Be(PreceptCollectionMutationVerb.Add);
     }
 
     [Fact]
@@ -408,13 +408,13 @@ public class DslCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is DslStateTransition __st && __st.TargetState == "Active");
+        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
         clause.CollectionMutations.Should().ContainSingle();
         clause.CollectionMutations![0].ExpressionText.Should().Be("Target");
     }
 }
 
-public class DslCollectionRuntimeTests
+public class PreceptCollectionRuntimeTests
 {
     [Fact]
     public void Fire_AddToSet_CollectionContainsValue()
@@ -435,7 +435,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance.Should().NotBeNull();
         var collection = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         collection.Should().NotBeNull();
@@ -468,12 +468,12 @@ public class DslCollectionRuntimeTests
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Step1");
-        (fire1.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire1.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col1 = fire1.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col1!.Count.Should().Be(3);
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance, "Step2");
-        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col2 = fire2.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col2!.Count.Should().Be(2);
         col2.Contains(5d).Should().BeFalse();
@@ -505,12 +505,12 @@ public class DslCollectionRuntimeTests
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Enq");
-        (fire1.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire1.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col1 = fire1.UpdatedInstance!.InstanceData["Tasks"] as List<object>;
         col1!.Count.Should().Be(2);
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance, "Deq");
-        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col2 = fire2.UpdatedInstance!.InstanceData["Tasks"] as List<object>;
         col2!.Count.Should().Be(1);
         // "first" was dequeued, "second" remains
@@ -541,13 +541,13 @@ public class DslCollectionRuntimeTests
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Push");
-        (fire1.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire1.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col1 = fire1.UpdatedInstance!.InstanceData["History"] as List<object>;
         col1!.Count.Should().Be(2);
         col1[^1].Should().Be(20d);
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance, "Pop");
-        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col2 = fire2.UpdatedInstance!.InstanceData["History"] as List<object>;
         col2!.Count.Should().Be(1);
         col2[^1].Should().Be(10d);
@@ -604,7 +604,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Deq");
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle().Which.Should().Contain("empty queue");
     }
 
@@ -627,7 +627,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Pop");
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle().Which.Should().Contain("empty stack");
     }
 
@@ -658,7 +658,7 @@ public class DslCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -689,7 +689,7 @@ public class DslCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
     }
 
     [Fact]
@@ -720,7 +720,7 @@ public class DslCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -753,7 +753,7 @@ public class DslCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -786,7 +786,7 @@ public class DslCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -818,7 +818,7 @@ public class DslCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -850,7 +850,7 @@ public class DslCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -874,7 +874,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Contains(5d).Should().BeTrue();
     }
@@ -899,7 +899,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Request", new Dictionary<string, object?> { ["Floor"] = 7 });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Contains(7d).Should().BeTrue();
     }
@@ -922,7 +922,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        fire.Outcome.Should().Be(DslOutcomeKind.AcceptedInPlace);
+        fire.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
         fire.UpdatedInstance.Should().NotBeNull();
         var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Count.Should().Be(1);
@@ -950,7 +950,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["Count"].Should().Be(1d);
         var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Contains(3d).Should().BeTrue();
@@ -981,10 +981,10 @@ public class DslCollectionRuntimeTests
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Go");
-        (fire1.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire1.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Go");
-        (fire2.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire2.NewState.Should().Be("C");
         var col = fire2.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Count.Should().Be(2);
@@ -1038,7 +1038,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Count.Should().Be(1);
     }
@@ -1065,7 +1065,7 @@ public class DslCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.OfType<double>().DefaultIfEmpty(double.NaN).Min().Should().Be(1d);
         col.Max().Should().Be(7d);
@@ -1094,7 +1094,7 @@ public class DslCollectionRuntimeTests
         var fire = workflow.Fire(instance, "Go");
 
         // Second dequeue on empty queue should reject
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         // Original instance should be unmodified
         var col = instance.InstanceData["Tasks"] as List<object>;
         col!.Count.Should().Be(0);

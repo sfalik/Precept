@@ -3,9 +3,9 @@ using Precept;
 
 namespace Precept.Tests.Infrastructure;
 
-internal static class DslExpressionTestHelper
+internal static class PreceptExpressionTestHelper
 {
-    internal static DslExpression ParseFirstSetExpression(string expressionText)
+    internal static PreceptExpression ParseFirstSetExpression(string expressionText)
     {
         var dsl = $$"""
             precept Parser

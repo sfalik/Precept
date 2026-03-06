@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Precept.Tests;
 
-public class DslWorkflowTests
+public class PreceptWorkflowTests
 {
     [Fact]
     public void Parse_And_Compile_UnguardedTransition_IsAccepted()
@@ -26,9 +26,9 @@ public class DslWorkflowTests
 
         var inspection = workflow.Inspect(workflow.CreateInstance("Red"), "Advance");
 
-        (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
-        inspection.Outcome.Should().Be(DslOutcomeKind.Accepted);
+        (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        inspection.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
         inspection.TargetState.Should().Be("Green");
         inspection.Reasons.Should().BeEmpty();
     }
@@ -85,9 +85,9 @@ public class DslWorkflowTests
         var blocked = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 0 }), "Advance");
         var enabled = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 2 }), "Advance");
 
-        undefined.Outcome.Should().Be(DslOutcomeKind.NotDefined);
-        blocked.Outcome.Should().Be(DslOutcomeKind.Rejected);
-        enabled.Outcome.Should().Be(DslOutcomeKind.Accepted);
+        undefined.Outcome.Should().Be(PreceptOutcomeKind.NotDefined);
+        blocked.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        enabled.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
     }
 
     [Fact]
@@ -110,8 +110,8 @@ public class DslWorkflowTests
 
         var inspection = workflow.Inspect(workflow.CreateInstance("Red", data), "Advance");
 
-        (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         inspection.TargetState.Should().Be("Green");
         inspection.Reasons.Should().BeEmpty();
     }
@@ -136,8 +136,8 @@ public class DslWorkflowTests
 
         var inspection = workflow.Inspect(workflow.CreateInstance("Red", data), "Advance");
 
-        (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         inspection.TargetState.Should().BeNull();
         inspection.Reasons.Should().ContainSingle("Cars waiting required");
     }
@@ -161,8 +161,8 @@ public class DslWorkflowTests
 
         var inspection = workflow.Inspect(workflow.CreateInstance("Red"), "Advance");
 
-        (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         inspection.Reasons.Should().ContainSingle("Cars waiting required");
     }
 
@@ -187,8 +187,8 @@ public class DslWorkflowTests
 
         var inspection = workflow.Inspect(workflow.CreateInstance("Disabled", data), "Evaluate");
 
-        (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         inspection.Reasons.Should().ContainSingle("Feature must be enabled");
     }
 
@@ -219,8 +219,8 @@ public class DslWorkflowTests
 
         var inspection = workflow.Inspect(workflow.CreateInstance("Red", data), "Advance");
 
-        (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         inspection.Reasons.Should().ContainSingle("No eligible transition");
     }
 
@@ -245,11 +245,11 @@ public class DslWorkflowTests
         var noTransition = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["Hold"] = true }), "Advance");
         var enabled = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["Hold"] = false }), "Advance");
 
-        noTransition.Outcome.Should().Be(DslOutcomeKind.AcceptedInPlace);
-        (noTransition.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
+        noTransition.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        (noTransition.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
         noTransition.TargetState.Should().Be("Red");
 
-        enabled.Outcome.Should().Be(DslOutcomeKind.Accepted);
+        enabled.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
         enabled.TargetState.Should().Be("Green");
     }
 
@@ -287,11 +287,11 @@ public class DslWorkflowTests
             ["PreferAlpha"] = true
         }), "Route");
 
-        firstBranchWins.Outcome.Should().Be(DslOutcomeKind.AcceptedInPlace);
-        (firstBranchWins.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
+        firstBranchWins.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        (firstBranchWins.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
         firstBranchWins.TargetState.Should().Be("Source");
 
-        secondBranchWins.Outcome.Should().Be(DslOutcomeKind.Accepted);
+        secondBranchWins.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
         secondBranchWins.TargetState.Should().Be("Alpha");
     }
 
@@ -315,8 +315,8 @@ public class DslWorkflowTests
 
         var inspection = workflow.Inspect(workflow.CreateInstance("Draft", data), "Publish");
 
-        (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         inspection.TargetState.Should().Be("Live");
     }
 
@@ -340,8 +340,8 @@ public class DslWorkflowTests
 
         var inspection = workflow.Inspect(workflow.CreateInstance("Open", data), "Escalate");
 
-        (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         inspection.TargetState.Should().Be("Pending");
     }
 
@@ -365,8 +365,8 @@ public class DslWorkflowTests
 
         var inspection = workflow.Inspect(workflow.CreateInstance("Low", data), "Scale");
 
-        (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         inspection.TargetState.Should().Be("High");
     }
 
@@ -394,8 +394,8 @@ public class DslWorkflowTests
 
         var inspection = workflow.Inspect(workflow.CreateInstance("A", data), "Go");
 
-        (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         inspection.TargetState.Should().Be("B");
     }
 
@@ -423,8 +423,8 @@ public class DslWorkflowTests
 
         var inspection = workflow.Inspect(workflow.CreateInstance("A", data), "Go");
 
-        (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         inspection.Reasons.Should().ContainSingle("Both flags must be true");
     }
 
@@ -448,8 +448,8 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(workflow.CreateInstance("Red", data), "Advance");
 
-        (fire.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.NewState.Should().Be("Green");
         fire.Reasons.Should().BeEmpty();
     }
@@ -474,8 +474,8 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(instance, "Advance");
 
-        (fire.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.NewState.Should().Be("Green");
         fire.UpdatedInstance.Should().NotBeNull();
         fire.UpdatedInstance!.CurrentState.Should().Be("Green");
@@ -500,8 +500,8 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(instance, "Advance");
 
-        (fire.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance.Should().NotBeNull();
         fire.UpdatedInstance!.InstanceData["CarsWaiting"].Should().Be(0d);
     }
@@ -524,8 +524,8 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(instance, "Emergency", new Dictionary<string, object?> { ["Reason"] = "Accident" });
 
-        (fire.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance.Should().NotBeNull();
         fire.UpdatedInstance!.InstanceData["EmergencyReason"].Should().Be("Accident");
     }
@@ -549,8 +549,8 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(instance, "Emergency");
 
-        (fire.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains("required argument 'Reason'", StringComparison.Ordinal));
     }
 
@@ -578,7 +578,7 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(instance, "Advance");
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["LastCarsWaiting"].Should().Be(3d);
     }
 
@@ -607,7 +607,7 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(instance, "Advance");
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.NewState.Should().Be("Green");
         fire.UpdatedInstance!.InstanceData["CarsWaiting"].Should().Be(2d);
         fire.UpdatedInstance!.InstanceData["LastCarsWaiting"].Should().Be(3d);
@@ -638,7 +638,7 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(instance, "Advance");
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.NewState.Should().BeNull();
         fire.UpdatedInstance.Should().BeNull();
         fire.Reasons.Should().ContainSingle(r => r.Contains("Data assignment failed", StringComparison.Ordinal));
@@ -670,7 +670,7 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(instance, "Advance");
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["NextCarsWaiting"].Should().Be(5d);
     }
 
@@ -699,7 +699,7 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(instance, "Emergency", new Dictionary<string, object?> { ["Reason"] = "Accident" });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["Message"].Should().Be("Reason: Accident");
     }
 
@@ -730,7 +730,7 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(instance, "Emergency", new Dictionary<string, object?> { ["Reason"] = null });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains("operator '+' requires number+number or string+string", StringComparison.Ordinal));
     }
 
@@ -775,7 +775,7 @@ public class DslWorkflowTests
         });
         var fire = workflow.Fire(instance, "Emergency", new Dictionary<string, object?> { ["Reason"] = "Accident" });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["EmergencyReason"].Should().Be("Accident");
     }
 
@@ -798,8 +798,8 @@ public class DslWorkflowTests
 
         var inspect = workflow.Inspect(instance, "Emergency");
 
-        (inspect.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (inspect.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (inspect.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (inspect.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         inspect.RequiredEventArgumentKeys.Should().ContainSingle().Which.Should().Be("Reason");
     }
 
@@ -824,11 +824,11 @@ public class DslWorkflowTests
         var start = workflow.CreateInstance("Off", new Dictionary<string, object?>());
 
         var enabled = workflow.Fire(start, "Enable", new Dictionary<string, object?> { ["true"] = "not-used" });
-        (enabled.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (enabled.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         enabled.UpdatedInstance!.InstanceData["IsEnabled"].Should().Be(true);
 
         var disabled = workflow.Fire(enabled.UpdatedInstance!, "Disable", new Dictionary<string, object?> { ["false"] = "not-used" });
-        (disabled.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (disabled.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         disabled.UpdatedInstance!.InstanceData["IsEnabled"].Should().Be(false);
     }
 
@@ -850,7 +850,7 @@ public class DslWorkflowTests
 
         var cleared = workflow.Fire(instance, "Clear", new Dictionary<string, object?> { ["null"] = "not-used" });
 
-        (cleared.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (cleared.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         cleared.UpdatedInstance!.InstanceData["Note"].Should().BeNull();
     }
 
@@ -872,8 +872,8 @@ public class DslWorkflowTests
 
         var inspect = workflow.Inspect(instance, "Advance");
 
-        (inspect.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (inspect.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (inspect.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (inspect.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         instance.InstanceData["CarsWaiting"].Should().Be(3);
     }
 
@@ -899,13 +899,13 @@ public class DslWorkflowTests
         var withConflictingArg = workflow.Inspect(instance, "Evaluate", new Dictionary<string, object?> { ["IsEnabled"] = true });
         var rejectedWithUnrelatedArgs = workflow.Inspect(instance, "Evaluate", new Dictionary<string, object?> { ["Other"] = true });
 
-        (rejected.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (rejected.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        (withConflictingArg.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (withConflictingArg.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (rejected.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (rejected.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (withConflictingArg.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (withConflictingArg.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         withConflictingArg.Reasons.Should().ContainSingle("Feature must be enabled");
-        (rejectedWithUnrelatedArgs.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (rejectedWithUnrelatedArgs.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (rejectedWithUnrelatedArgs.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (rejectedWithUnrelatedArgs.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         rejectedWithUnrelatedArgs.Reasons.Should().NotBeEmpty();
     }
 
@@ -922,7 +922,7 @@ public class DslWorkflowTests
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
-        var incompatible = new DslWorkflowInstance(
+        var incompatible = new PreceptInstance(
             "OtherWorkflow",
             "Red",
             null,
@@ -931,8 +931,8 @@ public class DslWorkflowTests
 
         var inspection = workflow.Inspect(incompatible, "Advance");
 
-        inspection.Outcome.Should().Be(DslOutcomeKind.NotDefined);
-        (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        inspection.Outcome.Should().Be(PreceptOutcomeKind.NotDefined);
+        (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         inspection.Reasons.Should().ContainSingle(r => r.Contains("workflow", StringComparison.Ordinal));
     }
 
@@ -952,8 +952,8 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(workflow.CreateInstance("Green"), "Advance");
 
-        (fire.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.NewState.Should().Be("Yellow");
         fire.Reasons.Should().BeEmpty();
     }
@@ -974,8 +974,8 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(workflow.CreateInstance("Green"), "Advance");
 
-        fire.Outcome.Should().Be(DslOutcomeKind.NotDefined);
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        fire.Outcome.Should().Be(PreceptOutcomeKind.NotDefined);
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.NewState.Should().BeNull();
         fire.Reasons.Should().ContainSingle();
     }
@@ -1017,13 +1017,13 @@ public class DslWorkflowTests
         var machine = PreceptParser.Parse(dsl);
 
         machine.Transitions.Should().ContainSingle();
-        var guardedClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is DslStateTransition);
+        var guardedClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is PreceptStateTransition);
         guardedClause.Predicate.Should().Be("CarsWaiting > 0");
         guardedClause.SetAssignments.Should().ContainSingle();
         guardedClause.SetAssignments[0].Key.Should().Be("CarsWaiting");
         guardedClause.SetAssignments[0].ExpressionText.Should().Be("0");
-        var rejectClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is DslRejection);
-        ((DslRejection)rejectClause.Outcome).Reason.Should().Be("Cars waiting required");
+        var rejectClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is PreceptRejection);
+        ((PreceptRejection)rejectClause.Outcome).Reason.Should().Be("Cars waiting required");
     }
 
     [Fact]
@@ -1087,9 +1087,9 @@ public class DslWorkflowTests
 
                 machine.Transitions.Should().ContainSingle();
                 machine.Transitions[0].FromState.Should().Be("Red");
-                machine.Transitions[0].Clauses.Any(c => c.Outcome is DslStateTransition st && st.TargetState == "Green").Should().BeTrue();
-                machine.Transitions[0].Clauses.Any(c => c.Outcome is DslRejection).Should().BeTrue();
-                ((DslRejection)machine.Transitions[0].Clauses.Single(c => c.Outcome is DslRejection).Outcome).Reason.Should().Be("No cars waiting");
+                machine.Transitions[0].Clauses.Any(c => c.Outcome is PreceptStateTransition st && st.TargetState == "Green").Should().BeTrue();
+                machine.Transitions[0].Clauses.Any(c => c.Outcome is PreceptRejection).Should().BeTrue();
+                ((PreceptRejection)machine.Transitions[0].Clauses.Single(c => c.Outcome is PreceptRejection).Outcome).Reason.Should().Be("No cars waiting");
         }
 
         [Fact]
@@ -1111,9 +1111,9 @@ public class DslWorkflowTests
 
                 var inspection = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 0 }), "Advance");
 
-                (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-                (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
-                inspection.Outcome.Should().Be(DslOutcomeKind.Rejected);
+                (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+                (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+                inspection.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
                 inspection.Reasons.Should().ContainSingle("No cars waiting");
         }
 
@@ -1136,9 +1136,9 @@ public class DslWorkflowTests
 
                 var inspection = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 0 }), "Advance");
 
-                (inspection.Outcome is DslOutcomeKind.NotDefined).Should().BeFalse();
-                (inspection.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
-                inspection.Outcome.Should().Be(DslOutcomeKind.AcceptedInPlace);
+                (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+                (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+                inspection.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
                 inspection.TargetState.Should().Be("Red");
         }
 
@@ -1162,9 +1162,9 @@ public class DslWorkflowTests
                 var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
                 var data = new Dictionary<string, object?> { ["Reason"] = "Accident" };
 
-                workflow.Inspect(workflow.CreateInstance("Red"), "Emergency", data).Outcome.Should().BeOneOf(DslOutcomeKind.Accepted, DslOutcomeKind.AcceptedInPlace);
-                workflow.Inspect(workflow.CreateInstance("Green"), "Emergency", data).Outcome.Should().BeOneOf(DslOutcomeKind.Accepted, DslOutcomeKind.AcceptedInPlace);
-                workflow.Inspect(workflow.CreateInstance("Yellow"), "Emergency", data).Outcome.Should().BeOneOf(DslOutcomeKind.Accepted, DslOutcomeKind.AcceptedInPlace);
+                workflow.Inspect(workflow.CreateInstance("Red"), "Emergency", data).Outcome.Should().BeOneOf(PreceptOutcomeKind.Accepted, PreceptOutcomeKind.AcceptedInPlace);
+                workflow.Inspect(workflow.CreateInstance("Green"), "Emergency", data).Outcome.Should().BeOneOf(PreceptOutcomeKind.Accepted, PreceptOutcomeKind.AcceptedInPlace);
+                workflow.Inspect(workflow.CreateInstance("Yellow"), "Emergency", data).Outcome.Should().BeOneOf(PreceptOutcomeKind.Accepted, PreceptOutcomeKind.AcceptedInPlace);
         }
 
         [Fact]
@@ -1299,7 +1299,7 @@ public class DslWorkflowTests
                 workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 1 }), "Advance").TargetState.Should().Be("Yellow");
 
                 var rejected = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 0 }), "Advance");
-                rejected.Outcome.Should().Be(DslOutcomeKind.Rejected);
+                rejected.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
                 rejected.Reasons.Should().ContainSingle("No cars waiting");
             }
 
@@ -1766,7 +1766,7 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(instance, "Submit");
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["LastReason"].Should().Be("auto");
     }
 
@@ -1789,7 +1789,7 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(instance, "Submit", new Dictionary<string, object?> { ["Reason"] = "manual" });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["LastReason"].Should().Be("manual");
     }
 
@@ -1812,7 +1812,7 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(instance, "Submit");
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["LastReason"].Should().Be("fallback");
     }
 
@@ -1835,7 +1835,7 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(instance, "Submit");
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["LastReason"].Should().BeNull();
     }
 
@@ -1856,7 +1856,7 @@ public class DslWorkflowTests
 
         var fire = workflow.Fire(instance, "Submit");
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains("required argument 'Reason'", StringComparison.Ordinal));
     }
 
@@ -2009,12 +2009,12 @@ public class DslWorkflowTests
 
         // No event args supplied (simulates discovery-mode bulk refresh)
         var noArgs = workflow.Inspect(frozen, "Deposit");
-        noArgs.Outcome.Should().Be(DslOutcomeKind.NotApplicable,
+        noArgs.Outcome.Should().Be(PreceptOutcomeKind.NotApplicable,
             because: "when predicate is false, NotApplicable must be returned before arg validation");
 
         // Explicit empty args dict — same expectation
         var emptyArgs = workflow.Inspect(frozen, "Deposit", new Dictionary<string, object?>());
-        emptyArgs.Outcome.Should().Be(DslOutcomeKind.NotApplicable,
+        emptyArgs.Outcome.Should().Be(PreceptOutcomeKind.NotApplicable,
             because: "empty arg dict with false when predicate must still yield NotApplicable");
     }
 
@@ -2038,11 +2038,11 @@ public class DslWorkflowTests
 
         // No args: predicate passes, but required 'Amount' is missing → Rejected
         var noArgs = workflow.Inspect(unfrozen, "Deposit");
-        noArgs.Outcome.Should().NotBe(DslOutcomeKind.NotApplicable,
+        noArgs.Outcome.Should().NotBe(PreceptOutcomeKind.NotApplicable,
             because: "when predicate is true, the call proceeds to arg validation");
 
         // Correct args: should be accepted
         var withArgs = workflow.Inspect(unfrozen, "Deposit", new Dictionary<string, object?> { ["Amount"] = 100.0 });
-        withArgs.Outcome.Should().BeOneOf(DslOutcomeKind.Accepted, DslOutcomeKind.AcceptedInPlace);
+        withArgs.Outcome.Should().BeOneOf(PreceptOutcomeKind.Accepted, PreceptOutcomeKind.AcceptedInPlace);
     }
 }

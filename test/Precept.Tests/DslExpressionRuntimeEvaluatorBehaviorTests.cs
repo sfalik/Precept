@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Precept.Tests;
 
-public class DslExpressionRuntimeEvaluatorBehaviorTests
+public class PreceptExpressionRuntimeEvaluatorBehaviorTests
 {
     [Theory]
     [InlineData("+", 6d)]
@@ -26,7 +26,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Output"] = 0d
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["Output"].Should().Be(expected);
     }
 
@@ -49,7 +49,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["IsMatch"] = false
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["IsMatch"].Should().Be(expected);
     }
 
@@ -70,7 +70,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["EventText"] = "Accident"
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["Message"].Should().Be("Reason: Accident");
     }
 
@@ -88,7 +88,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Message"] = ""
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains("operator '+' requires number+number or string+string", StringComparison.Ordinal));
     }
 
@@ -105,7 +105,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["IsDisabled"] = false
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["IsDisabled"].Should().Be(false);
     }
 
@@ -122,7 +122,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Negated"] = 0d
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["Negated"].Should().Be(-3d);
     }
 
@@ -139,7 +139,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Output"] = 0d
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["Output"].Should().Be(18d);
     }
 
@@ -157,7 +157,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Result"] = false
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains("operator '&&' requires boolean operands", StringComparison.Ordinal));
     }
 
@@ -175,7 +175,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Result"] = false
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains("operator '&&' requires boolean operands", StringComparison.Ordinal));
     }
 
@@ -191,7 +191,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Output"] = 0d
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains("data key 'Missing' was not provided", StringComparison.Ordinal));
     }
 
@@ -218,7 +218,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ? new Dictionary<string, object?> { ["Input"] = "text", ["ResultBool"] = false }
                 : new Dictionary<string, object?> { ["Input"] = "text", ["ResultNum"] = 0d });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains(expectedMessage, StringComparison.Ordinal));
     }
 
@@ -243,7 +243,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Output"] = 0d
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["Output"].Should().Be(expected);
     }
 
@@ -259,7 +259,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Output"] = 0d
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains("data key 'Missing' was not provided", StringComparison.Ordinal));
     }
 
@@ -273,7 +273,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Flag"] = false
             });
 
-        (inspect.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (inspect.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         inspect.Reasons.Should().ContainSingle("blocked");
     }
 
@@ -287,7 +287,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Flag"] = true
             });
 
-        (inspect.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (inspect.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         inspect.TargetState.Should().Be("B");
     }
 
@@ -302,7 +302,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["OtherFlag"] = true
             });
 
-        (inspect.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (inspect.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         inspect.TargetState.Should().Be("B");
     }
 
@@ -317,7 +317,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["OtherFlag"] = true
             });
 
-        (inspect.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (inspect.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
         inspect.TargetState.Should().Be("B");
     }
 
@@ -328,7 +328,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
             "1 + 1",
             new Dictionary<string, object?>());
 
-        (inspect.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (inspect.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         inspect.Reasons.Should().ContainSingle("blocked");
     }
 
@@ -342,7 +342,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Flag"] = true
             });
 
-        (inspect.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (inspect.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         inspect.Reasons.Should().ContainSingle("blocked");
     }
 
@@ -359,7 +359,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Result"] = false
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains("operator '!' requires boolean operand", StringComparison.Ordinal));
     }
 
@@ -376,7 +376,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Result"] = 0d
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains("unary '-' requires numeric operand", StringComparison.Ordinal));
     }
 
@@ -394,7 +394,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Result"] = false
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains("operator '||' requires boolean operands", StringComparison.Ordinal));
     }
 
@@ -412,7 +412,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Result"] = false
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains("operator '||' requires boolean operands", StringComparison.Ordinal));
     }
 
@@ -429,11 +429,11 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
                 ["Result"] = false
             });
 
-        (fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
         fire.Reasons.Should().ContainSingle(r => r.Contains("operator '>' requires numeric operands", StringComparison.Ordinal));
     }
 
-    private static DslFireResult FireForSet(
+    private static PreceptFireResult FireForSet(
         string declarations,
         string targetField,
         string expression,
@@ -506,7 +506,7 @@ public class DslExpressionRuntimeEvaluatorBehaviorTests
         return string.Join(Environment.NewLine, updated);
     }
 
-    private static DslEventInspectionResult InspectForGuard(string guardExpression, IReadOnlyDictionary<string, object?> data)
+    private static PreceptEventInspectionResult InspectForGuard(string guardExpression, IReadOnlyDictionary<string, object?> data)
     {
         var dsl = $$"""
             precept Guards

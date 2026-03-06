@@ -6,26 +6,26 @@ namespace Precept;
 
 public sealed class PreceptEngine
 {
-    private readonly Dictionary<(string State, string Event), DslTransition> _transitionMap;
-    private readonly Dictionary<string, DslField> _fieldMap;
-    private readonly Dictionary<string, DslCollectionField> _collectionFieldMap;
-    private readonly Dictionary<string, Dictionary<string, DslEventArg>> _eventArgContractMap;
+    private readonly Dictionary<(string State, string Event), PreceptTransition> _transitionMap;
+    private readonly Dictionary<string, PreceptField> _fieldMap;
+    private readonly Dictionary<string, PreceptCollectionField> _collectionFieldMap;
+    private readonly Dictionary<string, Dictionary<string, PreceptEventArg>> _eventArgContractMap;
 
     // Rules storage
-    private readonly IReadOnlyList<DslRule> _topLevelRules;
-    private readonly IReadOnlyList<DslRule> _allFieldRules;
-    private readonly IReadOnlyList<DslRule> _allCollectionRules;
-    private readonly IReadOnlyDictionary<string, IReadOnlyList<DslRule>> _stateRuleMap;
-    private readonly IReadOnlyDictionary<string, IReadOnlyList<DslRule>> _eventRules;
+    private readonly IReadOnlyList<PreceptRule> _topLevelRules;
+    private readonly IReadOnlyList<PreceptRule> _allFieldRules;
+    private readonly IReadOnlyList<PreceptRule> _allCollectionRules;
+    private readonly IReadOnlyDictionary<string, IReadOnlyList<PreceptRule>> _stateRuleMap;
+    private readonly IReadOnlyDictionary<string, IReadOnlyList<PreceptRule>> _eventRules;
 
     public string Name { get; }
     public IReadOnlyList<string> States { get; }
     public string InitialState { get; }
-    public IReadOnlyList<DslEvent> Events { get; }
-    public IReadOnlyList<DslField> Fields { get; }
-    public IReadOnlyList<DslCollectionField> CollectionFields { get; }
+    public IReadOnlyList<PreceptEvent> Events { get; }
+    public IReadOnlyList<PreceptField> Fields { get; }
+    public IReadOnlyList<PreceptCollectionField> CollectionFields { get; }
 
-    internal PreceptEngine(DslWorkflowModel model)
+    internal PreceptEngine(PreceptDefinition model)
     {
         Name = model.Name;
         States = model.States.Select(s => s.Name).ToArray();
@@ -53,7 +53,7 @@ public sealed class PreceptEngine
                 StringComparer.Ordinal);
 
         // Flatten rules for runtime access
-        _topLevelRules = model.TopLevelRules ?? Array.Empty<DslRule>();
+        _topLevelRules = model.TopLevelRules ?? Array.Empty<PreceptRule>();
         _allFieldRules = model.Fields
             .Where(f => f.Rules is not null)
             .SelectMany(f => f.Rules!)
@@ -70,11 +70,11 @@ public sealed class PreceptEngine
             .ToDictionary(e => e.Name, e => e.Rules!, StringComparer.Ordinal);
     }
 
-    public DslWorkflowInstance CreateInstance(
+    public PreceptInstance CreateInstance(
         IReadOnlyDictionary<string, object?>? instanceData = null)
         => CreateInstance(InitialState, instanceData);
 
-    public DslWorkflowInstance CreateInstance(
+    public PreceptInstance CreateInstance(
         string initialState,
         IReadOnlyDictionary<string, object?>? instanceData = null)
     {
@@ -88,7 +88,7 @@ public sealed class PreceptEngine
         if (!TryValidateDataContract(data, out var dataError))
             throw new InvalidOperationException(dataError);
 
-        return new DslWorkflowInstance(
+        return new PreceptInstance(
             Name,
             initialState,
             null,
@@ -189,19 +189,19 @@ public sealed class PreceptEngine
         return result;
     }
 
-    public DslCompatibilityResult CheckCompatibility(DslWorkflowInstance instance)
+    public PreceptCompatibilityResult CheckCompatibility(PreceptInstance instance)
     {
         if (!instance.WorkflowName.Equals(Name, StringComparison.Ordinal))
         {
-            return DslCompatibilityResult.NotCompatible(
+            return PreceptCompatibilityResult.NotCompatible(
                 $"Instance workflow '{instance.WorkflowName}' does not match compiled workflow '{Name}'.");
         }
 
         if (!States.Contains(instance.CurrentState, StringComparer.Ordinal))
-            return DslCompatibilityResult.NotCompatible($"Instance state '{instance.CurrentState}' is not defined in workflow '{Name}'.");
+            return PreceptCompatibilityResult.NotCompatible($"Instance state '{instance.CurrentState}' is not defined in workflow '{Name}'.");
 
         if (!TryValidateDataContract(instance.InstanceData, out var dataError))
-            return DslCompatibilityResult.NotCompatible(dataError);
+            return PreceptCompatibilityResult.NotCompatible(dataError);
 
         // Verify the instance satisfies all current rules (data rules + current state rules).
         // A compiled definition guarantees rules pass at CreateInstance time; an externally loaded
@@ -211,13 +211,13 @@ public sealed class PreceptEngine
         ruleViolations.AddRange(EvaluateDataRules(internalData));
         ruleViolations.AddRange(EvaluateStateRules(instance.CurrentState, internalData));
         if (ruleViolations.Count > 0)
-            return DslCompatibilityResult.NotCompatible(
+            return PreceptCompatibilityResult.NotCompatible(
                 $"Instance violates {ruleViolations.Count} rule(s): {string.Join("; ", ruleViolations)}");
 
-        return DslCompatibilityResult.Compatible();
+        return PreceptCompatibilityResult.Compatible();
     }
 
-    public DslEventInspectionResult Inspect(
+    public PreceptEventInspectionResult Inspect(
         string currentState,
         string eventName,
         IReadOnlyDictionary<string, object?>? eventArguments = null)
@@ -227,32 +227,32 @@ public sealed class PreceptEngine
         // Check event rules first
         var eventRuleViolations = EvaluateEventRules(eventName, evaluationData);
         if (eventRuleViolations.Count > 0)
-            return DslEventInspectionResult.Rejected(currentState, eventName, eventRuleViolations);
+            return PreceptEventInspectionResult.Rejected(currentState, eventName, eventRuleViolations);
 
         var resolution = ResolveTransition(currentState, eventName, evaluationData);
 
         return resolution.Kind switch
         {
-            TransitionResolutionKind.Accepted => DslEventInspectionResult.Accepted(
+            TransitionResolutionKind.Accepted => PreceptEventInspectionResult.Accepted(
                 currentState,
                 eventName,
-                ((DslStateTransition)resolution.Clause!.Outcome).TargetState,
+                ((PreceptStateTransition)resolution.Clause!.Outcome).TargetState,
                 GetRequiredEventArgumentKeys(eventName)),
-            TransitionResolutionKind.NotApplicable => DslEventInspectionResult.NotApplicable(currentState, eventName),
-            TransitionResolutionKind.NoTransition => DslEventInspectionResult.AcceptedInPlace(currentState, eventName),
-            TransitionResolutionKind.NotDefined => DslEventInspectionResult.NotDefined(currentState, eventName, resolution.NotDefinedReason!),
-            _ => DslEventInspectionResult.Rejected(currentState, eventName, resolution.Reasons)
+            TransitionResolutionKind.NotApplicable => PreceptEventInspectionResult.NotApplicable(currentState, eventName),
+            TransitionResolutionKind.NoTransition => PreceptEventInspectionResult.AcceptedInPlace(currentState, eventName),
+            TransitionResolutionKind.NotDefined => PreceptEventInspectionResult.NotDefined(currentState, eventName, resolution.NotDefinedReason!),
+            _ => PreceptEventInspectionResult.Rejected(currentState, eventName, resolution.Reasons)
         };
     }
 
-    public DslEventInspectionResult Inspect(
-        DslWorkflowInstance instance,
+    public PreceptEventInspectionResult Inspect(
+        PreceptInstance instance,
         string eventName,
         IReadOnlyDictionary<string, object?>? eventArguments = null)
     {
         var compatibility = CheckCompatibility(instance);
         if (!compatibility.IsCompatible)
-            return DslEventInspectionResult.NotDefined(instance.CurrentState, eventName, compatibility.Reason!);
+            return PreceptEventInspectionResult.NotDefined(instance.CurrentState, eventName, compatibility.Reason!);
 
         // Hydrate clean InstanceData to internal format for engine evaluation
         var internalData = HydrateInstanceData(instance.InstanceData);
@@ -266,16 +266,16 @@ public sealed class PreceptEngine
             preCheckTransition.PredicateAst is not null)
         {
             var instanceOnlyContext = BuildEvaluationData(internalData, eventName, null);
-            var whenResult = DslExpressionRuntimeEvaluator.Evaluate(preCheckTransition.PredicateAst, instanceOnlyContext);
+            var whenResult = PreceptExpressionRuntimeEvaluator.Evaluate(preCheckTransition.PredicateAst, instanceOnlyContext);
             if (!whenResult.Success || whenResult.Value is not bool whenBool || !whenBool)
-                return DslEventInspectionResult.NotApplicable(instance.CurrentState, eventName);
+                return PreceptEventInspectionResult.NotApplicable(instance.CurrentState, eventName);
         }
 
         // Inspect is a discovery API — it intentionally accepts calls with missing/partial event arguments
         // so callers can determine required args via RequiredEventArgumentKeys before firing.
         // Full argument validation happens in Fire().
         if (eventArguments != null && !TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
-            return DslEventInspectionResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
+            return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
 
         var evaluationArguments = BuildEvaluationData(internalData, eventName, eventArguments);
 
@@ -284,21 +284,21 @@ public sealed class PreceptEngine
         {
             var eventRuleViolations = EvaluateEventRules(eventName, BuildDirectEvaluationData(eventName, eventArguments));
             if (eventRuleViolations.Count > 0)
-                return DslEventInspectionResult.Rejected(instance.CurrentState, eventName, eventRuleViolations);
+                return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, eventRuleViolations);
         }
 
         var resolution = ResolveTransition(instance.CurrentState, eventName, evaluationArguments);
         if (resolution.Kind == TransitionResolutionKind.NotDefined)
-            return DslEventInspectionResult.NotDefined(instance.CurrentState, eventName, resolution.NotDefinedReason!);
+            return PreceptEventInspectionResult.NotDefined(instance.CurrentState, eventName, resolution.NotDefinedReason!);
 
         if (resolution.Kind == TransitionResolutionKind.NotApplicable)
-            return DslEventInspectionResult.NotApplicable(instance.CurrentState, eventName);
+            return PreceptEventInspectionResult.NotApplicable(instance.CurrentState, eventName);
 
         if (resolution.Kind == TransitionResolutionKind.NoTransition)
-            return DslEventInspectionResult.AcceptedInPlace(instance.CurrentState, eventName);
+            return PreceptEventInspectionResult.AcceptedInPlace(instance.CurrentState, eventName);
 
         if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.Clause is null)
-            return DslEventInspectionResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
+            return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
 
         // Simulate set assignments and check field/top-level/state rules
         var simulatedData = new Dictionary<string, object?>(internalData, StringComparer.Ordinal);
@@ -307,7 +307,7 @@ public sealed class PreceptEngine
         foreach (var assignment in resolution.Clause.SetAssignments)
         {
             var ctx = BuildEvaluationDataWithCollections(simulatedData, simulatedCollections, eventName, eventArguments);
-            var eval = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, ctx);
+            var eval = PreceptExpressionRuntimeEvaluator.Evaluate(assignment.Expression, ctx);
             if (eval.Success)
                 simulatedData[assignment.Key] = eval.Value;
         }
@@ -319,14 +319,14 @@ public sealed class PreceptEngine
 
         var dataRuleViolations = EvaluateDataRules(simulatedData);
         if (dataRuleViolations.Count > 0)
-            return DslEventInspectionResult.Rejected(instance.CurrentState, eventName, dataRuleViolations);
+            return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, dataRuleViolations);
 
-        var targetState = ((DslStateTransition)resolution.Clause.Outcome).TargetState;
+        var targetState = ((PreceptStateTransition)resolution.Clause.Outcome).TargetState;
         var stateRuleViolations = EvaluateStateRules(targetState, simulatedData);
         if (stateRuleViolations.Count > 0)
-            return DslEventInspectionResult.Rejected(instance.CurrentState, eventName, stateRuleViolations);
+            return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, stateRuleViolations);
 
-        return DslEventInspectionResult.Accepted(
+        return PreceptEventInspectionResult.Accepted(
             instance.CurrentState,
             eventName,
             targetState,
@@ -337,14 +337,14 @@ public sealed class PreceptEngine
     /// Inspects all events reachable from the instance's current state and returns a summary
     /// including the current state, serialized data, and per-event inspection results.
     /// </summary>
-    public DslInspectionResult Inspect(DslWorkflowInstance instance)
+    public PreceptInspectionResult Inspect(PreceptInstance instance)
     {
         var compatibility = CheckCompatibility(instance);
         if (!compatibility.IsCompatible)
-            return new DslInspectionResult(
+            return new PreceptInspectionResult(
                 instance.CurrentState,
                 instance.InstanceData,
-                Array.Empty<DslEventInspectionResult>());
+                Array.Empty<PreceptEventInspectionResult>());
 
         var eventDeclarationOrder = Events
             .Select((e, i) => (e.Name, i))
@@ -362,7 +362,7 @@ public sealed class PreceptEngine
             .Select(eventName => Inspect(instance, eventName))
             .ToArray();
 
-        return new DslInspectionResult(instance.CurrentState, instance.InstanceData, eventResults);
+        return new PreceptInspectionResult(instance.CurrentState, instance.InstanceData, eventResults);
     }
 
     /// <summary>
@@ -393,7 +393,7 @@ public sealed class PreceptEngine
         return coerced;
     }
 
-    private static object? CoerceArgumentValue(object? value, DslEventArg contract)
+    private static object? CoerceArgumentValue(object? value, PreceptEventArg contract)
     {
         // Unwrap JsonElement from System.Text.Json deserialization.
         if (value is System.Text.Json.JsonElement jsonElement)
@@ -404,10 +404,10 @@ public sealed class PreceptEngine
 
         return contract.Type switch
         {
-            DslScalarType.Number => CoerceToNumber(value),
-            DslScalarType.Boolean => CoerceToBoolean(value),
-            DslScalarType.String => value?.ToString(),
-            DslScalarType.Null => null,
+            PreceptScalarType.Number => CoerceToNumber(value),
+            PreceptScalarType.Boolean => CoerceToBoolean(value),
+            PreceptScalarType.String => value?.ToString(),
+            PreceptScalarType.Null => null,
             _ => value
         };
     }
@@ -447,8 +447,8 @@ public sealed class PreceptEngine
         return value;
     }
 
-    public DslFireResult Fire(
-        DslWorkflowInstance instance,
+    public PreceptFireResult Fire(
+        PreceptInstance instance,
         string eventName,
         IReadOnlyDictionary<string, object?>? eventArguments = null)
     {
@@ -457,11 +457,11 @@ public sealed class PreceptEngine
         if (!compatibility.IsCompatible)
         {
             var reasons = new[] { compatibility.Reason! };
-            return DslFireResult.NotDefined(instance.CurrentState, eventName, reasons);
+            return PreceptFireResult.NotDefined(instance.CurrentState, eventName, reasons);
         }
 
         if (!TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
-            return DslFireResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
+            return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
 
         var evaluationArguments = BuildEvaluationData(internalData, eventName, eventArguments);
 
@@ -470,15 +470,15 @@ public sealed class PreceptEngine
         // shadow the arg value (e.g. CreditScore field must not override Submit.CreditScore).
         var eventRuleViolations = EvaluateEventRules(eventName, BuildDirectEvaluationData(eventName, eventArguments));
         if (eventRuleViolations.Count > 0)
-            return DslFireResult.Rejected(instance.CurrentState, eventName, eventRuleViolations);
+            return PreceptFireResult.Rejected(instance.CurrentState, eventName, eventRuleViolations);
 
         // Stage 2: Guard evaluation (resolve transition)
         var resolution = ResolveTransition(instance.CurrentState, eventName, evaluationArguments);
         if (resolution.Kind == TransitionResolutionKind.NotDefined)
-            return DslFireResult.NotDefined(instance.CurrentState, eventName, new[] { resolution.NotDefinedReason! });
+            return PreceptFireResult.NotDefined(instance.CurrentState, eventName, new[] { resolution.NotDefinedReason! });
 
         if (resolution.Kind == TransitionResolutionKind.NotApplicable)
-            return DslFireResult.NotApplicable(instance.CurrentState, eventName);
+            return PreceptFireResult.NotApplicable(instance.CurrentState, eventName);
 
         if (resolution.Kind == TransitionResolutionKind.NoTransition)
         {
@@ -492,12 +492,12 @@ public sealed class PreceptEngine
                 foreach (var assignment in noTransitionSets)
                 {
                     var assignmentContext = BuildEvaluationDataWithCollections(noTransitionData, workingCollections, eventName, eventArguments);
-                    var assignmentEvaluation = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, assignmentContext);
+                    var assignmentEvaluation = PreceptExpressionRuntimeEvaluator.Evaluate(assignment.Expression, assignmentContext);
                     if (!assignmentEvaluation.Success)
-                        return DslFireResult.Rejected(instance.CurrentState, eventName, new[] { $"Data assignment failed: {assignmentEvaluation.Error}" });
+                        return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { $"Data assignment failed: {assignmentEvaluation.Error}" });
 
                     if (!TryValidateAssignedValue(assignment.Key, assignmentEvaluation.Value, out var contractError))
-                        return DslFireResult.Rejected(instance.CurrentState, eventName, new[] { contractError! });
+                        return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { contractError! });
 
                     noTransitionData[assignment.Key] = assignmentEvaluation.Value;
                 }
@@ -508,7 +508,7 @@ public sealed class PreceptEngine
             {
                 var mutationError = ExecuteCollectionMutations(noTransitionMutations, workingCollections, noTransitionData, eventName, eventArguments);
                 if (mutationError is not null)
-                    return DslFireResult.Rejected(instance.CurrentState, eventName, new[] { mutationError });
+                    return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { mutationError });
             }
 
             // Commit working collections back to data
@@ -523,11 +523,11 @@ public sealed class PreceptEngine
                 InstanceData = DehydrateData(noTransitionData)
             };
 
-            return DslFireResult.AcceptedInPlace(instance.CurrentState, eventName, noTransitionUpdated);
+            return PreceptFireResult.AcceptedInPlace(instance.CurrentState, eventName, noTransitionUpdated);
         }
 
         if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.Clause is null)
-            return DslFireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
+            return PreceptFireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
 
         // Stage 3: Set execution (on working copy)
         var updatedData = new Dictionary<string, object?>(internalData, StringComparer.Ordinal);
@@ -538,12 +538,12 @@ public sealed class PreceptEngine
         foreach (var assignment in resolution.Clause.SetAssignments)
         {
             var assignmentContext = BuildEvaluationDataWithCollections(updatedData, transitionCollections, eventName, eventArguments);
-            var assignmentEvaluation = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, assignmentContext);
+            var assignmentEvaluation = PreceptExpressionRuntimeEvaluator.Evaluate(assignment.Expression, assignmentContext);
             if (!assignmentEvaluation.Success)
-                return DslFireResult.Rejected(instance.CurrentState, eventName, new[] { $"Data assignment failed: {assignmentEvaluation.Error}" });
+                return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { $"Data assignment failed: {assignmentEvaluation.Error}" });
 
             if (!TryValidateAssignedValue(assignment.Key, assignmentEvaluation.Value, out var contractError))
-                return DslFireResult.Rejected(instance.CurrentState, eventName, new[] { contractError! });
+                return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { contractError! });
 
             updatedData[assignment.Key] = assignmentEvaluation.Value;
         }
@@ -553,7 +553,7 @@ public sealed class PreceptEngine
         {
             var mutationError = ExecuteCollectionMutations(transitionMutations, transitionCollections, updatedData, eventName, eventArguments);
             if (mutationError is not null)
-                return DslFireResult.Rejected(instance.CurrentState, eventName, new[] { mutationError });
+                return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { mutationError });
         }
 
         // Commit working collections to updatedData for rule evaluation
@@ -562,13 +562,13 @@ public sealed class PreceptEngine
         // Stage 4: Field and top-level rules (checked against post-set data; rollback on failure)
         var dataRuleViolations = EvaluateDataRules(updatedData);
         if (dataRuleViolations.Count > 0)
-            return DslFireResult.Rejected(instance.CurrentState, eventName, dataRuleViolations);
+            return PreceptFireResult.Rejected(instance.CurrentState, eventName, dataRuleViolations);
 
         // Stage 5: State rules (only checked on state transition, including self-transitions)
-        var targetState = ((DslStateTransition)resolution.Clause.Outcome).TargetState;
+        var targetState = ((PreceptStateTransition)resolution.Clause.Outcome).TargetState;
         var stateRuleViolations = EvaluateStateRules(targetState, updatedData);
         if (stateRuleViolations.Count > 0)
-            return DslFireResult.Rejected(instance.CurrentState, eventName, stateRuleViolations);
+            return PreceptFireResult.Rejected(instance.CurrentState, eventName, stateRuleViolations);
 
         var updated = instance with
         {
@@ -578,7 +578,7 @@ public sealed class PreceptEngine
             InstanceData = DehydrateData(updatedData)
         };
 
-        return DslFireResult.Accepted(instance.CurrentState, eventName, targetState, updated);
+        return PreceptFireResult.Accepted(instance.CurrentState, eventName, targetState, updated);
     }
 
     /// <summary>
@@ -586,7 +586,7 @@ public sealed class PreceptEngine
     /// instance's current data. Returns a flat list of violated rule reason strings. An empty list
     /// means all rules are satisfied. Never throws — violations are collected without short-circuiting.
     /// </summary>
-    internal IReadOnlyList<string> EvaluateCurrentRules(DslWorkflowInstance instance)
+    internal IReadOnlyList<string> EvaluateCurrentRules(PreceptInstance instance)
     {
         var violations = new List<string>();
         violations.AddRange(EvaluateDataRules(instance.InstanceData));
@@ -616,7 +616,7 @@ public sealed class PreceptEngine
         // Evaluate 'when' predicate — if false, the entire block is not applicable
         if (transition.PredicateAst is not null)
         {
-            var whenResult = DslExpressionRuntimeEvaluator.Evaluate(transition.PredicateAst, evaluationData);
+            var whenResult = PreceptExpressionRuntimeEvaluator.Evaluate(transition.PredicateAst, evaluationData);
             if (!whenResult.Success || whenResult.Value is not bool whenBool || !whenBool)
                 return TransitionResolution.NotApplicable();
         }
@@ -627,7 +627,7 @@ public sealed class PreceptEngine
             // Evaluate clause guard predicate (if/else if)
             if (clause.PredicateAst is not null)
             {
-                var guardResult = DslExpressionRuntimeEvaluator.Evaluate(clause.PredicateAst, evaluationData);
+                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(clause.PredicateAst, evaluationData);
                 if (!guardResult.Success || guardResult.Value is not bool guardBool || !guardBool)
                 {
                     reasons.Add(clause.Predicate is not null
@@ -646,9 +646,9 @@ public sealed class PreceptEngine
             // Clause predicate passed (or no predicate — unguarded/else)
             return clause.Outcome switch
             {
-                DslStateTransition => TransitionResolution.Accepted(clause),
-                DslNoTransition => TransitionResolution.NoTransition(clause),
-                DslRejection rej => TransitionResolution.Rejected(new[]
+                PreceptStateTransition => TransitionResolution.Accepted(clause),
+                PreceptNoTransition => TransitionResolution.NoTransition(clause),
+                PreceptRejection rej => TransitionResolution.Rejected(new[]
                 {
                     string.IsNullOrWhiteSpace(rej.Reason)
                         ? (reasons.FirstOrDefault() ?? $"No transition for '{eventName}' from '{currentState}'.")
@@ -672,11 +672,11 @@ public sealed class PreceptEngine
 
     private sealed record TransitionResolution(
         TransitionResolutionKind Kind,
-        DslClause? Clause,
+        PreceptClause? Clause,
         string? NotDefinedReason,
         IReadOnlyList<string> Reasons)
     {
-        internal static TransitionResolution Accepted(DslClause clause) =>
+        internal static TransitionResolution Accepted(PreceptClause clause) =>
             new(TransitionResolutionKind.Accepted, clause, null, Array.Empty<string>());
 
         internal static TransitionResolution Rejected(IReadOnlyList<string> reasons) =>
@@ -685,7 +685,7 @@ public sealed class PreceptEngine
         internal static TransitionResolution NotDefined(string reason) =>
             new(TransitionResolutionKind.NotDefined, null, reason, new[] { reason });
 
-        internal static TransitionResolution NoTransition(DslClause clause) =>
+        internal static TransitionResolution NoTransition(PreceptClause clause) =>
             new(TransitionResolutionKind.NoTransition, clause, null, Array.Empty<string>());
 
         internal static TransitionResolution NotApplicable() =>
@@ -876,7 +876,7 @@ public sealed class PreceptEngine
         var violations = new List<string>();
         foreach (var rule in rules)
         {
-            var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, evaluationData);
+            var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, evaluationData);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
                 violations.Add(rule.Reason);
         }
@@ -889,21 +889,21 @@ public sealed class PreceptEngine
 
         foreach (var rule in _allFieldRules)
         {
-            var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
+            var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
                 violations.Add(rule.Reason);
         }
 
         foreach (var rule in _allCollectionRules)
         {
-            var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
+            var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
                 violations.Add(rule.Reason);
         }
 
         foreach (var rule in _topLevelRules)
         {
-            var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
+            var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
                 violations.Add(rule.Reason);
         }
@@ -919,7 +919,7 @@ public sealed class PreceptEngine
         var violations = new List<string>();
         foreach (var rule in rules)
         {
-            var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
+            var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
                 violations.Add(rule.Reason);
         }
@@ -941,7 +941,7 @@ public sealed class PreceptEngine
     }
 
     private string? ExecuteCollectionMutations(
-        IReadOnlyList<DslCollectionMutation> mutations,
+        IReadOnlyList<PreceptCollectionMutation> mutations,
         Dictionary<string, CollectionValue> workingCollections,
         Dictionary<string, object?> data,
         string eventName,
@@ -956,7 +956,7 @@ public sealed class PreceptEngine
             if (mutation.Expression is not null)
             {
                 var ctx = BuildEvaluationDataWithCollections(data, workingCollections, eventName, eventArguments);
-                var result = DslExpressionRuntimeEvaluator.Evaluate(mutation.Expression, ctx);
+                var result = PreceptExpressionRuntimeEvaluator.Evaluate(mutation.Expression, ctx);
                 if (!result.Success)
                     return $"Collection mutation failed: {result.Error}";
                 argValue = result.Value;
@@ -964,33 +964,33 @@ public sealed class PreceptEngine
 
             switch (mutation.Verb)
             {
-                case DslCollectionMutationVerb.Add:
+                case PreceptCollectionMutationVerb.Add:
                     collection.Add(argValue!);
                     break;
-                case DslCollectionMutationVerb.Remove:
+                case PreceptCollectionMutationVerb.Remove:
                     collection.Remove(argValue!);
                     break;
-                case DslCollectionMutationVerb.Enqueue:
+                case PreceptCollectionMutationVerb.Enqueue:
                     collection.Enqueue(argValue!);
                     break;
-                case DslCollectionMutationVerb.Dequeue:
+                case PreceptCollectionMutationVerb.Dequeue:
                     if (collection.Count == 0)
                         return $"Collection mutation failed: cannot dequeue from empty queue '{mutation.TargetField}'.";
                     if (mutation.IntoField is not null)
                         data[mutation.IntoField] = collection.Peek();
                     collection.Dequeue();
                     break;
-                case DslCollectionMutationVerb.Push:
+                case PreceptCollectionMutationVerb.Push:
                     collection.Push(argValue!);
                     break;
-                case DslCollectionMutationVerb.Pop:
+                case PreceptCollectionMutationVerb.Pop:
                     if (collection.Count == 0)
                         return $"Collection mutation failed: cannot pop from empty stack '{mutation.TargetField}'.";
                     if (mutation.IntoField is not null)
                         data[mutation.IntoField] = collection.Peek();
                     collection.Pop();
                     break;
-                case DslCollectionMutationVerb.Clear:
+                case PreceptCollectionMutationVerb.Clear:
                     collection.Clear();
                     break;
             }
@@ -1102,7 +1102,7 @@ public sealed class PreceptEngine
         return false;
     }
 
-    private static bool TryValidateScalarValue(string name, DslScalarType type, bool isNullable, object? value, out string? error)
+    private static bool TryValidateScalarValue(string name, PreceptScalarType type, bool isNullable, object? value, out string? error)
     {
         if (value is null)
         {
@@ -1118,10 +1118,10 @@ public sealed class PreceptEngine
 
         bool typeMatches = type switch
         {
-            DslScalarType.String => value is string,
-            DslScalarType.Boolean => value is bool,
-            DslScalarType.Number => value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal,
-            DslScalarType.Null => false,
+            PreceptScalarType.String => value is string,
+            PreceptScalarType.Boolean => value is bool,
+            PreceptScalarType.Number => value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal,
+            PreceptScalarType.Null => false,
             _ => false
         };
 
@@ -1139,7 +1139,7 @@ public sealed class PreceptEngine
 
 public static class PreceptCompiler
 {
-    public static PreceptEngine Compile(DslWorkflowModel model)
+    public static PreceptEngine Compile(PreceptDefinition model)
     {
         if (model is null)
             throw new ArgumentNullException(nameof(model));
@@ -1156,7 +1156,7 @@ public static class PreceptCompiler
         return new PreceptEngine(model);
     }
 
-    private static void ValidateRulesAtCompileTime(DslWorkflowModel model)
+    private static void ValidateRulesAtCompileTime(PreceptDefinition model)
     {
         // Build initial instance data (using field defaults)
         var defaultData = BuildDefaultData(model);
@@ -1174,7 +1174,7 @@ public static class PreceptCompiler
 
             foreach (var rule in field.Rules)
             {
-                var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
+                var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
                     throw new InvalidOperationException($"Line {rule.SourceLine}: compile-time rule violation: rule \"{rule.Reason}\" on field '{field.Name}' is violated by the field's default value.");
             }
@@ -1196,7 +1196,7 @@ public static class PreceptCompiler
 
             foreach (var rule in col.Rules)
             {
-                var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, colCtx);
+                var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, colCtx);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
                     throw new InvalidOperationException($"Line {rule.SourceLine}: compile-time rule violation: rule \"{rule.Reason}\" on collection field '{col.Name}' is violated at creation (collection starts empty).");
             }
@@ -1207,7 +1207,7 @@ public static class PreceptCompiler
         {
             foreach (var rule in model.TopLevelRules)
             {
-                var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
+                var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
                     throw new InvalidOperationException($"Line {rule.SourceLine}: compile-time rule violation: top-level rule \"{rule.Reason}\" is violated by default field values.");
             }
@@ -1219,7 +1219,7 @@ public static class PreceptCompiler
         {
             foreach (var rule in initialStateRules)
             {
-                var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
+                var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
                     throw new InvalidOperationException($"Line {rule.SourceLine}: compile-time rule violation: state rule \"{rule.Reason}\" on initial state '{model.InitialState}' is violated by default data.");
             }
@@ -1258,7 +1258,7 @@ public static class PreceptCompiler
 
             foreach (var rule in evt.Rules)
             {
-                var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, eventDefaults);
+                var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, eventDefaults);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
                     throw new InvalidOperationException($"Line {rule.SourceLine}: compile-time rule violation: event rule \"{rule.Reason}\" on event '{evt.Name}' is violated by default argument values.");
             }
@@ -1270,19 +1270,19 @@ public static class PreceptCompiler
         ValidateLiteralSetAssignments(model, defaultData);
     }
 
-    private static void ValidateLiteralSetAssignments(DslWorkflowModel model, IReadOnlyDictionary<string, object?> defaultData)
+    private static void ValidateLiteralSetAssignments(PreceptDefinition model, IReadOnlyDictionary<string, object?> defaultData)
     {
         var fieldRuleMap = model.Fields
             .Where(f => f.Rules is not null && f.Rules.Count > 0)
             .ToDictionary(f => f.Name, f => f.Rules!, StringComparer.Ordinal);
 
-        var topLevelRules = model.TopLevelRules ?? Array.Empty<DslRule>();
+        var topLevelRules = model.TopLevelRules ?? Array.Empty<PreceptRule>();
 
-        void CheckLiteralAssignment(DslSetAssignment assignment)
+        void CheckLiteralAssignment(PreceptSetAssignment assignment)
         {
             // Try to evaluate the assignment expression as a constant (no field references needed).
             // This catches literal numbers, strings, bools, null, and also constant expressions like -1.
-            var constantEval = DslExpressionRuntimeEvaluator.Evaluate(assignment.Expression, EmptyInstanceData.Instance);
+            var constantEval = PreceptExpressionRuntimeEvaluator.Evaluate(assignment.Expression, EmptyInstanceData.Instance);
             if (!constantEval.Success)
                 return; // Expression depends on runtime data — cannot check at compile time
 
@@ -1301,7 +1301,7 @@ public static class PreceptCompiler
             {
                 foreach (var rule in fieldRules)
                 {
-                    var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, ctx);
+                    var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, ctx);
                     if (!result.Success || result.Value is not bool boolVal || !boolVal)
                         throw new InvalidOperationException($"Line {assignment.SourceLine}: literal assignment 'set {assignment.Key} = {assignment.ExpressionText}' violates rule \"{rule.Reason}\" on field '{assignment.Key}'.");
                 }
@@ -1309,7 +1309,7 @@ public static class PreceptCompiler
 
             foreach (var rule in topLevelRules)
             {
-                var result = DslExpressionRuntimeEvaluator.Evaluate(rule.Expression, ctx);
+                var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, ctx);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
                     throw new InvalidOperationException($"Line {assignment.SourceLine}: literal assignment 'set {assignment.Key} = {assignment.ExpressionText}' violates top-level rule \"{rule.Reason}\".");
             }
@@ -1325,7 +1325,7 @@ public static class PreceptCompiler
         }
     }
 
-    private static IReadOnlyDictionary<string, object?> BuildDefaultData(DslWorkflowModel model)
+    private static IReadOnlyDictionary<string, object?> BuildDefaultData(PreceptDefinition model)
     {
         var data = new Dictionary<string, object?>(StringComparer.Ordinal);
         foreach (var field in model.Fields)
@@ -1341,17 +1341,17 @@ public static class PreceptCompiler
     }
 }
 
-public sealed record DslWorkflowInstance(
+public sealed record PreceptInstance(
     string WorkflowName,
     string CurrentState,
     string? LastEvent,
     DateTimeOffset UpdatedAt,
     IReadOnlyDictionary<string, object?> InstanceData);
 
-public sealed record DslCompatibilityResult(bool IsCompatible, string? Reason)
+public sealed record PreceptCompatibilityResult(bool IsCompatible, string? Reason)
 {
-    internal static DslCompatibilityResult Compatible() => new(true, null);
-    internal static DslCompatibilityResult NotCompatible(string reason) => new(false, reason);
+    internal static PreceptCompatibilityResult Compatible() => new(true, null);
+    internal static PreceptCompatibilityResult NotCompatible(string reason) => new(false, reason);
 }
 
 internal sealed class EmptyInstanceData : IReadOnlyDictionary<string, object?>
@@ -1373,60 +1373,60 @@ internal sealed class EmptyInstanceData : IReadOnlyDictionary<string, object?>
     System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
-public sealed record DslEventInspectionResult(
-    DslOutcomeKind Outcome,
+public sealed record PreceptEventInspectionResult(
+    PreceptOutcomeKind Outcome,
     string CurrentState,
     string EventName,
     string? TargetState,
     IReadOnlyList<string> RequiredEventArgumentKeys,
     IReadOnlyList<string> Reasons)
 {
-    internal static DslEventInspectionResult Accepted(string state, string evt, string target, IReadOnlyList<string> requiredEventArgumentKeys) =>
-        new(DslOutcomeKind.Accepted, state, evt, target, requiredEventArgumentKeys, Array.Empty<string>());
+    internal static PreceptEventInspectionResult Accepted(string state, string evt, string target, IReadOnlyList<string> requiredEventArgumentKeys) =>
+        new(PreceptOutcomeKind.Accepted, state, evt, target, requiredEventArgumentKeys, Array.Empty<string>());
 
-    internal static DslEventInspectionResult AcceptedInPlace(string state, string evt) =>
-        new(DslOutcomeKind.AcceptedInPlace, state, evt, state, Array.Empty<string>(), Array.Empty<string>());
+    internal static PreceptEventInspectionResult AcceptedInPlace(string state, string evt) =>
+        new(PreceptOutcomeKind.AcceptedInPlace, state, evt, state, Array.Empty<string>(), Array.Empty<string>());
 
-    internal static DslEventInspectionResult NotDefined(string state, string evt, string reason) =>
-        new(DslOutcomeKind.NotDefined, state, evt, null, Array.Empty<string>(), new[] { reason });
+    internal static PreceptEventInspectionResult NotDefined(string state, string evt, string reason) =>
+        new(PreceptOutcomeKind.NotDefined, state, evt, null, Array.Empty<string>(), new[] { reason });
 
-    internal static DslEventInspectionResult NotApplicable(string state, string evt) =>
-        new(DslOutcomeKind.NotApplicable, state, evt, null, Array.Empty<string>(), Array.Empty<string>());
+    internal static PreceptEventInspectionResult NotApplicable(string state, string evt) =>
+        new(PreceptOutcomeKind.NotApplicable, state, evt, null, Array.Empty<string>(), Array.Empty<string>());
 
-    internal static DslEventInspectionResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(DslOutcomeKind.Rejected, state, evt, null, Array.Empty<string>(), reasons);
+    internal static PreceptEventInspectionResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
+        new(PreceptOutcomeKind.Rejected, state, evt, null, Array.Empty<string>(), reasons);
 }
 
-public sealed record DslInspectionResult(
+public sealed record PreceptInspectionResult(
     string CurrentState,
     IReadOnlyDictionary<string, object?> InstanceData,
-    IReadOnlyList<DslEventInspectionResult> Events);
+    IReadOnlyList<PreceptEventInspectionResult> Events);
 
-public sealed record DslFireResult(
-    DslOutcomeKind Outcome,
+public sealed record PreceptFireResult(
+    PreceptOutcomeKind Outcome,
     string PreviousState,
     string EventName,
     string? NewState,
     IReadOnlyList<string> Reasons,
-    DslWorkflowInstance? UpdatedInstance)
+    PreceptInstance? UpdatedInstance)
 {
-    internal static DslFireResult Accepted(string state, string evt, string newState, DslWorkflowInstance updated) =>
-        new(DslOutcomeKind.Accepted, state, evt, newState, Array.Empty<string>(), updated);
+    internal static PreceptFireResult Accepted(string state, string evt, string newState, PreceptInstance updated) =>
+        new(PreceptOutcomeKind.Accepted, state, evt, newState, Array.Empty<string>(), updated);
 
-    internal static DslFireResult AcceptedInPlace(string state, string evt, DslWorkflowInstance updated) =>
-        new(DslOutcomeKind.AcceptedInPlace, state, evt, state, Array.Empty<string>(), updated);
+    internal static PreceptFireResult AcceptedInPlace(string state, string evt, PreceptInstance updated) =>
+        new(PreceptOutcomeKind.AcceptedInPlace, state, evt, state, Array.Empty<string>(), updated);
 
-    internal static DslFireResult NotDefined(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(DslOutcomeKind.NotDefined, state, evt, null, reasons, null);
+    internal static PreceptFireResult NotDefined(string state, string evt, IReadOnlyList<string> reasons) =>
+        new(PreceptOutcomeKind.NotDefined, state, evt, null, reasons, null);
 
-    internal static DslFireResult NotApplicable(string state, string evt) =>
-        new(DslOutcomeKind.NotApplicable, state, evt, null, Array.Empty<string>(), null);
+    internal static PreceptFireResult NotApplicable(string state, string evt) =>
+        new(PreceptOutcomeKind.NotApplicable, state, evt, null, Array.Empty<string>(), null);
 
-    internal static DslFireResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(DslOutcomeKind.Rejected, state, evt, null, reasons, null);
+    internal static PreceptFireResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
+        new(PreceptOutcomeKind.Rejected, state, evt, null, reasons, null);
 }
 
-public enum DslOutcomeKind
+public enum PreceptOutcomeKind
 {
     NotDefined,
     NotApplicable,

@@ -6,62 +6,62 @@ using Xunit;
 
 namespace Precept.Tests;
 
-public class DslExpressionParserEdgeCaseTests
+public class PreceptExpressionParserEdgeCaseTests
 {
     [Theory]
     [InlineData("true", true)]
     [InlineData("false", false)]
     public void Parse_SetExpression_BooleanLiteral_IsLiteralExpression(string input, bool expected)
     {
-        var expression = DslExpressionTestHelper.ParseFirstSetExpression(input);
+        var expression = PreceptExpressionTestHelper.ParseFirstSetExpression(input);
 
-        expression.Should().BeOfType<DslLiteralExpression>();
-        ((DslLiteralExpression)expression).Value.Should().Be(expected);
+        expression.Should().BeOfType<PreceptLiteralExpression>();
+        ((PreceptLiteralExpression)expression).Value.Should().Be(expected);
     }
 
     [Fact]
     public void Parse_SetExpression_NullLiteral_IsLiteralExpression()
     {
-        var expression = DslExpressionTestHelper.ParseFirstSetExpression("null");
+        var expression = PreceptExpressionTestHelper.ParseFirstSetExpression("null");
 
-        expression.Should().BeOfType<DslLiteralExpression>();
-        ((DslLiteralExpression)expression).Value.Should().BeNull();
+        expression.Should().BeOfType<PreceptLiteralExpression>();
+        ((PreceptLiteralExpression)expression).Value.Should().BeNull();
     }
 
     [Fact]
     public void Parse_SetExpression_NumberWithExponent_IsLiteralExpression()
     {
-        var expression = DslExpressionTestHelper.ParseFirstSetExpression("1.5e2");
+        var expression = PreceptExpressionTestHelper.ParseFirstSetExpression("1.5e2");
 
-        expression.Should().BeOfType<DslLiteralExpression>();
-        ((DslLiteralExpression)expression).Value.Should().Be(150d);
+        expression.Should().BeOfType<PreceptLiteralExpression>();
+        ((PreceptLiteralExpression)expression).Value.Should().Be(150d);
     }
 
     [Fact]
     public void Parse_SetExpression_StringWithEscapes_IsLiteralExpression()
     {
-        var expression = DslExpressionTestHelper.ParseFirstSetExpression("\"line1\\nline2\"");
+        var expression = PreceptExpressionTestHelper.ParseFirstSetExpression("\"line1\\nline2\"");
 
-        expression.Should().BeOfType<DslLiteralExpression>();
-        ((DslLiteralExpression)expression).Value.Should().Be("line1\nline2");
+        expression.Should().BeOfType<PreceptLiteralExpression>();
+        ((PreceptLiteralExpression)expression).Value.Should().Be("line1\nline2");
     }
 
     [Fact]
     public void Parse_SetExpression_ComparisonChain_RespectsPrecedence()
     {
-        var expression = DslExpressionTestHelper.ParseFirstSetExpression("A > B == C");
+        var expression = PreceptExpressionTestHelper.ParseFirstSetExpression("A > B == C");
 
-        expression.Should().BeOfType<DslBinaryExpression>();
-        var equals = (DslBinaryExpression)expression;
+        expression.Should().BeOfType<PreceptBinaryExpression>();
+        var equals = (PreceptBinaryExpression)expression;
         equals.Operator.Should().Be("==");
-        equals.Left.Should().BeOfType<DslBinaryExpression>();
-        ((DslBinaryExpression)equals.Left).Operator.Should().Be(">");
+        equals.Left.Should().BeOfType<PreceptBinaryExpression>();
+        ((PreceptBinaryExpression)equals.Left).Operator.Should().Be(">");
     }
 
     [Fact]
     public void Parse_SetExpression_SingleAmpersand_ThrowsLineError()
     {
-        var act = DslExpressionTestHelper.ParseFirstSetExpressionAction("A & B");
+        var act = PreceptExpressionTestHelper.ParseFirstSetExpressionAction("A & B");
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*invalid set expression*unexpected character '&'*");
@@ -70,7 +70,7 @@ public class DslExpressionParserEdgeCaseTests
     [Fact]
     public void Parse_SetExpression_SinglePipe_ThrowsLineError()
     {
-        var act = DslExpressionTestHelper.ParseFirstSetExpressionAction("A | B");
+        var act = PreceptExpressionTestHelper.ParseFirstSetExpressionAction("A | B");
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*invalid set expression*unexpected character '|'*");
@@ -79,7 +79,7 @@ public class DslExpressionParserEdgeCaseTests
     [Fact]
     public void Parse_SetExpression_UnexpectedCharacter_ThrowsLineError()
     {
-        var act = DslExpressionTestHelper.ParseFirstSetExpressionAction("A @ B");
+        var act = PreceptExpressionTestHelper.ParseFirstSetExpressionAction("A @ B");
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*invalid set expression*unexpected character '@'*");
@@ -88,7 +88,7 @@ public class DslExpressionParserEdgeCaseTests
     [Fact]
     public void Parse_SetExpression_MissingRightParenthesis_ThrowsLineError()
     {
-        var act = DslExpressionTestHelper.ParseFirstSetExpressionAction("(A + 1");
+        var act = PreceptExpressionTestHelper.ParseFirstSetExpressionAction("(A + 1");
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*invalid set expression*expected ')'*");
@@ -97,7 +97,7 @@ public class DslExpressionParserEdgeCaseTests
     [Fact]
     public void Parse_SetExpression_UnexpectedTrailingToken_ThrowsLineError()
     {
-        var act = DslExpressionTestHelper.ParseFirstSetExpressionAction("A + 1 extra");
+        var act = PreceptExpressionTestHelper.ParseFirstSetExpressionAction("A + 1 extra");
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*invalid set expression*expected '<end>'*found 'extra'*");

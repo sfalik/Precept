@@ -18,8 +18,8 @@ internal sealed class SmDslAnalyzer
     private static readonly Regex EventMemberPrefixRegex = new("(?<event>[A-Za-z_][A-Za-z0-9_]*)\\.$", RegexOptions.Compiled);
     private static readonly Regex SetLineRegex = new("^\\s*set\\s+(?<key>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<expr>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex CollectionDeclRegex = new("^\\s*(?:set|queue|stack)<(?:number|string|boolean)>\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly MethodInfo? ExpressionParseMethod = typeof(DslWorkflowModel).Assembly
-        .GetType("Precept.DslExpressionParser", throwOnError: false)
+    private static readonly MethodInfo? ExpressionParseMethod = typeof(PreceptDefinition).Assembly
+        .GetType("Precept.PreceptExpressionParser", throwOnError: false)
         ?.GetMethod(
             "Parse",
             BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
@@ -354,7 +354,7 @@ internal sealed class SmDslAnalyzer
             .OrderBy(item => item.Label, StringComparer.Ordinal)
             .ToArray();
 
-    private static IReadOnlyList<Diagnostic> GetSemanticDiagnostics(DslWorkflowModel model, string[] lines)
+    private static IReadOnlyList<Diagnostic> GetSemanticDiagnostics(PreceptDefinition model, string[] lines)
     {
         var diagnostics = new List<Diagnostic>();
         var dataFieldKinds = model.Fields.ToDictionary(
@@ -492,11 +492,11 @@ internal sealed class SmDslAnalyzer
     }
 
     private static void ValidateRuleDiagnostics(
-        DslWorkflowModel model,
+        PreceptDefinition model,
         string[] lines,
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
-        IReadOnlyDictionary<string, DslCollectionField> collectionFieldMap,
+        IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
         List<Diagnostic> diagnostics)
     {
         // Symbols for data fields (field rules and top-level rules scope)
@@ -566,9 +566,9 @@ internal sealed class SmDslAnalyzer
             {
                 var argKind = arg.Type switch
                 {
-                    DslScalarType.String => StaticValueKind.String,
-                    DslScalarType.Number => StaticValueKind.Number,
-                    DslScalarType.Boolean => StaticValueKind.Boolean,
+                    PreceptScalarType.String => StaticValueKind.String,
+                    PreceptScalarType.Number => StaticValueKind.Number,
+                    PreceptScalarType.Boolean => StaticValueKind.Boolean,
                     _ => StaticValueKind.None
                 };
                 if (arg.IsNullable) argKind |= StaticValueKind.Null;
@@ -591,7 +591,7 @@ internal sealed class SmDslAnalyzer
                 model.Transitions
                     .SelectMany(t => t.Clauses)
                     .Select(c => c.Outcome)
-                    .OfType<DslStateTransition>()
+                    .OfType<PreceptStateTransition>()
                     .Select(st => st.TargetState),
                 StringComparer.Ordinal);
             foreach (var state in statesWithRules)
@@ -630,7 +630,7 @@ internal sealed class SmDslAnalyzer
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         string eventName,
-        IReadOnlyList<DslCollectionField>? collectionFields = null)
+        IReadOnlyList<PreceptCollectionField>? collectionFields = null)
     {
         var symbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
         foreach (var pair in dataFieldKinds)
@@ -649,9 +649,9 @@ internal sealed class SmDslAnalyzer
             {
                 var innerKind = col.InnerType switch
                 {
-                    DslScalarType.Number => StaticValueKind.Number,
-                    DslScalarType.String => StaticValueKind.String,
-                    DslScalarType.Boolean => StaticValueKind.Boolean,
+                    PreceptScalarType.Number => StaticValueKind.Number,
+                    PreceptScalarType.String => StaticValueKind.String,
+                    PreceptScalarType.Boolean => StaticValueKind.Boolean,
                     _ => StaticValueKind.None
                 };
 
@@ -695,7 +695,7 @@ internal sealed class SmDslAnalyzer
         }
     }
 
-    private static bool TryParseExpression(string expression, out DslExpression? parsed, out string error)
+    private static bool TryParseExpression(string expression, out PreceptExpression? parsed, out string error)
     {
         parsed = null;
         error = string.Empty;
@@ -708,7 +708,7 @@ internal sealed class SmDslAnalyzer
 
         try
         {
-            parsed = ExpressionParseMethod.Invoke(null, [expression]) as DslExpression;
+            parsed = ExpressionParseMethod.Invoke(null, [expression]) as PreceptExpression;
             if (parsed is null)
             {
                 error = "expression parse failed.";
@@ -730,7 +730,7 @@ internal sealed class SmDslAnalyzer
     }
 
     private static bool TryInferKind(
-        DslExpression expression,
+        PreceptExpression expression,
         IReadOnlyDictionary<string, StaticValueKind> symbols,
         out StaticValueKind kind,
         out string error)
@@ -740,11 +740,11 @@ internal sealed class SmDslAnalyzer
 
         switch (expression)
         {
-            case DslLiteralExpression literal:
+            case PreceptLiteralExpression literal:
                 kind = MapLiteralKind(literal.Value);
                 return true;
 
-            case DslIdentifierExpression identifier:
+            case PreceptIdentifierExpression identifier:
             {
                 var key = identifier.Member is null ? identifier.Name : $"{identifier.Name}.{identifier.Member}";
                 if (!symbols.TryGetValue(key, out var symbolKind))
@@ -757,10 +757,10 @@ internal sealed class SmDslAnalyzer
                 return true;
             }
 
-            case DslParenthesizedExpression parenthesized:
+            case PreceptParenthesizedExpression parenthesized:
                 return TryInferKind(parenthesized.Inner, symbols, out kind, out error);
 
-            case DslUnaryExpression unary:
+            case PreceptUnaryExpression unary:
             {
                 if (!TryInferKind(unary.Operand, symbols, out var operandKind, out error))
                     return false;
@@ -793,7 +793,7 @@ internal sealed class SmDslAnalyzer
                 return false;
             }
 
-            case DslBinaryExpression binary:
+            case PreceptBinaryExpression binary:
             {
                 switch (binary.Operator)
                 {
@@ -945,16 +945,16 @@ internal sealed class SmDslAnalyzer
     }
 
     private static IReadOnlyDictionary<string, StaticValueKind> ApplyNarrowing(
-        DslExpression expression,
+        PreceptExpression expression,
         IReadOnlyDictionary<string, StaticValueKind> symbols,
         bool assumeTrue)
     {
         expression = StripParentheses(expression);
 
-        if (expression is DslUnaryExpression { Operator: "!" } unary)
+        if (expression is PreceptUnaryExpression { Operator: "!" } unary)
             return ApplyNarrowing(unary.Operand, symbols, !assumeTrue);
 
-        if (expression is DslBinaryExpression binary)
+        if (expression is PreceptBinaryExpression binary)
         {
             if (binary.Operator == "&&")
             {
@@ -987,7 +987,7 @@ internal sealed class SmDslAnalyzer
     }
 
     private static bool TryApplyNullComparisonNarrowing(
-        DslBinaryExpression binary,
+        PreceptBinaryExpression binary,
         IReadOnlyDictionary<string, StaticValueKind> symbols,
         bool assumeTrue,
         out IReadOnlyDictionary<string, StaticValueKind> narrowed)
@@ -1026,10 +1026,10 @@ internal sealed class SmDslAnalyzer
     }
 
     private static void ValidateCollectionMutations(
-        IReadOnlyList<DslCollectionMutation>? mutations,
+        IReadOnlyList<PreceptCollectionMutation>? mutations,
         IReadOnlyDictionary<string, StaticValueKind> symbols,
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
-        IReadOnlyDictionary<string, DslCollectionField> collectionFieldMap,
+        IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
         ref int searchLine,
         int fallbackLine,
         List<Diagnostic> diagnostics,
@@ -1049,10 +1049,10 @@ internal sealed class SmDslAnalyzer
 
             switch (mutation.Verb)
             {
-                case DslCollectionMutationVerb.Add:
-                case DslCollectionMutationVerb.Remove:
-                case DslCollectionMutationVerb.Enqueue:
-                case DslCollectionMutationVerb.Push:
+                case PreceptCollectionMutationVerb.Add:
+                case PreceptCollectionMutationVerb.Remove:
+                case PreceptCollectionMutationVerb.Enqueue:
+                case PreceptCollectionMutationVerb.Push:
                     if (!string.IsNullOrWhiteSpace(mutation.ExpressionText))
                     {
                         ValidateExpression(
@@ -1067,8 +1067,8 @@ internal sealed class SmDslAnalyzer
 
                     break;
 
-                case DslCollectionMutationVerb.Dequeue:
-                case DslCollectionMutationVerb.Pop:
+                case PreceptCollectionMutationVerb.Dequeue:
+                case PreceptCollectionMutationVerb.Pop:
                     if (!string.IsNullOrWhiteSpace(mutation.IntoField) &&
                         dataFieldKinds.TryGetValue(mutation.IntoField!, out var intoKind))
                     {
@@ -1084,25 +1084,25 @@ internal sealed class SmDslAnalyzer
 
                     break;
 
-                case DslCollectionMutationVerb.Clear:
+                case PreceptCollectionMutationVerb.Clear:
                     break;
             }
         }
     }
 
-    private static StaticValueKind MapScalarTypeToKind(DslScalarType type) => type switch
+    private static StaticValueKind MapScalarTypeToKind(PreceptScalarType type) => type switch
     {
-        DslScalarType.String => StaticValueKind.String,
-        DslScalarType.Number => StaticValueKind.Number,
-        DslScalarType.Boolean => StaticValueKind.Boolean,
-        DslScalarType.Null => StaticValueKind.Null,
+        PreceptScalarType.String => StaticValueKind.String,
+        PreceptScalarType.Number => StaticValueKind.Number,
+        PreceptScalarType.Boolean => StaticValueKind.Boolean,
+        PreceptScalarType.Null => StaticValueKind.Null,
         _ => StaticValueKind.None
     };
 
-    private static bool TryGetIdentifierKey(DslExpression expression, out string key)
+    private static bool TryGetIdentifierKey(PreceptExpression expression, out string key)
     {
         var stripped = StripParentheses(expression);
-        if (stripped is DslIdentifierExpression identifier)
+        if (stripped is PreceptIdentifierExpression identifier)
         {
             key = identifier.Member is null
                 ? identifier.Name
@@ -1114,16 +1114,16 @@ internal sealed class SmDslAnalyzer
         return false;
     }
 
-    private static DslExpression StripParentheses(DslExpression expression)
+    private static PreceptExpression StripParentheses(PreceptExpression expression)
     {
-        while (expression is DslParenthesizedExpression parenthesized)
+        while (expression is PreceptParenthesizedExpression parenthesized)
             expression = parenthesized.Inner;
 
         return expression;
     }
 
-    private static bool IsNullLiteral(DslExpression expression)
-        => StripParentheses(expression) is DslLiteralExpression { Value: null };
+    private static bool IsNullLiteral(PreceptExpression expression)
+        => StripParentheses(expression) is PreceptLiteralExpression { Value: null };
 
     private static bool IsExactly(StaticValueKind kind, StaticValueKind expected)
         => kind == expected;
@@ -1231,18 +1231,18 @@ internal sealed class SmDslAnalyzer
         };
     }
 
-    private static StaticValueKind MapFieldContractKind(DslField field) => MapKind(field.Type, field.IsNullable);
+    private static StaticValueKind MapFieldContractKind(PreceptField field) => MapKind(field.Type, field.IsNullable);
 
-    private static StaticValueKind MapFieldContractKind(DslEventArg arg) => MapKind(arg.Type, arg.IsNullable);
+    private static StaticValueKind MapFieldContractKind(PreceptEventArg arg) => MapKind(arg.Type, arg.IsNullable);
 
-    private static StaticValueKind MapKind(DslScalarType type, bool isNullable)
+    private static StaticValueKind MapKind(PreceptScalarType type, bool isNullable)
     {
         var kind = type switch
         {
-            DslScalarType.String => StaticValueKind.String,
-            DslScalarType.Number => StaticValueKind.Number,
-            DslScalarType.Boolean => StaticValueKind.Boolean,
-            DslScalarType.Null => StaticValueKind.Null,
+            PreceptScalarType.String => StaticValueKind.String,
+            PreceptScalarType.Number => StaticValueKind.Number,
+            PreceptScalarType.Boolean => StaticValueKind.Boolean,
+            PreceptScalarType.Null => StaticValueKind.Null,
             _ => StaticValueKind.None
         };
 

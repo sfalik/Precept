@@ -56,16 +56,16 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         var coercedArgs = session.Engine.CoerceEventArguments(request.EventName!, request.Args);
         var inspect = session.Engine.Inspect(session.Instance, request.EventName!, coercedArgs);
         var evt = session.Engine.Events.FirstOrDefault(e => string.Equals(e.Name, request.EventName, StringComparison.Ordinal));
-        var args = (evt?.Args ?? Array.Empty<DslEventArg>())
+        var args = (evt?.Args ?? Array.Empty<PreceptEventArg>())
             .Select(arg => new SmPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable, arg.HasDefaultValue, arg.DefaultValue))
             .ToArray();
 
         var outcome = inspect.Outcome switch
         {
-            DslOutcomeKind.Accepted => "enabled",
-            DslOutcomeKind.AcceptedInPlace => "noTransition",
-            DslOutcomeKind.Rejected => "blocked",
-            DslOutcomeKind.NotApplicable => "notApplicable",
+            PreceptOutcomeKind.Accepted => "enabled",
+            PreceptOutcomeKind.AcceptedInPlace => "noTransition",
+            PreceptOutcomeKind.Rejected => "blocked",
+            PreceptOutcomeKind.NotApplicable => "notApplicable",
             _ => "undefined"
         };
 
@@ -94,7 +94,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         if (fire.UpdatedInstance is not null)
             session.Instance = fire.UpdatedInstance;
 
-        if (fire.Outcome is not (DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace))
+        if (fire.Outcome is not (PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace))
         {
             var reason = fire.Reasons.FirstOrDefault() ?? $"Event '{request.EventName}' did not fire.";
             return new SmPreviewResponse(false, Error: reason, Errors: fire.Reasons, Snapshot: BuildSnapshot(session));
@@ -127,7 +127,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         {
             var coercedStepArgs = session.Engine.CoerceEventArguments(step.EventName, step.Args);
             var fire = session.Engine.Fire(session.Instance, step.EventName, coercedStepArgs);
-            if ((fire.Outcome is DslOutcomeKind.Accepted or DslOutcomeKind.AcceptedInPlace) && fire.UpdatedInstance is not null)
+            if ((fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace) && fire.UpdatedInstance is not null)
             {
                 session.Instance = fire.UpdatedInstance;
                 messages.Add($"{step.EventName}: {fire.PreviousState} -> {fire.NewState}");
@@ -151,7 +151,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
 
         SmTextDocumentSyncHandler.SharedAnalyzer.SetDocumentText(request.Uri, text);
 
-        DslWorkflowModel model;
+        PreceptDefinition model;
         PreceptEngine engine;
         try
         {
@@ -171,7 +171,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         return SessionResult.Ok(session);
     }
 
-    private static PreviewSession CreateSession(DocumentUri uri, string sourceText, DslWorkflowModel model, PreceptEngine engine)
+    private static PreviewSession CreateSession(DocumentUri uri, string sourceText, PreceptDefinition model, PreceptEngine engine)
     {
         var instance = engine.CreateInstance();
         return new PreviewSession(uri, sourceText, model, engine, instance);
@@ -181,7 +181,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         DocumentUri uri,
         PreviewSession existing,
         string sourceText,
-        DslWorkflowModel model,
+        PreceptDefinition model,
         PreceptEngine engine)
     {
         if (string.Equals(existing.SourceText, sourceText, StringComparison.Ordinal))
@@ -208,15 +208,15 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
             .Select(inspect =>
             {
                 var evt = session.Engine.Events.FirstOrDefault(e => string.Equals(e.Name, inspect.EventName, StringComparison.Ordinal));
-                var args = (evt?.Args ?? Array.Empty<DslEventArg>())
+                var args = (evt?.Args ?? Array.Empty<PreceptEventArg>())
                     .Select(arg => new SmPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable, arg.HasDefaultValue, arg.DefaultValue))
                     .ToArray();
 
                 var outcome = inspect.Outcome switch
                 {
-                    DslOutcomeKind.Accepted => "enabled",
-                    DslOutcomeKind.AcceptedInPlace => "noTransition",
-                    DslOutcomeKind.Rejected => "blocked",
+                    PreceptOutcomeKind.Accepted => "enabled",
+                    PreceptOutcomeKind.AcceptedInPlace => "noTransition",
+                    PreceptOutcomeKind.Rejected => "blocked",
                     _ => "undefined"
                 };
 
@@ -227,14 +227,14 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         var transitions = session.Model.Transitions
             .SelectMany(t => t.Clauses.Select(clause => new SmPreviewTransition(
                 t.FromState,
-                clause.Outcome is DslStateTransition st ? st.TargetState : t.FromState,
+                clause.Outcome is PreceptStateTransition st ? st.TargetState : t.FromState,
                 t.EventName,
                 clause.Predicate ?? t.Predicate,
                 clause.Outcome switch
                 {
-                    DslStateTransition => "transition",
-                    DslNoTransition => "noTransition",
-                    DslRejection => "reject",
+                    PreceptStateTransition => "transition",
+                    PreceptNoTransition => "noTransition",
+                    PreceptRejection => "reject",
                     _ => "transition"
                 })))
             .ToArray();
@@ -254,7 +254,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
         foreach (var field in session.Engine.CollectionFields.Where(f => f.Rules is not null))
             foreach (var rule in field.Rules!)
                 ruleDefinitions.Add(new SmPreviewRuleInfo($"field:{field.Name}", rule.ExpressionText, rule.Reason));
-        foreach (var rule in session.Model.TopLevelRules ?? Array.Empty<DslRule>())
+        foreach (var rule in session.Model.TopLevelRules ?? Array.Empty<PreceptRule>())
             ruleDefinitions.Add(new SmPreviewRuleInfo("topLevel", rule.ExpressionText, rule.Reason));
         foreach (var state in session.Model.States.Where(s => s.Rules is not null && s.Rules.Count > 0))
             foreach (var rule in state.Rules!)
@@ -287,7 +287,7 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
 
     private sealed class PreviewSession
     {
-        public PreviewSession(DocumentUri uri, string sourceText, DslWorkflowModel model, PreceptEngine engine, DslWorkflowInstance instance)
+        public PreviewSession(DocumentUri uri, string sourceText, PreceptDefinition model, PreceptEngine engine, PreceptInstance instance)
         {
             Uri = uri;
             SourceText = sourceText;
@@ -298,9 +298,9 @@ internal sealed class SmPreviewHandler : IJsonRpcRequestHandler<SmPreviewRequest
 
         public DocumentUri Uri { get; set; }
         public string SourceText { get; set; }
-        public DslWorkflowModel Model { get; set; }
+        public PreceptDefinition Model { get; set; }
         public PreceptEngine Engine { get; set; }
-        public DslWorkflowInstance Instance { get; set; }
+        public PreceptInstance Instance { get; set; }
     }
 
     private sealed record SessionResult(bool Success, string? Error, PreviewSession? Session)

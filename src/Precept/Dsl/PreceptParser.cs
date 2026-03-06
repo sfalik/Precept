@@ -65,19 +65,19 @@ public static class PreceptParser
         "^rule\\s+(?<expr>.+?)\\s+\"(?<reason>[^\"]+)\"\\s*$",
         RegexOptions.Compiled);
 
-    public static DslWorkflowModel Parse(string text)
+    public static PreceptDefinition Parse(string text)
     {
         if (string.IsNullOrWhiteSpace(text))
             throw new InvalidOperationException("DSL input is empty.");
 
         string? name = null;
-        DslState? initialState = null;
-        var states = new List<DslState>();
-        var events = new List<DslEvent>();
-        var transitions = new List<DslTransition>();
-        var dataFields = new List<DslField>();
-        var collectionFields = new List<DslCollectionField>();
-        var topLevelRules = new List<DslRule>();
+        PreceptState? initialState = null;
+        var states = new List<PreceptState>();
+        var events = new List<PreceptEvent>();
+        var transitions = new List<PreceptTransition>();
+        var dataFields = new List<PreceptField>();
+        var collectionFields = new List<PreceptCollectionField>();
+        var topLevelRules = new List<PreceptRule>();
         var seenFromOnPairs = new HashSet<(string State, string Event)>();
 
         var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
@@ -162,15 +162,15 @@ public static class PreceptParser
 
                 var collectionKind = collectionFieldMatch.Groups["kind"].Value.ToLowerInvariant() switch
                 {
-                    "set" => DslCollectionKind.Set,
-                    "queue" => DslCollectionKind.Queue,
-                    "stack" => DslCollectionKind.Stack,
+                    "set" => PreceptCollectionKind.Set,
+                    "queue" => PreceptCollectionKind.Queue,
+                    "stack" => PreceptCollectionKind.Stack,
                     _ => throw new InvalidOperationException($"Line {i + 1}: unknown collection kind '{collectionFieldMatch.Groups["kind"].Value}'.")
                 };
                 var innerType = ParseScalarType(collectionFieldMatch.Groups["inner"].Value);
 
                 var collectionFieldRules = ParseFieldRules(lines, ref i, fieldName, isCollection: true);
-                collectionFields.Add(new DslCollectionField(fieldName, collectionKind, innerType, collectionFieldRules.Count > 0 ? collectionFieldRules : null));
+                collectionFields.Add(new PreceptCollectionField(fieldName, collectionKind, innerType, collectionFieldRules.Count > 0 ? collectionFieldRules : null));
                 continue;
             }
 
@@ -196,7 +196,7 @@ public static class PreceptParser
 
                 var fieldRules = ParseFieldRules(lines, ref i, fieldName, isCollection: false);
 
-                dataFields.Add(new DslField(
+                dataFields.Add(new PreceptField(
                     fieldName,
                     fieldType,
                     isNullable,
@@ -224,12 +224,12 @@ public static class PreceptParser
                 var declaredNames = new HashSet<string>(dataFields.Select(f => f.Name).Concat(collectionFields.Select(f => f.Name)), StringComparer.Ordinal);
                 ValidateRuleScope(ruleExprText, i + 1, declaredNames, allowedIdentifiers: null, scopeDescription: "top-level rule");
 
-                DslExpression ruleExpr;
-                try { ruleExpr = DslExpressionParser.Parse(ruleExprText); }
+                PreceptExpression ruleExpr;
+                try { ruleExpr = PreceptExpressionParser.Parse(ruleExprText); }
                 catch (InvalidOperationException ex)
                 { throw new InvalidOperationException($"Line {i + 1}: invalid rule expression '{ruleExprText}'. {ex.Message}"); }
 
-                topLevelRules.Add(new DslRule(ruleExprText, ruleExpr, ruleReason, i + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
+                topLevelRules.Add(new PreceptRule(ruleExprText, ruleExpr, ruleReason, i + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
                 i++;
                 continue;
             }
@@ -282,7 +282,7 @@ public static class PreceptParser
 
         ValidateReferences(states, events, transitions, dataFields, collectionFields);
 
-        return new DslWorkflowModel(name, states, initialState, events, transitions, dataFields, collectionFields,
+        return new PreceptDefinition(name, states, initialState, events, transitions, dataFields, collectionFields,
             topLevelRules.Count > 0 ? topLevelRules : null);
     }
 
@@ -290,14 +290,14 @@ public static class PreceptParser
         string[] lines,
         ref int index,
         string eventName,
-        ICollection<DslEvent> events)
+        ICollection<PreceptEvent> events)
     {
         if (events.Any(e => string.Equals(e.Name, eventName, StringComparison.Ordinal)))
             throw new InvalidOperationException($"Line {index + 1}: duplicate event '{eventName}'.");
 
         var headerIndent = GetIndentation(lines[index]);
-        var args = new List<DslEventArg>();
-        var eventRules = new List<DslRule>();
+        var args = new List<PreceptEventArg>();
+        var eventRules = new List<PreceptRule>();
 
         index++;
         while (index < lines.Length)
@@ -325,8 +325,8 @@ public static class PreceptParser
                 // Event rules may only reference event arg identifiers (prefixed or bare)
                 ValidateEventRuleScope(ruleExprText, index + 1, argNames, eventName);
 
-                DslExpression ruleExpr;
-                try { ruleExpr = DslExpressionParser.Parse(ruleExprText); }
+                PreceptExpression ruleExpr;
+                try { ruleExpr = PreceptExpressionParser.Parse(ruleExprText); }
                 catch (InvalidOperationException ex)
                 { throw new InvalidOperationException($"Line {index + 1}: invalid rule expression '{ruleExprText}'. {ex.Message}"); }
 
@@ -335,7 +335,7 @@ public static class PreceptParser
                 var exprEndCol = exprStartCol + ruleExprText.Length;
                 var reasonStartCol = exprEndCol;
                 var reasonEndCol = reasonStartCol + ruleReason.Length;
-                eventRules.Add(new DslRule(ruleExprText, ruleExpr, ruleReason, index + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
+                eventRules.Add(new PreceptRule(ruleExprText, ruleExpr, ruleReason, index + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
                 index++;
                 continue;
             }
@@ -355,7 +355,7 @@ public static class PreceptParser
                 ? ParseFieldDefaultLiteral(fieldMatch.Groups["default"].Value.Trim(), argType, argIsNullable, fieldName, index + 1)
                 : null;
 
-            args.Add(new DslEventArg(
+            args.Add(new PreceptEventArg(
                 fieldName,
                 argType,
                 argIsNullable,
@@ -364,14 +364,14 @@ public static class PreceptParser
             index++;
         }
 
-        events.Add(new DslEvent(eventName, args, eventRules.Count > 0 ? eventRules : null));
+        events.Add(new PreceptEvent(eventName, args, eventRules.Count > 0 ? eventRules : null));
     }
 
     /// <summary>
     /// Advances <paramref name="index"/> past the state header line and collects any indented
     /// <c>rule</c> lines that follow. Non-rule indented content causes a parse error.
     /// </summary>
-    private static DslState ParseStateDeclaration(
+    private static PreceptState ParseStateDeclaration(
         string[] lines,
         ref int index,
         string stateName)
@@ -379,7 +379,7 @@ public static class PreceptParser
         var headerIndent = GetIndentation(lines[index]);
         index++;
 
-        var rules = new List<DslRule>();
+        var rules = new List<PreceptRule>();
         while (index < lines.Length)
         {
             var raw = lines[index];
@@ -409,16 +409,16 @@ public static class PreceptParser
             var reasonStartCol = exprEndCol;
             var reasonEndCol = reasonStartCol + ruleReason.Length;
 
-            DslExpression ruleExpr;
-            try { ruleExpr = DslExpressionParser.Parse(ruleExprText); }
+            PreceptExpression ruleExpr;
+            try { ruleExpr = PreceptExpressionParser.Parse(ruleExprText); }
             catch (InvalidOperationException ex)
             { throw new InvalidOperationException($"Line {index + 1}: invalid rule expression '{ruleExprText}'. {ex.Message}"); }
 
-            rules.Add(new DslRule(ruleExprText, ruleExpr, ruleReason, index + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
+            rules.Add(new PreceptRule(ruleExprText, ruleExpr, ruleReason, index + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
             index++;
         }
 
-        return new DslState(stateName, rules.Count > 0 ? rules : null);
+        return new PreceptState(stateName, rules.Count > 0 ? rules : null);
     }
 
     /// <summary>
@@ -426,9 +426,9 @@ public static class PreceptParser
     /// Validates field rule scope restriction (only the owning field is allowed).
     /// Leaves <paramref name="index"/> pointing at the next non-rule line.
     /// </summary>
-    private static List<DslRule> ParseFieldRules(string[] lines, ref int index, string owningField, bool isCollection)
+    private static List<PreceptRule> ParseFieldRules(string[] lines, ref int index, string owningField, bool isCollection)
     {
-        var rules = new List<DslRule>();
+        var rules = new List<PreceptRule>();
         var headerIndent = GetIndentation(lines[index]);
         index++; // advance past the field line
 
@@ -457,8 +457,8 @@ public static class PreceptParser
             var allowed = new HashSet<string>(StringComparer.Ordinal) { owningField };
             ValidateRuleScope(ruleExprText, index + 1, allowed, allowedIdentifiers: null, scopeDescription: null, fieldRuleOwner: owningField);
 
-            DslExpression ruleExpr;
-            try { ruleExpr = DslExpressionParser.Parse(ruleExprText); }
+            PreceptExpression ruleExpr;
+            try { ruleExpr = PreceptExpressionParser.Parse(ruleExprText); }
             catch (InvalidOperationException ex)
             { throw new InvalidOperationException($"Line {index + 1}: invalid rule expression '{ruleExprText}'. {ex.Message}"); }
 
@@ -468,7 +468,7 @@ public static class PreceptParser
             var reasonStartCol = exprEndCol;
             var reasonEndCol = reasonStartCol + ruleReason.Length;
 
-            rules.Add(new DslRule(ruleExprText, ruleExpr, ruleReason, index + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
+            rules.Add(new PreceptRule(ruleExprText, ruleExpr, ruleReason, index + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
             index++;
         }
 
@@ -489,15 +489,15 @@ public static class PreceptParser
         string? scopeDescription,
         string? fieldRuleOwner = null)
     {
-        DslExpression parsed;
-        try { parsed = DslExpressionParser.Parse(expressionText); }
+        PreceptExpression parsed;
+        try { parsed = PreceptExpressionParser.Parse(expressionText); }
         catch { return; } // parse errors are reported separately
 
         ValidateRuleScopeNode(parsed, lineNumber, allowedSet, allowedIdentifiers, scopeDescription, fieldRuleOwner);
     }
 
     private static void ValidateRuleScopeNode(
-        DslExpression expr,
+        PreceptExpression expr,
         int lineNumber,
         HashSet<string> allowedSet,
         HashSet<string>? allowedIdentifiers,
@@ -506,7 +506,7 @@ public static class PreceptParser
     {
         switch (expr)
         {
-            case DslIdentifierExpression id:
+            case PreceptIdentifierExpression id:
                 // The base identifier name is always the lookup key (member is a property of the base)
                 var baseName = id.Name;
                 if (allowedSet.Contains(baseName, StringComparer.Ordinal))
@@ -518,16 +518,16 @@ public static class PreceptParser
                 if (scopeDescription is not null)
                     throw new InvalidOperationException($"Line {lineNumber}: {scopeDescription} references undeclared field '{baseName}'.");
                 break;
-            case DslLiteralExpression:
+            case PreceptLiteralExpression:
                 return;
-            case DslUnaryExpression unary:
+            case PreceptUnaryExpression unary:
                 ValidateRuleScopeNode(unary.Operand, lineNumber, allowedSet, allowedIdentifiers, scopeDescription, fieldRuleOwner);
                 break;
-            case DslBinaryExpression binary:
+            case PreceptBinaryExpression binary:
                 ValidateRuleScopeNode(binary.Left, lineNumber, allowedSet, allowedIdentifiers, scopeDescription, fieldRuleOwner);
                 ValidateRuleScopeNode(binary.Right, lineNumber, allowedSet, allowedIdentifiers, scopeDescription, fieldRuleOwner);
                 break;
-            case DslParenthesizedExpression paren:
+            case PreceptParenthesizedExpression paren:
                 ValidateRuleScopeNode(paren.Inner, lineNumber, allowedSet, allowedIdentifiers, scopeDescription, fieldRuleOwner);
                 break;
         }
@@ -542,22 +542,22 @@ public static class PreceptParser
         HashSet<string> argNames,
         string eventName)
     {
-        DslExpression parsed;
-        try { parsed = DslExpressionParser.Parse(expressionText); }
+        PreceptExpression parsed;
+        try { parsed = PreceptExpressionParser.Parse(expressionText); }
         catch { return; }
 
         ValidateEventRuleScopeNode(parsed, lineNumber, argNames, eventName);
     }
 
     private static void ValidateEventRuleScopeNode(
-        DslExpression expr,
+        PreceptExpression expr,
         int lineNumber,
         HashSet<string> argNames,
         string eventName)
     {
         switch (expr)
         {
-            case DslIdentifierExpression id:
+            case PreceptIdentifierExpression id:
                 // Accept: EventName.ArgName  (Name=eventName, Member=argName)
                 if (string.Equals(id.Name, eventName, StringComparison.Ordinal) && id.Member is not null)
                 {
@@ -576,45 +576,45 @@ public static class PreceptParser
                 var displayName = id.Member is not null ? $"{id.Name}.{id.Member}" : id.Name;
                 throw new InvalidOperationException(
                     $"Line {lineNumber}: event rule may only reference event argument identifiers; '{displayName}' is not a declared argument for event '{eventName}'.");
-            case DslLiteralExpression:
+            case PreceptLiteralExpression:
                 return;
-            case DslUnaryExpression unary:
+            case PreceptUnaryExpression unary:
                 ValidateEventRuleScopeNode(unary.Operand, lineNumber, argNames, eventName);
                 break;
-            case DslBinaryExpression binary:
+            case PreceptBinaryExpression binary:
                 ValidateEventRuleScopeNode(binary.Left, lineNumber, argNames, eventName);
                 ValidateEventRuleScopeNode(binary.Right, lineNumber, argNames, eventName);
                 break;
-            case DslParenthesizedExpression paren:
+            case PreceptParenthesizedExpression paren:
                 ValidateEventRuleScopeNode(paren.Inner, lineNumber, argNames, eventName);
                 break;
         }
     }
 
     /// <summary>Collects all identifier base names referenced in an expression (not dotted members).</summary>
-    private static void CollectIdentifiers(DslExpression expression, out HashSet<string> names)
+    private static void CollectIdentifiers(PreceptExpression expression, out HashSet<string> names)
     {
         names = new HashSet<string>(StringComparer.Ordinal);
         CollectIdentifiersInto(expression, names);
     }
 
-    private static void CollectIdentifiersInto(DslExpression expression, HashSet<string> names)
+    private static void CollectIdentifiersInto(PreceptExpression expression, HashSet<string> names)
     {
         switch (expression)
         {
-            case DslIdentifierExpression id:
+            case PreceptIdentifierExpression id:
                 names.Add(id.Name);
                 break;
-            case DslLiteralExpression:
+            case PreceptLiteralExpression:
                 break;
-            case DslUnaryExpression unary:
+            case PreceptUnaryExpression unary:
                 CollectIdentifiersInto(unary.Operand, names);
                 break;
-            case DslBinaryExpression binary:
+            case PreceptBinaryExpression binary:
                 CollectIdentifiersInto(binary.Left, names);
                 CollectIdentifiersInto(binary.Right, names);
                 break;
-            case DslParenthesizedExpression paren:
+            case PreceptParenthesizedExpression paren:
                 CollectIdentifiersInto(paren.Inner, names);
                 break;
         }
@@ -624,10 +624,10 @@ public static class PreceptParser
         string[] lines,
         ref int index,
         Match fromOnMatch,
-        IReadOnlyList<DslState> declaredStates,
-        ICollection<DslTransition> transitions,
-        IReadOnlyList<DslCollectionField> collectionFields,
-        IReadOnlyList<DslField> dataFields)
+        IReadOnlyList<PreceptState> declaredStates,
+        ICollection<PreceptTransition> transitions,
+        IReadOnlyList<PreceptCollectionField> collectionFields,
+        IReadOnlyList<PreceptField> dataFields)
     {
         var headerRaw = lines[index];
         var headerIndent = GetIndentation(headerRaw);
@@ -644,17 +644,17 @@ public static class PreceptParser
             throw new InvalidOperationException($"Line {index + 1}: 'from any' requires states to be declared first.");
 
         // Parse optional 'when' predicate
-        DslExpression? whenAst = null;
+        PreceptExpression? whenAst = null;
         if (whenText is not null)
         {
-            try { whenAst = DslExpressionParser.Parse(whenText); }
+            try { whenAst = PreceptExpressionParser.Parse(whenText); }
             catch (InvalidOperationException ex)
             { throw new InvalidOperationException($"Line {index + 1}: invalid 'when' expression '{whenText}'. {ex.Message}"); }
         }
 
-        var clauses = new List<DslClause>();
-        var pendingSets = new List<DslSetAssignment>();
-        var pendingMutations = new List<DslCollectionMutation>();
+        var clauses = new List<PreceptClause>();
+        var pendingSets = new List<PreceptSetAssignment>();
+        var pendingMutations = new List<PreceptCollectionMutation>();
         bool reachedOutcome = false;
         bool hasIfChain = false;
         bool hasElseBranch = false;
@@ -754,9 +754,9 @@ public static class PreceptParser
                     throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
                 var targetState = simpleTransitionAtBlock.Groups["to"].Value.Trim();
                 var outcomeLineNumber = index + 1;
-                clauses.Add(new DslClause(
-                    new DslStateTransition(targetState),
-                    pendingSets.Count > 0 ? pendingSets.ToArray() : Array.Empty<DslSetAssignment>(),
+                clauses.Add(new PreceptClause(
+                    new PreceptStateTransition(targetState),
+                    pendingSets.Count > 0 ? pendingSets.ToArray() : Array.Empty<PreceptSetAssignment>(),
                     outcomeLineNumber,
                     null,
                     null,
@@ -773,9 +773,9 @@ public static class PreceptParser
                 if (hasIfChain && !hasElseBranch)
                     throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
                 var outcomeLineNumber = index + 1;
-                clauses.Add(new DslClause(
-                    new DslNoTransition(),
-                    pendingSets.Count > 0 ? pendingSets.ToArray() : Array.Empty<DslSetAssignment>(),
+                clauses.Add(new PreceptClause(
+                    new PreceptNoTransition(),
+                    pendingSets.Count > 0 ? pendingSets.ToArray() : Array.Empty<PreceptSetAssignment>(),
                     outcomeLineNumber,
                     null,
                     null,
@@ -794,9 +794,9 @@ public static class PreceptParser
                     throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
                 var reason = Unquote(rejectMatch.Groups["reason"].Value.Trim());
                 var outcomeLineNumber = index + 1;
-                clauses.Add(new DslClause(
-                    new DslRejection(reason),
-                    Array.Empty<DslSetAssignment>(),
+                clauses.Add(new PreceptClause(
+                    new PreceptRejection(reason),
+                    Array.Empty<PreceptSetAssignment>(),
                     outcomeLineNumber,
                     null,
                     null,
@@ -815,11 +815,11 @@ public static class PreceptParser
         if (!reachedOutcome)
             throw new InvalidOperationException($"Line {index}: from/on block must end with an outcome statement: transition <State>, reject <reason>, or no transition.");
 
-        var clauseList = (IReadOnlyList<DslClause>)clauses.AsReadOnly();
+        var clauseList = (IReadOnlyList<PreceptClause>)clauses.AsReadOnly();
 
         foreach (var sourceState in sourceStates)
         {
-            transitions.Add(new DslTransition(
+            transitions.Add(new PreceptTransition(
                 sourceState,
                 eventName,
                 clauseList,
@@ -829,18 +829,18 @@ public static class PreceptParser
         }
     }
 
-    private static DslClause ParseGuardedClause(
+    private static PreceptClause ParseGuardedClause(
         string[] lines,
         ref int index,
         int branchHeaderIndent,
         string guardExpression,
         int clauseSourceLine,
-        IReadOnlyList<DslCollectionField> collectionFields,
-        IReadOnlyList<DslField> dataFields)
+        IReadOnlyList<PreceptCollectionField> collectionFields,
+        IReadOnlyList<PreceptField> dataFields)
     {
-        var branchSets = new List<DslSetAssignment>();
-        var branchMutations = new List<DslCollectionMutation>();
-        DslClauseOutcome? outcome = null;
+        var branchSets = new List<PreceptSetAssignment>();
+        var branchMutations = new List<PreceptCollectionMutation>();
+        PreceptClauseOutcome? outcome = null;
         bool reachedOutcome = false;
 
         index++;
@@ -883,7 +883,7 @@ public static class PreceptParser
                 if (outcome is not null)
                     throw new InvalidOperationException($"Line {index + 1}: only one outcome statement is allowed in an if-branch.");
 
-                outcome = new DslStateTransition(transitionMatch.Groups["to"].Value.Trim());
+                outcome = new PreceptStateTransition(transitionMatch.Groups["to"].Value.Trim());
                 reachedOutcome = true;
                 index++;
                 continue;
@@ -894,7 +894,7 @@ public static class PreceptParser
                 if (outcome is not null)
                     throw new InvalidOperationException($"Line {index + 1}: only one outcome statement is allowed in an if-branch.");
 
-                outcome = new DslNoTransition();
+                outcome = new PreceptNoTransition();
                 reachedOutcome = true;
                 index++;
                 continue;
@@ -909,30 +909,30 @@ public static class PreceptParser
         if (outcome is null)
             throw new InvalidOperationException($"Line {index}: if/else if branch requires 'transition <State>' or 'no transition'.");
 
-        DslExpression? guardAst = null;
-        try { guardAst = DslExpressionParser.Parse(guardExpression); }
+        PreceptExpression? guardAst = null;
+        try { guardAst = PreceptExpressionParser.Parse(guardExpression); }
         catch { /* parse errors reported separately in analyzer */ }
 
-        return new DslClause(
+        return new PreceptClause(
             outcome,
-            branchSets.Count > 0 ? (IReadOnlyList<DslSetAssignment>)branchSets.ToArray() : Array.Empty<DslSetAssignment>(),
+            branchSets.Count > 0 ? (IReadOnlyList<PreceptSetAssignment>)branchSets.ToArray() : Array.Empty<PreceptSetAssignment>(),
             clauseSourceLine,
             guardExpression,
             guardAst,
             branchMutations.Count > 0 ? branchMutations.ToArray() : null);
     }
 
-    private static DslClause ParseElseClause(
+    private static PreceptClause ParseElseClause(
         string[] lines,
         ref int index,
         int branchHeaderIndent,
         int clauseSourceLine,
-        IReadOnlyList<DslCollectionField> collectionFields,
-        IReadOnlyList<DslField> dataFields)
+        IReadOnlyList<PreceptCollectionField> collectionFields,
+        IReadOnlyList<PreceptField> dataFields)
     {
-        var branchSets = new List<DslSetAssignment>();
-        var branchMutations = new List<DslCollectionMutation>();
-        DslClauseOutcome? outcome = null;
+        var branchSets = new List<PreceptSetAssignment>();
+        var branchMutations = new List<PreceptCollectionMutation>();
+        PreceptClauseOutcome? outcome = null;
         bool reachedOutcome = false;
 
         index++;
@@ -972,7 +972,7 @@ public static class PreceptParser
             var transitionMatch = SimpleTransitionRegex.Match(nestedLine);
             if (transitionMatch.Success)
             {
-                outcome = new DslStateTransition(transitionMatch.Groups["to"].Value.Trim());
+                outcome = new PreceptStateTransition(transitionMatch.Groups["to"].Value.Trim());
                 reachedOutcome = true;
                 index++;
                 continue;
@@ -980,7 +980,7 @@ public static class PreceptParser
 
             if (nestedLine.Equals("no transition", StringComparison.Ordinal))
             {
-                outcome = new DslNoTransition();
+                outcome = new PreceptNoTransition();
                 reachedOutcome = true;
                 index++;
                 continue;
@@ -989,7 +989,7 @@ public static class PreceptParser
             var rejectMatch = RejectRegex.Match(nestedLine);
             if (rejectMatch.Success)
             {
-                outcome = new DslRejection(Unquote(rejectMatch.Groups["reason"].Value.Trim()));
+                outcome = new PreceptRejection(Unquote(rejectMatch.Groups["reason"].Value.Trim()));
                 reachedOutcome = true;
                 index++;
                 continue;
@@ -1001,50 +1001,50 @@ public static class PreceptParser
         if (!reachedOutcome)
             throw new InvalidOperationException($"Line {index}: else branch requires an outcome statement.");
 
-        return new DslClause(
+        return new PreceptClause(
             outcome!,
-            branchSets.Count > 0 ? (IReadOnlyList<DslSetAssignment>)branchSets.ToArray() : Array.Empty<DslSetAssignment>(),
+            branchSets.Count > 0 ? (IReadOnlyList<PreceptSetAssignment>)branchSets.ToArray() : Array.Empty<PreceptSetAssignment>(),
             clauseSourceLine,
             null,
             null,
             branchMutations.Count > 0 ? branchMutations.ToArray() : null);
     }
 
-    private static DslCollectionMutation? TryParseCollectionMutation(
+    private static PreceptCollectionMutation? TryParseCollectionMutation(
         string line,
         int lineNumber,
-        IReadOnlyList<DslCollectionField> collectionFields,
-        IReadOnlyList<DslField> dataFields)
+        IReadOnlyList<PreceptCollectionField> collectionFields,
+        IReadOnlyList<PreceptField> dataFields)
     {
         // Try each mutation verb
         var addMatch = AddRegex.Match(line);
         if (addMatch.Success)
-            return BuildMutation(DslCollectionMutationVerb.Add, addMatch.Groups["field"].Value, addMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, DslCollectionKind.Set);
+            return BuildMutation(PreceptCollectionMutationVerb.Add, addMatch.Groups["field"].Value, addMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, PreceptCollectionKind.Set);
 
         var removeMatch = RemoveRegex.Match(line);
         if (removeMatch.Success)
-            return BuildMutation(DslCollectionMutationVerb.Remove, removeMatch.Groups["field"].Value, removeMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, DslCollectionKind.Set);
+            return BuildMutation(PreceptCollectionMutationVerb.Remove, removeMatch.Groups["field"].Value, removeMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, PreceptCollectionKind.Set);
 
         var enqueueMatch = EnqueueRegex.Match(line);
         if (enqueueMatch.Success)
-            return BuildMutation(DslCollectionMutationVerb.Enqueue, enqueueMatch.Groups["field"].Value, enqueueMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, DslCollectionKind.Queue);
+            return BuildMutation(PreceptCollectionMutationVerb.Enqueue, enqueueMatch.Groups["field"].Value, enqueueMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, PreceptCollectionKind.Queue);
 
         var dequeueMatch = DequeueRegex.Match(line);
         if (dequeueMatch.Success)
         {
             string? intoField = dequeueMatch.Groups["into"].Success ? dequeueMatch.Groups["into"].Value : null;
-            return BuildMutationNoExpr(DslCollectionMutationVerb.Dequeue, dequeueMatch.Groups["field"].Value, lineNumber, collectionFields, DslCollectionKind.Queue, dataFields, intoField);
+            return BuildMutationNoExpr(PreceptCollectionMutationVerb.Dequeue, dequeueMatch.Groups["field"].Value, lineNumber, collectionFields, PreceptCollectionKind.Queue, dataFields, intoField);
         }
 
         var pushMatch = PushRegex.Match(line);
         if (pushMatch.Success)
-            return BuildMutation(DslCollectionMutationVerb.Push, pushMatch.Groups["field"].Value, pushMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, DslCollectionKind.Stack);
+            return BuildMutation(PreceptCollectionMutationVerb.Push, pushMatch.Groups["field"].Value, pushMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, PreceptCollectionKind.Stack);
 
         var popMatch = PopRegex.Match(line);
         if (popMatch.Success)
         {
             string? intoField = popMatch.Groups["into"].Success ? popMatch.Groups["into"].Value : null;
-            return BuildMutationNoExpr(DslCollectionMutationVerb.Pop, popMatch.Groups["field"].Value, lineNumber, collectionFields, DslCollectionKind.Stack, dataFields, intoField);
+            return BuildMutationNoExpr(PreceptCollectionMutationVerb.Pop, popMatch.Groups["field"].Value, lineNumber, collectionFields, PreceptCollectionKind.Stack, dataFields, intoField);
         }
 
         var clearMatch = ClearRegex.Match(line);
@@ -1055,19 +1055,19 @@ public static class PreceptParser
             if (field is null)
                 throw new InvalidOperationException($"Line {lineNumber}: 'clear' targets unknown collection field '{fieldName}'.");
 
-            return new DslCollectionMutation(DslCollectionMutationVerb.Clear, fieldName, null, null);
+            return new PreceptCollectionMutation(PreceptCollectionMutationVerb.Clear, fieldName, null, null);
         }
 
         return null;
     }
 
-    private static DslCollectionMutation BuildMutation(
-        DslCollectionMutationVerb verb,
+    private static PreceptCollectionMutation BuildMutation(
+        PreceptCollectionMutationVerb verb,
         string fieldName,
         string expressionText,
         int lineNumber,
-        IReadOnlyList<DslCollectionField> collectionFields,
-        DslCollectionKind requiredKind)
+        IReadOnlyList<PreceptCollectionField> collectionFields,
+        PreceptCollectionKind requiredKind)
     {
         var field = collectionFields.FirstOrDefault(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal));
         if (field is null)
@@ -1078,8 +1078,8 @@ public static class PreceptParser
 
         try
         {
-            var expression = DslExpressionParser.Parse(expressionText);
-            return new DslCollectionMutation(verb, fieldName, expressionText, expression);
+            var expression = PreceptExpressionParser.Parse(expressionText);
+            return new PreceptCollectionMutation(verb, fieldName, expressionText, expression);
         }
         catch (InvalidOperationException ex)
         {
@@ -1087,13 +1087,13 @@ public static class PreceptParser
         }
     }
 
-    private static DslCollectionMutation BuildMutationNoExpr(
-        DslCollectionMutationVerb verb,
+    private static PreceptCollectionMutation BuildMutationNoExpr(
+        PreceptCollectionMutationVerb verb,
         string fieldName,
         int lineNumber,
-        IReadOnlyList<DslCollectionField> collectionFields,
-        DslCollectionKind requiredKind,
-        IReadOnlyList<DslField> dataFields,
+        IReadOnlyList<PreceptCollectionField> collectionFields,
+        PreceptCollectionKind requiredKind,
+        IReadOnlyList<PreceptField> dataFields,
         string? intoFieldName = null)
     {
         var field = collectionFields.FirstOrDefault(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal));
@@ -1121,7 +1121,7 @@ public static class PreceptParser
                 throw new InvalidOperationException($"Line {lineNumber}: type mismatch — 'into' target '{intoFieldName}' is {targetField.Type.ToString().ToLowerInvariant()}{(targetField.IsNullable ? "?" : "")} but collection '{fieldName}' has inner type {field.InnerType.ToString().ToLowerInvariant()}.");
         }
 
-        return new DslCollectionMutation(verb, fieldName, null, null, intoFieldName);
+        return new PreceptCollectionMutation(verb, fieldName, null, null, intoFieldName);
     }
 
     private static string Unquote(string value)
@@ -1173,29 +1173,29 @@ public static class PreceptParser
         return results;
     }
 
-    private static DslScalarType ParseScalarType(string token)
+    private static PreceptScalarType ParseScalarType(string token)
         => token.Trim().ToLowerInvariant() switch
         {
-            "string" => DslScalarType.String,
-            "number" => DslScalarType.Number,
-            "boolean" => DslScalarType.Boolean,
-            "null" => DslScalarType.Null,
+            "string" => PreceptScalarType.String,
+            "number" => PreceptScalarType.Number,
+            "boolean" => PreceptScalarType.Boolean,
+            "null" => PreceptScalarType.Null,
             _ => throw new InvalidOperationException($"Unsupported scalar type '{token}'.")
         };
 
-    private static object? ParseFieldDefaultLiteral(string text, DslScalarType type, bool isNullable, string fieldName, int lineNumber)
+    private static object? ParseFieldDefaultLiteral(string text, PreceptScalarType type, bool isNullable, string fieldName, int lineNumber)
     {
-        DslExpression parsedExpression;
+        PreceptExpression parsedExpression;
         try
         {
-            parsedExpression = DslExpressionParser.Parse(text);
+            parsedExpression = PreceptExpressionParser.Parse(text);
         }
         catch (InvalidOperationException ex)
         {
             throw new InvalidOperationException($"Line {lineNumber}: invalid default value for field '{fieldName}'. {ex.Message}");
         }
 
-        if (parsedExpression is not DslLiteralExpression literal)
+        if (parsedExpression is not PreceptLiteralExpression literal)
             throw new InvalidOperationException($"Line {lineNumber}: default value for field '{fieldName}' must be a literal.");
 
         if (!IsValidDefaultLiteral(type, isNullable, literal.Value))
@@ -1204,17 +1204,17 @@ public static class PreceptParser
         return literal.Value;
     }
 
-    private static bool IsValidDefaultLiteral(DslScalarType type, bool isNullable, object? value)
+    private static bool IsValidDefaultLiteral(PreceptScalarType type, bool isNullable, object? value)
     {
         if (value is null)
             return isNullable;
 
         return type switch
         {
-            DslScalarType.String => value is string,
-            DslScalarType.Boolean => value is bool,
-            DslScalarType.Number => value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal,
-            DslScalarType.Null => false,
+            PreceptScalarType.String => value is string,
+            PreceptScalarType.Boolean => value is bool,
+            PreceptScalarType.Number => value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal,
+            PreceptScalarType.Null => false,
             _ => false
         };
     }
@@ -1242,15 +1242,15 @@ public static class PreceptParser
         return line;
     }
 
-    private static DslSetAssignment ParseSetAssignment(Match setMatch, int lineNumber)
+    private static PreceptSetAssignment ParseSetAssignment(Match setMatch, int lineNumber)
     {
         var key = NormalizeDataAssignmentKey(setMatch.Groups["setKey"].Value.Trim());
         var expressionText = setMatch.Groups["setExpr"].Value.Trim();
 
         try
         {
-            var expression = DslExpressionParser.Parse(expressionText);
-            return new DslSetAssignment(key, expressionText, expression, lineNumber);
+            var expression = PreceptExpressionParser.Parse(expressionText);
+            return new PreceptSetAssignment(key, expressionText, expression, lineNumber);
         }
         catch (InvalidOperationException ex)
         {
@@ -1259,11 +1259,11 @@ public static class PreceptParser
     }
 
     private static void ValidateReferences(
-        IReadOnlyCollection<DslState> states,
-        IReadOnlyCollection<DslEvent> events,
-        IReadOnlyCollection<DslTransition> transitions,
-        IReadOnlyCollection<DslField> dataFields,
-        IReadOnlyCollection<DslCollectionField> collectionFields)
+        IReadOnlyCollection<PreceptState> states,
+        IReadOnlyCollection<PreceptEvent> events,
+        IReadOnlyCollection<PreceptTransition> transitions,
+        IReadOnlyCollection<PreceptField> dataFields,
+        IReadOnlyCollection<PreceptCollectionField> collectionFields)
     {
         var stateSet = new HashSet<string>(states.Select(s => s.Name), StringComparer.Ordinal);
         var eventSet = new HashSet<string>(events.Select(e => e.Name), StringComparer.Ordinal);
@@ -1282,13 +1282,13 @@ public static class PreceptParser
             {
                 var cPrefix = clause.SourceLine > 0 ? $"Line {clause.SourceLine}: " : tPrefix;
 
-                if (clause.Outcome is DslStateTransition st)
+                if (clause.Outcome is PreceptStateTransition st)
                 {
                     if (!stateSet.Contains(st.TargetState))
                         throw new InvalidOperationException($"{cPrefix}Transition references unknown target state '{st.TargetState}'.");
                 }
 
-                if (clause.Outcome is DslRejection rej && string.IsNullOrWhiteSpace(rej.Reason))
+                if (clause.Outcome is PreceptRejection rej && string.IsNullOrWhiteSpace(rej.Reason))
                     throw new InvalidOperationException($"{cPrefix}Reject outcome requires a reason.");
 
                 foreach (var assignment in clause.SetAssignments)
