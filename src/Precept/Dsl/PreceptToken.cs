@@ -342,6 +342,11 @@ public enum PreceptToken
     [TokenSymbol("/")]
     Slash,
 
+    [TokenCategory(TokenCategory.Operator)]
+    [TokenDescription("Modulo")]
+    [TokenSymbol("%")]
+    Percent,
+
     // ═══ Punctuation ═══
 
     [TokenCategory(TokenCategory.Punctuation)]

@@ -564,11 +564,13 @@ on Cancel assert reason != "" because "Cancel requires a reason"
 
 ---
 
-## Expressions (Carry-forward; details TBD)
+## Expressions (Locked)
 
-The intent is to reuse the existing expression language shape:
+The expression language supports:
 
-- logical: `&&`, `||`, `!`
+- arithmetic: `+`, `-`, `*`, `/`, `%`
+- unary: `-` (numeric negation), `!` (logical not)
+- logical: `&&`, `||`
 - comparisons: `==`, `!=`, `>`, `>=`, `<`, `<=`
 - membership: `contains`
 - parentheses
@@ -809,4 +811,3 @@ Locked in this discussion:
 
 Not yet locked:
 - Full EBNF and tokenization rules
-- Arithmetic operators in expressions (`+`, `-`, `*`, `/`, `%`) — carry-forward TBD

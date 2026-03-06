@@ -13,24 +13,20 @@ public class PreceptSetParsingTests
     {
         const string dsl = """
             precept Sample
-            number Count = 0
+            field Count as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                if Count > 0
-                    set Count = Count - 1
-                    no transition
-                else
-                    transition Green
+            from Red on Advance when Count > 0 -> set Count = Count - 1 -> no transition
+            from Red on Advance -> transition Green
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        machine.Transitions.Should().ContainSingle();
-        var noTransClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is PreceptNoTransition);
-        noTransClause.SetAssignments.Should().ContainSingle();
-        noTransClause.SetAssignments[0].Key.Should().Be("Count");
+        machine.TransitionRows.Should().HaveCount(2);
+        var noTransRow = machine.TransitionRows!.Single(r => r.Outcome is PreceptNoTransition);
+        noTransRow.SetAssignments.Should().ContainSingle();
+        noTransRow.SetAssignments[0].Key.Should().Be("Count");
     }
 
     [Fact]
@@ -38,18 +34,17 @@ public class PreceptSetParsingTests
     {
         const string dsl = """
             precept Sample
-            number Count = 0
+            field Count as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                set Count = Count + 1
+            from Red on Advance -> set Count = Count + 1
             """;
 
         var act = () => PreceptParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*set requires a following transition*");
+            .WithMessage("*missing an outcome*");
     }
 
     [Fact]
@@ -57,19 +52,24 @@ public class PreceptSetParsingTests
     {
         const string dsl = """
             precept Sample
-            number Count = 0
+            field Count as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                set MissingField = Count
-                transition Green
+            from Red on Advance -> set MissingField = Count -> transition Green
             """;
 
-        var act = () => PreceptParser.Parse(dsl);
+        var machine = PreceptParser.Parse(dsl);
+        var engine = PreceptCompiler.Compile(machine);
+        var inst = engine.CreateInstance();
+        var result = engine.Fire(inst, "Advance");
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*assigns unknown data field 'MissingField'*");
+        // After firing, the unknown field ends up in instance data;
+        // next operation catches the unknown field via data-contract validation.
+        var updated = result.UpdatedInstance!;
+        var compat = engine.CheckCompatibility(updated);
+        compat.IsCompatible.Should().BeFalse();
+        compat.Reason.Should().Contain("unknown data field 'MissingField'");
     }
 
     [Fact]
@@ -77,26 +77,21 @@ public class PreceptSetParsingTests
     {
         const string dsl = """
             precept Sample
-            number Count = 0
-            string Label = ""
+            field Count as number default 0
+            field Label as string default ""
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                if Count > 0
-                    transition Green
-                else
-                    set Count = Count + 1
-                    set Label = "Retry"
-                    transition Red
+            from Red on Advance when Count > 0 -> transition Green
+            from Red on Advance -> set Count = Count + 1 -> set Label = "Retry" -> transition Red
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        machine.Transitions.Should().ContainSingle();
-        var elseClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is PreceptStateTransition st && st.TargetState == "Red");
-        elseClause.SetAssignments.Should().HaveCount(2);
-        elseClause.SetAssignments[0].Key.Should().Be("Count");
-        elseClause.SetAssignments[1].Key.Should().Be("Label");
+        machine.TransitionRows.Should().HaveCount(2);
+        var elseRow = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Red");
+        elseRow.SetAssignments.Should().HaveCount(2);
+        elseRow.SetAssignments[0].Key.Should().Be("Count");
+        elseRow.SetAssignments[1].Key.Should().Be("Label");
     }
 }

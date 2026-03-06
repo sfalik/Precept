@@ -10,22 +10,20 @@ namespace Precept.LanguageServer.Tests;
 
 public class PreceptAnalyzerCollectionMutationTests
 {
-    // ── Add / Push / Enqueue value type checking ─────────────────────────────
+    // Add / Push / Enqueue value type checking
 
     [Fact]
     public void Diagnostics_Collection_NullableValueInAdd_ProducesError()
     {
-        // string? Value cannot be added to set<string> because inner type is non-nullable string.
+        // string? Value cannot be added to set of string because inner type is non-nullable string.
         const string text = """
             precept M
-            string? Value
-            set<string> Tags
+            field Value as string nullable
+            field Tags as set of string
             state A initial
             state B
             event Go
-            from A on Go
-              add Tags Value
-              transition B
+            from A on Go -> add Tags Value -> transition B
             """;
 
         var diagnostics = Analyze(text);
@@ -41,17 +39,13 @@ public class PreceptAnalyzerCollectionMutationTests
         // Inside "if Value != null" the guard narrows string? to string, so the push is valid.
         const string text = """
             precept M
-            string? Value
-            stack<string> History
+            field Value as string nullable
+            field History as stack of string
             state A initial
             state B
             event Go
-            from A on Go
-              if Value != null
-                push History Value
-                transition B
-              else
-                reject "no value"
+            from A on Go when Value != null -> push History Value -> transition B
+            from A on Go -> reject "no value"
             """;
 
         var diagnostics = Analyze(text);
@@ -62,16 +56,14 @@ public class PreceptAnalyzerCollectionMutationTests
     [Fact]
     public void Diagnostics_Collection_TypeMismatch_NumberExpressionInStringSet_ProducesError()
     {
-        // Literal 42 is number; set<string> inner type is string — mismatch.
+        // Literal 42 is number; set of string inner type is string - mismatch.
         const string text = """
             precept M
-            set<string> Tags
+            field Tags as set of string
             state A initial
             state B
             event Go
-            from A on Go
-              add Tags 42
-              transition B
+            from A on Go -> add Tags 42 -> transition B
             """;
 
         var diagnostics = Analyze(text);
@@ -80,22 +72,20 @@ public class PreceptAnalyzerCollectionMutationTests
         diagnostics[0].Message.Should().Contain("type mismatch");
     }
 
-    // ── Dequeue / Pop into-field type checking ────────────────────────────────
+    // Dequeue / Pop into-field type checking
 
     [Fact]
     public void Diagnostics_Collection_DequeueIntoTypeMismatch_ProducesError()
     {
-        // queue<string> inner type is string; target field is number — mismatch.
+        // queue of string inner type is string; target field is number - mismatch.
         const string text = """
             precept M
-            number Target = 0
-            queue<string> Names
+            field Target as number default 0
+            field Names as queue of string
             state A initial
             state B
             event Go
-            from A on Go
-              dequeue Names into Target
-              transition B
+            from A on Go -> dequeue Names into Target -> transition B
             """;
 
         var diagnostics = Analyze(text);
@@ -108,17 +98,15 @@ public class PreceptAnalyzerCollectionMutationTests
     [Fact]
     public void Diagnostics_Collection_DequeueIntoMatchingType_NoError()
     {
-        // queue<string> inner type is string; target field is string — valid.
+        // queue of string inner type is string; target field is string - valid.
         const string text = """
             precept M
-            string LastName = ""
-            queue<string> Names
+            field LastName as string default ""
+            field Names as queue of string
             state A initial
             state B
             event Go
-            from A on Go
-              dequeue Names into LastName
-              transition B
+            from A on Go -> dequeue Names into LastName -> transition B
             """;
 
         var diagnostics = Analyze(text);
@@ -133,17 +121,13 @@ public class PreceptAnalyzerCollectionMutationTests
         // so add Tags Value in the else branch should be valid.
         const string text = """
             precept M
-            string? Value
-            set<string> Tags
+            field Value as string nullable
+            field Tags as set of string
             state A initial
             state B
             event Go
-            from A on Go
-              if Value == null
-                no transition
-              else
-                add Tags Value
-                transition B
+            from A on Go when Value == null -> no transition
+            from A on Go -> add Tags Value -> transition B
             """;
 
         var diagnostics = Analyze(text);

@@ -14,7 +14,7 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state Idle initial
             """;
 
@@ -32,7 +32,7 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            queue<string> Messages
+            field Messages as queue of string
             state Idle initial
             """;
 
@@ -50,7 +50,7 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            stack<boolean> Flags
+            field Flags as stack of boolean
             state Idle initial
             """;
 
@@ -68,8 +68,8 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            set<number> Items
-            set<number> Items
+            field Items as set of number
+            field Items as set of number
             state Idle initial
             """;
 
@@ -84,8 +84,8 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            number Items = 0
-            set<number> Items
+            field Items as number default 0
+            field Items as set of number
             state Idle initial
             """;
 
@@ -100,20 +100,18 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state Idle initial
             state Active
             event Go
-            from Idle on Go
-                add Floors 5
-                transition Active
+            from Idle on Go -> add Floors 5 -> transition Active
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
-        clause.CollectionMutations.Should().ContainSingle();
-        var mut = clause.CollectionMutations![0];
+        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        row.CollectionMutations.Should().ContainSingle();
+        var mut = row.CollectionMutations![0];
         mut.Verb.Should().Be(PreceptCollectionMutationVerb.Add);
         mut.TargetField.Should().Be("Floors");
         mut.ExpressionText.Should().Be("5");
@@ -124,20 +122,18 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state Idle initial
             state Active
             event Go
-            from Idle on Go
-                remove Floors 5
-                transition Active
+            from Idle on Go -> remove Floors 5 -> transition Active
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
-        clause.CollectionMutations.Should().ContainSingle();
-        var mut = clause.CollectionMutations![0];
+        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        row.CollectionMutations.Should().ContainSingle();
+        var mut = row.CollectionMutations![0];
         mut.Verb.Should().Be(PreceptCollectionMutationVerb.Remove);
         mut.TargetField.Should().Be("Floors");
     }
@@ -147,20 +143,18 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            queue<string> Tasks
+            field Tasks as queue of string
             state Idle initial
             state Active
             event Go
-            from Idle on Go
-                enqueue Tasks "work"
-                transition Active
+            from Idle on Go -> enqueue Tasks "work" -> transition Active
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
-        clause.CollectionMutations.Should().ContainSingle();
-        var mut = clause.CollectionMutations![0];
+        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        row.CollectionMutations.Should().ContainSingle();
+        var mut = row.CollectionMutations![0];
         mut.Verb.Should().Be(PreceptCollectionMutationVerb.Enqueue);
         mut.TargetField.Should().Be("Tasks");
     }
@@ -170,20 +164,18 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            queue<string> Tasks
+            field Tasks as queue of string
             state Idle initial
             state Active
             event Go
-            from Idle on Go
-                dequeue Tasks
-                transition Active
+            from Idle on Go -> dequeue Tasks -> transition Active
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
-        clause.CollectionMutations.Should().ContainSingle();
-        var mut = clause.CollectionMutations![0];
+        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        row.CollectionMutations.Should().ContainSingle();
+        var mut = row.CollectionMutations![0];
         mut.Verb.Should().Be(PreceptCollectionMutationVerb.Dequeue);
         mut.TargetField.Should().Be("Tasks");
         mut.ExpressionText.Should().BeNull();
@@ -194,20 +186,18 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            stack<number> History
+            field History as stack of number
             state Idle initial
             state Active
             event Go
-            from Idle on Go
-                push History 42
-                transition Active
+            from Idle on Go -> push History 42 -> transition Active
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
-        clause.CollectionMutations.Should().ContainSingle();
-        var mut = clause.CollectionMutations![0];
+        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        row.CollectionMutations.Should().ContainSingle();
+        var mut = row.CollectionMutations![0];
         mut.Verb.Should().Be(PreceptCollectionMutationVerb.Push);
         mut.TargetField.Should().Be("History");
     }
@@ -217,20 +207,18 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            stack<number> History
+            field History as stack of number
             state Idle initial
             state Active
             event Go
-            from Idle on Go
-                pop History
-                transition Active
+            from Idle on Go -> pop History -> transition Active
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
-        clause.CollectionMutations.Should().ContainSingle();
-        var mut = clause.CollectionMutations![0];
+        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        row.CollectionMutations.Should().ContainSingle();
+        var mut = row.CollectionMutations![0];
         mut.Verb.Should().Be(PreceptCollectionMutationVerb.Pop);
         mut.TargetField.Should().Be("History");
     }
@@ -240,20 +228,18 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state Idle initial
             state Active
             event Go
-            from Idle on Go
-                clear Floors
-                transition Active
+            from Idle on Go -> clear Floors -> transition Active
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
-        clause.CollectionMutations.Should().ContainSingle();
-        var mut = clause.CollectionMutations![0];
+        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        row.CollectionMutations.Should().ContainSingle();
+        var mut = row.CollectionMutations![0];
         mut.Verb.Should().Be(PreceptCollectionMutationVerb.Clear);
         mut.TargetField.Should().Be("Floors");
     }
@@ -263,19 +249,17 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            set<number> Items
+            field Items as set of number
             state Idle initial
             state Active
             event Go
-            from Idle on Go
-                enqueue Items 1
-                transition Active
+            from Idle on Go -> enqueue Items 1 -> transition Active
             """;
 
         var act = () => PreceptParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*enqueue*set*");
+            .WithMessage("*enqueue*set*Items*");
     }
 
     [Fact]
@@ -283,19 +267,17 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            queue<number> Items
+            field Items as queue of number
             state Idle initial
             state Active
             event Go
-            from Idle on Go
-                push Items 1
-                transition Active
+            from Idle on Go -> push Items 1 -> transition Active
             """;
 
         var act = () => PreceptParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*push*queue*");
+            .WithMessage("*push*queue*Items*");
     }
 
     [Fact]
@@ -303,19 +285,17 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            queue<number> Items
+            field Items as queue of number
             state Idle initial
             state Active
             event Go
-            from Idle on Go
-                add Items 1
-                transition Active
+            from Idle on Go -> add Items 1 -> transition Active
             """;
 
         var act = () => PreceptParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*add*queue*");
+            .WithMessage("*add*queue*Items*");
     }
 
     [Fact]
@@ -326,9 +306,7 @@ public class PreceptCollectionParsingTests
             state Idle initial
             state Active
             event Go
-            from Idle on Go
-                add Missing 1
-                transition Active
+            from Idle on Go -> add Missing 1 -> transition Active
             """;
 
         var act = () => PreceptParser.Parse(dsl);
@@ -342,27 +320,23 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state Idle initial
             state Active
             event Go
-            from Idle on Go
-                add Floors 3
-                add Floors 5
-                remove Floors 1
-                transition Active
+            from Idle on Go -> add Floors 3 -> add Floors 5 -> remove Floors 1 -> transition Active
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
-        clause.CollectionMutations.Should().HaveCount(3);
-        clause.CollectionMutations![0].Verb.Should().Be(PreceptCollectionMutationVerb.Add);
-        clause.CollectionMutations![0].ExpressionText.Should().Be("3");
-        clause.CollectionMutations![1].Verb.Should().Be(PreceptCollectionMutationVerb.Add);
-        clause.CollectionMutations![1].ExpressionText.Should().Be("5");
-        clause.CollectionMutations![2].Verb.Should().Be(PreceptCollectionMutationVerb.Remove);
-        clause.CollectionMutations![2].ExpressionText.Should().Be("1");
+        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        row.CollectionMutations.Should().HaveCount(3);
+        row.CollectionMutations![0].Verb.Should().Be(PreceptCollectionMutationVerb.Add);
+        row.CollectionMutations![0].ExpressionText.Should().Be("3");
+        row.CollectionMutations![1].Verb.Should().Be(PreceptCollectionMutationVerb.Add);
+        row.CollectionMutations![1].ExpressionText.Should().Be("5");
+        row.CollectionMutations![2].Verb.Should().Be(PreceptCollectionMutationVerb.Remove);
+        row.CollectionMutations![2].ExpressionText.Should().Be("1");
     }
 
     [Fact]
@@ -370,25 +344,21 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
-            number Count = 0
+            field Floors as set of number
+            field Count as number default 0
             state Idle initial
             state Active
             event Go
-            from Idle on Go
-                if Count > 0
-                    add Floors 1
-                    no transition
-                else
-                    transition Active
+            from Idle on Go when Count > 0 -> add Floors 1 -> no transition
+            from Idle on Go -> transition Active
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        machine.Transitions.Should().ContainSingle();
-        var noTransClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is PreceptNoTransition);
-        noTransClause.CollectionMutations.Should().ContainSingle();
-        noTransClause.CollectionMutations![0].Verb.Should().Be(PreceptCollectionMutationVerb.Add);
+        machine.TransitionRows.Should().HaveCount(2);
+        var noTransRow = machine.TransitionRows!.Single(r => r.Outcome is PreceptNoTransition);
+        noTransRow.CollectionMutations.Should().ContainSingle();
+        noTransRow.CollectionMutations![0].Verb.Should().Be(PreceptCollectionMutationVerb.Add);
     }
 
     [Fact]
@@ -396,21 +366,19 @@ public class PreceptCollectionParsingTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
-            number Target = 5
+            field Floors as set of number
+            field Target as number default 5
             state Idle initial
             state Active
             event Go
-            from Idle on Go
-                add Floors Target
-                transition Active
+            from Idle on Go -> add Floors Target -> transition Active
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        var clause = machine.Transitions.SelectMany(t => t.Clauses).Single(c => c.Outcome is PreceptStateTransition __st && __st.TargetState == "Active");
-        clause.CollectionMutations.Should().ContainSingle();
-        clause.CollectionMutations![0].ExpressionText.Should().Be("Target");
+        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        row.CollectionMutations.Should().ContainSingle();
+        row.CollectionMutations![0].ExpressionText.Should().Be("Target");
     }
 }
 
@@ -421,13 +389,11 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state Idle initial
             state Active
             event Go
-            from Idle on Go
-                add Floors 3
-                transition Active
+            from Idle on Go -> add Floors 3 -> transition Active
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -448,20 +414,14 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state A initial
             state B
             state C
             event Step1
             event Step2
-            from A on Step1
-                add Floors 3
-                add Floors 5
-                add Floors 7
-                transition B
-            from B on Step2
-                remove Floors 5
-                transition C
+            from A on Step1 -> add Floors 3 -> add Floors 5 -> add Floors 7 -> transition B
+            from B on Step2 -> remove Floors 5 -> transition C
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -486,19 +446,14 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            queue<string> Tasks
+            field Tasks as queue of string
             state A initial
             state B
             state C
             event Enq
             event Deq
-            from A on Enq
-                enqueue Tasks "first"
-                enqueue Tasks "second"
-                transition B
-            from B on Deq
-                dequeue Tasks
-                transition C
+            from A on Enq -> enqueue Tasks "first" -> enqueue Tasks "second" -> transition B
+            from B on Deq -> dequeue Tasks -> transition C
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -522,19 +477,14 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            stack<number> History
+            field History as stack of number
             state A initial
             state B
             state C
             event Push
             event Pop
-            from A on Push
-                push History 10
-                push History 20
-                transition B
-            from B on Pop
-                pop History
-                transition C
+            from A on Push -> push History 10 -> push History 20 -> transition B
+            from B on Pop -> pop History -> transition C
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -558,19 +508,14 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state A initial
             state B
             state C
             event Add
             event Reset
-            from A on Add
-                add Floors 1
-                add Floors 2
-                transition B
-            from B on Reset
-                clear Floors
-                transition C
+            from A on Add -> add Floors 1 -> add Floors 2 -> transition B
+            from B on Reset -> clear Floors -> transition C
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -590,13 +535,11 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            queue<string> Tasks
+            field Tasks as queue of string
             state A initial
             state B
             event Deq
-            from A on Deq
-                dequeue Tasks
-                transition B
+            from A on Deq -> dequeue Tasks -> transition B
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -613,13 +556,11 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            stack<number> History
+            field History as stack of number
             state A initial
             state B
             event Pop
-            from A on Pop
-                pop History
-                transition B
+            from A on Pop -> pop History -> transition B
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -636,20 +577,15 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state A initial
             state B
             state C
             event Add
             event Check
-            from A on Add
-                add Floors 3
-                transition B
-            from B on Check
-                if Floors contains 3
-                    transition C
-                else
-                    reject "not found"
+            from A on Add -> add Floors 3 -> transition B
+            from B on Check when Floors contains 3 -> transition C
+            from B on Check -> reject "not found"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -667,20 +603,15 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state A initial
             state B
             state C
             event Add
             event Check
-            from A on Add
-                add Floors 3
-                transition B
-            from B on Check
-                if Floors contains 99
-                    transition C
-                else
-                    reject "not found"
+            from A on Add -> add Floors 3 -> transition B
+            from B on Check when Floors contains 99 -> transition C
+            from B on Check -> reject "not found"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -697,21 +628,15 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state A initial
             state B
             state C
             event Add
             event Check
-            from A on Add
-                add Floors 3
-                add Floors 5
-                transition B
-            from B on Check
-                if Floors.count > 1
-                    transition C
-                else
-                    reject "too few"
+            from A on Add -> add Floors 3 -> add Floors 5 -> transition B
+            from B on Check when Floors.count > 1 -> transition C
+            from B on Check -> reject "too few"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -729,22 +654,15 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state A initial
             state B
             state C
             event Add
             event Check
-            from A on Add
-                add Floors 3
-                add Floors 7
-                add Floors 1
-                transition B
-            from B on Check
-                if Floors.min == 1
-                    transition C
-                else
-                    reject "wrong min"
+            from A on Add -> add Floors 3 -> add Floors 7 -> add Floors 1 -> transition B
+            from B on Check when Floors.min == 1 -> transition C
+            from B on Check -> reject "wrong min"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -762,22 +680,15 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state A initial
             state B
             state C
             event Add
             event Check
-            from A on Add
-                add Floors 3
-                add Floors 7
-                add Floors 1
-                transition B
-            from B on Check
-                if Floors.max == 7
-                    transition C
-                else
-                    reject "wrong max"
+            from A on Add -> add Floors 3 -> add Floors 7 -> add Floors 1 -> transition B
+            from B on Check when Floors.max == 7 -> transition C
+            from B on Check -> reject "wrong max"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -795,21 +706,15 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            queue<string> Tasks
+            field Tasks as queue of string
             state A initial
             state B
             state C
             event Add
             event Check
-            from A on Add
-                enqueue Tasks "alpha"
-                enqueue Tasks "beta"
-                transition B
-            from B on Check
-                if Tasks.peek == "alpha"
-                    transition C
-                else
-                    reject "wrong peek"
+            from A on Add -> enqueue Tasks "alpha" -> enqueue Tasks "beta" -> transition B
+            from B on Check when Tasks.peek == "alpha" -> transition C
+            from B on Check -> reject "wrong peek"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -827,21 +732,15 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            stack<number> History
+            field History as stack of number
             state A initial
             state B
             state C
             event Add
             event Check
-            from A on Add
-                push History 10
-                push History 20
-                transition B
-            from B on Check
-                if History.peek == 20
-                    transition C
-                else
-                    reject "wrong peek"
+            from A on Add -> push History 10 -> push History 20 -> transition B
+            from B on Check when History.peek == 20 -> transition C
+            from B on Check -> reject "wrong peek"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -859,14 +758,12 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
-            number Target = 5
+            field Floors as set of number
+            field Target as number default 5
             state A initial
             state B
             event Go
-            from A on Go
-                add Floors Target
-                transition B
+            from A on Go -> add Floors Target -> transition B
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -884,14 +781,11 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state A initial
             state B
-            event Request
-                number Floor
-            from A on Request
-                add Floors Request.Floor
-                transition B
+            event Request with Floor as number
+            from A on Request -> add Floors Request.Floor -> transition B
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -909,12 +803,10 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state A initial
             event Go
-            from A on Go
-                add Floors 3
-                no transition
+            from A on Go -> add Floors 3 -> no transition
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -934,15 +826,12 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
-            number Count = 0
+            field Floors as set of number
+            field Count as number default 0
             state A initial
             state B
             event Go
-            from A on Go
-                add Floors 3
-                set Count = Count + 1
-                transition B
+            from A on Go -> add Floors 3 -> set Count = Count + 1 -> transition B
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -961,20 +850,14 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state A initial
             state B
             state C
             event Go
-            from A on Go
-                add Floors 3
-                transition B
-            from B on Go
-                if Floors.count == 1
-                    add Floors 5
-                    transition C
-                else
-                    reject "wrong count"
+            from A on Go -> add Floors 3 -> transition B
+            from B on Go when Floors.count == 1 -> add Floors 5 -> transition C
+            from B on Go -> reject "wrong count"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -995,9 +878,9 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
-            queue<string> Tasks
-            stack<boolean> Flags
+            field Floors as set of number
+            field Tasks as queue of string
+            field Flags as stack of boolean
             state Idle initial
             """;
 
@@ -1023,14 +906,11 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state A initial
             state B
             event Go
-            from A on Go
-                add Floors 3
-                add Floors 3
-                transition B
+            from A on Go -> add Floors 3 -> add Floors 3 -> transition B
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -1048,16 +928,11 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            set<number> Floors
+            field Floors as set of number
             state A initial
             state B
             event Go
-            from A on Go
-                add Floors 7
-                add Floors 1
-                add Floors 5
-                add Floors 3
-                transition B
+            from A on Go -> add Floors 7 -> add Floors 1 -> add Floors 5 -> add Floors 3 -> transition B
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -1077,15 +952,11 @@ public class PreceptCollectionRuntimeTests
     {
         const string dsl = """
             precept Sample
-            queue<string> Tasks
+            field Tasks as queue of string
             state A initial
             state B
             event Go
-            from A on Go
-                enqueue Tasks "first"
-                dequeue Tasks
-                dequeue Tasks
-                transition B
+            from A on Go -> enqueue Tasks "first" -> dequeue Tasks -> dequeue Tasks -> transition B
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));

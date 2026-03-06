@@ -25,13 +25,12 @@ public class PreceptPreviewRulesTests
     {
         const string dsl = """
             precept M
-            number Balance = 100
-              rule Balance >= 0 "Balance must not go negative"
+            field Balance as number default 100
+            invariant Balance >= 0 because "Balance must not go negative"
             state A initial
             state B
             event Transfer
-            from A on Transfer
-              transition B
+            from A on Transfer -> transition B
             """;
 
         var machine = PreceptParser.Parse(dsl);
@@ -48,14 +47,13 @@ public class PreceptPreviewRulesTests
     {
         const string dsl = """
             precept M
-            number Balance = 100
-              rule Balance >= 0 "Balance must not go negative"
-            number Quantity = 1
-              rule Quantity >= 1 "Quantity must stay positive"
+            field Balance as number default 100
+            invariant Balance >= 0 because "Balance must not go negative"
+            field Quantity as number default 1
+            invariant Quantity >= 1 because "Quantity must stay positive"
             state A initial
             event Go
-            from A on Go
-              transition A
+            from A on Go -> transition A
             """;
 
         var machine = PreceptParser.Parse(dsl);
@@ -80,13 +78,12 @@ public class PreceptPreviewRulesTests
     {
         const string dsl = """
             precept M
-            number Balance = 100
-              rule Balance >= 0 "Balance must not go negative"
+            field Balance as number default 100
+            invariant Balance >= 0 because "Balance must not go negative"
             state A initial
             state B
             event Go
-            from A on Go
-              transition B
+            from A on Go -> transition B
             """;
 
         var (handler, uri) = CreateHandler();
@@ -97,9 +94,9 @@ public class PreceptPreviewRulesTests
         response.Snapshot.Should().NotBeNull();
 
         var ruleDefs = response.Snapshot!.RuleDefinitions;
-        ruleDefs.Should().NotBeNullOrEmpty("the machine declares a field rule");
+        ruleDefs.Should().NotBeNullOrEmpty("the machine declares an invariant");
         ruleDefs!.Should().ContainSingle(r =>
-            r.Scope == "field:Balance" &&
+            r.Scope == "topLevel" &&
             r.Expression == "Balance >= 0" &&
             r.Reason == "Balance must not go negative");
     }
@@ -109,13 +106,12 @@ public class PreceptPreviewRulesTests
     {
         const string dsl = """
             precept M
-            number Balance = 100
-              rule Balance >= 0 "Balance must not go negative"
+            field Balance as number default 100
+            invariant Balance >= 0 because "Balance must not go negative"
             state A initial
             state B
             event Go
-            from A on Go
-              transition B
+            from A on Go -> transition B
             """;
 
         var (handler, uri) = CreateHandler();
@@ -136,20 +132,17 @@ public class PreceptPreviewRulesTests
     [Fact]
     public async Task HandleFire_BlockedByMultipleRules_ReturnsAllReasonsInErrors()
     {
-        // Both Balance and Quantity field rules are violated by firingReduce with a large Amount.
+        // Both Balance and Quantity field rules are violated by firing Reduce with a large Amount.
         const string dsl = """
             precept M
-            number Balance = 100
-              rule Balance >= 0 "Balance must not go negative"
-            number Quantity = 1
-              rule Quantity >= 1 "Quantity must stay positive"
+            field Balance as number default 100
+            invariant Balance >= 0 because "Balance must not go negative"
+            field Quantity as number default 1
+            invariant Quantity >= 1 because "Quantity must stay positive"
             state A initial
-            event Reduce
-              number Amount = 0
-            from A on Reduce
-              set Balance = Balance - Reduce.Amount
-              set Quantity = Quantity - Reduce.Amount
-              transition A
+            event Reduce with Amount as number
+            on Reduce assert Amount > 0 because "Amount must be positive"
+            from A on Reduce -> set Balance = Balance - Reduce.Amount -> set Quantity = Quantity - Reduce.Amount -> transition A
             """;
 
         var (handler, uri) = CreateHandler();
@@ -183,21 +176,15 @@ public class PreceptPreviewRulesTests
         // The top-level rule "balance >= 0 - overdraftLimit" is violated after simulation.
         const string dsl = """
             precept Test
-            number balance = 0
-            number overdraftLimit = 100
-            rule balance >= 0 - overdraftLimit "Balance must be within overdraft limit"
+            field balance as number default 0
+            field overdraftLimit as number default 100
+            invariant balance >= 0 - overdraftLimit because "Balance must be within overdraft limit"
             state GoodStanding initial
             state Overdrawn
-            event Withdraw
-              number amount
-                rule amount > 0 "Withdraw amount must be positive"
-            from GoodStanding on Withdraw
-              if balance - Withdraw.amount >= 0
-                set balance = balance - Withdraw.amount
-                no transition
-              else
-                set balance = balance - Withdraw.amount
-                transition Overdrawn
+            event Withdraw with amount as number
+            on Withdraw assert amount > 0 because "Withdraw amount must be positive"
+            from GoodStanding on Withdraw when balance - Withdraw.amount >= 0 -> set balance = balance - Withdraw.amount -> no transition
+            from GoodStanding on Withdraw -> set balance = balance - Withdraw.amount -> transition Overdrawn
             """;
 
         var (handler, uri) = CreateHandler();
@@ -225,20 +212,14 @@ public class PreceptPreviewRulesTests
         // With amount=30, balance stays at −30 which is >= −100, rule passes.
         const string dsl = """
             precept Test
-            number balance = 0
-            number overdraftLimit = 100
-            rule balance >= 0 - overdraftLimit "Balance must be within overdraft limit"
+            field balance as number default 0
+            field overdraftLimit as number default 100
+            invariant balance >= 0 - overdraftLimit because "Balance must be within overdraft limit"
             state GoodStanding initial
             state Overdrawn
-            event Withdraw
-              number amount
-            from GoodStanding on Withdraw
-              if balance - Withdraw.amount >= 0
-                set balance = balance - Withdraw.amount
-                no transition
-              else
-                set balance = balance - Withdraw.amount
-                transition Overdrawn
+            event Withdraw with amount as number
+            from GoodStanding on Withdraw when balance - Withdraw.amount >= 0 -> set balance = balance - Withdraw.amount -> no transition
+            from GoodStanding on Withdraw -> set balance = balance - Withdraw.amount -> transition Overdrawn
             """;
 
         var (handler, uri) = CreateHandler();

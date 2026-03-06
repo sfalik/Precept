@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Reflection;
 using System.Text.RegularExpressions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -27,14 +26,7 @@ internal sealed class PreceptAnalyzer
     // Match `event Name with ...` (inline event args in new syntax)
     private static readonly Regex NewEventWithArgsRegex = new("^\\s*event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+with\\s+(?<args>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    private static readonly MethodInfo? ExpressionParseMethod = typeof(PreceptDefinition).Assembly
-        .GetType("Precept.PreceptLegacyExpressionParser", throwOnError: false)
-        ?.GetMethod(
-            "Parse",
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
-            binder: null,
-            types: [typeof(string)],
-            modifiers: null);
+
 
     private readonly ConcurrentDictionary<DocumentUri, string> _documents = new();
 
@@ -869,27 +861,10 @@ internal sealed class PreceptAnalyzer
         parsed = null;
         error = string.Empty;
 
-        if (ExpressionParseMethod is null)
-        {
-            error = "expression analyzer unavailable in language server.";
-            return false;
-        }
-
         try
         {
-            parsed = ExpressionParseMethod.Invoke(null, [expression]) as PreceptExpression;
-            if (parsed is null)
-            {
-                error = "expression parse failed.";
-                return false;
-            }
-
+            parsed = PreceptParser.ParseExpression(expression);
             return true;
-        }
-        catch (TargetInvocationException tie)
-        {
-            error = tie.InnerException?.Message ?? tie.Message;
-            return false;
         }
         catch (Exception ex)
         {
@@ -1549,8 +1524,7 @@ internal sealed class PreceptAnalyzer
         new CompletionItem { Label = "null", Kind = CompletionItemKind.Keyword },
         // Operators
         new CompletionItem { Label = "contains", Kind = CompletionItemKind.Keyword },
-        // Legacy (block-syntax) support
-        new CompletionItem { Label = "rule", Kind = CompletionItemKind.Keyword }
+
     ];
 
     private static readonly IReadOnlyList<CompletionItem> ExpressionOperatorItems =

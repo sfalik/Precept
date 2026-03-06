@@ -20,8 +20,6 @@ public static class PreceptParser
 
     /// <summary>
     /// Parses a <c>.precept</c> DSL text string into a <see cref="PreceptDefinition"/> record tree.
-    /// Tries the new Superpower token-based parser first; falls back to the legacy regex parser
-    /// for older syntax (e.g. inline type declarations, block-based transitions).
     /// Throws <see cref="InvalidOperationException"/> on syntax errors.
     /// </summary>
     public static PreceptDefinition Parse(string text)
@@ -29,31 +27,24 @@ public static class PreceptParser
         if (string.IsNullOrWhiteSpace(text))
             throw new InvalidOperationException("DSL input is empty.");
 
-        // Try new Superpower parser first
+        TokenList<PreceptToken> tokens;
         try
         {
-            var tokens = PreceptTokenizerBuilder.Instance.Tokenize(text);
-            var result = RawFileParser.TryParse(tokens);
-            if (result.HasValue && result.Remainder.IsAtEnd)
-                return AssembleModel(result.Value.Name, result.Value.Statements);
+            tokens = PreceptTokenizerBuilder.Instance.Tokenize(text);
         }
-        catch (InvalidOperationException)
+        catch (Superpower.ParseException ex)
         {
-            // Semantic validation error from AssembleModel (after IsAtEnd confirmed) — propagate
-            throw;
+            throw new InvalidOperationException(ex.Message, ex);
         }
-        catch
-        {
-            // Tokenization or parse combinator failure — fall through to legacy parser
-        }
+        var result = RawFileParser.TryParse(tokens);
+        if (result.HasValue && result.Remainder.IsAtEnd)
+            return AssembleModel(result.Value.Name, result.Value.Statements);
 
-        // Fall back to legacy regex parser
-        return PreceptLegacyParser.Parse(text);
+        throw new InvalidOperationException("Failed to parse DSL input.");
     }
 
     /// <summary>
     /// Parses with diagnostics — returns a model (or null) and a list of parse diagnostics.
-    /// Tries new parser first, falls back to legacy parser on failure.
     /// For use by the language server.
     /// </summary>
     public static (PreceptDefinition? Model, IReadOnlyList<ParseDiagnostic> Diagnostics) ParseWithDiagnostics(string text)
@@ -66,39 +57,56 @@ public static class PreceptParser
             return (null, diagnostics);
         }
 
-        // Try new Superpower parser first
         TokenList<PreceptToken> tokens;
-        bool tokenizationFailed = false;
         try
         {
             tokens = PreceptTokenizerBuilder.Instance.Tokenize(text);
         }
-        catch (Superpower.ParseException)
+        catch (Superpower.ParseException ex)
         {
-            tokenizationFailed = true;
-            tokens = default;
+            diagnostics.Add(new ParseDiagnostic(1, 0, ex.Message));
+            return (null, diagnostics);
         }
 
-        if (!tokenizationFailed)
+        var result = RawFileParser.TryParse(tokens);
+        if (result.HasValue && result.Remainder.IsAtEnd)
         {
-            var result = RawFileParser.TryParse(tokens);
-            if (result.HasValue && result.Remainder.IsAtEnd)
+            try
             {
-                try
-                {
-                    var model = AssembleModel(result.Value.Name, result.Value.Statements);
-                    return (model, diagnostics);
-                }
-                catch (InvalidOperationException ex)
-                {
-                    diagnostics.Add(new ParseDiagnostic(1, 0, ex.Message));
-                    return (null, diagnostics);
-                }
+                var model = AssembleModel(result.Value.Name, result.Value.Statements);
+                return (model, diagnostics);
+            }
+            catch (InvalidOperationException ex)
+            {
+                diagnostics.Add(new ParseDiagnostic(1, 0, ex.Message));
+                return (null, diagnostics);
             }
         }
 
-        // Fall back to legacy parser
-        return PreceptLegacyParser.ParseWithDiagnostics(text);
+        // Report parse failure with position info from Superpower
+        var pos = result.ErrorPosition;
+        var line = pos.HasValue ? pos.Line : 1;
+        var col = pos.HasValue ? pos.Column : 0;
+        var msg = result.ErrorMessage ?? "Unexpected input";
+        var expectations = result.Expectations ?? [];
+        if (expectations.Length > 0)
+            msg += $" (expected {string.Join(" or ", expectations)})";
+        diagnostics.Add(new ParseDiagnostic(line, col, msg));
+        return (null, diagnostics);
+    }
+
+    /// <summary>
+    /// Parses an expression string into a <see cref="PreceptExpression"/> tree.
+    /// Used by the language server for expression analysis (null narrowing, type inference).
+    /// Throws <see cref="InvalidOperationException"/> on parse failure.
+    /// </summary>
+    public static PreceptExpression ParseExpression(string expression)
+    {
+        var tokens = PreceptTokenizerBuilder.Instance.Tokenize(expression);
+        var result = BoolExpr.TryParse(tokens);
+        if (result.HasValue && result.Remainder.IsAtEnd)
+            return result.Value;
+        throw new InvalidOperationException($"Failed to parse expression: {expression}");
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -199,7 +207,8 @@ public static class PreceptParser
     private static readonly TokenListParser<PreceptToken, PreceptExpression> Factor =
         Superpower.Parse.Chain(
             Token.EqualTo(PreceptToken.Star).Value("*")
-                .Or(Token.EqualTo(PreceptToken.Slash).Value("/")),
+                .Or(Token.EqualTo(PreceptToken.Slash).Value("/"))
+                .Or(Token.EqualTo(PreceptToken.Percent).Value("%")),
             Unary,
             (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right));
 
@@ -300,6 +309,22 @@ public static class PreceptParser
 
     private static readonly TokenListParser<PreceptToken, object?> DefaultValue =
         ListLiteral.Try().Or(ScalarLiteral);
+
+    /// <summary>
+    /// Parses an optional 'default &lt;value&gt;' clause, returning a sentinel tuple
+    /// to distinguish "not specified" from "default null".
+    /// </summary>
+    private static readonly TokenListParser<PreceptToken, (bool Specified, object? Value)> OptionalDefault =
+        Token.EqualTo(PreceptToken.Default)
+            .IgnoreThen(DefaultValue)
+            .Select(v => (Specified: true, Value: v))
+            .OptionalOrDefault((Specified: false, Value: (object?)null));
+
+    private static readonly TokenListParser<PreceptToken, (bool Specified, object? Value)> OptionalScalarDefault =
+        Token.EqualTo(PreceptToken.Default)
+            .IgnoreThen(ScalarLiteral)
+            .Select(v => (Specified: true, Value: v))
+            .OptionalOrDefault((Specified: false, Value: (object?)null));
 
     // ═══════════════════════════════════════════════════════════════════
     // State Target Parser
@@ -465,14 +490,14 @@ public static class PreceptParser
          from _ in Token.EqualTo(PreceptToken.As)
          from typeRef in TypeRef
          from nullable in Token.EqualTo(PreceptToken.Nullable).Value(true).OptionalOrDefault(false)
-         from defaultVal in Token.EqualTo(PreceptToken.Default).IgnoreThen(DefaultValue).OptionalOrDefault()
+         from dflt in OptionalDefault
          select typeRef.IsCollection
             ? (StatementResult)new CollectionFieldResult(new PreceptCollectionField(
                 name.ToText(), typeRef.CollectionKind!.Value, typeRef.ScalarType))
             : new FieldResult(new PreceptField(
                 name.ToText(), typeRef.ScalarType, nullable,
-                defaultVal is not null || (nullable && defaultVal is null),
-                defaultVal)))
+                dflt.Specified || nullable,
+                dflt.Specified ? dflt.Value : null)))
         .Named("field declaration");
 
     // invariant <BoolExpr> because "reason"
@@ -482,7 +507,8 @@ public static class PreceptParser
          from _ in Token.EqualTo(PreceptToken.Because)
          from reason in Token.EqualTo(PreceptToken.StringLiteral)
          select (StatementResult)new InvariantResult(new PreceptInvariant(
-             ReconstituteExpr(expr), expr, reason.ToStringLiteralValue())))
+             ReconstituteExpr(expr), expr, reason.ToStringLiteralValue(),
+             SourceLine: kw.Span.Position.Line)))
         .Named("invariant declaration");
 
     // state <Name> [initial]
@@ -500,8 +526,10 @@ public static class PreceptParser
         from _ in Token.EqualTo(PreceptToken.As)
         from type in ScalarType
         from nullable in Token.EqualTo(PreceptToken.Nullable).Value(true).OptionalOrDefault(false)
-        from dflt in Token.EqualTo(PreceptToken.Default).IgnoreThen(ScalarLiteral).OptionalOrDefault()
-        select new PreceptEventArg(name.ToText(), type, nullable, dflt is not null, dflt);
+        from dflt in OptionalScalarDefault
+        select new PreceptEventArg(name.ToText(), type, nullable,
+            dflt.Specified,
+            dflt.Specified ? dflt.Value : null);
 
     private static readonly TokenListParser<PreceptToken, StatementResult> EventDecl =
         (from kw in Token.EqualTo(PreceptToken.Event)
@@ -751,10 +779,20 @@ public static class PreceptParser
                     break;
 
                 case TransitionRowResult trr:
-                    var outcome = trr.ActionsAndOutcome.OfType<OutcomeAction>().LastOrDefault()?.Outcome;
-                    if (outcome is null)
+                    var outcomes = trr.ActionsAndOutcome.OfType<OutcomeAction>().ToList();
+                    if (outcomes.Count == 0)
                         throw new InvalidOperationException($"Transition row for event '{trr.EventName}' is missing an outcome (transition, no transition, or reject).");
 
+                    // Design: "exactly one outcome, at the end; no statements after it"
+                    if (outcomes.Count > 1)
+                        throw new InvalidOperationException(
+                            $"Transition row for event '{trr.EventName}': no statements are allowed after an outcome statement.");
+                    var firstOutcomeIdx = Array.IndexOf(trr.ActionsAndOutcome, outcomes[0]);
+                    if (firstOutcomeIdx < trr.ActionsAndOutcome.Length - 1)
+                        throw new InvalidOperationException(
+                            $"Transition row for event '{trr.EventName}': no statements are allowed after an outcome statement.");
+
+                    var outcome = outcomes[0].Outcome;
                     var rowActions = trr.ActionsAndOutcome.Where(a => a is not OutcomeAction).ToArray();
                     var (rowSets, rowMutations) = SplitActions(rowActions);
                     var whenText = trr.WhenGuard is not null ? ReconstituteExpr(trr.WhenGuard) : null;
@@ -779,6 +817,127 @@ public static class PreceptParser
         if (initialState is null)
             throw new InvalidOperationException("Exactly one state must be marked initial. Use 'state <Name> initial'.");
 
+        // Validate event assert scope: expressions may only reference event argument identifiers
+        foreach (var ea in eventAsserts)
+        {
+            var evt = events.FirstOrDefault(e => e.Name == ea.EventName);
+            if (evt is null) continue;
+            var argNames = evt.Args.Select(a => a.Name).ToHashSet(StringComparer.Ordinal);
+            foreach (var id in CollectIdentifiers(ea.Expression))
+            {
+                if (id.Member is not null)
+                {
+                    // EventName.ArgName form: prefix must be the event name, member must be an arg
+                    if (!StringComparer.Ordinal.Equals(id.Name, ea.EventName))
+                        throw new InvalidOperationException(
+                            $"'on {ea.EventName} assert' can only reference event argument identifiers. '{id.Name}.{id.Member}' uses an unknown prefix.");
+                    if (!argNames.Contains(id.Member))
+                        throw new InvalidOperationException(
+                            $"'on {ea.EventName} assert' can only reference event argument identifiers. '{id.Member}' is not an event argument of '{ea.EventName}'.");
+                }
+                else if (!argNames.Contains(id.Name))
+                {
+                    throw new InvalidOperationException(
+                        $"'on {ea.EventName} assert' can only reference event argument identifiers. '{id.Name}' is not an event argument of '{ea.EventName}'.");
+                }
+            }
+        }
+
+        // Validate field defaults: non-nullable fields must have a default; default type must match
+        foreach (var f in fields)
+        {
+            if (!f.IsNullable && !f.HasDefaultValue)
+                throw new InvalidOperationException(
+                    $"Non-nullable field '{f.Name}' requires a default value.");
+            if (f.HasDefaultValue && f.DefaultValue is not null)
+            {
+                var ok = f.Type switch
+                {
+                    PreceptScalarType.Number => f.DefaultValue is double,
+                    PreceptScalarType.String => f.DefaultValue is string,
+                    PreceptScalarType.Boolean => f.DefaultValue is bool,
+                    _ => true
+                };
+                if (!ok)
+                    throw new InvalidOperationException(
+                        $"Default value for field '{f.Name}' does not match declared type '{f.Type}'.");
+            }
+            if (f.HasDefaultValue && f.DefaultValue is null && !f.IsNullable)
+                throw new InvalidOperationException(
+                    $"Default value for field '{f.Name}' does not match declared type '{f.Type}' (null is not allowed for non-nullable fields).");
+        }
+
+        // Validate event arg defaults: type mismatch / null on non-nullable
+        foreach (var evt in events)
+        {
+            foreach (var arg in evt.Args)
+            {
+                if (arg.HasDefaultValue && arg.DefaultValue is not null)
+                {
+                    var ok = arg.Type switch
+                    {
+                        PreceptScalarType.Number => arg.DefaultValue is double,
+                        PreceptScalarType.String => arg.DefaultValue is string,
+                        PreceptScalarType.Boolean => arg.DefaultValue is bool,
+                        _ => true
+                    };
+                    if (!ok)
+                        throw new InvalidOperationException(
+                            $"Default value for event argument '{arg.Name}' does not match declared type '{arg.Type}'.");
+                }
+                if (arg.HasDefaultValue && arg.DefaultValue is null && !arg.IsNullable)
+                    throw new InvalidOperationException(
+                        $"Default value for event argument '{arg.Name}' does not match declared type '{arg.Type}' (null is not allowed for non-nullable arguments).");
+            }
+        }
+
+        // Validate collection mutation verb-vs-kind and unknown collections
+        var collectionMap = collectionFields.ToDictionary(c => c.Name, c => c.CollectionKind, StringComparer.Ordinal);
+        foreach (var row in transitionRows)
+        {
+            if (row.CollectionMutations is null) continue;
+            foreach (var mut in row.CollectionMutations)
+            {
+                if (!collectionMap.TryGetValue(mut.TargetField, out var kind))
+                {
+                    if (fields.Any(f => f.Name == mut.TargetField))
+                        throw new InvalidOperationException(
+                            $"'{mut.Verb.ToString().ToLowerInvariant()}' targets '{mut.TargetField}' which is a scalar field, not a collection.");
+                    throw new InvalidOperationException(
+                        $"'{mut.Verb.ToString().ToLowerInvariant()}' targets unknown collection '{mut.TargetField}'.");
+                }
+                var verbValid = (mut.Verb, kind) switch
+                {
+                    (PreceptCollectionMutationVerb.Add, PreceptCollectionKind.Set) => true,
+                    (PreceptCollectionMutationVerb.Remove, PreceptCollectionKind.Set) => true,
+                    (PreceptCollectionMutationVerb.Enqueue, PreceptCollectionKind.Queue) => true,
+                    (PreceptCollectionMutationVerb.Dequeue, PreceptCollectionKind.Queue) => true,
+                    (PreceptCollectionMutationVerb.Push, PreceptCollectionKind.Stack) => true,
+                    (PreceptCollectionMutationVerb.Pop, PreceptCollectionKind.Stack) => true,
+                    (PreceptCollectionMutationVerb.Clear, _) => true,
+                    _ => false
+                };
+                if (!verbValid)
+                    throw new InvalidOperationException(
+                        $"Cannot '{mut.Verb.ToString().ToLowerInvariant()}' on a {kind.ToString().ToLowerInvariant()} collection '{mut.TargetField}'.");
+            }
+        }
+
+        // Validate unreachable rows: an unguarded row for (state, event) followed by another row
+        var seenUnguarded = new HashSet<(string State, string Event)>(
+            EqualityComparer<(string, string)>.Create(
+                (a, b) => StringComparer.Ordinal.Equals(a.Item1, b.Item1) && StringComparer.Ordinal.Equals(a.Item2, b.Item2),
+                h => HashCode.Combine(StringComparer.Ordinal.GetHashCode(h.Item1), StringComparer.Ordinal.GetHashCode(h.Item2))));
+        foreach (var row in transitionRows)
+        {
+            var key = (row.FromState, row.EventName);
+            if (seenUnguarded.Contains(key))
+                throw new InvalidOperationException(
+                    $"Duplicate 'from {row.FromState} on {row.EventName}' row is unreachable — a previous unguarded row already catches all cases.");
+            if (row.WhenGuard is null)
+                seenUnguarded.Add(key);
+        }
+
         return new PreceptDefinition(
             name, states, initialState, events,
             oldTransitions,
@@ -799,6 +958,17 @@ public static class PreceptParser
             return declaredStates.Select(s => s.Name).ToList();
         return targets.ToList();
     }
+
+    /// <summary>Collects all identifier references from an expression tree.</summary>
+    private static IEnumerable<PreceptIdentifierExpression> CollectIdentifiers(PreceptExpression expr) =>
+        expr switch
+        {
+            PreceptIdentifierExpression id => [id],
+            PreceptUnaryExpression un => CollectIdentifiers(un.Operand),
+            PreceptBinaryExpression bin => CollectIdentifiers(bin.Left).Concat(CollectIdentifiers(bin.Right)),
+            PreceptParenthesizedExpression par => CollectIdentifiers(par.Inner),
+            _ => []
+        };
 
     /// <summary>Splits parsed actions into set assignments and collection mutations.</summary>
     private static (List<PreceptSetAssignment> Sets, List<PreceptCollectionMutation> Mutations) SplitActions(ParsedAction[] actions)

@@ -824,6 +824,12 @@ Add these **new sections**:
 | `docs/DesignNotes.md` | **Moderate edit** — supersede or replace | 9 |
 | `.github/copilot-instructions.md` | **Major edit** — rename project refs, replace manual checklists with catalog-driven rules, add Catalog Sync + SYNC Comment sections | 9 |
 | `docs/RuntimeApiDesign.md` | **Moderate edit** — fire pipeline stages, model types table, terminology | 9 |
+| `src/Precept/Dsl/PreceptParser.cs` | **Edit** — remove fallback, add `ParseExpression()` | 10 |
+| `src/Precept/Dsl/PreceptLegacyParser.cs` | **Delete** | 10 |
+| `src/Precept/Dsl/PreceptLegacyExpressionParser.cs` | **Delete** | 10 |
+| `src/Precept/Dsl/PreceptParser.Old.cs.bak` | **Delete** | 10 |
+| `src/Precept/Dsl/PreceptExpressionParser.cs.bak` | **Delete** | 10 |
+| `tools/Precept.LanguageServer/PreceptAnalyzer.cs` | **Edit** — replace reflection with direct `ParseExpression()` call, remove `rule` keyword | 10 |
 
 ## Preserve List (Unchanged)
 
@@ -869,7 +875,8 @@ These files/components are not modified:
 | 7. Language server | ~500 | Medium (resilience to partial files) |
 | 8. TextMate grammar | ~100 | Low |
 | 9. Documentation | ~300 | Low |
-| **Total** | **~3,400** | |
+| 10. Legacy parser removal | ~-1,500 (net deletion) | Low |
+| **Total** | **~1,900 net** | |
 
 ---
 
@@ -886,6 +893,170 @@ Three core infrastructure components from this plan directly support the MCP ser
 See `docs/CatalogInfrastructureDesign.md` for the full architecture rationale, consumer matrix, and drift defense strategy.
 
 The MCP project only adds the tool wrappers (`ValidateTool.cs`, `SchemaTool.cs`, etc.) and the MCP SDK transport. If MCP is removed, core infrastructure remains unchanged — better error messages, richer language server features, and documented constraints continue to work.
+
+---
+
+## Phase 10: Legacy Parser Removal
+
+**Goal:** Remove the legacy regex-based parser and its expression parser, eliminating dual-parser tech debt. After this phase, the Superpower token-based parser is the sole parser.
+
+### Rationale
+
+During the language redesign (Phases 0–9), the legacy regex parser was retained as a fallback — if the new Superpower parser failed, the old parser was used. This was a pragmatic choice for safe migration, but now that all 17 sample files and 370 tests use new syntax exclusively, the fallback is dead code. Keeping it:
+
+- Adds ~1,500 lines of unmaintained code (`PreceptLegacyParser.cs` + `PreceptLegacyExpressionParser.cs`)
+- Creates false confidence that old syntax is "supported" when it isn't tested
+- Keeps `.bak` archive files in the source tree
+- Forces the language server to use reflection to call a legacy expression parser instead of the Superpower-based one
+
+### Modified files
+
+| File | Change | Detail |
+|---|---|---|
+| `src/Precept/Dsl/PreceptParser.cs` | **Edit** | Remove fallback code paths in `Parse()` and `ParseWithDiagnostics()`. Add public `ParseExpression(string)` method for LS use. |
+| `src/Precept/Dsl/PreceptLegacyParser.cs` | **Delete** | Remove 1,138-line legacy regex parser |
+| `src/Precept/Dsl/PreceptLegacyExpressionParser.cs` | **Delete** | Remove 341-line legacy expression parser |
+| `src/Precept/Dsl/PreceptParser.Old.cs.bak` | **Delete** | Remove archive file |
+| `src/Precept/Dsl/PreceptExpressionParser.cs.bak` | **Delete** | Remove archive file |
+| `tools/Precept.LanguageServer/PreceptAnalyzer.cs` | **Edit** | Replace reflection-based `ExpressionParseMethod` (calling `PreceptLegacyExpressionParser.Parse`) with direct call to `PreceptParser.ParseExpression()`. Remove `rule` keyword from completion items. |
+
+### Implementation steps
+
+#### Step 1: Add public expression-parsing API to `PreceptParser`
+
+The Superpower-based `BoolExpr` combinator (line 242) is `internal` and works on `TokenList<PreceptToken>`, not raw strings. The language server needs a public method that accepts a string:
+
+```csharp
+/// <summary>
+/// Parses an expression string into a <see cref="PreceptExpression"/> tree.
+/// Used by the language server for expression analysis (null narrowing, type inference).
+/// </summary>
+public static PreceptExpression ParseExpression(string expression)
+{
+    var tokens = PreceptTokenizerBuilder.Instance.Tokenize(expression);
+    var result = BoolExpr.TryParse(tokens);
+    if (result.HasValue && result.Remainder.IsAtEnd)
+        return result.Value;
+    throw new InvalidOperationException($"Failed to parse expression: {expression}");
+}
+```
+
+#### Step 2: Remove fallback in `Parse()`
+
+Remove the try/catch fallback structure. The method becomes:
+
+```csharp
+public static PreceptDefinition Parse(string text)
+{
+    if (string.IsNullOrWhiteSpace(text))
+        throw new InvalidOperationException("DSL input is empty.");
+
+    var tokens = PreceptTokenizerBuilder.Instance.Tokenize(text);
+    var result = RawFileParser.TryParse(tokens);
+    if (result.HasValue && result.Remainder.IsAtEnd)
+        return AssembleModel(result.Value.Name, result.Value.Statements);
+
+    throw new InvalidOperationException("Failed to parse DSL input.");
+}
+```
+
+#### Step 3: Remove fallback in `ParseWithDiagnostics()`
+
+Same pattern — remove the legacy fallback. On Superpower failure, return diagnostics from the Superpower parse result (position, expected tokens).
+
+#### Step 4: Update `PreceptAnalyzer.TryParseExpression()`
+
+Replace reflection-based call with direct call:
+
+```csharp
+private static bool TryParseExpression(string expression, out PreceptExpression? parsed, out string error)
+{
+    parsed = null;
+    error = string.Empty;
+    try
+    {
+        parsed = PreceptParser.ParseExpression(expression);
+        return true;
+    }
+    catch (Exception ex)
+    {
+        error = ex.Message;
+        return false;
+    }
+}
+```
+
+Remove the `ExpressionParseMethod` field and its reflection setup.
+
+#### Step 5: Clean up analyzer completions
+
+Remove `rule` keyword from `KeywordItems` (line ~1552, marked "Legacy (block-syntax) support").
+
+#### Step 6: Delete legacy files
+
+- `src/Precept/Dsl/PreceptLegacyParser.cs`
+- `src/Precept/Dsl/PreceptLegacyExpressionParser.cs`
+- `src/Precept/Dsl/PreceptParser.Old.cs.bak`
+- `src/Precept/Dsl/PreceptExpressionParser.cs.bak`
+
+#### Checkpoint
+
+- `dotnet build Precept.slnx` — 0 errors
+- All 370 tests pass
+- No references to `PreceptLegacyParser` or `PreceptLegacyExpressionParser` remain in the codebase
+- No `.bak` files remain in `src/Precept/Dsl/`
+- Language server expression analysis works via Superpower (no reflection)
+
+---
+
+## Completion Summary
+
+**Status:** All 10 phases completed on `feature/language-redesign`. Pending final commit.
+**Date completed:** 2026-03-06
+**Final test count:** 370/370 passing (348 core + 22 language server).
+**Sample files:** 17 `.precept` files migrated to new syntax.
+
+### Commit History
+
+| Commit | Phase | Description |
+|---|---|---|
+| `4e5f29e` | 0 | Branch + Superpower NuGet |
+| `1aaf37d` | 1 | Token enum with `[TokenCategory]`/`[TokenDescription]`/`[TokenSymbol]` attributes + Superpower tokenizer |
+| `f05a99a` | 2 | New model records (`PreceptInvariant`, `PreceptStateAssert`, `PreceptStateAction`, `PreceptEventAssert`, `PreceptTransitionRow`, `PreceptEditBlock`) |
+| `d526603` | — | Unplanned rebrand: rename all `Dsl`-prefixed types to `Precept` prefix |
+| `0913b00` | 3 | Superpower combinator parser replacing regex parser |
+| `dc636d6` | 4 | Runtime engine and compiler rewrite for new model constructs |
+| `06a7d5c` | 5 | Tests — backward compat fixes, new syntax test coverage |
+| `05f4ce9` | 6 | Migrate all 17 sample files to new syntax |
+| `19038ef` | 7 | Language Server — token-based semantic tokens, new-syntax completions, `ParseWithDiagnostics`, Sm→Precept rename |
+| `2d16881` | 8 | TextMate grammar rewrite for new syntax |
+| `c6dad27` | 9 | Documentation — archived old README/DesignNotes, promoted new README, updated copilot-instructions |
+| TBD | 10 | Legacy parser removal, design-required parser validations, expression operator completeness, 370/370 tests green |
+
+### Deviations from Plan
+
+1. **ConstructCatalog / ConstraintCatalog not implemented.** The plan called for runtime registries with `Register()` calls and `// SYNC:CONSTRAINT:Cnn` markers (advisory). Constraints are enforced inline in the parser and runtime without a separate catalog layer. This infrastructure can be added later if needed for MCP server serialization.
+
+2. **Expression parser fully integrated (resolved in Phase 10).** The plan called for removing the separate expression parser and integrating expressions into the Superpower parser. Through Phases 3–9 the expression combinators (`BoolExpr`, `Factor`, `Term`, etc.) lived in `PreceptParser.cs` as Superpower combinators, with the legacy archive files (`PreceptExpressionParser.cs.bak`, `PreceptLegacyExpressionParser.cs`) retained. Phase 10 deleted all archive/legacy expression parser files. No separate expression parser module exists — expressions are fully inline in `PreceptParser.cs`.
+
+3. **Legacy parser fallback removed in Phase 10.** Through Phase 9, the old regex-based parser was retained as a fallback: if Superpower failed, the legacy parser ran. Phase 10 eliminated this entirely — `PreceptLegacyParser.cs` deleted, fallback code removed from `Parse()` and `ParseWithDiagnostics()`. The Superpower parser is now the sole implementation.
+
+4. **Unplanned Sm → Precept rename (between Phases 2–3).** All `SmDsl*` and `Sm*` class/file prefixes were renamed to `Precept*` across the entire codebase. This was a natural prerequisite discovered during implementation.
+
+5. **Phase 9 approach changed.** The plan called for in-place rewrites of README and DesignNotes. Instead, old documentation was archived as `-legacy.md` files (with preservation notices) and a separately authored README was promoted. This was cleaner than trying to surgically update 800+ lines of old-syntax examples.
+
+6. **RuntimeApiDesign.md not updated.** The plan called for fire pipeline / model type table updates. Deferred — the public API surface (`PreceptParser.Parse`, `PreceptEngine` methods, all result types) is unchanged, so the design doc remains accurate for callers.
+
+7. **State entry/exit actions and compile-time static analysis** (subsumption, contradiction, deadlock checks) were identified as risk points in the plan. These are new-syntax features that the parser recognizes but the runtime does not yet fully implement — they are future work beyond the scope of this language redesign.
+
+8. **Phase 10 scope expanded beyond plan.** The plan scoped Phase 10 as a cleanup-only phase (remove legacy files, add `ParseExpression()`, update analyzer). During Phase 10 execution, additional design-required work was completed that had been deferred from earlier phases:
+   - **`%` operator added** — was already in the expression evaluator and TextMate grammar but missing from the tokenizer and parser combinator. Locked in `PreceptLanguageDesign.md` Expressions section.
+   - **String literal escape sequence support** — tokenizer rule replaced with `Span.Regex` (`"([^"\\]|\\.)*"`) to correctly handle `\n`, `\"`, etc.
+   - **Scientific notation in number literals** — tokenizer rule replaced with `Span.Regex` to support `1.5e-3` form.
+   - **Tokenizer exceptions wrapped** — `Superpower.ParseException` now caught in `Parse()` and rethrown as `InvalidOperationException` per the parser contract.
+   - **Design-required parser validations added to `AssembleModel()`:** non-nullable field without default (error), default value type mismatch (error), same for event args, collection verb-vs-kind mismatch (error), unknown collection target (error), statement after outcome (error), duplicate unguarded transition row (unreachable row error).
+   - **Nullable field implicit null default** — parser correctly sets `HasDefaultValue = true` when a field is declared nullable without an explicit `default` clause, matching the design spec.
+   - **LS test fix** — `Snapshot_IncludesRuleDefinitions_WhenMachineHasRules` was asserting `scope == "field:Balance"` for an `invariant` declaration; corrected to `scope == "topLevel"` to match the actual model semantics.
 
 ---
 

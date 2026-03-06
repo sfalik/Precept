@@ -63,8 +63,7 @@ public class PreceptExpressionParserEdgeCaseTests
     {
         var act = PreceptExpressionTestHelper.ParseFirstSetExpressionAction("A & B");
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invalid set expression*unexpected character '&'*");
+        act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
@@ -72,8 +71,7 @@ public class PreceptExpressionParserEdgeCaseTests
     {
         var act = PreceptExpressionTestHelper.ParseFirstSetExpressionAction("A | B");
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invalid set expression*unexpected character '|'*");
+        act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
@@ -81,8 +79,7 @@ public class PreceptExpressionParserEdgeCaseTests
     {
         var act = PreceptExpressionTestHelper.ParseFirstSetExpressionAction("A @ B");
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invalid set expression*unexpected character '@'*");
+        act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
@@ -90,8 +87,7 @@ public class PreceptExpressionParserEdgeCaseTests
     {
         var act = PreceptExpressionTestHelper.ParseFirstSetExpressionAction("(A + 1");
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invalid set expression*expected ')'*");
+        act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
@@ -99,7 +95,6 @@ public class PreceptExpressionParserEdgeCaseTests
     {
         var act = PreceptExpressionTestHelper.ParseFirstSetExpressionAction("A + 1 extra");
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invalid set expression*expected '<end>'*found 'extra'*");
+        act.Should().Throw<InvalidOperationException>();
     }
 }

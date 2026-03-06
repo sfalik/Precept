@@ -15,15 +15,12 @@ public class PreceptAnalyzerNullNarrowingTests
     {
         const string text = """
             precept M
-            number? RetryCount
+            field RetryCount as number nullable
             state A initial
             state B
             event Go
-            from A on Go
-              if RetryCount != null && RetryCount > 0
-                transition B
-              else
-                reject \"blocked\"
+            from A on Go when RetryCount != null && RetryCount > 0 -> transition B
+            from A on Go -> reject "blocked"
             """;
 
         var diagnostics = Analyze(text);
@@ -36,15 +33,12 @@ public class PreceptAnalyzerNullNarrowingTests
     {
         const string text = """
             precept M
-            number? RetryCount
+            field RetryCount as number nullable
             state A initial
             state B
             event Go
-            from A on Go
-              if RetryCount == null || RetryCount > 0
-                transition B
-              else
-                reject \"blocked\"
+            from A on Go when RetryCount == null || RetryCount > 0 -> transition B
+            from A on Go -> reject "blocked"
             """;
 
         var diagnostics = Analyze(text);
@@ -57,15 +51,12 @@ public class PreceptAnalyzerNullNarrowingTests
     {
         const string text = """
             precept M
-            number? RetryCount
+            field RetryCount as number nullable
             state A initial
             state B
             event Go
-            from A on Go
-              if RetryCount > 0
-                transition B
-              else
-                reject \"blocked\"
+            from A on Go when RetryCount > 0 -> transition B
+            from A on Go -> reject "blocked"
             """;
 
         var diagnostics = Analyze(text);
@@ -79,14 +70,12 @@ public class PreceptAnalyzerNullNarrowingTests
     {
         const string text = """
             precept M
-            number Value = 0
-            number? RetryCount
+            field Value as number default 0
+            field RetryCount as number nullable
             state A initial
             state B
             event Go
-            from A on Go
-              set Value = RetryCount
-              transition B
+            from A on Go -> set Value = RetryCount -> transition B
             """;
 
         var diagnostics = Analyze(text);
@@ -100,17 +89,13 @@ public class PreceptAnalyzerNullNarrowingTests
     {
         const string text = """
             precept M
-            number Value = 0
-            number? RetryCount
+            field Value as number default 0
+            field RetryCount as number nullable
             state A initial
             state B
             event Go
-            from A on Go
-              if RetryCount != null
-                set Value = RetryCount
-                transition B
-              else
-                reject \"blocked\"
+            from A on Go when RetryCount != null -> set Value = RetryCount -> transition B
+            from A on Go -> reject "blocked"
             """;
 
         var diagnostics = Analyze(text);
@@ -118,26 +103,19 @@ public class PreceptAnalyzerNullNarrowingTests
         diagnostics.Should().BeEmpty();
     }
 
-    // ── Cross-branch null narrowing ───────────────────────────────────────────
-
     [Fact]
     public void Diagnostics_CrossBranch_ElseIfAfterNullReject_NoFalsePositiveOnNumericComparison()
     {
-        // After "if RetryCount == null -> no transition", the else-if should see RetryCount as number
-        // (not number?), so "RetryCount > 0" must not produce a false-positive diagnostic.
+        // After "if RetryCount == null -> no transition", the else-if should see RetryCount as number.
         const string text = """
             precept M
-            number? RetryCount
+            field RetryCount as number nullable
             state A initial
             state B
             event Go
-            from A on Go
-              if RetryCount == null
-                no transition
-              else if RetryCount > 0
-                transition B
-              else
-                no transition
+            from A on Go when RetryCount == null -> no transition
+            from A on Go when RetryCount > 0 -> transition B
+            from A on Go -> no transition
             """;
 
         var diagnostics = Analyze(text);
@@ -148,21 +126,16 @@ public class PreceptAnalyzerNullNarrowingTests
     [Fact]
     public void Diagnostics_CrossBranch_ElseAfterNullReject_NarrowedSymbolsForSetAssignment()
     {
-        // After "if RetryCount == null -> no transition", the else branch sees RetryCount as number
-        // (not number?). "set Value = RetryCount" in the else branch must not be flagged.
+        // After "if RetryCount == null -> no transition", the else branch sees RetryCount as number.
         const string text = """
             precept M
-            number Value = 0
-            number? RetryCount
+            field Value as number default 0
+            field RetryCount as number nullable
             state A initial
             state B
             event Go
-            from A on Go
-              if RetryCount == null
-                no transition
-              else
-                set Value = RetryCount
-                transition B
+            from A on Go when RetryCount == null -> no transition
+            from A on Go -> set Value = RetryCount -> transition B
             """;
 
         var diagnostics = Analyze(text);
@@ -173,21 +146,16 @@ public class PreceptAnalyzerNullNarrowingTests
     [Fact]
     public void Diagnostics_CrossBranch_MultiChain_NoFalsePositives()
     {
-        // Full three-branch chain: if null/no-transition, else if positive/transition, else/no-transition.
-        // Each branch should validate cleanly with cross-branch narrowing applied.
+        // Three-branch chain: if null/no-transition, else if positive/transition, else/no-transition.
         const string text = """
             precept M
-            number? X
+            field X as number nullable
             state A initial
             state B
             event Go
-            from A on Go
-              if X == null
-                no transition
-              else if X > 0
-                transition B
-              else
-                no transition
+            from A on Go when X == null -> no transition
+            from A on Go when X > 0 -> transition B
+            from A on Go -> no transition
             """;
 
         var diagnostics = Analyze(text);
@@ -198,22 +166,17 @@ public class PreceptAnalyzerNullNarrowingTests
     [Fact]
     public void Diagnostics_CrossBranch_NonNullNarrowingGuard_SubsequentBranchStillSeesNullable()
     {
-        // "if SomeFlag" does not narrow Item's nullability, so the else-if should still see
-        // Item as number? and flag "Item > 0" as an error.
+        // "if SomeFlag" does not narrow Item's nullability, so "Item > 0" should still error.
         const string text = """
             precept M
-            boolean SomeFlag = true
-            number? Item
+            field SomeFlag as boolean default true
+            field Item as number nullable
             state A initial
             state B
             event Go
-            from A on Go
-              if SomeFlag
-                transition B
-              else if Item > 0
-                transition B
-              else
-                no transition
+            from A on Go when SomeFlag -> transition B
+            from A on Go when Item > 0 -> transition B
+            from A on Go -> no transition
             """;
 
         var diagnostics = Analyze(text);

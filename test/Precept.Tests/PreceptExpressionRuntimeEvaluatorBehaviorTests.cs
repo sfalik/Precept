@@ -440,19 +440,15 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
         IReadOnlyDictionary<string, object?> instanceData,
         IReadOnlyDictionary<string, object?>? eventArgs = null)
     {
-        var normalizedDeclarations = AddDefaultsForNonNullableFields(declarations);
+        var normalizedDeclarations = ConvertToNewSyntaxFields(declarations);
 
         var dsl = $$"""
             precept Calc
             {{normalizedDeclarations}}
             state A initial
             state B
-            event Go
-              number? EventNum
-              string? EventText
-            from A on Go
-              set {{targetField}} = {{expression}}
-              transition B
+            event Go with EventNum as number nullable, EventText as string nullable
+            from A on Go -> set {{targetField}} = {{expression}} -> transition B
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -460,7 +456,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
         return workflow.Fire(instance, "Go", eventArgs);
     }
 
-    private static string AddDefaultsForNonNullableFields(string declarations)
+    private static string ConvertToNewSyntaxFields(string declarations)
     {
         var lines = declarations.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
         var updated = new string[lines.Length];
@@ -470,37 +466,55 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
             var line = lines[i];
             var trimmed = line.Trim();
 
-            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.Contains("=", StringComparison.Ordinal))
+            if (string.IsNullOrWhiteSpace(trimmed))
             {
                 updated[i] = line;
                 continue;
             }
 
+            // Handle "type? Name" (nullable)
             var parts = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length != 2)
+            if (parts.Length < 2)
             {
                 updated[i] = line;
                 continue;
             }
 
             var typeToken = parts[0];
-            if (typeToken.EndsWith("?", StringComparison.Ordinal))
+            var name = parts.Length >= 2 ? parts[1] : "";
+            bool isNullable = typeToken.EndsWith("?", StringComparison.Ordinal);
+            var baseType = isNullable ? typeToken[..^1] : typeToken;
+
+            if (baseType is not ("number" or "string" or "boolean"))
             {
                 updated[i] = line;
                 continue;
             }
 
-            string? defaultLiteral = typeToken switch
+            // Check for explicit default: "type Name = value"
+            if (parts.Length >= 4 && parts[2] == "=")
             {
-                "number" => "0",
-                "boolean" => "false",
-                "string" => "\"\"",
-                _ => null
-            };
-
-            updated[i] = defaultLiteral is null
-                ? line
-                : $"{line} = {defaultLiteral}";
+                var defaultVal = string.Join(" ", parts[3..]);
+                updated[i] = isNullable
+                    ? $"field {name} as {baseType} nullable default {defaultVal}"
+                    : $"field {name} as {baseType} default {defaultVal}";
+            }
+            else if (isNullable)
+            {
+                updated[i] = $"field {name} as {baseType} nullable";
+            }
+            else
+            {
+                // Add default for non-nullable
+                string defaultLiteral = baseType switch
+                {
+                    "number" => "0",
+                    "boolean" => "false",
+                    "string" => "\"\"",
+                    _ => "0"
+                };
+                updated[i] = $"field {name} as {baseType} default {defaultLiteral}";
+            }
         }
 
         return string.Join(Environment.NewLine, updated);
@@ -510,16 +524,13 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     {
         var dsl = $$"""
             precept Guards
-            boolean Flag = false
-            boolean OtherFlag = false
+            field Flag as boolean default false
+            field OtherFlag as boolean default false
             state A initial
             state B
             event Go
-            from A on Go
-              if {{guardExpression}}
-                transition B
-              else
-                reject "blocked"
+            from A on Go when {{guardExpression}} -> transition B
+            from A on Go -> reject "blocked"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));

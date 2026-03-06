@@ -47,11 +47,11 @@ public static class PreceptTokenizerBuilder
         // 1. Comments — strip from token stream so the parser never sees them
         builder.Ignore(CommentParser);
 
-        // 2. String literals ("..." with C-style escapes)
-        builder.Match(QuotedString.CStyle, PreceptToken.StringLiteral);
+        // 2. String literals ("..." with C-style escapes: \n, \t, \", \\, etc.)
+        builder.Match(Span.Regex("\"([^\"\\\\]|\\\\.)*\""), PreceptToken.StringLiteral);
 
-        // 3. Number literals (123 or 123.45)
-        builder.Match(DecimalNumber, PreceptToken.NumberLiteral);
+        // 3. Number literals (integer, decimal, or scientific notation: 42, 3.14, 1.5e2)
+        builder.Match(Span.Regex(@"\d+(\.\d+)?([eE][+-]?\d+)?"), PreceptToken.NumberLiteral);
 
         // 4. Multi-char operators — must come before single-char variants
         builder.Match(Span.EqualTo("=="), PreceptToken.DoubleEquals);
@@ -71,6 +71,7 @@ public static class PreceptTokenizerBuilder
         builder.Match(Character.EqualTo('-'), PreceptToken.Minus);
         builder.Match(Character.EqualTo('*'), PreceptToken.Star);
         builder.Match(Character.EqualTo('/'), PreceptToken.Slash);
+        builder.Match(Character.EqualTo('%'), PreceptToken.Percent);
 
         // 6. Punctuation
         builder.Match(Character.EqualTo(','), PreceptToken.Comma);

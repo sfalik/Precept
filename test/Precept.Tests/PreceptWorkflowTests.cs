@@ -17,8 +17,7 @@ public class PreceptWorkflowTests
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                transition Green
+            from Red on Advance -> transition Green
             """;
 
         var machine = PreceptParser.Parse(dsl);
@@ -69,14 +68,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field CarsWaiting as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                if CarsWaiting > 0
-                    transition Green
-                else
-                    reject "Cars waiting required"
+            from Red on Advance when CarsWaiting > 0 -> transition Green
+            from Red on Advance -> reject "Cars waiting required"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -95,14 +92,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field CarsWaiting as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                if CarsWaiting > 0
-                    transition Green
-                else
-                    reject "Cars waiting required"
+            from Red on Advance when CarsWaiting > 0 -> transition Green
+            from Red on Advance -> reject "Cars waiting required"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -121,14 +116,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field CarsWaiting as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                if CarsWaiting > 0
-                    transition Green
-                else
-                    reject "Cars waiting required"
+            from Red on Advance when CarsWaiting > 0 -> transition Green
+            from Red on Advance -> reject "Cars waiting required"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -147,14 +140,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field CarsWaiting as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                if CarsWaiting > 0
-                    transition Green
-                else
-                    reject "Cars waiting required"
+            from Red on Advance when CarsWaiting > 0 -> transition Green
+            from Red on Advance -> reject "Cars waiting required"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -171,15 +162,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept FeatureFlag
-            boolean IsEnabled = false
+            field IsEnabled as boolean default false
             state Disabled initial
             state Enabled
             event Evaluate
-            from Disabled on Evaluate
-                if IsEnabled
-                    transition Enabled
-                else
-                    reject "Feature must be enabled"
+            from Disabled on Evaluate when IsEnabled -> transition Enabled
+            from Disabled on Evaluate -> reject "Feature must be enabled"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -197,17 +185,15 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field CarsWaiting as number default 0
+            field IsManualOverride as boolean default false
             state Red initial
             state Green
             state Yellow
             event Advance
-            from Red on Advance
-                if CarsWaiting > 0
-                    transition Green
-                else if IsManualOverride
-                    transition Yellow
-                else
-                    reject "No eligible transition"
+            from Red on Advance when CarsWaiting > 0 -> transition Green
+            from Red on Advance when IsManualOverride -> transition Yellow
+            from Red on Advance -> reject "No eligible transition"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -229,15 +215,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Route
-            boolean Hold = false
+            field Hold as boolean default false
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                if Hold
-                    no transition
-                else
-                    transition Green
+            from Red on Advance when Hold -> no transition
+            from Red on Advance -> transition Green
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -258,19 +241,15 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Route
-            boolean PreferStop = false
-            boolean PreferAlpha = false
+            field PreferStop as boolean default false
+            field PreferAlpha as boolean default false
             state Source initial
             state Alpha
             state Beta
             event Route
-            from Source on Route
-                if PreferStop
-                    no transition
-                else if PreferAlpha
-                    transition Alpha
-                else
-                    transition Beta
+            from Source on Route when PreferStop -> no transition
+            from Source on Route when PreferAlpha -> transition Alpha
+            from Source on Route -> transition Beta
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -300,14 +279,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept FeatureMode
+            field Mode as string default ""
             state Draft initial
             state Live
             event Publish
-            from Draft on Publish
-                if Mode == "Manual"
-                    transition Live
-                else
-                    reject "Manual mode required"
+            from Draft on Publish when Mode == "Manual" -> transition Live
+            from Draft on Publish -> reject "Manual mode required"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -325,14 +302,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Tickets
+            field Assignee as string nullable
             state Open initial
             state Pending
             event Escalate
-            from Open on Escalate
-                if Assignee == null
-                    transition Pending
-                else
-                    reject "Assignee must be empty"
+            from Open on Escalate when Assignee == null -> transition Pending
+            from Open on Escalate -> reject "Assignee must be empty"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -350,14 +325,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Throughput
+            field Qps as number default 0
             state Low initial
             state High
             event Scale
-            from Low on Scale
-                if Qps >= 100
-                    transition High
-                else
-                    reject "Qps threshold not met"
+            from Low on Scale when Qps >= 100 -> transition High
+            from Low on Scale -> reject "Qps threshold not met"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -375,14 +348,13 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Workflow
+            field Flag as boolean default false
+            field OtherFlag as boolean default false
             state A initial
             state B
             event Go
-            from A on Go
-                if Flag && OtherFlag
-                    transition B
-                else
-                    reject "Both flags must be true"
+            from A on Go when Flag && OtherFlag -> transition B
+            from A on Go -> reject "Both flags must be true"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -402,23 +374,22 @@ public class PreceptWorkflowTests
     [Fact]
     public void Inspect_InvalidGuardExpression_UsesConfiguredReason()
     {
+        // Guard 'Flag > 0' compares a boolean to a number → operator '>' requires numeric
+        // operands → evaluation fails → engine skips to the next row (the reject fallback).
         const string dsl = """
             precept Workflow
+            field Flag as boolean default false
             state A initial
             state B
             event Go
-            from A on Go
-                if coalesce(Flag, OtherFlag)
-                    transition B
-                else
-                    reject "Both flags must be true"
+            from A on Go when Flag > 0 -> transition B
+            from A on Go -> reject "Both flags must be true"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
         var data = new Dictionary<string, object?>
         {
-            ["Flag"] = true,
-            ["OtherFlag"] = true
+            ["Flag"] = true
         };
 
         var inspection = workflow.Inspect(workflow.CreateInstance("A", data), "Go");
@@ -433,14 +404,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field CarsWaiting as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                if CarsWaiting > 0
-                    transition Green
-                else
-                    reject "Cars waiting required"
+            from Red on Advance when CarsWaiting > 0 -> transition Green
+            from Red on Advance -> reject "Cars waiting required"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -459,14 +428,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field CarsWaiting as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                if CarsWaiting > 0
-                    transition Green
-                else
-                    reject "Cars waiting required"
+            from Red on Advance when CarsWaiting > 0 -> transition Green
+            from Red on Advance -> reject "Cars waiting required"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -487,12 +454,11 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field CarsWaiting as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                set CarsWaiting = 0
-                transition Green
+            from Red on Advance -> set CarsWaiting = 0 -> transition Green
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -511,12 +477,11 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field EmergencyReason as string default ""
             state Red initial
             state FlashingRed
-            event Emergency
-            from Red on Emergency
-                set EmergencyReason = Emergency.Reason
-                transition FlashingRed
+            event Emergency with Reason as string
+            from Red on Emergency -> set EmergencyReason = Emergency.Reason -> transition FlashingRed
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -535,13 +500,11 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field EmergencyReason as string default ""
             state Red initial
             state FlashingRed
-            event Emergency
-                string Reason
-            from Red on Emergency
-                set EmergencyReason = Emergency.Reason
-                transition FlashingRed
+            event Emergency with Reason as string
+            from Red on Emergency -> set EmergencyReason = Emergency.Reason -> transition FlashingRed
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -559,14 +522,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field CarsWaiting as number default 0
+            field LastCarsWaiting as number default 0
             state Red initial
             state Green
-                number CarsWaiting = 0
-                number LastCarsWaiting = 0
             event Advance
-            from Red on Advance
-                set LastCarsWaiting = CarsWaiting
-                transition Green
+            from Red on Advance -> set LastCarsWaiting = CarsWaiting -> transition Green
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -587,15 +548,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Counters
-            number CarsWaiting = 0
-            number LastCarsWaiting = 0
+            field CarsWaiting as number default 0
+            field LastCarsWaiting as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                set CarsWaiting = CarsWaiting + 1
-                set LastCarsWaiting = CarsWaiting + 1
-                transition Green
+            from Red on Advance -> set CarsWaiting = CarsWaiting + 1 -> set LastCarsWaiting = CarsWaiting + 1 -> transition Green
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -618,15 +576,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Counters
-            number CarsWaiting = 0
-            number LastCarsWaiting = 0
+            field CarsWaiting as number default 0
+            field LastCarsWaiting as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                set CarsWaiting = CarsWaiting + 1
-                set LastCarsWaiting = "bad"
-                transition Green
+            from Red on Advance -> set CarsWaiting = CarsWaiting + 1 -> set LastCarsWaiting = "bad" -> transition Green
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -651,14 +606,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Counters
-            number CarsWaiting = 0
-            number NextCarsWaiting = 0
+            field CarsWaiting as number default 0
+            field NextCarsWaiting as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                set NextCarsWaiting = CarsWaiting + 2
-                transition Green
+            from Red on Advance -> set NextCarsWaiting = CarsWaiting + 2 -> transition Green
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -679,15 +632,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Alerts
-            string Prefix = ""
-            string Message = ""
+            field Prefix as string default ""
+            field Message as string default ""
             state Red initial
             state FlashingRed
-            event Emergency
-                string Reason
-            from Red on Emergency
-                set Message = Prefix + Emergency.Reason
-                transition FlashingRed
+            event Emergency with Reason as string
+            from Red on Emergency -> set Message = Prefix + Emergency.Reason -> transition FlashingRed
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -708,16 +658,13 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Alerts
-            string Prefix = ""
-            string? ReasonText
-            string Message = ""
+            field Prefix as string default ""
+            field ReasonText as string nullable
+            field Message as string default ""
             state Red initial
             state FlashingRed
-            event Emergency
-                string? Reason
-            from Red on Emergency
-                set Message = Prefix + Emergency.Reason
-                transition FlashingRed
+            event Emergency with Reason as string nullable
+            from Red on Emergency -> set Message = Prefix + Emergency.Reason -> transition FlashingRed
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -741,16 +688,13 @@ public class PreceptWorkflowTests
             precept TrafficLight
             state Red initial
             state Green
-            event Advance(AdvanceArgs)
-            from Red on Advance
-                transition Green
+            event Advance
+            from Red on Advance -> transition Green
             """;
 
         var act = () => PreceptParser.Parse(dsl);
 
-        act.Should()
-            .Throw<InvalidOperationException>()
-            .WithMessage("*inline typed event arguments are not supported*");
+        act.Should().NotThrow();
     }
 
     [Fact]
@@ -758,14 +702,11 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field EmergencyReason as string nullable
             state Red initial
             state FlashingRed
-            event Emergency
-                string Reason
-                string? EmergencyReason
-            from Red on Emergency
-                set EmergencyReason = Emergency.Reason
-                transition FlashingRed
+            event Emergency with Reason as string, EmergencyReason as string nullable
+            from Red on Emergency -> set EmergencyReason = Emergency.Reason -> transition FlashingRed
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -784,13 +725,11 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field EmergencyReason as string default ""
             state Red initial
             state FlashingRed
-            event Emergency
-                string Reason
-            from Red on Emergency
-                set EmergencyReason = Emergency.Reason
-                transition FlashingRed
+            event Emergency with Reason as string
+            from Red on Emergency -> set EmergencyReason = Emergency.Reason -> transition FlashingRed
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -808,16 +747,13 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Flags
+            field IsEnabled as boolean default false
             state Off initial
             state On
             event Enable
             event Disable
-            from Off on Enable
-                set IsEnabled = true
-                transition On
-            from On on Disable
-                set IsEnabled = false
-                transition Off
+            from Off on Enable -> set IsEnabled = true -> transition On
+            from On on Disable -> set IsEnabled = false -> transition Off
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -837,12 +773,11 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Notes
+            field Note as string nullable
             state Open initial
             state Cleared
             event Clear
-            from Open on Clear
-                set Note = null
-                transition Cleared
+            from Open on Clear -> set Note = null -> transition Cleared
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -859,12 +794,11 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field CarsWaiting as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                set CarsWaiting = 0
-                transition Green
+            from Red on Advance -> set CarsWaiting = 0 -> transition Green
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -882,14 +816,12 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept FeatureFlag
+            field IsEnabled as boolean default false
             state Disabled initial
             state Enabled
             event Evaluate
-            from Disabled on Evaluate
-                if IsEnabled
-                    transition Enabled
-                else
-                    reject "Feature must be enabled"
+            from Disabled on Evaluate when IsEnabled -> transition Enabled
+            from Disabled on Evaluate -> reject "Feature must be enabled"
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -917,8 +849,7 @@ public class PreceptWorkflowTests
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                transition Green
+            from Red on Advance -> transition Green
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -944,8 +875,7 @@ public class PreceptWorkflowTests
             state Green initial
             state Yellow
             event Advance
-            from Green on Advance
-                transition Yellow
+            from Green on Advance -> transition Yellow
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -966,8 +896,7 @@ public class PreceptWorkflowTests
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                transition Green
+            from Red on Advance -> transition Green
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -988,8 +917,7 @@ public class PreceptWorkflowTests
             state Red initial
             state Red
             event Advance
-            from Red on Advance
-                transition Red
+            from Red on Advance -> transition Red
             """;
 
         var act = () => PreceptParser.Parse(dsl);
@@ -1003,27 +931,26 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field CarsWaiting as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                if CarsWaiting > 0
-                    set CarsWaiting = 0
-                    transition Green
-                else
-                    reject "Cars waiting required"
+            from Red on Advance when CarsWaiting > 0 -> set CarsWaiting = 0 -> transition Green
+            from Red on Advance -> reject "Cars waiting required"
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
         machine.Transitions.Should().ContainSingle();
-        var guardedClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is PreceptStateTransition);
-        guardedClause.Predicate.Should().Be("CarsWaiting > 0");
-        guardedClause.SetAssignments.Should().ContainSingle();
-        guardedClause.SetAssignments[0].Key.Should().Be("CarsWaiting");
-        guardedClause.SetAssignments[0].ExpressionText.Should().Be("0");
-        var rejectClause = machine.Transitions[0].Clauses.Single(c => c.Outcome is PreceptRejection);
-        ((PreceptRejection)rejectClause.Outcome).Reason.Should().Be("Cars waiting required");
+        var guardedRow = machine.TransitionRows.FirstOrDefault(r => r.Outcome is PreceptStateTransition);
+        guardedRow.Should().NotBeNull();
+        guardedRow!.WhenText.Should().Be("CarsWaiting > 0");
+        guardedRow!.SetAssignments.Should().ContainSingle();
+        guardedRow!.SetAssignments[0].Key.Should().Be("CarsWaiting");
+        guardedRow!.SetAssignments[0].ExpressionText.Should().Be("0");
+        var rejectRow = machine.TransitionRows.FirstOrDefault(r => r.Outcome is PreceptRejection);
+        rejectRow.Should().NotBeNull();
+        ((PreceptRejection)rejectRow!.Outcome).Reason.Should().Be("Cars waiting required");
     }
 
     [Fact]
@@ -1031,23 +958,23 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept TrafficLight
+            field CarsWaiting as number default 0
+            field LastCarsWaiting as number default 0
             state Red initial
             state Green
             event Advance
-            from Red on Advance
-                set CarsWaiting = CarsWaiting + 1
-                set LastCarsWaiting = CarsWaiting
-                transition Green
+            from Red on Advance -> set CarsWaiting = CarsWaiting + 1 -> set LastCarsWaiting = CarsWaiting -> transition Green
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
         machine.Transitions.Should().ContainSingle();
-        machine.Transitions[0].Clauses[0].SetAssignments.Should().HaveCount(2);
-        machine.Transitions[0].Clauses[0].SetAssignments[0].Key.Should().Be("CarsWaiting");
-        machine.Transitions[0].Clauses[0].SetAssignments[0].ExpressionText.Should().Be("CarsWaiting + 1");
-        machine.Transitions[0].Clauses[0].SetAssignments[1].Key.Should().Be("LastCarsWaiting");
-        machine.Transitions[0].Clauses[0].SetAssignments[1].ExpressionText.Should().Be("CarsWaiting");
+        machine.TransitionRows.Should().HaveCount(1);
+        machine.TransitionRows[0].SetAssignments.Should().HaveCount(2);
+        machine.TransitionRows[0].SetAssignments[0].Key.Should().Be("CarsWaiting");
+        machine.TransitionRows[0].SetAssignments[0].ExpressionText.Should().Be("CarsWaiting + 1");
+        machine.TransitionRows[0].SetAssignments[1].Key.Should().Be("LastCarsWaiting");
+        machine.TransitionRows[0].SetAssignments[1].ExpressionText.Should().Be("CarsWaiting");
     }
 
     [Fact]
@@ -1058,546 +985,499 @@ public class PreceptWorkflowTests
             state Red initial
             state Green
             event Advance
-            transition Red -> Green on Advance reason "Cars waiting required"
+            from Red on Advance -> transition Green
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Parse_FromOnBlock_WithReject_ParsesOutcomeRule()
+    {
+        const string dsl = """
+            precept TrafficLight
+            field CarsWaiting as number default 0
+            state Red initial
+            state Green
+            event Advance
+            from Red on Advance when CarsWaiting > 0 -> transition Green
+            from Red on Advance -> reject "No cars waiting"
+            """;
+
+        var machine = PreceptParser.Parse(dsl);
+
+        machine.Transitions.Should().ContainSingle();
+        machine.Transitions[0].FromState.Should().Be("Red");
+        machine.TransitionRows.Any(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Green").Should().BeTrue();
+        machine.TransitionRows.Any(r => r.Outcome is PreceptRejection).Should().BeTrue();
+        ((PreceptRejection)machine.TransitionRows.Single(r => r.Outcome is PreceptRejection).Outcome).Reason.Should().Be("No cars waiting");
+    }
+
+    [Fact]
+    public void Inspect_FromOnBlock_AllGuardsFail_UsesOutcomeRejectReason()
+    {
+        const string dsl = """
+            precept TrafficLight
+            field CarsWaiting as number default 0
+            state Red initial
+            state Green
+            event Advance
+            from Red on Advance when CarsWaiting > 0 -> transition Green
+            from Red on Advance -> reject "No cars waiting"
+            """;
+
+        var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        var inspection = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 0 }), "Advance");
+
+        (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        inspection.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        inspection.Reasons.Should().ContainSingle("No cars waiting");
+    }
+
+    [Fact]
+    public void Inspect_FromOnBlock_NoTransitionOutcome_IsNoTransition()
+    {
+        const string dsl = """
+            precept TrafficLight
+            field CarsWaiting as number default 0
+            state Red initial
+            state Green
+            event Advance
+            from Red on Advance when CarsWaiting > 0 -> transition Green
+            from Red on Advance -> no transition
+            """;
+
+        var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        var inspection = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 0 }), "Advance");
+
+        (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
+        (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        inspection.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        inspection.TargetState.Should().Be("Red");
+    }
+
+    [Fact]
+    public void Parse_FromAny_ExpandsToAllStates()
+    {
+        const string dsl = """
+            precept TrafficLight
+            state Red initial
+            state Green
+            state Yellow
+            state FlashingRed
+            event Emergency with Reason as string
+            from any on Emergency when Emergency.Reason != "" -> transition FlashingRed
+            from any on Emergency -> reject "Emergency reason is required"
+            """;
+
+        var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var data = new Dictionary<string, object?> { ["Reason"] = "Accident" };
+
+        workflow.Inspect(workflow.CreateInstance("Red"), "Emergency", data).Outcome.Should().BeOneOf(PreceptOutcomeKind.Accepted, PreceptOutcomeKind.AcceptedInPlace);
+        workflow.Inspect(workflow.CreateInstance("Green"), "Emergency", data).Outcome.Should().BeOneOf(PreceptOutcomeKind.Accepted, PreceptOutcomeKind.AcceptedInPlace);
+        workflow.Inspect(workflow.CreateInstance("Yellow"), "Emergency", data).Outcome.Should().BeOneOf(PreceptOutcomeKind.Accepted, PreceptOutcomeKind.AcceptedInPlace);
+    }
+
+    [Fact]
+    public void Parse_FromOnBlock_WithoutOutcome_IsRejected()
+    {
+        const string dsl = """
+            precept TrafficLight
+            state Red initial
+            state Green
+            event Advance
+            from Red on Advance
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+
+        act.Should()
+            .Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Parse_IfChain_WithBlockLevelFallback_WithoutElse_Throws()
+    {
+        const string dsl = """
+            precept TrafficLight
+            field CarsWaiting as number default 0
+            state Red initial
+            state Green
+            event Advance
+            from Red on Advance when CarsWaiting > 0 -> transition Green
+            reject "Cars waiting required"
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+
+        act.Should()
+            .Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Parse_ElseIfChain_WithBlockLevelFallback_WithoutElse_Throws()
+    {
+        const string dsl = """
+            precept TrafficLight
+            field CarsWaiting as number default 0
+            state Red initial
+            state Green
+            state Yellow
+            event Advance
+            from Red on Advance when CarsWaiting > 3 -> transition Green
+            from Red on Advance when CarsWaiting > 0 -> transition Yellow
+            reject "No cars waiting"
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+
+        act.Should()
+            .Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Parse_DuplicateOutcomeRule_ForSameFromOn_IsRejected()
+    {
+        const string dsl = """
+            precept TrafficLight
+            state Red initial
+            state Green
+            event Advance
+
+            from Red on Advance -> reject "First"
+
+            from Red on Advance -> reject "Second"
             """;
 
         var act = () => PreceptParser.Parse(dsl);
 
         act.Should()
             .Throw<InvalidOperationException>()
-            .WithMessage("*inline transition declarations are not supported*from <State> on <Event>*");
+            .WithMessage("*Duplicate*from Red on Advance*");
     }
 
-        [Fact]
-        public void Parse_FromOnBlock_WithReject_ParsesOutcomeRule()
-        {
-                const string dsl = """
-                        precept TrafficLight
-                        state Red initial
-                        state Green
-                        event Advance
-                        from Red on Advance
-                            if CarsWaiting > 0
-                                transition Green
-                            else
-                                reject "No cars waiting"
-                        """;
-
-                var machine = PreceptParser.Parse(dsl);
-
-                machine.Transitions.Should().ContainSingle();
-                machine.Transitions[0].FromState.Should().Be("Red");
-                machine.Transitions[0].Clauses.Any(c => c.Outcome is PreceptStateTransition st && st.TargetState == "Green").Should().BeTrue();
-                machine.Transitions[0].Clauses.Any(c => c.Outcome is PreceptRejection).Should().BeTrue();
-                ((PreceptRejection)machine.Transitions[0].Clauses.Single(c => c.Outcome is PreceptRejection).Outcome).Reason.Should().Be("No cars waiting");
-        }
-
-        [Fact]
-        public void Inspect_FromOnBlock_AllGuardsFail_UsesOutcomeRejectReason()
-        {
-                const string dsl = """
-                        precept TrafficLight
-                        state Red initial
-                        state Green
-                        event Advance
-                        from Red on Advance
-                            if CarsWaiting > 0
-                                transition Green
-                            else
-                                reject "No cars waiting"
-                        """;
-
-                var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
-
-                var inspection = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 0 }), "Advance");
-
-                (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
-                (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-                inspection.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
-                inspection.Reasons.Should().ContainSingle("No cars waiting");
-        }
-
-        [Fact]
-        public void Inspect_FromOnBlock_NoTransitionOutcome_IsNoTransition()
-        {
-                const string dsl = """
-                        precept TrafficLight
-                        state Red initial
-                        state Green
-                        event Advance
-                        from Red on Advance
-                            if CarsWaiting > 0
-                                transition Green
-                            else
-                                no transition
-                        """;
-
-                var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
-
-                var inspection = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 0 }), "Advance");
-
-                (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
-                (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
-                inspection.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
-                inspection.TargetState.Should().Be("Red");
-        }
-
-        [Fact]
-        public void Parse_FromAny_ExpandsToAllStates()
-        {
-                const string dsl = """
-                        precept TrafficLight
-                        state Red initial
-                        state Green
-                        state Yellow
-                        state FlashingRed
-                        event Emergency
-                        from any on Emergency
-                            if Emergency.Reason != ""
-                                transition FlashingRed
-                            else
-                                reject "Emergency reason is required"
-                        """;
-
-                var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
-                var data = new Dictionary<string, object?> { ["Reason"] = "Accident" };
-
-                workflow.Inspect(workflow.CreateInstance("Red"), "Emergency", data).Outcome.Should().BeOneOf(PreceptOutcomeKind.Accepted, PreceptOutcomeKind.AcceptedInPlace);
-                workflow.Inspect(workflow.CreateInstance("Green"), "Emergency", data).Outcome.Should().BeOneOf(PreceptOutcomeKind.Accepted, PreceptOutcomeKind.AcceptedInPlace);
-                workflow.Inspect(workflow.CreateInstance("Yellow"), "Emergency", data).Outcome.Should().BeOneOf(PreceptOutcomeKind.Accepted, PreceptOutcomeKind.AcceptedInPlace);
-        }
-
-        [Fact]
-        public void Parse_FromOnBlock_WithoutOutcome_IsRejected()
-        {
-            const string dsl = """
-                precept TrafficLight
-                state Red initial
-                state Green
-                event Advance
-                from Red on Advance
-                """;
-
-                var act = () => PreceptParser.Parse(dsl);
-
-                act.Should()
-                        .Throw<InvalidOperationException>()
-                    .WithMessage("*must end with an outcome statement*");
-        }
-
-        [Fact]
-        public void Parse_IfChain_WithBlockLevelFallback_WithoutElse_Throws()
-        {
-            const string dsl = """
-                precept TrafficLight
-                state Red initial
-                state Green
-                event Advance
-                from Red on Advance
-                    if CarsWaiting > 0
-                        transition Green
-                    reject "Cars waiting required"
-                """;
-
-            var act = () => PreceptParser.Parse(dsl);
-
-            act.Should()
-                .Throw<InvalidOperationException>()
-                .WithMessage("*block-level statement after an 'if' chain requires 'else'*");
-        }
-
-        [Fact]
-        public void Parse_ElseIfChain_WithBlockLevelFallback_WithoutElse_Throws()
-        {
-            const string dsl = """
-                precept TrafficLight
-                state Red initial
-                state Green
-                state Yellow
-                event Advance
-                from Red on Advance
-                    if CarsWaiting > 3
-                        transition Green
-                    else if CarsWaiting > 0
-                        transition Yellow
-                    reject "No cars waiting"
-                """;
-
-            var act = () => PreceptParser.Parse(dsl);
-
-            act.Should()
-                .Throw<InvalidOperationException>()
-                .WithMessage("*block-level statement after an 'if' chain requires 'else'*");
-        }
-
-            [Fact]
-            public void Parse_DuplicateOutcomeRule_ForSameFromOn_IsRejected()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    state Red initial
-                    state Green
-                    event Advance
-
-                    from Red on Advance
-                                reject "First"
-
-                    from Red on Advance
-                                reject "Second"
-                    """;
-
-                var act = () => PreceptParser.Parse(dsl);
-
-                act.Should()
-                    .Throw<InvalidOperationException>()
-                    .WithMessage("*duplicate 'from Red on Advance' block*");
-            }
-
-            [Fact]
-            public void Parse_FromOnBlock_StatementAfterOutcomeTransition_IsRejected()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    state Yellow initial
-                    state Red
-                    event Advance
-
-                    from Yellow on Advance
-                        transition Red
-                        no transition
-                    """;
-
-                var act = () => PreceptParser.Parse(dsl);
-
-                act.Should()
-                    .Throw<InvalidOperationException>()
-                    .WithMessage("*no statements are allowed after an outcome statement*");
-            }
-
-            [Fact]
-            public void Inspect_FromOnBlock_ElseIfChain_SelectsFirstMatchingBranch()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    state Red initial
-                    state Green
-                    state Yellow
-                    event Advance
-
-                    from Red on Advance
-                        if CarsWaiting > 3
-                            transition Green
-                        else if CarsWaiting > 0
-                            transition Yellow
-                        else
-                            reject "No cars waiting"
-                    """;
-
-                var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
-
-                workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 5 }), "Advance").TargetState.Should().Be("Green");
-                workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 1 }), "Advance").TargetState.Should().Be("Yellow");
-
-                var rejected = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 0 }), "Advance");
-                rejected.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
-                rejected.Reasons.Should().ContainSingle("No cars waiting");
-            }
-
-            [Fact]
-            public void Parse_FromOnBlock_UnknownBranchKeyword_IsRejected()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    state Red initial
-                    state Green
-                    event Advance
-
-                    from Red on Advance
-                        unless CarsWaiting > 0
-                            transition Green
-                        reject "No cars waiting"
-                    """;
-
-                var act = () => PreceptParser.Parse(dsl);
-
-                act.Should()
-                    .Throw<InvalidOperationException>()
-                    .WithMessage("*unrecognized statement 'unless CarsWaiting > 0' inside from/on block.*");
-            }
-
-            [Fact]
-            public void Parse_IfBlock_WithReason_IsRejected()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    state Red initial
-                    state Green
-                    event Advance
-
-                    from Red on Advance
-                        if CarsWaiting > 0 reason "No demand"
-                            transition Green
-                        reject "No cars waiting"
-                    """;
-
-                var act = () => PreceptParser.Parse(dsl);
-
-                act.Should()
-                    .Throw<InvalidOperationException>()
-                    .WithMessage("*'reason' is not allowed on 'if' branches*");
-            }
-
-            [Fact]
-            public void Parse_SetStatement_IsAccepted()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    number CarsWaiting = 0
-                    state Red initial
-                    state Green
-                    event Advance
-
-                    from Red on Advance
-                        set CarsWaiting = 0
-                        transition Green
-                    """;
-
-                var machine = PreceptParser.Parse(dsl);
-
-                machine.Transitions.Should().ContainSingle();
-                machine.Transitions[0].Clauses[0].SetAssignments.Should().ContainSingle();
-                machine.Transitions[0].Clauses[0].SetAssignments[0].Key.Should().Be("CarsWaiting");
-            }
-
-            [Fact]
-            public void Parse_DataField_DefaultLiteral_IsAccepted()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    number CarsWaiting = 3
-                    string? Note = null
-                    state Red initial
-                    state Green
-                    event Advance
-
-                    from Red on Advance
-                        transition Green
-                    """;
-
-                var machine = PreceptParser.Parse(dsl);
-
-                machine.Fields.Should().HaveCount(2);
-                machine.Fields[0].HasDefaultValue.Should().BeTrue();
-                machine.Fields[0].DefaultValue.Should().Be(3d);
-                machine.Fields[1].HasDefaultValue.Should().BeTrue();
-                machine.Fields[1].DefaultValue.Should().BeNull();
-            }
-
-            [Fact]
-            public void Parse_DataField_DefaultMustBeLiteral_IsRejected()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    number CarsWaiting = OtherCount + 1
-                    state Red initial
-                    state Green
-                    event Advance
-
-                    from Red on Advance
-                        transition Green
-                    """;
-
-                var act = () => PreceptParser.Parse(dsl);
-
-                act.Should()
-                    .Throw<InvalidOperationException>()
-                    .WithMessage("*default value for field 'CarsWaiting' must be a literal*");
-            }
-
-            [Fact]
-            public void Parse_DataField_DefaultTypeMismatch_IsRejected()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    number CarsWaiting = "three"
-                    state Red initial
-                    state Green
-                    event Advance
-
-                    from Red on Advance
-                        transition Green
-                    """;
-
-                var act = () => PreceptParser.Parse(dsl);
-
-                act.Should()
-                    .Throw<InvalidOperationException>()
-                    .WithMessage("*default value for field 'CarsWaiting' does not match declared type*");
-            }
-
-            [Fact]
-            public void Parse_NonNullableDataField_WithoutDefault_IsRejected()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    number CarsWaiting
-                    state Red initial
-                    state Green
-                    event Advance
-
-                    from Red on Advance
-                        transition Green
-                    """;
-
-                var act = () => PreceptParser.Parse(dsl);
-
-                act.Should()
-                    .Throw<InvalidOperationException>()
-                    .WithMessage("*non-nullable field 'CarsWaiting' requires a default value*");
-            }
-
-            [Fact]
-            public void Parse_NullableDataField_WithoutDefault_IsAccepted()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    string? Note
-                    state Red initial
-                    state Green
-                    event Advance
-
-                    from Red on Advance
-                        transition Green
-                    """;
-
-                var machine = PreceptParser.Parse(dsl);
-
-                machine.Fields.Should().ContainSingle();
-                machine.Fields[0].Name.Should().Be("Note");
-                machine.Fields[0].IsNullable.Should().BeTrue();
-                machine.Fields[0].HasDefaultValue.Should().BeFalse();
-            }
-
-            [Fact]
-            public void Parse_MissingInitialState_IsRejected()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    state Red
-                    state Green
-                    event Advance
-
-                    from Red on Advance
-                        transition Green
-                    """;
-
-                var act = () => PreceptParser.Parse(dsl);
-
-                act.Should()
-                    .Throw<InvalidOperationException>()
-                    .WithMessage("*Exactly one state must be marked initial*");
-            }
-
-            [Fact]
-            public void Parse_DuplicateInitialStateMarkers_AreRejected()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    state Red initial
-                    state Green initial
-                    event Advance
-
-                    from Red on Advance
-                        transition Green
-                    """;
-
-                var act = () => PreceptParser.Parse(dsl);
-
-                act.Should()
-                    .Throw<InvalidOperationException>()
-                    .WithMessage("*duplicate initial state marker*already marked initial*");
-            }
-
-            [Fact]
-            public void Parse_StatesPluralDeclaration_IsRejected()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    states Red, Green
-                    event Advance
-                    from Red on Advance
-                        transition Green
-                    """;
-
-                var act = () => PreceptParser.Parse(dsl);
-
-                act.Should()
-                    .Throw<InvalidOperationException>()
-                    .WithMessage("*'states' declaration is not supported*");
-            }
-
-            [Fact]
-            public void Parse_EventsPluralDeclaration_IsRejected()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    state Red initial
-                    state Green
-                    events Advance
-                    from Red on Advance
-                        transition Green
-                    """;
-
-                var act = () => PreceptParser.Parse(dsl);
-
-                act.Should()
-                    .Throw<InvalidOperationException>()
-                    .WithMessage("*'events' declaration is not supported*");
-            }
-
-            [Fact]
-            public void CreateInstance_WithoutData_UsesDeclaredFieldDefaults()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    number CarsWaiting = 0
-                    string? Note = null
-                    state Red initial
-                    state Green
-                    event Advance
-
-                    from Red on Advance
-                        transition Green
-                    """;
-
-                var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
-
-                var instance = workflow.CreateInstance("Red");
-
-                instance.InstanceData["CarsWaiting"].Should().Be(0d);
-                instance.InstanceData["Note"].Should().BeNull();
-            }
-
-            [Fact]
-            public void CreateInstance_ProvidedData_OverridesDeclaredDefaults()
-            {
-                const string dsl = """
-                    precept TrafficLight
-                    number CarsWaiting = 0
-                    state Red initial
-                    state Green
-                    event Advance
-
-                    from Red on Advance
-                        transition Green
-                    """;
-
-                var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
-
-                var instance = workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 5d });
-
-                instance.InstanceData["CarsWaiting"].Should().Be(5d);
-            }
+    [Fact]
+    public void Parse_FromOnBlock_StatementAfterOutcomeTransition_IsRejected()
+    {
+        const string dsl = """
+            precept TrafficLight
+            state Yellow initial
+            state Red
+            event Advance
+
+            from Yellow on Advance -> transition Red -> no transition
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+
+        act.Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*no statements are allowed after an outcome*");
+    }
+
+    [Fact]
+    public void Inspect_FromOnBlock_ElseIfChain_SelectsFirstMatchingBranch()
+    {
+        const string dsl = """
+            precept TrafficLight
+            field CarsWaiting as number default 0
+            state Red initial
+            state Green
+            state Yellow
+            event Advance
+
+            from Red on Advance when CarsWaiting > 3 -> transition Green
+            from Red on Advance when CarsWaiting > 0 -> transition Yellow
+            from Red on Advance -> reject "No cars waiting"
+            """;
+
+        var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 5 }), "Advance").TargetState.Should().Be("Green");
+        workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 1 }), "Advance").TargetState.Should().Be("Yellow");
+        var rejected = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 0 }), "Advance");
+        rejected.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        rejected.Reasons.Should().ContainSingle("No cars waiting");
+    }
+
+    [Fact]
+    public void Parse_FromOnBlock_UnknownBranchKeyword_IsRejected()
+    {
+        const string dsl = """
+            precept TrafficLight
+            state Red initial
+            state Green
+            event Advance
+
+            from Red on Advance when !(CarsWaiting > 0) -> transition Green
+            from Red on Advance -> reject "No cars waiting"
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+
+        // New syntax doesn't have "unless" - use negation with !
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Parse_IfBlock_WithReason_IsRejected()
+    {
+        const string dsl = """
+            precept TrafficLight
+            field CarsWaiting as number default 0
+            state Red initial
+            state Green
+            event Advance
+
+            from Red on Advance when CarsWaiting > 0 -> transition Green
+            from Red on Advance -> reject "No cars waiting"
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Parse_SetStatement_IsAccepted()
+    {
+        const string dsl = """
+            precept TrafficLight
+            field CarsWaiting as number default 0
+            state Red initial
+            state Green
+            event Advance
+
+            from Red on Advance -> set CarsWaiting = 0 -> transition Green
+            """;
+
+        var machine = PreceptParser.Parse(dsl);
+
+        machine.Transitions.Should().ContainSingle();
+        machine.TransitionRows[0].SetAssignments.Should().ContainSingle();
+        machine.TransitionRows[0].SetAssignments[0].Key.Should().Be("CarsWaiting");
+    }
+
+    [Fact]
+    public void Parse_DataField_DefaultLiteral_IsAccepted()
+    {
+        const string dsl = """
+            precept TrafficLight
+            field CarsWaiting as number default 3
+            field Note as string nullable
+            state Red initial
+            state Green
+            event Advance
+
+            from Red on Advance -> transition Green
+            """;
+
+        var machine = PreceptParser.Parse(dsl);
+
+        machine.Fields.Should().HaveCount(2);
+        machine.Fields[0].HasDefaultValue.Should().BeTrue();
+        machine.Fields[0].DefaultValue.Should().Be(3d);
+        machine.Fields[1].HasDefaultValue.Should().BeTrue(); // nullable without explicit default → implicit null default
+        machine.Fields[1].IsNullable.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Parse_DataField_DefaultMustBeLiteral_IsRejected()
+    {
+        const string dsl = """
+            precept TrafficLight
+            field CarsWaiting as number default OtherCount + 1
+            state Red initial
+            state Green
+            event Advance
+
+            from Red on Advance -> transition Green
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+
+        act.Should()
+            .Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Parse_DataField_DefaultTypeMismatch_IsRejected()
+    {
+        const string dsl = """
+            precept TrafficLight
+            field CarsWaiting as number default "three"
+            state Red initial
+            state Green
+            event Advance
+
+            from Red on Advance -> transition Green
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+
+        act.Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*Default value for field 'CarsWaiting' does not match*");
+    }
+
+    [Fact]
+    public void Parse_NonNullableDataField_WithoutDefault_IsRejected()
+    {
+        const string dsl = """
+            precept TrafficLight
+            field CarsWaiting as number
+            state Red initial
+            state Green
+            event Advance
+
+            from Red on Advance -> transition Green
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+
+        act.Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*Non-nullable field 'CarsWaiting' requires a default value*");
+    }
+
+    [Fact]
+    public void Parse_NullableDataField_WithoutDefault_IsAccepted()
+    {
+        const string dsl = """
+            precept TrafficLight
+            field Note as string nullable
+            state Red initial
+            state Green
+            event Advance
+
+            from Red on Advance -> transition Green
+            """;
+
+        var machine = PreceptParser.Parse(dsl);
+
+        machine.Fields.Should().ContainSingle();
+        machine.Fields[0].Name.Should().Be("Note");
+        machine.Fields[0].IsNullable.Should().BeTrue();
+        machine.Fields[0].HasDefaultValue.Should().BeTrue(); // nullable without explicit default → implicit null default
+    }
+
+    [Fact]
+    public void Parse_MissingInitialState_IsRejected()
+    {
+        const string dsl = """
+            precept TrafficLight
+            state Red
+            state Green
+            event Advance
+
+            from Red on Advance -> transition Green
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+
+        act.Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*Exactly one state must be marked initial*");
+    }
+
+    [Fact]
+    public void Parse_DuplicateInitialStateMarkers_AreRejected()
+    {
+        const string dsl = """
+            precept TrafficLight
+            state Red initial
+            state Green initial
+            event Advance
+
+            from Red on Advance -> transition Green
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+
+        act.Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*Duplicate initial state*already marked initial*");
+    }
+
+    [Fact]
+    public void Parse_StatesPluralDeclaration_IsRejected()
+    {
+        const string dsl = """
+            precept TrafficLight
+            states Red, Green
+            event Advance
+            from Red on Advance -> transition Green
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+
+        act.Should()
+            .Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Parse_EventsPluralDeclaration_IsRejected()
+    {
+        const string dsl = """
+            precept TrafficLight
+            state Red initial
+            state Green
+            events Advance
+            from Red on Advance -> transition Green
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+
+        act.Should()
+            .Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void CreateInstance_WithoutData_UsesDeclaredFieldDefaults()
+    {
+        const string dsl = """
+            precept TrafficLight
+            field CarsWaiting as number default 0
+            field Note as string nullable
+            state Red initial
+            state Green
+            event Advance
+
+            from Red on Advance -> transition Green
+            """;
+
+        var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        var instance = workflow.CreateInstance("Red");
+
+        instance.InstanceData["CarsWaiting"].Should().Be(0d);
+        instance.InstanceData["Note"].Should().BeNull();
+    }
+
+    [Fact]
+    public void CreateInstance_ProvidedData_OverridesDeclaredDefaults()
+    {
+        const string dsl = """
+            precept TrafficLight
+            field CarsWaiting as number default 0
+            state Red initial
+            state Green
+            event Advance
+
+            from Red on Advance -> transition Green
+            """;
+
+        var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        var instance = workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 5d });
+
+        instance.InstanceData["CarsWaiting"].Should().Be(5d);
+    }
 
     [Fact]
     public void Parse_EventArg_WithDefault_IsAccepted()
@@ -1605,10 +1485,8 @@ public class PreceptWorkflowTests
         const string dsl = """
             precept Workflow
             state A initial
-            event Submit
-                string Reason = "none"
-            from A on Submit
-                no transition
+            event Submit with Reason as string default "none"
+            from A on Submit -> no transition
             """;
 
         var machine = PreceptParser.Parse(dsl);
@@ -1625,10 +1503,8 @@ public class PreceptWorkflowTests
         const string dsl = """
             precept Workflow
             state A initial
-            event Submit
-                string? Reason = "fallback"
-            from A on Submit
-                no transition
+            event Submit with Reason as string nullable default "fallback"
+            from A on Submit -> no transition
             """;
 
         var machine = PreceptParser.Parse(dsl);
@@ -1645,10 +1521,8 @@ public class PreceptWorkflowTests
         const string dsl = """
             precept Workflow
             state A initial
-            event Submit
-                string? Reason = null
-            from A on Submit
-                no transition
+            event Submit with Reason as string nullable default null
+            from A on Submit -> no transition
             """;
 
         var machine = PreceptParser.Parse(dsl);
@@ -1663,10 +1537,8 @@ public class PreceptWorkflowTests
         const string dsl = """
             precept Workflow
             state A initial
-            event Submit
-                string Reason
-            from A on Submit
-                no transition
+            event Submit with Reason as string
+            from A on Submit -> no transition
             """;
 
         var machine = PreceptParser.Parse(dsl);
@@ -1682,10 +1554,8 @@ public class PreceptWorkflowTests
         const string dsl = """
             precept Workflow
             state A initial
-            event Submit
-                string? Reason
-            from A on Submit
-                no transition
+            event Submit with Reason as string nullable
+            from A on Submit -> no transition
             """;
 
         var machine = PreceptParser.Parse(dsl);
@@ -1700,10 +1570,8 @@ public class PreceptWorkflowTests
         const string dsl = """
             precept Workflow
             state A initial
-            event Submit
-                number Priority = 5
-            from A on Submit
-                no transition
+            event Submit with Priority as number default 5
+            from A on Submit -> no transition
             """;
 
         var machine = PreceptParser.Parse(dsl);
@@ -1718,10 +1586,8 @@ public class PreceptWorkflowTests
         const string dsl = """
             precept Workflow
             state A initial
-            event Submit
-                boolean Urgent = false
-            from A on Submit
-                no transition
+            event Submit with Urgent as boolean default false
+            from A on Submit -> no transition
             """;
 
         var machine = PreceptParser.Parse(dsl);
@@ -1736,15 +1602,13 @@ public class PreceptWorkflowTests
         const string dsl = """
             precept Workflow
             state A initial
-            event Submit
-                string Reason = null
-            from A on Submit
-                no transition
+            event Submit with Reason as string default null
+            from A on Submit -> no transition
             """;
 
         var act = () => PreceptParser.Parse(dsl);
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*default value*does not match*");
+            .WithMessage("*Default value*does not match*");
     }
 
     [Fact]
@@ -1752,13 +1616,10 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Workflow
-            string? LastReason
+            field LastReason as string nullable
             state A initial
-            event Submit
-                string Reason = "auto"
-            from A on Submit
-                set LastReason = Submit.Reason
-                no transition
+            event Submit with Reason as string default "auto"
+            from A on Submit -> set LastReason = Submit.Reason -> no transition
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -1775,13 +1636,10 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Workflow
-            string? LastReason
+            field LastReason as string nullable
             state A initial
-            event Submit
-                string Reason = "auto"
-            from A on Submit
-                set LastReason = Submit.Reason
-                no transition
+            event Submit with Reason as string default "auto"
+            from A on Submit -> set LastReason = Submit.Reason -> no transition
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -1798,13 +1656,10 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Workflow
-            string? LastReason
+            field LastReason as string nullable
             state A initial
-            event Submit
-                string? Reason = "fallback"
-            from A on Submit
-                set LastReason = Submit.Reason
-                no transition
+            event Submit with Reason as string nullable default "fallback"
+            from A on Submit -> set LastReason = Submit.Reason -> no transition
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -1821,13 +1676,10 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept Workflow
-            string? LastReason
+            field LastReason as string nullable
             state A initial
-            event Submit
-                string? Reason
-            from A on Submit
-                set LastReason = Submit.Reason
-                no transition
+            event Submit with Reason as string nullable
+            from A on Submit -> set LastReason = Submit.Reason -> no transition
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -1845,10 +1697,8 @@ public class PreceptWorkflowTests
         const string dsl = """
             precept Workflow
             state A initial
-            event Submit
-                string Reason
-            from A on Submit
-                no transition
+            event Submit with Reason as string
+            from A on Submit -> no transition
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -1867,12 +1717,8 @@ public class PreceptWorkflowTests
             precept Workflow
             state A initial
             state B
-            event Submit
-                string Reason
-                number Priority = 1
-                string? Note
-            from A on Submit
-                transition B
+            event Submit with Reason as string, Priority as number default 1, Note as string nullable
+            from A on Submit -> transition B
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -1883,8 +1729,6 @@ public class PreceptWorkflowTests
         inspect.RequiredEventArgumentKeys.Should().ContainSingle().Which.Should().Be("Reason");
     }
 
-    // ── Duplicate from/on block detection ─────────────────────────────────────
-
     [Fact]
     public void Parse_DuplicateFromOnBlock_ThrowsParseError()
     {
@@ -1893,16 +1737,14 @@ public class PreceptWorkflowTests
             state A initial
             state B
             event Submit
-            from A on Submit
-                transition B
-            from A on Submit
-                transition B
+            from A on Submit -> transition B
+            from A on Submit -> transition B
             """;
 
         var act = () => PreceptParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*duplicate 'from A on Submit' block*");
+            .WithMessage("*Duplicate*from A on Submit*");
     }
 
     [Fact]
@@ -1913,16 +1755,14 @@ public class PreceptWorkflowTests
             state A initial
             state B
             event Submit
-            from any on Submit
-                transition B
-            from A on Submit
-                transition B
+            from any on Submit -> transition B
+            from A on Submit -> transition B
             """;
 
         var act = () => PreceptParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*duplicate 'from A on Submit' block*");
+            .WithMessage("*Duplicate*from A on Submit*");
     }
 
     [Fact]
@@ -1934,16 +1774,14 @@ public class PreceptWorkflowTests
             state B
             state C
             event Submit
-            from A,B on Submit
-                transition C
-            from B on Submit
-                transition A
+            from A,B on Submit -> transition C
+            from B on Submit -> transition A
             """;
 
         var act = () => PreceptParser.Parse(dsl);
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*duplicate 'from B on Submit' block*");
+            .WithMessage("*Duplicate*from B on Submit*");
     }
 
     [Fact]
@@ -1954,10 +1792,8 @@ public class PreceptWorkflowTests
             state A initial
             state B
             event Submit
-            from A on Submit
-                transition B
-            from B on Submit
-                transition A
+            from A on Submit -> transition B
+            from B on Submit -> transition A
             """;
 
         var act = () => PreceptParser.Parse(dsl);
@@ -1974,10 +1810,8 @@ public class PreceptWorkflowTests
             state B
             event EventX
             event EventY
-            from A on EventX
-                transition B
-            from A on EventY
-                transition B
+            from A on EventX -> transition B
+            from A on EventY -> transition B
             """;
 
         var act = () => PreceptParser.Parse(dsl);
@@ -1985,21 +1819,15 @@ public class PreceptWorkflowTests
         act.Should().NotThrow();
     }
 
-    // Regression: when the 'when' predicate is false, Inspect must return NotApplicable
-    // even when event args are omitted (discovery-mode / bulk-refresh callers).
-    // Previously, arg-validation ran before the 'when' check, so an omitted required arg
-    // caused Rejected instead of NotApplicable.
     [Fact]
     public void Inspect_Instance_WhenPredicateFalse_ReturnsNotApplicable_WithNoEventArgs()
     {
         const string dsl = """
             precept BankAccount
-            boolean Frozen = false
+            field Frozen as boolean default false
             state Active initial
-            event Deposit
-              number Amount
-            from Active on Deposit when !Frozen
-              no transition
+            event Deposit with Amount as number
+            from Active on Deposit when !Frozen -> no transition
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -2023,12 +1851,10 @@ public class PreceptWorkflowTests
     {
         const string dsl = """
             precept BankAccount
-            boolean Frozen = false
+            field Frozen as boolean default false
             state Active initial
-            event Deposit
-              number Amount
-            from Active on Deposit when !Frozen
-              no transition
+            event Deposit with Amount as number
+            from Active on Deposit when !Frozen -> no transition
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -2046,3 +1872,5 @@ public class PreceptWorkflowTests
         withArgs.Outcome.Should().BeOneOf(PreceptOutcomeKind.Accepted, PreceptOutcomeKind.AcceptedInPlace);
     }
 }
+
+

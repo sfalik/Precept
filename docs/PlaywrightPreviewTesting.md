@@ -332,6 +332,43 @@ import snapshot from './fixtures/bugtracker-snapshot.json';
 
 ---
 
+## Parked Status (2026-03-05)
+
+This effort was paused after a repeatable blocker in standalone Playwright mode.
+
+### What was attempted
+
+- Created a temporary harness at `test/Precept.PlaywrightTests/` with `@playwright/test`.
+- Implemented a BankLoan smoke test against `tools/Precept.VsCode/webview/inspector-preview.html`.
+- Mocked `acquireVsCodeApi`, captured outbound `previewRequest` messages, and replied with `previewResponse` snapshots.
+- Tried both message paths:
+  - push-style: `{ type: "snapshot", ... }`
+  - request/response style: `{ type: "previewRequest", action: "snapshot" }` -> `{ type: "previewResponse", requestId, snapshot }`
+
+### Observed blocker
+
+- The webview consistently rendered:
+  - `No events available from current state.`
+  - `Layout engine did not produce a result`
+- Assertion failure was consistent: `.event-btn[data-event="Submit"]` not found.
+
+### Likely cause
+
+- The standalone HTML flow appears to rely on runtime state that is normally produced in extension-host context (for example, inspect-refresh behavior and/or layout payload cadence), and the mocked messages did not reproduce enough of that lifecycle to populate the event dock.
+
+### Recommended resume path
+
+1. Prefer true extension-host E2E first (`@vscode/test-electron`) to validate the full VS Code -> language server -> webview loop.
+2. Export real snapshots from `PreceptPreviewHandler` for `samples/bank-loan.precept` and feed those fixtures to Playwright.
+3. In standalone mode, instrument the page during test runs to log internal values (`currentState`, `transitions.length`, `currentEventStatuses.length`, `getOrderedCurrentEvents()`) before asserting event buttons.
+
+### Cleanup completed
+
+- Temporary harness folder `test/Precept.PlaywrightTests/` was removed.
+- `.gitignore` was reverted to remove temporary Playwright-specific ignore entries.
+
+---
+
 ## Copilot Prompt for Future Sessions
 
 Copy and paste this prompt to have Copilot set up and run the Playwright tests:

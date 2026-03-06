@@ -9,13 +9,11 @@ internal static class PreceptExpressionTestHelper
     {
         var dsl = $$"""
             precept Parser
-            number Value = 0
+            field Value as number default 0
             event Advance
             state Red initial
             state Green
-            from Red on Advance
-                set Value = {{expressionText}}
-                transition Green
+            from Red on Advance -> set Value = {{expressionText}} -> transition Green
             """;
 
         var machine = PreceptParser.Parse(dsl);
