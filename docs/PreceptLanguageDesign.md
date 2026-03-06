@@ -55,7 +55,7 @@ Four prepositions are used throughout the language to dereference named entities
 
 | Preposition | Meaning | Dereferences | Used in |
 |---|---|---|---|
-| `in` | While residing in a state | State name | `in <State> assert ...` |
+| `in` | While residing in a state | State name | `in <State> assert ...`, `in <State> edit ...` |
 | `to` | Crossing into a state | State name | `to <State> assert ...`, `to <State> -> ...` |
 | `from` | Crossing out of a state | State name | `from <State> assert ...`, `from <State> -> ...`, `from <State> on ...` |
 | `on` | When an event fires | Event name | `on <Event> assert ...`, `from ... on <Event>` |
@@ -65,10 +65,11 @@ Four prepositions are used throughout the language to dereference named entities
 - `from Draft assert ...` → exit gate (assert context)
 - `from Draft on SubmitOrder` → transition routing (transition context)
 - `on SubmitOrder assert ...` → event arg validation (assert context)
-- `from Draft on SubmitOrder` → transition routing (transition context)
+- `in Open edit Notes, Priority` → editable field declaration (edit context)
 
 **Disambiguation:** The token after the identifier resolves any ambiguity:
 - `assert` → constraint/validation statement
+- `edit` → editable field declaration (continues with field name list)
 - `on` → transition header (continues with event name)
 - Transition body keywords (`set`, `transition`, `if`, etc.) → transition body
 
@@ -122,7 +123,7 @@ PreceptFile        := PreceptHeader Statement*
 PreceptHeader      := "precept" Identifier
 
 Statement          := FieldDecl | Invariant | StateDecl | StateAssert | StateAction
-                    | EventDecl | EventAssert | TransitionRow
+                    | EditDecl | EventDecl | EventAssert | TransitionRow
                     | Comment | Blank
 
 FieldDecl          := "field" Identifier "as" TypeRef NullableOpt DefaultOpt
@@ -155,6 +156,9 @@ DequeueAction      := "dequeue" Identifier ("into" Identifier)?
 PushAction         := "push" Identifier Expr
 PopAction          := "pop" Identifier ("into" Identifier)?
 ClearAction        := "clear" Identifier
+
+EditDecl           := "in" StateTarget "edit" FieldList
+FieldList          := Identifier ("," Identifier)*
 
 EventDecl          := "event" Identifier ("with" ArgList)?
 ArgList            := ArgDecl ("," ArgDecl)*
@@ -214,7 +218,7 @@ Keywords are **strictly lowercase**. Identifiers are case-sensitive. `From` and 
 Full reserved keyword list:
 
 `precept`, `field`, `as`, `nullable`, `default`, `invariant`, `because`,
-`state`, `initial`, `event`, `with`, `assert`,
+`state`, `initial`, `event`, `with`, `assert`, `edit`,
 `in`, `to`, `from`, `on`, `when`, `any`, `of`,
 `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `into`,
 `transition`, `no`, `reject`,
@@ -426,6 +430,75 @@ For `no transition` / AcceptedInPlace: no exit or entry actions fire (you didn't
 Disambiguation:
 - `to Open assert ...` — validation (next token: `assert`)
 - `to Open -> ...` — entry action (next token: `->`)
+
+---
+
+## Editable Fields (Locked: syntax only — runtime deferred)
+
+Editable field declarations specify which fields can be modified directly (via the runtime `Update` API) while residing in a state. They use the `in` preposition because editability is about what you can do **while in** a state — consistent with `in <State> assert` (state-scoped invariants).
+
+### Syntax
+
+Form:
+
+- `in <StateTarget> edit <FieldList>`
+
+Where `<FieldList>` is a comma-separated list of declared field names. `<StateTarget>` follows the same rules as state asserts: a single state, comma-separated states, or `any`.
+
+Examples:
+
+```precept
+# Notes and Priority are editable in any state
+in any edit Notes, Priority
+
+# Description and Tags are editable while work is active
+in Open, InProgress edit Description, Tags
+
+# Resolution summary is editable only when resolved
+in Resolved edit ResolutionSummary
+```
+
+### Disambiguation
+
+The `in` preposition followed by a state target is disambiguated by the next keyword:
+
+- `in Open assert ...` → state-scoped invariant (next token: `assert`)
+- `in Open edit ...` → editable field declaration (next token: `edit`)
+
+This is LL(2) at most — the parser sees `in` → state list → `assert` or `edit`.
+
+### Semantics
+
+- **Additive across declarations:** Multiple `in ... edit` statements matching the same state are unioned. The effective editable set for a state is the union of all matching declarations.
+- **`in any edit`** expands to all declared states at parse time (same as `in any assert`).
+- **Independence from events:** Edit declarations and event transitions are orthogonal. A field can be both editable and modified by event `set` assignments.
+- **No terminal state exclusion:** `in any edit` includes terminal states. To exclude specific states, list states explicitly.
+
+### Compile-time checks
+
+| Check | Severity |
+|---|---|
+| Field name not declared | Error |
+| State name not declared | Error |
+| Duplicate field in same `edit` statement | Warning |
+| Empty field list | Error |
+
+### Model
+
+The parser produces one `DslEditBlock` per state after expansion:
+
+```csharp
+public sealed record DslEditBlock(
+    string State,
+    IReadOnlyList<string> FieldNames,
+    int SourceLine = 0);
+```
+
+`DslWorkflowModel` gains an optional `IReadOnlyList<DslEditBlock>? EditBlocks` property.
+
+### Runtime (deferred)
+
+The runtime `Update` API, `IUpdatePatchBuilder`, validation pipeline, and inspect integration are defined in `docs/EditableFieldsDesign.md` and will be implemented as a follow-on task after the language redesign lands. The parser and model support for `in <State> edit` is included in the language redesign to avoid a second breaking change to the tokenizer/parser/LS pipeline.
 
 ---
 
@@ -699,6 +772,10 @@ from Submitted on Cancel
 
 from Draft on Cancel
     -> transition Canceled
+
+# Data editing — fields editable without events
+in any edit Notes
+in Draft edit Email
 ```
 
 ---
@@ -728,6 +805,7 @@ Locked in this discussion:
 - Execution order: event asserts → when guard → exit actions → row mutations → entry actions → validation
 - Coverage warning (not error) for reachable `(state, event)` pairs without transition rows
 - Unreachable row after unguarded row = compile-time error
+- Editable field declarations: `in <StateTarget> edit <FieldList>` — flat comma-separated syntax, `in` preposition (consistent with "while residing in"), additive across declarations, `any` support. Syntax and model included in language redesign; runtime `Update` API deferred (see `docs/EditableFieldsDesign.md`).
 
 Not yet locked:
 - Full EBNF and tokenization rules

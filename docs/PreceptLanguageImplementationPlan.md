@@ -6,6 +6,29 @@ Spec: `docs/PreceptLanguageDesign.md`
 
 This plan implements the full-stack language redesign: new Superpower-based parser, updated model, updated runtime, language server, grammar, tests, samples, and docs.
 
+### Mandatory vs. Advisory
+
+This plan contains two kinds of guidance — know which is which:
+
+**Mandatory (do not deviate):**
+- **Phase ordering and checkpoints** — dependencies are real (tokenizer → parser → runtime). Each phase must end with `dotnet build` passing.
+- **Model record shapes** — dictated by the language design spec. Field names, record structures, and semantic meanings are locked.
+- **Token enum members** — dictated by the grammar. Every keyword, operator, and punctuation symbol must be represented.
+- **Fire pipeline stages and evaluation order** — locked semantics from the design doc.
+- **Preposition scoping rules** — `in`/`to`/`from`/`on` meanings are locked.
+- **Public API stability** — `PreceptEngine` method signatures, result types, and `DslWorkflowInstance` must not change.
+- **Preserve list** — files marked "unchanged" must not be modified.
+
+**Advisory (one reasonable approach — adapt freely):**
+- **Catalog infrastructure patterns** — `ConstructCatalog.Register`, `ConstraintCatalog`, `// SYNC:CONSTRAINT:Cnn` markers, `MessageTemplate` with placeholders. The *requirement* is that parser constructs and semantic constraints are introspectable at runtime (for language server features and future MCP serialization). The specific C# patterns shown are suggestions. If a simpler approach emerges (static arrays, source generators, well-organized constants), use it.
+- **Superpower-specific techniques** — `Parse.Chain` for precedence, keyword recognition callbacks, tokenizer rule ordering. These describe how Superpower *probably* works based on documentation. If the actual API differs or offers better patterns, follow the library, not this plan.
+- **Language server implementation details** — attribute-driven `SemanticTypeMap`, `BuildFromAttributes()` reflection, the `Previous token(s) → Suggest` lookup table. These are one approach. The *requirement* is that semantic tokens and completions derive from the token stream (not regex). How that mapping is structured is flexible.
+- **Error recovery strategy** — "Skip to next statement-starting keyword" is a reasonable heuristic, but Superpower may have its own error recovery patterns that work better.
+- **Code samples** — all ````csharp` blocks in this plan are illustrative. The structure and naming should be consistent with the codebase conventions discovered during implementation, not copied verbatim.
+- **LOC estimates** — rough guidance for scoping, not targets.
+
+When the plan says "do X," check: is it a semantic/behavioral requirement, or an implementation technique? If the latter, treat it as a starting point and improve on it when you find something better.
+
 ---
 
 ## Guiding Principle: Tokenize Once, Consume Everywhere
@@ -52,12 +75,19 @@ Key design decisions:
 
 ### Token enum
 
+Each member carries three attributes for runtime reflection: `[TokenCategory]`, `[TokenDescription]`, and `[TokenSymbol]`. These attributes are **core infrastructure** — they power the tokenizer keyword dictionary, language server completions ('group by category'), semantic tokens, parser error messages ('expected a type keyword'), and are reflected by the MCP `precept_language` tool's vocabulary tier. See `docs/CatalogInfrastructureDesign.md` for the full architecture rationale.
+
 ```csharp
 public enum PreceptToken
 {
     // === Keywords: declarations ===
-    Precept, Field, As, Nullable, Default, Invariant, Because,
-    State, Initial, Event, With, Assert,
+    [TokenCategory(TokenCategory.Declaration)] [TokenDescription("Top-level precept declaration")] [TokenSymbol("precept")]
+    Precept,
+    [TokenCategory(TokenCategory.Declaration)] [TokenDescription("Declares a data field")] [TokenSymbol("field")]
+    Field,
+    // ... remaining members follow the same pattern — every member has all three attributes
+    As, Nullable, Default, Invariant, Because,
+    State, Initial, Event, With, Assert, Edit,
 
     // === Keywords: prepositions + modifiers ===
     In, To, From, On, When, Any, Of,
@@ -75,8 +105,10 @@ public enum PreceptToken
     True, False, Null,
 
     // === Operators ===
-    DoubleEquals,    // ==
-    NotEquals,       // !=
+    [TokenSymbol("==")]
+    DoubleEquals,
+    [TokenSymbol("!=")]
+    NotEquals,
     GreaterThanOrEqual, // >=
     LessThanOrEqual,    // <=
     GreaterThan,     // >
@@ -88,8 +120,10 @@ public enum PreceptToken
     Contains,        // contains (keyword-operator)
 
     // === Punctuation ===
-    Arrow,           // ->
-    Comma,           // ,
+    [TokenSymbol("->")]
+    Arrow,
+    [TokenSymbol(",")]
+    Comma,
     Dot,             // .
     LeftParen,       // (
     RightParen,      // )
@@ -115,13 +149,14 @@ public enum PreceptToken
 4. String literals: `"..."` (with `\"` escape)
 5. Number literals: `\d+(\.\d+)?`
 6. Comments: `#` to end-of-line
-7. Keywords vs identifiers: tokenize as `Identifier`, then use Superpower's keyword recognition to promote matching identifiers. This ensures `From` (uppercase) stays an `Identifier` while `from` (lowercase) becomes `From` token.
+7. Keywords vs identifiers: tokenize as `Identifier`, then use Superpower's keyword recognition to promote matching identifiers. The keyword dictionary is **built by reflecting `[TokenSymbol]` attributes** on all keyword-category tokens — adding a keyword to the enum automatically adds it to the tokenizer (zero drift). This ensures `From` (uppercase) stays an `Identifier` while `from` (lowercase) becomes `From` token.
 8. Newlines: `\r\n` or `\n` — significant only for comment termination and statement boundary heuristics, but tracked as tokens for position accuracy.
 
 ### Checkpoint
 
 - `dotnet build` passes
 - Unit test: tokenize a minimal `.precept` source and assert the token sequence
+- Every `PreceptToken` member has `[TokenCategory]`, `[TokenDescription]`, and `[TokenSymbol]` attributes (keyword/operator/punctuation members require `[TokenSymbol]`; value/structure tokens may omit it)
 
 ---
 
@@ -145,6 +180,7 @@ public enum PreceptToken
 | `DslClause` | **Removed** | Clauses (if/else if/else) are replaced by ordered first-match rows |
 | `DslRule` | **Removed** | Replaced by `DslInvariant`, `DslStateAssert`, `DslEventAssert` |
 | `DslEventAssert` | **New** | `on <Event> assert <expr> because "reason"` — event arg validation |
+| `DslEditBlock` | **New** | `in <State> edit <Field>, <Field>` — editable field declaration. Runtime `Update` API deferred; model/parser included now. |
 | `DslEvent` | Drop `Rules`; args now use `with` keyword (parser concern only) | |
 | `DslState` | Drop `Rules` | State asserts/actions are top-level, not attached to states |
 | `DslField` | Drop `Rules` | Invariants are top-level |
@@ -200,6 +236,9 @@ static TokenListParser<PreceptToken, DslEventAssert> EventAssert = ...;  // on <
 // Actions
 static TokenListParser<PreceptToken, DslStateAction> StateAction = ...;  // to/from <Target> -> <chain>
 
+// Editable fields
+static TokenListParser<PreceptToken, DslEditBlock[]> EditDecl = ...;  // in <Target> edit <Field>, <Field>
+
 // Transitions
 static TokenListParser<PreceptToken, DslTransitionRow> TransitionRow = ...;  // from <Target> on <Event> [when <expr>] -> ... -> <outcome>
 
@@ -220,14 +259,86 @@ static TokenListParser<PreceptToken, ...> ActionChain = ...;  // (-> Action)+
 
 ### Expression parser unification
 
-The current `DslExpressionParser` (with its own `Lexer` class) is **eliminated**. Expression parsing uses the same Superpower token stream via combinators. Benefits:
-- No "extract substring, hand to separate parser" boundary
-- Expression positions map back to original source positions automatically
-- One fewer parser to maintain
+The current `DslExpressionParser` (with its own `Lexer` class) is **eliminated**. Expression parsing uses the same Superpower token stream via combinators.
+
+**Why eliminate it:**
+- The hand-written `Lexer` class (~224 lines) is redundant — the Superpower tokenizer already produces typed tokens with spans. Keeping a separate lexer means maintaining two tokenization implementations that must agree on what constitutes a number, string, identifier, and operator.
+- Substring extraction is fragile — the current parser extracts expression text as a raw string and hands it to `DslExpressionParser.Parse(string)`. This loses source position information, so expression-level diagnostics can't report accurate line/column. With unified token parsing, every sub-expression node carries its original source span.
+- One fewer parser to maintain — bugs or features only need to be addressed in one place.
+
+**Superpower-specific techniques for expression parsing:**
+
+- **`Parse.Chain` for binary operators** — Superpower's `Parse.Chain(operatorParser, operandParser)` handles left-recursive binary operator chains with correct associativity. Define one chain per precedence level:
+  ```
+  Level 1 (lowest):  ||          via Parse.Chain(Or, level2)
+  Level 2:           &&          via Parse.Chain(And, level3)
+  Level 3:           ==, !=, >, >=, <, <=, contains   via Parse.Chain(comparison, level4)
+  Level 4 (unary):   !           via prefix combinator on atom
+  Level 5 (atom):    literal | identifier[.member] | (expr)
+  ```
+- **`contains` as a keyword-operator** — Unlike `&&` or `==`, `contains` is a keyword token, not a symbol token. It must appear in the Level 3 comparison operator parser alongside the symbol operators. In the token enum it's `PreceptToken.Contains`; in the operator parser it produces a `DslBinaryExpression` with `Operator = "contains"`, same as today.
+- **Combinator testability** — Each expression level is a `static` field that can be tested in isolation:
+  ```csharp
+  var result = ExprAtom.TryParse(tokenize("Balance"));
+  var result = BoolExpr.TryParse(tokenize("Balance > 0 && Email != null"));
+  ```
+  This makes precedence and associativity easy to verify without parsing a full `.precept` file.
+
+### Keyword recognition strategy
+
+All keywords are **strictly lowercase** (design doc: "Keywords are strictly lowercase. Identifiers are case-sensitive."). The tokenizer handles this by:
+
+1. Tokenize all `[A-Za-z_][A-Za-z0-9_]*` sequences as `PreceptToken.Identifier`
+2. Post-process: exact-match lowercase identifiers against the keyword table → promote to the specific keyword token (e.g., `"from"` → `PreceptToken.From`)
+3. Non-matching identifiers stay as `PreceptToken.Identifier`
+
+This ensures `From` (capital F) remains a valid identifier while `from` is a keyword. Superpower's `Tokenizer<T>` supports this via keyword recognition callbacks.
 
 ### `because` as expression terminator
 
 When parsing `invariant <expr> because "reason"` or `assert <expr> because "reason"`, the expression combinator parses tokens until it encounters `Because`. This is a natural terminator — expressions can never contain the keyword `because`.
+
+### Construct catalog (core infrastructure)
+
+Each parser combinator is registered with a syntax template, description, and working example. This is **core infrastructure** — not MCP-specific. It powers parser error messages, language server hovers, and is serialized by the MCP `precept_language` tool.
+
+**New file:** `src/Precept/Dsl/ConstructCatalog.cs`
+
+```csharp
+public sealed record ConstructInfo(string Name, string Form, string Context, string Description, string Example);
+
+public static class ConstructCatalog
+{
+    private static readonly List<ConstructInfo> _constructs = [];
+    public static IReadOnlyList<ConstructInfo> Constructs => _constructs;
+
+    public static TokenListParser<PreceptToken, T> Register<T>(
+        this TokenListParser<PreceptToken, T> parser, ConstructInfo info)
+    {
+        _constructs.Add(info);
+        return parser;
+    }
+}
+```
+
+Usage in parser:
+
+```csharp
+static readonly TokenListParser<PreceptToken, DslField> FieldDecl =
+    ( /* combinator chain */ )
+    .Register(new ConstructInfo(
+        "field-declaration",
+        "field <Name> as <Type> [nullable] [default <Value>]",
+        "top-level",
+        "Declares a scalar data field tracked across events.",
+        "field Priority as number default 3"));
+```
+
+Consumers:
+- **Parser error messages:** `"Invalid field declaration. Expected: field <Name> as <Type> [nullable] [default <Value>]"`
+- **Language server hovers:** Show the syntax template when hovering over a keyword
+- **Language server completions:** Show descriptions alongside keyword suggestions
+- **MCP `precept_language`:** Serializes `ConstructCatalog.Constructs` directly
 
 ### Error recovery strategy
 
@@ -240,6 +351,7 @@ When parsing `invariant <expr> because "reason"` or `assert <expr> because "reas
 - `dotnet build` passes
 - Parser tests: parse a full `.precept` file → verify model
 - Round-trip test: current samples parse without errors
+- Every parser combinator registered in `ConstructCatalog` with a parseable example
 
 ---
 
@@ -261,6 +373,62 @@ When parsing `invariant <expr> because "reason"` or `assert <expr> because "reas
 | State asserts | Single `DslRule` list per state | `DslStateAssert` with `In`/`To`/`From` preposition; evaluation depends on whether state is changing and direction |
 | State actions | Not implemented | New: run exit actions → row mutations → entry actions |
 | Compile-time checks | Field/collection/state rules against defaults | All 5 state assert checks (subsumption, duplication, initial-state, contradiction, deadlock) + transition checks (coverage, unreachable row, missing outcome) |
+
+### Constraint catalog (core infrastructure)
+
+Semantic constraints are declared as data alongside their enforcement code. This is **core infrastructure** — not MCP-specific. The constraint descriptions serve as error messages, power language server diagnostics, and are serialized by the MCP `precept_language` tool.
+
+**New file:** `src/Precept/Dsl/ConstraintCatalog.cs`
+
+```csharp
+public sealed record LanguageConstraint(
+    string Id,
+    string Phase,
+    string Rule,
+    string MessageTemplate,
+    ConstraintSeverity Severity);
+
+public enum ConstraintSeverity { Error, Warning }
+
+public static class ConstraintCatalog
+{
+    private static readonly List<LanguageConstraint> _constraints = [];
+    public static IReadOnlyList<LanguageConstraint> Constraints => _constraints;
+
+    public static LanguageConstraint Register(
+        string id, string phase, string rule,
+        string messageTemplate, ConstraintSeverity severity = ConstraintSeverity.Error)
+    {
+        var c = new LanguageConstraint(id, phase, rule, messageTemplate, severity);
+        _constraints.Add(c);
+        return c;
+    }
+}
+```
+
+Usage at each enforcement point in parser/compiler/engine:
+
+```csharp
+// SYNC:CONSTRAINT:C7
+static readonly LanguageConstraint C7 = ConstraintCatalog.Register(
+    "C7", "parse",
+    "Non-nullable fields without 'default' are a parse error.",
+    "Field '{fieldName}' is non-nullable and has no default value.");
+
+if (!field.HasDefault && !field.IsNullable)
+    throw new ParseException(C7.FormatMessage(new { fieldName = field.Name }));
+```
+
+Consumers:
+- **Parser/compiler/engine error messages:** `MessageTemplate` with contextual placeholders IS the error message — the `Rule` property provides the general description, while the template produces the specific diagnostic. No duplication.
+- **Language server diagnostics:** Each diagnostic carries a stable code (`C7` → `PRECEPT007`), the constraint's `Severity` mapped to LSP `DiagnosticSeverity`, and the formatted message. The `Rule` is available as supplementary detail.
+- **MCP `precept_language`:** Serializes `ConstraintCatalog.Constraints` directly (ID, phase, rule)
+- **`// SYNC:CONSTRAINT:Cnn` comments:** Copilot-visible markers at each enforcement point
+
+Drift defense:
+- `[Fact]` test: every registered constraint has a matching `// SYNC:CONSTRAINT:Cnn` comment in the codebase, and vice versa
+- `[Theory]` test: each constraint has a test case with a violating input that triggers the expected error
+- `copilot-instructions.md`: tells Copilot the sync rule explicitly
 
 ### Fire pipeline update
 
@@ -348,6 +516,18 @@ else (state transition):
 - [ ] `field Name as type nullable default val` syntax
 - [ ] Compile-time checks: subsumption, duplication, initial-state, contradiction, deadlock
 - [ ] sectionless file parsing (statements in any order)
+- [ ] Edit block parsing: `in <State> edit <Field>, <Field>` produces `DslEditBlock` records
+- [ ] Multi-state edit: `in Open, InProgress edit` expands to one `DslEditBlock` per state
+- [ ] `in any edit` expands to one `DslEditBlock` per declared state
+- [ ] Additive semantics: overlapping edit declarations produce unioned field sets
+- [ ] Compile-time checks: unknown field, unknown state, duplicate field (warning), empty field list (error)
+- [ ] Disambiguation: `in Open assert` vs `in Open edit` parsed correctly
+- [ ] Construct catalog: every registered example parses successfully
+- [ ] Constraint catalog: every registered constraint has a violating input that triggers the expected error
+- [ ] Constraint catalog: every `// SYNC:CONSTRAINT:Cnn` comment has a matching registry entry, and vice versa
+- [ ] Token attributes: every `PreceptToken` member has `[TokenCategory]` and `[TokenDescription]`; keyword/operator/punctuation members have `[TokenSymbol]`
+- [ ] Documentation constraints match: constraint list in `docs/DesignNotes.md § DSL Syntax Contract` matches `ConstraintCatalog.Constraints` (same IDs, same rules)
+- [ ] Reference sample coverage: at least one `.precept` sample file uses every construct registered in `ConstructCatalog`
 
 ### Checkpoint
 
@@ -367,6 +547,7 @@ else (state transition):
 ```
 Old:                              New:
 machine Name                →     precept Name
+from X edit (indented)      →     in X edit Field1, Field2  (flat comma-separated)
 string? Email               →     field Email as string nullable
 number Balance = 0          →     field Balance as number default 0
 set<string> Tags            →     field Tags as set of string
@@ -411,26 +592,45 @@ The language server calls `TryTokenize()` once per document change and caches th
 
 **Current:** 12+ regex patterns matched per line, manually pushing semantic tokens.
 
-**New:** Walk `TokenList<PreceptToken>`:
+**New:** Walk `TokenList<PreceptToken>` with **attribute-driven token type mapping**. The `[TokenCategory]` attribute determines the semantic token type — no hardcoded `switch` arms for individual enum members:
 
 ```csharp
+// Built once at startup via reflection
+static readonly Dictionary<PreceptToken, string> SemanticTypeMap = BuildFromAttributes();
+
+static Dictionary<PreceptToken, string> BuildFromAttributes()
+{
+    var map = new Dictionary<PreceptToken, string>();
+    foreach (var member in Enum.GetValues<PreceptToken>())
+    {
+        var category = member.GetCustomAttribute<TokenCategoryAttribute>()?.Category;
+        var semanticType = category switch
+        {
+            TokenCategory.Control or TokenCategory.Declaration
+                or TokenCategory.Action or TokenCategory.Outcome => "keyword",
+            TokenCategory.Type => "type",
+            TokenCategory.Literal => "keyword",  // true/false/null
+            TokenCategory.Operator => "operator",
+            TokenCategory.Structure => member == PreceptToken.Comment ? "comment" : null,
+            _ => null  // Value tokens classified contextually
+        };
+        if (semanticType != null) map[member] = semanticType;
+    }
+    return map;
+}
+
 foreach (var token in tokens)
 {
-    var semanticType = token.Kind switch
-    {
-        PreceptToken.Precept or PreceptToken.Field or ... => "keyword",
-        PreceptToken.StringType or PreceptToken.NumberType => "type",
-        PreceptToken.StringLiteral => "string",
-        PreceptToken.NumberLiteral => "number",
-        PreceptToken.Comment => "comment",
-        PreceptToken.Identifier => ClassifyIdentifier(token, context),
-        _ when IsOperator(token.Kind) => "operator",
-        _ => null
-    };
+    var semanticType = SemanticTypeMap.GetValueOrDefault(token.Kind)
+        ?? (token.Kind == PreceptToken.Identifier ? ClassifyIdentifier(token, context) : null)
+        ?? (token.Kind == PreceptToken.StringLiteral ? "string" : null)
+        ?? (token.Kind == PreceptToken.NumberLiteral ? "number" : null);
     if (semanticType != null)
         builder.Push(token.Span.Position.Line, token.Span.Position.Column, token.Span.Length, semanticType);
 }
 ```
+
+Adding a new keyword to the `PreceptToken` enum with `[TokenCategory]` automatically gives it the correct semantic coloring — no separate change needed in the semantic tokens handler.
 
 Identifier classification (state name, event name, field name, variable) uses the parsed model or declaration-tracking from earlier tokens.
 
@@ -438,19 +638,24 @@ Identifier classification (state name, event name, field name, variable) uses th
 
 **Current:** 8+ regex patterns to detect cursor context, manual identifier collection.
 
-**New:** Find the token at or before the cursor position in the token list:
+**New:** Find the token at or before the cursor position in the token list. **Keyword sets and descriptions are derived from catalog infrastructure** — no hand-maintained lists:
+
+- **Keyword groups** from `[TokenCategory]`: `TokenCategory.Type` → type keywords, `TokenCategory.Action` → action keywords, etc.
+- **Completion detail text** from `[TokenDescription]`: each keyword suggestion shows its description (e.g., `field` → "Declares a data field")
+- **Statement-level descriptions** from `ConstructCatalog`: statement-starting keywords show the construct's `Form` + `Description` (e.g., `field` → "field \<Name\> as \<Type\> [nullable] [default \<Value\>]")
 
 | Previous token(s) | Suggest |
 |---|---|
-| `As` | Type keywords: `string`, `number`, `boolean`, `set`, `queue`, `stack` |
-| `Arrow` (`->`) | Action keywords: `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `transition`, `no`, `reject` |
+| `As` | Type keywords (from `TokenCategory.Type`): `string`, `number`, `boolean`, `set`, `queue`, `stack` |
+| `Arrow` (`->`) | Action keywords (from `TokenCategory.Action` + `TokenCategory.Outcome`): `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `transition`, `no`, `reject` |
 | `From` + `Identifier` | `on`, `assert`, `->` |
 | `From` + `Identifier` + `On` | Event names |
 | `On` + `Identifier` | `assert` |
-| `In`/`To` + `Identifier` | `assert`, `->` |
+| `In`/`To` + `Identifier` | `assert`, `->`, `edit` (for `In` only) |
+| `In` + `Identifier` + `Edit` | Declared field names (comma-separated list) |
 | `Of` | Scalar type keywords: `string`, `number`, `boolean` |
 | `Identifier` + `Dot` | Member names: `count`, `min`, `max`, `peek`, event arg names |
-| Start of line / no context | Statement-starting keywords, semantically ordered: `field`, `invariant`, `state`, `in`, `to`, `from`, `event`, `on` |
+| Start of line / no context | Statement-starting keywords (from `ConstructCatalog` top-level constructs), semantically ordered: `field`, `invariant`, `state`, `in`, `to`, `from`, `event`, `on` |
 
 Statement-starting keyword ordering uses semantic context: what's already declared in the file determines priority (per design doc: fields first → states → events → transitions).
 
@@ -459,6 +664,21 @@ Statement-starting keyword ordering uses semantic context: what's already declar
 **Current:** Try `PreceptParser.Parse()`, catch exception, regex-parse error message for line number.
 
 **New:** Use `ParseWithDiagnostics()` from Phase 3. Each diagnostic has exact position from Superpower's token spans → map directly to LSP `Diagnostic` with precise range.
+
+**Diagnostic codes from constraint IDs:** Each `LanguageConstraint` ID maps to a stable diagnostic code:
+
+```
+C7  → PRECEPT007
+C13 → PRECEPT013
+```
+
+The language server produces diagnostics with:
+- `code`: `PRECEPTnnn` derived from the constraint ID
+- `severity`: mapped from `ConstraintSeverity` → LSP `DiagnosticSeverity`
+- `message`: formatted from `MessageTemplate` with contextual values
+- `source`: `"precept"`
+
+This gives every error a stable, searchable code that appears in the Problems panel.
 
 ### 7e. Preview handler (`SmPreviewHandler.cs`)
 
@@ -482,7 +702,7 @@ Minimal changes — still calls `PreceptParser.Parse()` → `PreceptCompiler.Com
 ### Changes
 
 - Remove: `rule` keyword, section header patterns (`\[fields\]` etc.), `if`/`else` patterns, type-before-name patterns (`string? Name`)
-- Add: `invariant`, `assert`, `because`, `with`, `when`, `any`, `of`, `nullable`, `default`, `initial` keywords
+- Add: `invariant`, `assert`, `because`, `with`, `when`, `any`, `of`, `nullable`, `default`, `initial`, `edit` keywords
 - Update: `field` declaration pattern, `event ... with` pattern, transition row pattern
 - Reorder: Specific patterns (declarations, dotted refs) before general ones (type keywords, identifiers)
 
@@ -512,6 +732,19 @@ Minimal changes — still calls `PreceptParser.Parse()` → `PreceptCompiler.Com
 
 - DSL Syntax Contract (Current) → replace with new grammar from `PreceptLanguageDesign.md`, or mark as superseded with pointer to new doc
 
+### RuntimeApiDesign updates
+
+The public API surface (`PreceptParser.Parse`, `PreceptCompiler.Compile`, `PreceptEngine` methods, all result types) is unchanged — no breaking change for callers. The doc needs internal-facing updates:
+
+| Section | Change needed |
+|---|---|
+| Fire pipeline stages | Rewrite: `when` moves from block-level pre-step to per-row guard during first-match selection. if/else if/else clauses replaced by ordered first-match rows. New stages for state exit actions (step 3) and entry actions (step 5). |
+| Inspect semantics | Update: no block-level `when`; row-level `when` guards during first-match. `NotApplicable` when no row matches. |
+| Compile validation | Expand: add 5 state assert checks (subsumption, duplication, initial-state, contradiction, deadlock) + transition checks (coverage warning, unreachable row error). |
+| Model Types table | Rewrite: `DslRule` → `DslInvariant`, `DslStateAssert`, `DslEventAssert`. `DslTransition` → `DslTransitionRow`. `DslClause` → eliminated. |
+| CheckCompatibility | Minor: "data rules + state entry rules" → "invariants + `in <CurrentState>` asserts" |
+| Terminology | Throughout: "rules" → "invariants"/"asserts", "clauses" → "rows", "guards" → "`when` guards" |
+
 ### Checkpoint
 
 - No aspirational claims presented as implemented
@@ -525,8 +758,10 @@ Minimal changes — still calls `PreceptParser.Parse()` → `PreceptCompiler.Com
 | File | Action | Phase |
 |---|---|---|
 | `src/Precept/Precept.csproj` | Add Superpower dependency | 0 |
-| `src/Precept/Dsl/PreceptToken.cs` | **New** | 1 |
+| `src/Precept/Dsl/PreceptToken.cs` | **New** — token enum with `[TokenCategory]`/`[TokenDescription]` attributes | 1 |
 | `src/Precept/Dsl/PreceptTokenizer.cs` | **New** | 1 |
+| `src/Precept/Dsl/ConstructCatalog.cs` | **New** — parser construct registry (core infrastructure) | 3 |
+| `src/Precept/Dsl/ConstraintCatalog.cs` | **New** — semantic constraint registry (core infrastructure) | 4 |
 | `src/Precept/Dsl/PreceptModel.cs` | **Major edit** — new records, remove `DslRule`/`DslClause`/`DslTransition` | 2 |
 | `src/Precept/Dsl/PreceptParser.cs` | **Full rewrite** — Superpower combinators | 3 |
 | `src/Precept/Dsl/PreceptExpressionParser.cs` | **Remove** — expressions integrated into parser | 3 |
@@ -541,6 +776,7 @@ Minimal changes — still calls `PreceptParser.Parse()` → `PreceptCompiler.Com
 | `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` | **Major edit** — new patterns | 8 |
 | `README.md` | **Major edit** — syntax, examples, status | 9 |
 | `docs/DesignNotes.md` | **Moderate edit** — supersede or replace | 9 |
+| `docs/RuntimeApiDesign.md` | **Moderate edit** — fire pipeline stages, model types table, terminology | 9 |
 
 ## Preserve List (Unchanged)
 
@@ -579,14 +815,30 @@ These files/components are not modified:
 | 0. Branch + dependency | ~5 | None |
 | 1. Token + tokenizer | ~150 | Low |
 | 2. Model records | ~100 | Low |
-| 3. Parser (full rewrite) | ~400 | Medium (expression integration) |
-| 4. Runtime adaptation | ~300 | Medium (new pipeline logic) |
-| 5. Tests | ~800 | Low (mechanical + new behavior tests) |
+| 3. Parser (full rewrite + construct catalog) | ~500 | Medium (expression integration, edit decl) |
+| 4. Runtime adaptation + constraint catalog | ~350 | Medium (new pipeline logic) |
+| 5. Tests | ~850 | Low (mechanical + new behavior tests + edit block tests) |
 | 6. Samples | ~600 | Low (mechanical rewrite) |
 | 7. Language server | ~500 | Medium (resilience to partial files) |
 | 8. TextMate grammar | ~100 | Low |
 | 9. Documentation | ~300 | Low |
-| **Total** | **~3,250** | |
+| **Total** | **~3,400** | |
+
+---
+
+## MCP Server
+
+The MCP server (`tools/Precept.Mcp/`) is designed and implemented **after** the language redesign lands. See `docs/McpServerDesign.md` for the full design.
+
+Three core infrastructure components from this plan directly support the MCP server — but are **not MCP-specific**. They live in `src/Precept/` and are also used by the parser, language server, and error reporting:
+
+1. **Token enum attributes** (Phase 1) — `[TokenCategory]`, `[TokenDescription]`, and `[TokenSymbol]` on each `PreceptToken` member. Used by the tokenizer keyword dictionary, language server completions/semantic tokens, and reflected by MCP `precept_language` for vocabulary.
+2. **Construct catalog** (Phase 3) — `ConstructCatalog` registered alongside parser combinators. Used by parser error messages, language server hovers/completions, and serialized by MCP `precept_language` for construct forms.
+3. **Constraint catalog** (Phase 4) — `ConstraintCatalog` registered alongside enforcement code, with `MessageTemplate` and `Severity` properties. Used as error message templates (with contextual placeholders) and diagnostic codes in the parser/compiler/engine/language server, and serialized by MCP `precept_language` for semantic rules.
+
+See `docs/CatalogInfrastructureDesign.md` for the full architecture rationale, consumer matrix, and drift defense strategy.
+
+The MCP project only adds the tool wrappers (`ValidateTool.cs`, `SchemaTool.cs`, etc.) and the MCP SDK transport. If MCP is removed, core infrastructure remains unchanged — better error messages, richer language server features, and documented constraints continue to work.
 
 ---
 
@@ -594,15 +846,23 @@ These files/components are not modified:
 
 Use this prompt to begin implementation in a new Copilot Chat session:
 
-> Implement the Precept language redesign described in `docs/PreceptLanguageDesign.md`, following the phased plan in `docs/PreceptLanguageImplementationPlan.md`.
+> Implement the Precept language redesign. Start by reading these documents in full:
 >
-> Start by reading both documents in full. Then:
+> 1. `docs/PreceptLanguageDesign.md` — the language spec (what to build)
+> 2. `docs/PreceptLanguageImplementationPlan.md` — the phased plan (how to build it)
+> 3. `docs/CatalogInfrastructureDesign.md` — the three-tier catalog architecture (token attributes, construct catalog, constraint catalog)
+> 4. `docs/RuntimeApiDesign.md` — the current runtime API surface and fire pipeline (what to preserve vs. update)
+> 5. `.github/copilot-instructions.md` — mandatory sync rules for docs, grammar, intellisense, and syntax highlighting
+>
+> Then:
 >
 > 1. Create a new branch `feature/language-redesign` from the current HEAD.
 > 2. Execute the phases in order (0 through 9), committing at each checkpoint.
 > 3. Each phase must end with `dotnet build` passing before moving to the next.
 > 4. Follow the "tokenize once, consume everywhere" principle — the Superpower `TokenList<PreceptToken>` is the shared foundation for the parser, language server semantic tokens, completions, and diagnostics.
 > 5. Preserve the files listed in the Preserve List — do not modify `PreceptExpressionEvaluator.cs`, the `DslExpression` record hierarchy, `DslWorkflowInstance`, `DslFireResult`, or any file under `tools/Precept.VsCode/src/`.
-> 6. Follow the project's copilot-instructions (`.github/copilot-instructions.md`) for documentation sync, grammar sync, intellisense sync, and syntax highlighting sync — these are non-negotiable.
+> 6. The three catalog tiers (token attributes, `ConstructCatalog`, `ConstraintCatalog`) are core infrastructure — they must have stable, serializable shapes because a future MCP server will reflect them. See `docs/McpServerDesign.md` for that context, but do not implement the MCP server in this branch.
+> 7. The public runtime API (`PreceptEngine` methods, result types, `DslWorkflowInstance`) must not change signatures. Internal pipeline restructuring (first-match rows, preposition-scoped asserts, entry/exit actions) is expected.
+> 8. Include editable field declarations (`in <StateTarget> edit <FieldList>`) in the parser and model. The `Edit` token, `DslEditBlock` record, `EditDecl` parser combinator, and language server support (completions after `in ... edit`, semantic tokens for `edit` keyword and field references) are part of this redesign. The runtime `Update` API, `IUpdatePatchBuilder`, and inspect integration are **deferred** to a follow-on task — see `docs/EditableFieldsDesign.md` for the full runtime design.
 >
 > Begin with Phase 0: create the branch and add the Superpower NuGet package.

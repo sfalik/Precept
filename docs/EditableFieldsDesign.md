@@ -4,6 +4,8 @@ Date: 2026-03-04
 
 Status: **Design phase — not yet implemented.**
 
+> **Language redesign note (2026-03-05):** The editable fields syntax has been updated from indentation-based `from <State> edit` blocks to flat keyword-anchored `in <State> edit <Field>, <Field>` statements, consistent with the new Precept language design (`docs/PreceptLanguageDesign.md`). The `in` preposition is used instead of `from` because editability is about what you can do **while residing in** a state, matching `in <State> assert` semantics. The parser/model support for `in <State> edit` is included in the language redesign; the runtime `Update` API is deferred to a follow-on task.
+
 Depends on: **Rules** (docs/RulesDesign.md) — ✅ rules are now implemented. The prerequisite dependency is satisfied. Rules enforce data invariants on every mutation regardless of path, making direct field editing safe.
 
 ## Overview
@@ -40,30 +42,27 @@ Editable fields are viable *because* rules exist. Without rules, direct field ed
 
 ## Syntax
 
-### The `from <State> edit` block
+### The `in <State> edit` declaration
 
-Editable field blocks reuse the existing `from` keyword and follow the same multi-state syntax as transitions:
+Editable field declarations use the `in` preposition ("while residing in a state") and the `edit` keyword, followed by a comma-separated list of field names:
 
 ```text
-from <any|StateA[,StateB...]> edit
-  <FieldName>
-  <FieldName>
-  ...
+in <any|StateA[,StateB...]> edit <FieldName>, <FieldName>, ...
 ```
 
-Each field name on an indented line declares that field as editable in the specified state(s). Block-form only — no inline one-liners, consistent with transition blocks.
+Each field name in the list declares that field as editable in the specified state(s). This is a flat, keyword-anchored statement — consistent with all other Precept declarations.
 
 ### Examples
 
-```text
-machine WorkOrder
+```precept
+precept WorkOrder
 
-string Description = ""
-string? Notes = null
-number Priority = 3
-string AssignedTo = ""
-set<string> Tags
-string? ResolutionSummary = null
+field Description as string default ""
+field Notes as string nullable
+field Priority as number default 3
+field AssignedTo as string default ""
+field Tags as set of string
+field ResolutionSummary as string nullable
 
 state Open initial
 state InProgress
@@ -71,61 +70,53 @@ state Resolved
 state Closed
 
 # Notes and Priority are editable in any state
-from any edit
-  Notes
-  Priority
+in any edit Notes, Priority
 
 # Description and Tags are editable while work is active
-from Open, InProgress edit
-  Description
-  Tags
+in Open, InProgress edit Description, Tags
 
 # Assigned technician is editable before resolution
-from Open, InProgress edit
-  AssignedTo
+in Open, InProgress edit AssignedTo
 
 # Resolution summary is editable only when resolved
-from Resolved edit
-  ResolutionSummary
+in Resolved edit ResolutionSummary
 ```
 
 ### Multi-state support
 
-Multi-state `from` is already supported for transitions (`from State1, State2 on Event`). Edit blocks reuse the same syntax — the parser handles comma-separated state lists identically.
+Multi-state `in` is already supported for state asserts (`in Open, InProgress assert ...`). Edit declarations reuse the same syntax — the parser handles comma-separated state lists identically.
 
-### `from any edit`
+### `in any edit`
 
-`from any edit` makes the listed fields editable in every declared state, including terminal states. `any` means any — no special exclusions.
+`in any edit` makes the listed fields editable in every declared state, including terminal states. `any` means any — no special exclusions.
 
 ## Semantics
 
 ### Additive across blocks
 
-When multiple edit blocks match the current state, their field lists are **unioned**. The effective editable set for a state is the union of all matching `from ... edit` blocks.
+When multiple edit declarations match the current state, their field lists are **unioned**. The effective editable set for a state is the union of all matching `in ... edit` declarations.
 
-```text
-from any edit
-  Notes
+```precept
+in any edit Notes
 
-from Open edit
-  Description
+in Open edit Description
 
 # In state Open: Notes + Description are editable
 # In state Closed: only Notes is editable
 ```
 
-This is consistent with how `from any on Event` coexists with state-specific `from State on Event` blocks — they are independent declarations, not overrides.
+This is consistent with how `in any assert` coexists with state-specific `in State assert` declarations — they are independent declarations, not overrides.
 
 ### Independence from events
 
-Edit blocks and event blocks are independent features. A field can be both editable (via `from ... edit`) and modified by event `set` assignments. There is no conflict — they are different mutation paths with different semantics:
+Edit declarations and event transitions are independent features. A field can be both editable (via `in ... edit`) and modified by event `set` assignments. There is no conflict — they are different mutation paths with different semantics:
 
 - **Event path**: lifecycle action with guards, branching, state transitions, audit trail
-- **Edit path**: direct data modification with editability scope and rules enforcement
+- **Edit path**: direct data modification with editability scope and invariant/assert enforcement
 
 ### No special terminal state treatment
 
-`from any edit` includes terminal states (states with no outgoing transitions). If the author wants to exclude a terminal state, they list states explicitly instead of using `any`.
+`in any edit` includes terminal states (states with no outgoing transitions). If the author wants to exclude a terminal state, they list states explicitly instead of using `any`.
 
 ### Fields without rules
 
@@ -142,27 +133,27 @@ Collection editing supports both granular operations (add/remove individual elem
 
 ## Compiler Validations
 
-The compiler validates edit blocks at compile time:
+The compiler validates edit declarations at compile time:
 
-- **Unknown field names**: every field listed in an `edit` block must be a declared instance data field.
-- **Unknown state names**: every state in the `from` clause must be a declared state (same validation as transition blocks).
-- **Duplicate field in same block**: a field listed twice in the same `edit` block is a warning.
-- **No fields**: an `edit` block with no field names is a parse error.
+- **Unknown field names**: every field listed in an `edit` declaration must be a declared instance data field.
+- **Unknown state names**: every state in the `in` clause must be a declared state (same validation as state asserts).
+- **Duplicate field in same declaration**: a field listed twice in the same `edit` declaration is a warning.
+- **No fields**: an `edit` declaration with no field names is a parse error.
 
 ## Model Extension
 
 ### `DslEditBlock` record
 
-The parser produces one `DslEditBlock` per `(FromState, FieldNames)` grouping:
+The parser produces one `DslEditBlock` per `(State, FieldNames)` grouping:
 
 ```csharp
 public sealed record DslEditBlock(
-    string FromState,
+    string State,
     IReadOnlyList<string> FieldNames,
     int SourceLine = 0);
 ```
 
-When `from any edit` is used, the parser expands `any` into one `DslEditBlock` per declared state (same expansion pattern as `from any on Event`). When `from State1, State2 edit` is used, the parser creates one `DslEditBlock` per listed state.
+When `in any edit` is used, the parser expands `any` into one `DslEditBlock` per declared state (same expansion pattern as `in any assert`). When `in State1, State2 edit` is used, the parser creates one `DslEditBlock` per listed state.
 
 ### `DslWorkflowModel` extension
 
@@ -178,6 +169,8 @@ public sealed record DslWorkflowModel(
     IReadOnlyList<DslRule>? TopLevelRules = null,
     IReadOnlyList<DslEditBlock>? EditBlocks = null);  // <-- NEW
 ```
+
+> **Language redesign note:** In the new model, `DslWorkflowModel` replaces `DslRule` with `DslInvariant`/`DslStateAssert`/`DslEventAssert` and `DslTransition` with `DslTransitionRow`. The `EditBlocks` property is additive and survives unchanged.
 
 ### `DslWorkflowEngine` — editability map
 
@@ -254,13 +247,13 @@ if (result.Outcome == UpdateOutcome.Updated)
 
 When `Update` is called, the runtime executes the following steps in order:
 
-1. **Editability check** — For each field in the patch, verify the field is editable in the current state (union of matching `from ... edit` blocks). If any field is not editable, the entire update is rejected with `NotAllowed` outcome. No partial application.
+1. **Editability check** — For each field in the patch, verify the field is editable in the current state (union of matching `in ... edit` declarations). If any field is not editable, the entire update is rejected with `NotAllowed` outcome. No partial application.
 
 2. **Type check** — Verify each value matches the declared field type. Scalar type mismatches, null on non-nullable fields, and wrong-typed collection elements are rejected.
 
 3. **Atomic mutation** — Apply all patch operations to a working copy of instance data, in declaration order within the patch. This is the same working-copy pattern used by `set` assignments in transitions.
 
-4. **Rules evaluation** — Evaluate field rules, top-level rules, and the current state's rules against the post-mutation working copy. If any rule fails, all mutations are rolled back and the outcome is `Blocked` with violated rule reasons. (Note: the current state's rules are checked because the data must remain valid for the state we're in, even though no state entry occurs.)
+4. **Rules evaluation** — Evaluate invariants, state asserts (`in <CurrentState>` asserts), and field invariants against the post-mutation working copy. If any fail, all mutations are rolled back and the outcome is `Blocked` with violated rule reasons. (Note: state asserts are checked because the data must remain valid for the state we're in, even though no state entry occurs.)
 
 5. **Commit** — If all validations pass, the working copy replaces the live instance data.
 
@@ -332,7 +325,7 @@ public sealed record DslEditableFieldInfo(
 );
 ```
 
-When no edit blocks are declared, `EditableFields` is `null`. Otherwise, it contains the effective editable field set for the instance's current state (the union of all matching `from ... edit` blocks), pre-populated with current values.
+When no edit declarations exist, `EditableFields` is `null`. Otherwise, it contains the effective editable field set for the instance's current state (the union of all matching `in ... edit` declarations), pre-populated with current values.
 
 This gives the host application (or preview UI) enough information to render an edit form with type-appropriate input controls and editability scope — all from a single `engine.Inspect(instance)` call.
 
@@ -353,69 +346,54 @@ The preview handler calls aggregate `Inspect` once and receives both event statu
 
 ### DSL definition
 
-```text
-machine WorkOrder
+```precept
+precept WorkOrder
 
-string Description = ""
-string? Notes = null
-number Priority = 3
-string AssignedTo = ""
-string Status = "New"
-set<string> Tags
-number? EstimatedHours = null
-string? ResolutionSummary = null
+field Description as string default ""
+field Notes as string nullable
+field Priority as number default 3
+field AssignedTo as string default ""
+field Status as string default "New"
+field Tags as set of string
+field EstimatedHours as number nullable
+field ResolutionSummary as string nullable
 
-# Rules protect data integrity regardless of mutation path
-number Priority
-  rule Priority >= 1 && Priority <= 5 "Priority must be between 1 and 5"
+# Invariants protect data integrity regardless of mutation path
+invariant Priority >= 1 && Priority <= 5 because "Priority must be between 1 and 5"
 
 state Open initial
 state InProgress
 state Resolved
-  rule ResolutionSummary != null "Resolution requires a summary"
 state Closed
 
-event Assign
-  string Technician
+in Resolved assert ResolutionSummary != null because "Resolution requires a summary"
 
+event Assign with Technician as string
 event StartWork
-
-event Resolve
-  string Summary
-
+event Resolve with Summary as string
 event Close
 
 # Lifecycle transitions — full event pipeline
+from Open on Assign when Assign.Technician != ""
+    -> set AssignedTo = Assign.Technician
+    -> transition InProgress
+
 from Open on Assign
-  if Assign.Technician != ""
-    set AssignedTo = Assign.Technician
-    transition InProgress
-  else
-    reject "Technician name is required"
+    -> reject "Technician name is required"
+
+from InProgress on Resolve when Resolve.Summary != ""
+    -> set ResolutionSummary = Resolve.Summary
+    -> transition Resolved
 
 from InProgress on Resolve
-  if Resolve.Summary != ""
-    set ResolutionSummary = Resolve.Summary
-    transition Resolved
-  else
-    reject "Resolution summary is required"
+    -> reject "Resolution summary is required"
 
-from Resolved on Close
-  transition Closed
+from Resolved on Close -> transition Closed
 
 # Data editing — direct field access scoped by state
-from any edit
-  Notes
-  Priority
-  Tags
-
-from Open, InProgress edit
-  Description
-  EstimatedHours
-  AssignedTo
-
-from Resolved edit
-  ResolutionSummary
+in any edit Notes, Priority, Tags
+in Open, InProgress edit Description, EstimatedHours, AssignedTo
+in Resolved edit ResolutionSummary
 ```
 
 ### Host application
@@ -469,16 +447,19 @@ DslUpdateResult wrongState = engine.Update(instance, patch => patch
 
 ## Grammar Extension
 
-The edit block adds one new production to the DSL grammar:
+The edit declaration adds one new production to the DSL grammar:
 
 ```text
-<EditBlock> := from <any|StateA[,StateB...]> edit
-                 <FieldName>+
+<EditDecl> := "in" <StateTarget> "edit" <FieldList>
 
+<FieldList> := <FieldName> ("," <FieldName>)*
 <FieldName> := identifier referencing a declared instance data field
+<StateTarget> := "any" | Identifier ("," Identifier)*
 ```
 
-The `edit` keyword is a new reserved word. It appears only in the `from ... edit` position — it cannot be used as a field name, state name, or event name.
+The `edit` keyword is a new reserved word. It appears only in the `in ... edit` position — it cannot be used as a field name, state name, or event name.
+
+**Disambiguation:** `in <State>` is followed by either `assert` (state-scoped invariant) or `edit` (editable field declaration). The parser disambiguates at LL(2).
 
 ## Preview Protocol Extension
 
@@ -542,27 +523,26 @@ internal sealed record SmPreviewPatchOp(
 
 ### Parser
 
-- Add `FromEditRegex` to recognize `from <states> edit` as a new block form (parallel to `FromOnRegex`).
-- Parse indented field names as the edit block body.
-- Report errors for unknown fields, unknown states, empty blocks.
-- Call `ParseIdentifierList` for multi-state expansion (same as `ParseFromOnBlock`).
+- The `EditDecl` parser combinator recognizes `in <states> edit <fieldList>` as a statement (no regex needed — Superpower token stream).
+- Report errors for unknown fields, unknown states, empty field lists.
+- Expand multi-state and `any` targets (same as state asserts).
 - Generate one `DslEditBlock` per source state.
 
 ### Analyzer
 
-- Validate field references in edit blocks.
+- Validate field references in edit declarations.
 - Compute effective editable set per state for diagnostics.
-- Warn on duplicate field within the same block.
+- Warn on duplicate field within the same declaration.
 
 ### Completions
 
-- After `from <states>`, suggest both `on` and `edit` as continuations.
-- Inside an edit block body, suggest declared field names not already listed.
+- After `in <states>`, suggest both `assert` and `edit` as continuations.
+- After `in <states> edit`, suggest declared field names (comma-separated context).
 
 ### Semantic tokens
 
-- `edit` keyword highlighted consistently with `on`, `transition`, etc.
-- Field names in edit blocks highlighted as variable references.
+- `edit` keyword highlighted consistently with `assert`, `transition`, etc.
+- Field names in edit declarations highlighted as variable references.
 
 ## Implementation Prompt
 
@@ -572,32 +552,32 @@ The following prompt can be pasted into a new session to implement the editable 
 
 Implement the editable fields feature for the state machine DSL as specified in docs/EditableFieldsDesign.md. This is a full-stack implementation across parser, model, compiler, runtime, language server, and documentation. Read docs/EditableFieldsDesign.md thoroughly before starting — it is the complete design spec. Also read docs/RuntimeApiDesign.md for the current public API surface and naming conventions. This feature depends on the rules feature (docs/RulesDesign.md) being implemented first.
 
-Summary of what editable fields are: a way to declare subsets of instance data fields as directly modifiable in specific states, without going through the event pipeline. The DSL syntax is `from <any|State1,State2> edit` with indented field names. The runtime exposes `engine.Update(instance, patch)` for host applications to modify editable fields with full type checking and rules enforcement.
+Summary of what editable fields are: a way to declare subsets of instance data fields as directly modifiable in specific states, without going through the event pipeline. The DSL syntax is `in <any|State1,State2> edit <Field>, <Field>` as a flat keyword-anchored statement. The runtime exposes `engine.Update(instance, patch)` for host applications to modify editable fields with full type checking and invariant/assert enforcement.
 
-DSL syntax: `from <any|StateA[,StateB...]> edit` followed by indented lines each containing a single field name. Block-form only, no inline syntax. Multi-state comma-separated lists are supported (same as transition blocks). `from any edit` makes fields editable in all states. Multiple edit blocks are additive — the effective editable set for a state is the union of all matching blocks.
+DSL syntax: `in <any|StateA[,StateB...]> edit <FieldName>, <FieldName>, ...` — a flat, keyword-anchored statement with comma-separated field names. Multi-state comma-separated state lists are supported (same as `in <State> assert`). `in any edit` makes fields editable in all states. Multiple edit declarations are additive — the effective editable set for a state is the union of all matching declarations. The `in` preposition is used (not `from`) because editability is about what you can do **while residing in** a state.
 
-Compiler validations: unknown field names in edit blocks are errors. Unknown state names are errors. Empty edit blocks (no field names) are parse errors. Duplicate field in same block is a warning. `edit` is a new reserved word.
+Compiler validations: unknown field names in edit declarations are errors. Unknown state names are errors. Empty field lists are parse errors. Duplicate field in same declaration is a warning. `edit` is a new reserved word.
 
-Model: add `DslEditBlock(string FromState, IReadOnlyList<string> FieldNames, int SourceLine = 0)` record. Add `IReadOnlyList<DslEditBlock>? EditBlocks = null` to `DslWorkflowModel`. The parser expands `from any edit` into one `DslEditBlock` per declared state, and `from State1, State2 edit` into one per listed state (same expansion pattern as transitions).
+Model: add `DslEditBlock(string State, IReadOnlyList<string> FieldNames, int SourceLine = 0)` record. Add `IReadOnlyList<DslEditBlock>? EditBlocks = null` to `DslWorkflowModel`. The parser expands `in any edit` into one `DslEditBlock` per declared state, and `in State1, State2 edit` into one per listed state (same expansion pattern as state asserts).
 
-Runtime API: add `Update(DslWorkflowInstance instance, Action<IUpdatePatchBuilder> patch)` method on `DslWorkflowEngine`, returning `DslUpdateResult`. The patch builder supports `Set` for scalars, `Add`/`Remove` for sets, `Enqueue`/`Dequeue` for queues, `Push`/`Pop` for stacks, `Replace` and `Clear` for all collections. Validation sequence: editability check (is field editable in current state?), type check (does value match declared type?), atomic mutation on working copy, rules evaluation (field rules, top-level rules, current-state rules), commit or rollback. Outcomes: `Updated` (success), `NotAllowed` (field not editable in current state), `Blocked` (rules violated), `Invalid` (type mismatch, unknown field, patch conflict). Patch conflicts detected at build time: duplicate Set on same scalar, Replace + granular op on same collection, Set on collection field, granular op on scalar field. Update never triggers state transitions. Update and Fire are independent. `DslUpdateResult` mirrors `DslFireResult` naming convention: `DslUpdateResult(UpdateOutcome Outcome, IReadOnlyList<string> Reasons, DslWorkflowInstance? UpdatedInstance)`.
+Runtime API: add `Update(DslWorkflowInstance instance, Action<IUpdatePatchBuilder> patch)` method on `PreceptEngine`, returning `DslUpdateResult`. The patch builder supports `Set` for scalars, `Add`/`Remove` for sets, `Enqueue`/`Dequeue` for queues, `Push`/`Pop` for stacks, `Replace` and `Clear` for all collections. Validation sequence: editability check (is field editable in current state?), type check (does value match declared type?), atomic mutation on working copy, invariant/assert evaluation (invariants, `in <CurrentState>` asserts), commit or rollback. Outcomes: `Updated` (success), `NotAllowed` (field not editable in current state), `Blocked` (invariants/asserts violated), `Invalid` (type mismatch, unknown field, patch conflict). Patch conflicts detected at build time: duplicate Set on same scalar, Replace + granular op on same collection, Set on collection field, granular op on scalar field. Update never triggers state transitions. Update and Fire are independent. `DslUpdateResult` mirrors `DslFireResult` naming convention: `DslUpdateResult(UpdateOutcome Outcome, IReadOnlyList<string> Reasons, DslWorkflowInstance? UpdatedInstance)`.
 
 Inspect integration: extend the aggregate `DslInspectionResult` with an `IReadOnlyList<DslEditableFieldInfo>? EditableFields = null` property. `DslEditableFieldInfo` has `FieldName`, `FieldType`, `IsNullable`, `CurrentValue`, `CollectionType`. The aggregate `engine.Inspect(instance)` now returns event statuses AND editable field info in one call. No separate `GetEditableFields` method — this is folded into the aggregate inspect result.
 
-Language server: recognize `edit` after `from <states>` as alternative to `on <event>`. Parse indented field names. Validate field and state references. Suggest `edit` in completions after `from <states>`. Suggest field names inside edit block body. Highlight `edit` keyword and field references with semantic tokens.
+Language server: recognize `edit` after `in <states>` as alternative to `assert`. Suggest declared field names as comma-separated completions after `in <states> edit`. Highlight `edit` keyword and field references with semantic tokens.
 
-Preview UI needs to be updated to support editing of fields inline in the data panel according to the engine defining which fields are editable for the current state. While editing, the rules should be checked and the input box highlighted red when rules are violated.
+Preview UI needs to be updated to support editing of fields inline in the data panel according to the engine defining which fields are editable for the current state. While editing, the invariants/asserts should be checked and the input box highlighted red when they are violated.
 
-Tests: add comprehensive tests covering edit block parsing, multi-state edit blocks, `from any edit`, additive semantics across overlapping blocks, Update API with scalar fields, Update with collection fields (all types), editability enforcement per state, type checking, rules enforcement on update, atomic rollback on rule violation, patch conflict detection, inspect editable fields in aggregate result, and coexistence of edit blocks with event transitions.
+Tests: add comprehensive tests covering edit declaration parsing, multi-state edit declarations, `in any edit`, additive semantics across overlapping declarations, Update API with scalar fields, Update with collection fields (all types), editability enforcement per state, type checking, invariant/assert enforcement on update, atomic rollback on validation failure, patch conflict detection, inspect editable fields in aggregate result, and coexistence of edit declarations with event transitions.
 
-Documentation: update docs/DesignNotes.md DSL Syntax Contract section to include edit block syntax. Update README.md DSL Syntax Reference, DSL Cookbook, and Status sections. Update docs/EditableFieldsDesign.md status from design phase to implemented.
+Documentation: update docs/DesignNotes.md DSL Syntax Contract section to include edit declaration syntax. Update README.md DSL Syntax Reference, DSL Cookbook, and Status sections. Update docs/EditableFieldsDesign.md status from design phase to implemented.
 
 Syntax highlighting grammar sync (non-negotiable — do not skip): update `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` for every new DSL construct introduced by this feature. Apply the Grammar Sync Checklist from `.github/copilot-instructions.md` in full. At minimum, the following changes are required for this feature:
 
-1. **Declaration form** — add a `fromEditHeader` pattern matching `^(\s*)(from)(\s+)(any|StateList)(\s+)(edit)` so that `from` and `edit` are colored as control/action keywords and the state list gets entity coloring, consistent with the existing `fromOnHeader` pattern.
+1. **Declaration form** — add an `inEditHeader` pattern matching `^(\s*)(in)(\s+)(any|StateList)(\s+)(edit)` so that `in` and `edit` are colored as control/action keywords and the state list gets entity coloring, consistent with the existing `inAssertHeader` pattern.
 2. **Keyword** — add `edit` to the `controlKeywords` alternation so it is highlighted wherever it appears.
-3. **Field references in edit block body** — field names indented under `from ... edit` are already caught by the `identifierReference` catch-all; no dedicated pattern is needed unless a more specific scope (e.g. `variable.other.editable-field`) is desired.
-4. **Pattern ordering** — insert `fromEditHeader` into the top-level `patterns` array alongside (and at the same priority as) `fromOnHeader`, before `controlKeywords`.
+3. **Field references in edit declaration** — field names after `edit` are comma-separated on the same line; these are already caught by the `identifierReference` catch-all unless a more specific scope (e.g. `variable.other.editable-field`) is desired.
+4. **Pattern ordering** — insert `inEditHeader` into the top-level `patterns` array alongside (and at the same priority as) `inAssertHeader`, before `controlKeywords`.
 
 Verify the grammar file is valid JSON after changes by parsing it. Confirm that `edit` does not accidentally color identifiers that happen to start with the substring — word-boundary anchors (`\b`) are required.
 
@@ -605,9 +585,10 @@ Intellisense sync (non-negotiable — do not skip): apply the Intellisense Sync 
 
 1. **`KeywordItems`** — add `edit` to `KeywordItems` in `SmDslAnalyzer.cs`.
 2. **`KeywordTokens`** — add `edit` to `KeywordTokens` in `SmSemanticTokensHandler.cs`.
-3. **Completion context for `from … edit` header** — add a regex branch in `GetCompletions` that detects `^\s*from\s+[^\n]+\s+edit(?:\s+[^\n]*)?$` and returns field name completions (the declared instance data fields are the valid completions inside an edit block body).
-4. **Completion context for edit block body** — lines indented under `from … edit` contain bare field names; add a regex branch that detects this indented position and suggests declared data field names.
-5. **Semantic token for edit header** — add a regex to `HighlightNamedSymbols` matching the `from … edit` header line and push the state list tokens as `type` and `edit` as `keyword`.
-6. **`ExpressionLineRegex`** — edit block bodies do not contain expressions (only bare field names), so no update to `ExpressionLineRegex` is needed.
+3. **Completion context for `in … edit` header** — add a regex branch in `GetCompletions` that detects `^\s*in\s+[^\n]+\s+edit(?:\s+[^\n]*)?$` and returns field name completions (the declared instance data fields are the valid completions after `edit`).
+4. **Semantic token for edit header** — add a regex to `HighlightNamedSymbols` matching the `in … edit` header line and push the state list tokens as `type` and `edit` as `keyword`.
+5. **`ExpressionLineRegex`** — edit declarations do not contain expressions (only field name lists), so no update to `ExpressionLineRegex` is needed.
+
+Note: The parser and model support for `in <State> edit` is included in the language redesign (`docs/PreceptLanguageImplementationPlan.md`). This implementation prompt covers the **runtime** portion (Update API, validation pipeline, inspect integration, preview protocol) that is deferred from the language redesign.
 
 Build with dotnet build from repo root. Run tests in test/Precept.Tests/ and test/Precept.LanguageServer.Tests/. Make sure all existing tests still pass.
