@@ -3,54 +3,32 @@
   "name": "Precept",
   "scopeName": "source.precept",
   "patterns": [
-    {
-      "include": "#comment"
-    },
-    {
-      "include": "#machineDeclaration"
-    },
-    {
-      "include": "#stateDeclaration"
-    },
-    {
-      "include": "#eventDeclaration"
-    },
-    {
-      "include": "#fromOnHeader"
-    },
-    {
-      "include": "#simpleTransition"
-    },
-    {
-      "include": "#eventArgReference"
-    },
-    {
-      "include": "#fieldDeclaration"
-    },
-    {
-      "include": "#controlKeywords"
-    },
-    {
-      "include": "#typeKeywords"
-    },
-    {
-      "include": "#actionKeywords"
-    },
-    {
-      "include": "#operators"
-    },
-    {
-      "include": "#booleanNull"
-    },
-    {
-      "include": "#numbers"
-    },
-    {
-      "include": "#identifierReference"
-    },
-    {
-      "include": "#strings"
-    }
+    { "include": "#comment" },
+    { "include": "#strings" },
+    { "include": "#machineDeclaration" },
+    { "include": "#stateDeclaration" },
+    { "include": "#eventWithArgsDeclaration" },
+    { "include": "#eventDeclaration" },
+    { "include": "#fieldCollectionDeclaration" },
+    { "include": "#fieldScalarDeclaration" },
+    { "include": "#legacyCollectionFieldDeclaration" },
+    { "include": "#legacyScalarFieldDeclaration" },
+    { "include": "#invariantStatement" },
+    { "include": "#assertStatement" },
+    { "include": "#fromOnHeader" },
+    { "include": "#transitionTarget" },
+    { "include": "#eventArgReference" },
+    { "include": "#collectionMemberAccess" },
+    { "include": "#controlKeywords" },
+    { "include": "#declarationKeywords" },
+    { "include": "#typeKeywords" },
+    { "include": "#actionKeywords" },
+    { "include": "#outcomeKeywords" },
+    { "include": "#arrowOperator" },
+    { "include": "#operators" },
+    { "include": "#booleanNull" },
+    { "include": "#numbers" },
+    { "include": "#identifierReference" }
   ],
   "repository": {
     "comment": {
@@ -61,18 +39,30 @@
         }
       ]
     },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.precept",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.precept",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+
     "machineDeclaration": {
       "patterns": [
         {
-          "name": "meta.declaration.precept.precept-dsl",
+          "name": "meta.declaration.precept.precept",
           "match": "^(\\s*)(precept)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
-            "2": {
-              "name": "keyword.control.precept"
-            },
-            "4": {
-              "name": "entity.name.type.precept.precept-dsl"
-            }
+            "2": { "name": "keyword.control.precept" },
+            "4": { "name": "entity.name.type.precept" }
           }
         }
       ]
@@ -81,13 +71,44 @@
       "patterns": [
         {
           "name": "meta.declaration.state.precept",
-          "match": "^(\\s*)(state)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
+          "match": "^(\\s*)(state)(\\s+)([A-Za-z_][A-Za-z0-9_]*)(\\s+(initial))?",
           "captures": {
-            "2": {
-              "name": "keyword.control.precept"
-            },
-            "4": {
-              "name": "entity.name.type.state.precept"
+            "2": { "name": "keyword.control.precept" },
+            "4": { "name": "entity.name.type.state.precept" },
+            "6": { "name": "keyword.control.precept" }
+          }
+        }
+      ]
+    },
+    "eventWithArgsDeclaration": {
+      "comment": "event Name with Arg as type, Arg2 as type",
+      "patterns": [
+        {
+          "name": "meta.declaration.event.precept",
+          "match": "^(\\s*)(event)(\\s+)([A-Za-z_][A-Za-z0-9_]*)(\\s+)(with)(\\s+)(.*)",
+          "captures": {
+            "2": { "name": "keyword.control.precept" },
+            "4": { "name": "entity.name.function.event.precept" },
+            "6": { "name": "keyword.other.precept" },
+            "8": {
+              "patterns": [
+                { "include": "#typeKeywords" },
+                { "include": "#declarationKeywords" },
+                { "include": "#numbers" },
+                { "include": "#booleanNull" },
+                { "include": "#operators" },
+                {
+                  "comment": "argument name before 'as'",
+                  "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(?=\\s+as\\b)",
+                  "captures": {
+                    "1": { "name": "variable.parameter.precept" }
+                  }
+                },
+                {
+                  "name": "punctuation.separator.comma.precept",
+                  "match": ","
+                }
+              ]
             }
           }
         }
@@ -99,12 +120,102 @@
           "name": "meta.declaration.event.precept",
           "match": "^(\\s*)(event)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
-            "2": {
-              "name": "keyword.control.precept"
-            },
-            "4": {
-              "name": "entity.name.function.event.precept"
+            "2": { "name": "keyword.control.precept" },
+            "4": { "name": "entity.name.function.event.precept" }
+          }
+        }
+      ]
+    },
+    "fieldCollectionDeclaration": {
+      "comment": "field Name as set of string",
+      "patterns": [
+        {
+          "name": "meta.field-declaration.collection.precept",
+          "match": "^(\\s*)(field)(\\s+)([A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(set|queue|stack)(\\s+)(of)(\\s+)(string|number|boolean)",
+          "captures": {
+            "2": { "name": "keyword.other.precept" },
+            "4": { "name": "variable.other.field.precept" },
+            "6": { "name": "keyword.other.precept" },
+            "8": { "name": "storage.type.precept" },
+            "10": { "name": "keyword.control.precept" },
+            "12": { "name": "storage.type.precept" }
+          }
+        }
+      ]
+    },
+    "fieldScalarDeclaration": {
+      "comment": "field Name as string nullable default value",
+      "patterns": [
+        {
+          "name": "meta.field-declaration.scalar.precept",
+          "match": "^(\\s*)(field)(\\s+)([A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(string|number|boolean)(.*)",
+          "captures": {
+            "2": { "name": "keyword.other.precept" },
+            "4": { "name": "variable.other.field.precept" },
+            "6": { "name": "keyword.other.precept" },
+            "8": { "name": "storage.type.precept" },
+            "9": {
+              "patterns": [
+                { "include": "#declarationKeywords" },
+                { "include": "#booleanNull" },
+                { "include": "#numbers" },
+                { "include": "#strings" }
+              ]
             }
+          }
+        }
+      ]
+    },
+    "legacyCollectionFieldDeclaration": {
+      "comment": "Legacy: set<number> FieldName",
+      "patterns": [
+        {
+          "name": "meta.field-declaration.collection.precept",
+          "match": "\\b(set|queue|stack)<(string|number|boolean)>\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.precept" },
+            "2": { "name": "storage.type.precept" },
+            "3": { "name": "variable.other.field.precept" }
+          }
+        }
+      ]
+    },
+    "legacyScalarFieldDeclaration": {
+      "comment": "Legacy: string? Name or number Balance = 0",
+      "patterns": [
+        {
+          "name": "meta.field-declaration.scalar.precept",
+          "match": "\\b(string|number|boolean|null)(\\?)?\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.precept" },
+            "2": { "name": "keyword.operator.precept" },
+            "3": { "name": "variable.other.field.precept" }
+          }
+        }
+      ]
+    },
+    "invariantStatement": {
+      "comment": "invariant Expr because \"Reason\"",
+      "patterns": [
+        {
+          "name": "meta.invariant.precept",
+          "match": "^(\\s*)(invariant)\\b",
+          "captures": {
+            "2": { "name": "keyword.other.precept" }
+          }
+        }
+      ]
+    },
+    "assertStatement": {
+      "comment": "on EventName assert Expr because \"Reason\"",
+      "patterns": [
+        {
+          "name": "meta.assert.precept",
+          "match": "^(\\s*)(on)(\\s+)([A-Za-z_][A-Za-z0-9_]*)(\\s+)(assert)\\b",
+          "captures": {
+            "2": { "name": "keyword.control.precept" },
+            "4": { "name": "entity.name.function.event.precept" },
+            "6": { "name": "keyword.other.precept" }
           }
         }
       ]
@@ -115,39 +226,67 @@
           "name": "meta.transition.header.precept",
           "match": "^(\\s*)(from)(\\s+)(any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)(\\s+)(on)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
-            "2": {
-              "name": "keyword.control.precept"
-            },
-            "4": {
-              "name": "entity.name.type.state.precept"
-            },
-            "6": {
-              "name": "keyword.control.precept"
-            },
-            "8": {
-              "name": "entity.name.function.event.precept"
-            }
+            "2": { "name": "keyword.control.precept" },
+            "4": { "name": "entity.name.type.state.precept" },
+            "6": { "name": "keyword.control.precept" },
+            "8": { "name": "entity.name.function.event.precept" }
           }
         }
       ]
     },
+    "transitionTarget": {
+      "comment": "transition StateName — highlights the state name after transition keyword",
+      "patterns": [
+        {
+          "name": "meta.transition.target.precept",
+          "match": "\\b(transition)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.precept" },
+            "3": { "name": "entity.name.type.state.precept" }
+          }
+        }
+      ]
+    },
+    "eventArgReference": {
+      "patterns": [
+        {
+          "name": "meta.event-arg-ref.precept",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "entity.name.function.event.precept" },
+            "2": { "name": "punctuation.accessor.precept" },
+            "3": { "name": "variable.other.property.precept" }
+          }
+        }
+      ]
+    },
+    "collectionMemberAccess": {
+      "comment": "Collection.count, Collection.min, etc.",
+      "patterns": [
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)(count|min|max|peek)\\b",
+          "captures": {
+            "1": { "name": "variable.other.field.precept" },
+            "2": { "name": "punctuation.accessor.precept" },
+            "3": { "name": "variable.other.property.precept" }
+          }
+        }
+      ]
+    },
+
     "controlKeywords": {
       "patterns": [
         {
           "name": "keyword.control.precept",
-          "match": "\\b(machine|state|event|from|on|if|else|initial|when)\\b"
+          "match": "\\b(precept|state|event|from|on|if|else|initial|when|in|to|any|of)\\b"
         }
       ]
     },
-    "actionKeywords": {
+    "declarationKeywords": {
       "patterns": [
         {
           "name": "keyword.other.precept",
-          "match": "\\b(transition|reject|set|reason|any|rule|add|remove|enqueue|dequeue|push|pop|clear|into|contains|above|below)\\b"
-        },
-        {
-          "name": "keyword.other.precept",
-          "match": "\\bno\\s+transition\\b"
+          "match": "\\b(field|as|with|assert|because|nullable|default|invariant|edit|rule)\\b"
         }
       ]
     },
@@ -155,11 +294,35 @@
       "patterns": [
         {
           "name": "storage.type.precept",
-          "match": "\\b(set|queue|stack)<(string|number|boolean)>\\b"
+          "match": "\\b(string|number|boolean|set|queue|stack)\\b"
+        }
+      ]
+    },
+    "actionKeywords": {
+      "patterns": [
+        {
+          "name": "keyword.other.precept",
+          "match": "\\b(set|add|remove|enqueue|dequeue|push|pop|clear|into|contains)\\b"
+        }
+      ]
+    },
+    "outcomeKeywords": {
+      "patterns": [
+        {
+          "name": "keyword.other.precept",
+          "match": "\\bno\\s+transition\\b"
         },
         {
-          "name": "storage.type.precept",
-          "match": "\\b(string|number|boolean)\\??\\b"
+          "name": "keyword.other.precept",
+          "match": "\\b(transition|reject)\\b"
+        }
+      ]
+    },
+    "arrowOperator": {
+      "patterns": [
+        {
+          "name": "punctuation.separator.arrow.precept",
+          "match": "->"
         }
       ]
     },
@@ -203,97 +366,12 @@
         }
       ]
     },
-    "fieldDeclaration": {
-      "patterns": [
-        {
-          "comment": "collection field: set<number> FieldName",
-          "name": "meta.field-declaration.collection.precept",
-          "match": "\\b(set|queue|stack)<(string|number|boolean)>\\s+([A-Za-z_][A-Za-z0-9_]*)",
-          "captures": {
-            "1": { "name": "storage.type.precept" },
-            "2": { "name": "storage.type.precept" },
-            "3": { "name": "variable.other.field.precept" }
-          }
-        },
-        {
-          "comment": "scalar field: number balance = 0  or  string? Name",
-          "name": "meta.field-declaration.scalar.precept",
-          "match": "\\b(string|number|boolean|null)(\\?)?\\s+([A-Za-z_][A-Za-z0-9_]*)",
-          "captures": {
-            "1": { "name": "storage.type.precept" },
-            "2": { "name": "keyword.operator.precept" },
-            "3": { "name": "variable.other.field.precept" }
-          }
-        }
-      ]
-    },
-    "eventArgReference": {
-      "patterns": [
-        {
-          "name": "meta.event-arg-ref.precept",
-          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)([A-Za-z_][A-Za-z0-9_]*)",
-          "captures": {
-            "1": {
-              "name": "entity.name.function.event.precept"
-            },
-            "2": {
-              "name": "punctuation.accessor.precept"
-            },
-            "3": {
-              "name": "variable.other.property.precept"
-            }
-          }
-        }
-      ]
-    },
-    "simpleTransition": {
-      "patterns": [
-        {
-          "name": "meta.transition.simple.precept",
-          "match": "^(\\s*)(transition)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
-          "captures": {
-            "2": {
-              "name": "keyword.other.precept"
-            },
-            "4": {
-              "name": "entity.name.type.state.precept"
-            }
-          }
-        }
-      ]
-    },
     "identifierReference": {
       "patterns": [
         {
-          "comment": "catch-all for bare identifier references (field names, arg names) in expression positions",
+          "comment": "catch-all for bare identifier references in expression positions",
           "name": "variable.other.precept",
           "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
-        }
-      ]
-    },
-    "strings": {
-      "patterns": [
-        {
-          "name": "string.quoted.double.precept",
-          "begin": "\"",
-          "end": "\"",
-          "patterns": [
-            {
-              "name": "constant.character.escape.precept",
-              "match": "\\\\."
-            }
-          ]
-        },
-        {
-          "name": "string.quoted.single.precept",
-          "begin": "'",
-          "end": "'",
-          "patterns": [
-            {
-              "name": "constant.character.escape.precept",
-              "match": "\\\\."
-            }
-          ]
         }
       ]
     }
