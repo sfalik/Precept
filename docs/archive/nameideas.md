@@ -1,5 +1,7 @@
 # Library Name Ideas
 
+> **ARCHIVED** — The name "Precept" has been selected and locked. This document is retained for historical reference only.
+
 ## Core concept to convey
 
 The library enforces that **state and data change together, only through transitions**. Neither can be mutated independently. The `Inspect`-before-`Fire` pattern lets you evaluate a transition before committing it.

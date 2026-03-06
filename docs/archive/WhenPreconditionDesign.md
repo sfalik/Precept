@@ -1,5 +1,7 @@
 # Design: Conditional Event Availability via `when` Precondition
 
+> **ARCHIVED** — This feature is fully implemented. This document is retained for historical reference only. See the current language design in `docs/PreceptLanguageDesign.md`.
+
 **Status: Implemented**
 **Date: 2026-03-04**
 

@@ -1,5 +1,7 @@
 # Interactive Inspector Mockup (Option 4)
 
+> **ARCHIVED** — The interactive inspector has been implemented. This early mockup is retained for historical reference only.
+
 Goal: validate UX for executing `.precept` transitions from a VS Code side panel before building runtime integration.
 
 ## Panel Layout (concept)
