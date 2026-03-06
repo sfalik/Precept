@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Precept.LanguageServer.Tests;
 
-public class SmDslAnalyzerCollectionMutationTests
+public class PreceptAnalyzerCollectionMutationTests
 {
     // ── Add / Push / Enqueue value type checking ─────────────────────────────
 

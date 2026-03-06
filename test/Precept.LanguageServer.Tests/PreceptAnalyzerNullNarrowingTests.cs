@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Precept.LanguageServer.Tests;
 
-public class SmDslAnalyzerNullNarrowingTests
+public class PreceptAnalyzerNullNarrowingTests
 {
     [Fact]
     public void Diagnostics_Guard_NullCheckAndNumericComparison_UsesNarrowedType()

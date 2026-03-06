@@ -720,6 +720,7 @@ Minimal changes — still calls `PreceptParser.Parse()` → `PreceptCompiler.Com
 **Modified files:**
 - `README.md` — syntax reference, cookbook, examples, API descriptions, current status
 - `docs/DesignNotes.md` — mark old DSL Syntax Contract as superseded, or replace with new
+- `.github/copilot-instructions.md` — rename project references, replace manual sync checklists with catalog-driven rules
 
 ### README updates
 
@@ -745,11 +746,37 @@ The public API surface (`PreceptParser.Parse`, `PreceptCompiler.Compile`, `Prece
 | CheckCompatibility | Minor: "data rules + state entry rules" → "invariants + `in <CurrentState>` asserts" |
 | Terminology | Throughout: "rules" → "invariants"/"asserts", "clauses" → "rows", "guards" → "`when` guards" |
 
+### Copilot instructions update (`.github/copilot-instructions.md`)
+
+The catalog infrastructure makes most manual sync checklists obsolete. Rewrite the instructions in this pass:
+
+| Current section | Change |
+|---|---|
+| Title | "Copilot Instructions for StateMachine" → "Copilot Instructions for Precept" |
+| DSL Sample Files | `.sm` → `.precept`; reference `PreceptLanguageDesign.md` instead of `DesignNotes.md § DSL Syntax Contract` |
+| Syntax Highlighting Grammar Sync | **Simplify.** Remove the 6-step checklist. Replace with: "Update keyword alternations in `precept.tmLanguage.json` when a keyword is added or removed. The TextMate grammar is the only consumer that isn't catalog-driven — it requires manual regex updates." |
+| Intellisense Sync | **Remove entirely.** Completions and semantic tokens are now derived from `[TokenCategory]` attributes and `ConstructCatalog`. No manual sync needed — adding a token attribute automatically updates both. |
+| DSL Syntax Reference Sync | Keep, but update file paths (`PreceptLanguageDesign.md` is now the single grammar source) |
+| DSL Authoring | Keep, but reference `PreceptLanguageDesign.md` instead of `DesignNotes.md § DSL Syntax Contract` |
+| File paths throughout | `StateMachine.Dsl.VsCode` → `Precept.VsCode`; `StateMachineDslParser.cs` → `PreceptParser.cs`; `SmDslAnalyzer.cs` path update, etc. |
+
+Add these **new sections**:
+
+**Catalog Sync (Non-Negotiable):**
+- When adding a keyword to `PreceptToken`: add `[TokenCategory]`, `[TokenDescription]`, and `[TokenSymbol]` attributes. This auto-updates the tokenizer keyword dictionary, semantic tokens, and completions.
+- When adding a parser construct: call `.Register()` with a `ConstructInfo` that includes a parseable `Example`. The example is validated by CI tests.
+- When adding or modifying a semantic constraint: call `ConstraintCatalog.Register()` with ID, phase, rule, `MessageTemplate`, and `Severity`. Add a `// SYNC:CONSTRAINT:Cnn` comment at the enforcement site. Never add one without the other.
+- When modifying a constraint's `Rule` text: update the matching entry in `docs/DesignNotes.md § DSL Syntax Contract` — the documentation-match test enforces parity.
+
+**SYNC Comment Rule:**
+- Every `// SYNC:CONSTRAINT:Cnn` comment must have a matching `ConstraintCatalog.Register()` call, and vice versa. CI tests enforce both directions.
+
 ### Checkpoint
 
 - No aspirational claims presented as implemented
 - All code examples in docs parse correctly with the new parser
-- Design doc, README, and DesignNotes are consistent
+- Design doc, README, DesignNotes, and copilot-instructions are consistent
+- Copilot-instructions reference correct file paths and catalog-driven workflow
 
 ---
 
@@ -776,6 +803,7 @@ The public API surface (`PreceptParser.Parse`, `PreceptCompiler.Compile`, `Prece
 | `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` | **Major edit** — new patterns | 8 |
 | `README.md` | **Major edit** — syntax, examples, status | 9 |
 | `docs/DesignNotes.md` | **Moderate edit** — supersede or replace | 9 |
+| `.github/copilot-instructions.md` | **Major edit** — rename project refs, replace manual checklists with catalog-driven rules, add Catalog Sync + SYNC Comment sections | 9 |
 | `docs/RuntimeApiDesign.md` | **Moderate edit** — fire pipeline stages, model types table, terminology | 9 |
 
 ## Preserve List (Unchanged)

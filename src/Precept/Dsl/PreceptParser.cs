@@ -20,6 +20,8 @@ public static class PreceptParser
 
     /// <summary>
     /// Parses a <c>.precept</c> DSL text string into a <see cref="PreceptDefinition"/> record tree.
+    /// Tries the new Superpower token-based parser first; falls back to the legacy regex parser
+    /// for older syntax (e.g. inline type declarations, block-based transitions).
     /// Throws <see cref="InvalidOperationException"/> on syntax errors.
     /// </summary>
     public static PreceptDefinition Parse(string text)
@@ -27,34 +29,31 @@ public static class PreceptParser
         if (string.IsNullOrWhiteSpace(text))
             throw new InvalidOperationException("DSL input is empty.");
 
-        TokenList<PreceptToken> tokens;
+        // Try new Superpower parser first
         try
         {
-            tokens = PreceptTokenizerBuilder.Instance.Tokenize(text);
+            var tokens = PreceptTokenizerBuilder.Instance.Tokenize(text);
+            var result = RawFileParser.TryParse(tokens);
+            if (result.HasValue && result.Remainder.IsAtEnd)
+                return AssembleModel(result.Value.Name, result.Value.Statements);
         }
-        catch (Superpower.ParseException ex)
+        catch (InvalidOperationException)
         {
-            throw new InvalidOperationException($"Tokenization error: {ex.Message}", ex);
+            // Semantic validation error from AssembleModel (after IsAtEnd confirmed) — propagate
+            throw;
+        }
+        catch
+        {
+            // Tokenization or parse combinator failure — fall through to legacy parser
         }
 
-        var result = FileParser.TryParse(tokens);
-        if (!result.HasValue)
-        {
-            var pos = result.ErrorPosition;
-            var line = pos.HasValue ? pos.Line : 0;
-            var expectations = result.Expectations ?? [];
-            var expectStr = expectations.Length > 0
-                ? $" Expected: {string.Join(", ", expectations)}."
-                : "";
-            throw new InvalidOperationException(
-                $"Line {line}: parse error.{expectStr} {result.ErrorMessage ?? ""}".TrimEnd());
-        }
-
-        return result.Value;
+        // Fall back to legacy regex parser
+        return PreceptLegacyParser.Parse(text);
     }
 
     /// <summary>
     /// Parses with diagnostics — returns a model (or null) and a list of parse diagnostics.
+    /// Tries new parser first, falls back to legacy parser on failure.
     /// For use by the language server.
     /// </summary>
     public static (PreceptDefinition? Model, IReadOnlyList<ParseDiagnostic> Diagnostics) ParseWithDiagnostics(string text)
@@ -67,28 +66,39 @@ public static class PreceptParser
             return (null, diagnostics);
         }
 
+        // Try new Superpower parser first
         TokenList<PreceptToken> tokens;
+        bool tokenizationFailed = false;
         try
         {
             tokens = PreceptTokenizerBuilder.Instance.Tokenize(text);
         }
-        catch (Superpower.ParseException ex)
+        catch (Superpower.ParseException)
         {
-            diagnostics.Add(new ParseDiagnostic(1, 0, $"Tokenization error: {ex.Message}"));
-            return (null, diagnostics);
+            tokenizationFailed = true;
+            tokens = default;
         }
 
-        var result = FileParser.TryParse(tokens);
-        if (!result.HasValue)
+        if (!tokenizationFailed)
         {
-            var pos = result.ErrorPosition;
-            var line = pos.HasValue ? pos.Line : 1;
-            var col = pos.HasValue ? pos.Column : 0;
-            diagnostics.Add(new ParseDiagnostic(line, col, result.ErrorMessage ?? "Parse error."));
-            return (null, diagnostics);
+            var result = RawFileParser.TryParse(tokens);
+            if (result.HasValue && result.Remainder.IsAtEnd)
+            {
+                try
+                {
+                    var model = AssembleModel(result.Value.Name, result.Value.Statements);
+                    return (model, diagnostics);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    diagnostics.Add(new ParseDiagnostic(1, 0, ex.Message));
+                    return (null, diagnostics);
+                }
+            }
         }
 
-        return (result.Value, diagnostics);
+        // Fall back to legacy parser
+        return PreceptLegacyParser.ParseWithDiagnostics(text);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -641,10 +651,15 @@ public static class PreceptParser
     // File Parser (top-level)
     // ═══════════════════════════════════════════════════════════════════
 
-    private static readonly TokenListParser<PreceptToken, PreceptDefinition> FileParser =
+    /// <summary>
+    /// Raw file parser: captures header + statements without validation.
+    /// AssembleModel is called separately after confirming IsAtEnd, so partial
+    /// parses of old-syntax files can fall through to the legacy parser.
+    /// </summary>
+    private static readonly TokenListParser<PreceptToken, (string Name, StatementResult[] Statements)> RawFileParser =
         from header in PreceptHeader
         from statements in Statement.Many()
-        select AssembleModel(header, statements);
+        select (header, statements);
 
     /// <summary>
     /// Assembles individual parsed statements into a <see cref="PreceptDefinition"/>.

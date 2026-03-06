@@ -16,7 +16,7 @@ namespace Precept.LanguageServer.Tests;
 /// <c>EvaluateCurrentRules</c> on <c>PreceptEngine</c> and
 /// the rule fields surfaced by <c>SmPreviewHandler</c> in snapshot and fire responses.
 /// </summary>
-public class SmPreviewRulesTests
+public class PreceptPreviewRulesTests
 {
     // ── EvaluateCurrentRules — runtime API ───────────────────────────────────
 

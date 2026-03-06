@@ -19,7 +19,7 @@ internal sealed class SmDslAnalyzer
     private static readonly Regex SetLineRegex = new("^\\s*set\\s+(?<key>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<expr>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex CollectionDeclRegex = new("^\\s*(?:set|queue|stack)<(?:number|string|boolean)>\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly MethodInfo? ExpressionParseMethod = typeof(PreceptDefinition).Assembly
-        .GetType("Precept.PreceptExpressionParser", throwOnError: false)
+        .GetType("Precept.PreceptLegacyExpressionParser", throwOnError: false)
         ?.GetMethod(
             "Parse",
             BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,

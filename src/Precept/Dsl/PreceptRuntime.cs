@@ -61,11 +61,22 @@ public sealed class PreceptEngine
                 var rows = new List<PreceptTransitionRow>();
                 foreach (var clause in t.Clauses)
                 {
+                    // Combine block-level 'when' predicate with clause-level 'if' guard.
+                    // Both must pass for the row to match.
+                    var whenGuard = CombineGuards(t.PredicateAst, clause.PredicateAst);
+                    var whenText = CombineGuardText(t.Predicate, clause.Predicate);
+
+                    // If the clause has a predicate string but no AST (unparseable expression like
+                    // function calls), treat it as a guarded row. ResolveTransition will handle the
+                    // eval failure by falling through to the next row.
+                    if (whenText is not null && whenGuard is null)
+                        whenGuard = new PreceptIdentifierExpression("__unparseable_guard__");
+
                     rows.Add(new PreceptTransitionRow(
                         t.FromState, t.EventName, clause.Outcome,
                         clause.SetAssignments.ToList(),
                         clause.CollectionMutations,
-                        clause.Predicate, clause.PredicateAst,
+                        whenText, whenGuard,
                         clause.SourceLine));
                 }
                 _transitionRowMap[key] = rows;
@@ -85,10 +96,49 @@ public sealed class PreceptEngine
                 StringComparer.Ordinal);
 
         // Invariants (replaces top-level rules + field rules + collection rules)
-        _invariants = model.Invariants ?? Array.Empty<PreceptInvariant>();
+        var invariantsList = new List<PreceptInvariant>();
+        if (model.Invariants is { Count: > 0 })
+            invariantsList.AddRange(model.Invariants);
+
+        // Backward compat: synthesize invariants from old-style rules
+        if (model.TopLevelRules is { Count: > 0 } && (model.Invariants is null or { Count: 0 }))
+        {
+            foreach (var rule in model.TopLevelRules)
+                invariantsList.Add(new PreceptInvariant(rule.ExpressionText, rule.Expression, rule.Reason, rule.SourceLine));
+        }
+        foreach (var field in model.Fields)
+        {
+            if (field.Rules is { Count: > 0 })
+            {
+                foreach (var rule in field.Rules)
+                    invariantsList.Add(new PreceptInvariant(rule.ExpressionText, rule.Expression, rule.Reason, rule.SourceLine));
+            }
+        }
+        foreach (var col in model.CollectionFields)
+        {
+            if (col.Rules is { Count: > 0 })
+            {
+                foreach (var rule in col.Rules)
+                    invariantsList.Add(new PreceptInvariant(rule.ExpressionText, rule.Expression, rule.Reason, rule.SourceLine));
+            }
+        }
+        _invariants = invariantsList;
 
         // Event asserts (replaces event rules)
-        _eventAsserts = model.EventAsserts ?? Array.Empty<PreceptEventAssert>();
+        var eventAssertList = new List<PreceptEventAssert>();
+        if (model.EventAsserts is { Count: > 0 })
+            eventAssertList.AddRange(model.EventAsserts);
+
+        // Backward compat: synthesize event asserts from old-style event rules
+        foreach (var evt in model.Events)
+        {
+            if (evt.Rules is { Count: > 0 })
+            {
+                foreach (var rule in evt.Rules)
+                    eventAssertList.Add(new PreceptEventAssert(evt.Name, rule.ExpressionText, rule.Expression, rule.Reason, rule.SourceLine));
+            }
+        }
+        _eventAsserts = eventAssertList;
         _eventAssertMap = new Dictionary<string, List<PreceptEventAssert>>(StringComparer.Ordinal);
         foreach (var ea in _eventAsserts)
         {
@@ -101,7 +151,24 @@ public sealed class PreceptEngine
         }
 
         // State asserts (replaces state rules, now preposition-aware)
-        _stateAsserts = model.StateAsserts ?? Array.Empty<PreceptStateAssert>();
+        var stateAssertList = new List<PreceptStateAssert>();
+        if (model.StateAsserts is { Count: > 0 })
+            stateAssertList.AddRange(model.StateAsserts);
+
+        // Backward compat: synthesize state asserts from old-style state rules
+        // Old state rules were only checked on state entry (transition INTO state),
+        // NOT on no-transition. Map to 'To' preposition to preserve that behavior.
+        foreach (var state in model.States)
+        {
+            if (state.Rules is { Count: > 0 })
+            {
+                foreach (var rule in state.Rules)
+                    stateAssertList.Add(new PreceptStateAssert(
+                        PreceptAssertPreposition.To, state.Name,
+                        rule.ExpressionText, rule.Expression, rule.Reason, rule.SourceLine));
+            }
+        }
+        _stateAsserts = stateAssertList;
         _stateAssertMap = new Dictionary<(PreceptAssertPreposition Prep, string State), List<PreceptStateAssert>>();
         foreach (var sa in _stateAsserts)
         {
@@ -725,6 +792,27 @@ public sealed class PreceptEngine
             .ToArray();
     }
 
+    /// <summary>
+    /// Combines a block-level 'when' guard with a clause-level 'if' guard using logical AND.
+    /// Returns null only if both are null (unguarded).
+    /// </summary>
+    private static PreceptExpression? CombineGuards(PreceptExpression? blockGuard, PreceptExpression? clauseGuard)
+    {
+        if (blockGuard is null) return clauseGuard;
+        if (clauseGuard is null) return blockGuard;
+        return new PreceptBinaryExpression("&&", blockGuard, clauseGuard);
+    }
+
+    /// <summary>
+    /// Combines block-level 'when' text with clause-level 'if' text.
+    /// </summary>
+    private static string? CombineGuardText(string? blockText, string? clauseText)
+    {
+        if (blockText is null) return clauseText;
+        if (clauseText is null) return blockText;
+        return $"({blockText}) && ({clauseText})";
+    }
+
     private IReadOnlyDictionary<string, object?> BuildEvaluationData(
         IReadOnlyDictionary<string, object?> instanceData,
         string eventName,
@@ -952,7 +1040,8 @@ public sealed class PreceptEngine
 
         if (string.Equals(sourceState, targetState, StringComparison.Ordinal))
         {
-            // AcceptedInPlace / self-transition: evaluate 'in' asserts
+            // AcceptedInPlace / self-transition: evaluate 'to' + 'in' asserts
+            violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.To, targetState, data));
             violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.In, sourceState, data));
         }
         else
@@ -1338,7 +1427,19 @@ public static class PreceptCompiler
     private static void ValidateLiteralSetAssignments(PreceptDefinition model, IReadOnlyDictionary<string, object?> defaultData)
     {
         var invariants = model.Invariants ?? Array.Empty<PreceptInvariant>();
-        if (invariants.Count == 0)
+
+        // Also gather old-style field rules for backward compat
+        var fieldRules = new List<(PreceptExpression Expression, string Reason)>();
+        foreach (var field in model.Fields)
+        {
+            if (field.Rules is { Count: > 0 })
+            {
+                foreach (var rule in field.Rules)
+                    fieldRules.Add((rule.Expression, rule.Reason));
+            }
+        }
+
+        if (invariants.Count == 0 && fieldRules.Count == 0)
             return;
 
         void CheckLiteralAssignment(PreceptSetAssignment assignment)
@@ -1358,6 +1459,14 @@ public static class PreceptCompiler
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
                     throw new InvalidOperationException(
                         $"Line {assignment.SourceLine}: literal assignment 'set {assignment.Key} = {assignment.ExpressionText}' violates invariant \"{inv.Reason}\".");
+            }
+
+            foreach (var (expression, reason) in fieldRules)
+            {
+                var result = PreceptExpressionRuntimeEvaluator.Evaluate(expression, ctx);
+                if (!result.Success || result.Value is not bool boolVal || !boolVal)
+                    throw new InvalidOperationException(
+                        $"Line {assignment.SourceLine}: literal assignment 'set {assignment.Key} = {assignment.ExpressionText}' violates rule \"{reason}\".");
             }
         }
 

@@ -351,13 +351,20 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
   - Mark as "Implemented" with date
   - Note any deviations from the original design discovered during implementation
 - [ ] Verify `docs/CatalogInfrastructureDesign.md` cross-references are still accurate
-- [ ] Ensure copilot-instructions.md covers any new sync rules for MCP tool changes
+- [ ] Add MCP sync rule to `.github/copilot-instructions.md`:
+
+**MCP Tool Sync** (new section in copilot-instructions):
+- When core model types change (`DslWorkflowModel`, `DslField`, `DslState`, `DslEvent`, `DslTransitionRow`, etc.), check whether MCP tool DTOs in `tools/Precept.Mcp/Tools/` need corresponding updates.
+- When `ConstructCatalog` or `ConstraintCatalog` records gain or lose properties, verify `LanguageTool.cs` serialization still matches `McpServerDesign.md § precept_language` output format.
+- When the fire pipeline stages change, update the static `firePipeline` array in `LanguageTool.cs`.
+- The MCP tools are **thin wrappers** — never duplicate domain logic. If a tool method exceeds ~30 lines of non-serialization code, the logic probably belongs in `src/Precept/`.
 
 ### Checkpoint
 
 - README accurately describes all 6 tools
 - No aspirational claims presented as implemented
 - Design doc marked as implemented
+- Copilot-instructions includes MCP Tool Sync section
 
 ---
 
@@ -384,6 +391,7 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 | `Precept.slnx` | **Edit** — add `Precept.Mcp` project | 0 |
 | `README.md` | **Edit** — MCP server section | 8 |
 | `docs/McpServerDesign.md` | **Edit** — mark implemented | 8 |
+| `.github/copilot-instructions.md` | **Edit** — add MCP Tool Sync section | 8 |
 
 ## Dependency Graph
 

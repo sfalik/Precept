@@ -13,10 +13,9 @@ namespace Precept;
 /// </summary>
 public static class PreceptTokenizerBuilder
 {
-    /// <summary>Singleton tokenizer instance, thread-safe after initialization.</summary>
-    public static Tokenizer<PreceptToken> Instance { get; } = Build();
-
     // ── Text parsers for complex token patterns ──────────────────────
+    // NOTE: These must be declared BEFORE Instance so they are initialized
+    // before Build() runs (C# static fields initialize in textual order).
 
     /// <summary>Comment: # followed by any non-newline characters to end of line.</summary>
     static readonly TextParser<Unit> CommentParser =
@@ -34,6 +33,9 @@ public static class PreceptTokenizerBuilder
                         .Try()
                         .OptionalOrDefault([])));
 
+    /// <summary>Singleton tokenizer instance, thread-safe after initialization.</summary>
+    public static Tokenizer<PreceptToken> Instance { get; } = Build();
+
     // ── Builder ──────────────────────────────────────────────────────
 
     static Tokenizer<PreceptToken> Build()
@@ -42,8 +44,8 @@ public static class PreceptTokenizerBuilder
 
         var builder = new TokenizerBuilder<PreceptToken>();
 
-        // 1. Comments (must come before any single-char # handling)
-        builder.Match(CommentParser, PreceptToken.Comment);
+        // 1. Comments — strip from token stream so the parser never sees them
+        builder.Ignore(CommentParser);
 
         // 2. String literals ("..." with C-style escapes)
         builder.Match(QuotedString.CStyle, PreceptToken.StringLiteral);
