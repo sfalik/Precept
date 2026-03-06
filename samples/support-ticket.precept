@@ -1,19 +1,19 @@
 precept SupportTicket
 
-string? AssignedAgent = null
-number Priority = 3
-	rule Priority >= 1 && Priority <= 5 "Priority must be between 1 and 5"
-boolean CustomerConfirmed = false
-boolean EscalatedOnce = false
-string? ResolutionSummary = null
-number ReopenCount = 0
-	rule ReopenCount >= 0 "Reopen count cannot be negative"
+field AssignedAgent as string nullable
+field Priority as number default 3
+invariant Priority >= 1 && Priority <= 5 because "Priority must be between 1 and 5"
+field CustomerConfirmed as boolean default false
+field EscalatedOnce as boolean default false
+field ResolutionSummary as string nullable
+field ReopenCount as number default 0
+invariant ReopenCount >= 0 because "Reopen count cannot be negative"
 # Ordered pool of available agents; Assign dequeues the next one
-queue<string> AgentPool
+field AgentPool as queue of string
 
 state Open initial
 state Assigned
-	rule AssignedAgent != null "Must have an assigned agent"
+in Assigned assert AssignedAgent != null because "Must have an assigned agent"
 state InProgress
 state PendingCustomer
 state Escalated
@@ -22,88 +22,51 @@ state Closed
 state Reopened
 
 # Add an agent to the back of the assignment pool
-event RegisterAgent
-	string AgentName
-		rule AgentName != "" "Agent name is required"
+event RegisterAgent with AgentName as string
+on RegisterAgent assert AgentName != "" because "Agent name is required"
 
 # Dequeues the next agent from the pool; set priority for this ticket
-event Assign
-	number Priority = 3
-		rule Priority >= 1 && Priority <= 5 "Priority must be between 1 and 5"
+event Assign with Priority as number default 3
+on Assign assert Priority >= 1 && Priority <= 5 because "Priority must be between 1 and 5"
 
 event StartWork
 
-event RequestCustomerInfo
-	string Question
+event RequestCustomerInfo with Question as string
 
-event CustomerReply
-	string Answer
+event CustomerReply with Answer as string
 
-event Escalate
-	string Reason
+event Escalate with Reason as string
 
-event Resolve
-	string Summary
-		rule Summary != "" "Resolution summary is required"
+event Resolve with Summary as string
+on Resolve assert Summary != "" because "Resolution summary is required"
 
 event ConfirmResolution
-
 event Close
 
-event Reopen
-	string Reason
+event Reopen with Reason as string
 
-from any on RegisterAgent
-	enqueue AgentPool RegisterAgent.AgentName
-	no transition
+from any on RegisterAgent -> enqueue AgentPool RegisterAgent.AgentName -> no transition
 
-from Open on Assign
-	if AgentPool.count > 0
-		set AssignedAgent = AgentPool.peek
-		dequeue AgentPool
-		set Priority = Assign.Priority
-		transition Assigned
-	else
-		reject "No agents available in the pool"
+from Open on Assign when AgentPool.count > 0 -> set AssignedAgent = AgentPool.peek -> dequeue AgentPool -> set Priority = Assign.Priority -> transition Assigned
+from Open on Assign -> reject "No agents available in the pool"
 
-from Assigned on StartWork
-	transition InProgress
+from Assigned on StartWork -> transition InProgress
 
-from InProgress on RequestCustomerInfo
-	no transition
+from InProgress on RequestCustomerInfo -> no transition
 
-from any on CustomerReply
-	no transition
+from any on CustomerReply -> no transition
 
 # Escalate is only applicable the first time; once escalated it becomes NotApplicable
-from InProgress, PendingCustomer on Escalate when !EscalatedOnce
-        set EscalatedOnce = true
-        set Priority = 1
-        transition Escalated
+from InProgress, PendingCustomer on Escalate when !EscalatedOnce -> set EscalatedOnce = true -> set Priority = 1 -> transition Escalated
 
-from InProgress, Escalated on Resolve
-	set ResolutionSummary = Resolve.Summary
-	transition Resolved
+from InProgress, Escalated on Resolve -> set ResolutionSummary = Resolve.Summary -> transition Resolved
 
-from Resolved on ConfirmResolution
-	set CustomerConfirmed = true
-	no transition
+from Resolved on ConfirmResolution -> set CustomerConfirmed = true -> no transition
 
-from Resolved on Close
-	transition Closed
+from Resolved on Close -> transition Closed
 
 # Reopen is only applicable while under the three-reopen cap
-from Resolved, Closed on Reopen when ReopenCount < 3
-        set ReopenCount = ReopenCount + 1
-        set ResolutionSummary = null
-        set CustomerConfirmed = false
-        transition Reopened
+from Resolved, Closed on Reopen when ReopenCount < 3 -> set ReopenCount = ReopenCount + 1 -> set ResolutionSummary = null -> set CustomerConfirmed = false -> transition Reopened
 
-from Reopened on Assign
-	if AgentPool.count > 0
-		set AssignedAgent = AgentPool.peek
-		dequeue AgentPool
-		set Priority = Assign.Priority
-		transition Assigned
-	else
-		reject "No agents available in the pool"
+from Reopened on Assign when AgentPool.count > 0 -> set AssignedAgent = AgentPool.peek -> dequeue AgentPool -> set Priority = Assign.Priority -> transition Assigned
+from Reopened on Assign -> reject "No agents available in the pool"

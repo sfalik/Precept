@@ -1,14 +1,14 @@
 precept HotelBooking
 
-string? GuestName = null
-number NightsBooked = 0
-	rule NightsBooked >= 0 "Nights booked cannot be negative"
-number RatePerNight = 0
-	rule RatePerNight >= 0 "Rate per night cannot be negative"
-number TotalCharge = 0
-	rule TotalCharge >= 0 "Total charge cannot be negative"
-boolean IsLateCheckout = false
-string? CancellationReason = null
+field GuestName as string nullable
+field NightsBooked as number default 0
+invariant NightsBooked >= 0 because "Nights booked cannot be negative"
+field RatePerNight as number default 0
+invariant RatePerNight >= 0 because "Rate per night cannot be negative"
+field TotalCharge as number default 0
+invariant TotalCharge >= 0 because "Total charge cannot be negative"
+field IsLateCheckout as boolean default false
+field CancellationReason as string nullable
 
 state Available initial
 state Reserved
@@ -16,44 +16,24 @@ state CheckedIn
 state CheckedOut
 state Cancelled
 
-event Reserve
-	string GuestName
-	number Nights
-		rule Nights > 0 "Nights must be greater than zero"
-	number RatePerNight
-		rule RatePerNight > 0 "Rate must be greater than zero"
+event Reserve with GuestName as string, Nights as number, RatePerNight as number
+on Reserve assert Nights > 0 because "Nights must be greater than zero"
+on Reserve assert RatePerNight > 0 because "Rate must be greater than zero"
 
 event CheckIn
-
 event RequestLateCheckout
-
 event CheckOut
 
-event Cancel
-	string Reason
-		rule Reason != "" "Cancellation reason is required"
+event Cancel with Reason as string
+on Cancel assert Reason != "" because "Cancellation reason is required"
 
-from Available on Reserve
-	set GuestName = Reserve.GuestName
-	set NightsBooked = Reserve.Nights
-	set RatePerNight = Reserve.RatePerNight
-	set TotalCharge = Reserve.Nights * Reserve.RatePerNight
-	transition Reserved
+from Available on Reserve -> set GuestName = Reserve.GuestName -> set NightsBooked = Reserve.Nights -> set RatePerNight = Reserve.RatePerNight -> set TotalCharge = Reserve.Nights * Reserve.RatePerNight -> transition Reserved
 
-from Reserved on CheckIn
-	transition CheckedIn
+from Reserved on CheckIn -> transition CheckedIn
 
-from CheckedIn on RequestLateCheckout
-	if IsLateCheckout
-		no transition
-	else
-		set IsLateCheckout = true
-		set TotalCharge = TotalCharge + RatePerNight
-		no transition
+from CheckedIn on RequestLateCheckout when !IsLateCheckout -> set IsLateCheckout = true -> set TotalCharge = TotalCharge + RatePerNight -> no transition
+from CheckedIn on RequestLateCheckout -> no transition
 
-from CheckedIn on CheckOut
-	transition CheckedOut
+from CheckedIn on CheckOut -> transition CheckedOut
 
-from Reserved, CheckedIn on Cancel
-	set CancellationReason = Cancel.Reason
-	transition Cancelled
+from Reserved, CheckedIn on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled

@@ -1,94 +1,56 @@
 precept Subscription
 
-string? PlanName = null
-number MonthlyPrice = 0
-	rule MonthlyPrice >= 0 "Monthly price cannot be negative"
-number BillingCycleDay = 1
-boolean AutoRenew = true
-number FailedPayments = 0
-	rule FailedPayments >= 0 "Failed payments cannot be negative"
-string? CancellationReason = null
+field PlanName as string nullable
+field MonthlyPrice as number default 0
+invariant MonthlyPrice >= 0 because "Monthly price cannot be negative"
+field BillingCycleDay as number default 1
+field AutoRenew as boolean default true
+field FailedPayments as number default 0
+invariant FailedPayments >= 0 because "Failed payments cannot be negative"
+field CancellationReason as string nullable
 
 state Free initial
 state TrialActive
 state Active
-	rule PlanName != null "Must have a plan name to be active"
+in Active assert PlanName != null because "Must have a plan name to be active"
 state PastDue
 state Suspended
 state Cancelled
 
-event StartTrial
-	string PlanName
-	number MonthlyPrice
-		rule MonthlyPrice > 0 "Plan requires a valid monthly price"
+event StartTrial with PlanName as string, MonthlyPrice as number
+on StartTrial assert MonthlyPrice > 0 because "Plan requires a valid monthly price"
 
-event Upgrade
-	string PlanName
-	number MonthlyPrice
-		rule MonthlyPrice > 0 "Monthly price must be greater than zero"
+event Upgrade with PlanName as string, MonthlyPrice as number
+on Upgrade assert MonthlyPrice > 0 because "Monthly price must be greater than zero"
 
 event BillSucceeded
-
 event BillFailed
-
 event PayOutstanding
-
 event ToggleAutoRenew
 
-event Cancel
-	string Reason
-		rule Reason != "" "Cancellation reason is required"
+event Cancel with Reason as string
+on Cancel assert Reason != "" because "Cancellation reason is required"
 
-event Reactivate
-	string PlanName
-	number MonthlyPrice
-		rule MonthlyPrice > 0 "Monthly price must be greater than zero"
+event Reactivate with PlanName as string, MonthlyPrice as number
+on Reactivate assert MonthlyPrice > 0 because "Monthly price must be greater than zero"
 
-from Free on StartTrial
-	set PlanName = StartTrial.PlanName
-	set MonthlyPrice = StartTrial.MonthlyPrice
-	set FailedPayments = 0
-	transition TrialActive
+from Free on StartTrial -> set PlanName = StartTrial.PlanName -> set MonthlyPrice = StartTrial.MonthlyPrice -> set FailedPayments = 0 -> transition TrialActive
 
-from Free, TrialActive on Upgrade
-	set PlanName = Upgrade.PlanName
-	set MonthlyPrice = Upgrade.MonthlyPrice
-	transition Active
+from Free, TrialActive on Upgrade -> set PlanName = Upgrade.PlanName -> set MonthlyPrice = Upgrade.MonthlyPrice -> transition Active
 
-from any on ToggleAutoRenew
-	set AutoRenew = !AutoRenew
-	no transition
+from any on ToggleAutoRenew -> set AutoRenew = !AutoRenew -> no transition
 
-from TrialActive, Active on BillSucceeded
-	set FailedPayments = 0
-	transition Active
+from TrialActive, Active on BillSucceeded -> set FailedPayments = 0 -> transition Active
 
-from TrialActive, Active on BillFailed
-	if FailedPayments >= 2
-		set FailedPayments = FailedPayments + 1
-		transition Suspended
-	else
-		set FailedPayments = FailedPayments + 1
-		transition PastDue
+from TrialActive, Active on BillFailed when FailedPayments >= 2 -> set FailedPayments = FailedPayments + 1 -> transition Suspended
+from TrialActive, Active on BillFailed -> set FailedPayments = FailedPayments + 1 -> transition PastDue
 
-from PastDue on BillSucceeded
-	set FailedPayments = 0
-	transition Active
+from PastDue on BillSucceeded -> set FailedPayments = 0 -> transition Active
 
-from PastDue on BillFailed
-	set FailedPayments = FailedPayments + 1
-	transition Suspended
+from PastDue on BillFailed -> set FailedPayments = FailedPayments + 1 -> transition Suspended
 
-from PastDue on PayOutstanding
-	set FailedPayments = 0
-	transition Active
+from PastDue on PayOutstanding -> set FailedPayments = 0 -> transition Active
 
-from Active, PastDue, TrialActive on Cancel
-	set CancellationReason = Cancel.Reason
-	transition Cancelled
+from Active, PastDue, TrialActive on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
 
-from Suspended on Reactivate
-	set PlanName = Reactivate.PlanName
-	set MonthlyPrice = Reactivate.MonthlyPrice
-	set FailedPayments = 0
-	transition Active
+from Suspended on Reactivate -> set PlanName = Reactivate.PlanName -> set MonthlyPrice = Reactivate.MonthlyPrice -> set FailedPayments = 0 -> transition Active

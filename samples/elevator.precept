@@ -1,125 +1,78 @@
 precept Elevator
 
 # Persistent data
-number CurrentFloor = 1
-	rule CurrentFloor >= 1 "Current floor must be at least 1"
-number TargetFloor = 1
-	rule TargetFloor >= 1 "Target floor must be at least 1"
-number TotalFloors = 10
-	rule TotalFloors >= 1 "Must have at least one floor"
-boolean Overloaded = false
-boolean EmergencyActive = false
-boolean MovingUp = true    # Direction of current or last trip
+field CurrentFloor as number default 1
+invariant CurrentFloor >= 1 because "Current floor must be at least 1"
+field TargetFloor as number default 1
+invariant TargetFloor >= 1 because "Target floor must be at least 1"
+field TotalFloors as number default 10
+invariant TotalFloors >= 1 because "Must have at least one floor"
+field Overloaded as boolean default false
+field EmergencyActive as boolean default false
+field MovingUp as boolean default true
 
-rule CurrentFloor <= TotalFloors "Current floor cannot exceed total floors"
-rule TargetFloor <= TotalFloors "Target floor cannot exceed total floors"
+invariant CurrentFloor <= TotalFloors because "Current floor cannot exceed total floors"
+invariant TargetFloor <= TotalFloors because "Target floor cannot exceed total floors"
 
 # Collection: floors with pending requests (sorted, deduplicated)
-set<number> PendingFloors
+field PendingFloors as set of number
 
 # States
-state Idle initial         # At a floor, doors closed, no pending request
-state Moving               # Traveling toward TargetFloor
-state DoorsOpen            # Doors fully open, passengers boarding/alighting
-state EmergencyHalt        # Emergency stop; requires technician reset
+state Idle initial
+state Moving
+state DoorsOpen
+state EmergencyHalt
 
-# User / hall-call button — accepted in Idle, Moving, and DoorsOpen
-event RequestFloor
-	number Floor
-		rule Floor >= 1 "Floor must be at least 1"
+# User / hall-call button
+event RequestFloor with Floor as number
+on RequestFloor assert Floor >= 1 because "Floor must be at least 1"
 
-# Sensor: cabin has reached TargetFloor (fired by position sensor)
+# Sensor: cabin has reached TargetFloor
 event FloorReached
 
-# Button: request doors to close (cabin button or automatic-timer expiry)
+# Button: request doors to close
 event CloseDoors
 
-# Button: hold doors open (door-open button, obstruction sensor, or re-request)
+# Button: hold doors open
 event HoldDoor
 
 # Weight sensor
 event DetectOverload
-
 event ClearOverload
 
-# Emergency stop — valid from any state
+# Emergency stop
 event TriggerEmergency
 
 # Technician resets after emergency inspection
 event ResetEmergency
 
 # --- Idle ---
-# Accept a floor call, add to pending set, then begin moving
-from Idle on RequestFloor
-	if RequestFloor.Floor <= TotalFloors && RequestFloor.Floor > CurrentFloor
-		add PendingFloors RequestFloor.Floor
-		set TargetFloor = RequestFloor.Floor
-		set MovingUp = true
-		transition Moving
-	else if RequestFloor.Floor <= TotalFloors && RequestFloor.Floor < CurrentFloor
-		add PendingFloors RequestFloor.Floor
-		set TargetFloor = RequestFloor.Floor
-		set MovingUp = false
-		transition Moving
-	else
-		reject "Floor must be within range and different from the current floor"
+from Idle on RequestFloor when RequestFloor.Floor <= TotalFloors && RequestFloor.Floor > CurrentFloor -> add PendingFloors RequestFloor.Floor -> set TargetFloor = RequestFloor.Floor -> set MovingUp = true -> transition Moving
+from Idle on RequestFloor when RequestFloor.Floor <= TotalFloors && RequestFloor.Floor < CurrentFloor -> add PendingFloors RequestFloor.Floor -> set TargetFloor = RequestFloor.Floor -> set MovingUp = false -> transition Moving
+from Idle on RequestFloor -> reject "Floor must be within range and different from the current floor"
 
 # --- Moving ---
-# Queue additional destinations into the pending set while en route
-from Moving on RequestFloor
-	if RequestFloor.Floor <= TotalFloors && RequestFloor.Floor != CurrentFloor
-		add PendingFloors RequestFloor.Floor
-		no transition
-	else
-		reject "Floor must be within range and different from the current floor"
+from Moving on RequestFloor when RequestFloor.Floor <= TotalFloors && RequestFloor.Floor != CurrentFloor -> add PendingFloors RequestFloor.Floor -> no transition
+from Moving on RequestFloor -> reject "Floor must be within range and different from the current floor"
 
-# Position sensor fires when the cabin arrives at TargetFloor
-from Moving on FloorReached
-	set CurrentFloor = TargetFloor
-	remove PendingFloors TargetFloor
-	transition DoorsOpen
+from Moving on FloorReached -> set CurrentFloor = TargetFloor -> remove PendingFloors TargetFloor -> transition DoorsOpen
 
 # --- DoorsOpen ---
-# Accept a new destination while waiting at a stop
-from DoorsOpen on RequestFloor
-	if RequestFloor.Floor <= TotalFloors && RequestFloor.Floor != CurrentFloor
-		add PendingFloors RequestFloor.Floor
-		no transition
-	else
-		reject "Floor must be within range and different from the current floor"
+from DoorsOpen on RequestFloor when RequestFloor.Floor <= TotalFloors && RequestFloor.Floor != CurrentFloor -> add PendingFloors RequestFloor.Floor -> no transition
+from DoorsOpen on RequestFloor -> reject "Floor must be within range and different from the current floor"
 
-# Close doors: if pending floors remain, pick nearest in current direction; otherwise Idle
-from DoorsOpen on CloseDoors
-	if !Overloaded && PendingFloors.count > 0 && MovingUp
-		set TargetFloor = PendingFloors.min
-		transition Moving
-	else if !Overloaded && PendingFloors.count > 0 && !MovingUp
-		set TargetFloor = PendingFloors.max
-		transition Moving
-	else if !Overloaded && PendingFloors.count == 0
-		transition Idle
-	else
-		reject "Cannot close doors while elevator is overloaded"
+from DoorsOpen on CloseDoors when !Overloaded && PendingFloors.count > 0 && MovingUp -> set TargetFloor = PendingFloors.min -> transition Moving
+from DoorsOpen on CloseDoors when !Overloaded && PendingFloors.count > 0 && !MovingUp -> set TargetFloor = PendingFloors.max -> transition Moving
+from DoorsOpen on CloseDoors when !Overloaded && PendingFloors.count == 0 -> transition Idle
+from DoorsOpen on CloseDoors -> reject "Cannot close doors while elevator is overloaded"
 
-# Hold button while doors are open — resets the close timer (no state change)
-from DoorsOpen on HoldDoor
-	no transition
+from DoorsOpen on HoldDoor -> no transition
 
-from DoorsOpen on DetectOverload
-	set Overloaded = true
-	no transition
+from DoorsOpen on DetectOverload -> set Overloaded = true -> no transition
 
-from DoorsOpen on ClearOverload
-	set Overloaded = false
-	no transition
+from DoorsOpen on ClearOverload -> set Overloaded = false -> no transition
 
 # --- Emergency (any state) ---
-from any on TriggerEmergency
-	set EmergencyActive = true
-	transition EmergencyHalt
+from any on TriggerEmergency -> set EmergencyActive = true -> transition EmergencyHalt
 
-from EmergencyHalt on ResetEmergency
-	set EmergencyActive = false
-	set Overloaded = false
-	clear PendingFloors
-	transition Idle
+from EmergencyHalt on ResetEmergency -> set EmergencyActive = false -> set Overloaded = false -> clear PendingFloors -> transition Idle

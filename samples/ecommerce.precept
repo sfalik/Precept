@@ -1,5 +1,14 @@
 precept ECommerceOrder
 
+field OrderTotal as number default 0
+invariant OrderTotal >= 0 because "Order total cannot be negative"
+field ItemCount as number default 0
+invariant ItemCount >= 0 because "Item count cannot be negative"
+field TrackingNumber as string nullable
+field CancellationReason as string nullable
+field RefundReason as string nullable
+field RefundIssued as boolean default false
+
 state Pending initial
 state PaymentFailed
 state Paid
@@ -8,74 +17,40 @@ state Delivered
 state Cancelled
 state Refunded
 
-number OrderTotal = 0
-	rule OrderTotal >= 0 "Order total cannot be negative"
-number ItemCount = 0
-	rule ItemCount >= 0 "Item count cannot be negative"
-string? TrackingNumber = null
-string? CancellationReason = null
-string? RefundReason = null
-boolean RefundIssued = false
+event Pay with Amount as number
 
-event Pay
-	number Amount
+event FailPayment with Reason as string
+on FailPayment assert Reason != "" because "Failure reason is required"
 
-event FailPayment
-	string Reason
-		rule Reason != "" "Failure reason is required"
+event RetryPayment with Amount as number
 
-event RetryPayment
-	number Amount
-
-event Ship
-	string TrackingNumber
-		rule TrackingNumber != "" "Tracking number is required"
+event Ship with TrackingNumber as string
+on Ship assert TrackingNumber != "" because "Tracking number is required"
 
 event Deliver
 
-event Cancel
-	string Reason
-		rule Reason != "" "Cancellation reason is required"
+event Cancel with Reason as string
+on Cancel assert Reason != "" because "Cancellation reason is required"
 
-event Refund
-	string Reason
-		rule Reason != "" "Refund reason is required"
+event Refund with Reason as string
+on Refund assert Reason != "" because "Refund reason is required"
 
-from Pending on Pay
-	if Pay.Amount == OrderTotal
-		transition Paid
-	else
-		reject "Payment amount does not match order total"
+from Pending on Pay when Pay.Amount == OrderTotal -> transition Paid
+from Pending on Pay -> reject "Payment amount does not match order total"
 
-from Pending on FailPayment
-	transition PaymentFailed
+from Pending on FailPayment -> transition PaymentFailed
 
-from PaymentFailed on RetryPayment
-	if RetryPayment.Amount == OrderTotal
-		transition Paid
-	else
-		reject "Payment amount does not match order total"
+from PaymentFailed on RetryPayment when RetryPayment.Amount == OrderTotal -> transition Paid
+from PaymentFailed on RetryPayment -> reject "Payment amount does not match order total"
 
-from Paid on Ship
-	set TrackingNumber = Ship.TrackingNumber
-	transition Shipped
+from Paid on Ship -> set TrackingNumber = Ship.TrackingNumber -> transition Shipped
 
-from Shipped on Deliver
-	transition Delivered
+from Shipped on Deliver -> transition Delivered
 
-from Pending, PaymentFailed on Cancel
-	set CancellationReason = Cancel.Reason
-	transition Cancelled
+from Pending, PaymentFailed on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
 
 # Post-payment cancellations require a refund
-from Paid, Shipped on Cancel
-	set CancellationReason = Cancel.Reason
-	transition Refunded
+from Paid, Shipped on Cancel -> set CancellationReason = Cancel.Reason -> transition Refunded
 
-from Refunded on Refund
-	if !RefundIssued
-		set RefundReason = Refund.Reason
-		set RefundIssued = true
-		no transition
-	else
-		reject "Refund has already been issued"
+from Refunded on Refund when !RefundIssued -> set RefundReason = Refund.Reason -> set RefundIssued = true -> no transition
+from Refunded on Refund -> reject "Refund has already been issued"

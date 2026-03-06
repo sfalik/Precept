@@ -1,10 +1,10 @@
 precept PackageDelivery
 
-string? CurrentLocation = null
-boolean RequiresSignature = false
-number DeliveryAttempts = 0
-	rule DeliveryAttempts >= 0 "Delivery attempts cannot be negative"
-string? FailureReason = null
+field CurrentLocation as string nullable
+field RequiresSignature as boolean default false
+field DeliveryAttempts as number default 0
+invariant DeliveryAttempts >= 0 because "Delivery attempts cannot be negative"
+field FailureReason as string nullable
 
 state Pending initial
 state PickedUp
@@ -14,48 +14,29 @@ state Delivered
 state DeliveryFailed
 state Returned
 
-event PickUp
-	string WarehouseLocation
+event PickUp with WarehouseLocation as string
 
-event TransferHub
-	string HubName
+event TransferHub with HubName as string
 
 event LoadForDelivery
 
-event AttemptDelivery
-	boolean RecipientPresent
+event AttemptDelivery with RecipientPresent as boolean
 
-event MarkReturned
-	string Reason
-		rule Reason != "" "Return reason is required"
+event MarkReturned with Reason as string
+on MarkReturned assert Reason != "" because "Return reason is required"
 
-from Pending on PickUp
-	set CurrentLocation = PickUp.WarehouseLocation
-	transition PickedUp
+from Pending on PickUp -> set CurrentLocation = PickUp.WarehouseLocation -> transition PickedUp
 
-from PickedUp, InTransit on TransferHub
-	set CurrentLocation = TransferHub.HubName
-	transition InTransit
+from PickedUp, InTransit on TransferHub -> set CurrentLocation = TransferHub.HubName -> transition InTransit
 
-from InTransit on LoadForDelivery
-	transition OutForDelivery
+from InTransit on LoadForDelivery -> transition OutForDelivery
 
-from OutForDelivery on AttemptDelivery
-	if AttemptDelivery.RecipientPresent
-		set DeliveryAttempts = DeliveryAttempts + 1
-		transition Delivered
-	else if DeliveryAttempts < 2
-		set DeliveryAttempts = DeliveryAttempts + 1
-		transition OutForDelivery
-	else
-		set DeliveryAttempts = DeliveryAttempts + 1
-		transition DeliveryFailed
+from OutForDelivery on AttemptDelivery when AttemptDelivery.RecipientPresent -> set DeliveryAttempts = DeliveryAttempts + 1 -> transition Delivered
+from OutForDelivery on AttemptDelivery when DeliveryAttempts < 2 -> set DeliveryAttempts = DeliveryAttempts + 1 -> transition OutForDelivery
+from OutForDelivery on AttemptDelivery -> set DeliveryAttempts = DeliveryAttempts + 1 -> transition DeliveryFailed
 
 # Once all three attempts are exhausted the package must be returned; further
 # delivery loads are NotApplicable and MarkReturned becomes the only valid path.
-from DeliveryFailed on LoadForDelivery when DeliveryAttempts < 3
-	transition OutForDelivery
+from DeliveryFailed on LoadForDelivery when DeliveryAttempts < 3 -> transition OutForDelivery
 
-from DeliveryFailed on MarkReturned
-	set FailureReason = MarkReturned.Reason
-	transition Returned
+from DeliveryFailed on MarkReturned -> set FailureReason = MarkReturned.Reason -> transition Returned

@@ -1,13 +1,13 @@
 precept RestaurantOrder
 
-number TableNumber = 0
-number ItemCount = 0
-	rule ItemCount >= 0 "Item count cannot be negative"
-number Subtotal = 0
-	rule Subtotal >= 0 "Subtotal cannot be negative"
-boolean IsTakeout = false
-boolean PaymentReceived = false
-string? SpecialInstructions = null
+field TableNumber as number default 0
+field ItemCount as number default 0
+invariant ItemCount >= 0 because "Item count cannot be negative"
+field Subtotal as number default 0
+invariant Subtotal >= 0 because "Subtotal cannot be negative"
+field IsTakeout as boolean default false
+field PaymentReceived as boolean default false
+field SpecialInstructions as string nullable
 
 state Seated initial
 state Ordering
@@ -17,75 +17,46 @@ state ReadyForService
 state Served
 state BillRequested
 state Paid
-	rule PaymentReceived "Payment must have been received"
+in Paid assert PaymentReceived because "Payment must have been received"
 state Completed
 
-event SeatGuests
-	number TableNumber
-		rule TableNumber > 0 "A valid table number is required"
-	boolean IsTakeout = false
+event SeatGuests with TableNumber as number, IsTakeout as boolean default false
+on SeatGuests assert TableNumber > 0 because "A valid table number is required"
 
-event AddItem
-	number Price
-		rule Price > 0 "Item price must be greater than zero"
+event AddItem with Price as number
+on AddItem assert Price > 0 because "Item price must be greater than zero"
 
-event AddSpecialInstructions
-	string Instructions
+event AddSpecialInstructions with Instructions as string
 
 event PlaceOrder
-
 event BeginPreparing
-
 event MarkReady
-
 event Serve
-
 event RequestBill
 
-event ProcessPayment
-	number Amount
-		rule Amount > 0 "Payment amount must be positive"
+event ProcessPayment with Amount as number
+on ProcessPayment assert Amount > 0 because "Payment amount must be positive"
 
 event Complete
 
-from Seated on SeatGuests
-	set TableNumber = SeatGuests.TableNumber
-	set IsTakeout = SeatGuests.IsTakeout
-	transition Ordering
+from Seated on SeatGuests -> set TableNumber = SeatGuests.TableNumber -> set IsTakeout = SeatGuests.IsTakeout -> transition Ordering
 
-from Ordering on AddItem
-	set ItemCount = ItemCount + 1
-	set Subtotal = Subtotal + AddItem.Price
-	no transition
+from Ordering on AddItem -> set ItemCount = ItemCount + 1 -> set Subtotal = Subtotal + AddItem.Price -> no transition
 
-from Ordering on AddSpecialInstructions
-	set SpecialInstructions = AddSpecialInstructions.Instructions
-	no transition
+from Ordering on AddSpecialInstructions -> set SpecialInstructions = AddSpecialInstructions.Instructions -> no transition
 
-from Ordering on PlaceOrder
-	if ItemCount > 0
-		transition Submitted
-	else
-		reject "Cannot place an empty order"
+from Ordering on PlaceOrder when ItemCount > 0 -> transition Submitted
+from Ordering on PlaceOrder -> reject "Cannot place an empty order"
 
-from Submitted on BeginPreparing
-	transition Preparing
+from Submitted on BeginPreparing -> transition Preparing
 
-from Preparing on MarkReady
-	transition ReadyForService
+from Preparing on MarkReady -> transition ReadyForService
 
-from ReadyForService on Serve
-	transition Served
+from ReadyForService on Serve -> transition Served
 
-from Served on RequestBill
-	transition BillRequested
+from Served on RequestBill -> transition BillRequested
 
-from BillRequested on ProcessPayment
-	if ProcessPayment.Amount >= Subtotal
-		set PaymentReceived = true
-		transition Paid
-	else
-		reject "Payment amount is less than the bill total"
+from BillRequested on ProcessPayment when ProcessPayment.Amount >= Subtotal -> set PaymentReceived = true -> transition Paid
+from BillRequested on ProcessPayment -> reject "Payment amount is less than the bill total"
 
-from Paid on Complete
-	transition Completed
+from Paid on Complete -> transition Completed

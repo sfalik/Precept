@@ -684,6 +684,25 @@ This gives every error a stable, searchable code that appears in the Problems pa
 
 Minimal changes — still calls `PreceptParser.Parse()` → `PreceptCompiler.Compile()` → engine methods. The parser API is the same; the implementation behind it changed.
 
+#### Functional differences requiring preview updates
+
+The new syntax introduces semantic distinctions that the preview UI and snapshot protocol must reflect:
+
+1. **Rules → Invariants + Asserts.** The old `rule <Expr> "<Reason>"` is now three distinct constructs:
+   - `invariant <Expr> because "<Reason>"` — data invariant (always holds post-commit)
+   - `in/to/from <State> assert <Expr> because "<Reason>"` — state-scoped movement constraint
+   - `on <Event> assert <Expr> because "<Reason>"` — event arg validation
+   
+   The preview snapshot currently carries `RuleDefinitions` and `ActiveRuleViolations` keyed to the old `rule` concept. These need to carry the new taxonomy (invariant vs assert, preposition, scope) so the UI can display the correct badge/tooltip/banner per construct kind. Fire error reporting should distinguish which kind of constraint blocked the transition.
+
+2. **Block transitions → Flat rows.** Old `from State on Event` with nested `if/else if/else` blocks become multiple flat `from State on Event [when guard] -> actions -> outcome` rows. The preview's inspect results may now show multiple independent rows for the same state+event pair, each returning its own outcome. The event dock and diagram edge rendering should handle this correctly.
+
+3. **State entry/exit actions.** New `to State -> set X = 1` and `from State -> set X = 1` have no old-syntax equivalent. These side effects execute during fire but aren't part of any transition row. The preview needs to surface these in fire result details (e.g., showing which actions ran on entry/exit).
+
+4. **Assert preposition semantics.** `in` (while residing — checked on entry and self-transition), `to` (entering from different state), `from` (leaving to different state) have distinct evaluation timing. The preview's fire error reporting needs to convey which assert preposition blocked a transition and why.
+
+5. **Edit block syntax change.** `in State edit Field1, Field2` replaces the old `from State edit` with indented field lines. The preview's editable-field detection must use the new model shape.
+
 ### Checkpoint
 
 - Extension loads, syntax coloring works on new-syntax files

@@ -1,17 +1,16 @@
 precept BankLoan
 
-number RequestedAmount = 0
-number ApprovedAmount = 0
-number CreditScore = 0
-number RemainingBalance = 0
-	rule RemainingBalance >= 0 "Remaining balance cannot be negative"
-number MissedPayments = 0
-	rule MissedPayments >= 0 "Missed payments cannot be negative"
-boolean CollateralVerified = false
-string? OfficerName = null
-string? DisbursementAccount = null
-string? RejectionReason = null
-
+field RequestedAmount as number default 0
+field ApprovedAmount as number default 0
+field CreditScore as number default 0
+field RemainingBalance as number default 0
+invariant RemainingBalance >= 0 because "Remaining balance cannot be negative"
+field MissedPayments as number default 0
+invariant MissedPayments >= 0 because "Missed payments cannot be negative"
+field CollateralVerified as boolean default false
+field OfficerName as string nullable
+field DisbursementAccount as string nullable
+field RejectionReason as string nullable
 
 state Apply initial
 state UnderReview
@@ -23,120 +22,62 @@ state Defaulted
 state Rejected
 state Cancelled
 
-event Submit
-	number Amount
-		rule Amount > 0 "Amount must be positive"
-	number CreditScore
-		rule CreditScore >= 300 "Credit score must be at least 300"
+event Submit with Amount as number, CreditScore as number
+on Submit assert Amount > 0 because "Amount must be positive"
+on Submit assert CreditScore >= 300 because "Credit score must be at least 300"
 
-event AssignOfficer
-	string OfficerName
-		rule OfficerName != "" "Officer name is required"
+event AssignOfficer with OfficerName as string
+on AssignOfficer assert OfficerName != "" because "Officer name is required"
 
 event VerifyCollateral
 
-event Approve
-	number ApprovedAmount
-		rule ApprovedAmount > 0 "Approved amount must be positive"
+event Approve with ApprovedAmount as number
+on Approve assert ApprovedAmount > 0 because "Approved amount must be positive"
 
-event Reject
-	string Reason
+event Reject with Reason as string
 
 event Withdraw
 
-event Disburse
-	string AccountNumber
-		rule AccountNumber != "" "Disbursement account number is required"
+event Disburse with AccountNumber as string
+on Disburse assert AccountNumber != "" because "Disbursement account number is required"
 
-event MakePayment
-	number Amount
-		rule Amount > 0 "Payment amount must be positive"
+event MakePayment with Amount as number
+on MakePayment assert Amount > 0 because "Payment amount must be positive"
 
 event MissPayment
 
-from Apply on Submit
-	set RequestedAmount = Submit.Amount
-	set CreditScore = Submit.CreditScore
-	transition UnderReview
+from Apply on Submit -> set RequestedAmount = Submit.Amount -> set CreditScore = Submit.CreditScore -> transition UnderReview
 
-from Apply on Withdraw
-	transition Cancelled
+from Apply on Withdraw -> transition Cancelled
 
-from UnderReview on AssignOfficer
-	if OfficerName == null
-		set OfficerName = AssignOfficer.OfficerName
-		no transition
-	else
-		reject "A loan officer is already assigned"
+from UnderReview on AssignOfficer when OfficerName == null -> set OfficerName = AssignOfficer.OfficerName -> no transition
+from UnderReview on AssignOfficer -> reject "A loan officer is already assigned"
 
-from UnderReview on VerifyCollateral when !CollateralVerified
-	if !CollateralVerified
-		set CollateralVerified = true
-		no transition
-	else
-		reject "Collateral has already been verified"
+from UnderReview on VerifyCollateral when !CollateralVerified -> set CollateralVerified = true -> no transition
+from UnderReview on VerifyCollateral -> reject "Collateral has already been verified"
 
-from UnderReview on Approve
-	if (CollateralVerified || CreditScore >= 700) && Approve.ApprovedAmount <= RequestedAmount
-		set ApprovedAmount = Approve.ApprovedAmount
-		set RemainingBalance = Approve.ApprovedAmount
-		transition Approved
-	else
-		reject "Approval requires collateral verification or credit score >= 700"
+from UnderReview on Approve when (CollateralVerified || CreditScore >= 700) && Approve.ApprovedAmount <= RequestedAmount -> set ApprovedAmount = Approve.ApprovedAmount -> set RemainingBalance = Approve.ApprovedAmount -> transition Approved
+from UnderReview on Approve -> reject "Approval requires collateral verification or credit score >= 700"
 
-from UnderReview on Reject
-	set RejectionReason = Reject.Reason
-	transition Rejected
+from UnderReview on Reject -> set RejectionReason = Reject.Reason -> transition Rejected
 
-from UnderReview on Withdraw
-	transition Cancelled
+from UnderReview on Withdraw -> transition Cancelled
 
-from Approved on Withdraw
-	transition Cancelled
+from Approved on Withdraw -> transition Cancelled
 
-from Approved on Disburse
-	if OfficerName != null
-		set DisbursementAccount = Disburse.AccountNumber
-		transition Disbursed
-	else
-		reject "A loan officer must be assigned before disbursement"
+from Approved on Disburse when OfficerName != null -> set DisbursementAccount = Disburse.AccountNumber -> transition Disbursed
+from Approved on Disburse -> reject "A loan officer must be assigned before disbursement"
 
-from Disbursed on MakePayment
-	if MakePayment.Amount < RemainingBalance
-		set RemainingBalance = RemainingBalance - MakePayment.Amount
-		set MissedPayments = 0
-		transition Repaying
-	else if MakePayment.Amount == RemainingBalance
-		set RemainingBalance = 0
-		set MissedPayments = 0
-		transition PaidOff
-	else
-		reject "Payment amount exceeds remaining balance"
+from Disbursed on MakePayment when MakePayment.Amount < RemainingBalance -> set RemainingBalance = RemainingBalance - MakePayment.Amount -> set MissedPayments = 0 -> transition Repaying
+from Disbursed on MakePayment when MakePayment.Amount == RemainingBalance -> set RemainingBalance = 0 -> set MissedPayments = 0 -> transition PaidOff
+from Disbursed on MakePayment -> reject "Payment amount exceeds remaining balance"
 
-from Disbursed on MissPayment
-	if MissedPayments >= 1
-		set MissedPayments = MissedPayments + 1
-		transition Defaulted
-	else
-		set MissedPayments = MissedPayments + 1
-		no transition
+from Disbursed on MissPayment when MissedPayments >= 1 -> set MissedPayments = MissedPayments + 1 -> transition Defaulted
+from Disbursed on MissPayment -> set MissedPayments = MissedPayments + 1 -> no transition
 
-from Repaying on MakePayment
-	if MakePayment.Amount < RemainingBalance
-		set RemainingBalance = RemainingBalance - MakePayment.Amount
-		set MissedPayments = 0
-		no transition
-	else if MakePayment.Amount == RemainingBalance
-		set RemainingBalance = 0
-		set MissedPayments = 0
-		transition PaidOff
-	else
-		reject "Payment amount exceeds remaining balance"
+from Repaying on MakePayment when MakePayment.Amount < RemainingBalance -> set RemainingBalance = RemainingBalance - MakePayment.Amount -> set MissedPayments = 0 -> no transition
+from Repaying on MakePayment when MakePayment.Amount == RemainingBalance -> set RemainingBalance = 0 -> set MissedPayments = 0 -> transition PaidOff
+from Repaying on MakePayment -> reject "Payment amount exceeds remaining balance"
 
-from Repaying on MissPayment
-	if MissedPayments >= 1
-		set MissedPayments = MissedPayments + 1
-		transition Defaulted
-	else
-		set MissedPayments = MissedPayments + 1
-		no transition
+from Repaying on MissPayment when MissedPayments >= 1 -> set MissedPayments = MissedPayments + 1 -> transition Defaulted
+from Repaying on MissPayment -> set MissedPayments = MissedPayments + 1 -> no transition
