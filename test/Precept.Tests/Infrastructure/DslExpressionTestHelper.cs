@@ -17,10 +17,9 @@ internal static class PreceptExpressionTestHelper
             """;
 
         var machine = PreceptParser.Parse(dsl);
-        machine.Transitions.Should().ContainSingle();
-        machine.Transitions[0].Clauses.Should().ContainSingle();
-        machine.Transitions[0].Clauses[0].SetAssignments.Should().ContainSingle();
-        return machine.Transitions[0].Clauses[0].SetAssignments[0].Expression;
+        machine.TransitionRows.Should().ContainSingle();
+        machine.TransitionRows![0].SetAssignments.Should().ContainSingle();
+        return machine.TransitionRows[0].SetAssignments[0].Expression;
     }
 
     internal static System.Action ParseFirstSetExpressionAction(string expressionText)

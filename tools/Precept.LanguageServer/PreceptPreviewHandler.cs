@@ -224,19 +224,19 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
             })
             .ToArray();
 
-        var transitions = session.Model.Transitions
-            .SelectMany(t => t.Clauses.Select(clause => new PreceptPreviewTransition(
-                t.FromState,
-                clause.Outcome is PreceptStateTransition st ? st.TargetState : t.FromState,
-                t.EventName,
-                clause.Predicate ?? t.Predicate,
-                clause.Outcome switch
+        var transitions = (session.Model.TransitionRows ?? Array.Empty<PreceptTransitionRow>())
+            .Select(row => new PreceptPreviewTransition(
+                row.FromState,
+                row.Outcome is PreceptStateTransition st ? st.TargetState : row.FromState,
+                row.EventName,
+                row.WhenText,
+                row.Outcome switch
                 {
                     PreceptStateTransition => "transition",
                     PreceptNoTransition => "noTransition",
                     PreceptRejection => "reject",
                     _ => "transition"
-                })))
+                }))
             .ToArray();
 
         var diagnostics = PreceptTextDocumentSyncHandler.SharedAnalyzer.GetDiagnostics(session.Uri)
@@ -248,20 +248,12 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
             .ToArray();
 
         var ruleDefinitions = new List<PreceptPreviewRuleInfo>();
-        foreach (var field in session.Engine.Fields.Where(f => f.Rules is not null))
-            foreach (var rule in field.Rules!)
-                ruleDefinitions.Add(new PreceptPreviewRuleInfo($"field:{field.Name}", rule.ExpressionText, rule.Reason));
-        foreach (var field in session.Engine.CollectionFields.Where(f => f.Rules is not null))
-            foreach (var rule in field.Rules!)
-                ruleDefinitions.Add(new PreceptPreviewRuleInfo($"field:{field.Name}", rule.ExpressionText, rule.Reason));
-        foreach (var rule in session.Model.TopLevelRules ?? Array.Empty<PreceptRule>())
-            ruleDefinitions.Add(new PreceptPreviewRuleInfo("topLevel", rule.ExpressionText, rule.Reason));
-        foreach (var state in session.Model.States.Where(s => s.Rules is not null && s.Rules.Count > 0))
-            foreach (var rule in state.Rules!)
-                ruleDefinitions.Add(new PreceptPreviewRuleInfo($"state:{state.Name}", rule.ExpressionText, rule.Reason));
-        foreach (var evt in session.Engine.Events.Where(e => e.Rules is not null && e.Rules.Count > 0))
-            foreach (var rule in evt.Rules!)
-                ruleDefinitions.Add(new PreceptPreviewRuleInfo($"event:{evt.Name}", rule.ExpressionText, rule.Reason));
+        foreach (var inv in session.Model.Invariants ?? Array.Empty<PreceptInvariant>())
+            ruleDefinitions.Add(new PreceptPreviewRuleInfo("invariant", inv.ExpressionText, inv.Reason));
+        foreach (var sa in session.Model.StateAsserts ?? Array.Empty<PreceptStateAssert>())
+            ruleDefinitions.Add(new PreceptPreviewRuleInfo($"state:{sa.Preposition.ToString().ToLowerInvariant()}:{sa.State}", sa.ExpressionText, sa.Reason));
+        foreach (var ea in session.Model.EventAsserts ?? Array.Empty<PreceptEventAssert>())
+            ruleDefinitions.Add(new PreceptPreviewRuleInfo($"event:{ea.EventName}", ea.ExpressionText, ea.Reason));
 
         return new PreceptPreviewSnapshot(
             session.Engine.Name,

@@ -9,10 +9,10 @@
 
 | # | Work Item | Status | Notes |
 |---|-----------|--------|-------|
-| 0 | Remove Legacy / Backward Compat Code | Not Started | Prerequisite for all other items |
-| 1 | Fix README.md | Not Started | Documentation debt |
+| 0 | Remove Legacy / Backward Compat Code | Done | All legacy types/properties removed from model, parser, runtime, language server. 4 backward-compat tests deleted, 2 ported. 344 tests passing (348 - 4). Zero references to PreceptTransition, PreceptClause, PreceptRule, TopLevelRules, or .Rules remain in source/test code. |
+| 1 | Fix README.md | Done | Updated DSL example (precept/invariant/on assert/flat rows), C# API (PreceptParser.Parse, PreceptCompiler.Compile, PreceptEngine, instance.InstanceData), and Pillars section (rule→invariant). |
 | 2 | Fix RuntimeApiDesign.md | Not Started | Documentation debt |
-| 3 | Add Test Gaps | Not Started | Test debt |
+| 3 | Add Test Gaps | Done | Added 27 new tests: 2 StateAssert/EventAssert SourceLine tests (Category A, required parser fix to track SourceLine for state/event assert declarations); 5 CoerceEventArguments tests (Category B); 17 sample file Theory tests across all samples/*.precept files (Category C/E); 4 ParseWithDiagnostics tests (Category D). Also fixed a broken LS test (PreceptPreviewRulesTests scope "topLevel" → "invariant") that was broken by Item 0 but not caught at the time. 394 tests now passing. |
 | 4 | Implement Editable Fields Runtime | Not Started | Next feature |
 | 5 | Implement ConstraintCatalog | Not Started | Infrastructure |
 | 6 | Implement MCP Server | Not Started | New capability |
@@ -36,6 +36,9 @@ The backward-compat layer was explicitly rejected. The decision is a **hard cut*
 ### Prompt
 
 ```
+Before starting, suggest which AI model (e.g. Claude Sonnet, Claude Opus, GPT-4.1, etc.)
+is best suited for this task and why, then wait for me to confirm or switch models.
+
 I need you to remove ALL backward-compatibility / legacy code from the Precept codebase.
 Read docs/CleanupAndNextSteps.md Item 0 for the full inventory of what to remove.
 
@@ -72,6 +75,10 @@ anywhere in the codebase.
 
 Note: The tests in PreceptRulesTests.cs use NEW DSL syntax in their input strings but assert
 on OLD model properties. The DSL strings are fine — it's the assertions that need porting.
+
+When finished, update the Status Tracker table in this document: set Item 0's Status
+to "Done" and add any relevant notes. If anything is unclear or ambiguous during the work,
+ask me for clarification before proceeding — do not guess.
 ```
 
 ### Analysis
@@ -178,6 +185,9 @@ These test files survive Item 0 unchanged (all use new model types exclusively):
 ### Prompt
 
 ```
+Before starting, suggest which AI model (e.g. Claude Sonnet, Claude Opus, GPT-4.1, etc.)
+is best suited for this task and why, then wait for me to confirm or switch models.
+
 The README.md is completely out of date. It uses old DSL syntax (machine keyword, rule keyword,
 old transition blocks) and old API names (instance.StateData). Read docs/CleanupAndNextSteps.md
 Item 1 for the specific issues.
@@ -192,6 +202,10 @@ Rewrite the README to reflect the current implementation:
 - Use correct API: PreceptCompiler.Compile(), PreceptEngine, instance.InstanceData
 - Include a realistic example (the bank-loan or support-ticket sample works well)
 - Keep it concise — overview, DSL example, C# API usage, that's it
+
+When finished, update the Status Tracker table in this document: set Item 1's Status
+to "Done" and add any relevant notes. If anything is unclear or ambiguous during the work,
+ask me for clarification before proceeding — do not guess.
 ```
 
 ### Analysis
@@ -215,12 +229,19 @@ The current README.md has these specific problems:
 ### Prompt
 
 ```
+Before starting, suggest which AI model (e.g. Claude Sonnet, Claude Opus, GPT-4.1, etc.)
+is best suited for this task and why, then wait for me to confirm or switch models.
+
 The RuntimeApiDesign.md uses stale "Dsl" prefix naming throughout. Read
 docs/CleanupAndNextSteps.md Item 2 for the full mapping. Rename every occurrence
 of the old Dsl* type names to match the actual codebase Precept* names. This is a
 straightforward find-and-replace across the document — there are ~40 instances.
 Also verify that the API signatures described in the document match the current
 implementation in src/Precept/Dsl/PreceptRuntime.cs.
+
+When finished, update the Status Tracker table in this document: set Item 2's Status
+to "Done" and add any relevant notes. If anything is unclear or ambiguous during the work,
+ask me for clarification before proceeding — do not guess.
 ```
 
 ### Analysis
@@ -250,6 +271,9 @@ Other design docs also use stale naming (EditableFieldsDesign.md, McpServerDesig
 ### Prompt
 
 ```
+Before starting, suggest which AI model (e.g. Claude Sonnet, Claude Opus, GPT-4.1, etc.)
+is best suited for this task and why, then wait for me to confirm or switch models.
+
 Read docs/CleanupAndNextSteps.md Item 3 for the full list of test gaps identified during
 the codebase review. Add these tests to the appropriate existing test files
 (NewSyntaxParserTests.cs, NewSyntaxRuntimeTests.cs, or PreceptWorkflowTests.cs).
@@ -264,6 +288,10 @@ E. Sample file validation (all samples/ files parse and compile clean)
 Read at least one sample file from samples/ before writing any DSL test strings.
 For each test, use NEW model types only (Invariants, StateAsserts, EventAsserts,
 TransitionRows) — never assert on TopLevelRules, .Rules, PreceptRule, etc.
+
+When finished, update the Status Tracker table in this document: set Item 3's Status
+to "Done" and add any relevant notes. If anything is unclear or ambiguous during the work,
+ask me for clarification before proceeding — do not guess.
 ```
 
 ### Analysis
@@ -343,6 +371,9 @@ If a non-throwing parse API exists (or should exist), test:
 ### Prompt
 
 ```
+Before starting, suggest which AI model (e.g. Claude Sonnet, Claude Opus, GPT-4.1, etc.)
+is best suited for this task and why, then wait for me to confirm or switch models.
+
 Read docs/EditableFieldsDesign.md for the full design, then read
 docs/CleanupAndNextSteps.md Item 4 for the implementation gap analysis.
 
@@ -358,6 +389,10 @@ Implement the runtime support per the design:
 
 Write tests in PreceptWorkflowTests.cs or a new PreceptEditTests.cs.
 Read at least one sample from samples/ before writing any DSL strings.
+
+When finished, update the Status Tracker table in this document: set Item 4's Status
+to "Done" and add any relevant notes. If anything is unclear or ambiguous during the work,
+ask me for clarification before proceeding — do not guess.
 ```
 
 ### Analysis
@@ -392,6 +427,9 @@ Read at least one sample from samples/ before writing any DSL strings.
 ### Prompt
 
 ```
+Before starting, suggest which AI model (e.g. Claude Sonnet, Claude Opus, GPT-4.1, etc.)
+is best suited for this task and why, then wait for me to confirm or switch models.
+
 Read docs/CatalogInfrastructureDesign.md for the full Tier 3 design, then read
 docs/CleanupAndNextSteps.md Item 5 for the implementation gap.
 
@@ -408,6 +446,10 @@ Steps:
 
 This is infrastructure — existing behavior must not change, only the error message source
 becomes centralized.
+
+When finished, update the Status Tracker table in this document: set Item 5's Status
+to "Done" and add any relevant notes. If anything is unclear or ambiguous during the work,
+ask me for clarification before proceeding — do not guess.
 ```
 
 ### Analysis
@@ -453,6 +495,9 @@ Consumers:
 ### Prompt
 
 ```
+Before starting, suggest which AI model (e.g. Claude Sonnet, Claude Opus, GPT-4.1, etc.)
+is best suited for this task and why, then wait for me to confirm or switch models.
+
 Read docs/McpServerDesign.md and docs/McpServerImplementationPlan.md for the full design
 and phased implementation plan. Then read docs/CleanupAndNextSteps.md Item 6 for context.
 
@@ -465,6 +510,10 @@ Implement the MCP server as a new project (tools/Precept.McpServer/) that expose
 
 This depends on Item 5 (ConstraintCatalog) for the precept_language endpoint.
 Follow the implementation plan phases in McpServerImplementationPlan.md.
+
+When finished, update the Status Tracker table in this document: set Item 6's Status
+to "Done" and add any relevant notes. If anything is unclear or ambiguous during the work,
+ask me for clarification before proceeding — do not guess.
 ```
 
 ### Analysis

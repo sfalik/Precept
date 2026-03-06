@@ -13,16 +13,14 @@
 
 ## 🚀 Quick Start
 
-1. **Install the .NET Package:**
+1. **Install the .NET package:**
    ```bash
    dotnet add package Precept
    ```
-2. **Install the VS Code Extension:** Search for `Precept DSL` in the marketplace or run:
+2. **Install the VS Code extension:** Search for `Precept DSL` in the marketplace or run:
    ```bash
    code --install-extension AuthorName.precept-vscode
    ```
-3. **Write your first Precept file (`bank-loan.precept`):**
-   *(See the code example below)*
 
 ---
 
@@ -30,75 +28,90 @@
 
 With Precept, you define the rules of your entity in a clean, domain-readable DSL, and then execute those exact rules deterministically in C#.
 
-### 1. The Constitution (`bank-loan.precept`)
-```text
-machine BankLoan
+### 1. The Contract (`bank-loan.precept`)
 
-// 1. Data bound to the lifecycle
-number RequestedAmount = 0
-number ApprovedAmount = 0
-number CreditScore = 0
-number RemainingBalance = 0
-	rule RemainingBalance >= 0 "Remaining balance cannot be negative"
+```
+precept BankLoan
 
-// Top level rule evaluating cross-field requirements
-rule ApprovedAmount <= RequestedAmount "Approved amount must not exceed requested amount"
+// Fields with defaults and invariants
+field RequestedAmount as number default 0
+field ApprovedAmount as number default 0
+field CreditScore as number default 0
+field RemainingBalance as number default 0
+invariant RemainingBalance >= 0 because "Remaining balance cannot be negative"
+invariant ApprovedAmount <= RequestedAmount because "Approved amount must not exceed requested amount"
 
-// 2. Clear state progression
+// State progression
 state Apply initial
 state UnderReview
 state Approved
+state Rejected
 
-// 3. Explicit Events and Arguments
-event Submit
-	number Amount
-		rule Amount > 0 "Amount must be positive"
-	number CreditScore
-		rule CreditScore >= 300 "Credit score must be at least 300"
+// Events with typed arguments and asserts
+event Submit with Amount as number, CreditScore as number
+on Submit assert Amount > 0 because "Amount must be positive"
+on Submit assert CreditScore >= 300 because "Credit score must be at least 300"
 
-event Approve
-	number ApprovedAmount
-		rule ApprovedAmount > 0 "Approved amount must be positive"
+event Approve with ApprovedAmount as number
+on Approve assert ApprovedAmount > 0 because "Approved amount must be positive"
 
-// 4. Transitions & Guards
-from Apply on Submit
-	set RequestedAmount = Submit.Amount
-	set CreditScore = Submit.CreditScore
-	transition UnderReview
+event Reject with Reason as string
+field RejectionReason as string nullable
 
-from UnderReview on Approve
-	// Pure guard evaluations enforce the business rules strictly
-	if CreditScore >= 700 && Approve.ApprovedAmount <= RequestedAmount
-		set ApprovedAmount = Approve.ApprovedAmount
-		set RemainingBalance = Approve.ApprovedAmount
-		transition Approved
-	else
-		reject "Approval requires credit score >= 700 and valid amount"
+// Flat transition rows — first matching row wins
+from Apply on Submit -> set RequestedAmount = Submit.Amount -> set CreditScore = Submit.CreditScore -> transition UnderReview
+from UnderReview on Approve when CreditScore >= 700 && Approve.ApprovedAmount <= RequestedAmount -> set ApprovedAmount = Approve.ApprovedAmount -> set RemainingBalance = Approve.ApprovedAmount -> transition Approved
+from UnderReview on Approve -> reject "Approval requires credit score >= 700 and valid amount"
+from UnderReview on Reject -> set RejectionReason = Reject.Reason -> transition Rejected
 ```
 
 ### 2. The Execution (C#)
-Because rules are absolute, and expressions are pure, you can safely `Inspect` an action before mutating your database. 
+
+Because guard expressions are purely evaluative, `Inspect` safely previews any action without touching your database.
 
 ```csharp
-using Precept.Runtime;
+using Precept;
 
-// Load the compiled precepts and the database record
-var machine = PreceptDefinition.Load("bank-loan.precept");
-var instance = machine.CreateInstance(jsonState);
+// Parse the DSL and compile to an engine (do this once at startup)
+var definition = PreceptParser.Parse(File.ReadAllText("bank-loan.precept"));
+var engine = PreceptCompiler.Compile(definition);
 
-// Safely inspect - without mutating!
-var preview = instance.Inspect("Approve", new { ApprovedAmount = 100000 });
+// Restore an instance from your database
+var instance = engine.CreateInstance(
+    "UnderReview",
+    new Dictionary<string, object?>
+    {
+        ["RequestedAmount"] = 50_000.0,
+        ["CreditScore"] = 720.0,
+        ["ApprovedAmount"] = 0.0,
+        ["RemainingBalance"] = 0.0,
+    });
 
-if (preview is Blocked b) 
+// Safely inspect — no mutation
+var preview = engine.Inspect(instance, "Approve", new Dictionary<string, object?>
+{
+    ["ApprovedAmount"] = 45_000.0
+});
+
+if (preview.Outcome == PreceptOutcomeKind.Rejected)
 {
     // Output: "Approval requires credit score >= 700 and valid amount"
-    Console.WriteLine($"Cannot approve: {b.Reason}"); 
+    Console.WriteLine(string.Join(", ", preview.Reasons));
 }
-else if (preview is Enabled e)
+else
 {
-    // The engine guarantees atoms: rules passed, state shifted, data updated.
-    instance.Fire("Approve", new { ApprovedAmount = 100000 });
-    await repository.SaveAsync(instance.StateData);
+    // Transition is valid — fire and persist
+    var result = engine.Fire(instance, "Approve", new Dictionary<string, object?>
+    {
+        ["ApprovedAmount"] = 45_000.0
+    });
+
+    if (result.Outcome == PreceptOutcomeKind.Accepted)
+    {
+        var updated = result.UpdatedInstance!;
+        Console.WriteLine($"State: {updated.CurrentState}"); // Approved
+        await repository.SaveAsync(updated.InstanceData);
+    }
 }
 ```
 
@@ -128,20 +141,22 @@ Precept fixes this by treating the lifecycle of an entity as an executable contr
 
 ## 🏗️ The Pillars of Precept
 
-### 1. The Universal Safety Net (`rule`)
-In most systems, validation is bound to *actions* (e.g., "Validate this API payload"). In Precept, rules are bound to the *data itself*. 
+### 1. The Universal Safety Net (`invariant`)
+In most systems, validation is bound to *actions* (e.g., "Validate this API payload"). In Precept, constraints are bound to the *data itself*.
 
-When you declare `rule Balance >= 0 "Balance cannot be negative"`, that precept is absolute. Whether a complex workflow transition deducts from the balance, or a user directly edits a linked field via an administrative override, the engine enforces the rule upon completion. If the rule fails, the entire transaction rolls back.
+When you declare `invariant Balance >= 0 because "Balance cannot be negative"`, that precept is absolute. Whether a complex workflow transition deducts from the balance, or a user directly edits a field via an administrative override, the engine enforces the invariant upon completion. If it fails, the entire transaction rolls back.
+
+State-scoped asserts (`in <State> assert ... because "..."`) and event-scoped asserts (`on <Event> assert ... because "..."`) let you enforce constraints exactly where they apply.
 
 ### 2. Pure Inspection (`Inspect` before `Fire`)
 Because Precept enforces rigorous grammar constraints—expressions evaluate, statements mutate—it is impossible for a transition guard to accidentally mutate data. This allows the `Inspect` API to safely preview any action, returning a precise outcome with specific error reasons—all without saving a thing.
 
 ### 3. Atomic, Deterministic Mutations
-A Precept transition either completely succeeds or entirely rolls back. Every evaluation is deterministic: the same definitions and the same data will *always* result in the same outcome. 
+A Precept transition either completely succeeds or entirely rolls back. Every evaluation is deterministic: the same definitions and the same data will *always* result in the same outcome.
 
 ### 4. Two Mutational Paths
 Precept acknowledges that entirely different ceremonies apply to different types of data updates:
 * **Transitions (`event`):** For lifecycle changes where routing, auditing, and complex state progression matter.
-* **Direct Edits (`edit`):** For simple data mutations where event ceremony is overkill. 
+* **Direct Edits (`edit`):** For simple data mutations where event ceremony is overkill.
 
-Both paths are safely watched by the exact same `rule` engine. Direct editing isn't a hack; it is a first-class feature protected by the same ironclad invariants.
+Both paths are safely watched by the exact same invariant engine. Direct editing isn't a hack; it is a first-class feature protected by the same ironclad invariants.

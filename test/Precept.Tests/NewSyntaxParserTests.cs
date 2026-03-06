@@ -717,56 +717,6 @@ public class NewSyntaxParserTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // PARSING — Backward compat: old-style transitions also populated
-    // ════════════════════════════════════════════════════════════════════
-
-    [Fact]
-    public void Parse_TransitionRow_AlsoPopulatesOldTransitions()
-    {
-        const string dsl = """
-            precept Test
-            state A initial
-            state B
-            event Go
-            from A on Go -> transition B
-            """;
-
-        var model = PreceptParser.Parse(dsl);
-
-        // New model
-        model.TransitionRows.Should().HaveCount(1);
-
-        // Also populated for backward compat
-        model.Transitions.Should().HaveCount(1);
-        model.Transitions[0].FromState.Should().Be("A");
-        model.Transitions[0].EventName.Should().Be("Go");
-        model.Transitions[0].Clauses.Should().HaveCount(1);
-        model.Transitions[0].Clauses[0].Outcome.Should().BeOfType<PreceptStateTransition>()
-            .Which.TargetState.Should().Be("B");
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // PARSING — Invariant also adds old-style top-level rule
-    // ════════════════════════════════════════════════════════════════════
-
-    [Fact]
-    public void Parse_Invariant_AlsoPopulatesTopLevelRules()
-    {
-        const string dsl = """
-            precept Test
-            field X as number default 0
-            invariant X >= 0 because "X non-negative"
-            state Active initial
-            """;
-
-        var model = PreceptParser.Parse(dsl);
-
-        model.TopLevelRules.Should().HaveCount(1);
-        model.TopLevelRules![0].ExpressionText.Should().Be("X >= 0");
-        model.TopLevelRules![0].Reason.Should().Be("X non-negative");
-    }
-
-    // ════════════════════════════════════════════════════════════════════
     // PARSING — Expression parser
     // ════════════════════════════════════════════════════════════════════
 
@@ -971,5 +921,105 @@ public class NewSyntaxParserTests
         model.StateActions.Should().HaveCount(2);
         model.EditBlocks.Should().HaveCount(1);
         model.TransitionRows.Should().HaveCount(2);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Source line tracking on asserts (Category A gaps)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_StateAssert_SourceLineIsCorrect()
+    {
+        const string dsl = """
+            precept Test
+            field AmountPaid as number default 0
+            state Idle initial
+            state Paid
+            in Paid assert AmountPaid > 0 because "Must have paid"
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        var sa = model.StateAsserts.Should().ContainSingle().Subject;
+        sa.SourceLine.Should().Be(5);
+    }
+
+    [Fact]
+    public void Parse_EventAssert_SourceLineIsCorrect()
+    {
+        const string dsl = """
+            precept Test
+            state Idle initial
+            event Pay with Amount as number
+            on Pay assert Amount > 0 because "Amount must be positive"
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        var ea = model.EventAsserts.Should().ContainSingle().Subject;
+        ea.SourceLine.Should().Be(4);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — ParseWithDiagnostics API (Category D)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ParseWithDiagnostics_ValidSource_ReturnsModelAndZeroDiagnostics()
+    {
+        const string dsl = """
+            precept Test
+            field Balance as number default 100
+            invariant Balance >= 0 because "Must be non-negative"
+            state Active initial
+            event Debit with Amount as number
+            from Active on Debit -> set Balance = Balance - Debit.Amount -> transition Active
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        model.Should().NotBeNull();
+        diagnostics.Should().BeEmpty();
+        model!.Name.Should().Be("Test");
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_InvalidSyntax_ReturnsDiagnosticAndNullModel()
+    {
+        const string dsl = """
+            precept Test
+            state Active initial
+            from Active on UNKNOWNKEYWORDTHATFAILS
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        model.Should().BeNull();
+        diagnostics.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_EmptyInput_ReturnsDiagnosticAndNullModel()
+    {
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics("");
+
+        model.Should().BeNull();
+        diagnostics.Should().ContainSingle(d => d.Message.Contains("empty"));
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_DuplicateState_ReturnsDiagnosticAndNullModel()
+    {
+        const string dsl = """
+            precept Test
+            state Active initial
+            state Active
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        model.Should().BeNull();
+        diagnostics.Should().NotBeEmpty();
+        diagnostics[0].Message.Should().Contain("Duplicate state");
     }
 }

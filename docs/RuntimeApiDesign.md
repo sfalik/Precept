@@ -7,9 +7,9 @@ This document describes the current public API surface of the `Precept` runtime 
 The runtime is a three-step pipeline:
 
 ```
-.precept text  ──►  PreceptParser.Parse()  ──►  DslWorkflowModel
-DslWorkflowModel  ──►  PreceptCompiler.Compile()  ──►  PreceptEngine
-PreceptEngine  ──►  CreateInstance()  ──►  DslWorkflowInstance (mutable over time)
+.precept text  ──►  PreceptParser.Parse()  ──►  PreceptDefinition
+PreceptDefinition  ──►  PreceptCompiler.Compile()  ──►  PreceptEngine
+PreceptEngine  ──►  CreateInstance()  ──►  PreceptInstance (mutable over time)
 ```
 
 All three steps are pure functions. No hidden state is accumulated outside the values returned by each step.
@@ -21,11 +21,14 @@ All three steps are pure functions. No hidden state is accumulated outside the v
 ```csharp
 public static class PreceptParser
 {
-    public static DslWorkflowModel Parse(string text)
+    public static PreceptDefinition Parse(string text)
+    public static (PreceptDefinition? Model, IReadOnlyList<ParseDiagnostic> Diagnostics) ParseWithDiagnostics(string text)
 }
 ```
 
-Parses a `.precept` DSL text string into a `DslWorkflowModel` record tree. Throws `InvalidOperationException` on syntax errors. The returned `DslWorkflowModel` is a passive, immutable parse tree — it carries no behavior and performs no validation beyond what the parser itself enforces.
+Parses a `.precept` DSL text string into a `PreceptDefinition` record tree. Throws `InvalidOperationException` on syntax errors. The returned `PreceptDefinition` is a passive, immutable parse tree — it carries no behavior and performs no validation beyond what the parser itself enforces.
+
+`ParseWithDiagnostics` is the non-throwing variant — it returns a `PreceptDefinition` (or `null` on hard failure) alongside a list of `ParseDiagnostic` records. Use this in tooling contexts where errors must be reported without exceptions.
 
 ---
 
@@ -34,11 +37,11 @@ Parses a `.precept` DSL text string into a `DslWorkflowModel` record tree. Throw
 ```csharp
 public static class PreceptCompiler
 {
-    public static PreceptEngine Compile(DslWorkflowModel model)
+    public static PreceptEngine Compile(PreceptDefinition model)
 }
 ```
 
-Compiles a `DslWorkflowModel` into an immutable `PreceptEngine`. Compilation performs semantic validation:
+Compiles a `PreceptDefinition` into an immutable `PreceptEngine`. Compilation performs semantic validation:
 
 - All state names referenced in transitions exist.
 - All event names referenced in transitions exist.
@@ -60,17 +63,17 @@ The immutable compiled engine. One `PreceptEngine` instance represents one workf
 | `Name` | `string` | Workflow name as declared with `precept`. |
 | `States` | `IReadOnlyList<string>` | All declared state names in declaration order. |
 | `InitialState` | `string` | The state marked `initial`. |
-| `Events` | `IReadOnlyList<DslEvent>` | All declared events with their argument contracts. |
-| `Fields` | `IReadOnlyList<DslField>` | All scalar data fields. |
-| `CollectionFields` | `IReadOnlyList<DslCollectionField>` | All collection fields (`set<T>`, `queue<T>`, `stack<T>`). |
+| `Events` | `IReadOnlyList<PreceptEvent>` | All declared events with their argument contracts. |
+| `Fields` | `IReadOnlyList<PreceptField>` | All scalar data fields. |
+| `CollectionFields` | `IReadOnlyList<PreceptCollectionField>` | All collection fields (`set<T>`, `queue<T>`, `stack<T>`). |
 
 ### `CreateInstance`
 
 ```csharp
-public DslWorkflowInstance CreateInstance(
+public PreceptInstance CreateInstance(
     IReadOnlyDictionary<string, object?>? instanceData = null)
 
-public DslWorkflowInstance CreateInstance(
+public PreceptInstance CreateInstance(
     string initialState,
     IReadOnlyDictionary<string, object?>? instanceData = null)
 ```
@@ -86,13 +89,18 @@ Creates a new workflow instance, optionally pre-seeded with field data and start
 ### `Inspect` (per-event)
 
 ```csharp
-public DslEventInspectionResult Inspect(
-    DslWorkflowInstance instance,
+public PreceptEventInspectionResult Inspect(
+    PreceptInstance instance,
+    string eventName,
+    IReadOnlyDictionary<string, object?>? eventArguments = null)
+
+public PreceptEventInspectionResult Inspect(
+    string currentState,
     string eventName,
     IReadOnlyDictionary<string, object?>? eventArguments = null)
 ```
 
-Non-mutating evaluation of a single event against the current instance. Returns `DslEventInspectionResult`.
+Non-mutating evaluation of a single event. Returns `PreceptEventInspectionResult`. The `PreceptInstance` overload also runs a compatibility check before evaluating; the `string currentState` overload skips that check and is used internally by the aggregate `Inspect`.
 
 **Semantics:**
 - Verifies schema compatibility via `CheckCompatibility` before evaluating. On failure, returns `NotDefined`.
@@ -109,10 +117,10 @@ Arguments are only validated and event rules are only run when `eventArguments !
 ### `Inspect` (aggregate)
 
 ```csharp
-public DslInspectionResult Inspect(DslWorkflowInstance instance)
+public PreceptInspectionResult Inspect(PreceptInstance instance)
 ```
 
-Evaluates all events that have at least one transition from the instance's current state, returning a single `DslInspectionResult` with the current state, serialized data, and per-event results.
+Evaluates all events that have at least one transition from the instance's current state, returning a single `PreceptInspectionResult` with the current state, serialized data, and per-event results.
 
 - Events are ordered by declaration position.
 - Each event is evaluated as `Inspect(instance, eventName)` with no event arguments (discovery mode).
@@ -123,13 +131,13 @@ Use this as the primary API for rendering a state-machine inspector view.
 ### `Fire`
 
 ```csharp
-public DslFireResult Fire(
-    DslWorkflowInstance instance,
+public PreceptFireResult Fire(
+    PreceptInstance instance,
     string eventName,
     IReadOnlyDictionary<string, object?>? eventArguments = null)
 ```
 
-Mutating event execution. Returns `DslFireResult`.
+Mutating event execution. Returns `PreceptFireResult`.
 
 **Evaluation stages (in order, with full rollback on any failure):**
 
@@ -145,14 +153,14 @@ Mutating event execution. Returns `DslFireResult`.
 
 On any rejection, the original instance is unchanged — all stages are fully rolled back.
 
-On success, returns `DslFireResult` with `UpdatedInstance != null`. The `UpdatedInstance` carries the new `CurrentState`, the updated `InstanceData`, and the current `UpdatedAt` timestamp.
+On success, returns `PreceptFireResult` with `UpdatedInstance != null`. The `UpdatedInstance` carries the new `CurrentState`, the updated `InstanceData`, and the current `UpdatedAt` timestamp.
 
 `no transition` outcomes execute `set` and collection mutations but do **not** trigger state rules.
 
 ### `CheckCompatibility`
 
 ```csharp
-public DslCompatibilityResult CheckCompatibility(DslWorkflowInstance instance)
+public PreceptCompatibilityResult CheckCompatibility(PreceptInstance instance)
 ```
 
 Validates that an externally loaded or deserialized instance is compatible with this compiled engine:
@@ -162,7 +170,7 @@ Validates that an externally loaded or deserialized instance is compatible with 
 3. `InstanceData` satisfies the field type contract (no unknown fields with wrong types).
 4. All data rules (field rules + top-level rules) and the current state's entry rules pass.
 
-Returns `DslCompatibilityResult(IsCompatible, Reason?)`. If `IsCompatible` is false, `Reason` contains a human-readable explanation.
+Returns `PreceptCompatibilityResult(IsCompatible, Reason?)`. If `IsCompatible` is false, `Reason` contains a human-readable explanation.
 
 Use this before using an externally deserialized instance — for example, one loaded from a JSON file or a database — to ensure schema evolution has not created a violating instance.
 
@@ -186,10 +194,10 @@ Call this on arguments obtained from JSON deserialization (e.g. CLI input or HTT
 
 ---
 
-## Instance: `DslWorkflowInstance`
+## Instance: `PreceptInstance`
 
 ```csharp
-public sealed record DslWorkflowInstance(
+public sealed record PreceptInstance(
     string WorkflowName,
     string CurrentState,
     string? LastEvent,
@@ -220,16 +228,16 @@ There are no `__collection__` prefix keys in instances returned by the engine. T
 
 ### Serialization
 
-`DslWorkflowInstance` is a plain record with no custom serialization logic. Serialize `InstanceData` directly — all values are `string`, `double`, `bool`, `null`, or `List<object>`. Deserialize by passing the resulting dictionary to `engine.CreateInstance(data)`.
+`PreceptInstance` is a plain record with no custom serialization logic. Serialize `InstanceData` directly — all values are `string`, `double`, `bool`, `null`, or `List<object>`. Deserialize by passing the resulting dictionary to `engine.CreateInstance(data)`.
 
 ---
 
 ## Result Types
 
-### `DslOutcomeKind`
+### `PreceptOutcomeKind`
 
 ```csharp
-public enum DslOutcomeKind
+public enum PreceptOutcomeKind
 {
     NotDefined,      // Event or state is unknown to the engine
     NotApplicable,   // 'when' precondition was false
@@ -239,11 +247,11 @@ public enum DslOutcomeKind
 }
 ```
 
-### `DslEventInspectionResult`
+### `PreceptEventInspectionResult`
 
 ```csharp
-public sealed record DslEventInspectionResult(
-    DslOutcomeKind Outcome,
+public sealed record PreceptEventInspectionResult(
+    PreceptOutcomeKind Outcome,
     string CurrentState,
     string EventName,
     string? TargetState,           // null unless Outcome is Accepted or AcceptedInPlace
@@ -253,35 +261,35 @@ public sealed record DslEventInspectionResult(
 
 Returned by the per-event `Inspect` overload. `TargetState` is populated for `Accepted` (the transition target) and `AcceptedInPlace` (same as `CurrentState`).
 
-### `DslInspectionResult`
+### `PreceptInspectionResult`
 
 ```csharp
-public sealed record DslInspectionResult(
+public sealed record PreceptInspectionResult(
     string CurrentState,
     IReadOnlyDictionary<string, object?> InstanceData,
-    IReadOnlyList<DslEventInspectionResult> Events)
+    IReadOnlyList<PreceptEventInspectionResult> Events)
 ```
 
 Returned by the aggregate `Inspect(instance)` overload. `InstanceData` is the same clean dictionary as `instance.InstanceData`.
 
-### `DslFireResult`
+### `PreceptFireResult`
 
 ```csharp
-public sealed record DslFireResult(
-    DslOutcomeKind Outcome,
+public sealed record PreceptFireResult(
+    PreceptOutcomeKind Outcome,
     string PreviousState,
     string EventName,
     string? NewState,              // null unless Outcome is Accepted or AcceptedInPlace
     IReadOnlyList<string> Reasons, // non-empty when Outcome is Rejected or NotDefined
-    DslWorkflowInstance? UpdatedInstance) // null unless Outcome is Accepted or AcceptedInPlace
+    PreceptInstance? UpdatedInstance) // null unless Outcome is Accepted or AcceptedInPlace
 ```
 
 `UpdatedInstance` is non-null only when the event was accepted. On any rejection, `UpdatedInstance` is `null` and the original instance is unchanged. `NewState` equals `PreviousState` for `AcceptedInPlace`.
 
-### `DslCompatibilityResult`
+### `PreceptCompatibilityResult`
 
 ```csharp
-public sealed record DslCompatibilityResult(bool IsCompatible, string? Reason)
+public sealed record PreceptCompatibilityResult(bool IsCompatible, string? Reason)
 ```
 
 ---
@@ -290,7 +298,7 @@ public sealed record DslCompatibilityResult(bool IsCompatible, string? Reason)
 
 `PreceptEngine` is immutable and thread-safe after construction — share one engine instance across all requests.
 
-`DslWorkflowInstance` is an immutable record — share or store freely. Do not mutate `InstanceData` after construction.
+`PreceptInstance` is an immutable record — share or store freely. Do not mutate `InstanceData` after construction.
 
 All coordination for concurrent reads and writes to persisted instance storage (files, databases, etc.) is outside the runtime's scope and must be managed by the caller.
 
@@ -320,7 +328,7 @@ var rawArgs = new Dictionary<string, object?> { ["Amount"] = jsonElement };
 var args    = engine.CoerceEventArguments("Pay", rawArgs);
 var result  = engine.Fire(instance, "Pay", args);
 
-if (result.Outcome == DslOutcomeKind.Accepted)
+if (result.Outcome == PreceptOutcomeKind.Accepted)
 {
     instance = result.UpdatedInstance!;  // advance to new instance
     // persist instance...
@@ -339,36 +347,37 @@ The following types are returned by `PreceptParser.Parse` and consumed by `Prece
 
 | Type | Description |
 |------|-------------|
-| `DslWorkflowModel` | Root record — name, states, events, transitions, fields, rules |
-| `DslState` | State with optional entry rules |
-| `DslEvent` | Event with argument contract and optional event rules |
-| `DslEventArg` | One typed argument: name, `DslScalarType`, nullability, optional default |
-| `DslField` | One scalar data field: name, `DslScalarType`, nullability, optional default, optional field rules |
-| `DslCollectionField` | One collection field: name, `DslCollectionKind`, `DslScalarType` inner type, optional rules |
-| `DslRule` | A boolean constraint expression with a human-readable `Reason` string |
-| `DslTransition` | One `from … on … [when …]` block: source states, event name, optional `when` predicate, ordered clauses |
-| `DslClause` | One branch inside a `from … on` block: optional guard predicate, outcome, `set` assignments, collection mutations |
-| `DslStateTransition` | Clause outcome: `transition <State>` |
-| `DslRejection` | Clause outcome: `reject "<message>"` |
-| `DslNoTransition` | Clause outcome: `no transition` |
+| `PreceptDefinition` | Root record — name, states, events, transition rows, fields, invariants, asserts |
+| `PreceptState` | State declaration |
+| `PreceptEvent` | Event with argument contract |
+| `PreceptEventArg` | One typed argument: name, `PreceptScalarType`, nullability, optional default |
+| `PreceptField` | One scalar data field: name, `PreceptScalarType`, nullability, optional default |
+| `PreceptCollectionField` | One collection field: name, `PreceptCollectionKind`, `PreceptScalarType` inner type |
+| `PreceptInvariant` | A global data constraint: `invariant <expr> because "reason"` — always holds |
+| `PreceptStateAssert` | A state-scoped assert: `in/to/from <State> assert <expr> because "reason"` |
+| `PreceptEventAssert` | An event-scoped arg validator: `on <Event> assert <expr> because "reason"` |
+| `PreceptTransitionRow` | One flat transition row: `from <State> on <Event> [when <expr>] → <outcome>` |
+| `PreceptStateTransition` | Row outcome: `transition <State>` |
+| `PreceptRejection` | Row outcome: `reject "<message>"` |
+| `PreceptNoTransition` | Row outcome: `no transition` |
 
 ### Scalar and Collection Enums
 
 ```csharp
-public enum DslScalarType  { String, Number, Boolean, Null }
-public enum DslCollectionKind { Set, Queue, Stack }
+public enum PreceptScalarType  { String, Number, Boolean, Null }
+public enum PreceptCollectionKind { Set, Queue, Stack }
 ```
 
 ### Expression AST
 
-Guard predicates and rule expressions are pre-parsed at compile time into a `DslExpression` AST:
+Guard predicates and rule expressions are pre-parsed at compile time into a `PreceptExpression` AST:
 
 | Node type | Represents |
 |-----------|-----------|
-| `DslLiteralExpression` | `true`, `false`, `null`, string literal, number literal |
-| `DslIdentifierExpression` | bare field/arg name, or dotted `EventName.ArgKey` form |
-| `DslUnaryExpression` | `!` operator |
-| `DslBinaryExpression` | `&&`, `\|\|`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `+`, `-`, `*`, `/` |
-| `DslParenthesizedExpression` | `( … )` grouping |
+| `PreceptLiteralExpression` | `true`, `false`, `null`, string literal, number literal |
+| `PreceptIdentifierExpression` | bare field/arg name, or dotted `EventName.ArgKey` form |
+| `PreceptUnaryExpression` | `!` operator |
+| `PreceptBinaryExpression` | `&&`, `\|\|`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `+`, `-`, `*`, `/` |
+| `PreceptParenthesizedExpression` | `( … )` grouping |
 
-The AST is evaluated by `DslExpressionRuntimeEvaluator` (internal). Callers never need to evaluate the AST directly.
+The AST is evaluated by `PreceptExpressionRuntimeEvaluator` (internal). Callers never need to evaluate the AST directly.

@@ -96,7 +96,7 @@ public class PreceptPreviewRulesTests
         var ruleDefs = response.Snapshot!.RuleDefinitions;
         ruleDefs.Should().NotBeNullOrEmpty("the machine declares an invariant");
         ruleDefs!.Should().ContainSingle(r =>
-            r.Scope == "topLevel" &&
+            r.Scope == "invariant" &&
             r.Expression == "Balance >= 0" &&
             r.Reason == "Balance must not go negative");
     }

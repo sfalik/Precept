@@ -37,7 +37,7 @@ public sealed class PreceptEngine
         Fields = model.Fields;
         CollectionFields = model.CollectionFields;
 
-        // Build transition row map from new TransitionRows (preferred) or old Transitions (backward compat)
+        // Build transition row map
         _transitionRowMap = new Dictionary<(string State, string Event), List<PreceptTransitionRow>>();
         if (model.TransitionRows is { Count: > 0 })
         {
@@ -50,36 +50,6 @@ public sealed class PreceptEngine
                     _transitionRowMap[key] = list;
                 }
                 list.Add(row);
-            }
-        }
-        else
-        {
-            // Backward compat: convert old Transitions to TransitionRows
-            foreach (var t in model.Transitions)
-            {
-                var key = (t.FromState, t.EventName);
-                var rows = new List<PreceptTransitionRow>();
-                foreach (var clause in t.Clauses)
-                {
-                    // Combine block-level 'when' predicate with clause-level 'if' guard.
-                    // Both must pass for the row to match.
-                    var whenGuard = CombineGuards(t.PredicateAst, clause.PredicateAst);
-                    var whenText = CombineGuardText(t.Predicate, clause.Predicate);
-
-                    // If the clause has a predicate string but no AST (unparseable expression like
-                    // function calls), treat it as a guarded row. ResolveTransition will handle the
-                    // eval failure by falling through to the next row.
-                    if (whenText is not null && whenGuard is null)
-                        whenGuard = new PreceptIdentifierExpression("__unparseable_guard__");
-
-                    rows.Add(new PreceptTransitionRow(
-                        t.FromState, t.EventName, clause.Outcome,
-                        clause.SetAssignments.ToList(),
-                        clause.CollectionMutations,
-                        whenText, whenGuard,
-                        clause.SourceLine));
-                }
-                _transitionRowMap[key] = rows;
             }
         }
 
@@ -95,50 +65,11 @@ public sealed class PreceptEngine
                 evt => evt.Args.ToDictionary(a => a.Name, a => a, StringComparer.Ordinal),
                 StringComparer.Ordinal);
 
-        // Invariants (replaces top-level rules + field rules + collection rules)
-        var invariantsList = new List<PreceptInvariant>();
-        if (model.Invariants is { Count: > 0 })
-            invariantsList.AddRange(model.Invariants);
+        // Invariants
+        _invariants = model.Invariants ?? Array.Empty<PreceptInvariant>();
 
-        // Backward compat: synthesize invariants from old-style rules
-        if (model.TopLevelRules is { Count: > 0 } && (model.Invariants is null or { Count: 0 }))
-        {
-            foreach (var rule in model.TopLevelRules)
-                invariantsList.Add(new PreceptInvariant(rule.ExpressionText, rule.Expression, rule.Reason, rule.SourceLine));
-        }
-        foreach (var field in model.Fields)
-        {
-            if (field.Rules is { Count: > 0 })
-            {
-                foreach (var rule in field.Rules)
-                    invariantsList.Add(new PreceptInvariant(rule.ExpressionText, rule.Expression, rule.Reason, rule.SourceLine));
-            }
-        }
-        foreach (var col in model.CollectionFields)
-        {
-            if (col.Rules is { Count: > 0 })
-            {
-                foreach (var rule in col.Rules)
-                    invariantsList.Add(new PreceptInvariant(rule.ExpressionText, rule.Expression, rule.Reason, rule.SourceLine));
-            }
-        }
-        _invariants = invariantsList;
-
-        // Event asserts (replaces event rules)
-        var eventAssertList = new List<PreceptEventAssert>();
-        if (model.EventAsserts is { Count: > 0 })
-            eventAssertList.AddRange(model.EventAsserts);
-
-        // Backward compat: synthesize event asserts from old-style event rules
-        foreach (var evt in model.Events)
-        {
-            if (evt.Rules is { Count: > 0 })
-            {
-                foreach (var rule in evt.Rules)
-                    eventAssertList.Add(new PreceptEventAssert(evt.Name, rule.ExpressionText, rule.Expression, rule.Reason, rule.SourceLine));
-            }
-        }
-        _eventAsserts = eventAssertList;
+        // Event asserts
+        _eventAsserts = model.EventAsserts ?? Array.Empty<PreceptEventAssert>();
         _eventAssertMap = new Dictionary<string, List<PreceptEventAssert>>(StringComparer.Ordinal);
         foreach (var ea in _eventAsserts)
         {
@@ -150,25 +81,8 @@ public sealed class PreceptEngine
             list.Add(ea);
         }
 
-        // State asserts (replaces state rules, now preposition-aware)
-        var stateAssertList = new List<PreceptStateAssert>();
-        if (model.StateAsserts is { Count: > 0 })
-            stateAssertList.AddRange(model.StateAsserts);
-
-        // Backward compat: synthesize state asserts from old-style state rules
-        // Old state rules were only checked on state entry (transition INTO state),
-        // NOT on no-transition. Map to 'To' preposition to preserve that behavior.
-        foreach (var state in model.States)
-        {
-            if (state.Rules is { Count: > 0 })
-            {
-                foreach (var rule in state.Rules)
-                    stateAssertList.Add(new PreceptStateAssert(
-                        PreceptAssertPreposition.To, state.Name,
-                        rule.ExpressionText, rule.Expression, rule.Reason, rule.SourceLine));
-            }
-        }
-        _stateAsserts = stateAssertList;
+        // State asserts (preposition-aware)
+        _stateAsserts = model.StateAsserts ?? Array.Empty<PreceptStateAssert>();
         _stateAssertMap = new Dictionary<(PreceptAssertPreposition Prep, string State), List<PreceptStateAssert>>();
         foreach (var sa in _stateAsserts)
         {
@@ -792,27 +706,6 @@ public sealed class PreceptEngine
             .ToArray();
     }
 
-    /// <summary>
-    /// Combines a block-level 'when' guard with a clause-level 'if' guard using logical AND.
-    /// Returns null only if both are null (unguarded).
-    /// </summary>
-    private static PreceptExpression? CombineGuards(PreceptExpression? blockGuard, PreceptExpression? clauseGuard)
-    {
-        if (blockGuard is null) return clauseGuard;
-        if (clauseGuard is null) return blockGuard;
-        return new PreceptBinaryExpression("&&", blockGuard, clauseGuard);
-    }
-
-    /// <summary>
-    /// Combines block-level 'when' text with clause-level 'if' text.
-    /// </summary>
-    private static string? CombineGuardText(string? blockText, string? clauseText)
-    {
-        if (blockText is null) return clauseText;
-        if (clauseText is null) return blockText;
-        return $"({blockText}) && ({clauseText})";
-    }
-
     private IReadOnlyDictionary<string, object?> BuildEvaluationData(
         IReadOnlyDictionary<string, object?> instanceData,
         string eventName,
@@ -1419,27 +1312,13 @@ public static class PreceptCompiler
 
         // 4. Validate literal set assignments against invariants
         ValidateLiteralSetAssignments(model, defaultData);
-
-        // 5. Backward compat: validate old-style field/collection/top-level/state/event rules
-        ValidateLegacyRules(model, defaultData);
     }
 
     private static void ValidateLiteralSetAssignments(PreceptDefinition model, IReadOnlyDictionary<string, object?> defaultData)
     {
         var invariants = model.Invariants ?? Array.Empty<PreceptInvariant>();
 
-        // Also gather old-style field rules for backward compat
-        var fieldRules = new List<(PreceptExpression Expression, string Reason)>();
-        foreach (var field in model.Fields)
-        {
-            if (field.Rules is { Count: > 0 })
-            {
-                foreach (var rule in field.Rules)
-                    fieldRules.Add((rule.Expression, rule.Reason));
-            }
-        }
-
-        if (invariants.Count == 0 && fieldRules.Count == 0)
+        if (invariants.Count == 0)
             return;
 
         void CheckLiteralAssignment(PreceptSetAssignment assignment)
@@ -1460,14 +1339,6 @@ public static class PreceptCompiler
                     throw new InvalidOperationException(
                         $"Line {assignment.SourceLine}: literal assignment 'set {assignment.Key} = {assignment.ExpressionText}' violates invariant \"{inv.Reason}\".");
             }
-
-            foreach (var (expression, reason) in fieldRules)
-            {
-                var result = PreceptExpressionRuntimeEvaluator.Evaluate(expression, ctx);
-                if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException(
-                        $"Line {assignment.SourceLine}: literal assignment 'set {assignment.Key} = {assignment.ExpressionText}' violates rule \"{reason}\".");
-            }
         }
 
         // Check assignments in transition rows
@@ -1476,106 +1347,6 @@ public static class PreceptCompiler
             foreach (var row in model.TransitionRows)
                 foreach (var assignment in row.SetAssignments)
                     CheckLiteralAssignment(assignment);
-        }
-
-        // Backward compat: check assignments in old transitions
-        foreach (var transition in model.Transitions)
-            foreach (var clause in transition.Clauses)
-                foreach (var assignment in clause.SetAssignments)
-                    CheckLiteralAssignment(assignment);
-    }
-
-    /// <summary>
-    /// Backward compat: validates old-style per-field, per-collection, top-level, state, and event rules
-    /// from models created by the old parser.
-    /// </summary>
-    private static void ValidateLegacyRules(PreceptDefinition model, IReadOnlyDictionary<string, object?> defaultData)
-    {
-        // Field rules
-        foreach (var field in model.Fields)
-        {
-            if (field.Rules is not { Count: > 0 } || !field.HasDefaultValue)
-                continue;
-            foreach (var rule in field.Rules)
-            {
-                var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
-                if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException(
-                        $"Line {rule.SourceLine}: compile-time rule violation: rule \"{rule.Reason}\" on field '{field.Name}' is violated by the field's default value.");
-            }
-        }
-
-        // Collection rules  
-        foreach (var col in model.CollectionFields)
-        {
-            if (col.Rules is not { Count: > 0 })
-                continue;
-            var colCtx = new Dictionary<string, object?>(defaultData, StringComparer.Ordinal)
-            {
-                [$"__collection__{col.Name}"] = new CollectionValue(col.CollectionKind, col.InnerType)
-            };
-            foreach (var rule in col.Rules)
-            {
-                var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, colCtx);
-                if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException(
-                        $"Line {rule.SourceLine}: compile-time rule violation: rule \"{rule.Reason}\" on collection field '{col.Name}' is violated at creation.");
-            }
-        }
-
-        // Top-level rules
-        if (model.TopLevelRules is { Count: > 0 })
-        {
-            foreach (var rule in model.TopLevelRules)
-            {
-                var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
-                if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException(
-                        $"Line {rule.SourceLine}: compile-time rule violation: top-level rule \"{rule.Reason}\" is violated by default field values.");
-            }
-        }
-
-        // State rules on initial state
-        if (model.InitialState.Rules is { Count: > 0 })
-        {
-            foreach (var rule in model.InitialState.Rules)
-            {
-                var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
-                if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException(
-                        $"Line {rule.SourceLine}: compile-time rule violation: state rule \"{rule.Reason}\" on initial state '{model.InitialState.Name}' is violated by default data.");
-            }
-        }
-
-        // Event rules
-        foreach (var evt in model.Events)
-        {
-            if (evt.Rules is not { Count: > 0 })
-                continue;
-            var eventDefaults = new Dictionary<string, object?>(StringComparer.Ordinal);
-            bool allArgsHaveDefaults = true;
-            foreach (var arg in evt.Args)
-            {
-                if (arg.HasDefaultValue)
-                {
-                    eventDefaults[arg.Name] = arg.DefaultValue;
-                    eventDefaults[$"{evt.Name}.{arg.Name}"] = arg.DefaultValue;
-                }
-                else if (arg.IsNullable)
-                {
-                    eventDefaults[arg.Name] = null;
-                    eventDefaults[$"{evt.Name}.{arg.Name}"] = null;
-                }
-                else { allArgsHaveDefaults = false; break; }
-            }
-            if (!allArgsHaveDefaults) continue;
-            foreach (var rule in evt.Rules)
-            {
-                var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, eventDefaults);
-                if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                    throw new InvalidOperationException(
-                        $"Line {rule.SourceLine}: compile-time rule violation: event rule \"{rule.Reason}\" on event '{evt.Name}' is violated by default argument values.");
-            }
         }
     }
 

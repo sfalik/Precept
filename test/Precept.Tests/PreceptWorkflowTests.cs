@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using FluentAssertions;
 using Precept;
@@ -45,7 +46,7 @@ public class PreceptWorkflowTests
         machine.Name.Should().Be("Minimal");
         machine.InitialState.Name.Should().Be("Idle");
         machine.Events.Should().BeEmpty();
-        machine.Transitions.Should().BeEmpty();
+        machine.TransitionRows.Should().BeNull();
     }
 
     [Fact]
@@ -941,8 +942,7 @@ public class PreceptWorkflowTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        machine.Transitions.Should().ContainSingle();
-        var guardedRow = machine.TransitionRows.FirstOrDefault(r => r.Outcome is PreceptStateTransition);
+        var guardedRow = machine.TransitionRows!.FirstOrDefault(r => r.Outcome is PreceptStateTransition);
         guardedRow.Should().NotBeNull();
         guardedRow!.WhenText.Should().Be("CarsWaiting > 0");
         guardedRow!.SetAssignments.Should().ContainSingle();
@@ -968,7 +968,6 @@ public class PreceptWorkflowTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        machine.Transitions.Should().ContainSingle();
         machine.TransitionRows.Should().HaveCount(1);
         machine.TransitionRows[0].SetAssignments.Should().HaveCount(2);
         machine.TransitionRows[0].SetAssignments[0].Key.Should().Be("CarsWaiting");
@@ -1008,8 +1007,8 @@ public class PreceptWorkflowTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        machine.Transitions.Should().ContainSingle();
-        machine.Transitions[0].FromState.Should().Be("Red");
+        machine.TransitionRows.Should().NotBeNull();
+        machine.TransitionRows!.Any(r => r.FromState == "Red").Should().BeTrue();
         machine.TransitionRows.Any(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Green").Should().BeTrue();
         machine.TransitionRows.Any(r => r.Outcome is PreceptRejection).Should().BeTrue();
         ((PreceptRejection)machine.TransitionRows.Single(r => r.Outcome is PreceptRejection).Outcome).Reason.Should().Be("No cars waiting");
@@ -1258,8 +1257,8 @@ public class PreceptWorkflowTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        machine.Transitions.Should().ContainSingle();
-        machine.TransitionRows[0].SetAssignments.Should().ContainSingle();
+        machine.TransitionRows.Should().HaveCount(1);
+        machine.TransitionRows![0].SetAssignments.Should().ContainSingle();
         machine.TransitionRows[0].SetAssignments[0].Key.Should().Be("CarsWaiting");
     }
 
@@ -1870,6 +1869,51 @@ public class PreceptWorkflowTests
         // Correct args: should be accepted
         var withArgs = workflow.Inspect(unfrozen, "Deposit", new Dictionary<string, object?> { ["Amount"] = 100.0 });
         withArgs.Outcome.Should().BeOneOf(PreceptOutcomeKind.Accepted, PreceptOutcomeKind.AcceptedInPlace);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // SAMPLE FILE VALIDATION — all samples/ files parse and compile clean (Category C/E)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData("bank-loan")]
+    [InlineData("bugtracker")]
+    [InlineData("document-signing")]
+    [InlineData("ecommerce")]
+    [InlineData("elevator")]
+    [InlineData("hotel-booking")]
+    [InlineData("job-application")]
+    [InlineData("loan")]
+    [InlineData("package-delivery")]
+    [InlineData("patient-admission")]
+    [InlineData("restaurant-order")]
+    [InlineData("smarthome")]
+    [InlineData("subscription")]
+    [InlineData("support-ticket")]
+    [InlineData("test")]
+    [InlineData("trafficlight")]
+    [InlineData("vending-machine")]
+    public void SampleFile_ParsesAndCompilesClean(string sampleName)
+    {
+        var path = Path.Combine(FindSamplesDir(), sampleName + ".precept");
+        var dsl = File.ReadAllText(path);
+
+        var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        act.Should().NotThrow(because: $"{sampleName}.precept should parse and compile without errors");
+    }
+
+    private static string FindSamplesDir()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null)
+        {
+            var candidate = Path.Combine(dir.FullName, "samples");
+            if (Directory.Exists(candidate))
+                return candidate;
+            dir = dir.Parent;
+        }
+        throw new DirectoryNotFoundException("Could not locate the samples/ directory by walking up from the test binary.");
     }
 }
 

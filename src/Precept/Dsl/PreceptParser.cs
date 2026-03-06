@@ -546,32 +546,35 @@ public static class PreceptParser
     // ═══════════════════════════════════════════════════════════════════
 
     // in/to/from <StateTarget> assert <BoolExpr> because "reason"
-    private static readonly TokenListParser<PreceptToken, (PreceptAssertPreposition Prep, string[] States)> StateAssertPrefix =
-        Token.EqualTo(PreceptToken.In).Value(PreceptAssertPreposition.In)
-            .Or(Token.EqualTo(PreceptToken.To).Value(PreceptAssertPreposition.To))
-            .Or(Token.EqualTo(PreceptToken.From).Value(PreceptAssertPreposition.From))
-            .Then(prep => StateTarget.Select(states => (prep, states)));
-
     private static readonly TokenListParser<PreceptToken, StatementResult> StateAssertDecl =
-        (from prefix in StateAssertPrefix
+        (from kw in Token.EqualTo(PreceptToken.In)
+                         .Or(Token.EqualTo(PreceptToken.To))
+                         .Or(Token.EqualTo(PreceptToken.From))
+         from states in StateTarget
          from _ in Token.EqualTo(PreceptToken.Assert)
          from expr in BoolExpr
          from __ in Token.EqualTo(PreceptToken.Because)
          from reason in Token.EqualTo(PreceptToken.StringLiteral)
-         select (StatementResult)new StateAssertResult(prefix.Prep, prefix.States,
-             ReconstituteExpr(expr), expr, reason.ToStringLiteralValue()))
+         select (StatementResult)new StateAssertResult(
+             kw.Kind == PreceptToken.In ? PreceptAssertPreposition.In :
+             kw.Kind == PreceptToken.To ? PreceptAssertPreposition.To :
+             PreceptAssertPreposition.From,
+             states,
+             ReconstituteExpr(expr), expr, reason.ToStringLiteralValue(),
+             SourceLine: kw.Span.Position.Line))
         .Named("state assert");
 
     // on <Event> assert <BoolExpr> because "reason"
     private static readonly TokenListParser<PreceptToken, StatementResult> EventAssertDecl =
-        (from _ in Token.EqualTo(PreceptToken.On)
+        (from kwOn in Token.EqualTo(PreceptToken.On)
          from eventName in Token.EqualTo(PreceptToken.Identifier)
-         from __ in Token.EqualTo(PreceptToken.Assert)
+         from _ in Token.EqualTo(PreceptToken.Assert)
          from expr in BoolExpr
-         from ___ in Token.EqualTo(PreceptToken.Because)
+         from __ in Token.EqualTo(PreceptToken.Because)
          from reason in Token.EqualTo(PreceptToken.StringLiteral)
          select (StatementResult)new EventAssertResult(new PreceptEventAssert(
-             eventName.ToText(), ReconstituteExpr(expr), expr, reason.ToStringLiteralValue())))
+             eventName.ToText(), ReconstituteExpr(expr), expr, reason.ToStringLiteralValue(),
+             SourceLine: kwOn.Span.Position.Line)))
         .Named("event assert");
 
     // ═══════════════════════════════════════════════════════════════════
@@ -646,7 +649,7 @@ public static class PreceptParser
     private sealed record StateResult(PreceptState State, bool IsInitial) : StatementResult;
     private sealed record EventResult(PreceptEvent Event) : StatementResult;
     private sealed record StateAssertResult(PreceptAssertPreposition Prep, string[] States,
-        string ExprText, PreceptExpression Expr, string Reason) : StatementResult;
+        string ExprText, PreceptExpression Expr, string Reason, int SourceLine = 0) : StatementResult;
     private sealed record EventAssertResult(PreceptEventAssert Assert) : StatementResult;
     private sealed record StateActionResult(PreceptAssertPreposition Prep, string[] States,
         ParsedAction[] Actions) : StatementResult;
@@ -707,10 +710,6 @@ public static class PreceptParser
         var transitionRows = new List<PreceptTransitionRow>();
         var editBlocks = new List<PreceptEditBlock>();
 
-        // Also build old-style transitions for backward compat during migration
-        var oldTransitions = new List<PreceptTransition>();
-        var oldTopLevelRules = new List<PreceptRule>();
-
         foreach (var stmt in statements)
         {
             switch (stmt)
@@ -729,10 +728,6 @@ public static class PreceptParser
 
                 case InvariantResult ir:
                     invariants.Add(ir.Invariant);
-                    // Also add as old-style top-level rule for backward compat
-                    oldTopLevelRules.Add(new PreceptRule(
-                        ir.Invariant.ExpressionText, ir.Invariant.Expression, ir.Invariant.Reason,
-                        ir.Invariant.SourceLine, 0, 0, 0, 0));
                     break;
 
                 case StateResult sr:
@@ -756,7 +751,7 @@ public static class PreceptParser
                 case StateAssertResult sar:
                     ExpandStateTargets(sar.States, states).ForEach(stateName =>
                         stateAsserts.Add(new PreceptStateAssert(
-                            sar.Prep, stateName, sar.ExprText, sar.Expr, sar.Reason)));
+                            sar.Prep, stateName, sar.ExprText, sar.Expr, sar.Reason, sar.SourceLine)));
                     break;
 
                 case EventAssertResult ear:
@@ -803,10 +798,6 @@ public static class PreceptParser
                             stateName, trr.EventName, outcome, rowSets, 
                             rowMutations.Count > 0 ? rowMutations : null,
                             whenText, trr.WhenGuard));
-
-                        // Build old-style transition for backward compat
-                        BuildOldTransition(oldTransitions, stateName, trr.EventName,
-                            outcome, rowSets, rowMutations, whenText, trr.WhenGuard);
                     });
                     break;
             }
@@ -940,9 +931,7 @@ public static class PreceptParser
 
         return new PreceptDefinition(
             name, states, initialState, events,
-            oldTransitions,
             fields, collectionFields,
-            oldTopLevelRules.Count > 0 ? oldTopLevelRules : null,
             invariants.Count > 0 ? invariants : null,
             stateAsserts.Count > 0 ? stateAsserts : null,
             stateActions.Count > 0 ? stateActions : null,
@@ -986,35 +975,6 @@ public static class PreceptParser
         return (sets, mutations);
     }
 
-    /// <summary>Adds a new-style transition row to the old-style transition list for backward compat.</summary>
-    private static void BuildOldTransition(
-        List<PreceptTransition> transitions,
-        string fromState, string eventName,
-        PreceptClauseOutcome outcome,
-        List<PreceptSetAssignment> sets,
-        List<PreceptCollectionMutation> mutations,
-        string? whenText,
-        PreceptExpression? whenGuard)
-    {
-        // Find or create the transition for this (state, event) pair
-        var existing = transitions.FirstOrDefault(t => t.FromState == fromState && t.EventName == eventName);
-        var clause = new PreceptClause(
-            outcome, sets,
-            Predicate: whenText,
-            PredicateAst: whenGuard,
-            CollectionMutations: mutations.Count > 0 ? mutations : null);
-
-        if (existing is not null)
-        {
-            var idx = transitions.IndexOf(existing);
-            var newClauses = existing.Clauses.Append(clause).ToList();
-            transitions[idx] = existing with { Clauses = newClauses };
-        }
-        else
-        {
-            transitions.Add(new PreceptTransition(fromState, eventName, [clause]));
-        }
-    }
 }
 
 /// <summary>A parse diagnostic with position information.</summary>

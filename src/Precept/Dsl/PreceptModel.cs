@@ -7,11 +7,8 @@ public sealed record PreceptDefinition(
     IReadOnlyList<PreceptState> States,
     PreceptState InitialState,
     IReadOnlyList<PreceptEvent> Events,
-    IReadOnlyList<PreceptTransition> Transitions,
     IReadOnlyList<PreceptField> Fields,
     IReadOnlyList<PreceptCollectionField> CollectionFields,
-    IReadOnlyList<PreceptRule>? TopLevelRules = null,
-    // ── New model properties (language redesign) ──
     IReadOnlyList<PreceptInvariant>? Invariants = null,
     IReadOnlyList<PreceptStateAssert>? StateAsserts = null,
     IReadOnlyList<PreceptStateAction>? StateActions = null,
@@ -20,13 +17,11 @@ public sealed record PreceptDefinition(
     IReadOnlyList<PreceptEditBlock>? EditBlocks = null);
 
 public sealed record PreceptState(
-    string Name,
-    IReadOnlyList<PreceptRule>? Rules = null);
+    string Name);
 
 public sealed record PreceptEvent(
     string Name,
-    IReadOnlyList<PreceptEventArg> Args,
-    IReadOnlyList<PreceptRule>? Rules = null);
+    IReadOnlyList<PreceptEventArg> Args);
 
 public sealed record PreceptEventArg(
     string Name,
@@ -40,27 +35,13 @@ public sealed record PreceptField(
     PreceptScalarType Type,
     bool IsNullable,
     bool HasDefaultValue = false,
-    object? DefaultValue = null,
-    IReadOnlyList<PreceptRule>? Rules = null);
+    object? DefaultValue = null);
 
 public sealed record PreceptCollectionField(
     string Name,
     PreceptCollectionKind CollectionKind,
-    PreceptScalarType InnerType,
-    IReadOnlyList<PreceptRule>? Rules = null);
+    PreceptScalarType InnerType);
 
-/// <summary>
-/// A declarative boolean constraint declared with the <c>rule</c> keyword.
-/// </summary>
-public sealed record PreceptRule(
-    string ExpressionText,
-    PreceptExpression Expression,
-    string Reason,
-    int SourceLine,
-    int ExpressionStartColumn,
-    int ExpressionEndColumn,
-    int ReasonStartColumn,
-    int ReasonEndColumn);
 
 public enum PreceptCollectionKind
 {
@@ -118,30 +99,7 @@ public enum PreceptCollectionMutationVerb
     Clear
 }
 
-/// <summary>
-/// Represents a complete <c>from &lt;State&gt; on &lt;Event&gt; [when &lt;Expr&gt;]</c> block.
-/// One instance per (FromState, EventName) pair.
-/// </summary>
-public sealed record PreceptTransition(
-    string FromState,
-    string EventName,
-    IReadOnlyList<PreceptClause> Clauses,
-    int SourceLine = 0,
-    string? Predicate = null,
-    PreceptExpression? PredicateAst = null);
-
-/// <summary>
-/// Represents one <c>if</c> / <c>else if</c> / <c>else</c> / unguarded branch within a <c>from…on</c> block.
-/// </summary>
-public sealed record PreceptClause(
-    PreceptClauseOutcome Outcome,
-    IReadOnlyList<PreceptSetAssignment> SetAssignments,
-    int SourceLine = 0,
-    string? Predicate = null,
-    PreceptExpression? PredicateAst = null,
-    IReadOnlyList<PreceptCollectionMutation>? CollectionMutations = null);
-
-/// <summary>Abstract base for the three possible outcomes of a <see cref="PreceptClause"/>.</summary>
+/// <summary>Abstract base for the three possible outcomes of a transition row.</summary>
 public abstract record PreceptClauseOutcome;
 
 /// <summary>The <c>transition &lt;State&gt;</c> outcome — moves to a new state.</summary>
@@ -152,10 +110,6 @@ public sealed record PreceptRejection(string? Reason = null) : PreceptClauseOutc
 
 /// <summary>The <c>no transition</c> outcome — event is accepted but state does not change.</summary>
 public sealed record PreceptNoTransition : PreceptClauseOutcome;
-
-// ══════════════════════════════════════════════════════════════════════
-// New model records — language redesign
-// ══════════════════════════════════════════════════════════════════════
 
 /// <summary>Preposition for state asserts: <c>in</c>, <c>to</c>, <c>from</c>.</summary>
 public enum PreceptAssertPreposition
@@ -214,7 +168,7 @@ public sealed record PreceptEventAssert(
 
 /// <summary>
 /// A flat transition row: <c>from &lt;State&gt; on &lt;Event&gt; [when &lt;expr&gt;] [-&gt; actions]* -&gt; &lt;outcome&gt;</c>.
-/// Replaces <see cref="PreceptTransition"/> + <see cref="PreceptClause"/> with a self-contained row.
+/// A self-contained transition row.
 /// Multiple rows for the same (State, Event) pair are evaluated top-to-bottom, first match wins.
 /// </summary>
 public sealed record PreceptTransitionRow(

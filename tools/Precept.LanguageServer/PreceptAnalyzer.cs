@@ -536,64 +536,44 @@ internal sealed class PreceptAnalyzer
             c => c,
             StringComparer.Ordinal);
 
-        // Process each transition (one per (FromState, EventName) pair), iterating clauses in order
-        // so that prior-branch guard negations are accumulated for subsequent branches.
-        foreach (var transition in model.Transitions)
+        // Process each transition row, grouping by (FromState, EventName) so that
+        // prior-row guard negations are accumulated for subsequent rows.
+        var rowGroups = (model.TransitionRows ?? Array.Empty<PreceptTransitionRow>())
+            .GroupBy(r => (r.FromState, r.EventName));
+        foreach (var group in rowGroups)
         {
-            var eventName = transition.EventName;
+            var eventName = group.Key.EventName;
             var baseSymbols = BuildSymbolKinds(dataFieldKinds, eventArgKinds, eventName, model.CollectionFields);
 
-            // Validate the transition-level `when` predicate if present
-            if (!string.IsNullOrWhiteSpace(transition.Predicate))
+            IReadOnlyDictionary<string, StaticValueKind> branchSymbols = baseSymbols;
+
+            foreach (var row in group)
             {
-                var whenLine = Math.Max(0, transition.SourceLine - 1);
-                ValidateExpression(
-                    transition.Predicate!,
-                    whenLine,
-                    baseSymbols,
-                    expectedKind: StaticValueKind.Boolean,
-                    expectedLabel: "when predicate",
-                    diagnostics,
-                    lines);
-            }
+                var searchLine = Math.Max(0, row.SourceLine - 1);
+                var fallbackLine = Math.Max(0, row.SourceLine - 1);
 
-            // branchSymbols starts as baseSymbols narrowed by the 'when' predicate (if any):
-            // within the block, 'when' is true, so identifiers can be narrowed accordingly.
-            // The 'false' (NotApplicable) path has no code to validate — no narrowing needed there.
-            IReadOnlyDictionary<string, StaticValueKind> branchSymbols = transition.PredicateAst is not null
-                ? ApplyNarrowing(transition.PredicateAst, baseSymbols, assumeTrue: true)
-                : baseSymbols;
-
-            foreach (var clause in transition.Clauses)
-            {
-                var searchLine = Math.Max(0, clause.SourceLine - 1);
-                var fallbackLine = Math.Max(0, clause.SourceLine - 1);
-
-                // setSymbols is used for set-assignment and mutation validation within this branch.
                 IReadOnlyDictionary<string, StaticValueKind> setSymbols = branchSymbols;
 
-                if (!string.IsNullOrWhiteSpace(clause.Predicate))
+                if (!string.IsNullOrWhiteSpace(row.WhenText))
                 {
-                    var guardLine = FindGuardLine(lines, ref searchLine, clause.Predicate!, fallbackLine);
+                    var guardLine = FindGuardLine(lines, ref searchLine, row.WhenText!, fallbackLine);
                     ValidateExpression(
-                        clause.Predicate!,
+                        row.WhenText!,
                         guardLine,
                         branchSymbols,
                         expectedKind: StaticValueKind.Boolean,
-                        expectedLabel: "guard expression",
+                        expectedLabel: "when predicate",
                         diagnostics,
                         lines);
 
-                    if (TryParseExpression(clause.Predicate!, out var parsedGuard, out _))
+                    if (TryParseExpression(row.WhenText!, out var parsedGuard, out _))
                     {
-                        // Within this branch the guard is true — narrow symbols for set/mutation validation.
                         setSymbols = ApplyNarrowing(parsedGuard!, branchSymbols, assumeTrue: true);
-                        // For the next branch the guard was false — accumulate the negation.
                         branchSymbols = ApplyNarrowing(parsedGuard!, branchSymbols, assumeTrue: false);
                     }
                 }
 
-                foreach (var assignment in clause.SetAssignments)
+                foreach (var assignment in row.SetAssignments)
                 {
                     var assignmentFallback = assignment.SourceLine > 0 ? assignment.SourceLine - 1 : fallbackLine;
                     var assignmentLine = FindSetLine(lines, ref searchLine, assignment.Key, assignment.ExpressionText, assignmentFallback);
@@ -611,7 +591,7 @@ internal sealed class PreceptAnalyzer
                 }
 
                 ValidateCollectionMutations(
-                    clause.CollectionMutations,
+                    row.CollectionMutations,
                     setSymbols,
                     dataFieldKinds,
                     collectionFieldMap,
@@ -667,110 +647,85 @@ internal sealed class PreceptAnalyzer
             dataSymbols[$"{col.Name}.count"] = StaticValueKind.Number;
         }
 
-        // Field rules: validate expression against single-field scope
-        foreach (var field in model.Fields)
+        // Invariants: validate against all data fields
+        if (model.Invariants is not null)
         {
-            if (field.Rules is null) continue;
-            var fieldSymbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal)
+            foreach (var inv in model.Invariants)
             {
-                [field.Name] = dataFieldKinds.TryGetValue(field.Name, out var fk) ? fk : StaticValueKind.None
-            };
-            foreach (var rule in field.Rules)
-            {
-                var lineIndex = Math.Max(0, rule.SourceLine - 1);
-                ValidateExpression(rule.ExpressionText, lineIndex, fieldSymbols, StaticValueKind.Boolean, $"field rule on '{field.Name}'", diagnostics, lines);
+                var lineIndex = Math.Max(0, inv.SourceLine - 1);
+                ValidateExpression(inv.ExpressionText, lineIndex, dataSymbols, StaticValueKind.Boolean, "invariant", diagnostics, lines);
             }
         }
 
-        // Collection field rules: validate expression against single-collection scope
-        foreach (var col in model.CollectionFields)
+        // State asserts: validate against all data fields
+        if (model.StateAsserts is not null)
         {
-            if (col.Rules is null) continue;
-            var colSymbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal)
+            foreach (var sa in model.StateAsserts)
             {
-                [$"{col.Name}.count"] = StaticValueKind.Number
-            };
-            foreach (var rule in col.Rules)
-            {
-                var lineIndex = Math.Max(0, rule.SourceLine - 1);
-                ValidateExpression(rule.ExpressionText, lineIndex, colSymbols, StaticValueKind.Boolean, $"collection rule on '{col.Name}'", diagnostics, lines);
+                var lineIndex = Math.Max(0, sa.SourceLine - 1);
+                ValidateExpression(sa.ExpressionText, lineIndex, dataSymbols, StaticValueKind.Boolean, $"state assert on '{sa.State}'", diagnostics, lines);
             }
         }
 
-        // Top-level rules: validate against all data fields
-        if (model.TopLevelRules is not null)
+        // Event asserts: validate against event arg scope only
+        if (model.EventAsserts is not null)
         {
-            foreach (var rule in model.TopLevelRules)
+            foreach (var ea in model.EventAsserts)
             {
-                var lineIndex = Math.Max(0, rule.SourceLine - 1);
-                ValidateExpression(rule.ExpressionText, lineIndex, dataSymbols, StaticValueKind.Boolean, "top-level rule", diagnostics, lines);
-            }
-        }
-
-        // State rules: validate against all data fields
-        foreach (var state in model.States)
-        {
-            if (state.Rules is null) continue;
-            foreach (var rule in state.Rules)
-            {
-                var lineIndex = Math.Max(0, rule.SourceLine - 1);
-                ValidateExpression(rule.ExpressionText, lineIndex, dataSymbols, StaticValueKind.Boolean, $"state rule on '{state.Name}'", diagnostics, lines);
-            }
-        }
-
-        // Event rules: validate against event arg scope only
-        foreach (var evt in model.Events)
-        {
-            if (evt.Rules is null) continue;
-            var evtSymbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
-            foreach (var arg in evt.Args)
-            {
-                var argKind = arg.Type switch
+                var evt = model.Events.FirstOrDefault(e => e.Name == ea.EventName);
+                if (evt is null) continue;
+                var evtSymbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
+                foreach (var arg in evt.Args)
                 {
-                    PreceptScalarType.String => StaticValueKind.String,
-                    PreceptScalarType.Number => StaticValueKind.Number,
-                    PreceptScalarType.Boolean => StaticValueKind.Boolean,
-                    _ => StaticValueKind.None
-                };
-                if (arg.IsNullable) argKind |= StaticValueKind.Null;
-                evtSymbols[$"{evt.Name}.{arg.Name}"] = argKind;
-                evtSymbols[arg.Name] = argKind;
-            }
-
-            foreach (var rule in evt.Rules)
-            {
-                var lineIndex = Math.Max(0, rule.SourceLine - 1);
-                ValidateExpression(rule.ExpressionText, lineIndex, evtSymbols, StaticValueKind.Boolean, $"event rule on '{evt.Name}'", diagnostics, lines);
-            }
-        }
-
-        // Warn about states with entry rules that are never targeted by any transition
-        var statesWithRules = model.States.Where(s => s.Rules is not null && s.Rules.Count > 0).ToList();
-        if (statesWithRules.Count > 0)
-        {
-            var targetedStates = new HashSet<string>(
-                model.Transitions
-                    .SelectMany(t => t.Clauses)
-                    .Select(c => c.Outcome)
-                    .OfType<PreceptStateTransition>()
-                    .Select(st => st.TargetState),
-                StringComparer.Ordinal);
-            foreach (var state in statesWithRules)
-            {
-                if (!targetedStates.Contains(state.Name))
-                {
-                    // Find the state line in the source
-                    var stateLineIdx = FindStateLine(lines, state.Name);
-                    var lineLen = stateLineIdx < lines.Length ? lines[stateLineIdx].Length : 1;
-                    diagnostics.Add(new Diagnostic
+                    var argKind = arg.Type switch
                     {
-                        Severity = DiagnosticSeverity.Warning,
-                        Message = $"State '{state.Name}' has entry rules but no transition targets it — entry rules are never checked.",
-                        Source = "precept",
-                        Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
-                            new Position(stateLineIdx, 0),
-                            new Position(stateLineIdx, Math.Max(1, lineLen)))
-                    });
+                        PreceptScalarType.String => StaticValueKind.String,
+                        PreceptScalarType.Number => StaticValueKind.Number,
+                        PreceptScalarType.Boolean => StaticValueKind.Boolean,
+                        _ => StaticValueKind.None
+                    };
+                    if (arg.IsNullable) argKind |= StaticValueKind.Null;
+                    evtSymbols[$"{evt.Name}.{arg.Name}"] = argKind;
+                    evtSymbols[arg.Name] = argKind;
+                }
+
+                var lineIndex = Math.Max(0, ea.SourceLine - 1);
+                ValidateExpression(ea.ExpressionText, lineIndex, evtSymbols, StaticValueKind.Boolean, $"event assert on '{ea.EventName}'", diagnostics, lines);
+            }
+        }
+
+        // Warn about states with 'to' asserts that are never targeted by any transition
+        if (model.StateAsserts is not null)
+        {
+            var statesWithToAsserts = model.StateAsserts
+                .Where(sa => sa.Preposition == PreceptAssertPreposition.To)
+                .Select(sa => sa.State)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            if (statesWithToAsserts.Count > 0)
+            {
+                var targetedStates = new HashSet<string>(
+                    (model.TransitionRows ?? Array.Empty<PreceptTransitionRow>())
+                        .Select(r => r.Outcome)
+                        .OfType<PreceptStateTransition>()
+                        .Select(st => st.TargetState),
+                    StringComparer.Ordinal);
+                foreach (var stateName in statesWithToAsserts)
+                {
+                    if (!targetedStates.Contains(stateName))
+                    {
+                        var stateLineIdx = FindStateLine(lines, stateName);
+                        var lineLen = stateLineIdx < lines.Length ? lines[stateLineIdx].Length : 1;
+                        diagnostics.Add(new Diagnostic
+                        {
+                            Severity = DiagnosticSeverity.Warning,
+                            Message = $"State '{stateName}' has entry asserts but no transition targets it — entry asserts are never checked.",
+                            Source = "precept",
+                            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                                new Position(stateLineIdx, 0),
+                                new Position(stateLineIdx, Math.Max(1, lineLen)))
+                        });
+                    }
                 }
             }
         }

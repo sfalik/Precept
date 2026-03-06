@@ -888,4 +888,100 @@ public class NewSyntaxRuntimeTests
         var r1 = wf.Fire(inst, "Go", new Dictionary<string, object?> { ["Role"] = "admin" });
         r1.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // COERCE — CoerceEventArguments type conversions (Category B)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void CoerceEventArguments_StringToNumber_IsConvertedToDouble()
+    {
+        const string dsl = """
+            precept Test
+            state Active initial
+            event Deposit with Amount as number
+            from Active on Deposit -> no transition
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var coerced = wf.CoerceEventArguments("Deposit", new Dictionary<string, object?> { ["Amount"] = "42.5" });
+
+        coerced.Should().NotBeNull();
+        coerced!["Amount"].Should().Be(42.5);
+    }
+
+    [Fact]
+    public void CoerceEventArguments_IntToNumber_IsConvertedToDouble()
+    {
+        const string dsl = """
+            precept Test
+            state Active initial
+            event Deposit with Amount as number
+            from Active on Deposit -> no transition
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var coerced = wf.CoerceEventArguments("Deposit", new Dictionary<string, object?> { ["Amount"] = 100 });
+
+        coerced.Should().NotBeNull();
+        coerced!["Amount"].Should().Be(100.0).And.BeOfType<double>();
+    }
+
+    [Fact]
+    public void CoerceEventArguments_StringBoolean_TrueAndFalse_AreConverted()
+    {
+        const string dsl = """
+            precept Test
+            state Active initial
+            event Toggle with Flag as boolean
+            from Active on Toggle -> no transition
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        var coercedTrue = wf.CoerceEventArguments("Toggle", new Dictionary<string, object?> { ["Flag"] = "true" });
+        coercedTrue!["Flag"].Should().Be(true);
+
+        var coercedFalse = wf.CoerceEventArguments("Toggle", new Dictionary<string, object?> { ["Flag"] = "FALSE" });
+        coercedFalse!["Flag"].Should().Be(false);
+    }
+
+    [Fact]
+    public void CoerceEventArguments_NullValue_PassesThrough()
+    {
+        const string dsl = """
+            precept Test
+            state Active initial
+            event Submit with Note as string nullable
+            from Active on Submit -> no transition
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var coerced = wf.CoerceEventArguments("Submit", new Dictionary<string, object?> { ["Note"] = null });
+
+        coerced.Should().NotBeNull();
+        coerced!["Note"].Should().BeNull();
+    }
+
+    [Fact]
+    public void CoerceEventArguments_StringNumber_ThenFire_EvaluatesAssert()
+    {
+        // End-to-end: string "50" coerced to 50.0 then used in event assert evaluation
+        const string dsl = """
+            precept Test
+            state Active initial
+            event Pay with Amount as number
+            on Pay assert Amount > 0 because "Must be positive"
+            from Active on Pay -> no transition
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var inst = wf.CreateInstance("Active");
+
+        var rawArgs = new Dictionary<string, object?> { ["Amount"] = "50" };
+        var coerced = wf.CoerceEventArguments("Pay", rawArgs)!;
+        var result = wf.Fire(inst, "Pay", coerced);
+
+        result.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+    }
 }

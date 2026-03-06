@@ -53,41 +53,6 @@ public class PreceptRulesTests
     }
 
     [Fact]
-    public void Parse_TopLevelRule_AttachedToMachine()
-    {
-        const string dsl = """
-            precept Test
-            field Quantity as number default 0
-            field Total as number default 0
-            invariant Quantity >= 0 because "Quantity must be non-negative"
-            state Idle initial
-            """;
-
-        var machine = PreceptParser.Parse(dsl);
-
-        machine.TopLevelRules.Should().ContainSingle();
-        machine.TopLevelRules![0].ExpressionText.Should().Be("Quantity >= 0");
-        machine.TopLevelRules[0].Reason.Should().Be("Quantity must be non-negative");
-    }
-
-    [Fact]
-    public void Parse_TopLevelRule_MultipleRules()
-    {
-        const string dsl = """
-            precept Test
-            field Balance as number default 100
-            field Limit as number default 1000
-            invariant Balance >= 0 because "Balance must not go negative"
-            invariant Balance <= Limit because "Balance must not exceed limit"
-            state Idle initial
-            """;
-
-        var machine = PreceptParser.Parse(dsl);
-
-        machine.TopLevelRules.Should().HaveCount(2);
-    }
-
-    [Fact]
     public void Parse_StateRule_AttachedToState()
     {
         const string dsl = """
@@ -1258,7 +1223,7 @@ public class PreceptRulesTests
     // ========================================================================================
 
     [Fact]
-    public void Parse_NoRules_MachineHasNullTopLevelRules()
+    public void Parse_NoRules_MachineHasNullConstraints()
     {
         const string dsl = """
             precept Test
@@ -1268,13 +1233,13 @@ public class PreceptRulesTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        machine.TopLevelRules.Should().BeNull();
-        machine.States.All(s => s.Rules == null).Should().BeTrue();
-        machine.Fields[0].Rules.Should().BeNull();
+        machine.Invariants.Should().BeNull();
+        machine.StateAsserts.Should().BeNull();
+        machine.EventAsserts.Should().BeNull();
     }
 
     [Fact]
-    public void Parse_NoRules_EventHasNullRules()
+    public void Parse_NoRules_EventAssertsAreNull()
     {
         const string dsl = """
             precept Test
@@ -1284,7 +1249,7 @@ public class PreceptRulesTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        machine.Events[0].Rules.Should().BeNull();
+        machine.EventAsserts.Should().BeNull();
     }
 }
 
