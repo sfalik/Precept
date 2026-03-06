@@ -1,1307 +1,836 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
-using System.Text.RegularExpressions;
+using Superpower;
+using Superpower.Model;
+using Superpower.Parsers;
 
 namespace Precept;
 
+/// <summary>
+/// Superpower-based parser for the Precept DSL.
+/// Converts source text → <see cref="PreceptDefinition"/> via token stream.
+/// </summary>
 public static class PreceptParser
 {
-    private static readonly Regex MachineRegex = new("^precept\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
-    private static readonly Regex StateRegex = new("^state\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+(?<initial>initial))?$", RegexOptions.Compiled);
-    private static readonly Regex EventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
-    private static readonly Regex TypedEventRegex = new("^event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*\\((?<arg>[A-Za-z_][A-Za-z0-9_<>., ]*)\\)$", RegexOptions.Compiled);
-    private static readonly Regex EventArgFieldRegex = new(
-        "^(?<type>string|number|boolean|null)(?<nullable>\\?)?\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\s*=\\s*(?<default>.+))?$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex DataFieldRegex = new(
-        "^(?<type>string|number|boolean|null)(?<nullable>\\?)?\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\s*=\\s*(?<default>.+))?$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex CollectionFieldRegex = new(
-        "^(?<kind>set|queue|stack)<(?<inner>number|string|boolean)>\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex TransitionRegex = new(
-        "^transition\\s+(?<from>[A-Za-z_][A-Za-z0-9_]*)\\s*->\\s*(?<to>[A-Za-z_][A-Za-z0-9_]*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+set\\s+(?<setKey>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<setExpr>.+))?$",
-        RegexOptions.Compiled);
-    private static readonly Regex FromOnRegex = new(
-        "^from\\s+(?<from>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+when\\s+(?<when>.+))?$",
-        RegexOptions.Compiled);
-    private static readonly Regex IfRegex = new(
-        "^if\\s+(?<guard>.+?)(?:\\s+reason\\s+\"(?<reason>[^\"]+)\")?$",
-        RegexOptions.Compiled);
-    private static readonly Regex ElseIfRegex = new(
-        "^else\\s+if\\s+(?<guard>.+?)(?:\\s+reason\\s+\"(?<reason>[^\"]+)\")?$",
-        RegexOptions.Compiled);
-    private static readonly Regex ElseRegex = new("^else$", RegexOptions.Compiled);
-    private static readonly Regex SetRegex = new(
-        "^set\\s+(?<setKey>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?<setExpr>.+)$",
-        RegexOptions.Compiled);
-    private static readonly Regex AddRegex = new(
-        "^add\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)\\s+(?<expr>.+)$",
-        RegexOptions.Compiled);
-    private static readonly Regex RemoveRegex = new(
-        "^remove\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)\\s+(?<expr>.+)$",
-        RegexOptions.Compiled);
-    private static readonly Regex EnqueueRegex = new(
-        "^enqueue\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)\\s+(?<expr>.+)$",
-        RegexOptions.Compiled);
-    private static readonly Regex DequeueRegex = new(
-        "^dequeue\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+into\\s+(?<into>[A-Za-z_][A-Za-z0-9_]*))?$",
-        RegexOptions.Compiled);
-    private static readonly Regex PushRegex = new(
-        "^push\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)\\s+(?<expr>.+)$",
-        RegexOptions.Compiled);
-    private static readonly Regex PopRegex = new(
-        "^pop\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)(?:\\s+into\\s+(?<into>[A-Za-z_][A-Za-z0-9_]*))?$",
-        RegexOptions.Compiled);
-    private static readonly Regex ClearRegex = new(
-        "^clear\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)$",
-        RegexOptions.Compiled);
-    private static readonly Regex SimpleTransitionRegex = new(
-        "^transition\\s+(?<to>[A-Za-z_][A-Za-z0-9_]*)$",
-        RegexOptions.Compiled);
-    private static readonly Regex RejectRegex = new("^reject\\s+(?<reason>.+)$", RegexOptions.Compiled);
-    private static readonly Regex RuleRegex = new(
-        "^rule\\s+(?<expr>.+?)\\s+\"(?<reason>[^\"]+)\"\\s*$",
-        RegexOptions.Compiled);
+    // ═══════════════════════════════════════════════════════════════════
+    // Public API (signature unchanged from old parser)
+    // ═══════════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// Parses a <c>.precept</c> DSL text string into a <see cref="PreceptDefinition"/> record tree.
+    /// Throws <see cref="InvalidOperationException"/> on syntax errors.
+    /// </summary>
     public static PreceptDefinition Parse(string text)
     {
         if (string.IsNullOrWhiteSpace(text))
             throw new InvalidOperationException("DSL input is empty.");
 
-        string? name = null;
-        PreceptState? initialState = null;
-        var states = new List<PreceptState>();
-        var events = new List<PreceptEvent>();
-        var transitions = new List<PreceptTransition>();
-        var dataFields = new List<PreceptField>();
-        var collectionFields = new List<PreceptCollectionField>();
-        var topLevelRules = new List<PreceptRule>();
-        var seenFromOnPairs = new HashSet<(string State, string Event)>();
-
-        var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-        int? firstContentLineNumber = null;
-        var lastStateLineNumber = 1;
-        int i = 0;
-        while (i < lines.Length)
+        TokenList<PreceptToken> tokens;
+        try
         {
-            var raw = lines[i];
-            string line = StripInlineComment(raw.Trim());
-            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
-            {
-                i++;
-                continue;
-            }
-
-            firstContentLineNumber ??= i + 1;
-
-            var machineMatch = MachineRegex.Match(line);
-            if (machineMatch.Success)
-            {
-                if (name != null)
-                    throw new InvalidOperationException($"Line {i + 1}: precept already declared.");
-
-                name = machineMatch.Groups["name"].Value;
-                i++;
-                continue;
-            }
-
-            var stateMatch = StateRegex.Match(line);
-            if (stateMatch.Success)
-            {
-                string stateName = stateMatch.Groups["name"].Value;
-                if (states.Any(s => string.Equals(s.Name, stateName, StringComparison.Ordinal)))
-                    throw new InvalidOperationException($"Line {i + 1}: duplicate state '{stateName}'.");
-
-                lastStateLineNumber = i + 1;
-                var dslState = ParseStateDeclaration(lines, ref i, stateName);
-                states.Add(dslState);
-
-                if (stateMatch.Groups["initial"].Success)
-                {
-                    if (initialState is not null)
-                        throw new InvalidOperationException($"Line {i}: duplicate initial state marker. '{initialState.Name}' is already marked initial.");
-
-                    initialState = dslState;
-                }
-
-                continue;
-            }
-
-            var eventMatch = EventRegex.Match(line);
-            if (eventMatch.Success)
-            {
-                string eventName = eventMatch.Groups["name"].Value;
-
-                ParseEventDeclaration(lines, ref i, eventName, events);
-                continue;
-            }
-
-            if (line.StartsWith("states ", StringComparison.Ordinal))
-                throw new InvalidOperationException($"Line {i + 1}: 'states' declaration is not supported. Declare each state with 'state <Name>'.");
-
-            if (line.StartsWith("events ", StringComparison.Ordinal))
-                throw new InvalidOperationException($"Line {i + 1}: 'events' declaration is not supported. Declare each event with 'event <Name>'.");
-
-            var typedEventMatch = TypedEventRegex.Match(line);
-            if (typedEventMatch.Success)
-            {
-                var eventName = typedEventMatch.Groups["name"].Value;
-                throw new InvalidOperationException($"Line {i + 1}: inline typed event arguments are not supported. Use 'event {eventName}' with optional indented argument declarations.");
-            }
-
-            var collectionFieldMatch = CollectionFieldRegex.Match(line);
-            if (collectionFieldMatch.Success)
-            {
-                var fieldName = collectionFieldMatch.Groups["name"].Value;
-                if (dataFields.Any(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal)))
-                    throw new InvalidOperationException($"Line {i + 1}: duplicate data field '{fieldName}'.");
-                if (collectionFields.Any(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal)))
-                    throw new InvalidOperationException($"Line {i + 1}: duplicate collection field '{fieldName}'.");
-
-                var collectionKind = collectionFieldMatch.Groups["kind"].Value.ToLowerInvariant() switch
-                {
-                    "set" => PreceptCollectionKind.Set,
-                    "queue" => PreceptCollectionKind.Queue,
-                    "stack" => PreceptCollectionKind.Stack,
-                    _ => throw new InvalidOperationException($"Line {i + 1}: unknown collection kind '{collectionFieldMatch.Groups["kind"].Value}'.")
-                };
-                var innerType = ParseScalarType(collectionFieldMatch.Groups["inner"].Value);
-
-                var collectionFieldRules = ParseFieldRules(lines, ref i, fieldName, isCollection: true);
-                collectionFields.Add(new PreceptCollectionField(fieldName, collectionKind, innerType, collectionFieldRules.Count > 0 ? collectionFieldRules : null));
-                continue;
-            }
-
-            var dataFieldMatch = DataFieldRegex.Match(line);
-            if (dataFieldMatch.Success)
-            {
-                var fieldName = dataFieldMatch.Groups["name"].Value;
-                if (dataFields.Any(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal)))
-                    throw new InvalidOperationException($"Line {i + 1}: duplicate data field '{fieldName}'.");
-                if (collectionFields.Any(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal)))
-                    throw new InvalidOperationException($"Line {i + 1}: duplicate data field '{fieldName}'.");
-
-                var fieldType = ParseScalarType(dataFieldMatch.Groups["type"].Value);
-                var isNullable = dataFieldMatch.Groups["nullable"].Success;
-                var hasDefaultValue = dataFieldMatch.Groups["default"].Success;
-
-                if (!isNullable && !hasDefaultValue)
-                    throw new InvalidOperationException($"Line {i + 1}: non-nullable field '{fieldName}' requires a default value.");
-
-                var defaultValue = hasDefaultValue
-                    ? ParseFieldDefaultLiteral(dataFieldMatch.Groups["default"].Value.Trim(), fieldType, isNullable, fieldName, i + 1)
-                    : null;
-
-                var fieldRules = ParseFieldRules(lines, ref i, fieldName, isCollection: false);
-
-                dataFields.Add(new PreceptField(
-                    fieldName,
-                    fieldType,
-                    isNullable,
-                    hasDefaultValue,
-                    defaultValue,
-                    fieldRules.Count > 0 ? fieldRules : null));
-
-                continue;
-            }
-
-            // Top-level rule (appears after referenced fields, before from/on blocks)
-            var topLevelRuleMatch = RuleRegex.Match(line);
-            if (topLevelRuleMatch.Success)
-            {
-                var ruleExprText = topLevelRuleMatch.Groups["expr"].Value.Trim();
-                var ruleReason = topLevelRuleMatch.Groups["reason"].Value;
-                var exprStartCol = raw.IndexOf(ruleExprText, StringComparison.Ordinal);
-                if (exprStartCol < 0) exprStartCol = line.IndexOf(ruleExprText, StringComparison.Ordinal);
-                var exprEndCol = exprStartCol + ruleExprText.Length;
-                var reasonStartCol = raw.LastIndexOf('"') - ruleReason.Length;
-                if (reasonStartCol < 0) reasonStartCol = exprEndCol;
-                var reasonEndCol = reasonStartCol + ruleReason.Length;
-
-                // Validate no forward references — only fields already declared are allowed
-                var declaredNames = new HashSet<string>(dataFields.Select(f => f.Name).Concat(collectionFields.Select(f => f.Name)), StringComparer.Ordinal);
-                ValidateRuleScope(ruleExprText, i + 1, declaredNames, allowedIdentifiers: null, scopeDescription: "top-level rule");
-
-                PreceptExpression ruleExpr;
-                try { ruleExpr = PreceptExpressionParser.Parse(ruleExprText); }
-                catch (InvalidOperationException ex)
-                { throw new InvalidOperationException($"Line {i + 1}: invalid rule expression '{ruleExprText}'. {ex.Message}"); }
-
-                topLevelRules.Add(new PreceptRule(ruleExprText, ruleExpr, ruleReason, i + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
-                i++;
-                continue;
-            }
-
-            var fromOnMatch = FromOnRegex.Match(line);
-            if (fromOnMatch.Success)
-            {
-                // Enforce uniqueness of (state, event) pairs before delegating to ParseFromOnBlock.
-                var fromToken = fromOnMatch.Groups["from"].Value.Trim();
-                var onEvent = fromOnMatch.Groups["event"].Value.Trim();
-                var sourceStatesForCheck = fromToken.Equals("any", StringComparison.Ordinal)
-                    ? states.Select(s => s.Name).ToList()
-                    : fromToken.Split(',').Select(s => s.Trim()).ToList();
-                foreach (var st in sourceStatesForCheck)
-                {
-                    if (!seenFromOnPairs.Add((st, onEvent)))
-                        throw new InvalidOperationException(
-                            $"Line {i + 1}: duplicate 'from {st} on {onEvent}' block. Each state+event combination must be handled in exactly one block.");
-                }
-
-                ParseFromOnBlock(
-                    lines,
-                    ref i,
-                    fromOnMatch,
-                    states,
-                    transitions,
-                    collectionFields,
-                    dataFields);
-                continue;
-            }
-
-            var transitionMatch = TransitionRegex.Match(line);
-            if (transitionMatch.Success)
-                throw new InvalidOperationException($"Line {i + 1}: inline 'transition <From> -> <To> on <Event>' declarations are not supported. Use a 'from <State> on <Event>' block instead.");
-
-            if (line.StartsWith("transition", StringComparison.Ordinal) && line.Contains(" reason ", StringComparison.Ordinal))
-                throw new InvalidOperationException($"Line {i + 1}: inline transition declarations are not supported. Use a 'from <State> on <Event>' block and place reasons on 'reject' statements.");
-
-            throw new InvalidOperationException($"Line {i + 1}: unrecognized statement '{line}'.");
+            tokens = PreceptTokenizerBuilder.Instance.Tokenize(text);
+        }
+        catch (Superpower.ParseException ex)
+        {
+            throw new InvalidOperationException($"Tokenization error: {ex.Message}", ex);
         }
 
-        if (name == null)
-            throw new InvalidOperationException($"Line {firstContentLineNumber ?? 1}: Missing 'precept <Name>' declaration.");
+        var result = FileParser.TryParse(tokens);
+        if (!result.HasValue)
+        {
+            var pos = result.ErrorPosition;
+            var line = pos.HasValue ? pos.Line : 0;
+            var expectations = result.Expectations ?? [];
+            var expectStr = expectations.Length > 0
+                ? $" Expected: {string.Join(", ", expectations)}."
+                : "";
+            throw new InvalidOperationException(
+                $"Line {line}: parse error.{expectStr} {result.ErrorMessage ?? ""}".TrimEnd());
+        }
+
+        return result.Value;
+    }
+
+    /// <summary>
+    /// Parses with diagnostics — returns a model (or null) and a list of parse diagnostics.
+    /// For use by the language server.
+    /// </summary>
+    public static (PreceptDefinition? Model, IReadOnlyList<ParseDiagnostic> Diagnostics) ParseWithDiagnostics(string text)
+    {
+        var diagnostics = new List<ParseDiagnostic>();
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            diagnostics.Add(new ParseDiagnostic(1, 0, "DSL input is empty."));
+            return (null, diagnostics);
+        }
+
+        TokenList<PreceptToken> tokens;
+        try
+        {
+            tokens = PreceptTokenizerBuilder.Instance.Tokenize(text);
+        }
+        catch (Superpower.ParseException ex)
+        {
+            diagnostics.Add(new ParseDiagnostic(1, 0, $"Tokenization error: {ex.Message}"));
+            return (null, diagnostics);
+        }
+
+        var result = FileParser.TryParse(tokens);
+        if (!result.HasValue)
+        {
+            var pos = result.ErrorPosition;
+            var line = pos.HasValue ? pos.Line : 1;
+            var col = pos.HasValue ? pos.Column : 0;
+            diagnostics.Add(new ParseDiagnostic(line, col, result.ErrorMessage ?? "Parse error."));
+            return (null, diagnostics);
+        }
+
+        return (result.Value, diagnostics);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Helpers
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>Extracts the text value (identifier name) from a token span.</summary>
+    private static string ToText(this Token<PreceptToken> token) => token.ToStringValue();
+
+    /// <summary>Extracts the string literal value (unquoting) from a StringLiteral token.</summary>
+    private static string ToStringLiteralValue(this Token<PreceptToken> token)
+    {
+        var raw = token.ToStringValue();
+        // Remove surrounding quotes and unescape
+        if (raw.Length >= 2 && raw[0] == '"' && raw[^1] == '"')
+        {
+            raw = raw[1..^1];
+            raw = raw.Replace("\\\"", "\"")
+                     .Replace("\\\\", "\\")
+                     .Replace("\\n", "\n")
+                     .Replace("\\r", "\r")
+                     .Replace("\\t", "\t");
+        }
+        return raw;
+    }
+
+    private static double ToNumberValue(this Token<PreceptToken> token)
+    {
+        if (double.TryParse(token.ToStringValue(), NumberStyles.Float, CultureInfo.InvariantCulture, out var v))
+            return v;
+        throw new InvalidOperationException($"Invalid number literal: {token.ToStringValue()}");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Expression Combinators
+    // ═══════════════════════════════════════════════════════════════════
+
+    // Level 5: Atoms
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> NumberAtom =
+        Token.EqualTo(PreceptToken.NumberLiteral)
+            .Select(t => (PreceptExpression)new PreceptLiteralExpression(t.ToNumberValue()));
+
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> StringAtom =
+        Token.EqualTo(PreceptToken.StringLiteral)
+            .Select(t => (PreceptExpression)new PreceptLiteralExpression(t.ToStringLiteralValue()));
+
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> TrueAtom =
+        Token.EqualTo(PreceptToken.True)
+            .Value((PreceptExpression)new PreceptLiteralExpression(true));
+
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> FalseAtom =
+        Token.EqualTo(PreceptToken.False)
+            .Value((PreceptExpression)new PreceptLiteralExpression(false));
+
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> NullAtom =
+        Token.EqualTo(PreceptToken.Null)
+            .Value((PreceptExpression)new PreceptLiteralExpression(null));
+
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> DottedIdentifier =
+        Token.EqualTo(PreceptToken.Identifier)
+            .Then(id =>
+                Token.EqualTo(PreceptToken.Dot)
+                    .IgnoreThen(Token.EqualTo(PreceptToken.Identifier))
+                    .Select(member => (PreceptExpression)new PreceptIdentifierExpression(id.ToText(), member.ToText()))
+                .Try()
+                .Or(Superpower.Parse.Return<PreceptToken, PreceptExpression>(
+                    new PreceptIdentifierExpression(id.ToText()))));
+
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> ParenExpr =
+        from _lp in Token.EqualTo(PreceptToken.LeftParen)
+        from inner in Superpower.Parse.Ref(() => BoolExpr)
+        from _rp in Token.EqualTo(PreceptToken.RightParen)
+        select (PreceptExpression)new PreceptParenthesizedExpression(inner);
+
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> Atom =
+        NumberAtom
+            .Try().Or(StringAtom)
+            .Try().Or(TrueAtom)
+            .Try().Or(FalseAtom)
+            .Try().Or(NullAtom)
+            .Try().Or(ParenExpr)
+            .Or(DottedIdentifier);
+
+    // Level 4: Unary (! and unary -)
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> Unary =
+        Token.EqualTo(PreceptToken.Not)
+            .IgnoreThen(Superpower.Parse.Ref(() => Unary))
+            .Select(expr => (PreceptExpression)new PreceptUnaryExpression("!", expr))
+        .Try()
+        .Or(
+            Token.EqualTo(PreceptToken.Minus)
+                .IgnoreThen(Superpower.Parse.Ref(() => Unary))
+                .Select(expr => (PreceptExpression)new PreceptUnaryExpression("-", expr))
+            .Try()
+            .Or(Atom));
+
+    // Level 3.5: Multiplicative (* / %)
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> Factor =
+        Superpower.Parse.Chain(
+            Token.EqualTo(PreceptToken.Star).Value("*")
+                .Or(Token.EqualTo(PreceptToken.Slash).Value("/")),
+            Unary,
+            (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right));
+
+    // Level 3: Additive (+ -)
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> Term =
+        Superpower.Parse.Chain(
+            Token.EqualTo(PreceptToken.Plus).Value("+")
+                .Or(Token.EqualTo(PreceptToken.Minus).Value("-")),
+            Factor,
+            (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right));
+
+    // Level 2: Comparison (==, !=, >, >=, <, <=, contains)
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> Comparison =
+        Superpower.Parse.Chain(
+            Token.EqualTo(PreceptToken.DoubleEquals).Value("==")
+                .Try().Or(Token.EqualTo(PreceptToken.NotEquals).Value("!="))
+                .Try().Or(Token.EqualTo(PreceptToken.GreaterThanOrEqual).Value(">="))
+                .Try().Or(Token.EqualTo(PreceptToken.LessThanOrEqual).Value("<="))
+                .Try().Or(Token.EqualTo(PreceptToken.GreaterThan).Value(">"))
+                .Try().Or(Token.EqualTo(PreceptToken.LessThan).Value("<"))
+                .Or(Token.EqualTo(PreceptToken.Contains).Value("contains")),
+            Term,
+            (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right));
+
+    // Level 1.5: Logical AND (&&)
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> AndExpr =
+        Superpower.Parse.Chain(
+            Token.EqualTo(PreceptToken.And).Value("&&"),
+            Comparison,
+            (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right));
+
+    // Level 1: Logical OR (||)
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> OrExpr =
+        Superpower.Parse.Chain(
+            Token.EqualTo(PreceptToken.Or).Value("||"),
+            AndExpr,
+            (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right));
+
+    /// <summary>Full boolean expression parser.</summary>
+    internal static readonly TokenListParser<PreceptToken, PreceptExpression> BoolExpr = OrExpr;
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Expression text reconstruction (for ExpressionText fields)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Reconstructs expression source text from a span of tokens.
+    /// Used for populating ExpressionText fields.
+    /// </summary>
+    private static string ExtractSpanText(Token<PreceptToken> startToken, Token<PreceptToken> endToken, string source)
+    {
+        var start = startToken.Span.Position.Absolute;
+        var end = endToken.Span.Position.Absolute + endToken.Span.Length;
+        return source[start..end].Trim();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Type Combinators
+    // ═══════════════════════════════════════════════════════════════════
+
+    private static readonly TokenListParser<PreceptToken, PreceptScalarType> ScalarType =
+        Token.EqualTo(PreceptToken.StringType).Value(PreceptScalarType.String)
+            .Or(Token.EqualTo(PreceptToken.NumberType).Value(PreceptScalarType.Number))
+            .Or(Token.EqualTo(PreceptToken.BooleanType).Value(PreceptScalarType.Boolean));
+
+    /// <summary>
+    /// Parses a type reference: scalar type or collection type.
+    /// Collection types use "set of scalar", "queue of scalar", "stack of scalar".
+    /// Dual-use 'set' keyword: after 'as' → if followed by 'of', it's a collection type.
+    /// </summary>
+    private static readonly TokenListParser<PreceptToken, (bool IsCollection, PreceptScalarType ScalarType, PreceptCollectionKind? CollectionKind)> TypeRef =
+        // Collection types: set/queue/stack of <scalar>
+        (from kw in Token.EqualTo(PreceptToken.Set).Value(PreceptCollectionKind.Set)
+             .Or(Token.EqualTo(PreceptToken.Queue).Value(PreceptCollectionKind.Queue))
+             .Or(Token.EqualTo(PreceptToken.Stack).Value(PreceptCollectionKind.Stack))
+         from _ in Token.EqualTo(PreceptToken.Of)
+         from inner in ScalarType
+         select (IsCollection: true, ScalarType: inner, CollectionKind: (PreceptCollectionKind?)kw))
+        .Try()
+        .Or(ScalarType.Select(st => (IsCollection: false, ScalarType: st, CollectionKind: (PreceptCollectionKind?)null)));
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Literal Parsers (for default values)
+    // ═══════════════════════════════════════════════════════════════════
+
+    private static readonly TokenListParser<PreceptToken, object?> ScalarLiteral =
+        Token.EqualTo(PreceptToken.NumberLiteral).Select(t => (object?)t.ToNumberValue())
+            .Try().Or(Token.EqualTo(PreceptToken.StringLiteral).Select(t => (object?)t.ToStringLiteralValue()))
+            .Try().Or(Token.EqualTo(PreceptToken.True).Value((object?)true))
+            .Try().Or(Token.EqualTo(PreceptToken.False).Value((object?)false))
+            .Or(Token.EqualTo(PreceptToken.Null).Value((object?)null));
+
+    private static readonly TokenListParser<PreceptToken, object?> ListLiteral =
+        from _ in Token.EqualTo(PreceptToken.LeftBracket)
+        from items in ScalarLiteral.ManyDelimitedBy(Token.EqualTo(PreceptToken.Comma))
+        from _2 in Token.EqualTo(PreceptToken.RightBracket)
+        select (object?)items.ToList();
+
+    private static readonly TokenListParser<PreceptToken, object?> DefaultValue =
+        ListLiteral.Try().Or(ScalarLiteral);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // State Target Parser
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Parses a state target: 'any' | Name (',' Name)*
+    /// Returns the list of state names. 'any' is represented as ["any"].
+    /// </summary>
+    private static readonly TokenListParser<PreceptToken, string[]> StateTarget =
+        Token.EqualTo(PreceptToken.Any).Value(new[] { "any" })
+        .Or(Token.EqualTo(PreceptToken.Identifier)
+            .Select(t => t.ToText())
+            .AtLeastOnceDelimitedBy(Token.EqualTo(PreceptToken.Comma)));
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Outcome Parser
+    // ═══════════════════════════════════════════════════════════════════
+
+    private static readonly TokenListParser<PreceptToken, PreceptClauseOutcome> TransitionOutcome =
+        Token.EqualTo(PreceptToken.Transition)
+            .IgnoreThen(Token.EqualTo(PreceptToken.Identifier))
+            .Select(t => (PreceptClauseOutcome)new PreceptStateTransition(t.ToText()));
+
+    private static readonly TokenListParser<PreceptToken, PreceptClauseOutcome> NoTransitionOutcome =
+        Token.EqualTo(PreceptToken.No)
+            .IgnoreThen(Token.EqualTo(PreceptToken.Transition))
+            .Value((PreceptClauseOutcome)new PreceptNoTransition());
+
+    private static readonly TokenListParser<PreceptToken, PreceptClauseOutcome> RejectOutcome =
+        Token.EqualTo(PreceptToken.Reject)
+            .IgnoreThen(Token.EqualTo(PreceptToken.StringLiteral))
+            .Select(t => (PreceptClauseOutcome)new PreceptRejection(t.ToStringLiteralValue()));
+
+    private static readonly TokenListParser<PreceptToken, PreceptClauseOutcome> Outcome =
+        NoTransitionOutcome.Try()
+            .Or(TransitionOutcome)
+            .Or(RejectOutcome);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Action Parsers (for -> pipeline)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>Represents a single parsed action (either set assignment or collection mutation).</summary>
+    private abstract record ParsedAction;
+    private sealed record SetAction(PreceptSetAssignment Assignment) : ParsedAction;
+    private sealed record CollectionAction(PreceptCollectionMutation Mutation) : ParsedAction;
+
+    private static readonly TokenListParser<PreceptToken, ParsedAction> SetActionParser =
+        from kw in Token.EqualTo(PreceptToken.Set)
+        from field in Token.EqualTo(PreceptToken.Identifier)
+        from eq in Token.EqualTo(PreceptToken.Assign)
+        from expr in BoolExpr
+        select (ParsedAction)new SetAction(new PreceptSetAssignment(
+            field.ToText(),
+            ReconstituteExpr(expr),
+            expr));
+
+    private static readonly TokenListParser<PreceptToken, ParsedAction> AddActionParser =
+        from kw in Token.EqualTo(PreceptToken.Add)
+        from field in Token.EqualTo(PreceptToken.Identifier)
+        from expr in BoolExpr
+        select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
+            PreceptCollectionMutationVerb.Add, field.ToText(), ReconstituteExpr(expr), expr));
+
+    private static readonly TokenListParser<PreceptToken, ParsedAction> RemoveActionParser =
+        from kw in Token.EqualTo(PreceptToken.Remove)
+        from field in Token.EqualTo(PreceptToken.Identifier)
+        from expr in BoolExpr
+        select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
+            PreceptCollectionMutationVerb.Remove, field.ToText(), ReconstituteExpr(expr), expr));
+
+    private static readonly TokenListParser<PreceptToken, ParsedAction> EnqueueActionParser =
+        from kw in Token.EqualTo(PreceptToken.Enqueue)
+        from field in Token.EqualTo(PreceptToken.Identifier)
+        from expr in BoolExpr
+        select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
+            PreceptCollectionMutationVerb.Enqueue, field.ToText(), ReconstituteExpr(expr), expr));
+
+    private static readonly TokenListParser<PreceptToken, ParsedAction> DequeueActionParser =
+        from kw in Token.EqualTo(PreceptToken.Dequeue)
+        from field in Token.EqualTo(PreceptToken.Identifier)
+        from intoField in Token.EqualTo(PreceptToken.Into)
+            .IgnoreThen(Token.EqualTo(PreceptToken.Identifier))
+            .Select(t => t.ToText())
+            .OptionalOrDefault()
+        select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
+            PreceptCollectionMutationVerb.Dequeue, field.ToText(), null, null, intoField));
+
+    private static readonly TokenListParser<PreceptToken, ParsedAction> PushActionParser =
+        from kw in Token.EqualTo(PreceptToken.Push)
+        from field in Token.EqualTo(PreceptToken.Identifier)
+        from expr in BoolExpr
+        select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
+            PreceptCollectionMutationVerb.Push, field.ToText(), ReconstituteExpr(expr), expr));
+
+    private static readonly TokenListParser<PreceptToken, ParsedAction> PopActionParser =
+        from kw in Token.EqualTo(PreceptToken.Pop)
+        from field in Token.EqualTo(PreceptToken.Identifier)
+        from intoField in Token.EqualTo(PreceptToken.Into)
+            .IgnoreThen(Token.EqualTo(PreceptToken.Identifier))
+            .Select(t => t.ToText())
+            .OptionalOrDefault()
+        select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
+            PreceptCollectionMutationVerb.Pop, field.ToText(), null, null, intoField));
+
+    private static readonly TokenListParser<PreceptToken, ParsedAction> ClearActionParser =
+        from kw in Token.EqualTo(PreceptToken.Clear)
+        from field in Token.EqualTo(PreceptToken.Identifier)
+        select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
+            PreceptCollectionMutationVerb.Clear, field.ToText(), null, null));
+
+    private static readonly TokenListParser<PreceptToken, ParsedAction> AnyAction =
+        SetActionParser
+            .Try().Or(AddActionParser)
+            .Try().Or(RemoveActionParser)
+            .Try().Or(EnqueueActionParser)
+            .Try().Or(DequeueActionParser)
+            .Try().Or(PushActionParser)
+            .Try().Or(PopActionParser)
+            .Or(ClearActionParser);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Expression text reconstitution
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Reconstitutes expression text from a parsed AST. Used for ExpressionText fields.
+    /// </summary>
+    private static string ReconstituteExpr(PreceptExpression expr)
+        => expr switch
+        {
+            PreceptLiteralExpression lit => lit.Value switch
+            {
+                null => "null",
+                bool b => b ? "true" : "false",
+                double d => d.ToString(CultureInfo.InvariantCulture),
+                string s => $"\"{s}\"",
+                _ => lit.Value.ToString() ?? "null"
+            },
+            PreceptIdentifierExpression id => id.Member is not null ? $"{id.Name}.{id.Member}" : id.Name,
+            PreceptUnaryExpression un => $"{un.Operator}{ReconstituteExpr(un.Operand)}",
+            PreceptBinaryExpression bin => $"{ReconstituteExpr(bin.Left)} {bin.Operator} {ReconstituteExpr(bin.Right)}",
+            PreceptParenthesizedExpression paren => $"({ReconstituteExpr(paren.Inner)})",
+            _ => expr.ToString() ?? ""
+        };
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Statement Declarations
+    // ═══════════════════════════════════════════════════════════════════
+
+    // precept <Name>
+    private static readonly TokenListParser<PreceptToken, string> PreceptHeader =
+        Token.EqualTo(PreceptToken.Precept)
+            .IgnoreThen(Token.EqualTo(PreceptToken.Identifier))
+            .Select(t => t.ToText())
+            .Named("precept declaration");
+
+    // field <Name> as <Type> [nullable] [default <Value>]
+    private static readonly TokenListParser<PreceptToken, StatementResult> FieldDecl =
+        (from kw in Token.EqualTo(PreceptToken.Field)
+         from name in Token.EqualTo(PreceptToken.Identifier)
+         from _ in Token.EqualTo(PreceptToken.As)
+         from typeRef in TypeRef
+         from nullable in Token.EqualTo(PreceptToken.Nullable).Value(true).OptionalOrDefault(false)
+         from defaultVal in Token.EqualTo(PreceptToken.Default).IgnoreThen(DefaultValue).OptionalOrDefault()
+         select typeRef.IsCollection
+            ? (StatementResult)new CollectionFieldResult(new PreceptCollectionField(
+                name.ToText(), typeRef.CollectionKind!.Value, typeRef.ScalarType))
+            : new FieldResult(new PreceptField(
+                name.ToText(), typeRef.ScalarType, nullable,
+                defaultVal is not null || (nullable && defaultVal is null),
+                defaultVal)))
+        .Named("field declaration");
+
+    // invariant <BoolExpr> because "reason"
+    private static readonly TokenListParser<PreceptToken, StatementResult> InvariantDecl =
+        (from kw in Token.EqualTo(PreceptToken.Invariant)
+         from expr in BoolExpr
+         from _ in Token.EqualTo(PreceptToken.Because)
+         from reason in Token.EqualTo(PreceptToken.StringLiteral)
+         select (StatementResult)new InvariantResult(new PreceptInvariant(
+             ReconstituteExpr(expr), expr, reason.ToStringLiteralValue())))
+        .Named("invariant declaration");
+
+    // state <Name> [initial]
+    private static readonly TokenListParser<PreceptToken, StatementResult> StateDecl =
+        (from kw in Token.EqualTo(PreceptToken.State)
+         from name in Token.EqualTo(PreceptToken.Identifier)
+         from initial in Token.EqualTo(PreceptToken.Initial).Value(true).OptionalOrDefault(false)
+         select (StatementResult)new StateResult(new PreceptState(name.ToText()), initial))
+        .Named("state declaration");
+
+    // event <Name> [with <ArgList>]
+    // where ArgList = Name as Type [nullable] [default val] separated by commas
+    private static readonly TokenListParser<PreceptToken, PreceptEventArg> EventArg =
+        from name in Token.EqualTo(PreceptToken.Identifier)
+        from _ in Token.EqualTo(PreceptToken.As)
+        from type in ScalarType
+        from nullable in Token.EqualTo(PreceptToken.Nullable).Value(true).OptionalOrDefault(false)
+        from dflt in Token.EqualTo(PreceptToken.Default).IgnoreThen(ScalarLiteral).OptionalOrDefault()
+        select new PreceptEventArg(name.ToText(), type, nullable, dflt is not null, dflt);
+
+    private static readonly TokenListParser<PreceptToken, StatementResult> EventDecl =
+        (from kw in Token.EqualTo(PreceptToken.Event)
+         from name in Token.EqualTo(PreceptToken.Identifier)
+         from args in Token.EqualTo(PreceptToken.With)
+             .IgnoreThen(EventArg.AtLeastOnceDelimitedBy(Token.EqualTo(PreceptToken.Comma)))
+             .OptionalOrDefault(Array.Empty<PreceptEventArg>())
+         select (StatementResult)new EventResult(new PreceptEvent(
+             name.ToText(), args.ToList())))
+        .Named("event declaration");
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Assert Statements
+    // ═══════════════════════════════════════════════════════════════════
+
+    // in/to/from <StateTarget> assert <BoolExpr> because "reason"
+    private static readonly TokenListParser<PreceptToken, (PreceptAssertPreposition Prep, string[] States)> StateAssertPrefix =
+        Token.EqualTo(PreceptToken.In).Value(PreceptAssertPreposition.In)
+            .Or(Token.EqualTo(PreceptToken.To).Value(PreceptAssertPreposition.To))
+            .Or(Token.EqualTo(PreceptToken.From).Value(PreceptAssertPreposition.From))
+            .Then(prep => StateTarget.Select(states => (prep, states)));
+
+    private static readonly TokenListParser<PreceptToken, StatementResult> StateAssertDecl =
+        (from prefix in StateAssertPrefix
+         from _ in Token.EqualTo(PreceptToken.Assert)
+         from expr in BoolExpr
+         from __ in Token.EqualTo(PreceptToken.Because)
+         from reason in Token.EqualTo(PreceptToken.StringLiteral)
+         select (StatementResult)new StateAssertResult(prefix.Prep, prefix.States,
+             ReconstituteExpr(expr), expr, reason.ToStringLiteralValue()))
+        .Named("state assert");
+
+    // on <Event> assert <BoolExpr> because "reason"
+    private static readonly TokenListParser<PreceptToken, StatementResult> EventAssertDecl =
+        (from _ in Token.EqualTo(PreceptToken.On)
+         from eventName in Token.EqualTo(PreceptToken.Identifier)
+         from __ in Token.EqualTo(PreceptToken.Assert)
+         from expr in BoolExpr
+         from ___ in Token.EqualTo(PreceptToken.Because)
+         from reason in Token.EqualTo(PreceptToken.StringLiteral)
+         select (StatementResult)new EventAssertResult(new PreceptEventAssert(
+             eventName.ToText(), ReconstituteExpr(expr), expr, reason.ToStringLiteralValue())))
+        .Named("event assert");
+
+    // ═══════════════════════════════════════════════════════════════════
+    // State Entry/Exit Actions
+    // ═══════════════════════════════════════════════════════════════════
+
+    // to/from <StateTarget> -> <ActionChain>
+    private static readonly TokenListParser<PreceptToken, (PreceptAssertPreposition Prep, string[] States)> StateActionPrefix =
+        Token.EqualTo(PreceptToken.To).Value(PreceptAssertPreposition.To)
+            .Or(Token.EqualTo(PreceptToken.From).Value(PreceptAssertPreposition.From))
+            .Then(prep => StateTarget.Select(states => (prep, states)));
+
+    private static readonly TokenListParser<PreceptToken, ParsedAction[]> ActionChain =
+        Token.EqualTo(PreceptToken.Arrow)
+            .IgnoreThen(AnyAction)
+            .AtLeastOnce();
+
+    private static readonly TokenListParser<PreceptToken, StatementResult> StateActionDecl =
+        (from prefix in StateActionPrefix
+         from actions in ActionChain
+         where !actions.Any(a => a is SetAction sa && false) // placeholder — allow all actions
+         select (StatementResult)new StateActionResult(prefix.Prep, prefix.States, actions))
+        .Named("state entry/exit action");
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Edit Declarations
+    // ═══════════════════════════════════════════════════════════════════
+
+    // in <StateTarget> edit <FieldList>
+    private static readonly TokenListParser<PreceptToken, StatementResult> EditDecl =
+        (from _ in Token.EqualTo(PreceptToken.In)
+         from states in StateTarget
+         from __ in Token.EqualTo(PreceptToken.Edit)
+         from fields in Token.EqualTo(PreceptToken.Identifier)
+             .Select(t => t.ToText())
+             .AtLeastOnceDelimitedBy(Token.EqualTo(PreceptToken.Comma))
+         select (StatementResult)new EditResult(states, fields))
+        .Named("edit declaration");
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Transition Rows
+    // ═══════════════════════════════════════════════════════════════════
+
+    // from <StateTarget> on <Event> [when <BoolExpr>] [-> <actions>]* -> <outcome>
+    private static readonly TokenListParser<PreceptToken, StatementResult> TransitionRowParser =
+        (from _ in Token.EqualTo(PreceptToken.From)
+         from states in StateTarget
+         from __ in Token.EqualTo(PreceptToken.On)
+         from eventName in Token.EqualTo(PreceptToken.Identifier)
+         from whenGuard in Token.EqualTo(PreceptToken.When)
+             .IgnoreThen(BoolExpr)
+             .OptionalOrDefault()
+         from actionsAndOutcome in Token.EqualTo(PreceptToken.Arrow)
+             .IgnoreThen(AnyAction.Try().Or(Outcome.Select(o => (ParsedAction)new OutcomeAction(o))))
+             .AtLeastOnce()
+         select (StatementResult)new TransitionRowResult(
+             states, eventName.ToText(), whenGuard, actionsAndOutcome))
+        .Named("transition row");
+
+    /// <summary>Wraps an outcome as a parsed action for the unified action pipeline.</summary>
+    private sealed record OutcomeAction(PreceptClauseOutcome Outcome) : ParsedAction;
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Statement Union (all statement kinds)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>Base type for parsed statement results before assembly into the model.</summary>
+    private abstract record StatementResult;
+    private sealed record FieldResult(PreceptField Field) : StatementResult;
+    private sealed record CollectionFieldResult(PreceptCollectionField Field) : StatementResult;
+    private sealed record InvariantResult(PreceptInvariant Invariant) : StatementResult;
+    private sealed record StateResult(PreceptState State, bool IsInitial) : StatementResult;
+    private sealed record EventResult(PreceptEvent Event) : StatementResult;
+    private sealed record StateAssertResult(PreceptAssertPreposition Prep, string[] States,
+        string ExprText, PreceptExpression Expr, string Reason) : StatementResult;
+    private sealed record EventAssertResult(PreceptEventAssert Assert) : StatementResult;
+    private sealed record StateActionResult(PreceptAssertPreposition Prep, string[] States,
+        ParsedAction[] Actions) : StatementResult;
+    private sealed record EditResult(string[] States, string[] Fields) : StatementResult;
+    private sealed record TransitionRowResult(string[] States, string EventName,
+        PreceptExpression? WhenGuard, ParsedAction[] ActionsAndOutcome) : StatementResult;
+
+    /// <summary>Union parser: tries each statement kind in priority order.</summary>
+    private static readonly TokenListParser<PreceptToken, StatementResult> Statement =
+        // Order matters: more specific patterns before general ones
+        // 'in ... edit' before 'in ... assert' (both start with In)
+        EditDecl.Try()
+        // Event assert: 'on <Event> assert'
+        .Or(EventAssertDecl.Try())
+        // State assert: 'in/to/from <State> assert'
+        // Must come before state action and transition row
+        .Or(StateAssertDecl.Try())
+        // Transition row: 'from <State> on <Event> ...'
+        // Must come before state action (both can start with from)
+        .Or(TransitionRowParser.Try())
+        // State action: 'to/from <State> -> ...'
+        .Or(StateActionDecl.Try())
+        // Simple declarations
+        .Or(FieldDecl.Try())
+        .Or(InvariantDecl.Try())
+        .Or(StateDecl.Try())
+        .Or(EventDecl);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // File Parser (top-level)
+    // ═══════════════════════════════════════════════════════════════════
+
+    private static readonly TokenListParser<PreceptToken, PreceptDefinition> FileParser =
+        from header in PreceptHeader
+        from statements in Statement.Many()
+        select AssembleModel(header, statements);
+
+    /// <summary>
+    /// Assembles individual parsed statements into a <see cref="PreceptDefinition"/>.
+    /// Validates structural constraints (one initial state, no duplicates, etc.).
+    /// </summary>
+    private static PreceptDefinition AssembleModel(string name, StatementResult[] statements)
+    {
+        var states = new List<PreceptState>();
+        PreceptState? initialState = null;
+        var events = new List<PreceptEvent>();
+        var fields = new List<PreceptField>();
+        var collectionFields = new List<PreceptCollectionField>();
+        var invariants = new List<PreceptInvariant>();
+        var stateAsserts = new List<PreceptStateAssert>();
+        var stateActions = new List<PreceptStateAction>();
+        var eventAsserts = new List<PreceptEventAssert>();
+        var transitionRows = new List<PreceptTransitionRow>();
+        var editBlocks = new List<PreceptEditBlock>();
+
+        // Also build old-style transitions for backward compat during migration
+        var oldTransitions = new List<PreceptTransition>();
+        var oldTopLevelRules = new List<PreceptRule>();
+
+        foreach (var stmt in statements)
+        {
+            switch (stmt)
+            {
+                case FieldResult fr:
+                    if (fields.Any(f => f.Name == fr.Field.Name) || collectionFields.Any(f => f.Name == fr.Field.Name))
+                        throw new InvalidOperationException($"Duplicate field '{fr.Field.Name}'.");
+                    fields.Add(fr.Field);
+                    break;
+
+                case CollectionFieldResult cfr:
+                    if (fields.Any(f => f.Name == cfr.Field.Name) || collectionFields.Any(f => f.Name == cfr.Field.Name))
+                        throw new InvalidOperationException($"Duplicate field '{cfr.Field.Name}'.");
+                    collectionFields.Add(cfr.Field);
+                    break;
+
+                case InvariantResult ir:
+                    invariants.Add(ir.Invariant);
+                    // Also add as old-style top-level rule for backward compat
+                    oldTopLevelRules.Add(new PreceptRule(
+                        ir.Invariant.ExpressionText, ir.Invariant.Expression, ir.Invariant.Reason,
+                        ir.Invariant.SourceLine, 0, 0, 0, 0));
+                    break;
+
+                case StateResult sr:
+                    if (states.Any(s => s.Name == sr.State.Name))
+                        throw new InvalidOperationException($"Duplicate state '{sr.State.Name}'.");
+                    states.Add(sr.State);
+                    if (sr.IsInitial)
+                    {
+                        if (initialState is not null)
+                            throw new InvalidOperationException($"Duplicate initial state. '{initialState.Name}' is already marked initial.");
+                        initialState = sr.State;
+                    }
+                    break;
+
+                case EventResult er:
+                    if (events.Any(e => e.Name == er.Event.Name))
+                        throw new InvalidOperationException($"Duplicate event '{er.Event.Name}'.");
+                    events.Add(er.Event);
+                    break;
+
+                case StateAssertResult sar:
+                    ExpandStateTargets(sar.States, states).ForEach(stateName =>
+                        stateAsserts.Add(new PreceptStateAssert(
+                            sar.Prep, stateName, sar.ExprText, sar.Expr, sar.Reason)));
+                    break;
+
+                case EventAssertResult ear:
+                    eventAsserts.Add(ear.Assert);
+                    break;
+
+                case StateActionResult sact:
+                    ExpandStateTargets(sact.States, states).ForEach(stateName =>
+                    {
+                        var (sets, mutations) = SplitActions(sact.Actions);
+                        stateActions.Add(new PreceptStateAction(
+                            sact.Prep, stateName, sets,
+                            mutations.Count > 0 ? mutations : null));
+                    });
+                    break;
+
+                case EditResult edr:
+                    ExpandStateTargets(edr.States, states).ForEach(stateName =>
+                        editBlocks.Add(new PreceptEditBlock(stateName, edr.Fields.ToList())));
+                    break;
+
+                case TransitionRowResult trr:
+                    var outcome = trr.ActionsAndOutcome.OfType<OutcomeAction>().LastOrDefault()?.Outcome;
+                    if (outcome is null)
+                        throw new InvalidOperationException($"Transition row for event '{trr.EventName}' is missing an outcome (transition, no transition, or reject).");
+
+                    var rowActions = trr.ActionsAndOutcome.Where(a => a is not OutcomeAction).ToArray();
+                    var (rowSets, rowMutations) = SplitActions(rowActions);
+                    var whenText = trr.WhenGuard is not null ? ReconstituteExpr(trr.WhenGuard) : null;
+
+                    ExpandStateTargets(trr.States, states).ForEach(stateName =>
+                    {
+                        transitionRows.Add(new PreceptTransitionRow(
+                            stateName, trr.EventName, outcome, rowSets, 
+                            rowMutations.Count > 0 ? rowMutations : null,
+                            whenText, trr.WhenGuard));
+
+                        // Build old-style transition for backward compat
+                        BuildOldTransition(oldTransitions, stateName, trr.EventName,
+                            outcome, rowSets, rowMutations, whenText, trr.WhenGuard);
+                    });
+                    break;
+            }
+        }
 
         if (states.Count == 0)
-            throw new InvalidOperationException($"Line {firstContentLineNumber ?? 1}: At least one state must be declared.");
-
+            throw new InvalidOperationException("At least one state must be declared.");
         if (initialState is null)
-            throw new InvalidOperationException($"Line {lastStateLineNumber}: Exactly one state must be marked initial. Use 'state <Name> initial'.");
+            throw new InvalidOperationException("Exactly one state must be marked initial. Use 'state <Name> initial'.");
 
-        ValidateReferences(states, events, transitions, dataFields, collectionFields);
-
-        return new PreceptDefinition(name, states, initialState, events, transitions, dataFields, collectionFields,
-            topLevelRules.Count > 0 ? topLevelRules : null);
+        return new PreceptDefinition(
+            name, states, initialState, events,
+            oldTransitions,
+            fields, collectionFields,
+            oldTopLevelRules.Count > 0 ? oldTopLevelRules : null,
+            invariants.Count > 0 ? invariants : null,
+            stateAsserts.Count > 0 ? stateAsserts : null,
+            stateActions.Count > 0 ? stateActions : null,
+            eventAsserts.Count > 0 ? eventAsserts : null,
+            transitionRows.Count > 0 ? transitionRows : null,
+            editBlocks.Count > 0 ? editBlocks : null);
     }
 
-    private static void ParseEventDeclaration(
-        string[] lines,
-        ref int index,
-        string eventName,
-        ICollection<PreceptEvent> events)
+    /// <summary>Expands 'any' to all declared state names, or returns the list as-is.</summary>
+    private static List<string> ExpandStateTargets(string[] targets, List<PreceptState> declaredStates)
     {
-        if (events.Any(e => string.Equals(e.Name, eventName, StringComparison.Ordinal)))
-            throw new InvalidOperationException($"Line {index + 1}: duplicate event '{eventName}'.");
-
-        var headerIndent = GetIndentation(lines[index]);
-        var args = new List<PreceptEventArg>();
-        var eventRules = new List<PreceptRule>();
-
-        index++;
-        while (index < lines.Length)
-        {
-            var raw = lines[index];
-            var line = StripInlineComment(raw.Trim());
-            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
-            {
-                index++;
-                continue;
-            }
-
-            var indent = GetIndentation(raw);
-            if (indent <= headerIndent)
-                break;
-
-            // Event-level rules: indented under event, scope is event args only
-            var eventRuleMatch = RuleRegex.Match(line);
-            if (eventRuleMatch.Success)
-            {
-                var ruleExprText = eventRuleMatch.Groups["expr"].Value.Trim();
-                var ruleReason = eventRuleMatch.Groups["reason"].Value;
-                var argNames = new HashSet<string>(args.Select(a => a.Name), StringComparer.Ordinal);
-                // Event rules may only reference event arg identifiers (prefixed or bare)
-                // Event rules may only reference event arg identifiers (prefixed or bare)
-                ValidateEventRuleScope(ruleExprText, index + 1, argNames, eventName);
-
-                PreceptExpression ruleExpr;
-                try { ruleExpr = PreceptExpressionParser.Parse(ruleExprText); }
-                catch (InvalidOperationException ex)
-                { throw new InvalidOperationException($"Line {index + 1}: invalid rule expression '{ruleExprText}'. {ex.Message}"); }
-
-                var exprStartCol = raw.IndexOf(ruleExprText, StringComparison.Ordinal);
-                if (exprStartCol < 0) exprStartCol = line.IndexOf(ruleExprText, StringComparison.Ordinal);
-                var exprEndCol = exprStartCol + ruleExprText.Length;
-                var reasonStartCol = exprEndCol;
-                var reasonEndCol = reasonStartCol + ruleReason.Length;
-                eventRules.Add(new PreceptRule(ruleExprText, ruleExpr, ruleReason, index + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
-                index++;
-                continue;
-            }
-
-            var fieldMatch = EventArgFieldRegex.Match(line);
-            if (!fieldMatch.Success)
-                throw new InvalidOperationException($"Line {index + 1}: invalid argument declaration '{line}'. Expected '<string|number|boolean|null>[?] <Name> [= <Default>]'.");
-
-            var fieldName = fieldMatch.Groups["name"].Value;
-            if (args.Any(a => string.Equals(a.Name, fieldName, StringComparison.Ordinal)))
-                throw new InvalidOperationException($"Line {index + 1}: duplicate argument '{fieldName}' for event '{eventName}'.");
-
-            var argType = ParseScalarType(fieldMatch.Groups["type"].Value);
-            var argIsNullable = fieldMatch.Groups["nullable"].Success;
-            var argHasDefault = fieldMatch.Groups["default"].Success;
-            var argDefaultValue = argHasDefault
-                ? ParseFieldDefaultLiteral(fieldMatch.Groups["default"].Value.Trim(), argType, argIsNullable, fieldName, index + 1)
-                : null;
-
-            args.Add(new PreceptEventArg(
-                fieldName,
-                argType,
-                argIsNullable,
-                argHasDefault,
-                argDefaultValue));
-            index++;
-        }
-
-        events.Add(new PreceptEvent(eventName, args, eventRules.Count > 0 ? eventRules : null));
+        if (targets.Length == 1 && targets[0] == "any")
+            return declaredStates.Select(s => s.Name).ToList();
+        return targets.ToList();
     }
 
-    /// <summary>
-    /// Advances <paramref name="index"/> past the state header line and collects any indented
-    /// <c>rule</c> lines that follow. Non-rule indented content causes a parse error.
-    /// </summary>
-    private static PreceptState ParseStateDeclaration(
-        string[] lines,
-        ref int index,
-        string stateName)
+    /// <summary>Splits parsed actions into set assignments and collection mutations.</summary>
+    private static (List<PreceptSetAssignment> Sets, List<PreceptCollectionMutation> Mutations) SplitActions(ParsedAction[] actions)
     {
-        var headerIndent = GetIndentation(lines[index]);
-        index++;
-
-        var rules = new List<PreceptRule>();
-        while (index < lines.Length)
+        var sets = new List<PreceptSetAssignment>();
+        var mutations = new List<PreceptCollectionMutation>();
+        foreach (var action in actions)
         {
-            var raw = lines[index];
-            var line = StripInlineComment(raw.Trim());
-            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
+            switch (action)
             {
-                index++;
-                continue;
+                case SetAction sa: sets.Add(sa.Assignment); break;
+                case CollectionAction ca: mutations.Add(ca.Mutation); break;
             }
-
-            var indent = GetIndentation(raw);
-            if (indent <= headerIndent)
-                break;
-
-            var ruleMatch = RuleRegex.Match(line);
-            if (!ruleMatch.Success)
-            {
-                // Not a rule line — stop consuming state body; outer parser will handle this line.
-                break;
-            }
-
-            var ruleExprText = ruleMatch.Groups["expr"].Value.Trim();
-            var ruleReason = ruleMatch.Groups["reason"].Value;
-            var exprStartCol = raw.IndexOf(ruleExprText, StringComparison.Ordinal);
-            if (exprStartCol < 0) exprStartCol = line.IndexOf(ruleExprText, StringComparison.Ordinal);
-            var exprEndCol = exprStartCol + ruleExprText.Length;
-            var reasonStartCol = exprEndCol;
-            var reasonEndCol = reasonStartCol + ruleReason.Length;
-
-            PreceptExpression ruleExpr;
-            try { ruleExpr = PreceptExpressionParser.Parse(ruleExprText); }
-            catch (InvalidOperationException ex)
-            { throw new InvalidOperationException($"Line {index + 1}: invalid rule expression '{ruleExprText}'. {ex.Message}"); }
-
-            rules.Add(new PreceptRule(ruleExprText, ruleExpr, ruleReason, index + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
-            index++;
         }
-
-        return new PreceptState(stateName, rules.Count > 0 ? rules : null);
+        return (sets, mutations);
     }
 
-    /// <summary>
-    /// Reads rule lines indented under a field declaration (scalar or collection).
-    /// Validates field rule scope restriction (only the owning field is allowed).
-    /// Leaves <paramref name="index"/> pointing at the next non-rule line.
-    /// </summary>
-    private static List<PreceptRule> ParseFieldRules(string[] lines, ref int index, string owningField, bool isCollection)
+    /// <summary>Adds a new-style transition row to the old-style transition list for backward compat.</summary>
+    private static void BuildOldTransition(
+        List<PreceptTransition> transitions,
+        string fromState, string eventName,
+        PreceptClauseOutcome outcome,
+        List<PreceptSetAssignment> sets,
+        List<PreceptCollectionMutation> mutations,
+        string? whenText,
+        PreceptExpression? whenGuard)
     {
-        var rules = new List<PreceptRule>();
-        var headerIndent = GetIndentation(lines[index]);
-        index++; // advance past the field line
+        // Find or create the transition for this (state, event) pair
+        var existing = transitions.FirstOrDefault(t => t.FromState == fromState && t.EventName == eventName);
+        var clause = new PreceptClause(
+            outcome, sets,
+            Predicate: whenText,
+            PredicateAst: whenGuard,
+            CollectionMutations: mutations.Count > 0 ? mutations : null);
 
-        while (index < lines.Length)
+        if (existing is not null)
         {
-            var raw = lines[index];
-            var line = StripInlineComment(raw.Trim());
-            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
-            {
-                index++;
-                continue;
-            }
-
-            var indent = GetIndentation(raw);
-            if (indent <= headerIndent)
-                break;
-
-            var ruleMatch = RuleRegex.Match(line);
-            if (!ruleMatch.Success)
-                throw new InvalidOperationException($"Line {index + 1}: only 'rule' statements are allowed indented under a field declaration.");
-
-            var ruleExprText = ruleMatch.Groups["expr"].Value.Trim();
-            var ruleReason = ruleMatch.Groups["reason"].Value;
-
-            // Scope restriction: only the declaring field, its dotted properties, and literals
-            var allowed = new HashSet<string>(StringComparer.Ordinal) { owningField };
-            ValidateRuleScope(ruleExprText, index + 1, allowed, allowedIdentifiers: null, scopeDescription: null, fieldRuleOwner: owningField);
-
-            PreceptExpression ruleExpr;
-            try { ruleExpr = PreceptExpressionParser.Parse(ruleExprText); }
-            catch (InvalidOperationException ex)
-            { throw new InvalidOperationException($"Line {index + 1}: invalid rule expression '{ruleExprText}'. {ex.Message}"); }
-
-            var exprStartCol = raw.IndexOf(ruleExprText, StringComparison.Ordinal);
-            if (exprStartCol < 0) exprStartCol = line.IndexOf(ruleExprText, StringComparison.Ordinal);
-            var exprEndCol = exprStartCol + ruleExprText.Length;
-            var reasonStartCol = exprEndCol;
-            var reasonEndCol = reasonStartCol + ruleReason.Length;
-
-            rules.Add(new PreceptRule(ruleExprText, ruleExpr, ruleReason, index + 1, exprStartCol, exprEndCol, reasonStartCol, reasonEndCol));
-            index++;
+            var idx = transitions.IndexOf(existing);
+            var newClauses = existing.Clauses.Append(clause).ToList();
+            transitions[idx] = existing with { Clauses = newClauses };
         }
-
-        return rules;
-    }
-
-    /// <summary>
-    /// Validates that a rule expression only references identifiers in <paramref name="allowedSet"/>
-    /// (and their dotted members) plus literals.
-    /// When <paramref name="fieldRuleOwner"/> is set, any identifier other than the owner (or its dotted properties)
-    /// is rejected with the field-rule-specific message.
-    /// </summary>
-    private static void ValidateRuleScope(
-        string expressionText,
-        int lineNumber,
-        HashSet<string> allowedSet,
-        HashSet<string>? allowedIdentifiers,
-        string? scopeDescription,
-        string? fieldRuleOwner = null)
-    {
-        PreceptExpression parsed;
-        try { parsed = PreceptExpressionParser.Parse(expressionText); }
-        catch { return; } // parse errors are reported separately
-
-        ValidateRuleScopeNode(parsed, lineNumber, allowedSet, allowedIdentifiers, scopeDescription, fieldRuleOwner);
-    }
-
-    private static void ValidateRuleScopeNode(
-        PreceptExpression expr,
-        int lineNumber,
-        HashSet<string> allowedSet,
-        HashSet<string>? allowedIdentifiers,
-        string? scopeDescription,
-        string? fieldRuleOwner)
-    {
-        switch (expr)
+        else
         {
-            case PreceptIdentifierExpression id:
-                // The base identifier name is always the lookup key (member is a property of the base)
-                var baseName = id.Name;
-                if (allowedSet.Contains(baseName, StringComparer.Ordinal))
-                    return;
-                if (allowedIdentifiers is not null && allowedIdentifiers.Contains(baseName, StringComparer.Ordinal))
-                    return;
-                if (fieldRuleOwner is not null)
-                    throw new InvalidOperationException($"Line {lineNumber}: field rule may only reference its own field '{fieldRuleOwner}'; use a top-level rule for cross-field constraints. (offending identifier: '{baseName}')");
-                if (scopeDescription is not null)
-                    throw new InvalidOperationException($"Line {lineNumber}: {scopeDescription} references undeclared field '{baseName}'.");
-                break;
-            case PreceptLiteralExpression:
-                return;
-            case PreceptUnaryExpression unary:
-                ValidateRuleScopeNode(unary.Operand, lineNumber, allowedSet, allowedIdentifiers, scopeDescription, fieldRuleOwner);
-                break;
-            case PreceptBinaryExpression binary:
-                ValidateRuleScopeNode(binary.Left, lineNumber, allowedSet, allowedIdentifiers, scopeDescription, fieldRuleOwner);
-                ValidateRuleScopeNode(binary.Right, lineNumber, allowedSet, allowedIdentifiers, scopeDescription, fieldRuleOwner);
-                break;
-            case PreceptParenthesizedExpression paren:
-                ValidateRuleScopeNode(paren.Inner, lineNumber, allowedSet, allowedIdentifiers, scopeDescription, fieldRuleOwner);
-                break;
-        }
-    }
-
-    /// <summary>
-    /// Validates that an event rule only references event arg identifiers (bare or prefixed with EventName.).
-    /// </summary>
-    private static void ValidateEventRuleScope(
-        string expressionText,
-        int lineNumber,
-        HashSet<string> argNames,
-        string eventName)
-    {
-        PreceptExpression parsed;
-        try { parsed = PreceptExpressionParser.Parse(expressionText); }
-        catch { return; }
-
-        ValidateEventRuleScopeNode(parsed, lineNumber, argNames, eventName);
-    }
-
-    private static void ValidateEventRuleScopeNode(
-        PreceptExpression expr,
-        int lineNumber,
-        HashSet<string> argNames,
-        string eventName)
-    {
-        switch (expr)
-        {
-            case PreceptIdentifierExpression id:
-                // Accept: EventName.ArgName  (Name=eventName, Member=argName)
-                if (string.Equals(id.Name, eventName, StringComparison.Ordinal) && id.Member is not null)
-                {
-                    if (!argNames.Contains(id.Member, StringComparer.Ordinal))
-                        throw new InvalidOperationException(
-                            $"Line {lineNumber}: event rule may only reference event argument identifiers; '{id.Name}.{id.Member}' is not a declared argument for event '{eventName}'.");
-                    return;
-                }
-                // Accept: bare ArgName  (Name=argName, no member)
-                if (id.Member is null && argNames.Contains(id.Name, StringComparer.Ordinal))
-                    return;
-                // Accept: ArgName.property  (Name=argName, Member=some property)
-                if (id.Member is not null && argNames.Contains(id.Name, StringComparer.Ordinal))
-                    return;
-                // Otherwise: reject
-                var displayName = id.Member is not null ? $"{id.Name}.{id.Member}" : id.Name;
-                throw new InvalidOperationException(
-                    $"Line {lineNumber}: event rule may only reference event argument identifiers; '{displayName}' is not a declared argument for event '{eventName}'.");
-            case PreceptLiteralExpression:
-                return;
-            case PreceptUnaryExpression unary:
-                ValidateEventRuleScopeNode(unary.Operand, lineNumber, argNames, eventName);
-                break;
-            case PreceptBinaryExpression binary:
-                ValidateEventRuleScopeNode(binary.Left, lineNumber, argNames, eventName);
-                ValidateEventRuleScopeNode(binary.Right, lineNumber, argNames, eventName);
-                break;
-            case PreceptParenthesizedExpression paren:
-                ValidateEventRuleScopeNode(paren.Inner, lineNumber, argNames, eventName);
-                break;
-        }
-    }
-
-    /// <summary>Collects all identifier base names referenced in an expression (not dotted members).</summary>
-    private static void CollectIdentifiers(PreceptExpression expression, out HashSet<string> names)
-    {
-        names = new HashSet<string>(StringComparer.Ordinal);
-        CollectIdentifiersInto(expression, names);
-    }
-
-    private static void CollectIdentifiersInto(PreceptExpression expression, HashSet<string> names)
-    {
-        switch (expression)
-        {
-            case PreceptIdentifierExpression id:
-                names.Add(id.Name);
-                break;
-            case PreceptLiteralExpression:
-                break;
-            case PreceptUnaryExpression unary:
-                CollectIdentifiersInto(unary.Operand, names);
-                break;
-            case PreceptBinaryExpression binary:
-                CollectIdentifiersInto(binary.Left, names);
-                CollectIdentifiersInto(binary.Right, names);
-                break;
-            case PreceptParenthesizedExpression paren:
-                CollectIdentifiersInto(paren.Inner, names);
-                break;
-        }
-    }
-
-    private static void ParseFromOnBlock(
-        string[] lines,
-        ref int index,
-        Match fromOnMatch,
-        IReadOnlyList<PreceptState> declaredStates,
-        ICollection<PreceptTransition> transitions,
-        IReadOnlyList<PreceptCollectionField> collectionFields,
-        IReadOnlyList<PreceptField> dataFields)
-    {
-        var headerRaw = lines[index];
-        var headerIndent = GetIndentation(headerRaw);
-        var headerLineNumber = index + 1;
-        var fromToken = fromOnMatch.Groups["from"].Value.Trim();
-        var eventName = fromOnMatch.Groups["event"].Value.Trim();
-        var whenText = fromOnMatch.Groups["when"].Success ? fromOnMatch.Groups["when"].Value.Trim() : null;
-
-        var sourceStates = fromToken.Equals("any", StringComparison.Ordinal)
-            ? declaredStates.Select(s => s.Name).ToList()
-            : ParseIdentifierList(fromToken, index + 1, "state");
-
-        if (sourceStates.Count == 0)
-            throw new InvalidOperationException($"Line {index + 1}: 'from any' requires states to be declared first.");
-
-        // Parse optional 'when' predicate
-        PreceptExpression? whenAst = null;
-        if (whenText is not null)
-        {
-            try { whenAst = PreceptExpressionParser.Parse(whenText); }
-            catch (InvalidOperationException ex)
-            { throw new InvalidOperationException($"Line {index + 1}: invalid 'when' expression '{whenText}'. {ex.Message}"); }
-        }
-
-        var clauses = new List<PreceptClause>();
-        var pendingSets = new List<PreceptSetAssignment>();
-        var pendingMutations = new List<PreceptCollectionMutation>();
-        bool reachedOutcome = false;
-        bool hasIfChain = false;
-        bool hasElseBranch = false;
-
-        index++;
-        while (index < lines.Length)
-        {
-            var raw = lines[index];
-            var line = StripInlineComment(raw.Trim());
-            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
-            {
-                index++;
-                continue;
-            }
-
-            var indent = GetIndentation(raw);
-            if (indent <= headerIndent)
-                break;
-
-            if (reachedOutcome)
-                throw new InvalidOperationException($"Line {index + 1}: no statements are allowed after an outcome statement in a from/on block.");
-
-            var ifMatch = IfRegex.Match(line);
-            if (ifMatch.Success)
-            {
-                if (ifMatch.Groups["reason"].Success)
-                    throw new InvalidOperationException($"Line {index + 1}: 'reason' is not allowed on 'if' branches. Provide a reason only on 'reject' statements.");
-
-                if (hasIfChain)
-                    throw new InvalidOperationException($"Line {index + 1}: use 'else if' to continue an existing if-chain.");
-
-                hasIfChain = true;
-                var clauseSourceLine = index + 1;
-                var clause = ParseGuardedClause(lines, ref index, indent, ifMatch.Groups["guard"].Value.Trim(), clauseSourceLine, collectionFields, dataFields);
-                clauses.Add(clause);
-                continue;
-            }
-
-            var elseIfMatch = ElseIfRegex.Match(line);
-            if (elseIfMatch.Success)
-            {
-                if (elseIfMatch.Groups["reason"].Success)
-                    throw new InvalidOperationException($"Line {index + 1}: 'reason' is not allowed on 'else if' branches. Provide a reason only on 'reject' statements.");
-
-                if (!hasIfChain)
-                    throw new InvalidOperationException($"Line {index + 1}: 'else if' requires a preceding 'if'.");
-
-                if (hasElseBranch)
-                    throw new InvalidOperationException($"Line {index + 1}: 'else if' is not allowed after 'else'.");
-
-                var clauseSourceLine = index + 1;
-                var clause = ParseGuardedClause(lines, ref index, indent, elseIfMatch.Groups["guard"].Value.Trim(), clauseSourceLine, collectionFields, dataFields);
-                clauses.Add(clause);
-                continue;
-            }
-
-            if (ElseRegex.IsMatch(line))
-            {
-                if (!hasIfChain)
-                    throw new InvalidOperationException($"Line {index + 1}: 'else' requires a preceding 'if'.");
-
-                if (hasElseBranch)
-                    throw new InvalidOperationException($"Line {index + 1}: duplicate 'else' is not allowed.");
-
-                hasElseBranch = true;
-                var clauseSourceLine = index + 1;
-                var clause = ParseElseClause(lines, ref index, indent, clauseSourceLine, collectionFields, dataFields);
-                clauses.Add(clause);
-                reachedOutcome = true;
-                continue;
-            }
-
-            var setAtBlock = SetRegex.Match(line);
-            if (setAtBlock.Success)
-            {
-                if (hasIfChain && !hasElseBranch)
-                    throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
-                pendingSets.Add(ParseSetAssignment(setAtBlock, index + 1));
-                index++;
-                continue;
-            }
-
-            var mutationResult = TryParseCollectionMutation(line, index + 1, collectionFields, dataFields);
-            if (mutationResult is not null)
-            {
-                if (hasIfChain && !hasElseBranch)
-                    throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
-                pendingMutations.Add(mutationResult);
-                index++;
-                continue;
-            }
-
-            var simpleTransitionAtBlock = SimpleTransitionRegex.Match(line);
-            if (simpleTransitionAtBlock.Success)
-            {
-                if (hasIfChain && !hasElseBranch)
-                    throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
-                var targetState = simpleTransitionAtBlock.Groups["to"].Value.Trim();
-                var outcomeLineNumber = index + 1;
-                clauses.Add(new PreceptClause(
-                    new PreceptStateTransition(targetState),
-                    pendingSets.Count > 0 ? pendingSets.ToArray() : Array.Empty<PreceptSetAssignment>(),
-                    outcomeLineNumber,
-                    null,
-                    null,
-                    pendingMutations.Count > 0 ? pendingMutations.ToArray() : null));
-                pendingSets.Clear();
-                pendingMutations.Clear();
-                reachedOutcome = true;
-                index++;
-                continue;
-            }
-
-            if (line.Equals("no transition", StringComparison.Ordinal))
-            {
-                if (hasIfChain && !hasElseBranch)
-                    throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
-                var outcomeLineNumber = index + 1;
-                clauses.Add(new PreceptClause(
-                    new PreceptNoTransition(),
-                    pendingSets.Count > 0 ? pendingSets.ToArray() : Array.Empty<PreceptSetAssignment>(),
-                    outcomeLineNumber,
-                    null,
-                    null,
-                    pendingMutations.Count > 0 ? pendingMutations.ToArray() : null));
-                pendingSets.Clear();
-                pendingMutations.Clear();
-                reachedOutcome = true;
-                index++;
-                continue;
-            }
-
-            var rejectMatch = RejectRegex.Match(line);
-            if (rejectMatch.Success)
-            {
-                if (hasIfChain && !hasElseBranch)
-                    throw new InvalidOperationException($"Line {index + 1}: block-level statement after an 'if' chain requires 'else'. Add 'else' before the fallback.");
-                var reason = Unquote(rejectMatch.Groups["reason"].Value.Trim());
-                var outcomeLineNumber = index + 1;
-                clauses.Add(new PreceptClause(
-                    new PreceptRejection(reason),
-                    Array.Empty<PreceptSetAssignment>(),
-                    outcomeLineNumber,
-                    null,
-                    null,
-                    null));
-                reachedOutcome = true;
-                index++;
-                continue;
-            }
-
-            throw new InvalidOperationException($"Line {index + 1}: unrecognized statement '{line}' inside from/on block.");
-        }
-
-        if (pendingSets.Count > 0 || pendingMutations.Count > 0)
-            throw new InvalidOperationException($"Line {index}: set requires a following transition.");
-
-        if (!reachedOutcome)
-            throw new InvalidOperationException($"Line {index}: from/on block must end with an outcome statement: transition <State>, reject <reason>, or no transition.");
-
-        var clauseList = (IReadOnlyList<PreceptClause>)clauses.AsReadOnly();
-
-        foreach (var sourceState in sourceStates)
-        {
-            transitions.Add(new PreceptTransition(
-                sourceState,
-                eventName,
-                clauseList,
-                headerLineNumber,
-                whenText,
-                whenAst));
-        }
-    }
-
-    private static PreceptClause ParseGuardedClause(
-        string[] lines,
-        ref int index,
-        int branchHeaderIndent,
-        string guardExpression,
-        int clauseSourceLine,
-        IReadOnlyList<PreceptCollectionField> collectionFields,
-        IReadOnlyList<PreceptField> dataFields)
-    {
-        var branchSets = new List<PreceptSetAssignment>();
-        var branchMutations = new List<PreceptCollectionMutation>();
-        PreceptClauseOutcome? outcome = null;
-        bool reachedOutcome = false;
-
-        index++;
-        while (index < lines.Length)
-        {
-            var nestedRaw = lines[index];
-            var nestedLine = StripInlineComment(nestedRaw.Trim());
-            if (string.IsNullOrWhiteSpace(nestedLine) || nestedLine.StartsWith("#", StringComparison.Ordinal))
-            {
-                index++;
-                continue;
-            }
-
-            var nestedIndent = GetIndentation(nestedRaw);
-            if (nestedIndent <= branchHeaderIndent)
-                break;
-
-            if (reachedOutcome)
-                throw new InvalidOperationException($"Line {index + 1}: no statements are allowed after an outcome statement in an if-branch.");
-
-            var setMatch = SetRegex.Match(nestedLine);
-            if (setMatch.Success)
-            {
-                branchSets.Add(ParseSetAssignment(setMatch, index + 1));
-                index++;
-                continue;
-            }
-
-            var mutationResult = TryParseCollectionMutation(nestedLine, index + 1, collectionFields, dataFields);
-            if (mutationResult is not null)
-            {
-                branchMutations.Add(mutationResult);
-                index++;
-                continue;
-            }
-
-            var transitionMatch = SimpleTransitionRegex.Match(nestedLine);
-            if (transitionMatch.Success)
-            {
-                if (outcome is not null)
-                    throw new InvalidOperationException($"Line {index + 1}: only one outcome statement is allowed in an if-branch.");
-
-                outcome = new PreceptStateTransition(transitionMatch.Groups["to"].Value.Trim());
-                reachedOutcome = true;
-                index++;
-                continue;
-            }
-
-            if (nestedLine.Equals("no transition", StringComparison.Ordinal))
-            {
-                if (outcome is not null)
-                    throw new InvalidOperationException($"Line {index + 1}: only one outcome statement is allowed in an if-branch.");
-
-                outcome = new PreceptNoTransition();
-                reachedOutcome = true;
-                index++;
-                continue;
-            }
-
-            if (RejectRegex.IsMatch(nestedLine))
-                throw new InvalidOperationException($"Line {index + 1}: if/else if branches support 'transition <State>' or 'no transition'; use else or a block outcome statement for reject.");
-
-            throw new InvalidOperationException($"Line {index + 1}: expected 'set <Key> = <Expr>', collection mutation, 'transition <State>', or 'no transition' inside if-branch.");
-        }
-
-        if (outcome is null)
-            throw new InvalidOperationException($"Line {index}: if/else if branch requires 'transition <State>' or 'no transition'.");
-
-        PreceptExpression? guardAst = null;
-        try { guardAst = PreceptExpressionParser.Parse(guardExpression); }
-        catch { /* parse errors reported separately in analyzer */ }
-
-        return new PreceptClause(
-            outcome,
-            branchSets.Count > 0 ? (IReadOnlyList<PreceptSetAssignment>)branchSets.ToArray() : Array.Empty<PreceptSetAssignment>(),
-            clauseSourceLine,
-            guardExpression,
-            guardAst,
-            branchMutations.Count > 0 ? branchMutations.ToArray() : null);
-    }
-
-    private static PreceptClause ParseElseClause(
-        string[] lines,
-        ref int index,
-        int branchHeaderIndent,
-        int clauseSourceLine,
-        IReadOnlyList<PreceptCollectionField> collectionFields,
-        IReadOnlyList<PreceptField> dataFields)
-    {
-        var branchSets = new List<PreceptSetAssignment>();
-        var branchMutations = new List<PreceptCollectionMutation>();
-        PreceptClauseOutcome? outcome = null;
-        bool reachedOutcome = false;
-
-        index++;
-        while (index < lines.Length)
-        {
-            var nestedRaw = lines[index];
-            var nestedLine = StripInlineComment(nestedRaw.Trim());
-            if (string.IsNullOrWhiteSpace(nestedLine) || nestedLine.StartsWith("#", StringComparison.Ordinal))
-            {
-                index++;
-                continue;
-            }
-
-            var nestedIndent = GetIndentation(nestedRaw);
-            if (nestedIndent <= branchHeaderIndent)
-                break;
-
-            if (reachedOutcome)
-                throw new InvalidOperationException($"Line {index + 1}: no statements are allowed after an outcome statement in an else-branch.");
-
-            var setMatch = SetRegex.Match(nestedLine);
-            if (setMatch.Success)
-            {
-                branchSets.Add(ParseSetAssignment(setMatch, index + 1));
-                index++;
-                continue;
-            }
-
-            var mutationResult = TryParseCollectionMutation(nestedLine, index + 1, collectionFields, dataFields);
-            if (mutationResult is not null)
-            {
-                branchMutations.Add(mutationResult);
-                index++;
-                continue;
-            }
-
-            var transitionMatch = SimpleTransitionRegex.Match(nestedLine);
-            if (transitionMatch.Success)
-            {
-                outcome = new PreceptStateTransition(transitionMatch.Groups["to"].Value.Trim());
-                reachedOutcome = true;
-                index++;
-                continue;
-            }
-
-            if (nestedLine.Equals("no transition", StringComparison.Ordinal))
-            {
-                outcome = new PreceptNoTransition();
-                reachedOutcome = true;
-                index++;
-                continue;
-            }
-
-            var rejectMatch = RejectRegex.Match(nestedLine);
-            if (rejectMatch.Success)
-            {
-                outcome = new PreceptRejection(Unquote(rejectMatch.Groups["reason"].Value.Trim()));
-                reachedOutcome = true;
-                index++;
-                continue;
-            }
-
-            throw new InvalidOperationException($"Line {index + 1}: expected an outcome statement inside else-branch.");
-        }
-
-        if (!reachedOutcome)
-            throw new InvalidOperationException($"Line {index}: else branch requires an outcome statement.");
-
-        return new PreceptClause(
-            outcome!,
-            branchSets.Count > 0 ? (IReadOnlyList<PreceptSetAssignment>)branchSets.ToArray() : Array.Empty<PreceptSetAssignment>(),
-            clauseSourceLine,
-            null,
-            null,
-            branchMutations.Count > 0 ? branchMutations.ToArray() : null);
-    }
-
-    private static PreceptCollectionMutation? TryParseCollectionMutation(
-        string line,
-        int lineNumber,
-        IReadOnlyList<PreceptCollectionField> collectionFields,
-        IReadOnlyList<PreceptField> dataFields)
-    {
-        // Try each mutation verb
-        var addMatch = AddRegex.Match(line);
-        if (addMatch.Success)
-            return BuildMutation(PreceptCollectionMutationVerb.Add, addMatch.Groups["field"].Value, addMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, PreceptCollectionKind.Set);
-
-        var removeMatch = RemoveRegex.Match(line);
-        if (removeMatch.Success)
-            return BuildMutation(PreceptCollectionMutationVerb.Remove, removeMatch.Groups["field"].Value, removeMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, PreceptCollectionKind.Set);
-
-        var enqueueMatch = EnqueueRegex.Match(line);
-        if (enqueueMatch.Success)
-            return BuildMutation(PreceptCollectionMutationVerb.Enqueue, enqueueMatch.Groups["field"].Value, enqueueMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, PreceptCollectionKind.Queue);
-
-        var dequeueMatch = DequeueRegex.Match(line);
-        if (dequeueMatch.Success)
-        {
-            string? intoField = dequeueMatch.Groups["into"].Success ? dequeueMatch.Groups["into"].Value : null;
-            return BuildMutationNoExpr(PreceptCollectionMutationVerb.Dequeue, dequeueMatch.Groups["field"].Value, lineNumber, collectionFields, PreceptCollectionKind.Queue, dataFields, intoField);
-        }
-
-        var pushMatch = PushRegex.Match(line);
-        if (pushMatch.Success)
-            return BuildMutation(PreceptCollectionMutationVerb.Push, pushMatch.Groups["field"].Value, pushMatch.Groups["expr"].Value.Trim(), lineNumber, collectionFields, PreceptCollectionKind.Stack);
-
-        var popMatch = PopRegex.Match(line);
-        if (popMatch.Success)
-        {
-            string? intoField = popMatch.Groups["into"].Success ? popMatch.Groups["into"].Value : null;
-            return BuildMutationNoExpr(PreceptCollectionMutationVerb.Pop, popMatch.Groups["field"].Value, lineNumber, collectionFields, PreceptCollectionKind.Stack, dataFields, intoField);
-        }
-
-        var clearMatch = ClearRegex.Match(line);
-        if (clearMatch.Success)
-        {
-            var fieldName = clearMatch.Groups["field"].Value;
-            var field = collectionFields.FirstOrDefault(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal));
-            if (field is null)
-                throw new InvalidOperationException($"Line {lineNumber}: 'clear' targets unknown collection field '{fieldName}'.");
-
-            return new PreceptCollectionMutation(PreceptCollectionMutationVerb.Clear, fieldName, null, null);
-        }
-
-        return null;
-    }
-
-    private static PreceptCollectionMutation BuildMutation(
-        PreceptCollectionMutationVerb verb,
-        string fieldName,
-        string expressionText,
-        int lineNumber,
-        IReadOnlyList<PreceptCollectionField> collectionFields,
-        PreceptCollectionKind requiredKind)
-    {
-        var field = collectionFields.FirstOrDefault(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal));
-        if (field is null)
-            throw new InvalidOperationException($"Line {lineNumber}: '{verb.ToString().ToLowerInvariant()}' targets unknown collection field '{fieldName}'.");
-
-        if (field.CollectionKind != requiredKind)
-            throw new InvalidOperationException($"Line {lineNumber}: '{verb.ToString().ToLowerInvariant()}' is not valid on {field.CollectionKind.ToString().ToLowerInvariant()}<{field.InnerType.ToString().ToLowerInvariant()}> field '{fieldName}'.");
-
-        try
-        {
-            var expression = PreceptExpressionParser.Parse(expressionText);
-            return new PreceptCollectionMutation(verb, fieldName, expressionText, expression);
-        }
-        catch (InvalidOperationException ex)
-        {
-            throw new InvalidOperationException($"Line {lineNumber}: invalid expression '{expressionText}'. {ex.Message}");
-        }
-    }
-
-    private static PreceptCollectionMutation BuildMutationNoExpr(
-        PreceptCollectionMutationVerb verb,
-        string fieldName,
-        int lineNumber,
-        IReadOnlyList<PreceptCollectionField> collectionFields,
-        PreceptCollectionKind requiredKind,
-        IReadOnlyList<PreceptField> dataFields,
-        string? intoFieldName = null)
-    {
-        var field = collectionFields.FirstOrDefault(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal));
-        if (field is null)
-            throw new InvalidOperationException($"Line {lineNumber}: '{verb.ToString().ToLowerInvariant()}' targets unknown collection field '{fieldName}'.");
-
-        if (field.CollectionKind != requiredKind)
-            throw new InvalidOperationException($"Line {lineNumber}: '{verb.ToString().ToLowerInvariant()}' is not valid on {field.CollectionKind.ToString().ToLowerInvariant()}<{field.InnerType.ToString().ToLowerInvariant()}> field '{fieldName}'.");
-
-        if (intoFieldName is not null)
-        {
-            var targetField = dataFields.FirstOrDefault(f => string.Equals(f.Name, intoFieldName, StringComparison.Ordinal));
-            if (targetField is null)
-            {
-                // Check if it's a collection field (not allowed)
-                var isCollection = collectionFields.Any(f => string.Equals(f.Name, intoFieldName, StringComparison.Ordinal));
-                if (isCollection)
-                    throw new InvalidOperationException($"Line {lineNumber}: 'into' target '{intoFieldName}' is a collection field. The target must be a scalar data field.");
-
-                throw new InvalidOperationException($"Line {lineNumber}: 'into' target '{intoFieldName}' is not a declared data field.");
-            }
-
-            // Validate type compatibility: the scalar field's type must match the collection's inner type
-            if (targetField.Type != field.InnerType)
-                throw new InvalidOperationException($"Line {lineNumber}: type mismatch — 'into' target '{intoFieldName}' is {targetField.Type.ToString().ToLowerInvariant()}{(targetField.IsNullable ? "?" : "")} but collection '{fieldName}' has inner type {field.InnerType.ToString().ToLowerInvariant()}.");
-        }
-
-        return new PreceptCollectionMutation(verb, fieldName, null, null, intoFieldName);
-    }
-
-    private static string Unquote(string value)
-    {
-        if (value.Length >= 2 && value[0] == '"' && value[^1] == '"')
-            return value.Substring(1, value.Length - 2);
-
-        return value;
-    }
-
-    private static int GetIndentation(string rawLine)
-    {
-        int count = 0;
-        foreach (char c in rawLine)
-        {
-            if (c == ' ')
-            {
-                count++;
-                continue;
-            }
-
-            if (c == '\t')
-            {
-                count += 4;
-                continue;
-            }
-
-            break;
-        }
-
-        return count;
-    }
-
-    private static List<string> ParseIdentifierList(string listText, int lineNumber, string kind)
-    {
-        var results = new List<string>();
-        foreach (var rawToken in listText.Split(','))
-        {
-            var token = rawToken.Trim();
-            if (string.IsNullOrWhiteSpace(token))
-                continue;
-
-            if (!Regex.IsMatch(token, "^[A-Za-z_][A-Za-z0-9_]*$"))
-                throw new InvalidOperationException($"Line {lineNumber}: invalid {kind} identifier '{token}'.");
-
-            results.Add(token);
-        }
-
-        return results;
-    }
-
-    private static PreceptScalarType ParseScalarType(string token)
-        => token.Trim().ToLowerInvariant() switch
-        {
-            "string" => PreceptScalarType.String,
-            "number" => PreceptScalarType.Number,
-            "boolean" => PreceptScalarType.Boolean,
-            "null" => PreceptScalarType.Null,
-            _ => throw new InvalidOperationException($"Unsupported scalar type '{token}'.")
-        };
-
-    private static object? ParseFieldDefaultLiteral(string text, PreceptScalarType type, bool isNullable, string fieldName, int lineNumber)
-    {
-        PreceptExpression parsedExpression;
-        try
-        {
-            parsedExpression = PreceptExpressionParser.Parse(text);
-        }
-        catch (InvalidOperationException ex)
-        {
-            throw new InvalidOperationException($"Line {lineNumber}: invalid default value for field '{fieldName}'. {ex.Message}");
-        }
-
-        if (parsedExpression is not PreceptLiteralExpression literal)
-            throw new InvalidOperationException($"Line {lineNumber}: default value for field '{fieldName}' must be a literal.");
-
-        if (!IsValidDefaultLiteral(type, isNullable, literal.Value))
-            throw new InvalidOperationException($"Line {lineNumber}: default value for field '{fieldName}' does not match declared type.");
-
-        return literal.Value;
-    }
-
-    private static bool IsValidDefaultLiteral(PreceptScalarType type, bool isNullable, object? value)
-    {
-        if (value is null)
-            return isNullable;
-
-        return type switch
-        {
-            PreceptScalarType.String => value is string,
-            PreceptScalarType.Boolean => value is bool,
-            PreceptScalarType.Number => value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal,
-            PreceptScalarType.Null => false,
-            _ => false
-        };
-    }
-
-    private static string NormalizeDataAssignmentKey(string setKey)
-        => setKey;
-
-    /// <summary>
-    /// Strips an inline comment from an already-trimmed line.
-    /// A <c>#</c> character outside a double-quoted string starts a comment;
-    /// everything from that point to the end of the line is discarded.
-    /// The result is right-trimmed so trailing whitespace before the <c>#</c> is removed.
-    /// </summary>
-    private static string StripInlineComment(string line)
-    {
-        bool inString = false;
-        for (int ci = 0; ci < line.Length; ci++)
-        {
-            char c = line[ci];
-            if (c == '"')
-                inString = !inString;
-            else if (c == '#' && !inString)
-                return line.Substring(0, ci).TrimEnd();
-        }
-        return line;
-    }
-
-    private static PreceptSetAssignment ParseSetAssignment(Match setMatch, int lineNumber)
-    {
-        var key = NormalizeDataAssignmentKey(setMatch.Groups["setKey"].Value.Trim());
-        var expressionText = setMatch.Groups["setExpr"].Value.Trim();
-
-        try
-        {
-            var expression = PreceptExpressionParser.Parse(expressionText);
-            return new PreceptSetAssignment(key, expressionText, expression, lineNumber);
-        }
-        catch (InvalidOperationException ex)
-        {
-            throw new InvalidOperationException($"Line {lineNumber}: invalid set expression '{expressionText}'. {ex.Message}");
-        }
-    }
-
-    private static void ValidateReferences(
-        IReadOnlyCollection<PreceptState> states,
-        IReadOnlyCollection<PreceptEvent> events,
-        IReadOnlyCollection<PreceptTransition> transitions,
-        IReadOnlyCollection<PreceptField> dataFields,
-        IReadOnlyCollection<PreceptCollectionField> collectionFields)
-    {
-        var stateSet = new HashSet<string>(states.Select(s => s.Name), StringComparer.Ordinal);
-        var eventSet = new HashSet<string>(events.Select(e => e.Name), StringComparer.Ordinal);
-
-        foreach (var transition in transitions)
-        {
-            var tPrefix = transition.SourceLine > 0 ? $"Line {transition.SourceLine}: " : string.Empty;
-
-            if (!stateSet.Contains(transition.FromState))
-                throw new InvalidOperationException($"{tPrefix}Transition references unknown source state '{transition.FromState}'.");
-
-            if (!eventSet.Contains(transition.EventName))
-                throw new InvalidOperationException($"{tPrefix}Transition references unknown event '{transition.EventName}'.");
-
-            foreach (var clause in transition.Clauses)
-            {
-                var cPrefix = clause.SourceLine > 0 ? $"Line {clause.SourceLine}: " : tPrefix;
-
-                if (clause.Outcome is PreceptStateTransition st)
-                {
-                    if (!stateSet.Contains(st.TargetState))
-                        throw new InvalidOperationException($"{cPrefix}Transition references unknown target state '{st.TargetState}'.");
-                }
-
-                if (clause.Outcome is PreceptRejection rej && string.IsNullOrWhiteSpace(rej.Reason))
-                    throw new InvalidOperationException($"{cPrefix}Reject outcome requires a reason.");
-
-                foreach (var assignment in clause.SetAssignments)
-                {
-                    if (dataFields.Count == 0)
-                        continue;
-
-                    var aPrefix = assignment.SourceLine > 0 ? $"Line {assignment.SourceLine}: " : cPrefix;
-                    var knownDataField = dataFields.Any(f => string.Equals(f.Name, assignment.Key, StringComparison.Ordinal));
-                    if (!knownDataField)
-                        throw new InvalidOperationException($"{aPrefix}Transition '{transition.FromState}' on '{transition.EventName}' assigns unknown data field '{assignment.Key}'.");
-                }
-            }
+            transitions.Add(new PreceptTransition(fromState, eventName, [clause]));
         }
     }
 }
+
+/// <summary>A parse diagnostic with position information.</summary>
+public sealed record ParseDiagnostic(int Line, int Column, string Message);
