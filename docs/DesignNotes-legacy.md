@@ -1,4 +1,7 @@
-# Precept Design Notes
+# Precept Design Notes (Legacy)
+
+> **⚠️ ARCHIVED — DO NOT UPDATE.**
+> This file documents design decisions for the original (pre-redesign) syntax and is preserved for historical reference only.
 
 Date: 2026-02-24
 
