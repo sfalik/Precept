@@ -15,6 +15,7 @@
 .vscode/*
 !.vscode/tasks.json
 !.vscode/extensions.json
+!.vscode/mcp.json
 
 # Temporary and local scratch files
 temp/
