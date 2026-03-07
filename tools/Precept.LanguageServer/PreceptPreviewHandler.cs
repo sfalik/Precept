@@ -155,10 +155,11 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
             ? Array.Empty<string>()
             : fieldErrors.Values.SelectMany(static errs => errs).Distinct(StringComparer.Ordinal).ToArray();
         var formErrors = fullErrors.Where(err => !attributedErrors.Contains(err, StringComparer.Ordinal)).ToArray();
+        var attributedEditable = ApplyAttributedViolations(editable, fieldErrors);
 
         return new PreceptPreviewResponse(
             true,
-            EditableFields: editable,
+            EditableFields: attributedEditable,
             Errors: fullErrors.Length > 0 ? fullErrors : null,
             FieldErrors: fieldErrors,
             FormErrors: formErrors.Length > 0 ? formErrors : null,
@@ -352,6 +353,25 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
             .Distinct(StringComparer.Ordinal)
             .ToArray()
             ?? Array.Empty<string>();
+
+    private static IReadOnlyList<PreceptPreviewEditableField>? ApplyAttributedViolations(
+        IReadOnlyList<PreceptPreviewEditableField>? editable,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? fieldErrors)
+    {
+        if (editable is null)
+            return null;
+
+        if (fieldErrors is null || fieldErrors.Count == 0)
+            return editable.Select(static field => field with { Violation = null }).ToArray();
+
+        return editable.Select(field =>
+        {
+            if (!fieldErrors.TryGetValue(field.FieldName, out var errors) || errors.Count == 0)
+                return field with { Violation = null };
+
+            return field with { Violation = string.Join(" · ", errors) };
+        }).ToArray();
+    }
 
     private static IReadOnlyDictionary<string, IReadOnlyList<string>>? BuildFieldErrors(
         PreviewSession session,

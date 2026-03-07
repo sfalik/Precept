@@ -130,7 +130,7 @@ if (editResult.Outcome == PreceptUpdateOutcome.Updated)
 ## 🛠️ World-Class Tooling
 
 Precept isn't just a library; it's an authoring experience. The accompanying VS Code extension provides:
-- **Interactive Inspector:** Fire events and edit data against a live, mock instance in VS Code. Field edits use explicit **Edit** mode with **Save/Cancel**; validation runs live via inspect while typing, and values are committed only when **Save** is clicked.
+- **Interactive Inspector:** Fire events and edit data against a live, mock instance in VS Code. Field edits use explicit **Edit** mode with **Save/Cancel**; validation runs live via inspect while typing, field-level errors stay attached only to the fields that caused them, and values are committed only when **Save** is clicked.
 - **Live Diagramming:** A dynamic state-transition diagram renders as you type.
 - **Null-Flow Analysis:** Real-time squiggles warn you if a guard path might access an unsafe null value.
 

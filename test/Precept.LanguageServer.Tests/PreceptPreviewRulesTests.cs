@@ -352,7 +352,7 @@ public class PreceptPreviewRulesTests
     }
 
     [Fact]
-    public async Task HandleInspectUpdate_MultiplePatchedFields_BothCanBeMarked()
+    public async Task HandleInspectUpdate_MultiplePatchedFields_OnlyCausalFieldIsMarked()
     {
         const string dsl = """
             precept DraftEdit
@@ -388,10 +388,49 @@ public class PreceptPreviewRulesTests
         var author = response.EditableFields!.Single(f => f.FieldName == "Author");
 
         age.Violation.Should().Contain("Age must be at least 12 years old");
-        author.Violation.Should().Contain("Age must be at least 12 years old",
-            "the raw runtime payload still includes full-patch violations on editable fields");
+        author.Violation.Should().BeNull("inline draft validation should stay attached only to the field that caused the violation");
         response.FieldErrors!["Age"].Should().ContainSingle(r => r.Contains("Age must be at least 12 years old"));
         response.FieldErrors.Should().NotContainKey("Author");
+    }
+
+    [Fact]
+    public async Task HandleInspectUpdate_OnlyAttributedFieldCarriesViolationText()
+    {
+        const string dsl = """
+            precept DraftEdit
+            field Author as string nullable
+            field Age as number default 12
+            invariant Age >= 12 because "Age must be at least 12 years old"
+            state Draft initial
+            in Draft edit Author, Age
+            """;
+
+        var (handler, uri) = CreateHandler();
+        await handler.Handle(new PreceptPreviewRequest("snapshot", uri, Text: dsl), CancellationToken.None);
+
+        var response = await handler.Handle(
+            new PreceptPreviewRequest(
+                "inspectUpdate",
+                uri,
+                Text: dsl,
+                FieldUpdates: new Dictionary<string, object?>
+                {
+                    ["Author"] = "Alice",
+                    ["Age"] = 9.0
+                }),
+            CancellationToken.None);
+
+        response.Success.Should().BeTrue();
+        response.EditableFields.Should().NotBeNull();
+
+        var age = response.EditableFields!.Single(f => f.FieldName == "Age");
+        var author = response.EditableFields!.Single(f => f.FieldName == "Author");
+
+        age.Violation.Should().Contain("Age must be at least 12 years old");
+        author.Violation.Should().BeNull();
+        response.FieldErrors.Should().NotBeNull();
+        response.FieldErrors!.Keys.Should().ContainSingle().Which.Should().Be("Age");
+        response.FormErrors.Should().BeNull();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

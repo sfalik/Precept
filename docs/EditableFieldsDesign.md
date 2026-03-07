@@ -5,6 +5,12 @@ Date: 2026-03-04
 Status: **Runtime implemented.** Parser/model support was included in the language redesign; the runtime `Update` API, `IUpdatePatchBuilder`, editability enforcement, invariant/assert validation, and `Inspect` integration are now implemented.
 
 > **Inspector UX note (2026-03-06):** The preview inspector applies direct field edits in explicit **Edit** mode. While typing, draft values are validated through `Inspect(...)`-based preview checks and violations are surfaced inline; runtime data is not committed until the user clicks **Save**. **Cancel** discards draft edits.
+>
+> The preview contract distinguishes between:
+> - **Field-level errors**: violations attributed to specific edited fields and surfaced inline on those fields only.
+> - **Form-level errors**: violations that cannot be attributed to one field alone and are surfaced in the draft validation banner.
+>
+> Attribution is owned by the preview service layer, not the webview. The webview renders the authoritative `EditableFields[i].Violation`, `FieldErrors`, and `FormErrors` returned by `inspectUpdate`; it does not infer ownership client-side from the raw runtime payload.
 
 > **Language redesign note (2026-03-05):** The editable fields syntax has been updated from indentation-based `from <State> edit` blocks to flat keyword-anchored `in <State> edit <Field>, <Field>` statements, consistent with the new Precept language design (`docs/PreceptLanguageDesign.md`). The `in` preposition is used instead of `from` because editability is about what you can do **while residing in** a state, matching `in <State> assert` semantics. The parser/model support for `in <State> edit` is included in the language redesign; the runtime `Update` API is deferred to a follow-on task.
 

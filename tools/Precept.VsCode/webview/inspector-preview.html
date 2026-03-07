@@ -1094,6 +1094,7 @@
     let draftFieldErrors = new Map();
     let draftFormErrors = [];
     let draftInspectTimer = null;
+    let latestDraftInspectSequence = 0;
 
     const vscodeApi = acquireVsCodeApi();
     let previewRequestId = 1;
@@ -2831,14 +2832,64 @@
         : [];
     }
 
-    function getDraftViolationText(fieldName) {
+    function findEditableFieldByName(editableFields, fieldName) {
+      if (!Array.isArray(editableFields) || !fieldName) {
+        return null;
+      }
+
+      const exactMatch = editableFields.find((editableField) => editableField.fieldName === fieldName);
+      if (exactMatch) {
+        return exactMatch;
+      }
+
+      const target = String(fieldName).toLowerCase();
+      return editableFields.find((editableField) => editableField.fieldName.toLowerCase() === target) || null;
+    }
+
+    function normalizeFieldErrors(rawFieldErrors, editableFields) {
+      const normalized = new Map();
+      if (!rawFieldErrors || typeof rawFieldErrors !== 'object') {
+        return normalized;
+      }
+
+      Object.entries(rawFieldErrors).forEach(([fieldName, errors]) => {
+        if (!Array.isArray(errors) || errors.length === 0) {
+          return;
+        }
+
+        const editableField = findEditableFieldByName(editableFields, fieldName);
+        const canonicalFieldName = editableField?.fieldName ?? String(fieldName);
+        normalized.set(canonicalFieldName, errors.map((err) => String(err)));
+      });
+
+      return normalized;
+    }
+
+    function applyAttributedEditableViolations(editableFields, fieldErrors, formErrors) {
+      if (!Array.isArray(editableFields) || editableFields.length === 0) {
+        return [];
+      }
+
+      if (fieldErrors.size === 0 && formErrors.length === 0) {
+        return editableFields;
+      }
+
+      return editableFields.map((editableField) => {
+        const errors = fieldErrors.get(editableField.fieldName);
+        return {
+          ...editableField,
+          violation: errors && errors.length > 0 ? errors.join(' · ') : null
+        };
+      });
+    }
+
+    function getDraftViolationText(fieldName, editableField = null) {
       const fieldErrors = draftFieldErrors.get(fieldName);
       if (fieldErrors && fieldErrors.length > 0) {
         return fieldErrors.join(' · ');
       }
 
-      const editableField = currentEditableFields.find((ef) => ef.fieldName === fieldName);
-      return editableField?.violation || null;
+      return editableField?.violation ? String(editableField.violation) : null;
     }
 
     function renderDraftValidationBanner() {
@@ -2866,7 +2917,8 @@
           return;
         }
 
-        const violationText = getDraftViolationText(fieldName);
+        const editableField = currentEditableFields.find((ef) => ef.fieldName === fieldName);
+        const violationText = getDraftViolationText(fieldName, editableField);
         const shell = input.closest('.data-edit-shell');
 
         if (input.type === 'checkbox') {
@@ -2895,9 +2947,11 @@
 
     async function inspectDraftUpdates() {
       const patch = buildDraftPatch();
+      const inspectSequence = ++latestDraftInspectSequence;
       if (Object.keys(patch).length === 0) {
         draftFieldErrors = new Map();
         draftFormErrors = [];
+        currentEditableFields = applyAttributedEditableViolations(currentEditableFields, draftFieldErrors, draftFormErrors);
         applyDraftValidationToRenderedInputs();
         return;
       }
@@ -2906,20 +2960,14 @@
         fieldUpdates: patch
       });
 
+      if (inspectSequence !== latestDraftInspectSequence) {
+        return;
+      }
+
       if (!response.success) {
         const errMsg = response.error || 'Inspect update failed.';
         showRowFeedback(null, `✖ ${errMsg}`, 'err');
         return;
-      }
-
-      const rawFieldErrors = response.fieldErrors ?? response.FieldErrors;
-      const nextFieldErrors = new Map();
-      if (rawFieldErrors && typeof rawFieldErrors === 'object') {
-        Object.entries(rawFieldErrors).forEach(([fieldName, errors]) => {
-          if (Array.isArray(errors) && errors.length > 0) {
-            nextFieldErrors.set(fieldName, errors.map((err) => String(err)));
-          }
-        });
       }
 
       const rawFormErrors = response.formErrors ?? response.FormErrors;
@@ -2927,13 +2975,20 @@
         ? rawFormErrors.map((err) => String(err))
         : [];
       const rawEditableFields = response.editableFields ?? response.EditableFields;
+      const nextEditableFields = mapEditableFields(rawEditableFields);
+      const rawFieldErrors = response.fieldErrors ?? response.FieldErrors;
+      const nextFieldErrors = normalizeFieldErrors(rawFieldErrors, nextEditableFields);
 
       const activeInput = document.activeElement;
       const activeField = activeInput?.dataset?.field ?? null;
 
-      currentEditableFields = mapEditableFields(rawEditableFields);
       draftFieldErrors = nextFieldErrors;
       draftFormErrors = nextFormErrors;
+      currentEditableFields = applyAttributedEditableViolations(
+        nextEditableFields,
+        nextFieldErrors,
+        nextFormErrors
+      );
       if (activeField) {
         applyDraftValidationToRenderedInputs();
         return;
@@ -3028,8 +3083,7 @@
             const draftValue = Object.prototype.hasOwnProperty.call(draftFieldValues, canonicalFieldName)
               ? draftFieldValues[canonicalFieldName]
               : value;
-            const violationList = draftFieldErrors.get(canonicalFieldName) || null;
-            const violationText = violationList ? violationList.join(' · ') : (editableField.violation || null);
+            const violationText = getDraftViolationText(canonicalFieldName, editableField);
             const violationTitle = violationText
               ? ` title="${String(violationText).replace(/"/g, '&quot;')}"`
               : '';
