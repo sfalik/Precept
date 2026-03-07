@@ -28,41 +28,47 @@
 
 With Precept, you define the rules of your entity in a clean, domain-readable DSL, and then execute those exact rules deterministically in C#.
 
-### 1. The Contract (`bank-loan.precept`)
+### 1. The Contract (`loan-application.precept`)
 
 ```
-precept BankLoan
+precept LoanApplication
 
-// Fields with defaults and invariants
+# Fields with defaults and invariants
+field ApplicantName as string nullable
 field RequestedAmount as number default 0
 field ApprovedAmount as number default 0
 field CreditScore as number default 0
-field RemainingBalance as number default 0
-invariant RemainingBalance >= 0 because "Remaining balance cannot be negative"
-invariant ApprovedAmount <= RequestedAmount because "Approved amount must not exceed requested amount"
+field AnnualIncome as number default 0
+field ExistingDebt as number default 0
+field DecisionNote as string nullable
+field DocumentsVerified as boolean default false
+invariant ApprovedAmount <= RequestedAmount because "Approved amount cannot exceed the request"
 
-// State progression
-state Apply initial
+# State progression
+state Draft initial
 state UnderReview
 state Approved
-state Rejected
+state Funded
+state Declined
 
-// Events with typed arguments and asserts
-event Submit with Amount as number, CreditScore as number
-on Submit assert Amount > 0 because "Amount must be positive"
-on Submit assert CreditScore >= 300 because "Credit score must be at least 300"
+# Events with typed arguments and asserts
+event Submit with Applicant as string, Amount as number, Score as number, Income as number, Debt as number
+on Submit assert Applicant != "" because "An applicant name is required"
+on Submit assert Amount > 0 because "Loan requests must be positive"
 
-event Approve with ApprovedAmount as number
-on Approve assert ApprovedAmount > 0 because "Approved amount must be positive"
+event VerifyDocuments
 
-event Reject with Reason as string
-field RejectionReason as string nullable
+event Approve with Amount as number, Note as string nullable default null
+on Approve assert Amount > 0 because "Approved amounts must be positive"
 
-// Flat transition rows — first matching row wins
-from Apply on Submit -> set RequestedAmount = Submit.Amount -> set CreditScore = Submit.CreditScore -> transition UnderReview
-from UnderReview on Approve when CreditScore >= 700 && Approve.ApprovedAmount <= RequestedAmount -> set ApprovedAmount = Approve.ApprovedAmount -> set RemainingBalance = Approve.ApprovedAmount -> transition Approved
-from UnderReview on Approve -> reject "Approval requires credit score >= 700 and valid amount"
-from UnderReview on Reject -> set RejectionReason = Reject.Reason -> transition Rejected
+event Decline with Note as string
+
+# Flat transition rows — first matching row wins
+from Draft on Submit -> set ApplicantName = Submit.Applicant -> set RequestedAmount = Submit.Amount -> set CreditScore = Submit.Score -> set AnnualIncome = Submit.Income -> set ExistingDebt = Submit.Debt -> transition UnderReview
+from UnderReview on VerifyDocuments -> set DocumentsVerified = true -> no transition
+from UnderReview on Approve when DocumentsVerified && CreditScore >= 680 && AnnualIncome >= ExistingDebt * 2 && RequestedAmount < AnnualIncome / 2 && Approve.Amount <= RequestedAmount -> set ApprovedAmount = Approve.Amount -> set DecisionNote = Approve.Note -> transition Approved
+from UnderReview on Approve -> reject "Approval requires verified documents, strong credit, and affordable debt load"
+from UnderReview on Decline -> set DecisionNote = Decline.Note -> transition Declined
 ```
 
 ### 2. The Execution (C#)
@@ -73,7 +79,7 @@ Because guard expressions are purely evaluative, `Inspect` safely previews any a
 using Precept;
 
 // Parse the DSL and compile to an engine (do this once at startup)
-var definition = PreceptParser.Parse(File.ReadAllText("bank-loan.precept"));
+var definition = PreceptParser.Parse(File.ReadAllText("loan-application.precept"));
 var engine = PreceptCompiler.Compile(definition);
 
 // Restore an instance from your database
@@ -81,10 +87,13 @@ var instance = engine.CreateInstance(
     "UnderReview",
     new Dictionary<string, object?>
     {
+        ["ApplicantName"] = "Jordan Lee",
         ["RequestedAmount"] = 50_000.0,
         ["CreditScore"] = 720.0,
+        ["AnnualIncome"] = 140_000.0,
+        ["ExistingDebt"] = 20_000.0,
         ["ApprovedAmount"] = 0.0,
-        ["RemainingBalance"] = 0.0,
+        ["DocumentsVerified"] = true,
     });
 
 // Safely inspect — no mutation
@@ -95,7 +104,7 @@ var preview = engine.Inspect(instance, "Approve", new Dictionary<string, object?
 
 if (preview.Outcome == PreceptOutcomeKind.Rejected)
 {
-    // Output: "Approval requires credit score >= 700 and valid amount"
+    // Output: "Approval requires verified documents, strong credit, and affordable debt load"
     Console.WriteLine(string.Join(", ", preview.Reasons));
 }
 else
@@ -127,12 +136,67 @@ if (editResult.Outcome == PreceptUpdateOutcome.Updated)
 
 ---
 
+## 📚 Sample Catalog
+
+The `samples/` directory now contains 18 fully commented workflows ordered from simple to complex. The first six are teaching-first samples, the middle six broaden feature usage, and the last six combine richer branching with more realistic review and operational rules.
+
+| Sample | Complexity | Learning focus |
+|--------|------------|----------------|
+| `event-registration.precept` | Simple | Scalar fields, payment flow, direct edits |
+| `library-hold-request.precept` | Simple | Queue promotion, stack history, entry and exit actions |
+| `restaurant-waitlist.precept` | Simple | Queue routing, `peek`, `from any` |
+| `parcel-locker-pickup.precept` | Simple | Timed guards, reminder log stack, `clear` |
+| `building-access-badge-request.precept` | Simple | `set<number>`, `add`, `remove`, `contains`, `.min`, `.max` |
+| `refund-request.precept` | Simple | Approval flow, nullable notes, guarded rejection |
+| `maintenance-work-order.precept` | Medium | Urgency rules, from-state assertions, progress updates |
+| `clinic-appointment-scheduling.precept` | Medium | Event-arg validation with `%`, scheduling edits |
+| `travel-reimbursement.precept` | Medium | Arithmetic policy checks with `*` and `/` |
+| `subscription-cancellation-retention.precept` | Medium | Retention offers, in-place review updates |
+| `vehicle-service-appointment.precept` | Medium | Service recommendation set, to-state assertions |
+| `it-helpdesk-ticket.precept` | Medium | Shared assignment queue, reopen loop |
+| `apartment-rental-application.precept` | Complex | Approval screening, deposit and lease sequencing |
+| `insurance-claim.precept` | Complex | Missing-document set management and review |
+| `hiring-pipeline.precept` | Complex | Interview loop tracking and offer gating |
+| `loan-application.precept` | Complex | Underwriting rules and affordability checks |
+| `utility-outage-report.precept` | Complex | Area tracking, crew dispatch queue, incident closure |
+| `warranty-repair-request.precept` | Complex | Repair step stack, `pop ... into`, return flow |
+
+### Feature Coverage Matrix
+
+The catalog is designed so the overall set exercises the full current language surface without forcing every feature into every file.
+
+| Feature | Representative samples |
+|---------|------------------------|
+| Scalar fields, nullable fields, defaults | `event-registration.precept`, `refund-request.precept`, `loan-application.precept` |
+| Global invariants | `event-registration.precept`, `travel-reimbursement.precept`, `loan-application.precept` |
+| Event args with defaults and nullable defaults | `event-registration.precept`, `clinic-appointment-scheduling.precept`, `subscription-cancellation-retention.precept` |
+| Event assertions | Present across all samples; see `clinic-appointment-scheduling.precept` and `travel-reimbursement.precept` |
+| `when` guards and first-match branching | `refund-request.precept`, `parcel-locker-pickup.precept`, `apartment-rental-application.precept` |
+| `transition`, `no transition`, and `reject` outcomes | Present across the catalog; see `event-registration.precept`, `refund-request.precept`, `loan-application.precept` |
+| `in <State> assert` | `event-registration.precept`, `utility-outage-report.precept`, `warranty-repair-request.precept` |
+| `to <State> assert` | `vehicle-service-appointment.precept`, `apartment-rental-application.precept` |
+| `from <State> assert` | `maintenance-work-order.precept`, `vehicle-service-appointment.precept` |
+| Entry and exit actions | `event-registration.precept`, `library-hold-request.precept`, `parcel-locker-pickup.precept`, `warranty-repair-request.precept` |
+| Editable fields with `edit` | `event-registration.precept`, `building-access-badge-request.precept`, `insurance-claim.precept`, `utility-outage-report.precept` |
+| Set collections with `add`, `remove`, `contains` | `building-access-badge-request.precept`, `insurance-claim.precept`, `vehicle-service-appointment.precept`, `hiring-pipeline.precept` |
+| Queue collections with `enqueue`, `dequeue`, `peek` | `library-hold-request.precept`, `restaurant-waitlist.precept`, `it-helpdesk-ticket.precept`, `utility-outage-report.precept` |
+| Stack collections with `push`, `pop`, `peek`, `clear` | `parcel-locker-pickup.precept`, `library-hold-request.precept`, `warranty-repair-request.precept` |
+| Collection accessors `.count`, `.min`, `.max`, `.peek` | `building-access-badge-request.precept`, `restaurant-waitlist.precept`, `it-helpdesk-ticket.precept`, `parcel-locker-pickup.precept` |
+| `from any on` rows | `restaurant-waitlist.precept`, `it-helpdesk-ticket.precept`, `utility-outage-report.precept` |
+| Arithmetic operators `+`, `-`, `*`, `/`, `%` | `maintenance-work-order.precept`, `parcel-locker-pickup.precept`, `travel-reimbursement.precept`, `clinic-appointment-scheduling.precept` |
+| Logical operators `&&`, `||`, `!` | `maintenance-work-order.precept`, `insurance-claim.precept`, `loan-application.precept` |
+
+If you want to learn the language progressively, read the samples in the order listed above. If you want to see a specific feature in context, start with the matrix and jump straight to a representative file.
+
+---
+
 ## 🛠️ World-Class Tooling
 
 Precept isn't just a library; it's an authoring experience. The accompanying VS Code extension provides:
 - **Context-Aware IntelliSense:** Completions respect DSL scope and the current grammar step, so declarations suggest the next required keywords and types, invariants and state asserts suggest data fields, event asserts suggest the active event's arguments, and guarded rows hand off to `->` once the guard is complete.
 - **Hover + Go to Definition:** Hover a field, state, event, event arg, collection accessor, or DSL keyword to see its meaning and syntax form, then jump to declarations directly from references.
 - **Document Outline:** The editor exposes a structured symbol tree for the precept, including fields, states, events, and event arguments.
+- **Shared Type Diagnostics:** Expression typing, null-flow narrowing, collection mutation checks, and `from any` state-aware analysis now come from the core compiler, so the language server and MCP validation surface the same `PRECEPT038`-`PRECEPT043` errors. The MCP `precept_validate` result includes those diagnostic codes structurally, and returns all shared type diagnostics instead of stopping at the first one.
 - **Structural Diagnostics:** Real-time diagnostics now surface unreachable states, dead-end states, orphaned events, and reject-only state/event pairs that likely model unsupported events as explicit rejections.
 - **Quick Fixes:** Reject-only state/event pair warnings offer a quick fix to remove the rows and restore `NotDefined` semantics for unsupported events, and orphaned event warnings offer a quick fix to remove the unused event declaration and its event asserts.
 - **Interactive Inspector:** Fire events and edit data against a live, mock instance in VS Code. The preview behaves like Markdown preview by default: one right-side preview follows the active `.precept` editor, and you can lock it to the current file with **Toggle Preview Locking**. Field edits use explicit **Edit** mode with **Save/Cancel**; validation runs live via inspect while typing, field-level errors stay attached only to the fields that caused them, and values are committed only when **Save** is clicked.
@@ -151,18 +215,20 @@ Precept includes an MCP (Model Context Protocol) server that exposes DSL parsing
 
 | Tool | Purpose |
 |------|---------|
-| `precept_validate` | Parse and compile a `.precept` file, return structured diagnostics |
+| `precept_validate` | Parse and compile a `.precept` file, including shared type diagnostics such as `PRECEPT038`-`PRECEPT043`; validation returns all shared type diagnostics with structured codes |
 | `precept_schema` | Return the full typed structure — states, fields, events, transitions |
 | `precept_audit` | Graph analysis — reachability, dead ends, terminal states, orphaned events |
 | `precept_run` | Execute a step-by-step event scenario, return outcomes |
 | `precept_language` | Full DSL reference — vocabulary, constructs, constraints, pipeline |
 | `precept_inspect` | From a state+data snapshot, preview what every event would do |
 
-### Setup
+### Bundled with the Extension
 
-The workspace includes a `.vscode/mcp.json` that registers the server with Copilot automatically. No manual configuration is required — Copilot discovers the six tools when the workspace is open.
+When the VS Code extension is packaged for distribution (`npm run package:dist`), a self-contained build of the MCP server is bundled inside the VSIX for each supported platform (win-x64, linux-x64, osx-arm64). The extension registers the server via the `mcpServerDefinitionProviders` contribution point in `package.json` and the `vscode.lm.registerMcpServerDefinitionProvider()` API so that VS Code discovers and launches it automatically — no manual `mcp.json` configuration, no .NET SDK prerequisite, and no separate install step.
 
-The server runs via stdio and is launched on demand through the workspace launcher:
+### Development Setup
+
+During development in this repo, the MCP server runs from source via `.vscode/mcp.json`, bypassing the bundled binary. The workspace launcher builds and shadow-copies the server on demand:
 ```
 node tools/Precept.VsCode/scripts/start-precept-mcp.js
 ```

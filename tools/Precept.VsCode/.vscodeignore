@@ -6,3 +6,4 @@
 !syntaxes/**
 !webview/**
 !node_modules/**
+!mcp-server/**
