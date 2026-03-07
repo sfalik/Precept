@@ -33,6 +33,27 @@ public class PreceptIntellisenseNavigationTests
     }
 
     [Fact]
+    public void Hover_Keyword_ShowsConstructForm()
+    {
+        const string text = """
+            precept M
+            fi$$eld Balance as number default 0
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var info = PreceptDocumentIntellisense.Analyze(code);
+
+        var hover = PreceptDocumentIntellisense.CreateHover(info, position);
+
+        hover.Should().NotBeNull();
+        hover!.Contents.ToString().Should().Contain("field <Name> as <Type> [nullable] [default <Value>]");
+        hover.Contents.ToString().Should().Contain("Declares a scalar or collection data field");
+    }
+
+    [Fact]
     public void Definition_TransitionTarget_ResolvesToStateDeclaration()
     {
         const string text = """

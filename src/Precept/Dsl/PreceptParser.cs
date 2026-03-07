@@ -14,6 +14,13 @@ namespace Precept;
 /// </summary>
 public static class PreceptParser
 {
+    /// <summary>
+    /// Forces static field initializers to run, populating <see cref="ConstructCatalog"/>
+    /// with construct registrations. Safe to call multiple times.
+    /// </summary>
+    public static void EnsureInitialized()
+        => System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(PreceptParser).TypeHandle);
+
     // ═══════════════════════════════════════════════════════════════════
     // Public API (signature unchanged from old parser)
     // ═══════════════════════════════════════════════════════════════════
@@ -26,7 +33,7 @@ public static class PreceptParser
     {
         // SYNC:CONSTRAINT:C1
         if (string.IsNullOrWhiteSpace(text))
-            throw new InvalidOperationException(ConstraintCatalog.C1.FormatMessage());
+            throw ConstraintCatalog.C1.ToException();
 
         TokenList<PreceptToken> tokens;
         try
@@ -36,14 +43,14 @@ public static class PreceptParser
         catch (Superpower.ParseException ex)
         {
             // SYNC:CONSTRAINT:C2
-            throw new InvalidOperationException(ConstraintCatalog.C2.FormatMessage(("message", ex.Message)), ex);
+            throw new ConstraintViolationException(ConstraintCatalog.C2, ConstraintCatalog.C2.FormatMessage(("message", ex.Message)));
         }
         var result = RawFileParser.TryParse(tokens);
         if (result.HasValue && result.Remainder.IsAtEnd)
             return AssembleModel(result.Value.Name, result.Value.Statements);
 
         // SYNC:CONSTRAINT:C3
-        throw new InvalidOperationException(ConstraintCatalog.C3.FormatMessage());
+        throw ConstraintCatalog.C3.ToException();
     }
 
     /// <summary>
@@ -57,7 +64,7 @@ public static class PreceptParser
         if (string.IsNullOrWhiteSpace(text))
         {
             // SYNC:CONSTRAINT:C1
-            diagnostics.Add(new ParseDiagnostic(1, 0, ConstraintCatalog.C1.FormatMessage()));
+            diagnostics.Add(new ParseDiagnostic(1, 0, ConstraintCatalog.C1.FormatMessage(), ConstraintCatalog.ToDiagnosticCode(ConstraintCatalog.C1.Id)));
             return (null, diagnostics);
         }
 
@@ -68,7 +75,8 @@ public static class PreceptParser
         }
         catch (Superpower.ParseException ex)
         {
-            diagnostics.Add(new ParseDiagnostic(1, 0, ex.Message));
+            // SYNC:CONSTRAINT:C2
+            diagnostics.Add(new ParseDiagnostic(1, 0, ex.Message, ConstraintCatalog.ToDiagnosticCode(ConstraintCatalog.C2.Id)));
             return (null, diagnostics);
         }
 
@@ -82,7 +90,10 @@ public static class PreceptParser
             }
             catch (InvalidOperationException ex)
             {
-                diagnostics.Add(new ParseDiagnostic(1, 0, ex.Message));
+                var code = ex is ConstraintViolationException cve
+                    ? ConstraintCatalog.ToDiagnosticCode(cve.Constraint.Id)
+                    : null;
+                diagnostics.Add(new ParseDiagnostic(1, 0, ex.Message, code));
                 return (null, diagnostics);
             }
         }
@@ -107,6 +118,13 @@ public static class PreceptParser
             var display = PreceptTokenMeta.GetSymbol(next.Kind) ?? tokenText;
             msg = $"Unexpected '{display}' — could not parse as a valid statement";
 
+            // Look up matching construct forms for the leading keyword
+            var keyword = display;
+            var matchingForms = ConstructCatalog.Constructs
+                .Where(c => ConstructFormStartsWithKeyword(c.Form, keyword))
+                .Select(c => c.Form)
+                .ToList();
+
             // Peek ahead for additional context (e.g. "from Draft on SendForReview" missing "->")
             var remaining = result.Remainder.ToArray();
             if (next.Kind == PreceptToken.From && remaining.Length >= 4
@@ -114,12 +132,19 @@ public static class PreceptParser
                 && remaining[2].Kind == PreceptToken.On
                 && remaining[3].Kind == PreceptToken.Identifier)
             {
+                var transitionForm = ConstructCatalog.Constructs
+                    .FirstOrDefault(c => c.Name == "transition-row")?.Form
+                    ?? "from <State> on <Event> [when <Guard>] -> <Action>* -> <Outcome>";
                 // Looks like a transition row — check for missing arrow
                 var hasArrow = remaining.Skip(4).Any(t => t.Kind == PreceptToken.Arrow);
                 if (!hasArrow)
                     msg = $"Transition row starting with 'from {remaining[1].ToStringValue()} on {remaining[3].ToStringValue()}' is missing '->' action chain";
                 else
-                    msg = $"Could not parse transition row 'from {remaining[1].ToStringValue()} on {remaining[3].ToStringValue()}' — expected 'from <State> on <Event> -> <action> [-> <action>]*'";
+                    msg = $"Could not parse transition row 'from {remaining[1].ToStringValue()} on {remaining[3].ToStringValue()}' — expected '{transitionForm}'";
+            }
+            else if (matchingForms.Count > 0)
+            {
+                msg += ". Expected: " + string.Join(" or ", matchingForms.Select(f => $"'{f}'"));
             }
         }
 
@@ -141,7 +166,7 @@ public static class PreceptParser
         if (result.HasValue && result.Remainder.IsAtEnd)
             return result.Value;
         // SYNC:CONSTRAINT:C4
-        throw new InvalidOperationException(ConstraintCatalog.C4.FormatMessage(("expression", expression)));
+        throw ConstraintCatalog.C4.ToException(("expression", expression));
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -173,7 +198,7 @@ public static class PreceptParser
         if (double.TryParse(token.ToStringValue(), NumberStyles.Float, CultureInfo.InvariantCulture, out var v))
             return v;
         // SYNC:CONSTRAINT:C5
-        throw new InvalidOperationException(ConstraintCatalog.C5.FormatMessage(("value", token.ToStringValue())));
+        throw ConstraintCatalog.C5.ToException(("value", token.ToStringValue()));
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -517,7 +542,13 @@ public static class PreceptParser
         Token.EqualTo(PreceptToken.Precept)
             .IgnoreThen(Token.EqualTo(PreceptToken.Identifier))
             .Select(t => t.ToText())
-            .Named("precept declaration");
+            .Named("precept declaration")
+            .Register(new ConstructInfo(
+                "precept-header",
+                "precept <Name>",
+                "top-level",
+                "Names the workflow",
+                "precept BugTracker"));
 
     // field <Name> as <Type> [nullable] [default <Value>]
     private static readonly TokenListParser<PreceptToken, StatementResult> FieldDecl =
@@ -534,7 +565,13 @@ public static class PreceptParser
                 name.ToText(), typeRef.ScalarType, nullable,
                 dflt.Specified || nullable,
                 dflt.Specified ? dflt.Value : null)))
-        .Named("field declaration");
+        .Named("field declaration")
+            .Register(new ConstructInfo(
+                "field-declaration",
+                "field <Name> as <Type> [nullable] [default <Value>]",
+                "top-level",
+                "Declares a scalar or collection data field",
+                "field Priority as number default 3"));
 
     // invariant <BoolExpr> because "reason"
     private static readonly TokenListParser<PreceptToken, StatementResult> InvariantDecl =
@@ -545,7 +582,13 @@ public static class PreceptParser
          select (StatementResult)new InvariantResult(new PreceptInvariant(
              ReconstituteExpr(expr), expr, reason.ToStringLiteralValue(),
              SourceLine: kw.Span.Position.Line)))
-        .Named("invariant declaration");
+        .Named("invariant declaration")
+            .Register(new ConstructInfo(
+                "invariant",
+                "invariant <Expr> because \"<Reason>\"",
+                "top-level",
+                "Global data constraint checked after every mutation",
+                "invariant Priority >= 1 because \"Priority must be positive\""));
 
     // state <Name> [initial]
     private static readonly TokenListParser<PreceptToken, StatementResult> StateDecl =
@@ -553,7 +596,13 @@ public static class PreceptParser
          from name in Token.EqualTo(PreceptToken.Identifier)
          from initial in Token.EqualTo(PreceptToken.Initial).Value(true).OptionalOrDefault(false)
          select (StatementResult)new StateResult(new PreceptState(name.ToText()), initial))
-        .Named("state declaration");
+        .Named("state declaration")
+            .Register(new ConstructInfo(
+                "state-declaration",
+                "state <Name> [initial]",
+                "top-level",
+                "Declares a workflow state",
+                "state Idle initial"));
 
     // event <Name> [with <ArgList>]
     // where ArgList = Name as Type [nullable] [default val] separated by commas
@@ -575,7 +624,13 @@ public static class PreceptParser
              .OptionalOrDefault(Array.Empty<PreceptEventArg>())
          select (StatementResult)new EventResult(new PreceptEvent(
              name.ToText(), args.ToList())))
-        .Named("event declaration");
+        .Named("event declaration")
+            .Register(new ConstructInfo(
+                "event-declaration",
+                "event <Name> [with <Arg> as <Type> [nullable] [default <Val>], ...]",
+                "top-level",
+                "Declares an external trigger with optional typed arguments",
+                "event Submit with Comment as string"));
 
     // ═══════════════════════════════════════════════════════════════════
     // Assert Statements
@@ -598,7 +653,13 @@ public static class PreceptParser
              states,
              ReconstituteExpr(expr), expr, reason.ToStringLiteralValue(),
              SourceLine: kw.Span.Position.Line))
-        .Named("state assert");
+        .Named("state assert")
+            .Register(new ConstructInfo(
+                "state-assert",
+                "in|to|from <State> assert <Expr> because \"<Reason>\"",
+                "top-level",
+                "State-scoped data constraint checked on entry, exit, or residency",
+                "in Open assert Assignee != null because \"Must have an assignee\""));
 
     // on <Event> assert <BoolExpr> because "reason"
     private static readonly TokenListParser<PreceptToken, StatementResult> EventAssertDecl =
@@ -611,7 +672,13 @@ public static class PreceptParser
          select (StatementResult)new EventAssertResult(new PreceptEventAssert(
              eventName.ToText(), ReconstituteExpr(expr), expr, reason.ToStringLiteralValue(),
              SourceLine: kwOn.Span.Position.Line)))
-        .Named("event assert");
+        .Named("event assert")
+            .Register(new ConstructInfo(
+                "event-assert",
+                "on <Event> assert <Expr> because \"<Reason>\"",
+                "top-level",
+                "Event-scoped argument constraint checked before firing",
+                "on Submit assert Comment != \"\" because \"Comment required\""));
 
     // ═══════════════════════════════════════════════════════════════════
     // State Entry/Exit Actions
@@ -633,7 +700,13 @@ public static class PreceptParser
          from actions in ActionChain
          where !actions.Any(a => a is SetAction sa && false) // placeholder — allow all actions
          select (StatementResult)new StateActionResult(prefix.Prep, prefix.States, actions))
-        .Named("state entry/exit action");
+        .Named("state entry/exit action")
+            .Register(new ConstructInfo(
+                "state-action",
+                "to|from <State> -> <Action> [-> <Action>]*",
+                "top-level",
+                "Automatic data mutations on state entry or exit",
+                "to Closed -> set Resolution = null"));
 
     // ═══════════════════════════════════════════════════════════════════
     // Edit Declarations
@@ -648,7 +721,13 @@ public static class PreceptParser
              .Select(t => t.ToText())
              .AtLeastOnceDelimitedBy(Token.EqualTo(PreceptToken.Comma))
          select (StatementResult)new EditResult(states, fields))
-        .Named("edit declaration");
+        .Named("edit declaration")
+            .Register(new ConstructInfo(
+                "edit-declaration",
+                "in <State> edit <Field>, ...",
+                "top-level",
+                "Declares which fields are editable in a state",
+                "in Open edit Priority"));
 
     // ═══════════════════════════════════════════════════════════════════
     // Transition Rows
@@ -668,7 +747,13 @@ public static class PreceptParser
              .AtLeastOnce()
          select (StatementResult)new TransitionRowResult(
              states, eventName.ToText(), whenGuard, actionsAndOutcome))
-        .Named("transition row");
+        .Named("transition row")
+            .Register(new ConstructInfo(
+                "transition-row",
+                "from <State> on <Event> [when <Guard>] -> <Action>* -> <Outcome>",
+                "top-level",
+                "Maps a (state, event) pair to actions and an outcome",
+                "from Open on Submit -> transition Closed"));
 
     /// <summary>Wraps an outcome as a parsed action for the unified action pipeline.</summary>
     private sealed record OutcomeAction(PreceptClauseOutcome Outcome) : ParsedAction;
@@ -753,14 +838,14 @@ public static class PreceptParser
                 case FieldResult fr:
                     if (fields.Any(f => f.Name == fr.Field.Name) || collectionFields.Any(f => f.Name == fr.Field.Name))
                         // SYNC:CONSTRAINT:C6
-                        throw new InvalidOperationException(ConstraintCatalog.C6.FormatMessage(("fieldName", fr.Field.Name)));
+                        throw ConstraintCatalog.C6.ToException(("fieldName", fr.Field.Name));
                     fields.Add(fr.Field);
                     break;
 
                 case CollectionFieldResult cfr:
                     if (fields.Any(f => f.Name == cfr.Field.Name) || collectionFields.Any(f => f.Name == cfr.Field.Name))
                         // SYNC:CONSTRAINT:C6
-                        throw new InvalidOperationException(ConstraintCatalog.C6.FormatMessage(("fieldName", cfr.Field.Name)));
+                        throw ConstraintCatalog.C6.ToException(("fieldName", cfr.Field.Name));
                     collectionFields.Add(cfr.Field);
                     break;
 
@@ -771,13 +856,13 @@ public static class PreceptParser
                 case StateResult sr:
                     if (states.Any(s => s.Name == sr.State.Name))
                         // SYNC:CONSTRAINT:C7
-                        throw new InvalidOperationException(ConstraintCatalog.C7.FormatMessage(("stateName", sr.State.Name)));
+                        throw ConstraintCatalog.C7.ToException(("stateName", sr.State.Name));
                     states.Add(sr.State);
                     if (sr.IsInitial)
                     {
                         if (initialState is not null)
                             // SYNC:CONSTRAINT:C8
-                            throw new InvalidOperationException(ConstraintCatalog.C8.FormatMessage(("stateName", initialState.Name)));
+                            throw ConstraintCatalog.C8.ToException(("stateName", initialState.Name));
                         initialState = sr.State;
                     }
                     break;
@@ -785,7 +870,7 @@ public static class PreceptParser
                 case EventResult er:
                     if (events.Any(e => e.Name == er.Event.Name))
                         // SYNC:CONSTRAINT:C9
-                        throw new InvalidOperationException(ConstraintCatalog.C9.FormatMessage(("eventName", er.Event.Name)));
+                        throw ConstraintCatalog.C9.ToException(("eventName", er.Event.Name));
                     events.Add(er.Event);
                     break;
 
@@ -818,18 +903,16 @@ public static class PreceptParser
                     var outcomes = trr.ActionsAndOutcome.OfType<OutcomeAction>().ToList();
                     if (outcomes.Count == 0)
                         // SYNC:CONSTRAINT:C10
-                        throw new InvalidOperationException(ConstraintCatalog.C10.FormatMessage(("eventName", trr.EventName)));
+                        throw ConstraintCatalog.C10.ToException(("eventName", trr.EventName));
 
                     // Design: "exactly one outcome, at the end; no statements after it"
                     if (outcomes.Count > 1)
                         // SYNC:CONSTRAINT:C11
-                        throw new InvalidOperationException(
-                            ConstraintCatalog.C11.FormatMessage(("eventName", trr.EventName)));
+                        throw ConstraintCatalog.C11.ToException(("eventName", trr.EventName));
                     var firstOutcomeIdx = Array.IndexOf(trr.ActionsAndOutcome, outcomes[0]);
                     if (firstOutcomeIdx < trr.ActionsAndOutcome.Length - 1)
                         // SYNC:CONSTRAINT:C11
-                        throw new InvalidOperationException(
-                            ConstraintCatalog.C11.FormatMessage(("eventName", trr.EventName)));
+                        throw ConstraintCatalog.C11.ToException(("eventName", trr.EventName));
 
                     var outcome = outcomes[0].Outcome;
                     var rowActions = trr.ActionsAndOutcome.Where(a => a is not OutcomeAction).ToArray();
@@ -849,10 +932,10 @@ public static class PreceptParser
 
         if (states.Count == 0)
             // SYNC:CONSTRAINT:C12
-            throw new InvalidOperationException(ConstraintCatalog.C12.FormatMessage());
+            throw ConstraintCatalog.C12.ToException();
         if (initialState is null)
             // SYNC:CONSTRAINT:C13
-            throw new InvalidOperationException(ConstraintCatalog.C13.FormatMessage());
+            throw ConstraintCatalog.C13.ToException();
 
         // Validate event assert scope: expressions may only reference event argument identifiers
         foreach (var ea in eventAsserts)
@@ -867,18 +950,15 @@ public static class PreceptParser
                     // EventName.ArgName form: prefix must be the event name, member must be an arg
                     if (!StringComparer.Ordinal.Equals(id.Name, ea.EventName))
                         // SYNC:CONSTRAINT:C14
-                        throw new InvalidOperationException(
-                            ConstraintCatalog.C14.FormatMessage(("eventName", ea.EventName), ("prefix", id.Name), ("member", id.Member)));
+                        throw ConstraintCatalog.C14.ToException(("eventName", ea.EventName), ("prefix", id.Name), ("member", id.Member));
                     if (!argNames.Contains(id.Member))
                         // SYNC:CONSTRAINT:C15
-                        throw new InvalidOperationException(
-                            ConstraintCatalog.C15.FormatMessage(("eventName", ea.EventName), ("member", id.Member)));
+                        throw ConstraintCatalog.C15.ToException(("eventName", ea.EventName), ("member", id.Member));
                 }
                 else if (!argNames.Contains(id.Name))
                 {
                     // SYNC:CONSTRAINT:C16
-                    throw new InvalidOperationException(
-                        ConstraintCatalog.C16.FormatMessage(("eventName", ea.EventName), ("identifier", id.Name)));
+                    throw ConstraintCatalog.C16.ToException(("eventName", ea.EventName), ("identifier", id.Name));
                 }
             }
         }
@@ -888,8 +968,7 @@ public static class PreceptParser
         {
             if (!f.IsNullable && !f.HasDefaultValue)
                 // SYNC:CONSTRAINT:C17
-                throw new InvalidOperationException(
-                    ConstraintCatalog.C17.FormatMessage(("fieldName", f.Name)));
+                throw ConstraintCatalog.C17.ToException(("fieldName", f.Name));
             if (f.HasDefaultValue && f.DefaultValue is not null)
             {
                 var ok = f.Type switch
@@ -901,13 +980,11 @@ public static class PreceptParser
                 };
                 if (!ok)
                     // SYNC:CONSTRAINT:C18
-                    throw new InvalidOperationException(
-                        ConstraintCatalog.C18.FormatMessage(("fieldName", f.Name), ("fieldType", f.Type)));
+                    throw ConstraintCatalog.C18.ToException(("fieldName", f.Name), ("fieldType", f.Type));
             }
             if (f.HasDefaultValue && f.DefaultValue is null && !f.IsNullable)
                 // SYNC:CONSTRAINT:C19
-                throw new InvalidOperationException(
-                    ConstraintCatalog.C19.FormatMessage(("fieldName", f.Name), ("fieldType", f.Type)));
+                throw ConstraintCatalog.C19.ToException(("fieldName", f.Name), ("fieldType", f.Type));
         }
 
         // Validate event arg defaults: type mismatch / null on non-nullable
@@ -926,13 +1003,11 @@ public static class PreceptParser
                     };
                     if (!ok)
                         // SYNC:CONSTRAINT:C20
-                        throw new InvalidOperationException(
-                            ConstraintCatalog.C20.FormatMessage(("argName", arg.Name), ("argType", arg.Type)));
+                        throw ConstraintCatalog.C20.ToException(("argName", arg.Name), ("argType", arg.Type));
                 }
                 if (arg.HasDefaultValue && arg.DefaultValue is null && !arg.IsNullable)
                     // SYNC:CONSTRAINT:C21
-                    throw new InvalidOperationException(
-                        ConstraintCatalog.C21.FormatMessage(("argName", arg.Name), ("argType", arg.Type)));
+                    throw ConstraintCatalog.C21.ToException(("argName", arg.Name), ("argType", arg.Type));
             }
         }
 
@@ -947,11 +1022,9 @@ public static class PreceptParser
                 {
                     if (fields.Any(f => f.Name == mut.TargetField))
                         // SYNC:CONSTRAINT:C22
-                        throw new InvalidOperationException(
-                            ConstraintCatalog.C22.FormatMessage(("verb", mut.Verb.ToString().ToLowerInvariant()), ("fieldName", mut.TargetField)));
+                        throw ConstraintCatalog.C22.ToException(("verb", mut.Verb.ToString().ToLowerInvariant()), ("fieldName", mut.TargetField));
                     // SYNC:CONSTRAINT:C23
-                    throw new InvalidOperationException(
-                        ConstraintCatalog.C23.FormatMessage(("verb", mut.Verb.ToString().ToLowerInvariant()), ("fieldName", mut.TargetField)));
+                    throw ConstraintCatalog.C23.ToException(("verb", mut.Verb.ToString().ToLowerInvariant()), ("fieldName", mut.TargetField));
                 }
                 var verbValid = (mut.Verb, kind) switch
                 {
@@ -966,8 +1039,7 @@ public static class PreceptParser
                 };
                 if (!verbValid)
                     // SYNC:CONSTRAINT:C24
-                    throw new InvalidOperationException(
-                        ConstraintCatalog.C24.FormatMessage(("verb", mut.Verb.ToString().ToLowerInvariant()), ("collectionKind", kind.ToString().ToLowerInvariant()), ("fieldName", mut.TargetField)));
+                    throw ConstraintCatalog.C24.ToException(("verb", mut.Verb.ToString().ToLowerInvariant()), ("collectionKind", kind.ToString().ToLowerInvariant()), ("fieldName", mut.TargetField));
             }
         }
 
@@ -981,8 +1053,7 @@ public static class PreceptParser
             var key = (row.FromState, row.EventName);
             if (seenUnguarded.Contains(key))
                 // SYNC:CONSTRAINT:C25
-                throw new InvalidOperationException(
-                    ConstraintCatalog.C25.FormatMessage(("fromState", row.FromState), ("eventName", row.EventName)));
+                throw ConstraintCatalog.C25.ToException(("fromState", row.FromState), ("eventName", row.EventName));
             if (row.WhenGuard is null)
                 seenUnguarded.Add(key);
         }
@@ -1033,7 +1104,19 @@ public static class PreceptParser
         return (sets, mutations);
     }
 
+    /// <summary>
+    /// Checks if a construct form starts with the given keyword.
+    /// Handles forms like "in|to|from ..." where any alternative matches.
+    /// </summary>
+    private static bool ConstructFormStartsWithKeyword(string form, string keyword)
+    {
+        var spaceIdx = form.IndexOf(' ');
+        var firstGroup = spaceIdx >= 0 ? form[..spaceIdx] : form;
+        return firstGroup.Split('|').Any(k =>
+            string.Equals(k, keyword, StringComparison.OrdinalIgnoreCase));
+    }
+
 }
 
 /// <summary>A parse diagnostic with position information.</summary>
-public sealed record ParseDiagnostic(int Line, int Column, string Message);
+public sealed record ParseDiagnostic(int Line, int Column, string Message, string? Code = null);

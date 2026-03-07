@@ -39,6 +39,22 @@ public sealed record LanguageConstraint(
             result = result.Replace($"{{{key}}}", value?.ToString() ?? "null");
         return result;
     }
+
+    /// <summary>
+    /// Creates a <see cref="ConstraintViolationException"/> with the formatted message.
+    /// </summary>
+    public ConstraintViolationException ToException(params (string Key, object? Value)[] args)
+        => new(this, FormatMessage(args));
+}
+
+/// <summary>
+/// Thrown when a constraint is violated during parsing or assembly.
+/// Carries the <see cref="LanguageConstraint"/> for diagnostic code derivation.
+/// </summary>
+public sealed class ConstraintViolationException(LanguageConstraint constraint, string message)
+    : InvalidOperationException(message)
+{
+    public LanguageConstraint Constraint { get; } = constraint;
 }
 
 public static class ConstraintCatalog
@@ -57,6 +73,15 @@ public static class ConstraintCatalog
         var c = new LanguageConstraint(id, phase, rule, messageTemplate, severity);
         _constraints.Add(c);
         return c;
+    }
+
+    /// <summary>
+    /// Converts a constraint ID (e.g. "C7") to an LSP diagnostic code (e.g. "PRECEPT007").
+    /// </summary>
+    public static string ToDiagnosticCode(string constraintId)
+    {
+        var digits = constraintId.AsSpan(1);
+        return $"PRECEPT{digits.ToString().PadLeft(3, '0')}";
     }
 
     // ═══════════════════════════════════════════════════════════════

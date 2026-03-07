@@ -129,6 +129,422 @@ public class PreceptAnalyzerCompletionTests
         return analyzer.GetCompletions(uri, position).ToArray();
     }
 
+    [Fact]
+    public void Completions_ArrowInTransitionRow_SuggestsActionsNotEvents()
+    {
+        const string text = """
+            precept M
+            field Balance as number default 0
+            state A initial
+            event Deposit with Amount as number
+            from A on Deposit -> $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("set");
+        completions.Should().Contain("transition");
+        completions.Should().Contain("no transition");
+        completions.Should().Contain("reject");
+        completions.Should().NotContain("Deposit", "events should not appear after ->");
+    }
+
+    [Fact]
+    public void Completions_AfterTransitionKeywordInArrow_SuggestsStateNames()
+    {
+        const string text = """
+            precept M
+            state A initial
+            state B
+            event Go
+            from A on Go -> transition $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("A");
+        completions.Should().Contain("B");
+        completions.Should().NotContain("set", "action keywords should not appear after 'transition'");
+        completions.Should().NotContain("Go", "events should not appear after 'transition'");
+    }
+
+    [Fact]
+    public void Completions_ArrowSetMidLine_SuggestsFieldNames()
+    {
+        const string text = """
+            precept M
+            field Balance as number default 0
+            state A initial
+            event Deposit with Amount as number
+            from A on Deposit -> set $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Balance");
+        completions.Should().NotContain("Deposit", "events should not appear after 'set'");
+    }
+
+    [Fact]
+    public void Completions_ArrowSetAssignmentMidLine_SuggestsExpressions()
+    {
+        const string text = """
+            precept M
+            field Balance as number default 0
+            state A initial
+            event Deposit with Amount as number
+            from A on Deposit -> set Balance = $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Balance");
+        completions.Should().Contain("Deposit.Amount");
+    }
+
+    [Fact]
+    public void Completions_ArrowRejectMidLine_SuggestsStringSnippet()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go
+            from A on Go -> reject $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("reject reason");
+        completions.Should().NotContain("Go");
+    }
+
+    [Fact]
+    public void Completions_ArrowAddMidLine_SuggestsCollectionFields()
+    {
+        const string text = """
+            precept M
+            field Items as set of string
+            state A initial
+            event AddItem with Name as string
+            from A on AddItem -> add $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Items");
+    }
+
+    [Fact]
+    public void Completions_ArrowNoMidLine_SuggestsTransition()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go
+            from A on Go -> no $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("transition");
+        completions.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Completions_AfterFieldName_SuggestsAs()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go
+            field Approvers $$
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("as");
+        completions.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Completions_AfterFieldAs_SuggestsTypes()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go
+            field Approvers as $$
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("string");
+        completions.Should().Contain("number");
+        completions.Should().Contain("boolean");
+        completions.Should().Contain("set");
+        completions.Should().Contain("queue");
+        completions.Should().Contain("stack");
+    }
+
+    [Fact]
+    public void Completions_AfterEventArgName_SuggestsAs()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Submit with Comment $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("as");
+        completions.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Completions_AfterEventArgAs_SuggestsScalarTypes()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Submit with Comment as $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("string");
+        completions.Should().Contain("number");
+        completions.Should().Contain("boolean");
+        completions.Should().NotContain("set");
+    }
+
+    [Fact]
+    public void Completions_AfterEventArgScalarType_SuggestsNullableDefaultAndComma()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Submit with Comment as string $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable");
+        completions.Should().Contain("default");
+        completions.Should().Contain(",");
+    }
+
+    [Fact]
+    public void Completions_AfterEventArgNullable_SuggestsDefaultAndComma()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Submit with Comment as string nullable $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("default");
+        completions.Should().Contain(",");
+    }
+
+    [Fact]
+    public void Completions_AfterEventArgDefault_SuggestsComma()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Submit with Comment as string default "" $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain(",");
+        completions.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Completions_AfterFieldScalarType_SuggestsNullableAndDefault()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go
+            field Name as string $$
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable");
+        completions.Should().Contain("default");
+        completions.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void Completions_AfterFieldNullable_SuggestsDefault()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go
+            field Name as string nullable $$
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("default");
+        completions.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Completions_AfterInvariantExpression_SuggestsBecause()
+    {
+        const string text = """
+            precept M
+            field Balance as number default 0
+            invariant Balance >= 0 $$
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("because");
+    }
+
+    [Fact]
+    public void Completions_AfterEventAssertExpression_SuggestsBecause()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Submit with Comment as string
+            on Submit assert Comment != "" $$
+            from A on Submit -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("because");
+    }
+
+    [Fact]
+    public void Completions_AfterStateAssertExpression_SuggestsBecause()
+    {
+        const string text = """
+            precept M
+            field Balance as number default 0
+            state Open initial
+            in Open assert Balance >= 0 $$
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("because");
+    }
+
+    [Fact]
+    public void Completions_AfterGuardExpression_SuggestsArrow()
+    {
+        const string text = """
+            precept M
+            field Balance as number default 0
+            state Open initial
+            event Go
+            from Open on Go when Balance >= 0 $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("->");
+    }
+
+    [Fact]
+    public void Completions_InEditClause_IncludeCollectionFields()
+    {
+        const string text = """
+            precept M
+            field Title as string nullable
+            field Approvers as set of string
+            state Open initial
+            in Open edit $$
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Title");
+        completions.Should().Contain("Approvers");
+    }
+
+    [Fact]
+    public void Completions_AfterCollectionKind_SuggestsOf()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go
+            field Items as set $$
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("of");
+        completions.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Completions_AfterCollectionOf_SuggestsScalarTypes()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go
+            field Items as set of $$
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("string");
+        completions.Should().Contain("number");
+        completions.Should().Contain("boolean");
+        completions.Should().NotContain("set", "collection types not valid as inner type");
+    }
+
     private static (string text, Position position) ExtractPosition(string textWithMarker)
     {
         var index = textWithMarker.IndexOf("$$", StringComparison.Ordinal);

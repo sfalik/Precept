@@ -108,21 +108,87 @@ internal static class PreceptDocumentIntellisense
     internal static Hover? CreateHover(PreceptDocumentInfo info, Position position)
     {
         var resolved = ResolveSymbol(info, position);
-        if (resolved is null)
+        if (resolved is not null)
+        {
+            var symbol = resolved.Value.Declaration;
+            return new Hover
+            {
+                Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = symbol.Markdown
+                }),
+                Range = resolved.Value.ReferenceRange
+            };
+        }
+
+        // Fall back to construct/keyword hover from catalogs
+        return CreateKeywordHover(info, position);
+    }
+
+    private static Hover? CreateKeywordHover(PreceptDocumentInfo info, Position position)
+    {
+        if (position.Line < 0 || position.Line >= info.Lines.Length)
             return null;
 
-        var symbol = resolved.Value.Declaration;
-        var contents = new MarkupContent
-        {
-            Kind = MarkupKind.Markdown,
-            Value = symbol.Markdown
-        };
+        var line = info.Lines[(int)position.Line];
+        if (!TryGetIdentifierAtPosition(line, (int)position.Character, out var word, out var start, out var end))
+            return null;
 
-        return new Hover
+        // Check if the word matches any construct's leading keyword(s)
+        PreceptParser.EnsureInitialized();
+        var matchingConstructs = ConstructCatalog.Constructs
+            .Where(c => ConstructFormStartsWithKeyword(c.Form, word))
+            .ToList();
+
+        if (matchingConstructs.Count > 0)
         {
-            Contents = new MarkedStringsOrMarkupContent(contents),
-            Range = resolved.Value.ReferenceRange
-        };
+            var markdown = string.Join("\n\n---\n\n", matchingConstructs.Select(c =>
+                $"```precept\n{c.Form}\n```\n\n{c.Description}"));
+            return new Hover
+            {
+                Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = markdown
+                }),
+                Range = CreateRange((int)position.Line, start, end)
+            };
+        }
+
+        // Fall back to token keyword description (Tier 1)
+        var tokenDict = PreceptTokenMeta.BuildKeywordDictionary();
+        if (tokenDict.TryGetValue(word, out var token))
+        {
+            var description = PreceptTokenMeta.GetDescription(token);
+            if (description is not null)
+            {
+                return new Hover
+                {
+                    Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+                    {
+                        Kind = MarkupKind.Markdown,
+                        Value = $"`{word}` — {description}"
+                    }),
+                    Range = CreateRange((int)position.Line, start, end)
+                };
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Checks if a construct form starts with the given keyword.
+    /// Handles forms like "in|to|from ..." where any alternative matches.
+    /// </summary>
+    private static bool ConstructFormStartsWithKeyword(string form, string keyword)
+    {
+        // Split form into first token group (may contain | for alternatives)
+        var spaceIdx = form.IndexOf(' ');
+        var firstGroup = spaceIdx >= 0 ? form[..spaceIdx] : form;
+        return firstGroup.Split('|').Any(k =>
+            string.Equals(k, keyword, StringComparison.OrdinalIgnoreCase));
     }
 
     internal static LocationOrLocationLinks CreateDefinition(DocumentUri uri, PreceptDocumentInfo info, Position position)

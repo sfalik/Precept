@@ -11,6 +11,7 @@ public static class LanguageTool
     [Description("Return the full structured language reference — vocabulary, constructs, constraints, expression scopes, fire pipeline, outcome kinds.")]
     public static LanguageResult Run()
     {
+        PreceptParser.EnsureInitialized();
         var vocabulary = BuildVocabulary();
         var constructs = ConstructCatalog.Constructs
             .Select(c => new ConstructDto(c.Form, c.Context, c.Description, c.Example))

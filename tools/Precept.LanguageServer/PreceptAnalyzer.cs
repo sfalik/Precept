@@ -8,6 +8,10 @@ namespace Precept.LanguageServer;
 
 internal sealed class PreceptAnalyzer
 {
+    internal const string RejectOnlyPairDiagnosticCode = "PA1001";
+    internal const string RejectOnlyPairSupportedElsewhereDiagnosticCode = "PA1002";
+    internal const string EventNeverSucceedsDiagnosticCode = "PA1003";
+
     private static readonly Regex LineErrorRegex = new("^Line\\s+(?<line>\\d+)\\s*:\\s*(?<message>.+)$", RegexOptions.Compiled);
     private static readonly Regex StateRegex = new("^\\s*state\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex EventRegex = new("^\\s*event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
@@ -25,7 +29,6 @@ internal sealed class PreceptAnalyzer
     private static readonly Regex NewCollectionFieldRegex = new("^\\s*field\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?:set|queue|stack)\\s+of\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     // Match `event Name with ...` (inline event args in new syntax)
     private static readonly Regex NewEventWithArgsRegex = new("^\\s*event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+with\\s+(?<args>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
 
 
     private readonly ConcurrentDictionary<DocumentUri, string> _documents = new();
@@ -60,6 +63,7 @@ internal sealed class PreceptAnalyzer
                     Severity = DiagnosticSeverity.Error,
                     Message = d.Message,
                     Source = "precept",
+                    Code = d.Code is not null ? new DiagnosticCode(d.Code) : default,
                     Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
                         new Position(lineIndex, d.Column),
                         new Position(lineIndex, Math.Max(d.Column + 1, lineLength)))
@@ -124,25 +128,19 @@ internal sealed class PreceptAnalyzer
                 return BuildItems(argsForEvent, CompletionItemKind.Field);
         }
 
-        if (Regex.IsMatch(beforeCursor, "^\\s*(?:if|else\\s+if)\\s+[^\\n]*$", RegexOptions.IgnoreCase))
-        {
-            var guardItems = BuildGuardCompletions(dataFields, collectionFields, collectionKinds, currentEvent, eventArgs);
-            return DistinctAndSort(guardItems.Concat(GuardSnippetItems));
-        }
-
         // reject: offer a string snippet
-        if (Regex.IsMatch(beforeCursor, "^\\s*reject(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*reject(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
             return [SnippetItem("reject reason", "reject \"${1:Reason}\"", "Rejection reason")];
 
         // Mutation verb lines: suggest collection field names after add/remove/enqueue/dequeue/push/pop/clear
-        if (Regex.IsMatch(beforeCursor, "^\\s*(?:add|remove|enqueue|dequeue|push|pop|clear)(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*(?:add|remove|enqueue|dequeue|push|pop|clear)(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
         {
             // After "dequeue <Field> into" or "pop <Field> into", suggest scalar data fields
-            if (Regex.IsMatch(beforeCursor, "^\\s*(?:dequeue|pop)\\s+[A-Za-z_][A-Za-z0-9_]*\\s+into(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
+            if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*(?:dequeue|pop)\\s+[A-Za-z_][A-Za-z0-9_]*\\s+into(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
                 return BuildItems(dataFields, CompletionItemKind.Field);
 
             // After "dequeue <Field>" or "pop <Field>", suggest "into" keyword and collection fields
-            if (Regex.IsMatch(beforeCursor, "^\\s*(?:dequeue|pop)\\s+[A-Za-z_][A-Za-z0-9_]*(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
+            if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*(?:dequeue|pop)\\s+[A-Za-z_][A-Za-z0-9_]*(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
             {
                 var items = new List<CompletionItem>(BuildItems(collectionFields, CompletionItemKind.Field));
                 items.Add(new CompletionItem { Label = "into", Kind = CompletionItemKind.Keyword });
@@ -150,18 +148,37 @@ internal sealed class PreceptAnalyzer
             }
 
             // After "add|remove|push|enqueue <Field> ", suggest expression (the value to add/push/remove)
-            if (Regex.IsMatch(beforeCursor, "^\\s*(?:add|remove|push|enqueue)\\s+[A-Za-z_][A-Za-z0-9_]*\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+            if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*(?:add|remove|push|enqueue)\\s+[A-Za-z_][A-Za-z0-9_]*\\s+[^\\n]*$", RegexOptions.IgnoreCase))
                 return BuildExpressionCompletions(dataFields, currentEvent, eventArgs, collectionKinds);
 
             return BuildItems(collectionFields, CompletionItemKind.Field);
         }
 
-        if (Regex.IsMatch(beforeCursor, "^\\s*set\\s+[^=\\n]*$", RegexOptions.IgnoreCase) &&
+        if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*set\\s+[^=\\n]*$", RegexOptions.IgnoreCase) &&
             !beforeCursor.Contains('=', StringComparison.Ordinal))
             return DistinctAndSort(BuildItems(dataFields, CompletionItemKind.Field).Concat(SetSnippetItems));
 
-        if (Regex.IsMatch(beforeCursor, "^\\s*set\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*[^\\n]*$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*set\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*[^\\n]*$", RegexOptions.IgnoreCase))
             return BuildExpressionCompletions(dataFields, currentEvent, eventArgs, collectionKinds);
+
+        // ── New-syntax: arrow pipeline ──
+        // After "-> transition " or start-of-line "transition " → suggest state names
+        if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*transition\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+            return BuildItems(states, CompletionItemKind.EnumMember);
+
+        // After "-> no " → suggest "transition"
+        if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*no\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+            return [new CompletionItem { Label = "transition", Kind = CompletionItemKind.Keyword }];
+
+        // After "-> " → suggest action/outcome keywords
+        // Must be checked before the broader "from … on …" regex which would swallow "->"
+        if (beforeCursor.TrimEnd().EndsWith("->", StringComparison.Ordinal) ||
+            Regex.IsMatch(beforeCursor, "->\\s+$"))
+            return ArrowItems;
+
+        // After a completed guarded transition expression, suggest the action/outcome pipeline.
+        if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+\\S+\\s+on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+when\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+            return [ArrowPipelineItem];
 
         // After "from <State> on <Event> when ", suggest expression completions
         if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+\\S+\\s+on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+when\\s+[^\\n]*$", RegexOptions.IgnoreCase))
@@ -175,7 +192,8 @@ internal sealed class PreceptAnalyzer
                 new CompletionItem { Label = "->", Kind = CompletionItemKind.Operator, Detail = "action/outcome pipeline" }
             ];
 
-        if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+[^\\n]*\\s+on(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+[^\\n]*\\s+on(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase) &&
+            !beforeCursor.Contains("->", StringComparison.Ordinal))
             return BuildItems(events, CompletionItemKind.Event);
 
         if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+[^\\n]*$", RegexOptions.IgnoreCase) &&
@@ -195,20 +213,45 @@ internal sealed class PreceptAnalyzer
 
         // ── New-syntax: field declarations ──
         // After "field Name as set|queue|stack of " → suggest scalar types
-        if (Regex.IsMatch(beforeCursor, "^\\s*field\\s+[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:set|queue|stack)\\s+of\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:set|queue|stack)\s+of\s+\w*$", RegexOptions.IgnoreCase))
             return ScalarTypeItems;
 
-        // After "field Name as " → suggest type keywords (string, number, boolean, set, queue, stack)
-        if (Regex.IsMatch(beforeCursor, "^\\s*field\\s+[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+        // After "field Name as set|queue|stack " → suggest "of"
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:set|queue|stack)\s+$", RegexOptions.IgnoreCase))
+            return [new CompletionItem { Label = "of", Kind = CompletionItemKind.Keyword }];
+
+        // After "field Name as Type nullable " → suggest "default"
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:string|number|boolean)\s+nullable\s+$", RegexOptions.IgnoreCase))
+            return [new CompletionItem { Label = "default", Kind = CompletionItemKind.Keyword, Detail = "Default value" }];
+
+        // After "field Name as Type " (scalar type completed) → suggest "nullable", "default"
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:string|number|boolean)\s+$", RegexOptions.IgnoreCase))
+            return
+            [
+                new CompletionItem { Label = "nullable", Kind = CompletionItemKind.Keyword, Detail = "Makes field nullable" },
+                new CompletionItem { Label = "default", Kind = CompletionItemKind.Keyword, Detail = "Default value" }
+            ];
+
+        // After "field Name as " (typing type) → suggest type keywords
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+\w*$", RegexOptions.IgnoreCase))
             return TypeItems;
 
-        // After "field " (no "as" yet) → user is typing a field name, no suggestions
-        // Falls through to global keywords below
+        // After "field Name " → suggest "as"
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+$", RegexOptions.IgnoreCase))
+            return [new CompletionItem { Label = "as", Kind = CompletionItemKind.Keyword }];
 
         // ── New-syntax: invariant/assert expressions ──
+        // After a completed invariant expression, suggest the required reason clause.
+        if (Regex.IsMatch(beforeCursor, "^\\s*invariant\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+            return [BecauseItem];
+
         // After "invariant " → suggest expression completions (field names, operators)
         if (Regex.IsMatch(beforeCursor, "^\\s*invariant\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return BuildDataExpressionCompletions(dataFields, collectionKinds);
+
+        // After a completed event assert expression, suggest the required reason clause.
+        if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+assert\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+            return [BecauseItem];
 
         // After "on EventName assert " → suggest expression completions (event args)
         if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+assert\\s+[^\\n]*$", RegexOptions.IgnoreCase))
@@ -242,6 +285,10 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to)\\s+(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*(?:[A-Za-z_][A-Za-z0-9_]*)?$", RegexOptions.IgnoreCase))
             return BuildItems(states.Append("any"), CompletionItemKind.EnumMember);
 
+        // After a completed state assert expression, suggest the required reason clause.
+        if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to|from)\\s+[^\\n]*\\s+assert\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+            return [BecauseItem];
+
         // After "in/to/from State assert " → expression completions
         if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to|from)\\s+[^\\n]*\\s+assert\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return BuildDataExpressionCompletions(dataFields, collectionKinds);
@@ -252,42 +299,84 @@ internal sealed class PreceptAnalyzer
 
         // After "in State edit " → suggest field names
         if (Regex.IsMatch(beforeCursor, "^\\s*in\\s+[^\\n]*\\s+edit\\s+[^\\n]*$", RegexOptions.IgnoreCase))
-            return BuildItems(dataFields, CompletionItemKind.Field);
+            return DistinctAndSort(
+                BuildItems(dataFields, CompletionItemKind.Field)
+                    .Concat(BuildItems(collectionFields, CompletionItemKind.Field)));
+
+        // After "event Name with Arg as Type [nullable] [default Value] " → suggest delimiter / modifiers
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)\\s+nullable\\s+$", RegexOptions.IgnoreCase))
+            return [DefaultItem, CommaItem];
+
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null)\\s*$", RegexOptions.IgnoreCase))
+            return [CommaItem];
+
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)\\s+$", RegexOptions.IgnoreCase))
+            return [NullableItem, DefaultItem, CommaItem];
 
         // After "event Name with ArgName as " → suggest type keywords
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+.*\\bas\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+\\w*$", RegexOptions.IgnoreCase))
             return ScalarTypeItems;
+
+        // After "event Name with ArgName " → suggest "as"
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
+            return [AsItem];
 
         // After "event Name with " → user is typing arg name, no suggestions
         // After "event Name " → suggest "with"
         if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
-            return [new CompletionItem { Label = "with", Kind = CompletionItemKind.Keyword }];
+            return [WithItem];
 
         // After "of " → suggest scalar types (for collection type declarations)
         if (Regex.IsMatch(beforeCursor, "\\bof\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return ScalarTypeItems;
 
-        // ── New-syntax: arrow pipeline ──
-        // After "-> " → suggest action/outcome keywords
-        if (beforeCursor.TrimEnd().EndsWith("->", StringComparison.Ordinal) ||
-            Regex.IsMatch(beforeCursor, "->\\s+$"))
-            return ArrowItems;
-
         // After "state <Name> ", suggest the "initial" keyword
         if (Regex.IsMatch(beforeCursor, "^\\s*state\\s+[A-Za-z_][A-Za-z0-9_]*\\s+[^\\n]*$", RegexOptions.IgnoreCase))
-            return [new CompletionItem { Label = "initial", Kind = CompletionItemKind.Keyword }];
-
-        // After "event Name with ArgName as " is handled above in new-syntax section
-        // After "event Name " → suggest "with" is handled above in new-syntax section
-
-        if (Regex.IsMatch(beforeCursor, "^\\s*transition(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
-            return DistinctAndSort(BuildItems(states, CompletionItemKind.EnumMember).Concat(TransitionSnippetItems));
-
-        if (Regex.IsMatch(beforeCursor, "^\\s*inspect\\s+[^\\n]*$", RegexOptions.IgnoreCase) ||
-            Regex.IsMatch(beforeCursor, "^\\s*fire\\s+[^\\n]*$", RegexOptions.IgnoreCase))
-            return BuildItems(events, CompletionItemKind.Event);
+            return [InitialItem];
 
         return DistinctAndSort(KeywordItems.Concat(GlobalSnippetItems));
+    }
+
+    internal IReadOnlyList<RejectOnlyStateEventIssue> GetRejectOnlyStateEventIssues(DocumentUri uri)
+    {
+        if (!_documents.TryGetValue(uri, out var text))
+            return Array.Empty<RejectOnlyStateEventIssue>();
+
+        var (model, parseDiags) = PreceptParser.ParseWithDiagnostics(text);
+        if (parseDiags.Count > 0 || model is null)
+            return Array.Empty<RejectOnlyStateEventIssue>();
+
+        try
+        {
+            PreceptCompiler.Compile(model);
+        }
+        catch (Exception)
+        {
+            return Array.Empty<RejectOnlyStateEventIssue>();
+        }
+
+        return AnalyzeRejectOnlyStateEventIssues(model, text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None));
+    }
+
+    internal IReadOnlyList<OrphanedEventIssue> GetOrphanedEventIssues(DocumentUri uri)
+    {
+        if (!_documents.TryGetValue(uri, out var text))
+            return Array.Empty<OrphanedEventIssue>();
+
+        var (model, parseDiags) = PreceptParser.ParseWithDiagnostics(text);
+        if (parseDiags.Count > 0 || model is null)
+            return Array.Empty<OrphanedEventIssue>();
+
+        try
+        {
+            PreceptCompiler.Compile(model);
+        }
+        catch (Exception)
+        {
+            return Array.Empty<OrphanedEventIssue>();
+        }
+
+        return AnalyzeOrphanedEventIssues(model, text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None));
     }
 
     private static IReadOnlyList<CompletionItem> BuildGuardCompletions(
@@ -683,9 +772,79 @@ internal sealed class PreceptAnalyzer
 
         // Validate rules
         ValidateRuleDiagnostics(model, lines, dataFieldKinds, eventArgKinds, collectionFieldMap, diagnostics);
+        AddEventSurfaceDiagnostics(model, lines, diagnostics);
         AddAuditDiagnostics(model, lines, diagnostics);
 
         return diagnostics;
+    }
+
+    private static void AddEventSurfaceDiagnostics(PreceptDefinition model, string[] lines, List<Diagnostic> diagnostics)
+    {
+        var rejectOnlyIssues = AnalyzeRejectOnlyStateEventIssues(model, lines);
+        foreach (var issue in rejectOnlyIssues)
+        {
+            var code = issue.EventSucceedsElsewhere
+                ? RejectOnlyPairSupportedElsewhereDiagnosticCode
+                : RejectOnlyPairDiagnosticCode;
+
+            var message = issue.EventSucceedsElsewhere
+                ? $"Event '{issue.EventName}' has successful behavior in other states, but in state '{issue.StateName}' it is defined only as rejection. If '{issue.EventName}' is unsupported in '{issue.StateName}', remove all 'from {issue.StateName} on {issue.EventName}' rows so the outcome is NotDefined."
+                : $"All rows for event '{issue.EventName}' in state '{issue.StateName}' reject. This makes the event part of the state's contract surface while ensuring it can never succeed. Remove the pair if the event should be unavailable here.";
+
+            diagnostics.Add(CreateDiagnostic(lines, issue.FirstLineIndex, DiagnosticSeverity.Warning, message, code));
+        }
+
+        var transitionRows = model.TransitionRows ?? Array.Empty<PreceptTransitionRow>();
+        var rowsByEvent = transitionRows
+            .GroupBy(row => row.EventName, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+
+        foreach (var evt in model.Events)
+        {
+            if (!rowsByEvent.TryGetValue(evt.Name, out var rows) || rows.Length == 0)
+                continue;
+
+            if (rows.Any(static row => row.Outcome is not PreceptRejection))
+                continue;
+
+            var lineIndex = FindEventLine(lines, evt.Name);
+            diagnostics.Add(CreateDiagnostic(
+                lines,
+                lineIndex,
+                DiagnosticSeverity.Warning,
+                $"Event '{evt.Name}' is declared and referenced in transition rows, but it never succeeds in any state. Remove the event, remove the reject-only rows, or add a successful transition/no-transition path.",
+                EventNeverSucceedsDiagnosticCode));
+        }
+    }
+
+    private static IReadOnlyList<RejectOnlyStateEventIssue> AnalyzeRejectOnlyStateEventIssues(PreceptDefinition model, string[] lines)
+    {
+        var transitionRows = model.TransitionRows ?? Array.Empty<PreceptTransitionRow>();
+        var eventHasSuccessfulPath = transitionRows
+            .GroupBy(row => row.EventName, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Any(static row => row.Outcome is not PreceptRejection),
+                StringComparer.Ordinal);
+
+        return transitionRows
+            .GroupBy(row => (row.FromState, row.EventName))
+            .Select(group =>
+            {
+                var rows = group.OrderBy(static row => row.SourceLine).ToArray();
+                if (rows.Length == 0 || rows.Any(static row => row.Outcome is not PreceptRejection))
+                    return null;
+
+                var firstLineIndex = FindTransitionPairLine(lines, group.Key.FromState, group.Key.EventName);
+                return new RejectOnlyStateEventIssue(
+                    group.Key.FromState,
+                    group.Key.EventName,
+                    firstLineIndex,
+                    eventHasSuccessfulPath.TryGetValue(group.Key.EventName, out var succeedsElsewhere) && succeedsElsewhere);
+            })
+            .Where(static issue => issue is not null)
+            .Cast<RejectOnlyStateEventIssue>()
+            .ToArray();
     }
 
     private static void AddAuditDiagnostics(PreceptDefinition model, string[] lines, List<Diagnostic> diagnostics)
@@ -749,8 +908,20 @@ internal sealed class PreceptAnalyzer
         foreach (var eventName in model.Events.Select(static evt => evt.Name).Where(eventName => !referencedEvents.Contains(eventName)))
         {
             var lineIndex = FindEventLine(lines, eventName);
-            diagnostics.Add(CreateDiagnostic(lines, lineIndex, DiagnosticSeverity.Hint, $"Event '{eventName}' is orphaned: it is declared but never referenced in transition rows."));
+            diagnostics.Add(CreateDiagnostic(lines, lineIndex, DiagnosticSeverity.Warning, $"Event '{eventName}' is orphaned: it is declared but never referenced in transition rows."));
         }
+    }
+
+    private static IReadOnlyList<OrphanedEventIssue> AnalyzeOrphanedEventIssues(PreceptDefinition model, string[] lines)
+    {
+        var referencedEvents = new HashSet<string>(
+            (model.TransitionRows ?? Array.Empty<PreceptTransitionRow>()).Select(static row => row.EventName),
+            StringComparer.Ordinal);
+
+        return model.Events
+            .Where(evt => !referencedEvents.Contains(evt.Name))
+            .Select(evt => new OrphanedEventIssue(evt.Name, FindEventLine(lines, evt.Name)))
+            .ToArray();
     }
 
     private static void ValidateRuleDiagnostics(
@@ -875,19 +1046,43 @@ internal sealed class PreceptAnalyzer
         return 0;
     }
 
-    private static Diagnostic CreateDiagnostic(string[] lines, int lineIndex, DiagnosticSeverity severity, string message)
+    private static int FindTransitionPairLine(string[] lines, string stateName, string eventName)
+    {
+        var prefix = $"from {stateName} on {eventName}";
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var trimmed = lines[i].TrimStart();
+            if (trimmed.StartsWith(prefix, StringComparison.Ordinal))
+                return i;
+        }
+
+        return 0;
+    }
+
+    private static Diagnostic CreateDiagnostic(string[] lines, int lineIndex, DiagnosticSeverity severity, string message, string? code = null)
     {
         var safeLineIndex = Math.Min(Math.Max(lineIndex, 0), Math.Max(lines.Length - 1, 0));
         var lineLength = safeLineIndex < lines.Length ? lines[safeLineIndex].Length : 1;
-        return new Diagnostic
-        {
-            Severity = severity,
-            Message = message,
-            Source = "precept",
-            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
-                new Position(safeLineIndex, 0),
-                new Position(safeLineIndex, Math.Max(1, lineLength)))
-        };
+        var range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+            new Position(safeLineIndex, 0),
+            new Position(safeLineIndex, Math.Max(1, lineLength)));
+
+        return code is null
+            ? new Diagnostic
+            {
+                Severity = severity,
+                Message = message,
+                Source = "precept",
+                Range = range
+            }
+            : new Diagnostic
+            {
+                Code = code,
+                Severity = severity,
+                Message = message,
+                Source = "precept",
+                Range = range
+            };
     }
 
     private static Dictionary<string, StaticValueKind> BuildSymbolKinds(
@@ -1578,57 +1773,44 @@ internal sealed class PreceptAnalyzer
             })
             .ToArray();
 
-    private static readonly IReadOnlyList<CompletionItem> KeywordItems =
-    [
-        // Declarations
-        new CompletionItem { Label = "precept", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "field", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "as", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "nullable", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "default", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "invariant", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "because", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "state", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "initial", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "event", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "with", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "assert", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "edit", Kind = CompletionItemKind.Keyword },
-        // Control
-        new CompletionItem { Label = "in", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "to", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "from", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "on", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "when", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "any", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "of", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "if", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "else if", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "else", Kind = CompletionItemKind.Keyword },
-        // Actions
-        new CompletionItem { Label = "set", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "add", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "remove", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "enqueue", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "dequeue", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "push", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "pop", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "clear", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "into", Kind = CompletionItemKind.Keyword },
-        // Outcomes
-        new CompletionItem { Label = "transition", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "no transition", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "reject", Kind = CompletionItemKind.Keyword },
-        // Types
-        new CompletionItem { Label = "string", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "number", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "boolean", Kind = CompletionItemKind.Keyword },
-        // Literals
-        new CompletionItem { Label = "null", Kind = CompletionItemKind.Keyword },
-        // Operators
-        new CompletionItem { Label = "contains", Kind = CompletionItemKind.Keyword },
+    private static readonly IReadOnlyList<CompletionItem> KeywordItems = BuildKeywordItems();
 
-    ];
+    /// <summary>
+    /// Builds the fallback keyword completion list from <see cref="PreceptTokenMeta"/> attributes.
+    /// Includes all word-tokens (alphabetic symbols) plus the composite "no transition" outcome.
+    /// </summary>
+    private static IReadOnlyList<CompletionItem> BuildKeywordItems()
+    {
+        var items = new List<CompletionItem>();
+
+        foreach (var token in Enum.GetValues<PreceptToken>())
+        {
+            var category = PreceptTokenMeta.GetCategory(token);
+            var symbol = PreceptTokenMeta.GetSymbol(token);
+            var description = PreceptTokenMeta.GetDescription(token);
+
+            if (category is null || symbol is null) continue;
+            if (!symbol.All(char.IsLetter)) continue;
+            if (category is TokenCategory.Structure or TokenCategory.Value) continue;
+
+            items.Add(new CompletionItem
+            {
+                Label = symbol,
+                Kind = CompletionItemKind.Keyword,
+                Detail = description
+            });
+        }
+
+        // Composite outcome: "no transition" is two tokens but one semantic unit
+        items.Add(new CompletionItem
+        {
+            Label = "no transition",
+            Kind = CompletionItemKind.Keyword,
+            Detail = "Stay in current state"
+        });
+
+        return items;
+    }
 
     private static readonly IReadOnlyList<CompletionItem> ExpressionOperatorItems =
     [
@@ -1666,25 +1848,9 @@ internal sealed class PreceptAnalyzer
         SnippetItem("event with args", "event ${1:Name} with ${2:Arg} as ${3:string}", "Event with arguments")
     ];
 
-    private static readonly IReadOnlyList<CompletionItem> GuardSnippetItems =
-    [
-        SnippetItem("if ... transition", "if ${1:condition}\n  transition ${2:State}", "Guard branch"),
-        SnippetItem("if ... no transition", "if ${1:condition}\n  no transition", "Guard branch"),
-        SnippetItem("else if ... transition", "else if ${1:condition}\n  transition ${2:State}", "Guard branch"),
-        SnippetItem("else ... reject", "else\n  reject \"${1:Reason}\"", "Fallback branch"),
-        SnippetItem("when guard row", "when ${1:guard} -> ${2:transition ${3:State}}", "Guarded row")
-    ];
-
     private static readonly IReadOnlyList<CompletionItem> SetSnippetItems =
     [
         SnippetItem("set assignment", "set ${1:Field} = ${2:value}", "Data assignment")
-    ];
-
-    private static readonly IReadOnlyList<CompletionItem> TransitionSnippetItems =
-    [
-        SnippetItem("transition state", "transition ${1:State}", "Transition"),
-        SnippetItem("no transition", "no transition", "Terminal outcome"),
-        SnippetItem("reject reason", "reject \"${1:Reason}\"", "Terminal outcome")
     ];
 
     // ── New-syntax item lists ──────────────────────────────────────────
@@ -1705,8 +1871,7 @@ internal sealed class PreceptAnalyzer
         new CompletionItem { Label = "boolean", Kind = CompletionItemKind.TypeParameter },
         new CompletionItem { Label = "set", Kind = CompletionItemKind.TypeParameter, Detail = "Sorted unique set" },
         new CompletionItem { Label = "queue", Kind = CompletionItemKind.TypeParameter, Detail = "FIFO ordered" },
-        new CompletionItem { Label = "stack", Kind = CompletionItemKind.TypeParameter, Detail = "LIFO ordered" },
-        new CompletionItem { Label = "nullable", Kind = CompletionItemKind.Keyword, Detail = "Makes field nullable" }
+        new CompletionItem { Label = "stack", Kind = CompletionItemKind.TypeParameter, Detail = "LIFO ordered" }
     ];
 
     /// <summary>Action/outcome keywords available after "->" in flat transition rows.</summary>
@@ -1724,6 +1889,18 @@ internal sealed class PreceptAnalyzer
         new CompletionItem { Label = "pop", Kind = CompletionItemKind.Keyword, Detail = "Pop from stack" },
         new CompletionItem { Label = "clear", Kind = CompletionItemKind.Keyword, Detail = "Clear collection" }
     ];
+
+    private static readonly CompletionItem AsItem = new() { Label = "as", Kind = CompletionItemKind.Keyword };
+    private static readonly CompletionItem WithItem = new() { Label = "with", Kind = CompletionItemKind.Keyword };
+    private static readonly CompletionItem InitialItem = new() { Label = "initial", Kind = CompletionItemKind.Keyword };
+    private static readonly CompletionItem NullableItem = new() { Label = "nullable", Kind = CompletionItemKind.Keyword, Detail = "Makes field nullable" };
+    private static readonly CompletionItem DefaultItem = new() { Label = "default", Kind = CompletionItemKind.Keyword, Detail = "Default value" };
+    private static readonly CompletionItem BecauseItem = new() { Label = "because", Kind = CompletionItemKind.Keyword, Detail = "Constraint reason" };
+    private static readonly CompletionItem ArrowPipelineItem = new() { Label = "->", Kind = CompletionItemKind.Operator, Detail = "action/outcome pipeline" };
+    private static readonly CompletionItem CommaItem = new() { Label = ",", Kind = CompletionItemKind.Operator, Detail = "Next event argument" };
+
+    private static bool EndsWithCompletedExpression(string text)
+        => Regex.IsMatch(text, "(?:[A-Za-z0-9_\\)\"]|true|false|null)\\s+$", RegexOptions.IgnoreCase);
 
     private static CompletionItem SnippetItem(string label, string snippet, string detail)
         => new()
@@ -1744,4 +1921,14 @@ internal sealed class PreceptAnalyzer
         Boolean = 4,
         Null = 8
     }
+
+    internal sealed record RejectOnlyStateEventIssue(
+        string StateName,
+        string EventName,
+        int FirstLineIndex,
+        bool EventSucceedsElsewhere);
+
+    internal sealed record OrphanedEventIssue(
+        string EventName,
+        int LineIndex);
 }

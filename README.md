@@ -130,11 +130,12 @@ if (editResult.Outcome == PreceptUpdateOutcome.Updated)
 ## 🛠️ World-Class Tooling
 
 Precept isn't just a library; it's an authoring experience. The accompanying VS Code extension provides:
-- **Context-Aware IntelliSense:** Completions now respect DSL scope, so invariants and state asserts suggest data fields while event asserts suggest the active event's arguments.
-- **Hover + Go to Definition:** Hover a field, state, event, event arg, or collection accessor to see its meaning, then jump to the declaration directly from a reference.
+- **Context-Aware IntelliSense:** Completions respect DSL scope and the current grammar step, so declarations suggest the next required keywords and types, invariants and state asserts suggest data fields, event asserts suggest the active event's arguments, and guarded rows hand off to `->` once the guard is complete.
+- **Hover + Go to Definition:** Hover a field, state, event, event arg, collection accessor, or DSL keyword to see its meaning and syntax form, then jump to declarations directly from references.
 - **Document Outline:** The editor exposes a structured symbol tree for the precept, including fields, states, events, and event arguments.
-- **Structural Diagnostics:** Real-time diagnostics now surface unreachable states, dead-end states, and orphaned events alongside parse and semantic errors.
-- **Interactive Inspector:** Fire events and edit data against a live, mock instance in VS Code. Field edits use explicit **Edit** mode with **Save/Cancel**; validation runs live via inspect while typing, field-level errors stay attached only to the fields that caused them, and values are committed only when **Save** is clicked.
+- **Structural Diagnostics:** Real-time diagnostics now surface unreachable states, dead-end states, orphaned events, and reject-only state/event pairs that likely model unsupported events as explicit rejections.
+- **Quick Fixes:** Reject-only state/event pair warnings offer a quick fix to remove the rows and restore `NotDefined` semantics for unsupported events, and orphaned event warnings offer a quick fix to remove the unused event declaration and its event asserts.
+- **Interactive Inspector:** Fire events and edit data against a live, mock instance in VS Code. The preview behaves like Markdown preview by default: one right-side preview follows the active `.precept` editor, and you can lock it to the current file with **Toggle Preview Locking**. Field edits use explicit **Edit** mode with **Save/Cancel**; validation runs live via inspect while typing, field-level errors stay attached only to the fields that caused them, and values are committed only when **Save** is clicked.
 - **Live Diagramming:** A dynamic state-transition diagram renders as you type.
 - **Null-Flow Analysis:** Real-time squiggles warn you if a guard path might access an unsafe null value.
 
@@ -166,9 +167,9 @@ The server runs via stdio and is launched on demand through the workspace launch
 node tools/Precept.VsCode/scripts/start-precept-mcp.js
 ```
 
----
 On each launch, the launcher builds `tools/Precept.Mcp/Precept.Mcp.csproj` into `temp/dev-mcp`, copies that build into a fresh shadow runtime under `temp/dev-mcp/runtime/run-*`, and runs the copied `Precept.Mcp.dll`. This keeps the live MCP process off the default `bin/Debug` output so rebuilding the project does not collide with the running server.
 
+---
 
 ## 🧠 The Problem It Solves
 
@@ -220,13 +221,13 @@ When you change TypeScript extension-host code or webview code:
 1. Run `extension: loop local install`.
 2. Run `Developer: Reload Window`.
 
-On first activation, the installed extension bootstraps the dev language-server artifacts under `temp/dev-language-server` if they are missing.
 When you change MCP server code:
 
 1. Run `Developer: Reload Window`.
 2. Trigger any MCP-backed action.
 3. The launcher rebuilds `tools/Precept.Mcp` into `temp/dev-mcp`, creates a fresh shadow copy under `temp/dev-mcp/runtime`, and starts the new runtime on demand.
 
+On first activation, the installed extension bootstraps the dev language-server artifacts under `temp/dev-language-server` if they are missing.
 
 The status bar shows `Precept LS: Dev`. Click it, or run `Precept: Show Language Server Mode`, to inspect the active launch paths in the output channel.
 
