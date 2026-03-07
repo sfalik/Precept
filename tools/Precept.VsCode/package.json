@@ -113,8 +113,8 @@
   },
   "mcpServers": {
     "precept": {
-      "command": "dotnet",
-      "args": ["run", "--project", "${workspaceFolder}/tools/Precept.Mcp"],
+      "command": "node",
+      "args": ["${workspaceFolder}/tools/Precept.VsCode/scripts/start-precept-mcp.js"],
       "type": "stdio"
     }
   }

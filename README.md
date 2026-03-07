@@ -161,12 +161,14 @@ Precept includes an MCP (Model Context Protocol) server that exposes DSL parsing
 
 The workspace includes a `.vscode/mcp.json` that registers the server with Copilot automatically. No manual configuration is required — Copilot discovers the six tools when the workspace is open.
 
-The server runs via stdio and is launched on demand:
+The server runs via stdio and is launched on demand through the workspace launcher:
 ```
-dotnet run --project tools/Precept.Mcp
+node tools/Precept.VsCode/scripts/start-precept-mcp.js
 ```
 
 ---
+On each launch, the launcher builds `tools/Precept.Mcp/Precept.Mcp.csproj` into `temp/dev-mcp`, copies that build into a fresh shadow runtime under `temp/dev-mcp/runtime/run-*`, and runs the copied `Precept.Mcp.dll`. This keeps the live MCP process off the default `bin/Debug` output so rebuilding the project does not collide with the running server.
+
 
 ## 🧠 The Problem It Solves
 
@@ -219,6 +221,12 @@ When you change TypeScript extension-host code or webview code:
 2. Run `Developer: Reload Window`.
 
 On first activation, the installed extension bootstraps the dev language-server artifacts under `temp/dev-language-server` if they are missing.
+When you change MCP server code:
+
+1. Run `Developer: Reload Window`.
+2. Trigger any MCP-backed action.
+3. The launcher rebuilds `tools/Precept.Mcp` into `temp/dev-mcp`, creates a fresh shadow copy under `temp/dev-mcp/runtime`, and starts the new runtime on demand.
+
 
 The status bar shows `Precept LS: Dev`. Click it, or run `Precept: Show Language Server Mode`, to inspect the active launch paths in the output channel.
 
