@@ -1,0 +1,54 @@
+precept RefundRequest
+
+# A customer refund request with a straightforward review and fulfillment path.
+# The example highlights nullable fields, guarded approvals, and a return step.
+
+field OrderId as string nullable
+field CustomerEmail as string nullable
+field ReasonText as string nullable
+field RequestedAmount as number default 0
+field ApprovedAmount as number default 0
+field ReturnReceived as boolean default false
+field DecisionNote as string nullable
+
+invariant RequestedAmount >= 0 because "Requested amount cannot be negative"
+invariant ApprovedAmount >= 0 because "Approved amount cannot be negative"
+invariant ApprovedAmount <= RequestedAmount because "Approved amount cannot exceed the request"
+
+state Draft initial
+state Submitted
+state AwaitingReturn
+state Refunded
+state Declined
+
+in Submitted edit ReasonText
+in AwaitingReturn assert ApprovedAmount > 0 because "A waiting return must already have an approved amount"
+in Refunded assert ReturnReceived because "A refunded request must have the item marked as returned"
+
+event Submit with OrderNumber as string, Email as string, Amount as number, Reason as string
+on Submit assert OrderNumber != "" because "An order number is required"
+on Submit assert Email != "" because "A customer email is required"
+on Submit assert Amount > 0 because "The refund amount must be positive"
+on Submit assert Reason != "" because "A refund reason is required"
+
+event Approve with Amount as number, Note as string nullable default null
+on Approve assert Amount > 0 because "The approved amount must be positive"
+on Approve assert Note == null || Note != "" because "An approval note cannot be blank when supplied"
+
+event Decline with Note as string
+on Decline assert Note != "" because "A decline note is required"
+
+event MarkReturnReceived
+
+event Cancel with Reason as string nullable default null
+on Cancel assert Reason == null || Reason != "" because "A supplied cancellation reason cannot be blank"
+
+from Draft on Submit -> set OrderId = Submit.OrderNumber -> set CustomerEmail = Submit.Email -> set RequestedAmount = Submit.Amount -> set ReasonText = Submit.Reason -> transition Submitted
+
+from Submitted on Approve when Approve.Amount <= RequestedAmount -> set ApprovedAmount = Approve.Amount -> set DecisionNote = Approve.Note -> transition AwaitingReturn
+from Submitted on Approve -> reject "The approved amount cannot exceed the submitted request"
+
+from Submitted on Decline -> set DecisionNote = Decline.Note -> transition Declined
+from Submitted on Cancel -> set DecisionNote = Cancel.Reason -> transition Declined
+
+from AwaitingReturn on MarkReturnReceived -> set ReturnReceived = true -> transition Refunded

@@ -1,0 +1,65 @@
+precept InsuranceClaim
+
+# Claims often bounce between missing-document collection and adjuster review.
+# This example keeps that back-and-forth in one readable file.
+
+field ClaimantName as string nullable
+field ClaimAmount as number default 0
+field ApprovedAmount as number default 0
+field AdjusterName as string nullable
+field DecisionNote as string nullable
+field PoliceReportRequired as boolean default false
+field FraudFlag as boolean default false
+
+field MissingDocuments as set of string
+
+invariant ClaimAmount >= 0 because "Claim amounts cannot be negative"
+invariant ApprovedAmount >= 0 because "Approved amounts cannot be negative"
+invariant ApprovedAmount <= ClaimAmount because "Approved amounts cannot exceed the claim"
+
+state Draft initial
+state Submitted
+state UnderReview
+state Approved
+state Denied
+state Paid
+
+in UnderReview edit FraudFlag
+in Approved assert ApprovedAmount > 0 because "Approved claims must specify a payout amount"
+
+event Submit with Claimant as string, Amount as number, RequiresPoliceReport as boolean default false
+on Submit assert Claimant != "" because "A claimant name is required"
+on Submit assert Amount > 0 because "Claim amounts must be positive"
+
+event RequestDocument with Name as string
+on RequestDocument assert Name != "" because "A document name is required"
+
+event ReceiveDocument with Name as string
+on ReceiveDocument assert Name != "" because "A document name is required"
+
+event AssignAdjuster with Name as string
+on AssignAdjuster assert Name != "" because "An adjuster name is required"
+
+event Approve with Amount as number, Note as string nullable default null
+on Approve assert Amount > 0 because "Approved claim amounts must be positive"
+on Approve assert Note == null || Note != "" because "A supplied decision note cannot be blank"
+
+event Deny with Note as string
+on Deny assert Note != "" because "A denial note is required"
+
+event PayClaim
+
+from Draft on Submit -> set ClaimantName = Submit.Claimant -> set ClaimAmount = Submit.Amount -> set PoliceReportRequired = Submit.RequiresPoliceReport -> transition Submitted
+
+from Submitted on RequestDocument -> add MissingDocuments RequestDocument.Name -> no transition
+from Submitted on AssignAdjuster -> set AdjusterName = AssignAdjuster.Name -> transition UnderReview
+
+from UnderReview on RequestDocument -> add MissingDocuments RequestDocument.Name -> no transition
+from UnderReview on ReceiveDocument when MissingDocuments contains ReceiveDocument.Name -> remove MissingDocuments ReceiveDocument.Name -> no transition
+from UnderReview on ReceiveDocument -> reject "That document is not currently outstanding"
+
+from UnderReview on Approve when (!PoliceReportRequired || MissingDocuments.count == 0) && Approve.Amount <= ClaimAmount -> set ApprovedAmount = Approve.Amount -> set DecisionNote = Approve.Note -> transition Approved
+from UnderReview on Approve -> reject "Required documents must be complete before a claim can be approved"
+
+from UnderReview on Deny -> set DecisionNote = Deny.Note -> transition Denied
+from Approved on PayClaim -> transition Paid

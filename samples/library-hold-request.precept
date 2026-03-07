@@ -1,0 +1,73 @@
+precept LibraryHoldRequest
+
+# This sample demonstrates queue and stack collections in a familiar library flow.
+# A book can circulate normally, accumulate holds, and promote the next patron.
+
+field BookTitle as string nullable
+field CurrentBorrower as string nullable
+field PromotedPatron as string nullable
+field ReadyPatron as string nullable
+field PickupCode as string nullable
+field PickupExpiryDay as number default 0
+field CurrentDay as number default 0
+
+field HoldQueue as queue of string
+field BorrowerHistory as stack of string
+
+invariant CurrentDay >= 0 because "The day counter cannot be negative"
+invariant PickupExpiryDay >= 0 because "Pickup expiry cannot be negative"
+
+state OnShelf initial
+state CheckedOut
+state HoldReady
+
+in HoldReady assert ReadyPatron != null because "A ready hold must name the patron"
+in HoldReady assert PickupCode != null because "A ready hold must have a pickup code"
+
+# Entering HoldReady sets the temporary pickup details for the promoted patron.
+to HoldReady -> set ReadyPatron = PromotedPatron -> set PickupCode = "READY" -> set PickupExpiryDay = CurrentDay + 3
+
+# Leaving HoldReady clears the temporary handoff fields.
+from HoldReady -> set PromotedPatron = null -> set ReadyPatron = null -> set PickupCode = null
+
+event Checkout with PatronId as string
+on Checkout assert PatronId != "" because "A patron id is required to check out a book"
+
+event ReturnBook
+
+event PlaceHold with PatronId as string
+on PlaceHold assert PatronId != "" because "A patron id is required for a hold"
+
+event ProcessNextHold
+
+event CollectHold with PatronId as string
+on CollectHold assert PatronId != "" because "The collecting patron must be identified"
+
+event AdvanceDay with DayNumber as number
+on AdvanceDay assert DayNumber >= 0 because "The day counter cannot be negative"
+
+from OnShelf on Checkout -> set CurrentBorrower = Checkout.PatronId -> push BorrowerHistory Checkout.PatronId -> transition CheckedOut
+
+# When the item is available, the first hold can be promoted immediately.
+from OnShelf on PlaceHold -> enqueue HoldQueue PlaceHold.PatronId -> dequeue HoldQueue into PromotedPatron -> transition HoldReady
+
+from CheckedOut on PlaceHold -> enqueue HoldQueue PlaceHold.PatronId -> no transition
+from CheckedOut on ReturnBook when HoldQueue.count > 0 -> dequeue HoldQueue into PromotedPatron -> set CurrentBorrower = null -> transition HoldReady
+from CheckedOut on ReturnBook -> set CurrentBorrower = null -> transition OnShelf
+
+from OnShelf on ProcessNextHold when HoldQueue.count > 0 -> dequeue HoldQueue into PromotedPatron -> transition HoldReady
+from OnShelf on ProcessNextHold -> reject "There is no waiting patron to promote"
+
+from HoldReady on CollectHold when ReadyPatron != null && CollectHold.PatronId == ReadyPatron -> set CurrentBorrower = CollectHold.PatronId -> push BorrowerHistory CollectHold.PatronId -> transition CheckedOut
+from HoldReady on CollectHold -> reject "Only the ready patron can collect this hold"
+
+from OnShelf on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
+from OnShelf on AdvanceDay -> reject "The day counter must move forward"
+
+from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
+from CheckedOut on AdvanceDay -> reject "The day counter must move forward"
+
+from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay && AdvanceDay.DayNumber <= PickupExpiryDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
+from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay && HoldQueue.count > 0 -> set CurrentDay = AdvanceDay.DayNumber -> dequeue HoldQueue into PromotedPatron -> set ReadyPatron = PromotedPatron -> set PickupCode = "READY" -> set PickupExpiryDay = AdvanceDay.DayNumber + 3 -> no transition
+from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> transition OnShelf
+from HoldReady on AdvanceDay -> reject "The day counter must move forward"

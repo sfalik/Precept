@@ -1,0 +1,55 @@
+precept ApartmentRentalApplication
+
+# A rental application moves from submission through screening, approval, and lease execution.
+# The rules stay realistic: income, credit, and household size all influence approval.
+
+field ApplicantName as string nullable
+field MonthlyIncome as number default 0
+field RequestedRent as number default 0
+field CreditScore as number default 0
+field HouseholdSize as number default 1
+field ReviewerNote as string nullable
+field DepositPaid as boolean default false
+field LeaseSigned as boolean default false
+
+invariant MonthlyIncome >= 0 because "Monthly income cannot be negative"
+invariant RequestedRent >= 0 because "Requested rent cannot be negative"
+invariant CreditScore >= 0 because "Credit score cannot be negative"
+invariant HouseholdSize > 0 because "Household size must be positive"
+
+state Draft initial
+state Submitted
+state Approved
+state MoveInReady
+state Declined
+
+in Approved assert MonthlyIncome >= RequestedRent * 3 because "Approved applicants must satisfy the 3x rent rule"
+in MoveInReady assert DepositPaid && LeaseSigned because "Move-in ready applications need both a deposit and a signed lease"
+
+to MoveInReady assert DepositPaid && LeaseSigned because "Move-in readiness requires the final move-in paperwork"
+
+event Submit with Name as string, Income as number, Rent as number, Score as number, Household as number default 1
+on Submit assert Name != "" because "An applicant name is required"
+on Submit assert Income >= 0 because "Income cannot be negative"
+on Submit assert Rent > 0 because "Requested rent must be positive"
+on Submit assert Score >= 0 because "Credit score cannot be negative"
+on Submit assert Household > 0 because "Household size must be positive"
+
+event Approve with Note as string nullable default null
+on Approve assert Note == null || Note != "" because "A supplied approval note cannot be blank"
+
+event PayDeposit
+event SignLease
+
+event Decline with Note as string
+on Decline assert Note != "" because "A decline note is required"
+
+from Draft on Submit -> set ApplicantName = Submit.Name -> set MonthlyIncome = Submit.Income -> set RequestedRent = Submit.Rent -> set CreditScore = Submit.Score -> set HouseholdSize = Submit.Household -> transition Submitted
+
+from Submitted on Approve when MonthlyIncome >= RequestedRent * 3 && CreditScore >= 650 && HouseholdSize < 8 -> set ReviewerNote = Approve.Note -> transition Approved
+from Submitted on Approve -> reject "Approval requires strong income coverage, acceptable credit, and a manageable household size"
+from Submitted on Decline -> set ReviewerNote = Decline.Note -> transition Declined
+
+from Approved on PayDeposit -> set DepositPaid = true -> no transition
+from Approved on SignLease when DepositPaid -> set LeaseSigned = true -> transition MoveInReady
+from Approved on SignLease -> reject "The security deposit must be paid before the lease is signed"

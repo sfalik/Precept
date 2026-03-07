@@ -1,0 +1,62 @@
+precept WarrantyRepairRequest
+
+# A warranty repair captures the intake decision, the repair work itself, and the return process.
+# The repair step log uses a stack so the last entered step can be reversed cleanly.
+
+field CustomerName as string nullable
+field ProductName as string nullable
+field SerialNumber as string nullable
+field ApprovalNote as string nullable
+field LastReversedStep as string nullable
+field RepairComplete as boolean default false
+field ShippingLabelSent as boolean default false
+
+field RepairSteps as stack of string
+
+state Draft initial
+state Submitted
+state Approved
+state InRepair
+state ReadyToReturn
+state Closed
+state Denied
+
+in ReadyToReturn assert RepairComplete because "Ready-to-return cases must have finished repair work"
+in Closed assert ShippingLabelSent because "Closed cases must have a return label on record"
+
+to ReadyToReturn -> set ShippingLabelSent = true
+
+event Submit with Customer as string, Product as string, Serial as string
+on Submit assert Customer != "" because "A customer name is required"
+on Submit assert Product != "" because "A product name is required"
+on Submit assert Serial != "" because "A serial number is required"
+
+event Approve with Note as string nullable default null
+on Approve assert Note == null || Note != "" because "A supplied approval note cannot be blank"
+
+event Deny with Note as string
+on Deny assert Note != "" because "A denial note is required"
+
+event StartRepair
+
+event LogRepairStep with StepName as string
+on LogRepairStep assert StepName != "" because "A repair step must have a description"
+
+event UndoLastStep
+event FinishRepair
+event ConfirmReturn
+
+from Draft on Submit -> set CustomerName = Submit.Customer -> set ProductName = Submit.Product -> set SerialNumber = Submit.Serial -> transition Submitted
+
+from Submitted on Approve -> set ApprovalNote = Approve.Note -> transition Approved
+from Submitted on Deny -> set ApprovalNote = Deny.Note -> transition Denied
+
+from Approved on StartRepair -> transition InRepair
+
+from InRepair on LogRepairStep -> push RepairSteps LogRepairStep.StepName -> no transition
+from InRepair on UndoLastStep when RepairSteps.count > 0 -> pop RepairSteps into LastReversedStep -> no transition
+from InRepair on UndoLastStep -> reject "There is no logged repair step to undo"
+from InRepair on FinishRepair when RepairSteps.count > 0 -> set RepairComplete = true -> transition ReadyToReturn
+from InRepair on FinishRepair -> reject "At least one repair step must be logged before the repair can finish"
+
+from ReadyToReturn on ConfirmReturn -> clear RepairSteps -> transition Closed

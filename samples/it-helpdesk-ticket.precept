@@ -1,0 +1,61 @@
+precept ItHelpdeskTicket
+
+# This sample uses a shared assignment queue to demonstrate queue.peek and dequeue.
+# It also shows from any rows that act like system-wide support events.
+
+field TicketTitle as string nullable
+field Severity as number default 3
+field AssignedAgent as string nullable
+field LastQueuedAgent as string nullable
+field ResolutionNote as string nullable
+field ReopenCount as number default 0
+
+field AgentQueue as queue of string
+
+invariant Severity >= 1 because "Severity cannot be lower than 1"
+invariant Severity <= 5 because "Severity cannot be higher than 5"
+invariant ReopenCount >= 0 because "Reopen count cannot be negative"
+
+state New initial
+state Assigned
+state WaitingOnCustomer
+state Resolved
+state Closed
+
+in Assigned assert AssignedAgent != null because "Assigned tickets must name an agent"
+
+event RegisterAgent with AgentName as string
+on RegisterAgent assert AgentName != "" because "An agent name is required"
+
+event Triage with Title as string, Level as number default 3
+on Triage assert Title != "" because "A ticket title is required"
+on Triage assert Level >= 1 && Level <= 5 because "Severity must stay within the supported range"
+
+event Assign
+
+event CustomerReply
+event Resolve with Note as string
+on Resolve assert Note != "" because "A resolution note is required"
+
+event CloseTicket
+
+event Reopen with Note as string nullable default null
+on Reopen assert Note == null || Note != "" because "A supplied reopen note cannot be blank"
+
+from New on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
+from Assigned on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
+from WaitingOnCustomer on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
+from Resolved on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
+
+from New on Triage -> set TicketTitle = Triage.Title -> set Severity = Triage.Level -> no transition
+from New on Assign when AgentQueue.count > 0 -> set LastQueuedAgent = AgentQueue.peek -> dequeue AgentQueue -> set AssignedAgent = LastQueuedAgent -> transition Assigned
+from New on Assign -> reject "No support agent is currently available"
+
+from Assigned on CustomerReply -> transition WaitingOnCustomer
+from Assigned on Resolve -> set ResolutionNote = Resolve.Note -> transition Resolved
+
+from WaitingOnCustomer on Assign when AgentQueue.count > 0 -> set LastQueuedAgent = AgentQueue.peek -> dequeue AgentQueue -> set AssignedAgent = LastQueuedAgent -> transition Assigned
+from WaitingOnCustomer on Assign -> reject "No support agent is currently available"
+
+from Resolved on CloseTicket -> transition Closed
+from Resolved on Reopen -> set ReopenCount = ReopenCount + 1 -> transition New

@@ -1,0 +1,63 @@
+precept EventRegistration
+
+# A simple attendee registration workflow with payment and check-in.
+# This sample is intentionally tutorial-like and uses mostly scalar fields.
+
+field RegistrantName as string nullable
+field ContactEmail as string nullable
+field SeatsReserved as number default 0
+field TicketsIssued as number default 0
+field AmountDue as number default 0
+field PaymentReceived as boolean default false
+field CancellationReason as string nullable
+field CheckInDesk as string nullable
+
+invariant SeatsReserved >= 0 because "Reserved seats cannot be negative"
+invariant TicketsIssued >= 0 because "Issued tickets cannot be negative"
+invariant TicketsIssued <= SeatsReserved because "Issued tickets cannot exceed reserved seats"
+invariant AmountDue >= 0 because "Amount due cannot be negative"
+
+state Draft initial
+state PendingPayment
+state Confirmed
+state Cancelled
+state CheckedIn
+
+# Staff can correct contact details while the registration is still open.
+in Draft edit ContactEmail
+in PendingPayment edit ContactEmail, SeatsReserved
+
+in Confirmed assert PaymentReceived because "Confirmed registrations must be paid"
+in Confirmed assert TicketsIssued == SeatsReserved because "Confirmed registrations must issue one ticket per reserved seat"
+in CheckedIn assert CheckInDesk != null because "Checked-in registrations must record the desk"
+
+# Every transition into Confirmed finishes the same bookkeeping.
+to Confirmed -> set PaymentReceived = true -> set AmountDue = 0
+
+event StartRegistration with Name as string, Email as string, Seats as number default 1, PricePerSeat as number default 25
+on StartRegistration assert Name != "" because "A registrant name is required"
+on StartRegistration assert Email != "" because "A contact email is required"
+on StartRegistration assert Seats > 0 because "At least one seat must be reserved"
+on StartRegistration assert PricePerSeat > 0 because "The seat price must be positive"
+
+event UpdateSeats with Seats as number
+on UpdateSeats assert Seats > 0 because "Updated seat count must stay positive"
+
+event RecordPayment
+
+event Cancel with Reason as string nullable default null
+on Cancel assert Reason == null || Reason != "" because "If a cancellation reason is supplied, it cannot be blank"
+
+event CheckIn with Desk as string
+on CheckIn assert Desk != "" because "The check-in desk is required"
+
+from Draft on StartRegistration -> set RegistrantName = StartRegistration.Name -> set ContactEmail = StartRegistration.Email -> set SeatsReserved = StartRegistration.Seats -> set AmountDue = StartRegistration.Seats * StartRegistration.PricePerSeat -> transition PendingPayment
+
+from PendingPayment on UpdateSeats -> set SeatsReserved = UpdateSeats.Seats -> set TicketsIssued = 0 -> set AmountDue = UpdateSeats.Seats * 25 -> no transition
+from PendingPayment on RecordPayment when SeatsReserved > 0 -> set TicketsIssued = SeatsReserved -> transition Confirmed
+from PendingPayment on RecordPayment -> reject "A payment cannot be recorded before seats are reserved"
+
+from Draft on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
+from PendingPayment on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
+
+from Confirmed on CheckIn -> set CheckInDesk = CheckIn.Desk -> transition CheckedIn

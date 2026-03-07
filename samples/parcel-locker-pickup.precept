@@ -1,0 +1,59 @@
+precept ParcelLockerPickup
+
+# This sample models a single locker bay from loading through pickup or return.
+# It introduces a stack-based reminder log and a few realistic timed guards.
+
+field LockerId as string nullable
+field RecipientName as string nullable
+field PickupCode as string nullable
+field ReminderCount as number default 0
+field CurrentDay as number default 0
+field LastReminderDay as number default 0
+field LastReminderNote as string nullable
+
+field ReminderLog as stack of string
+
+invariant ReminderCount >= 0 because "Reminder count cannot be negative"
+invariant CurrentDay >= 0 because "Current day cannot be negative"
+invariant LastReminderDay >= 0 because "Reminder day cannot be negative"
+
+state Empty initial
+state AwaitingPickup
+state PickedUp
+state Returned
+
+in AwaitingPickup assert RecipientName != null because "Loaded lockers must identify the recipient"
+in AwaitingPickup assert PickupCode != null because "Loaded lockers must store a pickup code"
+
+to PickedUp -> clear ReminderLog
+to Returned -> clear ReminderLog
+
+event LoadParcel with Locker as string, Recipient as string, Code as string
+on LoadParcel assert Locker != "" because "A locker id is required"
+on LoadParcel assert Recipient != "" because "A recipient is required"
+on LoadParcel assert Code != "" because "A pickup code is required"
+
+event SendReminder with Note as string
+on SendReminder assert Note != "" because "Reminder notes cannot be blank"
+
+event PickUp with Code as string
+on PickUp assert Code != "" because "The pickup code is required"
+
+event AdvanceDay with DayNumber as number
+on AdvanceDay assert DayNumber >= 0 because "Days cannot be negative"
+
+event ReturnParcel
+
+from Empty on LoadParcel -> set LockerId = LoadParcel.Locker -> set RecipientName = LoadParcel.Recipient -> set PickupCode = LoadParcel.Code -> set ReminderCount = 0 -> set LastReminderDay = CurrentDay -> transition AwaitingPickup
+
+from AwaitingPickup on SendReminder when CurrentDay - LastReminderDay >= 1 -> push ReminderLog SendReminder.Note -> set ReminderCount = ReminderCount + 1 -> set LastReminderDay = CurrentDay -> set LastReminderNote = ReminderLog.peek -> no transition
+from AwaitingPickup on SendReminder -> reject "Reminders can only be sent once per day"
+
+from AwaitingPickup on PickUp when PickUp.Code == PickupCode -> transition PickedUp
+from AwaitingPickup on PickUp -> reject "The pickup code does not match"
+
+from AwaitingPickup on AdvanceDay when AdvanceDay.DayNumber > CurrentDay && AdvanceDay.DayNumber - LastReminderDay >= 3 -> set CurrentDay = AdvanceDay.DayNumber -> transition Returned
+from AwaitingPickup on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
+from AwaitingPickup on AdvanceDay -> reject "Days must advance forward"
+
+from AwaitingPickup on ReturnParcel -> transition Returned

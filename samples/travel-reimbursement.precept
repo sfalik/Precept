@@ -1,0 +1,54 @@
+precept TravelReimbursement
+
+# Finance reviews a reimbursement request by checking both totals and policy ratios.
+# This sample brings in multiplication and division without making the domain obscure.
+
+field EmployeeName as string nullable
+field TripDays as number default 1
+field LodgingTotal as number default 0
+field MealsTotal as number default 0
+field MileageTotal as number default 0
+field MileageRate as number default 0.67
+field RequestedTotal as number default 0
+field ApprovedTotal as number default 0
+field FinanceNote as string nullable
+
+invariant TripDays > 0 because "Trip days must be positive"
+invariant RequestedTotal >= 0 because "Requested total cannot be negative"
+invariant ApprovedTotal >= 0 because "Approved total cannot be negative"
+invariant ApprovedTotal <= RequestedTotal because "Approved total cannot exceed the request"
+
+state Draft initial
+state Submitted
+state Approved
+state Paid
+state Rejected
+
+in Paid assert ApprovedTotal > 0 because "Paid reimbursements must have an approved amount"
+
+event Submit with Employee as string, Days as number, Lodging as number, Meals as number, Miles as number, Rate as number default 0.67
+on Submit assert Employee != "" because "An employee name is required"
+on Submit assert Days > 0 because "Trip days must be positive"
+on Submit assert Lodging >= 0 because "Lodging cannot be negative"
+on Submit assert Meals >= 0 because "Meals cannot be negative"
+on Submit assert Miles >= 0 because "Mileage cannot be negative"
+on Submit assert Rate >= 0 because "Mileage rate cannot be negative"
+
+event Approve with Amount as number, Note as string nullable default null
+on Approve assert Amount > 0 because "Approved amounts must be positive"
+on Approve assert Note == null || Note != "" because "A supplied finance note cannot be blank"
+
+event Reject with Note as string
+on Reject assert Note != "" because "A rejection note is required"
+
+event Pay
+
+# Average lodging per day is checked with division to keep the example realistic.
+from Draft on Submit when Submit.Lodging / Submit.Days <= 350 -> set EmployeeName = Submit.Employee -> set TripDays = Submit.Days -> set LodgingTotal = Submit.Lodging -> set MealsTotal = Submit.Meals -> set MileageTotal = Submit.Miles * Submit.Rate -> set MileageRate = Submit.Rate -> set RequestedTotal = Submit.Lodging + Submit.Meals + (Submit.Miles * Submit.Rate) -> transition Submitted
+from Draft on Submit -> reject "Average lodging per day exceeds the policy cap"
+
+from Submitted on Approve when Approve.Amount <= RequestedTotal -> set ApprovedTotal = Approve.Amount -> set FinanceNote = Approve.Note -> transition Approved
+from Submitted on Approve -> reject "Finance cannot approve more than the requested total"
+from Submitted on Reject -> set FinanceNote = Reject.Note -> transition Rejected
+
+from Approved on Pay -> transition Paid

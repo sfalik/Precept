@@ -1,0 +1,67 @@
+precept MaintenanceWorkOrder
+
+# A facilities work order from intake through scheduling and completion.
+# This sample introduces stronger guard logic and a from-state assertion.
+
+field RequesterName as string nullable
+field Location as string nullable
+field IssueSummary as string nullable
+field AssignedTechnician as string nullable
+field EstimatedHours as number default 0
+field ActualHours as number default 0
+field Urgent as boolean default false
+field PartsApproved as boolean default false
+field CompletionNote as string nullable
+field CancellationReason as string nullable
+
+invariant EstimatedHours >= 0 because "Estimated hours cannot be negative"
+invariant ActualHours >= 0 because "Actual hours cannot be negative"
+
+state Draft initial
+state Open
+state Scheduled
+state InProgress
+state Completed
+state Cancelled
+
+in Draft edit Location, IssueSummary, Urgent
+in Scheduled assert AssignedTechnician != null because "Scheduled work must have an assigned technician"
+in Completed assert CompletionNote != null because "Completed work orders need a completion note"
+
+# Leaving active work still requires a technician on record.
+from InProgress assert AssignedTechnician != null because "Active work cannot finish without a technician"
+
+event Submit with Requester as string, WorkLocation as string, Summary as string, IsUrgent as boolean default false
+on Submit assert Requester != "" because "A requester name is required"
+on Submit assert WorkLocation != "" because "A location is required"
+on Submit assert Summary != "" because "An issue summary is required"
+
+event Assign with Technician as string, Estimate as number
+on Assign assert Technician != "" because "A technician is required"
+on Assign assert Estimate > 0 because "Estimated hours must be positive"
+
+event ApproveParts
+event StartWork
+
+event RecordProgress with Hours as number
+on RecordProgress assert Hours > 0 because "Progress entries must be positive"
+
+event Complete with Note as string
+on Complete assert Note != "" because "A completion note is required"
+
+event Cancel with Reason as string nullable default null
+on Cancel assert Reason == null || Reason != "" because "A supplied cancellation reason cannot be blank"
+
+from Draft on Submit -> set RequesterName = Submit.Requester -> set Location = Submit.WorkLocation -> set IssueSummary = Submit.Summary -> set Urgent = Submit.IsUrgent -> transition Open
+
+from Open on Assign -> set AssignedTechnician = Assign.Technician -> set EstimatedHours = Assign.Estimate -> transition Scheduled
+from Open on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
+
+from Scheduled on ApproveParts -> set PartsApproved = true -> no transition
+from Scheduled on StartWork when !Urgent || PartsApproved -> transition InProgress
+from Scheduled on StartWork -> reject "Urgent work must have parts approved before it starts"
+from Scheduled on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
+
+from InProgress on RecordProgress -> set ActualHours = ActualHours + RecordProgress.Hours -> no transition
+from InProgress on Complete when ActualHours <= EstimatedHours + 4 -> set CompletionNote = Complete.Note -> transition Completed
+from InProgress on Complete -> reject "Work orders that exceed the estimate by more than four hours need review first"
