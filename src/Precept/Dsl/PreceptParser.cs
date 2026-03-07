@@ -24,8 +24,9 @@ public static class PreceptParser
     /// </summary>
     public static PreceptDefinition Parse(string text)
     {
+        // SYNC:CONSTRAINT:C1
         if (string.IsNullOrWhiteSpace(text))
-            throw new InvalidOperationException("DSL input is empty.");
+            throw new InvalidOperationException(ConstraintCatalog.C1.FormatMessage());
 
         TokenList<PreceptToken> tokens;
         try
@@ -34,13 +35,15 @@ public static class PreceptParser
         }
         catch (Superpower.ParseException ex)
         {
-            throw new InvalidOperationException(ex.Message, ex);
+            // SYNC:CONSTRAINT:C2
+            throw new InvalidOperationException(ConstraintCatalog.C2.FormatMessage(("message", ex.Message)), ex);
         }
         var result = RawFileParser.TryParse(tokens);
         if (result.HasValue && result.Remainder.IsAtEnd)
             return AssembleModel(result.Value.Name, result.Value.Statements);
 
-        throw new InvalidOperationException("Failed to parse DSL input.");
+        // SYNC:CONSTRAINT:C3
+        throw new InvalidOperationException(ConstraintCatalog.C3.FormatMessage());
     }
 
     /// <summary>
@@ -53,7 +56,8 @@ public static class PreceptParser
 
         if (string.IsNullOrWhiteSpace(text))
         {
-            diagnostics.Add(new ParseDiagnostic(1, 0, "DSL input is empty."));
+            // SYNC:CONSTRAINT:C1
+            diagnostics.Add(new ParseDiagnostic(1, 0, ConstraintCatalog.C1.FormatMessage()));
             return (null, diagnostics);
         }
 
@@ -136,7 +140,8 @@ public static class PreceptParser
         var result = BoolExpr.TryParse(tokens);
         if (result.HasValue && result.Remainder.IsAtEnd)
             return result.Value;
-        throw new InvalidOperationException($"Failed to parse expression: {expression}");
+        // SYNC:CONSTRAINT:C4
+        throw new InvalidOperationException(ConstraintCatalog.C4.FormatMessage(("expression", expression)));
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -167,7 +172,8 @@ public static class PreceptParser
     {
         if (double.TryParse(token.ToStringValue(), NumberStyles.Float, CultureInfo.InvariantCulture, out var v))
             return v;
-        throw new InvalidOperationException($"Invalid number literal: {token.ToStringValue()}");
+        // SYNC:CONSTRAINT:C5
+        throw new InvalidOperationException(ConstraintCatalog.C5.FormatMessage(("value", token.ToStringValue())));
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -746,13 +752,15 @@ public static class PreceptParser
             {
                 case FieldResult fr:
                     if (fields.Any(f => f.Name == fr.Field.Name) || collectionFields.Any(f => f.Name == fr.Field.Name))
-                        throw new InvalidOperationException($"Duplicate field '{fr.Field.Name}'.");
+                        // SYNC:CONSTRAINT:C6
+                        throw new InvalidOperationException(ConstraintCatalog.C6.FormatMessage(("fieldName", fr.Field.Name)));
                     fields.Add(fr.Field);
                     break;
 
                 case CollectionFieldResult cfr:
                     if (fields.Any(f => f.Name == cfr.Field.Name) || collectionFields.Any(f => f.Name == cfr.Field.Name))
-                        throw new InvalidOperationException($"Duplicate field '{cfr.Field.Name}'.");
+                        // SYNC:CONSTRAINT:C6
+                        throw new InvalidOperationException(ConstraintCatalog.C6.FormatMessage(("fieldName", cfr.Field.Name)));
                     collectionFields.Add(cfr.Field);
                     break;
 
@@ -762,19 +770,22 @@ public static class PreceptParser
 
                 case StateResult sr:
                     if (states.Any(s => s.Name == sr.State.Name))
-                        throw new InvalidOperationException($"Duplicate state '{sr.State.Name}'.");
+                        // SYNC:CONSTRAINT:C7
+                        throw new InvalidOperationException(ConstraintCatalog.C7.FormatMessage(("stateName", sr.State.Name)));
                     states.Add(sr.State);
                     if (sr.IsInitial)
                     {
                         if (initialState is not null)
-                            throw new InvalidOperationException($"Duplicate initial state. '{initialState.Name}' is already marked initial.");
+                            // SYNC:CONSTRAINT:C8
+                            throw new InvalidOperationException(ConstraintCatalog.C8.FormatMessage(("stateName", initialState.Name)));
                         initialState = sr.State;
                     }
                     break;
 
                 case EventResult er:
                     if (events.Any(e => e.Name == er.Event.Name))
-                        throw new InvalidOperationException($"Duplicate event '{er.Event.Name}'.");
+                        // SYNC:CONSTRAINT:C9
+                        throw new InvalidOperationException(ConstraintCatalog.C9.FormatMessage(("eventName", er.Event.Name)));
                     events.Add(er.Event);
                     break;
 
@@ -806,16 +817,19 @@ public static class PreceptParser
                 case TransitionRowResult trr:
                     var outcomes = trr.ActionsAndOutcome.OfType<OutcomeAction>().ToList();
                     if (outcomes.Count == 0)
-                        throw new InvalidOperationException($"Transition row for event '{trr.EventName}' is missing an outcome (transition, no transition, or reject).");
+                        // SYNC:CONSTRAINT:C10
+                        throw new InvalidOperationException(ConstraintCatalog.C10.FormatMessage(("eventName", trr.EventName)));
 
                     // Design: "exactly one outcome, at the end; no statements after it"
                     if (outcomes.Count > 1)
+                        // SYNC:CONSTRAINT:C11
                         throw new InvalidOperationException(
-                            $"Transition row for event '{trr.EventName}': no statements are allowed after an outcome statement.");
+                            ConstraintCatalog.C11.FormatMessage(("eventName", trr.EventName)));
                     var firstOutcomeIdx = Array.IndexOf(trr.ActionsAndOutcome, outcomes[0]);
                     if (firstOutcomeIdx < trr.ActionsAndOutcome.Length - 1)
+                        // SYNC:CONSTRAINT:C11
                         throw new InvalidOperationException(
-                            $"Transition row for event '{trr.EventName}': no statements are allowed after an outcome statement.");
+                            ConstraintCatalog.C11.FormatMessage(("eventName", trr.EventName)));
 
                     var outcome = outcomes[0].Outcome;
                     var rowActions = trr.ActionsAndOutcome.Where(a => a is not OutcomeAction).ToArray();
@@ -834,9 +848,11 @@ public static class PreceptParser
         }
 
         if (states.Count == 0)
-            throw new InvalidOperationException("At least one state must be declared.");
+            // SYNC:CONSTRAINT:C12
+            throw new InvalidOperationException(ConstraintCatalog.C12.FormatMessage());
         if (initialState is null)
-            throw new InvalidOperationException("Exactly one state must be marked initial. Use 'state <Name> initial'.");
+            // SYNC:CONSTRAINT:C13
+            throw new InvalidOperationException(ConstraintCatalog.C13.FormatMessage());
 
         // Validate event assert scope: expressions may only reference event argument identifiers
         foreach (var ea in eventAsserts)
@@ -850,16 +866,19 @@ public static class PreceptParser
                 {
                     // EventName.ArgName form: prefix must be the event name, member must be an arg
                     if (!StringComparer.Ordinal.Equals(id.Name, ea.EventName))
+                        // SYNC:CONSTRAINT:C14
                         throw new InvalidOperationException(
-                            $"'on {ea.EventName} assert' can only reference event argument identifiers. '{id.Name}.{id.Member}' uses an unknown prefix.");
+                            ConstraintCatalog.C14.FormatMessage(("eventName", ea.EventName), ("prefix", id.Name), ("member", id.Member)));
                     if (!argNames.Contains(id.Member))
+                        // SYNC:CONSTRAINT:C15
                         throw new InvalidOperationException(
-                            $"'on {ea.EventName} assert' can only reference event argument identifiers. '{id.Member}' is not an event argument of '{ea.EventName}'.");
+                            ConstraintCatalog.C15.FormatMessage(("eventName", ea.EventName), ("member", id.Member)));
                 }
                 else if (!argNames.Contains(id.Name))
                 {
+                    // SYNC:CONSTRAINT:C16
                     throw new InvalidOperationException(
-                        $"'on {ea.EventName} assert' can only reference event argument identifiers. '{id.Name}' is not an event argument of '{ea.EventName}'.");
+                        ConstraintCatalog.C16.FormatMessage(("eventName", ea.EventName), ("identifier", id.Name)));
                 }
             }
         }
@@ -868,8 +887,9 @@ public static class PreceptParser
         foreach (var f in fields)
         {
             if (!f.IsNullable && !f.HasDefaultValue)
+                // SYNC:CONSTRAINT:C17
                 throw new InvalidOperationException(
-                    $"Non-nullable field '{f.Name}' requires a default value.");
+                    ConstraintCatalog.C17.FormatMessage(("fieldName", f.Name)));
             if (f.HasDefaultValue && f.DefaultValue is not null)
             {
                 var ok = f.Type switch
@@ -880,12 +900,14 @@ public static class PreceptParser
                     _ => true
                 };
                 if (!ok)
+                    // SYNC:CONSTRAINT:C18
                     throw new InvalidOperationException(
-                        $"Default value for field '{f.Name}' does not match declared type '{f.Type}'.");
+                        ConstraintCatalog.C18.FormatMessage(("fieldName", f.Name), ("fieldType", f.Type)));
             }
             if (f.HasDefaultValue && f.DefaultValue is null && !f.IsNullable)
+                // SYNC:CONSTRAINT:C19
                 throw new InvalidOperationException(
-                    $"Default value for field '{f.Name}' does not match declared type '{f.Type}' (null is not allowed for non-nullable fields).");
+                    ConstraintCatalog.C19.FormatMessage(("fieldName", f.Name), ("fieldType", f.Type)));
         }
 
         // Validate event arg defaults: type mismatch / null on non-nullable
@@ -903,12 +925,14 @@ public static class PreceptParser
                         _ => true
                     };
                     if (!ok)
+                        // SYNC:CONSTRAINT:C20
                         throw new InvalidOperationException(
-                            $"Default value for event argument '{arg.Name}' does not match declared type '{arg.Type}'.");
+                            ConstraintCatalog.C20.FormatMessage(("argName", arg.Name), ("argType", arg.Type)));
                 }
                 if (arg.HasDefaultValue && arg.DefaultValue is null && !arg.IsNullable)
+                    // SYNC:CONSTRAINT:C21
                     throw new InvalidOperationException(
-                        $"Default value for event argument '{arg.Name}' does not match declared type '{arg.Type}' (null is not allowed for non-nullable arguments).");
+                        ConstraintCatalog.C21.FormatMessage(("argName", arg.Name), ("argType", arg.Type)));
             }
         }
 
@@ -922,10 +946,12 @@ public static class PreceptParser
                 if (!collectionMap.TryGetValue(mut.TargetField, out var kind))
                 {
                     if (fields.Any(f => f.Name == mut.TargetField))
+                        // SYNC:CONSTRAINT:C22
                         throw new InvalidOperationException(
-                            $"'{mut.Verb.ToString().ToLowerInvariant()}' targets '{mut.TargetField}' which is a scalar field, not a collection.");
+                            ConstraintCatalog.C22.FormatMessage(("verb", mut.Verb.ToString().ToLowerInvariant()), ("fieldName", mut.TargetField)));
+                    // SYNC:CONSTRAINT:C23
                     throw new InvalidOperationException(
-                        $"'{mut.Verb.ToString().ToLowerInvariant()}' targets unknown collection '{mut.TargetField}'.");
+                        ConstraintCatalog.C23.FormatMessage(("verb", mut.Verb.ToString().ToLowerInvariant()), ("fieldName", mut.TargetField)));
                 }
                 var verbValid = (mut.Verb, kind) switch
                 {
@@ -939,8 +965,9 @@ public static class PreceptParser
                     _ => false
                 };
                 if (!verbValid)
+                    // SYNC:CONSTRAINT:C24
                     throw new InvalidOperationException(
-                        $"Cannot '{mut.Verb.ToString().ToLowerInvariant()}' on a {kind.ToString().ToLowerInvariant()} collection '{mut.TargetField}'.");
+                        ConstraintCatalog.C24.FormatMessage(("verb", mut.Verb.ToString().ToLowerInvariant()), ("collectionKind", kind.ToString().ToLowerInvariant()), ("fieldName", mut.TargetField)));
             }
         }
 
@@ -953,8 +980,9 @@ public static class PreceptParser
         {
             var key = (row.FromState, row.EventName);
             if (seenUnguarded.Contains(key))
+                // SYNC:CONSTRAINT:C25
                 throw new InvalidOperationException(
-                    $"Duplicate 'from {row.FromState} on {row.EventName}' row is unreachable — a previous unguarded row already catches all cases.");
+                    ConstraintCatalog.C25.FormatMessage(("fromState", row.FromState), ("eventName", row.EventName)));
             if (row.WhenGuard is null)
                 seenUnguarded.Add(key);
         }

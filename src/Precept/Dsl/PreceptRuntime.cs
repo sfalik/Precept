@@ -138,13 +138,16 @@ public sealed class PreceptEngine
         string initialState,
         IReadOnlyDictionary<string, object?>? instanceData = null)
     {
+        // SYNC:CONSTRAINT:C33
         if (string.IsNullOrWhiteSpace(initialState))
-            throw new ArgumentException("Initial state is required.", nameof(initialState));
+            throw new ArgumentException(ConstraintCatalog.C33.FormatMessage(), nameof(initialState));
 
+        // SYNC:CONSTRAINT:C34
         if (!States.Contains(initialState, StringComparer.Ordinal))
-            throw new InvalidOperationException($"State '{initialState}' is not defined in workflow '{Name}'.");
+            throw new InvalidOperationException(ConstraintCatalog.C34.FormatMessage(("stateName", initialState), ("workflowName", Name)));
 
         var data = BuildInitialInstanceData(instanceData);
+        // SYNC:CONSTRAINT:C35
         if (!TryValidateDataContract(data, out var dataError))
             throw new InvalidOperationException(dataError);
 
@@ -952,10 +955,12 @@ public sealed class PreceptEngine
         string eventName,
         IReadOnlyDictionary<string, object?> evaluationData)
     {
+        // SYNC:CONSTRAINT:C36
         if (string.IsNullOrWhiteSpace(currentState))
-            throw new ArgumentException("Current state is required.", nameof(currentState));
+            throw new ArgumentException(ConstraintCatalog.C36.FormatMessage(), nameof(currentState));
+        // SYNC:CONSTRAINT:C37
         if (string.IsNullOrWhiteSpace(eventName))
-            throw new ArgumentException("Event name is required.", nameof(eventName));
+            throw new ArgumentException(ConstraintCatalog.C37.FormatMessage(), nameof(eventName));
 
         if (!States.Contains(currentState, StringComparer.Ordinal))
             return TransitionResolution.NotDefined($"Unknown state '{currentState}'.");
@@ -1561,14 +1566,17 @@ public static class PreceptCompiler
 {
     public static PreceptEngine Compile(PreceptDefinition model)
     {
+        // SYNC:CONSTRAINT:C26
         if (model is null)
             throw new ArgumentNullException(nameof(model));
 
+        // SYNC:CONSTRAINT:C27
         if (string.IsNullOrWhiteSpace(model.InitialState.Name))
-            throw new InvalidOperationException("Exactly one state must be marked initial. Use 'state <Name> initial'.");
+            throw new InvalidOperationException(ConstraintCatalog.C27.FormatMessage());
 
+        // SYNC:CONSTRAINT:C28
         if (!model.States.Contains(model.InitialState))
-            throw new InvalidOperationException($"Initial state '{model.InitialState.Name}' is not defined in workflow '{model.Name}'.");
+            throw new InvalidOperationException(ConstraintCatalog.C28.FormatMessage(("stateName", model.InitialState.Name), ("workflowName", model.Name)));
 
         // Compile-time constraint validations
         ValidateConstraintsAtCompileTime(model);
@@ -1587,8 +1595,9 @@ public static class PreceptCompiler
             {
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, defaultData);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
+                    // SYNC:CONSTRAINT:C29
                     throw new InvalidOperationException(
-                        $"Compile-time invariant violation: \"{inv.Reason}\" is violated by default field values.");
+                        ConstraintCatalog.C29.FormatMessage(("reason", inv.Reason)));
             }
         }
 
@@ -1605,8 +1614,9 @@ public static class PreceptCompiler
 
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(sa.Expression, defaultData);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
+                    // SYNC:CONSTRAINT:C30
                     throw new InvalidOperationException(
-                        $"Compile-time state assert violation: \"{sa.Reason}\" on initial state '{initialStateName}' is violated by default data.");
+                        ConstraintCatalog.C30.FormatMessage(("reason", sa.Reason), ("stateName", initialStateName)));
             }
         }
 
@@ -1645,8 +1655,9 @@ public static class PreceptCompiler
 
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(ea.Expression, eventDefaults);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
+                    // SYNC:CONSTRAINT:C31
                     throw new InvalidOperationException(
-                        $"Compile-time event assert violation: \"{ea.Reason}\" on event '{ea.EventName}' is violated by default argument values.");
+                        ConstraintCatalog.C31.FormatMessage(("reason", ea.Reason), ("eventName", ea.EventName)));
             }
         }
 
@@ -1676,8 +1687,9 @@ public static class PreceptCompiler
             {
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, ctx);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
+                    // SYNC:CONSTRAINT:C32
                     throw new InvalidOperationException(
-                        $"Line {assignment.SourceLine}: literal assignment 'set {assignment.Key} = {assignment.ExpressionText}' violates invariant \"{inv.Reason}\".");
+                        ConstraintCatalog.C32.FormatMessage(("sourceLine", assignment.SourceLine), ("key", assignment.Key), ("expression", assignment.ExpressionText), ("reason", inv.Reason)));
             }
         }
 
