@@ -16,6 +16,9 @@ $extensionRoot = Resolve-Path (Join-Path $scriptDirectory "..")
 Set-Location $extensionRoot
 
 npm run package:local
+if ($LASTEXITCODE -ne 0) {
+    throw "Packaging failed with exit code $LASTEXITCODE"
+}
 
 $manifest = Get-Content -Raw -Path (Join-Path $extensionRoot "package.json") | ConvertFrom-Json
 $vsixName = "{0}-{1}.vsix" -f $manifest.name, $manifest.version
@@ -25,7 +28,15 @@ if (-not (Test-Path $vsixPath)) {
     throw "VSIX not found: $vsixPath"
 }
 
-code --install-extension $vsixPath --force
+$codeCli = Join-Path $env:LOCALAPPDATA "Programs\Microsoft VS Code\bin\code.cmd"
+if (-not (Test-Path $codeCli)) {
+    $codeCli = "code"
+}
+
+& $codeCli --install-extension $vsixPath --force
+if ($LASTEXITCODE -ne 0) {
+    throw "Extension install failed with exit code $LASTEXITCODE"
+}
 
 Write-Host ""
 Write-Host "Installed $vsixName into your local VS Code profile."

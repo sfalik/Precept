@@ -11,7 +11,8 @@ internal sealed record PreceptPreviewRequest(
     string? Text = null,
     string? EventName = null,
     IReadOnlyDictionary<string, object?>? Args = null,
-    IReadOnlyList<PreceptPreviewReplayStep>? Steps = null) : IRequest<PreceptPreviewResponse>;
+    IReadOnlyList<PreceptPreviewReplayStep>? Steps = null,
+    IReadOnlyDictionary<string, object?>? FieldUpdates = null) : IRequest<PreceptPreviewResponse>;
 
 internal sealed record PreceptPreviewReplayStep(string EventName, IReadOnlyDictionary<string, object?>? Args = null);
 
@@ -21,7 +22,11 @@ internal sealed record PreceptPreviewResponse(
     PreceptPreviewSnapshot? Snapshot = null,
     IReadOnlyList<string>? ReplayMessages = null,
     PreceptPreviewEventStatus? InspectResult = null,
-    IReadOnlyList<string>? Errors = null);
+    IReadOnlyList<string>? Errors = null,
+    IReadOnlyList<PreceptPreviewEditableField>? EditableFields = null,
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? FieldErrors = null,
+    IReadOnlyList<string>? FormErrors = null,
+    bool? CanSave = null);
 
 internal sealed record PreceptPreviewSnapshot(
     string WorkflowName,
@@ -32,7 +37,8 @@ internal sealed record PreceptPreviewSnapshot(
     IReadOnlyDictionary<string, object?> Data,
     IReadOnlyList<PreceptPreviewDiagnostic> Diagnostics,
     IReadOnlyList<string>? ActiveRuleViolations = null,
-    IReadOnlyList<PreceptPreviewRuleInfo>? RuleDefinitions = null);
+    IReadOnlyList<PreceptPreviewRuleInfo>? RuleDefinitions = null,
+    IReadOnlyList<PreceptPreviewEditableField>? EditableFields = null);
 
 internal sealed record PreceptPreviewRuleInfo(string Scope, string Expression, string Reason);
 
@@ -53,3 +59,5 @@ internal sealed record PreceptPreviewEventStatus(
 internal sealed record PreceptPreviewEventArg(string Name, string Type, bool IsNullable, bool HasDefaultValue, object? DefaultValue);
 
 internal sealed record PreceptPreviewDiagnostic(string Severity, string Message, int Line, int Character);
+
+internal sealed record PreceptPreviewEditableField(string FieldName, string FieldType, bool IsNullable, object? CurrentValue, string? Violation = null);

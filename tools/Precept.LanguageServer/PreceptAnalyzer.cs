@@ -239,6 +239,11 @@ internal sealed class PreceptAnalyzer
                 new CompletionItem { Label = "->", Kind = CompletionItemKind.Operator, Detail = "action chain" }
             ];
 
+        // After "in/to " (typing state name) → suggest state names
+        // Only matches while still in the state-target portion (identifiers/commas), not after a keyword like edit/assert
+        if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to)\\s+(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*(?:[A-Za-z_][A-Za-z0-9_]*)?$", RegexOptions.IgnoreCase))
+            return BuildItems(states.Append("any"), CompletionItemKind.EnumMember);
+
         // After "in/to/from State assert " → expression completions
         if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to|from)\\s+[^\\n]*\\s+assert\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return DistinctAndSort(BuildGuardCompletions(dataFields, collectionFields, currentEvent, eventArgs));

@@ -2,7 +2,9 @@
 
 Date: 2026-03-04
 
-Status: **Design phase — not yet implemented.**
+Status: **Runtime implemented.** Parser/model support was included in the language redesign; the runtime `Update` API, `IUpdatePatchBuilder`, editability enforcement, invariant/assert validation, and `Inspect` integration are now implemented.
+
+> **Inspector UX note (2026-03-06):** The preview inspector applies direct field edits in explicit **Edit** mode. While typing, draft values are validated through `Inspect(...)`-based preview checks and violations are surfaced inline; runtime data is not committed until the user clicks **Save**. **Cancel** discards draft edits.
 
 > **Language redesign note (2026-03-05):** The editable fields syntax has been updated from indentation-based `from <State> edit` blocks to flat keyword-anchored `in <State> edit <Field>, <Field>` statements, consistent with the new Precept language design (`docs/PreceptLanguageDesign.md`). The `in` preposition is used instead of `from` because editability is about what you can do **while residing in** a state, matching `in <State> assert` semantics. The parser/model support for `in <State> edit` is included in the language redesign; the runtime `Update` API is deferred to a follow-on task.
 
@@ -142,39 +144,39 @@ The compiler validates edit declarations at compile time:
 
 ## Model Extension
 
-### `DslEditBlock` record
+### `PreceptEditBlock` record
 
-The parser produces one `DslEditBlock` per `(State, FieldNames)` grouping:
+The parser produces one `PreceptEditBlock` per `(State, FieldNames)` grouping:
 
 ```csharp
-public sealed record DslEditBlock(
+public sealed record PreceptEditBlock(
     string State,
     IReadOnlyList<string> FieldNames,
     int SourceLine = 0);
 ```
 
-When `in any edit` is used, the parser expands `any` into one `DslEditBlock` per declared state (same expansion pattern as `in any assert`). When `in State1, State2 edit` is used, the parser creates one `DslEditBlock` per listed state.
+When `in any edit` is used, the parser expands `any` into one `PreceptEditBlock` per declared state (same expansion pattern as `in any assert`). When `in State1, State2 edit` is used, the parser creates one `PreceptEditBlock` per listed state.
 
-### `DslWorkflowModel` extension
+### `PreceptDefinition` extension
 
 ```csharp
-public sealed record DslWorkflowModel(
+public sealed record PreceptDefinition(
     string Name,
-    IReadOnlyList<DslState> States,
-    DslState InitialState,
-    IReadOnlyList<DslEvent> Events,
-    IReadOnlyList<DslTransition> Transitions,
-    IReadOnlyList<DslField> Fields,
-    IReadOnlyList<DslCollectionField> CollectionFields,
-    IReadOnlyList<DslRule>? TopLevelRules = null,
-    IReadOnlyList<DslEditBlock>? EditBlocks = null);  // <-- NEW
+    IReadOnlyList<PreceptState> States,
+    PreceptState InitialState,
+    IReadOnlyList<PreceptEvent> Events,
+    IReadOnlyList<PreceptTransitionRow> TransitionRows,
+    IReadOnlyList<PreceptField> Fields,
+    IReadOnlyList<PreceptCollectionField> CollectionFields,
+    IReadOnlyList<PreceptInvariant>? Invariants = null,
+    IReadOnlyList<PreceptStateAssert>? StateAsserts = null,
+    IReadOnlyList<PreceptEventAssert>? EventAsserts = null,
+    IReadOnlyList<PreceptEditBlock>? EditBlocks = null);  // <-- NEW
 ```
 
-> **Language redesign note:** In the new model, `DslWorkflowModel` replaces `DslRule` with `DslInvariant`/`DslStateAssert`/`DslEventAssert` and `DslTransition` with `DslTransitionRow`. The `EditBlocks` property is additive and survives unchanged.
+### `PreceptEngine` — editability map
 
-### `DslWorkflowEngine` — editability map
-
-At compile time, `DslWorkflowEngine` builds an internal editability map:
+At compile time, `PreceptEngine` builds an internal editability map:
 
 ```csharp
 private readonly IReadOnlyDictionary<string, HashSet<string>> _editableFieldsByState;
@@ -187,10 +189,10 @@ This precomputed map makes `Update` validation O(1) per field.
 
 ### `Update(instance, patch)`
 
-A single new method on `DslWorkflowEngine`, following the same instance-parameter pattern as `Fire`:
+A single new method on `PreceptEngine`, following the same instance-parameter pattern as `Fire`:
 
 ```csharp
-DslUpdateResult Update(DslWorkflowInstance instance, Action<IUpdatePatchBuilder> patch)
+PreceptUpdateResult Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
 ```
 
 The caller passes the current instance; `Update` returns a result containing the updated instance (or null on failure). Instances remain immutable records — `Update` returns a new instance via `with` expression, just like `Fire`.
@@ -226,8 +228,8 @@ public interface IUpdatePatchBuilder
 ### Usage example
 
 ```csharp
-var model = DslWorkflowParser.Parse(dslText);
-var engine = DslWorkflowCompiler.Compile(model);
+var definition = PreceptParser.Parse(dslText);
+var engine = PreceptCompiler.Compile(definition);
 var instance = engine.CreateInstance();
 
 var result = engine.Update(instance, patch => patch
@@ -237,7 +239,7 @@ var result = engine.Update(instance, patch => patch
     .Remove("Tags", "low-priority")
 );
 
-if (result.Outcome == UpdateOutcome.Updated)
+if (result.Outcome == PreceptUpdateOutcome.Updated)
 {
     instance = result.UpdatedInstance!; // new immutable instance with updated data
 }
@@ -260,7 +262,7 @@ When `Update` is called, the runtime executes the following steps in order:
 ### Outcome kinds
 
 ```csharp
-public enum UpdateOutcome
+public enum PreceptUpdateOutcome
 {
     Updated,      // Success — all fields modified, all rules passed
     NotAllowed,   // One or more fields not editable in current state
@@ -270,14 +272,14 @@ public enum UpdateOutcome
 ```
 
 ```csharp
-public sealed record DslUpdateResult(
-    UpdateOutcome Outcome,
+public sealed record PreceptUpdateResult(
+    PreceptUpdateOutcome Outcome,
     IReadOnlyList<string> Reasons,
-    DslWorkflowInstance? UpdatedInstance  // null when not Updated
+    PreceptInstance? UpdatedInstance  // null when not Updated
 );
 ```
 
-`Updated` is a new outcome kind — distinct from `Accepted` (which implies a lifecycle event was processed). The caller sees "data was edited" vs. "an event was fired" as different categories. `UpdateOutcome` is a separate enum from `DslOutcomeKind` because `Update` and `Fire` are fundamentally different operations with different outcome semantics.
+`Updated` is a new outcome kind — distinct from `Accepted` (which implies a lifecycle event was processed). The caller sees "data was edited" vs. "an event was fired" as different categories. `PreceptUpdateOutcome` is a separate enum from `PreceptOutcomeKind` because `Update` and `Fire` are fundamentally different operations with different outcome semantics.
 
 ### Patch conflict rules
 
@@ -301,46 +303,60 @@ Both share the same rules evaluation infrastructure. A field modified by `Update
 
 ### Editable fields on the aggregate `Inspect` result
 
-The engine already has an aggregate `Inspect(instance)` method that returns `DslInspectionResult(CurrentState, InstanceData, Events[])` — a full snapshot for rendering an inspector view. Editable field information is state-level, not event-level — it answers "what fields can be edited in this state?" regardless of any event context. This makes it a natural extension of the aggregate inspect result.
+The engine already has an aggregate `Inspect(instance)` method that returns `PreceptInspectionResult(CurrentState, InstanceData, Events[])` — a full snapshot for rendering an inspector view. Editable field information is state-level, not event-level — it answers "what fields can be edited in this state?" regardless of any event context. This makes it a natural extension of the aggregate inspect result.
 
-Extend `DslInspectionResult` with an `EditableFields` collection:
+Extend `PreceptInspectionResult` with an `EditableFields` collection:
 
 ```csharp
-public sealed record DslInspectionResult(
+public sealed record PreceptInspectionResult(
     string CurrentState,
     IReadOnlyDictionary<string, object?> InstanceData,
-    IReadOnlyList<DslEventInspectionResult> Events,
-    IReadOnlyList<DslEditableFieldInfo>? EditableFields = null);  // <-- NEW
+    IReadOnlyList<PreceptEventInspectionResult> Events,
+    IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null);  // <-- NEW
 ```
 
-Each entry provides enough metadata for the host to render edit controls:
+Each entry provides enough metadata for the host to render edit controls, and carries a back-pointer to an associated `PreceptViolation` (populated during hypothetical-patch inspection):
 
 ```csharp
-public sealed record DslEditableFieldInfo(
+public sealed record PreceptEditableFieldInfo(
     string FieldName,
-    string FieldType,        // "string", "number", "boolean", "set<string>", etc.
+    string FieldType,        // composite type: "string", "number", "boolean", "set<string>", "queue<number>", etc.
     bool IsNullable,
-    object? CurrentValue,    // Current field value (scalar or serialized collection)
-    string? CollectionType   // null for scalars; "set", "queue", "stack" for collections
-);
+    object? CurrentValue,    // Current field value (scalar or collection)
+    PreceptViolation? Violation = null);  // non-null when a patch inspection found a violation implicating this field
 ```
+
+### `PreceptViolation` — structured violation with field attribution
+
+A violation carries both a human-readable reason and a list of all `PreceptEditableFieldInfo` objects it implicates. This allows the host to highlight every field involved in a multi-field constraint (e.g. `A + B <= 100` implicates both `A` and `B`):
+
+```csharp
+public sealed record PreceptViolation(
+    string Reason,
+    IReadOnlyList<PreceptEditableFieldInfo> AffectedFields);  // direct object references (runtime only — not serialized)
+```
+
+The bidirectional references (`FieldInfo.Violation` and `Violation.AffectedFields`) form an object graph that is safe in C# but never serialized directly. The preview protocol uses indices instead (see Preview Protocol Extension).
+
+### `Inspect(instance, patches)` — hypothetical-patch inspection
+
+A new `Inspect` overload applies a patch to a working copy of instance data, runs the full validation pipeline (editability check, type check, invariant/assert evaluation), and returns a `PreceptInspectionResult` with violations reflected in `EditableFields`. **No commit occurs** — the session instance is unchanged. This is the runtime primitive used for per-keystroke validation in the preview UI.
+
+```csharp
+PreceptInspectionResult Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
+```
+
+The returned `EditableFields` is the same as for `Inspect(instance)`, but each `PreceptEditableFieldInfo` whose field is implicated in a violation has its `Violation` property set.
 
 When no edit declarations exist, `EditableFields` is `null`. Otherwise, it contains the effective editable field set for the instance's current state (the union of all matching `in ... edit` declarations), pre-populated with current values.
 
-This gives the host application (or preview UI) enough information to render an edit form with type-appropriate input controls and editability scope — all from a single `engine.Inspect(instance)` call.
-
-### Inspect does not simulate Update
-
-Unlike event inspection (which simulates guard evaluation and set assignments), the editable fields list does not simulate update operations. It reports *what is editable* — the host decides what to change and calls `Update` with a concrete patch.
-
 ### Relationship to per-event Inspect
 
-The per-event `Inspect(instance, eventName)` returns `DslEventInspectionResult` and is unchanged. The aggregate `Inspect(instance)` now also carries editable field metadata. Both answer different questions:
+The per-event `Inspect(instance, eventName)` returns `PreceptEventInspectionResult` and is unchanged. The aggregate `Inspect(instance)` now also carries editable field metadata. The new `Inspect(instance, patches)` overload adds hypothetical-patch validation without committing. All three answer different questions:
 
-- **Per-event Inspect**: "What happens if I fire this event?"
-- **Aggregate Inspect `EditableFields`**: "What data can I edit in this state?"
-
-The preview handler calls aggregate `Inspect` once and receives both event statuses and editable field info in one result.
+- **`Inspect(instance, eventName)`**: "What happens if I fire this event?"
+- **`Inspect(instance)`**: "What data can I edit in this state, and what are the current values?"
+- **`Inspect(instance, patches)`**: "If I apply these edits, which fields would be in violation?"
 
 ## Full Example
 
@@ -400,12 +416,12 @@ in Resolved edit ResolutionSummary
 
 ```csharp
 // Create and compile
-DslWorkflowModel model = DslWorkflowParser.Parse(dslText);
-DslWorkflowEngine engine = DslWorkflowCompiler.Compile(model);
-DslWorkflowInstance instance = engine.CreateInstance();
+PreceptDefinition definition = PreceptParser.Parse(dslText);
+PreceptEngine engine = PreceptCompiler.Compile(definition);
+PreceptInstance instance = engine.CreateInstance();
 
 // Lifecycle: assign a technician (event pipeline)
-DslFireResult fireResult = engine.Fire(instance, "Assign", new Dictionary<string, object?>
+PreceptFireResult fireResult = engine.Fire(instance, "Assign", new Dictionary<string, object?>
 {
     ["Technician"] = "Alice"
 });
@@ -413,7 +429,7 @@ DslFireResult fireResult = engine.Fire(instance, "Assign", new Dictionary<string
 instance = fireResult.UpdatedInstance!;
 
 // Data editing: update notes and priority (no event needed)
-DslUpdateResult editResult = engine.Update(instance, patch => patch
+PreceptUpdateResult editResult = engine.Update(instance, patch => patch
     .Set("Notes", "Customer prefers morning appointments")
     .Set("Priority", 1)
     .Add("Tags", "urgent")
@@ -422,23 +438,28 @@ DslUpdateResult editResult = engine.Update(instance, patch => patch
 instance = editResult.UpdatedInstance!;
 
 // Full snapshot: events + editable fields in one call
-DslInspectionResult snapshot = engine.Inspect(instance);
+PreceptInspectionResult snapshot = engine.Inspect(instance);
 // snapshot.EditableFields => [Notes, Priority, Tags, Description, EstimatedHours, AssignedTo]
 // snapshot.Events => per-event inspection results for all relevant events
 
 // Per-event inspect: see what happens if we fire a specific event
-DslEventInspectionResult inspectResolve = engine.Inspect(instance, "Resolve");
+PreceptEventInspectionResult inspectResolve = engine.Inspect(instance, "Resolve");
 // inspectResolve.Outcome == Accepted (with guard status)
 
+// Hypothetical-patch inspect: validate edits before applying
+PreceptInspectionResult dryRun = engine.Inspect(instance, patch => patch.Set("Priority", 99));
+// dryRun.EditableFields[Priority].Violation.Reason == "Priority must be between 1 and 5"
+// No commit — instance is unchanged
+
 // Rules enforcement: priority out of range
-DslUpdateResult badEdit = engine.Update(instance, patch => patch
+PreceptUpdateResult badEdit = engine.Update(instance, patch => patch
     .Set("Priority", 99)
 );
 // badEdit.Outcome == Blocked
 // badEdit.Reasons => ["Priority must be between 1 and 5"]
 
 // Not editable in current state
-DslUpdateResult wrongState = engine.Update(instance, patch => patch
+PreceptUpdateResult wrongState = engine.Update(instance, patch => patch
     .Set("ResolutionSummary", "Fixed it")
 );
 // wrongState.Outcome == NotAllowed
@@ -463,43 +484,98 @@ The `edit` keyword is a new reserved word. It appears only in the `in ... edit` 
 
 ## Preview Protocol Extension
 
-### Snapshot: `EditableFields` collection
+### Typed field data in snapshot
 
-The `PreceptPreviewSnapshot` record is extended with an `EditableFields` collection:
+The `PreceptPreviewSnapshot.Data` property changes from a raw value map to a map of typed field values. This gives the webview all information needed to render field values correctly — including collection fields — regardless of whether they are editable:
 
 ```csharp
-internal sealed record PreceptPreviewSnapshot(
-    // ... existing fields ...
-    IReadOnlyList<PreceptPreviewEditableField>? EditableFields = null);
+internal sealed record PreceptPreviewFieldValue(
+    object? Value,
+    string Type,       // composite: "string", "number", "boolean", "set<string>", "queue<number>", etc.
+    bool IsNullable);
+
+// Snapshot.Data changes from:
+IReadOnlyDictionary<string, object?> Data
+// to:
+IReadOnlyDictionary<string, PreceptPreviewFieldValue> Data
+```
+
+The handler builds this map from `session.Engine.Fields` and `session.Engine.CollectionFields` (both already public on `PreceptEngine`) combined with `session.Instance.InstanceData`. No new engine API is needed.
+
+The webview parses `Type` to determine rendering:
+
+```javascript
+const isCollection = type.includes('<');
+const collectionKind = isCollection ? type.split('<')[0] : null;  // "set", "queue", "stack"
+const elementType = isCollection ? type.slice(type.indexOf('<') + 1, -1) : type;
+```
+
+### Collection display (read-only mode)
+
+| Collection type | Read-only display |
+|---|---|
+| `set<T>` | `{ urgent, billing }` — unordered, curly braces |
+| `queue<T>` | `[ a, b, c →]` — ordered front-to-back, arrow at tail |
+| `stack<T>` | `[ 3 \| 2 \| 1 ]` — top at left, pipe separators |
+| empty collection | `{ }` or `[ ]` matching the type |
+
+### Snapshot: `Violations` and `EditableFields`
+
+The snapshot gains two new fields for edit mode support. `EditableFields` identifies which fields are editable in the current state. `Violations` carries structured violation objects referenced by index from `EditableFields`:
+
+```csharp
+internal sealed record PreceptPreviewViolation(
+    string Reason,
+    IReadOnlyList<int> AffectedFieldIndexes);  // indices into EditableFields list
 
 internal sealed record PreceptPreviewEditableField(
     string Name,
-    string Type,           // "string", "number", "boolean", "set<string>", etc.
-    bool IsNullable,
-    object? CurrentValue,
-    string? CollectionType // null for scalars; "set", "queue", "stack" for collections
-);
+    int? ViolationIndex = null);  // index into snapshot.Violations; null if no violation
+
+// Snapshot gains:
+IReadOnlyList<PreceptPreviewEditableField>? EditableFields = null,
+IReadOnlyList<PreceptPreviewViolation>? Violations = null
 ```
 
-The preview handler reads `EditableFields` from the aggregate `engine.Inspect(instance)` result and maps each `DslEditableFieldInfo` to an `PreceptPreviewEditableField` record in the snapshot.
+The handler translates the runtime's object graph (bidirectional `PreceptViolation`/`PreceptEditableFieldInfo` refs) into stable indices. Each `EditableFields[i].ViolationIndex` points into `Violations[j]`, and each `Violations[j].AffectedFieldIndexes` lists the indices back into `EditableFields`. This lets the webview:
 
-### New `"update"` action
+- Turn an input red using `field.violationIndex != null`
+- Show the reason using `snapshot.violations[field.violationIndex].reason`
+- Highlight sibling fields using `snapshot.violations[j].affectedFieldIndexes`
 
-The preview handler adds an `"update"` action (parallel to `"fire"`):
+### Edit mode UI behavior
 
-```json
-{
-  "action": "update",
-  "uri": "file:///path/to/file.precept",
-  "patches": [
-    { "field": "Notes", "op": "set", "value": "Updated notes" },
-    { "field": "Tags", "op": "add", "value": "urgent" },
-    { "field": "Priority", "op": "set", "value": 1 }
-  ]
-}
-```
+The data panel has two modes — **read-only** and **edit mode**:
 
-The `patches` array is translated to `IUpdatePatchBuilder` calls. On success, the preview handler updates the session instance and returns a fresh snapshot.
+**Read-only mode** (default):
+- All field values display as formatted text using the typed `Data` map.
+- Editable fields (those in `EditableFields`) show a subtle pencil indicator (✎) next to their value. Non-editable fields have no indicator.
+- Field order follows declaration order.
+- An "Edit" button in the panel header enters edit mode.
+
+**Edit mode**:
+- Editable fields replace their value display with type-appropriate input controls (see below).
+- Non-editable fields remain as formatted text, visually dimmed.
+- The panel header shows "Apply" and "Cancel" buttons in place of "Edit".
+- **Cancel** — discards all buffered changes and returns to read-only mode. No server call.
+- **Apply** — sends a single `"update"` action with all buffered patches. On success, updates the session instance and returns to read-only mode with a fresh snapshot. On failure (`Blocked`/`Invalid`), stays in edit mode and shows violations.
+
+**Per-keystroke validation**:
+- On each input change, the webview debounces and sends an `"inspect"` action with the full current patch buffer. No commit occurs.
+- The server applies patches to a working copy, runs the full validation pipeline, and returns a snapshot with `editableFields[i].violationIndex` populated for any violations.
+- Inputs with violations are highlighted red; the violation reason appears below the input.
+- The full patch buffer is sent each time (not just the changed field) so multi-field invariants are evaluated correctly.
+
+### Collection field edit controls
+
+| Collection type | Edit controls |
+|---|---|
+| `set<T>` | Chip list with ✕ per item + add-item input; **Clear** button |
+| `queue<T>` | Ordered list; Enqueue input at tail; Dequeue button at head; **Clear** button |
+| `stack<T>` | Ordered list top-first; Push input at top; Pop button at top; **Clear** button |
+| All | **Replace** button — opens a confirmation textarea for full collection replacement |
+
+Each granular operation (add/remove/enqueue/dequeue/push/pop) adds to the buffered patch using the appropriate `op` value. Replace and Clear add a single `"replace"` or `"clear"` op and disable granular controls for that field for the remainder of the edit session.
 
 ### `PreceptPreviewRequest` extension
 
@@ -511,13 +587,17 @@ internal sealed record PreceptPreviewRequest(
     string? EventName = null,
     IReadOnlyDictionary<string, object?>? Args = null,
     IReadOnlyList<PreceptPreviewReplayStep>? Steps = null,
-    IReadOnlyList<PreceptPreviewPatchOp>? Patches = null);  // <-- NEW
+    IReadOnlyList<PreceptPreviewPatchOp>? Patches = null);  // <-- NEW for "inspect" and "update" actions
 
 internal sealed record PreceptPreviewPatchOp(
     string Field,
     string Op,       // "set", "add", "remove", "enqueue", "dequeue", "push", "pop", "replace", "clear"
     object? Value);  // null for dequeue, pop, clear
 ```
+
+**Actions:**
+- `"inspect"` with `Patches` — applies patches to working copy, returns snapshot with violations populated, **no commit**. Used for per-keystroke validation (debounced).
+- `"update"` with `Patches` — applies patches atomically, commits on success. Returns updated snapshot or failure snapshot with violations.
 
 ## Language Server Impact
 
@@ -526,7 +606,7 @@ internal sealed record PreceptPreviewPatchOp(
 - The `EditDecl` parser combinator recognizes `in <states> edit <fieldList>` as a statement (no regex needed — Superpower token stream).
 - Report errors for unknown fields, unknown states, empty field lists.
 - Expand multi-state and `any` targets (same as state asserts).
-- Generate one `DslEditBlock` per source state.
+- Generate one `PreceptEditBlock` per source state.
 
 ### Analyzer
 
@@ -550,45 +630,83 @@ The following prompt can be pasted into a new session to implement the editable 
 
 ---
 
-Implement the editable fields feature for the state machine DSL as specified in docs/EditableFieldsDesign.md. This is a full-stack implementation across parser, model, compiler, runtime, language server, and documentation. Read docs/EditableFieldsDesign.md thoroughly before starting — it is the complete design spec. Also read docs/RuntimeApiDesign.md for the current public API surface and naming conventions. This feature depends on the rules feature (docs/RulesDesign.md) being implemented first.
+Implement the editable fields feature for the Precept state machine DSL as specified in `docs/EditableFieldsDesign.md`. This is a full-stack implementation across parser, model, compiler, runtime, language server, preview protocol, preview UI, and documentation. Read `docs/EditableFieldsDesign.md` thoroughly before starting — it is the complete design spec. Also read `docs/RuntimeApiDesign.md` for the current public API surface and naming conventions. Read at least one sample from `samples/` before writing any DSL strings.
 
-Summary of what editable fields are: a way to declare subsets of instance data fields as directly modifiable in specific states, without going through the event pipeline. The DSL syntax is `in <any|State1,State2> edit <Field>, <Field>` as a flat keyword-anchored statement. The runtime exposes `engine.Update(instance, patch)` for host applications to modify editable fields with full type checking and invariant/assert enforcement.
+**Summary:** Editable fields allow direct modification of instance data fields in specific states without going through the event pipeline. The DSL syntax is `in <any|State1,State2> edit <Field>, <Field>` as a flat statement. The runtime exposes `engine.Update(instance, patch)` for atomic edits with full validation. The preview UI adds an explicit edit mode with per-keystroke inspect validation and a single Apply/Cancel commit.
 
-DSL syntax: `in <any|StateA[,StateB...]> edit <FieldName>, <FieldName>, ...` — a flat, keyword-anchored statement with comma-separated field names. Multi-state comma-separated state lists are supported (same as `in <State> assert`). `in any edit` makes fields editable in all states. Multiple edit declarations are additive — the effective editable set for a state is the union of all matching declarations. The `in` preposition is used (not `from`) because editability is about what you can do **while residing in** a state.
+**DSL syntax:** `in <any|StateA[,StateB...]> edit <FieldName>, <FieldName>, ...` — flat, keyword-anchored, comma-separated field names. Multi-state lists supported (same as `in <State> assert`). `in any edit` = editable in all states. Multiple declarations are additive (union). The `in` preposition is used because editability is about residing in a state. `edit` is a new reserved word.
 
-Compiler validations: unknown field names in edit declarations are errors. Unknown state names are errors. Empty field lists are parse errors. Duplicate field in same declaration is a warning. `edit` is a new reserved word.
+**Compiler validations:** Unknown field names → error. Unknown state names → error. Empty field list → parse error. Duplicate field in same declaration → warning.
 
-Model: add `DslEditBlock(string State, IReadOnlyList<string> FieldNames, int SourceLine = 0)` record. Add `IReadOnlyList<DslEditBlock>? EditBlocks = null` to `DslWorkflowModel`. The parser expands `in any edit` into one `DslEditBlock` per declared state, and `in State1, State2 edit` into one per listed state (same expansion pattern as state asserts).
+**Model:** Add `PreceptEditBlock(string State, IReadOnlyList<string> FieldNames, int SourceLine = 0)` record. Add `IReadOnlyList<PreceptEditBlock>? EditBlocks = null` to `PreceptDefinition`. Parser expands `in any edit` into one `PreceptEditBlock` per declared state and `in State1, State2 edit` into one per listed state (same expansion as state asserts).
 
-Runtime API: add `Update(DslWorkflowInstance instance, Action<IUpdatePatchBuilder> patch)` method on `PreceptEngine`, returning `DslUpdateResult`. The patch builder supports `Set` for scalars, `Add`/`Remove` for sets, `Enqueue`/`Dequeue` for queues, `Push`/`Pop` for stacks, `Replace` and `Clear` for all collections. Validation sequence: editability check (is field editable in current state?), type check (does value match declared type?), atomic mutation on working copy, invariant/assert evaluation (invariants, `in <CurrentState>` asserts), commit or rollback. Outcomes: `Updated` (success), `NotAllowed` (field not editable in current state), `Blocked` (invariants/asserts violated), `Invalid` (type mismatch, unknown field, patch conflict). Patch conflicts detected at build time: duplicate Set on same scalar, Replace + granular op on same collection, Set on collection field, granular op on scalar field. Update never triggers state transitions. Update and Fire are independent. `DslUpdateResult` mirrors `DslFireResult` naming convention: `DslUpdateResult(UpdateOutcome Outcome, IReadOnlyList<string> Reasons, DslWorkflowInstance? UpdatedInstance)`.
+**Runtime API:**
+- Add `Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)` on `PreceptEngine`, returning `PreceptUpdateResult`.
+- `IUpdatePatchBuilder` supports: `Set` (scalars), `Add`/`Remove` (sets), `Enqueue`/`Dequeue` (queues), `Push`/`Pop` (stacks), `Replace` and `Clear` (all collections).
+- Validation sequence: editability check → type check → atomic mutation on working copy → invariant/`in <CurrentState>` assert evaluation → commit or rollback.
+- Outcomes: `PreceptUpdateOutcome.Updated`, `NotAllowed`, `Blocked`, `Invalid`.
+- Patch conflicts detected at build time: duplicate Set on same scalar, Replace + granular on same collection, Set on collection field, granular op on scalar field.
+- `PreceptUpdateResult(PreceptUpdateOutcome Outcome, IReadOnlyList<string> Reasons, PreceptInstance? UpdatedInstance)`.
 
-Inspect integration: extend the aggregate `DslInspectionResult` with an `IReadOnlyList<DslEditableFieldInfo>? EditableFields = null` property. `DslEditableFieldInfo` has `FieldName`, `FieldType`, `IsNullable`, `CurrentValue`, `CollectionType`. The aggregate `engine.Inspect(instance)` now returns event statuses AND editable field info in one call. No separate `GetEditableFields` method — this is folded into the aggregate inspect result.
+**Inspect integration:**
+- Add `IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null` to `PreceptInspectionResult`.
+- `PreceptEditableFieldInfo(string FieldName, string FieldType, bool IsNullable, object? CurrentValue, PreceptViolation? Violation = null)`. `FieldType` is composite: `"string"`, `"set<string>"`, `"queue<number>"`, etc. No separate `CollectionType` property.
+- Add `PreceptViolation(string Reason, IReadOnlyList<PreceptEditableFieldInfo> AffectedFields)` — bidirectional object refs, runtime-only, never serialized directly.
+- Add `Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)` overload: applies patch to working copy, runs full validation pipeline, returns `PreceptInspectionResult` with violations reflected in `EditableFields`. **No commit.** Used for per-keystroke validation.
+- The aggregate `engine.Inspect(instance)` returns event statuses AND editable field info in one call. `engine.Inspect(instance, patches)` does the same with hypothetical patch evaluation.
 
-Language server: recognize `edit` after `in <states>` as alternative to `assert`. Suggest declared field names as comma-separated completions after `in <states> edit`. Highlight `edit` keyword and field references with semantic tokens.
+**Preview protocol (`PreceptPreviewProtocol.cs`):**
+- Change `PreceptPreviewSnapshot.Data` from `IReadOnlyDictionary<string, object?>` to `IReadOnlyDictionary<string, PreceptPreviewFieldValue>`.
+- `PreceptPreviewFieldValue(object? Value, string Type, bool IsNullable)` — `Type` is composite (e.g. `"set<string>"`).
+- Add `IReadOnlyList<PreceptPreviewEditableField>? EditableFields = null` and `IReadOnlyList<PreceptPreviewViolation>? Violations = null` to `PreceptPreviewSnapshot`.
+- `PreceptPreviewEditableField(string Name, int? ViolationIndex = null)` — index into `Violations`.
+- `PreceptPreviewViolation(string Reason, IReadOnlyList<int> AffectedFieldIndexes)` — indices into `EditableFields`.
+- `PreceptPreviewRequest` gains `IReadOnlyList<PreceptPreviewPatchOp>? Patches = null`.
+- `PreceptPreviewPatchOp(string Field, string Op, object? Value)` — ops: `"set"`, `"add"`, `"remove"`, `"enqueue"`, `"dequeue"`, `"push"`, `"pop"`, `"replace"`, `"clear"`.
+- `"inspect"` action with `Patches`: applies patches to working copy, returns snapshot with `EditableFields`/`Violations` populated, **no commit**. Used for per-keystroke validation (debounced).
+- `"update"` action with `Patches`: commits atomically. Returns updated snapshot on success; failure snapshot with violations on `Blocked`/`Invalid`.
 
-Preview UI needs to be updated to support editing of fields inline in the data panel according to the engine defining which fields are editable for the current state. While editing, the invariants/asserts should be checked and the input box highlighted red when they are violated.
+**Preview handler (`PreceptPreviewHandler.cs`):**
+- Build typed `Data` map using `session.Engine.Fields` (scalar) and `session.Engine.CollectionFields` (collections) — both already public on `PreceptEngine`. No new engine API needed.
+- Handle `"inspect"` with patches: call `engine.Inspect(instance, patches)`, translate bidirectional object graph to index-based protocol types, return snapshot without updating `session.Instance`.
+- Handle `"update"` with patches: call `engine.Update(instance, patches)`, on `Updated` advance `session.Instance` and return fresh snapshot; on `Blocked`/`Invalid` return failure snapshot with violations.
 
-Tests: add comprehensive tests covering edit declaration parsing, multi-state edit declarations, `in any edit`, additive semantics across overlapping declarations, Update API with scalar fields, Update with collection fields (all types), editability enforcement per state, type checking, invariant/assert enforcement on update, atomic rollback on validation failure, patch conflict detection, inspect editable fields in aggregate result, and coexistence of edit declarations with event transitions.
+**Preview UI (`inspector-preview.html`):**
+- **Collection display (read-only):** Parse `type` to detect collections (`type.includes('<')`). Render: `set` → `{ a, b }`, `queue` → `[ a, b, c →]`, `stack` → `[ top | 2 | 3 ]`, empty → `{ }` or `[ ]`. Update `formatValue` to be collection-aware.
+- **Edit mode toggle:** "Edit" button in the data panel header. In read-only mode, fields listed in `snapshot.editableFields` show a subtle ✎ indicator next to their value; non-editable fields show no indicator. Field order matches declaration order throughout.
+- **Edit mode layout:** Editable fields show type-appropriate input controls; non-editable fields stay as dimmed text. Header shows "Apply" and "Cancel" buttons.
+- **Per-keystroke validation:** On each input change, debounce (e.g. 300ms) and send `"inspect"` with the full current patch buffer. Read `editableFields[i].violationIndex` from the response — highlight the input red and show `violations[j].reason` below if violated. Also highlight any sibling fields implicated by `violations[j].affectedFieldIndexes`.
+- **Apply:** Send `"update"` with full patch buffer. On success, update session state and exit edit mode. On `Blocked`/`Invalid`, stay in edit mode and display violations.
+- **Cancel:** Discard buffer, exit edit mode. No server call.
+- **Collection edit controls — `set<T>`:** Chip list with ✕ per item + add-item input + **Clear** button.
+- **Collection edit controls — `queue<T>`:** Ordered list; Enqueue input at tail; Dequeue button at head; **Clear** button.
+- **Collection edit controls — `stack<T>`:** Ordered list top-first; Push input at top; Pop button at top; **Clear** button.
+- **Replace (all collection types):** A **Replace** button opens a confirmation textarea pre-filled with current items; on confirm, adds a `"replace"` op and disables granular controls for that field.
 
-Documentation: update docs/DesignNotes.md DSL Syntax Contract section to include edit declaration syntax. Update README.md DSL Syntax Reference, DSL Cookbook, and Status sections. Update docs/EditableFieldsDesign.md status from design phase to implemented.
+**Tests:** Add to `test/Precept.Tests/` and `test/Precept.LanguageServer.Tests/`:
+- Edit declaration parsing: single state, multi-state, `in any`
+- Additive semantics across overlapping declarations
+- `Update` with scalar fields: `Updated`, `NotAllowed`, `Blocked`, `Invalid` outcomes
+- `Update` with collection fields: all op types (`Add`, `Remove`, `Enqueue`, `Dequeue`, `Push`, `Pop`, `Replace`, `Clear`)
+- Editability enforcement per state (field editable in one state, not another)
+- Patch conflict detection at build time
+- Invariant/assert enforcement on update; atomic rollback on violation
+- `Inspect(instance)` → `EditableFields` populated correctly
+- `Inspect(instance, patches)` → violations reflected in `EditableFields` with correct `AffectedFields`
+- Coexistence of edit declarations with event transitions
 
-Syntax highlighting grammar sync (non-negotiable — do not skip): update `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` for every new DSL construct introduced by this feature. Apply the Grammar Sync Checklist from `.github/copilot-instructions.md` in full. At minimum, the following changes are required for this feature:
+**Documentation:** Update `README.md` to mention editable fields. Update `docs/EditableFieldsDesign.md` status from "Design phase" to "Implemented". Update `docs/RuntimeApiDesign.md` if API signatures changed.
 
-1. **Declaration form** — add an `inEditHeader` pattern matching `^(\s*)(in)(\s+)(any|StateList)(\s+)(edit)` so that `in` and `edit` are colored as control/action keywords and the state list gets entity coloring, consistent with the existing `inAssertHeader` pattern.
-2. **Keyword** — add `edit` to the `controlKeywords` alternation so it is highlighted wherever it appears.
-3. **Field references in edit declaration** — field names after `edit` are comma-separated on the same line; these are already caught by the `identifierReference` catch-all unless a more specific scope (e.g. `variable.other.editable-field`) is desired.
-4. **Pattern ordering** — insert `inEditHeader` into the top-level `patterns` array alongside (and at the same priority as) `inAssertHeader`, before `controlKeywords`.
+**Grammar sync (non-negotiable — do not skip):** Update `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`:
+1. Add `inEditHeader` pattern for `in … edit` header lines, consistent with existing `inAssertHeader`.
+2. Add `edit` to `controlKeywords` alternation with `\b` word-boundary anchors.
+3. Insert `inEditHeader` before `controlKeywords` in the top-level `patterns` array.
+4. Verify JSON is valid after changes.
 
-Verify the grammar file is valid JSON after changes by parsing it. Confirm that `edit` does not accidentally color identifiers that happen to start with the substring — word-boundary anchors (`\b`) are required.
+**Intellisense sync (non-negotiable — do not skip):** Update `tools/Precept.LanguageServer/PreceptAnalyzer.cs` and `PreceptSemanticTokensHandler.cs`:
+1. Add `edit` to `KeywordItems` in `PreceptAnalyzer.cs`.
+2. Add `edit` to `KeywordTokens` in `PreceptSemanticTokensHandler.cs`.
+3. Add regex branch in `GetCompletions` detecting `^\s*in\s+[^\n]+\s+edit` and returning declared field name completions.
+4. Add `in … edit` header line to `HighlightNamedSymbols` semantic token handling.
 
-Intellisense sync (non-negotiable — do not skip): apply the Intellisense Sync Checklist from `.github/copilot-instructions.md` in full. At minimum, the following changes are required for this feature:
-
-1. **`KeywordItems`** — add `edit` to `KeywordItems` in `PreceptAnalyzer.cs`.
-2. **`KeywordTokens`** — add `edit` to `KeywordTokens` in `PreceptSemanticTokensHandler.cs`.
-3. **Completion context for `in … edit` header** — add a regex branch in `GetCompletions` that detects `^\s*in\s+[^\n]+\s+edit(?:\s+[^\n]*)?$` and returns field name completions (the declared instance data fields are the valid completions after `edit`).
-4. **Semantic token for edit header** — add a regex to `HighlightNamedSymbols` matching the `in … edit` header line and push the state list tokens as `type` and `edit` as `keyword`.
-5. **`ExpressionLineRegex`** — edit declarations do not contain expressions (only field name lists), so no update to `ExpressionLineRegex` is needed.
-
-Note: The parser and model support for `in <State> edit` is included in the language redesign (`docs/PreceptLanguageImplementationPlan.md`). This implementation prompt covers the **runtime** portion (Update API, validation pipeline, inspect integration, preview protocol) that is deferred from the language redesign.
-
-Build with dotnet build from repo root. Run tests in test/Precept.Tests/ and test/Precept.LanguageServer.Tests/. Make sure all existing tests still pass.
+**Build:** `dotnet build` from repo root. Run `test/Precept.Tests/` and `test/Precept.LanguageServer.Tests/`. All 394 existing tests must continue to pass.

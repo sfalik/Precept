@@ -11,9 +11,9 @@
 |---|-----------|--------|-------|
 | 0 | Remove Legacy / Backward Compat Code | Done | All legacy types/properties removed from model, parser, runtime, language server. 4 backward-compat tests deleted, 2 ported. 344 tests passing (348 - 4). Zero references to PreceptTransition, PreceptClause, PreceptRule, TopLevelRules, or .Rules remain in source/test code. |
 | 1 | Fix README.md | Done | Updated DSL example (precept/invariant/on assert/flat rows), C# API (PreceptParser.Parse, PreceptCompiler.Compile, PreceptEngine, instance.InstanceData), and Pillars section (rule→invariant). |
-| 2 | Fix RuntimeApiDesign.md | Not Started | Documentation debt |
+| 2 | Fix RuntimeApiDesign.md | Done | No Dsl* renames needed — document already used correct Precept* naming throughout. All API signatures verified against PreceptRuntime.cs: PreceptParser, PreceptCompiler, PreceptEngine (Name/States/InitialState/Events/Fields/CollectionFields), CreateInstance, Inspect (both overloads), aggregate Inspect, Fire, CheckCompatibility, CoerceEventArguments, and all result records (PreceptInstance, PreceptCompatibilityResult, PreceptEventInspectionResult, PreceptInspectionResult, PreceptFireResult, PreceptOutcomeKind) — all match implementation exactly. |
 | 3 | Add Test Gaps | Done | Added 27 new tests: 2 StateAssert/EventAssert SourceLine tests (Category A, required parser fix to track SourceLine for state/event assert declarations); 5 CoerceEventArguments tests (Category B); 17 sample file Theory tests across all samples/*.precept files (Category C/E); 4 ParseWithDiagnostics tests (Category D). Also fixed a broken LS test (PreceptPreviewRulesTests scope "topLevel" → "invariant") that was broken by Item 0 but not caught at the time. 394 tests now passing. |
-| 4 | Implement Editable Fields Runtime | Not Started | Next feature |
+| 4 | Implement Editable Fields Runtime | Done | Runtime `Update()` API with `IUpdatePatchBuilder`, editability enforcement per state, type checking, patch conflict detection, invariant/state-assert validation post-edit, atomic rollback. `Inspect(instance)` returns `EditableFields`. `Inspect(instance, patch)` hypothetical-patch validation. 48 tests in `PreceptEditTests.cs`. 442 total tests passing. |
 | 5 | Implement ConstraintCatalog | Not Started | Infrastructure |
 | 6 | Implement MCP Server | Not Started | New capability |
 

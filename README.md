@@ -113,6 +113,16 @@ else
         await repository.SaveAsync(updated.InstanceData);
     }
 }
+
+// Direct field editing — no event needed (fields declared with `in <State> edit`)
+var editResult = engine.Update(instance, patch => patch
+    .Set("Notes", "Customer called back"));
+
+if (editResult.Outcome == PreceptUpdateOutcome.Updated)
+{
+    instance = editResult.UpdatedInstance!;
+    // Invariants and state asserts are enforced — same safety net as Fire
+}
 ```
 
 ---
@@ -120,7 +130,7 @@ else
 ## 🛠️ World-Class Tooling
 
 Precept isn't just a library; it's an authoring experience. The accompanying VS Code extension provides:
-- **Interactive Inspector:** Fire events and edit data directly against a live, mock instance in VS Code to prove your rules function exactly as desired.
+- **Interactive Inspector:** Fire events and edit data against a live, mock instance in VS Code. Field edits use explicit **Edit** mode with **Save/Cancel**; validation runs live via inspect while typing, and values are committed only when **Save** is clicked.
 - **Live Diagramming:** A dynamic state-transition diagram renders as you type.
 - **Null-Flow Analysis:** Real-time squiggles warn you if a guard path might access an unsafe null value.
 
@@ -160,3 +170,28 @@ Precept acknowledges that entirely different ceremonies apply to different types
 * **Direct Edits (`edit`):** For simple data mutations where event ceremony is overkill.
 
 Both paths are safely watched by the exact same invariant engine. Direct editing isn't a hack; it is a first-class feature protected by the same ironclad invariants.
+
+## VS Code Extension Local Loop (Contributors)
+
+Use the installed extension in your normal VS Code window.
+
+Recommended setup: keep `local.precept-vscode` installed for day-to-day work in that window. Use the packaging tasks only when you need to refresh the installed extension code after TypeScript or webview changes.
+
+When you change C# language-server or runtime code:
+
+1. Run `Build Task` / `Ctrl+Shift+B`.
+2. The default `build` task compiles `tools/Precept.LanguageServer/Precept.LanguageServer.csproj` into `temp/dev-language-server` with `--artifacts-path`.
+3. The installed extension detects the new DLL, creates a fresh shadow copy under `temp/dev-language-server/runtime`, and restarts the language client automatically.
+
+When you change TypeScript extension-host code or webview code:
+
+1. Run `extension: loop local install`.
+2. Run `Developer: Reload Window`.
+
+On first activation, the installed extension bootstraps the dev language-server artifacts under `temp/dev-language-server` if they are missing.
+
+The status bar shows `Precept LS: Dev`. Click it, or run `Precept: Show Language Server Mode`, to inspect the active launch paths in the output channel.
+
+Use `npm run loop:local` only as the command-line equivalent of `extension: loop local install`.
+
+Use `extension: loop local uninstall` or `npm run loop:local:uninstall` only if you want to remove the installed local VSIX from your profile.

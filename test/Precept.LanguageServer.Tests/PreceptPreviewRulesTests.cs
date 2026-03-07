@@ -237,6 +237,163 @@ public class PreceptPreviewRulesTests
             "simulating balance − 30 = −30 satisfies the top-level rule balance >= −100");
     }
 
+    // ── PreceptPreviewHandler — inspectUpdate (draft validation) ─────────────────
+
+    [Fact]
+    public async Task HandleInspectUpdate_SingleChangedFieldViolation_OnlyThatFieldHasViolation()
+    {
+        const string dsl = """
+            precept DraftEdit
+            field Author as string nullable
+            field Age as number default 12
+            invariant Age >= 12 because "Age must be at least 12 years old"
+            state Draft initial
+            in Draft edit Author, Age
+            """;
+
+        var (handler, uri) = CreateHandler();
+        await handler.Handle(new PreceptPreviewRequest("snapshot", uri, Text: dsl), CancellationToken.None);
+
+        var response = await handler.Handle(
+            new PreceptPreviewRequest(
+                "inspectUpdate",
+                uri,
+                Text: dsl,
+                FieldUpdates: new Dictionary<string, object?> { ["Age"] = 11.0 }),
+            CancellationToken.None);
+
+        response.Success.Should().BeTrue();
+        response.EditableFields.Should().NotBeNull();
+        response.FieldErrors.Should().NotBeNull();
+        response.FormErrors.Should().BeNull();
+        response.CanSave.Should().BeFalse();
+
+        var age = response.EditableFields!.Single(f => f.FieldName == "Age");
+        var author = response.EditableFields!.Single(f => f.FieldName == "Author");
+
+        age.Violation.Should().Contain("Age must be at least 12 years old");
+        author.Violation.Should().BeNull("only patched fields should be marked with this simulated violation");
+        response.FieldErrors!["Age"].Should().ContainSingle(r => r.Contains("Age must be at least 12 years old"));
+        response.FieldErrors.Should().NotContainKey("Author");
+
+        response.Errors.Should().NotBeNull();
+        response.Errors!.Should().ContainSingle(r => r.Contains("Age must be at least 12 years old"));
+    }
+
+    [Fact]
+    public async Task HandleInspectUpdate_EmptyPatch_ReturnsNoViolations()
+    {
+        const string dsl = """
+            precept DraftEdit
+            field Author as string nullable
+            field Age as number default 12
+            invariant Age >= 12 because "Age must be at least 12 years old"
+            state Draft initial
+            in Draft edit Author, Age
+            """;
+
+        var (handler, uri) = CreateHandler();
+        await handler.Handle(new PreceptPreviewRequest("snapshot", uri, Text: dsl), CancellationToken.None);
+
+        var response = await handler.Handle(
+            new PreceptPreviewRequest(
+                "inspectUpdate",
+                uri,
+                Text: dsl,
+                FieldUpdates: new Dictionary<string, object?>()),
+            CancellationToken.None);
+
+        response.Success.Should().BeTrue();
+        response.EditableFields.Should().NotBeNull();
+        response.EditableFields!.Should().OnlyContain(f => f.Violation == null);
+        response.Errors.Should().BeNull();
+        response.FieldErrors.Should().BeNull();
+        response.FormErrors.Should().BeNull();
+        response.CanSave.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task HandleInspectUpdate_DoesNotCommitData()
+    {
+        const string dsl = """
+            precept DraftEdit
+            field Author as string nullable
+            field Age as number default 12
+            state Draft initial
+            in Draft edit Author, Age
+            """;
+
+        var (handler, uri) = CreateHandler();
+        await handler.Handle(new PreceptPreviewRequest("snapshot", uri, Text: dsl), CancellationToken.None);
+
+        var inspectResponse = await handler.Handle(
+            new PreceptPreviewRequest(
+                "inspectUpdate",
+                uri,
+                Text: dsl,
+                FieldUpdates: new Dictionary<string, object?>
+                {
+                    ["Author"] = "Alice",
+                    ["Age"] = 30.0
+                }),
+            CancellationToken.None);
+
+        inspectResponse.Success.Should().BeTrue();
+
+        var snapshotAfterInspect = await handler.Handle(
+            new PreceptPreviewRequest("snapshot", uri, Text: dsl),
+            CancellationToken.None);
+
+        snapshotAfterInspect.Success.Should().BeTrue();
+        snapshotAfterInspect.Snapshot.Should().NotBeNull();
+
+        snapshotAfterInspect.Snapshot!.Data["Author"].Should().BeNull("inspectUpdate is preview-only and must not persist draft values");
+        Convert.ToDouble(snapshotAfterInspect.Snapshot!.Data["Age"]).Should().Be(12.0);
+    }
+
+    [Fact]
+    public async Task HandleInspectUpdate_MultiplePatchedFields_BothCanBeMarked()
+    {
+        const string dsl = """
+            precept DraftEdit
+            field Author as string nullable
+            field Age as number default 12
+            invariant Age >= 12 because "Age must be at least 12 years old"
+            state Draft initial
+            in Draft edit Author, Age
+            """;
+
+        var (handler, uri) = CreateHandler();
+        await handler.Handle(new PreceptPreviewRequest("snapshot", uri, Text: dsl), CancellationToken.None);
+
+        var response = await handler.Handle(
+            new PreceptPreviewRequest(
+                "inspectUpdate",
+                uri,
+                Text: dsl,
+                FieldUpdates: new Dictionary<string, object?>
+                {
+                    ["Author"] = "Alice",
+                    ["Age"] = 11.0
+                }),
+            CancellationToken.None);
+
+        response.Success.Should().BeTrue();
+        response.EditableFields.Should().NotBeNull();
+        response.FieldErrors.Should().NotBeNull();
+        response.FormErrors.Should().BeNull();
+        response.CanSave.Should().BeFalse();
+
+        var age = response.EditableFields!.Single(f => f.FieldName == "Age");
+        var author = response.EditableFields!.Single(f => f.FieldName == "Author");
+
+        age.Violation.Should().Contain("Age must be at least 12 years old");
+        author.Violation.Should().Contain("Age must be at least 12 years old",
+            "the raw runtime payload still includes full-patch violations on editable fields");
+        response.FieldErrors!["Age"].Should().ContainSingle(r => r.Contains("Age must be at least 12 years old"));
+        response.FieldErrors.Should().NotContainKey("Author");
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static (PreceptPreviewHandler handler, DocumentUri uri) CreateHandler()

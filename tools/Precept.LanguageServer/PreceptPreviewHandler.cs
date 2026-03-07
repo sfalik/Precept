@@ -1,3 +1,4 @@
+using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.JsonRpc;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -25,6 +26,8 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
                 "reset" => Task.FromResult(HandleReset(request)),
                 "replay" => Task.FromResult(HandleReplay(request)),
                 "inspect" => Task.FromResult(HandleInspect(request)),
+                "inspectupdate" => Task.FromResult(HandleInspectUpdate(request)),
+                "update" => Task.FromResult(HandleUpdate(request)),
                 _ => Task.FromResult(new PreceptPreviewResponse(false, Error: $"Unknown action '{request.Action}'."))
             };
         }
@@ -101,6 +104,65 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
         }
 
         return new PreceptPreviewResponse(true, Snapshot: BuildSnapshot(session));
+    }
+
+    private static PreceptPreviewResponse HandleUpdate(PreceptPreviewRequest request)
+    {
+        if (request.FieldUpdates is null || request.FieldUpdates.Count == 0)
+            return new PreceptPreviewResponse(false, Error: "Missing field updates for update action.");
+
+        var sessionOrError = EnsureSession(request);
+        if (!sessionOrError.Success || sessionOrError.Session is null)
+            return new PreceptPreviewResponse(false, Error: sessionOrError.Error);
+
+        var session = sessionOrError.Session;
+        var result = session.Engine.Update(session.Instance, builder =>
+        {
+            foreach (var (fieldName, value) in request.FieldUpdates)
+                builder.Set(fieldName, UnwrapJToken(value));
+        });
+
+        if (result.Outcome != PreceptUpdateOutcome.Updated || result.UpdatedInstance is null)
+        {
+            var reason = result.Reasons.FirstOrDefault() ?? "Update failed.";
+            return new PreceptPreviewResponse(false, Error: reason, Errors: result.Reasons, Snapshot: BuildSnapshot(session));
+        }
+
+        session.Instance = result.UpdatedInstance;
+        return new PreceptPreviewResponse(true, Snapshot: BuildSnapshot(session));
+    }
+
+    private static PreceptPreviewResponse HandleInspectUpdate(PreceptPreviewRequest request)
+    {
+        if (request.FieldUpdates is null)
+            return new PreceptPreviewResponse(false, Error: "Missing field updates for inspectUpdate action.");
+
+        var sessionOrError = EnsureSession(request);
+        if (!sessionOrError.Success || sessionOrError.Session is null)
+            return new PreceptPreviewResponse(false, Error: sessionOrError.Error);
+
+        var session = sessionOrError.Session;
+        var normalizedPatch = request.FieldUpdates.ToDictionary(
+            kvp => kvp.Key,
+            kvp => UnwrapJToken(kvp.Value),
+            StringComparer.Ordinal);
+
+        var inspect = InspectDraftPatch(session, normalizedPatch);
+        var editable = MapEditableFields(inspect.EditableFields);
+        var fullErrors = ExtractEditableViolations(editable);
+        var fieldErrors = BuildFieldErrors(session, normalizedPatch, fullErrors);
+        var attributedErrors = fieldErrors is null
+            ? Array.Empty<string>()
+            : fieldErrors.Values.SelectMany(static errs => errs).Distinct(StringComparer.Ordinal).ToArray();
+        var formErrors = fullErrors.Where(err => !attributedErrors.Contains(err, StringComparer.Ordinal)).ToArray();
+
+        return new PreceptPreviewResponse(
+            true,
+            EditableFields: editable,
+            Errors: fullErrors.Length > 0 ? fullErrors : null,
+            FieldErrors: fieldErrors,
+            FormErrors: formErrors.Length > 0 ? formErrors : null,
+            CanSave: fullErrors.Length == 0);
     }
 
     private static PreceptPreviewResponse HandleReset(PreceptPreviewRequest request)
@@ -264,7 +326,61 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
             new Dictionary<string, object?>(session.Instance.InstanceData, StringComparer.Ordinal),
             diagnostics,
             null,
-            ruleDefinitions.Count > 0 ? ruleDefinitions : null);
+            ruleDefinitions.Count > 0 ? ruleDefinitions : null,
+            MapEditableFields(inspectionResult.EditableFields));
+    }
+
+    private static IReadOnlyList<PreceptPreviewEditableField>? MapEditableFields(IReadOnlyList<PreceptEditableFieldInfo>? editableFields)
+        => editableFields?.Select(ef => new PreceptPreviewEditableField(
+            ef.FieldName,
+            ef.FieldType,
+            ef.IsNullable,
+            ef.CurrentValue,
+            ef.Violation?.Reason)).ToArray();
+
+    private static PreceptInspectionResult InspectDraftPatch(PreviewSession session, IReadOnlyDictionary<string, object?> patch)
+        => session.Engine.Inspect(session.Instance, builder =>
+        {
+            foreach (var (fieldName, value) in patch)
+                builder.Set(fieldName, value);
+        });
+
+    private static string[] ExtractEditableViolations(IReadOnlyList<PreceptPreviewEditableField>? editable)
+        => editable?
+            .Where(e => !string.IsNullOrWhiteSpace(e.Violation))
+            .Select(e => e.Violation!)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray()
+            ?? Array.Empty<string>();
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>>? BuildFieldErrors(
+        PreviewSession session,
+        IReadOnlyDictionary<string, object?> patch,
+        IReadOnlyList<string> fullErrors)
+    {
+        if (patch.Count == 0 || fullErrors.Count == 0)
+            return null;
+
+        var result = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        foreach (var fieldName in patch.Keys)
+        {
+            var reducedPatch = patch
+                .Where(kvp => !string.Equals(kvp.Key, fieldName, StringComparison.Ordinal))
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.Ordinal);
+
+            var reducedErrors = reducedPatch.Count == 0
+                ? Array.Empty<string>()
+                : ExtractEditableViolations(MapEditableFields(InspectDraftPatch(session, reducedPatch).EditableFields));
+
+            var attributed = fullErrors
+                .Where(err => !reducedErrors.Contains(err, StringComparer.Ordinal))
+                .ToArray();
+
+            if (attributed.Length > 0)
+                result[fieldName] = attributed;
+        }
+
+        return result.Count > 0 ? result : null;
     }
 
     private static string ResolveText(PreceptPreviewRequest request)
@@ -275,6 +391,21 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
         return PreceptTextDocumentSyncHandler.SharedAnalyzer.TryGetDocumentText(request.Uri, out var text)
             ? text
             : string.Empty;
+    }
+
+    private static object? UnwrapJToken(object? value)
+    {
+        if (value is JValue jv)
+            return jv.Type switch
+            {
+                JTokenType.String => jv.Value<string>(),
+                JTokenType.Integer => jv.Value<double>(),
+                JTokenType.Float => jv.Value<double>(),
+                JTokenType.Boolean => jv.Value<bool>(),
+                JTokenType.Null => null,
+                _ => jv.Value<object>()
+            };
+        return value;
     }
 
     private sealed class PreviewSession

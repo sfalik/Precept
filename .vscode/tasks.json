@@ -10,12 +10,15 @@
             "type": "shell",
             "command": "dotnet",
             "args": [
-                "build"
+                "build",
+                "${workspaceFolder}/tools/Precept.LanguageServer/Precept.LanguageServer.csproj",
+                "--artifacts-path",
+                "${workspaceFolder}/temp/dev-language-server"
             ],
             "problemMatcher": "$msCompile",
             "group": {
                 "_id": "build",
-                "isDefault": false
+                "isDefault": true
             }
         },
         {
@@ -25,6 +28,19 @@
             "args": [
                 "run",
                 "loop:local"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/tools/Precept.VsCode"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "extension: loop local uninstall",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "run",
+                "loop:local:uninstall"
             ],
             "options": {
                 "cwd": "${workspaceFolder}/tools/Precept.VsCode"

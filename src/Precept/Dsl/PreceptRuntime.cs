@@ -21,6 +21,9 @@ public sealed class PreceptEngine
     private readonly Dictionary<(PreceptAssertPreposition Prep, string State), List<PreceptStateAssert>> _stateAssertMap;
     private readonly Dictionary<(PreceptAssertPreposition Prep, string State), List<PreceptStateAction>> _stateActionMap;
 
+    // Editability: state → set of editable field names (union of all matching edit blocks)
+    private readonly IReadOnlyDictionary<string, HashSet<string>> _editableFieldsByState;
+
     public string Name { get; }
     public IReadOnlyList<string> States { get; }
     public string InitialState { get; }
@@ -108,6 +111,23 @@ public sealed class PreceptEngine
             }
             list.Add(sa);
         }
+
+        // Editable fields: build per-state union of editable field names
+        var editMap = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        if (model.EditBlocks is { Count: > 0 })
+        {
+            foreach (var block in model.EditBlocks)
+            {
+                if (!editMap.TryGetValue(block.State, out var fieldSet))
+                {
+                    fieldSet = new HashSet<string>(StringComparer.Ordinal);
+                    editMap[block.State] = fieldSet;
+                }
+                foreach (var fieldName in block.FieldNames)
+                    fieldSet.Add(fieldName);
+            }
+        }
+        _editableFieldsByState = editMap;
     }
 
     public PreceptInstance CreateInstance(
@@ -411,7 +431,106 @@ public sealed class PreceptEngine
             .Select(eventName => Inspect(instance, eventName))
             .ToArray();
 
-        return new PreceptInspectionResult(instance.CurrentState, instance.InstanceData, eventResults);
+        var editableFieldInfos = BuildEditableFieldInfos(instance.CurrentState, instance.InstanceData);
+
+        return new PreceptInspectionResult(instance.CurrentState, instance.InstanceData, eventResults, editableFieldInfos);
+    }
+
+    /// <summary>
+    /// Applies a hypothetical patch to a working copy of instance data, runs the full
+    /// validation pipeline, and returns a <see cref="PreceptInspectionResult"/> with
+    /// violations reflected in <see cref="PreceptEditableFieldInfo.Violation"/>.
+    /// No commit occurs — the instance is unchanged.
+    /// </summary>
+    public PreceptInspectionResult Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
+    {
+        var baseResult = Inspect(instance);
+        var editableFieldInfos = baseResult.EditableFields;
+
+        // If no edit blocks at all, return the base result unchanged
+        if (editableFieldInfos is null)
+            return baseResult;
+
+        var builder = new UpdatePatchBuilder();
+        patch(builder);
+
+        var operations = builder.GetOperations();
+        if (operations.Count == 0)
+            return baseResult;
+
+        // Validate conflicts
+        var conflictError = builder.ValidateConflicts(_fieldMap, _collectionFieldMap);
+        if (conflictError is not null)
+        {
+            // Return with a synthetic violation on the first field
+            var violatedInfos = new List<PreceptEditableFieldInfo>();
+            foreach (var info in editableFieldInfos)
+            {
+                var matchesOp = operations.Any(op => string.Equals(op.FieldName, info.FieldName, StringComparison.Ordinal));
+                if (matchesOp)
+                {
+                    var violation = new PreceptViolation(conflictError, Array.Empty<PreceptEditableFieldInfo>());
+                    violatedInfos.Add(info with { Violation = violation });
+                }
+                else
+                {
+                    violatedInfos.Add(info);
+                }
+            }
+            return new PreceptInspectionResult(baseResult.CurrentState, baseResult.InstanceData, baseResult.Events, violatedInfos);
+        }
+
+        // Check editability
+        var editableNames = _editableFieldsByState.TryGetValue(instance.CurrentState, out var editable)
+            ? editable : null;
+        foreach (var op in operations)
+        {
+            if (editableNames is null || !editableNames.Contains(op.FieldName))
+            {
+                var reason = $"Field '{op.FieldName}' is not editable in state '{instance.CurrentState}'.";
+                var violatedInfos = editableFieldInfos.Select(info =>
+                    string.Equals(info.FieldName, op.FieldName, StringComparison.Ordinal)
+                        ? info with { Violation = new PreceptViolation(reason, Array.Empty<PreceptEditableFieldInfo>()) }
+                        : info).ToList();
+                return new PreceptInspectionResult(baseResult.CurrentState, baseResult.InstanceData, baseResult.Events, violatedInfos);
+            }
+        }
+
+        // Simulate: apply patch to working copy and evaluate rules
+        var internalData = HydrateInstanceData(instance.InstanceData);
+        var updatedData = new Dictionary<string, object?>(internalData, StringComparer.Ordinal);
+        var workingCollections = CloneCollections(updatedData);
+
+        ApplyPatchOperations(operations, updatedData, workingCollections);
+        CommitCollections(updatedData, workingCollections);
+
+        // Evaluate rules on working copy
+        var violations = new List<string>();
+        violations.AddRange(EvaluateInvariants(updatedData));
+        violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.In, instance.CurrentState, updatedData));
+
+        if (violations.Count == 0)
+            return baseResult;
+
+        // Map violations to affected fields
+        var patchedFieldNames = new HashSet<string>(
+            operations.Select(op => op.FieldName), StringComparer.Ordinal);
+        var violationObj = new PreceptViolation(
+            string.Join("; ", violations),
+            Array.Empty<PreceptEditableFieldInfo>());
+
+        var resultInfos = editableFieldInfos.Select(info =>
+            patchedFieldNames.Contains(info.FieldName)
+                ? info with { Violation = violationObj }
+                : info).ToList();
+
+        // Wire up AffectedFields on the violation
+        var affectedFields = resultInfos.Where(f => f.Violation is not null).ToList();
+        violationObj = violationObj with { AffectedFields = affectedFields };
+        resultInfos = resultInfos.Select(info =>
+            info.Violation is not null ? info with { Violation = violationObj } : info).ToList();
+
+        return new PreceptInspectionResult(baseResult.CurrentState, baseResult.InstanceData, baseResult.Events, resultInfos);
     }
 
     /// <summary>
@@ -593,6 +712,227 @@ public sealed class PreceptEngine
         };
 
         return PreceptFireResult.Accepted(instance.CurrentState, eventName, targetState, updated);
+    }
+
+    /// <summary>
+    /// Atomically updates editable fields on an instance. Only fields declared in an
+    /// <c>in &lt;State&gt; edit</c> block for the current state are mutable.
+    /// After applying edits, evaluates all invariants and state asserts.
+    /// </summary>
+    public PreceptUpdateResult Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
+    {
+        var builder = new UpdatePatchBuilder();
+        patch(builder);
+
+        // Build-time conflict detection
+        var conflictError = builder.ValidateConflicts(_fieldMap, _collectionFieldMap);
+        if (conflictError is not null)
+            return PreceptUpdateResult.Failed(PreceptUpdateOutcome.Invalid, new[] { conflictError });
+
+        var operations = builder.GetOperations();
+        if (operations.Count == 0)
+            return PreceptUpdateResult.Failed(PreceptUpdateOutcome.Invalid, new[] { "Patch is empty." });
+
+        // Stage 1: Editability check — all fields in patch must be editable in current state
+        var editableFields = _editableFieldsByState.TryGetValue(instance.CurrentState, out var editable)
+            ? editable : null;
+        var notAllowed = new List<string>();
+        foreach (var op in operations)
+        {
+            if (editableFields is null || !editableFields.Contains(op.FieldName))
+                notAllowed.Add($"Field '{op.FieldName}' is not editable in state '{instance.CurrentState}'.");
+        }
+        if (notAllowed.Count > 0)
+            return PreceptUpdateResult.Failed(PreceptUpdateOutcome.NotAllowed, notAllowed);
+
+        // Stage 2: Type check + unknown field validation
+        foreach (var op in operations)
+        {
+            var typeError = ValidateUpdateOperation(op);
+            if (typeError is not null)
+                return PreceptUpdateResult.Failed(PreceptUpdateOutcome.Invalid, new[] { typeError });
+        }
+
+        // Stage 3: Atomic mutation on working copy
+        var internalData = HydrateInstanceData(instance.InstanceData);
+        var updatedData = new Dictionary<string, object?>(internalData, StringComparer.Ordinal);
+        var workingCollections = CloneCollections(updatedData);
+
+        var mutError = ApplyPatchOperations(operations, updatedData, workingCollections);
+        if (mutError is not null)
+            return PreceptUpdateResult.Failed(PreceptUpdateOutcome.Invalid, new[] { mutError });
+
+        CommitCollections(updatedData, workingCollections);
+
+        // Stage 4: Rules evaluation (invariants + 'in' state asserts)
+        var violations = new List<string>();
+        violations.AddRange(EvaluateInvariants(updatedData));
+        violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.In, instance.CurrentState, updatedData));
+        if (violations.Count > 0)
+            return PreceptUpdateResult.Failed(PreceptUpdateOutcome.Blocked, violations);
+
+        // Stage 5: Commit
+        var updated = instance with
+        {
+            UpdatedAt = DateTimeOffset.UtcNow,
+            InstanceData = DehydrateData(updatedData)
+        };
+
+        return PreceptUpdateResult.Updated(updated);
+    }
+
+    private string? ValidateUpdateOperation(UpdatePatchOperation op)
+    {
+        bool isScalar = _fieldMap.ContainsKey(op.FieldName);
+        bool isCollection = _collectionFieldMap.ContainsKey(op.FieldName);
+
+        if (!isScalar && !isCollection)
+            return $"Unknown field '{op.FieldName}'.";
+
+        if (isScalar && op.Kind != UpdateOpKind.Set)
+            return $"Granular operations are only valid on collection fields (field '{op.FieldName}' is scalar).";
+
+        if (isCollection && op.Kind == UpdateOpKind.Set)
+            return $"Use Replace for collection fields (field '{op.FieldName}').";
+
+        // Type check for scalar Set
+        if (isScalar && op.Kind == UpdateOpKind.Set)
+        {
+            var field = _fieldMap[op.FieldName];
+            if (!TryValidateScalarValue(field.Name, field.Type, field.IsNullable, op.Value, out var typeError))
+                return typeError;
+        }
+
+        // Type check for collection element values
+        if (isCollection && op.Value is not null)
+        {
+            var col = _collectionFieldMap[op.FieldName];
+            if (op.Kind is UpdateOpKind.Add or UpdateOpKind.Remove
+                or UpdateOpKind.Enqueue or UpdateOpKind.Push)
+            {
+                if (!TryValidateScalarValue(op.FieldName, col.InnerType, false, op.Value, out var elemError))
+                    return $"Collection element type mismatch: {elemError}";
+            }
+        }
+
+        // Type check for Replace values
+        if (isCollection && op.Kind == UpdateOpKind.Replace && op.Values is not null)
+        {
+            var col = _collectionFieldMap[op.FieldName];
+            foreach (var val in op.Values)
+            {
+                if (!TryValidateScalarValue(op.FieldName, col.InnerType, false, val, out var elemError))
+                    return $"Collection element type mismatch: {elemError}";
+            }
+        }
+
+        return null;
+    }
+
+    private string? ApplyPatchOperations(
+        IReadOnlyList<UpdatePatchOperation> operations,
+        Dictionary<string, object?> data,
+        Dictionary<string, CollectionValue> workingCollections)
+    {
+        foreach (var op in operations)
+        {
+            if (_fieldMap.ContainsKey(op.FieldName))
+            {
+                // Scalar set
+                data[op.FieldName] = op.Value;
+                continue;
+            }
+
+            if (!workingCollections.TryGetValue(op.FieldName, out var collection))
+                return $"Unknown collection field '{op.FieldName}'.";
+
+            switch (op.Kind)
+            {
+                case UpdateOpKind.Add:
+                    collection.Add(op.Value!);
+                    break;
+                case UpdateOpKind.Remove:
+                    collection.Remove(op.Value!);
+                    break;
+                case UpdateOpKind.Enqueue:
+                    collection.Enqueue(op.Value!);
+                    break;
+                case UpdateOpKind.Dequeue:
+                    if (collection.Count == 0)
+                        return $"Cannot dequeue from empty queue '{op.FieldName}'.";
+                    collection.Dequeue();
+                    break;
+                case UpdateOpKind.Push:
+                    collection.Push(op.Value!);
+                    break;
+                case UpdateOpKind.Pop:
+                    if (collection.Count == 0)
+                        return $"Cannot pop from empty stack '{op.FieldName}'.";
+                    collection.Pop();
+                    break;
+                case UpdateOpKind.Replace:
+                    collection.Clear();
+                    if (op.Values is not null)
+                    {
+                        foreach (var val in op.Values)
+                            collection.Add(val);
+                    }
+                    break;
+                case UpdateOpKind.Clear:
+                    collection.Clear();
+                    break;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the set of editable field names for the given state, or empty if none.
+    /// </summary>
+    internal IReadOnlySet<string> GetEditableFieldNames(string state)
+    {
+        if (_editableFieldsByState.TryGetValue(state, out var fields))
+            return fields;
+        return EmptyStringSet.Instance;
+    }
+
+    /// <summary>
+    /// Builds <see cref="PreceptEditableFieldInfo"/> entries for all editable fields
+    /// in the given state, populated with current values from instance data.
+    /// Returns null when no edit declarations exist for this engine.
+    /// </summary>
+    private IReadOnlyList<PreceptEditableFieldInfo>? BuildEditableFieldInfos(
+        string state, IReadOnlyDictionary<string, object?> instanceData)
+    {
+        if (_editableFieldsByState.Count == 0)
+            return null;
+
+        if (!_editableFieldsByState.TryGetValue(state, out var editableNames) || editableNames.Count == 0)
+            return Array.Empty<PreceptEditableFieldInfo>();
+
+        var result = new List<PreceptEditableFieldInfo>();
+        // Maintain declaration order: iterate Fields then CollectionFields
+        foreach (var field in Fields)
+        {
+            if (!editableNames.Contains(field.Name))
+                continue;
+            instanceData.TryGetValue(field.Name, out var currentValue);
+            var typeName = field.IsNullable
+                ? field.Type.ToString().ToLowerInvariant()
+                : field.Type.ToString().ToLowerInvariant();
+            result.Add(new PreceptEditableFieldInfo(
+                field.Name, typeName, field.IsNullable, currentValue));
+        }
+        foreach (var col in CollectionFields)
+        {
+            if (!editableNames.Contains(col.Name))
+                continue;
+            instanceData.TryGetValue(col.Name, out var currentValue);
+            var typeName = $"{col.CollectionKind.ToString().ToLowerInvariant()}<{col.InnerType.ToString().ToLowerInvariant()}>";
+            result.Add(new PreceptEditableFieldInfo(
+                col.Name, typeName, false, currentValue));
+        }
+        return result;
     }
 
     /// <summary>
@@ -1425,7 +1765,191 @@ public sealed record PreceptEventInspectionResult(
 public sealed record PreceptInspectionResult(
     string CurrentState,
     IReadOnlyDictionary<string, object?> InstanceData,
-    IReadOnlyList<PreceptEventInspectionResult> Events);
+    IReadOnlyList<PreceptEventInspectionResult> Events,
+    IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null);
+
+public sealed record PreceptEditableFieldInfo(
+    string FieldName,
+    string FieldType,
+    bool IsNullable,
+    object? CurrentValue,
+    PreceptViolation? Violation = null);
+
+public sealed record PreceptViolation(
+    string Reason,
+    IReadOnlyList<PreceptEditableFieldInfo> AffectedFields);
+
+public enum PreceptUpdateOutcome
+{
+    Updated,
+    NotAllowed,
+    Blocked,
+    Invalid
+}
+
+public sealed record PreceptUpdateResult(
+    PreceptUpdateOutcome Outcome,
+    IReadOnlyList<string> Reasons,
+    PreceptInstance? UpdatedInstance)
+{
+    internal static PreceptUpdateResult Updated(PreceptInstance updated) =>
+        new(PreceptUpdateOutcome.Updated, Array.Empty<string>(), updated);
+
+    internal static PreceptUpdateResult Failed(PreceptUpdateOutcome outcome, IReadOnlyList<string> reasons) =>
+        new(outcome, reasons, null);
+}
+
+public interface IUpdatePatchBuilder
+{
+    IUpdatePatchBuilder Set(string fieldName, object? value);
+    IUpdatePatchBuilder Add(string fieldName, object value);
+    IUpdatePatchBuilder Remove(string fieldName, object value);
+    IUpdatePatchBuilder Enqueue(string fieldName, object value);
+    IUpdatePatchBuilder Dequeue(string fieldName);
+    IUpdatePatchBuilder Push(string fieldName, object value);
+    IUpdatePatchBuilder Pop(string fieldName);
+    IUpdatePatchBuilder Replace(string fieldName, IEnumerable<object> values);
+    IUpdatePatchBuilder Clear(string fieldName);
+}
+
+internal enum UpdateOpKind
+{
+    Set,
+    Add,
+    Remove,
+    Enqueue,
+    Dequeue,
+    Push,
+    Pop,
+    Replace,
+    Clear
+}
+
+internal sealed record UpdatePatchOperation(
+    string FieldName,
+    UpdateOpKind Kind,
+    object? Value = null,
+    IReadOnlyList<object>? Values = null);
+
+internal sealed class UpdatePatchBuilder : IUpdatePatchBuilder
+{
+    private readonly List<UpdatePatchOperation> _operations = new();
+
+    public IUpdatePatchBuilder Set(string fieldName, object? value)
+    {
+        _operations.Add(new UpdatePatchOperation(fieldName, UpdateOpKind.Set, value));
+        return this;
+    }
+
+    public IUpdatePatchBuilder Add(string fieldName, object value)
+    {
+        _operations.Add(new UpdatePatchOperation(fieldName, UpdateOpKind.Add, value));
+        return this;
+    }
+
+    public IUpdatePatchBuilder Remove(string fieldName, object value)
+    {
+        _operations.Add(new UpdatePatchOperation(fieldName, UpdateOpKind.Remove, value));
+        return this;
+    }
+
+    public IUpdatePatchBuilder Enqueue(string fieldName, object value)
+    {
+        _operations.Add(new UpdatePatchOperation(fieldName, UpdateOpKind.Enqueue, value));
+        return this;
+    }
+
+    public IUpdatePatchBuilder Dequeue(string fieldName)
+    {
+        _operations.Add(new UpdatePatchOperation(fieldName, UpdateOpKind.Dequeue));
+        return this;
+    }
+
+    public IUpdatePatchBuilder Push(string fieldName, object value)
+    {
+        _operations.Add(new UpdatePatchOperation(fieldName, UpdateOpKind.Push, value));
+        return this;
+    }
+
+    public IUpdatePatchBuilder Pop(string fieldName)
+    {
+        _operations.Add(new UpdatePatchOperation(fieldName, UpdateOpKind.Pop));
+        return this;
+    }
+
+    public IUpdatePatchBuilder Replace(string fieldName, IEnumerable<object> values)
+    {
+        _operations.Add(new UpdatePatchOperation(fieldName, UpdateOpKind.Replace, Values: values.ToList()));
+        return this;
+    }
+
+    public IUpdatePatchBuilder Clear(string fieldName)
+    {
+        _operations.Add(new UpdatePatchOperation(fieldName, UpdateOpKind.Clear));
+        return this;
+    }
+
+    public IReadOnlyList<UpdatePatchOperation> GetOperations() => _operations;
+
+    public string? ValidateConflicts(
+        Dictionary<string, PreceptField> fieldMap,
+        Dictionary<string, PreceptCollectionField> collectionFieldMap)
+    {
+        // Duplicate Set on same scalar field
+        var scalarSets = new HashSet<string>(StringComparer.Ordinal);
+        var collectionReplacements = new HashSet<string>(StringComparer.Ordinal);
+        var collectionGranular = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var op in _operations)
+        {
+            bool isScalar = fieldMap.ContainsKey(op.FieldName);
+            bool isCollection = collectionFieldMap.ContainsKey(op.FieldName);
+
+            if (isScalar && op.Kind == UpdateOpKind.Set)
+            {
+                if (!scalarSets.Add(op.FieldName))
+                    return $"Duplicate Set on field '{op.FieldName}'.";
+            }
+
+            if (isCollection && op.Kind == UpdateOpKind.Set)
+                return $"Use Replace for collection fields (field '{op.FieldName}').";
+
+            if (isScalar && op.Kind != UpdateOpKind.Set)
+                return $"Granular operations are only valid on collection fields (field '{op.FieldName}' is scalar).";
+
+            if (isCollection && op.Kind == UpdateOpKind.Replace)
+                collectionReplacements.Add(op.FieldName);
+
+            if (isCollection && op.Kind is not UpdateOpKind.Replace and not UpdateOpKind.Clear)
+                collectionGranular.Add(op.FieldName);
+        }
+
+        // Replace + granular on same collection
+        foreach (var field in collectionReplacements)
+        {
+            if (collectionGranular.Contains(field))
+                return $"Cannot combine Replace with granular operations on field '{field}'.";
+        }
+
+        return null;
+    }
+}
+
+internal sealed class EmptyStringSet : IReadOnlySet<string>
+{
+    internal static readonly EmptyStringSet Instance = new();
+
+    public int Count => 0;
+    public bool Contains(string item) => false;
+    public bool IsProperSubsetOf(IEnumerable<string> other) => other.Any();
+    public bool IsProperSupersetOf(IEnumerable<string> other) => false;
+    public bool IsSubsetOf(IEnumerable<string> other) => true;
+    public bool IsSupersetOf(IEnumerable<string> other) => !other.Any();
+    public bool Overlaps(IEnumerable<string> other) => false;
+    public bool SetEquals(IEnumerable<string> other) => !other.Any();
+    public IEnumerator<string> GetEnumerator() => Enumerable.Empty<string>().GetEnumerator();
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+}
 
 public sealed record PreceptFireResult(
     PreceptOutcomeKind Outcome,

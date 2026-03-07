@@ -120,13 +120,30 @@ Arguments are only validated and event rules are only run when `eventArguments !
 public PreceptInspectionResult Inspect(PreceptInstance instance)
 ```
 
-Evaluates all events that have at least one transition from the instance's current state, returning a single `PreceptInspectionResult` with the current state, serialized data, and per-event results.
+Evaluates all events that have at least one transition from the instance's current state, returning a single `PreceptInspectionResult` with the current state, serialized data, per-event results, and editable field metadata.
 
 - Events are ordered by declaration position.
 - Each event is evaluated as `Inspect(instance, eventName)` with no event arguments (discovery mode).
+- `EditableFields` is `null` when no `in ... edit` declarations exist, or contains the union of all matching edit declarations for the current state.
 - If the instance fails `CheckCompatibility`, returns a result with an empty events list.
 
 Use this as the primary API for rendering a state-machine inspector view.
+
+### `Inspect` (hypothetical patch)
+
+```csharp
+public PreceptInspectionResult Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
+```
+
+Applies a hypothetical patch to a working copy of instance data, runs the full validation pipeline (editability check, type check, invariant/assert evaluation), and returns a `PreceptInspectionResult` with violations reflected in `EditableFields`. **No commit occurs** — the instance is unchanged. Used for per-keystroke validation in the preview UI.
+
+### `Update`
+
+```csharp
+public PreceptUpdateResult Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
+```
+
+Atomically updates editable fields. Only fields declared in an `in <State> edit` block for the current state are mutable. Validation sequence: editability check → type check → atomic mutation on working copy → invariant/state-assert evaluation → commit or rollback. Returns `PreceptUpdateResult`.
 
 ### `Fire`
 
@@ -267,10 +284,57 @@ Returned by the per-event `Inspect` overload. `TargetState` is populated for `Ac
 public sealed record PreceptInspectionResult(
     string CurrentState,
     IReadOnlyDictionary<string, object?> InstanceData,
-    IReadOnlyList<PreceptEventInspectionResult> Events)
+    IReadOnlyList<PreceptEventInspectionResult> Events,
+    IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null)
 ```
 
-Returned by the aggregate `Inspect(instance)` overload. `InstanceData` is the same clean dictionary as `instance.InstanceData`.
+Returned by the aggregate `Inspect(instance)` overload. `InstanceData` is the same clean dictionary as `instance.InstanceData`. `EditableFields` is `null` when no `in ... edit` declarations exist, or contains the effective editable field set for the current state.
+
+### `PreceptEditableFieldInfo`
+
+```csharp
+public sealed record PreceptEditableFieldInfo(
+    string FieldName,
+    string FieldType,        // "string", "number", "set<string>", etc.
+    bool IsNullable,
+    object? CurrentValue,
+    PreceptViolation? Violation = null)
+```
+
+Metadata for one editable field. `Violation` is populated only by `Inspect(instance, patch)` when a hypothetical patch fails a rule.
+
+### `PreceptViolation`
+
+```csharp
+public sealed record PreceptViolation(
+    string Reason,
+    IReadOnlyList<PreceptEditableFieldInfo> AffectedFields)
+```
+
+Bidirectional object reference — runtime only, never serialized directly.
+
+### `PreceptUpdateResult`
+
+```csharp
+public sealed record PreceptUpdateResult(
+    PreceptUpdateOutcome Outcome,
+    IReadOnlyList<string> Reasons,
+    PreceptInstance? UpdatedInstance)   // null unless Outcome is Updated
+```
+
+Returned by `Update`. `UpdatedInstance` is non-null only when `Outcome` is `Updated`.
+
+### `PreceptUpdateOutcome`
+
+```csharp
+public enum PreceptUpdateOutcome
+{
+    Updated,      // All fields modified, all rules passed
+    NotAllowed,   // One or more fields not editable in current state
+    Blocked,      // Rules violated — reasons collected
+    Invalid       // Type mismatch, unknown field, patch conflict, or empty patch
+}
+```
 
 ### `PreceptFireResult`
 
@@ -337,6 +401,14 @@ else
 {
     Console.WriteLine($"Rejected: {string.Join(", ", result.Reasons)}");
 }
+
+// 6. Direct field editing (for fields declared with `in <State> edit`)
+var editResult = engine.Update(instance, patch => patch
+    .Set("Notes", "Customer called back")
+    .Set("Priority", 1.0));
+
+if (editResult.Outcome == PreceptUpdateOutcome.Updated)
+    instance = editResult.UpdatedInstance!;
 ```
 
 ---
@@ -360,6 +432,7 @@ The following types are returned by `PreceptParser.Parse` and consumed by `Prece
 | `PreceptStateTransition` | Row outcome: `transition <State>` |
 | `PreceptRejection` | Row outcome: `reject "<message>"` |
 | `PreceptNoTransition` | Row outcome: `no transition` |
+| `PreceptEditBlock` | Editable field declaration: `in <State> edit <Field>, ...` |
 
 ### Scalar and Collection Enums
 

@@ -89,6 +89,36 @@ public static class PreceptParser
         var col = pos.HasValue ? pos.Column : 0;
         var msg = result.ErrorMessage ?? "Unexpected input";
         var expectations = result.Expectations ?? [];
+
+        // When the parser partially succeeded (HasValue=true but tokens remain),
+        // Superpower's ErrorPosition points to position 0 — not useful.
+        // Use the first unconsumed token's position instead for an accurate squiggle,
+        // and build a more descriptive error message.
+        if (result.HasValue && !result.Remainder.IsAtEnd)
+        {
+            var next = result.Remainder.First();
+            line = next.Position.Line;
+            col = next.Position.Column;
+            var tokenText = next.ToStringValue();
+            var display = PreceptTokenMeta.GetSymbol(next.Kind) ?? tokenText;
+            msg = $"Unexpected '{display}' — could not parse as a valid statement";
+
+            // Peek ahead for additional context (e.g. "from Draft on SendForReview" missing "->")
+            var remaining = result.Remainder.ToArray();
+            if (next.Kind == PreceptToken.From && remaining.Length >= 4
+                && remaining[1].Kind == PreceptToken.Identifier
+                && remaining[2].Kind == PreceptToken.On
+                && remaining[3].Kind == PreceptToken.Identifier)
+            {
+                // Looks like a transition row — check for missing arrow
+                var hasArrow = remaining.Skip(4).Any(t => t.Kind == PreceptToken.Arrow);
+                if (!hasArrow)
+                    msg = $"Transition row starting with 'from {remaining[1].ToStringValue()} on {remaining[3].ToStringValue()}' is missing '->' action chain";
+                else
+                    msg = $"Could not parse transition row 'from {remaining[1].ToStringValue()} on {remaining[3].ToStringValue()}' — expected 'from <State> on <Event> -> <action> [-> <action>]*'";
+            }
+        }
+
         if (expectations.Length > 0)
             msg += $" (expected {string.Join(" or ", expectations)})";
         diagnostics.Add(new ParseDiagnostic(line, col, msg));

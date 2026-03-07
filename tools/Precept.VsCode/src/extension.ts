@@ -1,3 +1,4 @@
+import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
@@ -9,9 +10,38 @@ import {
 } from "vscode-languageclient/node";
 
 let client: LanguageClient | undefined;
+let clientStartPromise: Promise<void> | undefined;
 const previewPanels = new Map<string, vscode.WebviewPanel>();
 const snapshotSequenceByPanel = new WeakMap<vscode.WebviewPanel, number>();
 let elkLayoutEngine: any | undefined;
+let languageServerRestartTimer: NodeJS.Timeout | undefined;
+let languageServerRestartInProgress = false;
+let languageServerRestartRequested = false;
+let languageServerRuntimeSequence = 0;
+let languageServerStatusItem: vscode.StatusBarItem | undefined;
+let currentLanguageServerLaunchInfo: LanguageServerLaunchInfo | undefined;
+
+const languageServerDllName = "Precept.LanguageServer.dll";
+const devLanguageServerRootRelativePath = path.join("temp", "dev-language-server");
+const devLanguageServerBuildDllRelativePath = path.join(
+  devLanguageServerRootRelativePath,
+  "bin",
+  "Precept.LanguageServer",
+  "debug",
+  languageServerDllName
+);
+const devLanguageServerRuntimeRelativePath = path.join(devLanguageServerRootRelativePath, "runtime");
+
+type LanguageServerLaunchMode = "dev-build-shadow-copy";
+
+interface LanguageServerLaunchInfo {
+  mode: LanguageServerLaunchMode;
+  command: string;
+  args: string[];
+  cwd: string;
+  buildDllPath?: string;
+  runtimeDllPath?: string;
+}
 
 function getPreviewPanelKey(uri: vscode.Uri): string {
   return uri.toString().toLowerCase();
@@ -23,7 +53,7 @@ function nextSnapshotSequence(panel: vscode.WebviewPanel): number {
   return next;
 }
 
-type PreviewAction = "snapshot" | "fire" | "reset" | "replay" | "inspect";
+type PreviewAction = "snapshot" | "fire" | "reset" | "replay" | "inspect" | "inspectUpdate" | "update";
 
 interface PreviewRequest {
   action: PreviewAction;
@@ -32,6 +62,7 @@ interface PreviewRequest {
   eventName?: string;
   args?: Record<string, unknown>;
   steps?: Array<{ eventName: string; args?: Record<string, unknown> }>;
+  fieldUpdates?: Record<string, unknown>;
 }
 
 interface PreviewResponse {
@@ -73,14 +104,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const outputChannel = vscode.window.createOutputChannel("Precept");
   context.subscriptions.push(outputChannel);
 
+  languageServerStatusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+  languageServerStatusItem.name = "Precept Language Server";
+  languageServerStatusItem.command = "precept.showLanguageServerMode";
+  context.subscriptions.push(languageServerStatusItem);
+  updateLanguageServerStatusItem("starting");
+  languageServerStatusItem.show();
+
   const openPreviewDisposable = vscode.commands.registerCommand("precept.openPreview", () => {
     void openInspectorPreviewPanel(context, outputChannel);
   });
   context.subscriptions.push(openPreviewDisposable);
 
+  const showLanguageServerModeDisposable = vscode.commands.registerCommand("precept.showLanguageServerMode", () => {
+    showLanguageServerMode(outputChannel);
+  });
+  context.subscriptions.push(showLanguageServerModeDisposable);
+
   const projectPath = resolveLanguageServerProjectPath(context, outputChannel);
 
   if (!projectPath) {
+    updateLanguageServerStatusItem("error", "project not found");
     outputChannel.appendLine("Language server project not found.");
     void vscode.window.showErrorMessage(
       "Precept: could not locate tools/Precept.LanguageServer/Precept.LanguageServer.csproj from the current workspace."
@@ -94,23 +138,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   outputChannel.appendLine(`Language server project: ${projectPath}`);
   outputChannel.appendLine(`Language server cwd: ${serverWorkingDirectory}`);
-
-  const serverOptions: ServerOptions = {
-    run: {
-      command: "dotnet",
-      args: ["run", "--project", projectPath],
-      options: {
-        cwd: serverWorkingDirectory
-      }
-    },
-    debug: {
-      command: "dotnet",
-      args: ["run", "--project", projectPath],
-      options: {
-        cwd: serverWorkingDirectory
-      }
-    }
-  };
 
   const clientOptions: LanguageClientOptions = {
     outputChannel,
@@ -126,19 +153,34 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   };
 
-  client = new LanguageClient(
-    "preceptLanguageServer",
-    "Precept Language Server",
-    serverOptions,
-    clientOptions
+  try {
+    await ensureLanguageClientStarted(projectPath, serverWorkingDirectory, clientOptions, outputChannel);
+  } catch (error) {
+    updateLanguageServerStatusItem("error", "startup failed");
+    outputChannel.appendLine(`Language client failed to start: ${String(error)}`);
+    void vscode.window.showErrorMessage("Precept: failed to start the language server. See the Precept output channel for details.");
+    outputChannel.show(true);
+    return;
+  }
+
+  const devLanguageServerWatcher = createDevLanguageServerWatcher(
+    serverWorkingDirectory,
+    () => {
+      scheduleLanguageClientRestart(projectPath, serverWorkingDirectory, clientOptions, outputChannel);
+    },
+    outputChannel
   );
+  context.subscriptions.push(devLanguageServerWatcher);
+  context.subscriptions.push(
+    new vscode.Disposable(() => {
+      if (!languageServerRestartTimer) {
+        return;
+      }
 
-  client.onDidChangeState((state) => {
-    outputChannel.appendLine(`Language client state: ${state.oldState} -> ${state.newState}`);
-  });
-
-  context.subscriptions.push(client);
-  await client.start();
+      clearTimeout(languageServerRestartTimer);
+      languageServerRestartTimer = undefined;
+    })
+  );
 
   const changeSubscription = vscode.workspace.onDidChangeTextDocument((event) => {
     const panel = previewPanels.get(getPreviewPanelKey(event.document.uri));
@@ -167,6 +209,14 @@ export async function deactivate(): Promise<void> {
   }
 
   previewPanels.clear();
+
+  if (languageServerRestartTimer) {
+    clearTimeout(languageServerRestartTimer);
+    languageServerRestartTimer = undefined;
+  }
+
+  languageServerStatusItem?.dispose();
+  languageServerStatusItem = undefined;
 
   if (!client) {
     return;
@@ -214,6 +264,373 @@ function resolveLanguageServerProjectPath(context: vscode.ExtensionContext, outp
   }
 
   return candidates.find((candidate) => fs.existsSync(candidate));
+}
+
+async function ensureLanguageClientStarted(
+  projectPath: string,
+  serverWorkingDirectory: string,
+  clientOptions: LanguageClientOptions,
+  output: vscode.OutputChannel
+): Promise<void> {
+  if (client) {
+    return;
+  }
+
+  if (clientStartPromise) {
+    await clientStartPromise;
+    return;
+  }
+
+  clientStartPromise = startLanguageClient(projectPath, serverWorkingDirectory, clientOptions, output);
+  try {
+    await clientStartPromise;
+  } finally {
+    clientStartPromise = undefined;
+  }
+}
+
+async function startLanguageClient(
+  projectPath: string,
+  serverWorkingDirectory: string,
+  clientOptions: LanguageClientOptions,
+  output: vscode.OutputChannel
+): Promise<void> {
+  const launchConfiguration = resolveLanguageServerLaunchConfiguration(projectPath, serverWorkingDirectory, output);
+  currentLanguageServerLaunchInfo = launchConfiguration;
+  updateLanguageServerStatusItem("starting");
+  const serverOptions = createServerOptions(launchConfiguration);
+  const nextClient = new LanguageClient(
+    "preceptLanguageServer",
+    "Precept Language Server",
+    serverOptions,
+    clientOptions
+  );
+
+  nextClient.onDidChangeState((state) => {
+    output.appendLine(`Language client state: ${state.oldState} -> ${state.newState}`);
+  });
+
+  client = nextClient;
+
+  try {
+    await nextClient.start();
+    updateLanguageServerStatusItem("ready");
+  } catch (error) {
+    client = undefined;
+    updateLanguageServerStatusItem("error", "start failed");
+    throw error;
+  }
+}
+
+function createServerOptions(launchConfiguration: LanguageServerLaunchInfo): ServerOptions {
+  return {
+    run: {
+      command: launchConfiguration.command,
+      args: launchConfiguration.args,
+      options: {
+        cwd: launchConfiguration.cwd
+      }
+    },
+    debug: {
+      command: launchConfiguration.command,
+      args: launchConfiguration.args,
+      options: {
+        cwd: launchConfiguration.cwd
+      }
+    }
+  };
+}
+
+function createDevLanguageServerWatcher(
+  serverWorkingDirectory: string,
+  onBuildArtifactChanged: () => void,
+  output: vscode.OutputChannel
+): vscode.FileSystemWatcher {
+  const dllPattern = new vscode.RelativePattern(
+    serverWorkingDirectory,
+    toGlobPath(devLanguageServerBuildDllRelativePath)
+  );
+  const watcher = vscode.workspace.createFileSystemWatcher(dllPattern);
+  const handleBuildArtifactChanged = (uri: vscode.Uri) => {
+    output.appendLine(`Dev language server build changed: ${uri.fsPath}`);
+    onBuildArtifactChanged();
+  };
+
+  watcher.onDidCreate(handleBuildArtifactChanged);
+  watcher.onDidChange(handleBuildArtifactChanged);
+  watcher.onDidDelete(handleBuildArtifactChanged);
+  return watcher;
+}
+
+function scheduleLanguageClientRestart(
+  projectPath: string,
+  serverWorkingDirectory: string,
+  clientOptions: LanguageClientOptions,
+  output: vscode.OutputChannel
+): void {
+  if (languageServerRestartTimer) {
+    clearTimeout(languageServerRestartTimer);
+  }
+
+  languageServerRestartTimer = setTimeout(() => {
+    languageServerRestartTimer = undefined;
+    void restartLanguageClient(projectPath, serverWorkingDirectory, clientOptions, output);
+  }, 500);
+}
+
+async function restartLanguageClient(
+  projectPath: string,
+  serverWorkingDirectory: string,
+  clientOptions: LanguageClientOptions,
+  output: vscode.OutputChannel
+): Promise<void> {
+  if (languageServerRestartInProgress) {
+    languageServerRestartRequested = true;
+    return;
+  }
+
+  languageServerRestartInProgress = true;
+  updateLanguageServerStatusItem("restarting");
+
+  try {
+    do {
+      languageServerRestartRequested = false;
+      output.appendLine("Restarting language client to pick up the latest language server build.");
+
+      const currentClient = client;
+      client = undefined;
+
+      if (currentClient) {
+        await currentClient.stop();
+      }
+
+      clientStartPromise = startLanguageClient(projectPath, serverWorkingDirectory, clientOptions, output);
+      try {
+        await clientStartPromise;
+      } finally {
+        clientStartPromise = undefined;
+      }
+    } while (languageServerRestartRequested);
+
+    void vscode.window.setStatusBarMessage("Precept language server restarted", 3000);
+  } catch (error) {
+    output.appendLine(`Language client restart failed: ${String(error)}`);
+    updateLanguageServerStatusItem("error", "restart failed");
+  } finally {
+    languageServerRestartInProgress = false;
+    if (client) {
+      updateLanguageServerStatusItem("ready");
+    }
+  }
+}
+
+function toGlobPath(filePath: string): string {
+  return filePath.replace(/\\/g, "/");
+}
+
+function updateLanguageServerStatusItem(
+  state: "starting" | "ready" | "restarting" | "error",
+  detail?: string
+): void {
+  if (!languageServerStatusItem) {
+    return;
+  }
+
+  const launchLabel = getLanguageServerLaunchModeLabel(currentLanguageServerLaunchInfo?.mode);
+  switch (state) {
+    case "starting":
+      languageServerStatusItem.text = `$(sync~spin) Precept LS: ${launchLabel}`;
+      break;
+    case "restarting":
+      languageServerStatusItem.text = `$(sync~spin) Precept LS: ${launchLabel}`;
+      break;
+    case "error":
+      languageServerStatusItem.text = `$(error) Precept LS: ${launchLabel}`;
+      break;
+    default:
+      languageServerStatusItem.text = `$(server-process) Precept LS: ${launchLabel}`;
+      break;
+  }
+
+  const detailLine = detail ? `Status: ${detail}` : `Status: ${state}`;
+  const launchInfo = currentLanguageServerLaunchInfo
+    ? buildLanguageServerLaunchInfoText(currentLanguageServerLaunchInfo)
+    : "Launch mode not resolved yet.";
+  languageServerStatusItem.tooltip = `Precept language server\n${detailLine}\n${launchInfo}\nClick for full launch details.`;
+  languageServerStatusItem.show();
+}
+
+function getLanguageServerLaunchModeLabel(mode: LanguageServerLaunchMode | undefined): string {
+  switch (mode) {
+    case "dev-build-shadow-copy":
+      return "Dev";
+    default:
+      return "?";
+  }
+}
+
+function buildLanguageServerLaunchInfoText(launchInfo: LanguageServerLaunchInfo): string {
+  const lines = [
+    `Mode: ${launchInfo.mode}`,
+    `Command: ${launchInfo.command} ${launchInfo.args.join(" ")}`,
+    `Working directory: ${launchInfo.cwd}`
+  ];
+
+  if (launchInfo.buildDllPath) {
+    lines.push(`Dev build DLL: ${launchInfo.buildDllPath}`);
+  }
+
+  if (launchInfo.runtimeDllPath) {
+    lines.push(`Runtime DLL: ${launchInfo.runtimeDllPath}`);
+  }
+
+  return lines.join("\n");
+}
+
+function showLanguageServerMode(output: vscode.OutputChannel): void {
+  if (!currentLanguageServerLaunchInfo) {
+    void vscode.window.showInformationMessage("Precept language server launch mode has not been resolved yet.");
+    return;
+  }
+
+  const message = buildLanguageServerLaunchInfoText(currentLanguageServerLaunchInfo);
+  output.appendLine(`Language server details:\n${message}`);
+  output.show(true);
+  void vscode.window.showInformationMessage(
+    `Precept language server mode: ${currentLanguageServerLaunchInfo.mode}`,
+    "Open Output"
+  ).then((selection) => {
+    if (selection === "Open Output") {
+      output.show(true);
+    }
+  });
+}
+
+function resolveLanguageServerLaunchConfiguration(
+  projectPath: string,
+  serverWorkingDirectory: string,
+  output: vscode.OutputChannel
+): LanguageServerLaunchInfo {
+  ensureDevLanguageServerBuild(projectPath, serverWorkingDirectory, output);
+  const devBuildDllPath = path.join(serverWorkingDirectory, devLanguageServerBuildDllRelativePath);
+
+  if (!fs.existsSync(devBuildDllPath)) {
+    throw new Error(`Dev language server build not found at ${devBuildDllPath}.`);
+  }
+
+  try {
+    const runtimeDllPath = prepareDevLanguageServerRuntime(serverWorkingDirectory, devBuildDllPath);
+    output.appendLine("Language server launch mode: dev build shadow copy");
+    output.appendLine(`Language server build dll: ${devBuildDllPath}`);
+    output.appendLine(`Language server runtime dll: ${runtimeDllPath}`);
+
+    return {
+      mode: "dev-build-shadow-copy",
+      command: "dotnet",
+      args: [runtimeDllPath],
+      cwd: serverWorkingDirectory,
+      buildDllPath: devBuildDllPath,
+      runtimeDllPath
+    };
+  } catch (error) {
+    output.appendLine(`Failed to prepare dev language server runtime copy: ${String(error)}`);
+    throw error;
+  }
+}
+
+function ensureDevLanguageServerBuild(
+  projectPath: string,
+  serverWorkingDirectory: string,
+  output: vscode.OutputChannel
+): void {
+  const devBuildRoot = path.join(serverWorkingDirectory, devLanguageServerRootRelativePath);
+  const devBuildDllPath = path.join(serverWorkingDirectory, devLanguageServerBuildDllRelativePath);
+
+  if (fs.existsSync(devBuildDllPath)) {
+    return;
+  }
+
+  fs.mkdirSync(devBuildRoot, { recursive: true });
+  output.appendLine("Bootstrapping dev language server build into temp/dev-language-server.");
+
+  const build = spawnSync(
+    "dotnet",
+    [
+      "build",
+      projectPath,
+      "--artifacts-path",
+      devBuildRoot
+    ],
+    {
+      cwd: serverWorkingDirectory,
+      encoding: "utf8"
+    }
+  );
+
+  if (build.stdout) {
+    output.appendLine(build.stdout.trimEnd());
+  }
+
+  if (build.stderr) {
+    output.appendLine(build.stderr.trimEnd());
+  }
+
+  if (build.status === 0 && fs.existsSync(devBuildDllPath)) {
+    output.appendLine(`Bootstrapped dev language server build: ${devBuildDllPath}`);
+    return;
+  }
+
+  throw new Error(`Bootstrapping dev language server build failed. Expected ${devBuildDllPath}.`);
+}
+
+function prepareDevLanguageServerRuntime(serverWorkingDirectory: string, buildDllPath: string): string {
+  const buildDirectory = path.dirname(buildDllPath);
+  const runtimeRoot = path.join(serverWorkingDirectory, devLanguageServerRuntimeRelativePath);
+  const runtimeDirectory = path.join(runtimeRoot, `run-${Date.now()}-${++languageServerRuntimeSequence}`);
+
+  copyDirectory(buildDirectory, runtimeDirectory);
+  pruneLanguageServerRuntimeDirectories(runtimeRoot, runtimeDirectory);
+
+  return path.join(runtimeDirectory, languageServerDllName);
+}
+
+function copyDirectory(sourceDirectory: string, targetDirectory: string): void {
+  fs.mkdirSync(targetDirectory, { recursive: true });
+
+  for (const entry of fs.readdirSync(sourceDirectory, { withFileTypes: true })) {
+    const sourcePath = path.join(sourceDirectory, entry.name);
+    const targetPath = path.join(targetDirectory, entry.name);
+
+    if (entry.isDirectory()) {
+      copyDirectory(sourcePath, targetPath);
+      continue;
+    }
+
+    fs.copyFileSync(sourcePath, targetPath);
+  }
+}
+
+function pruneLanguageServerRuntimeDirectories(runtimeRoot: string, activeRuntimeDirectory: string): void {
+  if (!fs.existsSync(runtimeRoot)) {
+    return;
+  }
+
+  for (const entry of fs.readdirSync(runtimeRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const candidate = path.join(runtimeRoot, entry.name);
+    if (candidate === activeRuntimeDirectory) {
+      continue;
+    }
+
+    try {
+      fs.rmSync(candidate, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup failures; the next restart can try again.
+    }
+  }
 }
 
 async function openInspectorPreviewPanel(context: vscode.ExtensionContext, output: vscode.OutputChannel): Promise<void> {
@@ -283,7 +700,8 @@ async function openInspectorPreviewPanel(context: vscode.ExtensionContext, outpu
       text: liveDocument.getText(),
       eventName: typeof message.eventName === "string" ? message.eventName : undefined,
       args: typeof message.args === "object" && message.args !== null ? message.args as Record<string, unknown> : undefined,
-      steps: Array.isArray(message.steps) ? message.steps : undefined
+      steps: Array.isArray(message.steps) ? message.steps : undefined,
+      fieldUpdates: typeof message.fieldUpdates === "object" && message.fieldUpdates !== null ? message.fieldUpdates as Record<string, unknown> : undefined
     };
 
     const response = await sendPreviewRequest(request, output);
@@ -531,6 +949,14 @@ async function withLayout(response: PreviewResponse, output: vscode.OutputChanne
 }
 
 async function sendPreviewRequest(request: PreviewRequest, output: vscode.OutputChannel): Promise<PreviewResponse> {
+  if (clientStartPromise) {
+    try {
+      await clientStartPromise;
+    } catch {
+      // The response below will surface the restart failure.
+    }
+  }
+
   if (!client) {
     return {
       success: false,

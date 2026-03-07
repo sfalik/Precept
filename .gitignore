@@ -14,8 +14,12 @@
 # VS Code - ignore user settings but keep shared configs
 .vscode/*
 !.vscode/tasks.json
-!.vscode/launch.json
 !.vscode/extensions.json
+
+# Temporary and local scratch files
+temp/
+src/Precept/temp/
+tools/Precept.LanguageServer/temp/
 
 # VS Code extension generated files
 tools/Precept.VsCode/node_modules/

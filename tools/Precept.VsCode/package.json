@@ -42,6 +42,11 @@
         "command": "precept.openPreview",
         "title": "Open Preview",
         "icon": "$(open-preview)"
+      },
+      {
+        "command": "precept.showLanguageServerMode",
+        "title": "Show Language Server Mode",
+        "icon": "$(server-process)"
       }
     ],
     "menus": {
@@ -56,6 +61,9 @@
         {
           "command": "precept.openPreview",
           "when": "editorLangId == precept"
+        },
+        {
+          "command": "precept.showLanguageServerMode"
         }
       ]
     },
@@ -91,6 +99,7 @@
     "dev:watch": "tsc -watch -p ./ --preserveWatchOutput",
     "package:local": "npm run compile && npx @vscode/vsce package --allow-missing-repository",
     "loop:local": "powershell -ExecutionPolicy Bypass -File ./scripts/install-local.ps1",
+    "loop:local:uninstall": "powershell -ExecutionPolicy Bypass -File ./scripts/uninstall-local.ps1",
     "vscode:prepublish": "npm run compile"
   },
   "dependencies": {

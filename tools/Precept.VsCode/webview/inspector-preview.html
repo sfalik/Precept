@@ -489,6 +489,93 @@
       border-bottom: none;
     }
 
+    .data-edit-input {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--fg);
+      font-family: inherit;
+      font-size: 12px;
+      padding: 2px 5px;
+      max-width: 140px;
+      min-width: 60px;
+    }
+
+    .data-edit-input:focus {
+      border-color: var(--accent);
+      outline: none;
+    }
+
+    .data-edit-input.violation {
+      border-color: var(--err);
+    }
+
+    .data-key .edit-icon {
+      margin-left: 4px;
+      opacity: 0.5;
+      font-size: 10px;
+    }
+
+    .data-edit-shell {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      align-self: stretch;
+      border: 1px solid var(--border);
+      min-width: 70px;
+      max-width: 160px;
+    }
+
+    .data-edit-shell.violation {
+      border-color: var(--err);
+    }
+
+    .data-edit-shell:focus-within {
+      border-color: var(--accent);
+    }
+
+    .data-edit-shell.violation:focus-within {
+      border-color: var(--err);
+    }
+
+    .data-edit-shell.is-null .data-edit-input {
+      opacity: 0.3;
+    }
+
+    .data-edit-null-toggle {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 11px;
+      padding: 0 4px 0 0;
+      margin: 0;
+      line-height: 1;
+      flex-shrink: 0;
+      opacity: 0.5;
+      transition: opacity 120ms ease, color 120ms ease;
+    }
+
+    .data-edit-null-toggle:hover {
+      opacity: 1;
+      color: var(--err);
+    }
+
+    .data-edit-shell.is-null .data-edit-null-toggle {
+      opacity: 0.25;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .data-edit-shell .data-edit-input {
+      width: 100%;
+      max-width: none;
+      min-width: 0;
+      border: none;
+      background: transparent;
+      padding: 3px 6px;
+    }
+
     .data-value-toast {
       color: var(--ok);
       font-weight: 600;
@@ -680,6 +767,23 @@
       background: transparent !important;
     }
 
+    .draft-validation-banner {
+      margin-bottom: 4px;
+      padding: 6px 8px;
+      border: 1px solid rgba(255, 42, 87, 0.35);
+      border-radius: 6px;
+      background: rgba(255, 42, 87, 0.10);
+      color: #ff8aa6;
+      font-size: 11px;
+      line-height: 1.35;
+      flex-shrink: 0;
+    }
+
+    .draft-validation-banner ul {
+      margin: 4px 0 0;
+      padding-left: 16px;
+    }
+
     .data-rule-icon {
       font-size: 9px;
       opacity: 0.75;
@@ -714,6 +818,9 @@
       <span class="muted"> · __FILE_NAME__</span>
     </div>
     <div class="actions">
+      <button id="edit-btn" class="action-btn" type="button" title="Enter edit mode for editable fields.">Edit</button>
+      <button id="save-btn" class="action-btn" type="button" title="Save draft field edits." hidden>Save</button>
+      <button id="cancel-btn" class="action-btn" type="button" title="Discard draft field edits." hidden>Cancel</button>
       <button id="reset-btn" class="action-btn" type="button" title="Restart from initial state and default data.">Reset</button>
     </div>
   </div>
@@ -727,6 +834,7 @@
         </div>
         <div class="data-overlay" aria-label="data overlay">
           <div id="rule-violations-banner" class="rule-violations-banner" hidden></div>
+          <div id="draft-validation-banner" class="draft-validation-banner" hidden></div>
           <div id="state-rules-indicator" class="state-rules-indicator" hidden></div>
           <ul id="data-list" class="data-list"></ul>
         </div>
@@ -755,6 +863,7 @@
       ...initialData
     };
     const eventArgValues = {};
+    let currentEditableFields = [];
 
     function getEventArgDefinitions(eventName) {
       const status = currentEventStatuses.find((s) => s.name === eventName);
@@ -955,6 +1064,10 @@
     const dataList = document.getElementById('data-list');
     const eventBar = document.getElementById('event-bar');
     const diagramToast = document.getElementById('diagram-toast');
+    const draftValidationBanner = document.getElementById('draft-validation-banner');
+    const editButton = document.getElementById('edit-btn');
+    const saveButton = document.getElementById('save-btn');
+    const cancelButton = document.getElementById('cancel-btn');
     const resetButton = document.getElementById('reset-btn');
 
     let selectedTransitionIndex = 0;
@@ -976,6 +1089,11 @@
     let transitionPaths = new Map();
     let nodeSizes = {};
     let diagramBounds = { width: 920, height: 430 };
+    let isEditMode = false;
+    let draftFieldValues = {};
+    let draftFieldErrors = new Map();
+    let draftFormErrors = [];
+    let draftInspectTimer = null;
 
     const vscodeApi = acquireVsCodeApi();
     let previewRequestId = 1;
@@ -1235,6 +1353,18 @@
           reason: String(r.reason ?? r.Reason ?? '')
         }))
         : [];
+
+      const rawEditableFields = snapshot.editableFields ?? snapshot.EditableFields;
+      currentEditableFields = mapEditableFields(rawEditableFields);
+
+      isEditMode = false;
+      draftFieldValues = {};
+      draftFieldErrors = new Map();
+      draftFormErrors = [];
+      if (draftInspectTimer) {
+        window.clearTimeout(draftInspectTimer);
+        draftInspectTimer = null;
+      }
 
       selectedTransitionIndex = transitions.findIndex((transition) => transition.from === currentState);
       if (selectedTransitionIndex < 0) {
@@ -2615,6 +2745,242 @@
       return String(value);
     }
 
+    function getEditableFieldForUiKey(key) {
+      return currentEditableFields.find((ef) =>
+        ef.fieldName === key || ef.fieldName.toLowerCase() === key.toLowerCase());
+    }
+
+    function updateEditButtons() {
+      const hasEditable = currentEditableFields.length > 0;
+      const hasDraftChanges = Object.keys(buildDraftPatch()).length > 0;
+      const hasDraftErrors = draftFieldErrors.size > 0 || draftFormErrors.length > 0;
+      if (editButton) {
+        editButton.hidden = isEditMode || !hasEditable;
+      }
+      if (saveButton) {
+        saveButton.hidden = !isEditMode;
+        saveButton.disabled = !isEditMode || !hasDraftChanges || hasDraftErrors;
+      }
+      if (cancelButton) {
+        cancelButton.hidden = !isEditMode;
+      }
+    }
+
+    function enterEditMode() {
+      if (currentEditableFields.length === 0) {
+        return;
+      }
+
+      isEditMode = true;
+      draftFieldValues = {};
+      draftFieldErrors = new Map();
+      draftFormErrors = [];
+
+      Object.entries(data).forEach(([key, value]) => {
+        const editableField = getEditableFieldForUiKey(key);
+        if (editableField) {
+          draftFieldValues[editableField.fieldName] = value;
+        }
+      });
+
+      renderAll();
+    }
+
+    function cancelEditMode() {
+      isEditMode = false;
+      draftFieldValues = {};
+      draftFieldErrors = new Map();
+      draftFormErrors = [];
+      if (draftInspectTimer) {
+        window.clearTimeout(draftInspectTimer);
+        draftInspectTimer = null;
+      }
+      renderAll();
+    }
+
+    function buildDraftPatch() {
+      const patch = {};
+      Object.entries(data).forEach(([key, committedValue]) => {
+        const editableField = getEditableFieldForUiKey(key);
+        if (!editableField) {
+          return;
+        }
+
+        const fieldName = editableField.fieldName;
+        if (!(fieldName in draftFieldValues)) {
+          return;
+        }
+
+        const draftValue = draftFieldValues[fieldName];
+        if (!Object.is(draftValue, committedValue)) {
+          patch[fieldName] = draftValue;
+        }
+      });
+      return patch;
+    }
+
+    function mapEditableFields(rawEditableFields) {
+      return Array.isArray(rawEditableFields)
+        ? rawEditableFields.map((ef) => ({
+          fieldName: String(ef.fieldName ?? ef.FieldName ?? ''),
+          fieldType: String(ef.fieldType ?? ef.FieldType ?? 'string'),
+          isNullable: Boolean(ef.isNullable ?? ef.IsNullable ?? false),
+          currentValue: ef.currentValue ?? ef.CurrentValue ?? null,
+          violation: ef.violation ?? ef.Violation ?? null
+        }))
+        : [];
+    }
+
+    function getDraftViolationText(fieldName) {
+      const fieldErrors = draftFieldErrors.get(fieldName);
+      if (fieldErrors && fieldErrors.length > 0) {
+        return fieldErrors.join(' · ');
+      }
+
+      const editableField = currentEditableFields.find((ef) => ef.fieldName === fieldName);
+      return editableField?.violation || null;
+    }
+
+    function renderDraftValidationBanner() {
+      if (!draftValidationBanner) {
+        return;
+      }
+
+      if (!isEditMode || draftFormErrors.length === 0) {
+        draftValidationBanner.innerHTML = '';
+        draftValidationBanner.setAttribute('hidden', '');
+        return;
+      }
+
+      const items = draftFormErrors
+        .map((err) => `<li>${String(err).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>`)
+        .join('');
+      draftValidationBanner.innerHTML = `<strong>Draft validation:</strong><ul>${items}</ul>`;
+      draftValidationBanner.removeAttribute('hidden');
+    }
+
+    function applyDraftValidationToRenderedInputs() {
+      dataList.querySelectorAll('.data-edit-input').forEach((input) => {
+        const fieldName = input.dataset.field;
+        if (!fieldName) {
+          return;
+        }
+
+        const violationText = getDraftViolationText(fieldName);
+        const shell = input.closest('.data-edit-shell');
+
+        if (input.type === 'checkbox') {
+          input.classList.toggle('violation', Boolean(violationText));
+          if (violationText) {
+            input.setAttribute('title', violationText);
+          } else {
+            input.removeAttribute('title');
+          }
+          return;
+        }
+
+        if (shell) {
+          shell.classList.toggle('violation', Boolean(violationText));
+          if (violationText) {
+            shell.setAttribute('title', violationText);
+          } else {
+            shell.removeAttribute('title');
+          }
+        }
+      });
+
+      renderDraftValidationBanner();
+      updateEditButtons();
+    }
+
+    async function inspectDraftUpdates() {
+      const patch = buildDraftPatch();
+      if (Object.keys(patch).length === 0) {
+        draftFieldErrors = new Map();
+        draftFormErrors = [];
+        applyDraftValidationToRenderedInputs();
+        return;
+      }
+
+      const response = await sendHostRequest('inspectUpdate', {
+        fieldUpdates: patch
+      });
+
+      if (!response.success) {
+        const errMsg = response.error || 'Inspect update failed.';
+        showRowFeedback(null, `✖ ${errMsg}`, 'err');
+        return;
+      }
+
+      const rawFieldErrors = response.fieldErrors ?? response.FieldErrors;
+      const nextFieldErrors = new Map();
+      if (rawFieldErrors && typeof rawFieldErrors === 'object') {
+        Object.entries(rawFieldErrors).forEach(([fieldName, errors]) => {
+          if (Array.isArray(errors) && errors.length > 0) {
+            nextFieldErrors.set(fieldName, errors.map((err) => String(err)));
+          }
+        });
+      }
+
+      const rawFormErrors = response.formErrors ?? response.FormErrors;
+      const nextFormErrors = Array.isArray(rawFormErrors)
+        ? rawFormErrors.map((err) => String(err))
+        : [];
+      const rawEditableFields = response.editableFields ?? response.EditableFields;
+
+      const activeInput = document.activeElement;
+      const activeField = activeInput?.dataset?.field ?? null;
+
+      currentEditableFields = mapEditableFields(rawEditableFields);
+      draftFieldErrors = nextFieldErrors;
+      draftFormErrors = nextFormErrors;
+      if (activeField) {
+        applyDraftValidationToRenderedInputs();
+        return;
+      }
+
+      renderData();
+    }
+
+    function scheduleDraftInspect() {
+      if (draftInspectTimer) {
+        window.clearTimeout(draftInspectTimer);
+      }
+      draftInspectTimer = window.setTimeout(() => {
+        draftInspectTimer = null;
+        void inspectDraftUpdates();
+      }, 140);
+    }
+
+    async function saveDraftEdits() {
+      const patch = buildDraftPatch();
+      if (Object.keys(patch).length === 0) {
+        cancelEditMode();
+        return;
+      }
+
+      const beforeData = snapshotData();
+      const response = await sendHostRequest('update', {
+        fieldUpdates: patch
+      });
+
+      if (!response.success || !response.snapshot) {
+        const allErrors = response.errors ?? response.Errors;
+        const errMsg = Array.isArray(allErrors) && allErrors.length > 0
+          ? allErrors.join(' · ')
+          : (response.error || 'Save failed.');
+        showRowFeedback(null, `✖ ${errMsg}`, 'err');
+        return;
+      }
+
+      applySnapshot(response.snapshot);
+      const afterData = snapshotData();
+      const changedKeys = getChangedDataKeys(beforeData, afterData);
+      showDataFieldToasts(changedKeys, beforeData, afterData);
+      showRowFeedback(null, '✔ Draft saved', 'ok');
+      renderAll();
+    }
+
     function renderData() {
       const violationsBanner = document.getElementById('rule-violations-banner');
       if (violationsBanner) {
@@ -2656,6 +3022,61 @@
             ? `<span class="data-rule-icon" title="${ruleTooltip}">⚠</span>`
             : '';
 
+          const editableField = getEditableFieldForUiKey(key);
+          if (editableField && isEditMode) {
+            const canonicalFieldName = editableField.fieldName;
+            const draftValue = Object.prototype.hasOwnProperty.call(draftFieldValues, canonicalFieldName)
+              ? draftFieldValues[canonicalFieldName]
+              : value;
+            const violationList = draftFieldErrors.get(canonicalFieldName) || null;
+            const violationText = violationList ? violationList.join(' · ') : (editableField.violation || null);
+            const violationTitle = violationText
+              ? ` title="${String(violationText).replace(/"/g, '&quot;')}"`
+              : '';
+            const isNull = draftValue === null;
+            const showNullToggle = editableField.isNullable
+              && editableField.fieldType !== 'boolean';
+            const shellClass = `data-edit-shell${violationText ? ' violation' : ''}${isNull ? ' is-null' : ''}`;
+            const nullToggle = showNullToggle
+              ? `<button class="data-edit-null-toggle" data-field="${canonicalFieldName}" data-ui-key="${key}" title="Set to null">×</button>`
+              : '';
+
+            let inputHtml;
+            if (isNull) {
+              if (editableField.fieldType === 'number') {
+                inputHtml = `<span class="${shellClass}"${violationTitle}><input class="data-edit-input" type="number" data-field="${canonicalFieldName}" data-ui-key="${key}" data-type="number" data-nullable="${editableField.isNullable}" value="" placeholder="null" />${nullToggle}</span>`;
+              } else if (editableField.fieldType === 'boolean') {
+                inputHtml = `<span class="muted">null</span>${nullToggle}`;
+              } else {
+                inputHtml = `<span class="${shellClass}"${violationTitle}><input class="data-edit-input" type="text" data-field="${canonicalFieldName}" data-ui-key="${key}" data-type="string" data-nullable="${editableField.isNullable}" value="" placeholder="null" />${nullToggle}</span>`;
+              }
+            } else if (editableField.fieldType === 'boolean') {
+              inputHtml = `<input class="data-edit-input${violationText ? ' violation' : ''}" type="checkbox" data-field="${canonicalFieldName}" data-ui-key="${key}" data-type="boolean" data-nullable="${editableField.isNullable}"${draftValue ? ' checked' : ''}${violationTitle} />`;
+            } else if (editableField.fieldType === 'number') {
+              inputHtml = `<span class="${shellClass}"${violationTitle}><input class="data-edit-input" type="number" data-field="${canonicalFieldName}" data-ui-key="${key}" data-type="number" data-nullable="${editableField.isNullable}" value="${draftValue}" />${nullToggle}</span>`;
+            } else {
+              const escaped = String(draftValue).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+              inputHtml = `<span class="${shellClass}"${violationTitle}><input class="data-edit-input" type="text" data-field="${canonicalFieldName}" data-ui-key="${key}" data-type="string" data-nullable="${editableField.isNullable}" value="${escaped}" placeholder="edit value" />${nullToggle}</span>`;
+            }
+
+            return `
+              <li>
+                <span class="data-key">${key}${ruleIcon}</span>
+                <span class="data-value-stack">${inputHtml}</span>
+              </li>
+            `;
+          }
+
+          if (editableField) {
+            const editIcon = `<span class="edit-icon" title="Editable in ${currentState}">✎</span>`;
+            return `
+              <li>
+                <span class="data-key">${key}${editIcon}${ruleIcon}</span>
+                <span class="data-value-stack"><span class="muted">${formatValue(value)}</span></span>
+              </li>
+            `;
+          }
+
           return `
             <li>
               <span class="data-key">${key}${ruleIcon}</span>
@@ -2668,6 +3089,68 @@
           `;
         })
         .join('');
+
+      if (isEditMode) {
+        dataList.querySelectorAll('.data-edit-input').forEach((input) => {
+          const fieldName = input.dataset.field;
+          const fieldType = input.dataset.type;
+          const isNullable = input.dataset.nullable === 'true';
+          if (!fieldName) {
+            return;
+          }
+
+          if (fieldType === 'boolean') {
+            input.addEventListener('change', () => {
+              draftFieldValues[fieldName] = input.checked;
+              scheduleDraftInspect();
+            });
+            return;
+          }
+
+          input.addEventListener('input', () => {
+            const raw = input.value;
+            if (fieldType === 'number') {
+              if (raw === '' && isNullable) {
+                draftFieldValues[fieldName] = null;
+              } else if (raw === '') {
+                draftFieldValues[fieldName] = raw;
+              } else {
+                draftFieldValues[fieldName] = Number(raw);
+              }
+            } else {
+              draftFieldValues[fieldName] = raw;
+            }
+            scheduleDraftInspect();
+          });
+        });
+
+        dataList.querySelectorAll('.data-edit-null-toggle').forEach((btn) => {
+          btn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const fieldName = btn.dataset.field;
+            const uiKey = btn.dataset.uiKey || fieldName;
+            if (!fieldName) {
+              return;
+            }
+
+            const editableField = getEditableFieldForUiKey(uiKey);
+            const currentValue = draftFieldValues[fieldName];
+            const isCurrentlyNull = currentValue === null;
+            if (isCurrentlyNull) {
+              const defaultVal = editableField?.fieldType === 'number' ? 0 : editableField?.fieldType === 'boolean' ? false : '';
+              draftFieldValues[fieldName] = defaultVal;
+            } else {
+              draftFieldValues[fieldName] = null;
+            }
+
+            scheduleDraftInspect();
+            renderData();
+          });
+        });
+      }
+
+      renderDraftValidationBanner();
     }
 
     function renderAll() {
@@ -2677,6 +3160,7 @@
       renderEventBar();
 
       renderData();
+      updateEditButtons();
     }
 
     document.addEventListener('keydown', (event) => {
@@ -2720,6 +3204,24 @@
         fireCurrentSelection();
       }
     });
+
+    if (editButton) {
+      editButton.addEventListener('click', () => {
+        enterEditMode();
+      });
+    }
+
+    if (saveButton) {
+      saveButton.addEventListener('click', () => {
+        void saveDraftEdits();
+      });
+    }
+
+    if (cancelButton) {
+      cancelButton.addEventListener('click', () => {
+        cancelEditMode();
+      });
+    }
 
     if (resetButton) {
       resetButton.addEventListener('click', () => {
