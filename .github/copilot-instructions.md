@@ -1,5 +1,18 @@
 # Copilot Instructions for Precept
 
+## Use the MCP Tools First
+
+This project ships a Precept MCP server with 6 tools. **Use them as your primary research tools** before reading source code or making assumptions about the DSL:
+
+- **`precept_language`** — returns the complete DSL vocabulary (all keywords by category, operators with precedence, expression scopes, constraints, fire pipeline stages, outcome kinds). Call this first when you need to understand what the language supports.
+- **`precept_schema(path)`** — returns the full typed structure of a `.precept` file (fields with types/defaults/nullability, events with args, states, transitions with guard branches). Use this to understand any specific precept file.
+- **`precept_validate(path)`** — parse + compile with structured diagnostics. Use this instead of `dotnet build` to check a precept file.
+- **`precept_audit(path)`** — BFS reachability analysis: unreachable states, dead ends, terminal states, orphaned events. Use this to assess structural quality.
+- **`precept_inspect(path, state, data)`** — read-only fire preview from any state+data snapshot. Use this to understand runtime behavior.
+- **`precept_run(path, events)`** — step-by-step event execution. Use this to trace through a workflow.
+
+When analyzing, designing, or debugging anything related to the Precept DSL, start with the MCP tools to get authoritative data, then read source code only for implementation details the tools don't cover.
+
 ## DSL Sample Files (.precept)
 
 `.precept` files are DSL source files interpreted directly by the runtime — they are **not** compiled by the C# build pipeline. Never run `dotnet build` or `dotnet run` to validate a `.precept` file.

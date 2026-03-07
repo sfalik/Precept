@@ -130,6 +130,10 @@ if (editResult.Outcome == PreceptUpdateOutcome.Updated)
 ## 🛠️ World-Class Tooling
 
 Precept isn't just a library; it's an authoring experience. The accompanying VS Code extension provides:
+- **Context-Aware IntelliSense:** Completions now respect DSL scope, so invariants and state asserts suggest data fields while event asserts suggest the active event's arguments.
+- **Hover + Go to Definition:** Hover a field, state, event, event arg, or collection accessor to see its meaning, then jump to the declaration directly from a reference.
+- **Document Outline:** The editor exposes a structured symbol tree for the precept, including fields, states, events, and event arguments.
+- **Structural Diagnostics:** Real-time diagnostics now surface unreachable states, dead-end states, and orphaned events alongside parse and semantic errors.
 - **Interactive Inspector:** Fire events and edit data against a live, mock instance in VS Code. Field edits use explicit **Edit** mode with **Save/Cancel**; validation runs live via inspect while typing, field-level errors stay attached only to the fields that caused them, and values are committed only when **Save** is clicked.
 - **Live Diagramming:** A dynamic state-transition diagram renders as you type.
 - **Null-Flow Analysis:** Real-time squiggles warn you if a guard path might access an unsafe null value.

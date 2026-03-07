@@ -89,7 +89,8 @@ internal sealed class PreceptAnalyzer
         if (!_documents.TryGetValue(uri, out var text))
             return KeywordItems;
 
-        var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        var info = PreceptDocumentIntellisense.Analyze(text);
+        var lines = info.Lines;
         if (position.Line >= lines.Length)
             return KeywordItems;
 
@@ -98,11 +99,12 @@ internal sealed class PreceptAnalyzer
             ? lineText[..(int)position.Character]
             : lineText;
 
-        var states = CollectIdentifiers(text, StateRegex);
-        var events = CollectIdentifiers(text, EventRegex);
-        var dataFields = CollectTopLevelDataFields(lines);
-        var collectionFields = CollectAllCollectionFields(text, lines);
-        var eventArgs = CollectEventArgs(lines);
+        var states = info.States;
+        var events = info.Events;
+        var dataFields = info.Fields;
+        var collectionFields = info.CollectionFields;
+        var eventArgs = info.EventArgs;
+        var collectionKinds = info.CollectionKinds;
         var currentEvent = FindCurrentEventName(lines, (int)position.Line);
 
         // Collection member prefix: e.g. "Floors." → suggest .count, .min, .max, .peek
@@ -111,15 +113,7 @@ internal sealed class PreceptAnalyzer
         {
             var colName = collectionMemberPrefixMatch.Groups["col"].Value;
             if (collectionFields.Contains(colName, StringComparer.Ordinal))
-            {
-                return new CompletionItem[]
-                {
-                    new() { Label = colName + ".count", Kind = CompletionItemKind.Property, Detail = "Number of elements" },
-                    new() { Label = colName + ".min", Kind = CompletionItemKind.Property, Detail = "Minimum element (set only)" },
-                    new() { Label = colName + ".max", Kind = CompletionItemKind.Property, Detail = "Maximum element (set only)" },
-                    new() { Label = colName + ".peek", Kind = CompletionItemKind.Property, Detail = "Front/top element (queue/stack)" }
-                };
-            }
+                return BuildCollectionMemberItems(colName, collectionKinds.TryGetValue(colName, out var kind) ? kind : null);
         }
 
         var eventMemberPrefixMatch = EventMemberPrefixRegex.Match(beforeCursor);
@@ -132,13 +126,9 @@ internal sealed class PreceptAnalyzer
 
         if (Regex.IsMatch(beforeCursor, "^\\s*(?:if|else\\s+if)\\s+[^\\n]*$", RegexOptions.IgnoreCase))
         {
-            var guardItems = BuildGuardCompletions(dataFields, collectionFields, currentEvent, eventArgs);
+            var guardItems = BuildGuardCompletions(dataFields, collectionFields, collectionKinds, currentEvent, eventArgs);
             return DistinctAndSort(guardItems.Concat(GuardSnippetItems));
         }
-
-        // rule expression: offer all in-scope identifiers + operators
-        if (Regex.IsMatch(beforeCursor, "^\\s*rule\\s+[^\\n]*$", RegexOptions.IgnoreCase))
-            return DistinctAndSort(BuildGuardCompletions(dataFields, collectionFields, currentEvent, eventArgs));
 
         // reject: offer a string snippet
         if (Regex.IsMatch(beforeCursor, "^\\s*reject(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
@@ -161,7 +151,7 @@ internal sealed class PreceptAnalyzer
 
             // After "add|remove|push|enqueue <Field> ", suggest expression (the value to add/push/remove)
             if (Regex.IsMatch(beforeCursor, "^\\s*(?:add|remove|push|enqueue)\\s+[A-Za-z_][A-Za-z0-9_]*\\s+[^\\n]*$", RegexOptions.IgnoreCase))
-                return BuildExpressionCompletions(dataFields, currentEvent, eventArgs);
+                return BuildExpressionCompletions(dataFields, currentEvent, eventArgs, collectionKinds);
 
             return BuildItems(collectionFields, CompletionItemKind.Field);
         }
@@ -171,11 +161,11 @@ internal sealed class PreceptAnalyzer
             return DistinctAndSort(BuildItems(dataFields, CompletionItemKind.Field).Concat(SetSnippetItems));
 
         if (Regex.IsMatch(beforeCursor, "^\\s*set\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*[^\\n]*$", RegexOptions.IgnoreCase))
-            return BuildExpressionCompletions(dataFields, currentEvent, eventArgs, collectionFields);
+            return BuildExpressionCompletions(dataFields, currentEvent, eventArgs, collectionKinds);
 
         // After "from <State> on <Event> when ", suggest expression completions
         if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+\\S+\\s+on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+when\\s+[^\\n]*$", RegexOptions.IgnoreCase))
-            return BuildGuardCompletions(dataFields, collectionFields, currentEvent, eventArgs);
+            return BuildGuardCompletions(dataFields, collectionFields, collectionKinds, currentEvent, eventArgs);
 
         // After "from <State> on <Event> " (trailing space, nothing else), suggest "when" and "->"
         if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+\\S+\\s+on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
@@ -191,8 +181,16 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+[^\\n]*$", RegexOptions.IgnoreCase) &&
             !Regex.IsMatch(beforeCursor, "\\s+on\\s+", RegexOptions.IgnoreCase))
         {
-            var stateItems = BuildItems(states.Append("any"), CompletionItemKind.EnumMember);
-            return stateItems.Concat(KeywordItems.Where(item => item.Label == "on")).ToArray();
+            var items = new List<CompletionItem>(BuildItems(states.Append("any"), CompletionItemKind.EnumMember));
+            items.AddRange(KeywordItems.Where(item => item.Label == "on"));
+
+            if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*(?:any|[A-Za-z_][A-Za-z0-9_]*)\\s+$", RegexOptions.IgnoreCase))
+            {
+                items.Add(new CompletionItem { Label = "assert", Kind = CompletionItemKind.Keyword });
+                items.Add(new CompletionItem { Label = "->", Kind = CompletionItemKind.Operator, Detail = "state exit actions" });
+            }
+
+            return DistinctAndSort(items);
         }
 
         // ── New-syntax: field declarations ──
@@ -210,13 +208,13 @@ internal sealed class PreceptAnalyzer
         // ── New-syntax: invariant/assert expressions ──
         // After "invariant " → suggest expression completions (field names, operators)
         if (Regex.IsMatch(beforeCursor, "^\\s*invariant\\s+[^\\n]*$", RegexOptions.IgnoreCase))
-            return DistinctAndSort(BuildGuardCompletions(dataFields, collectionFields, currentEvent, eventArgs));
+            return BuildDataExpressionCompletions(dataFields, collectionKinds);
 
         // After "on EventName assert " → suggest expression completions (event args)
         if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+assert\\s+[^\\n]*$", RegexOptions.IgnoreCase))
         {
             var eventName = Regex.Match(beforeCursor, "^\\s*on\\s+(?<evt>[A-Za-z_][A-Za-z0-9_]*)").Groups["evt"].Value;
-            return BuildGuardCompletions(dataFields, collectionFields, eventName, eventArgs);
+            return BuildEventAssertCompletions(eventName, eventArgs);
         }
 
         // After "on EventName " → suggest "assert"
@@ -246,7 +244,7 @@ internal sealed class PreceptAnalyzer
 
         // After "in/to/from State assert " → expression completions
         if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to|from)\\s+[^\\n]*\\s+assert\\s+[^\\n]*$", RegexOptions.IgnoreCase))
-            return DistinctAndSort(BuildGuardCompletions(dataFields, collectionFields, currentEvent, eventArgs));
+            return BuildDataExpressionCompletions(dataFields, collectionKinds);
 
         // After "because " → suggest string template
         if (Regex.IsMatch(beforeCursor, "\\bbecause\\s+[^\\n]*$", RegexOptions.IgnoreCase))
@@ -263,11 +261,7 @@ internal sealed class PreceptAnalyzer
         // After "event Name with " → user is typing arg name, no suggestions
         // After "event Name " → suggest "with"
         if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
-            return
-            [
-                new CompletionItem { Label = "with", Kind = CompletionItemKind.Keyword },
-                new CompletionItem { Label = "initial", Kind = CompletionItemKind.Keyword }
-            ];
+            return [new CompletionItem { Label = "with", Kind = CompletionItemKind.Keyword }];
 
         // After "of " → suggest scalar types (for collection type declarations)
         if (Regex.IsMatch(beforeCursor, "\\bof\\s+[^\\n]*$", RegexOptions.IgnoreCase))
@@ -299,12 +293,14 @@ internal sealed class PreceptAnalyzer
     private static IReadOnlyList<CompletionItem> BuildGuardCompletions(
         IReadOnlyList<string> dataFields,
         IReadOnlyList<string> collectionFields,
+        IReadOnlyDictionary<string, PreceptCollectionKind> collectionKinds,
         string? currentEvent,
         IReadOnlyDictionary<string, IReadOnlyList<string>> eventArgs)
     {
         var items = new List<CompletionItem>();
         items.AddRange(BuildItems(dataFields, CompletionItemKind.Variable));
         items.AddRange(BuildItems(collectionFields, CompletionItemKind.Variable));
+        items.AddRange(BuildCollectionScopeItems(collectionKinds));
         items.AddRange(ExpressionOperatorItems);
         items.AddRange(LiteralItems);
 
@@ -326,7 +322,7 @@ internal sealed class PreceptAnalyzer
         IReadOnlyList<string> dataFields,
         string? currentEvent,
         IReadOnlyDictionary<string, IReadOnlyList<string>> eventArgs,
-        IReadOnlyList<string>? collectionFields = null)
+        IReadOnlyDictionary<string, PreceptCollectionKind>? collectionKinds = null)
     {
         var items = new List<CompletionItem>();
         items.AddRange(BuildItems(dataFields, CompletionItemKind.Variable));
@@ -334,17 +330,8 @@ internal sealed class PreceptAnalyzer
         items.AddRange(LiteralItems);
 
         // Collection field members are valid in set-RHS expressions (e.g. MySet.count)
-        if (collectionFields is not null)
-        {
-            foreach (var col in collectionFields)
-            {
-                items.Add(new CompletionItem { Label = col + ".", Kind = CompletionItemKind.Module });
-                items.Add(new CompletionItem { Label = col + ".count", Kind = CompletionItemKind.Property, Detail = "Number of elements" });
-                items.Add(new CompletionItem { Label = col + ".min", Kind = CompletionItemKind.Property, Detail = "Minimum element (set only)" });
-                items.Add(new CompletionItem { Label = col + ".max", Kind = CompletionItemKind.Property, Detail = "Maximum element (set only)" });
-                items.Add(new CompletionItem { Label = col + ".peek", Kind = CompletionItemKind.Property, Detail = "Front/top element (queue/stack)" });
-            }
-        }
+        if (collectionKinds is not null)
+            items.AddRange(BuildCollectionScopeItems(collectionKinds));
 
         if (!string.IsNullOrWhiteSpace(currentEvent) && eventArgs.TryGetValue(currentEvent, out var argsForEvent) && argsForEvent.Count > 0)
         {
@@ -358,6 +345,69 @@ internal sealed class PreceptAnalyzer
         }
 
         return DistinctAndSort(items);
+    }
+
+    private static IReadOnlyList<CompletionItem> BuildDataExpressionCompletions(
+        IReadOnlyList<string> dataFields,
+        IReadOnlyDictionary<string, PreceptCollectionKind> collectionKinds)
+    {
+        var items = new List<CompletionItem>();
+        items.AddRange(BuildItems(dataFields, CompletionItemKind.Variable));
+        items.AddRange(BuildItems(collectionKinds.Keys, CompletionItemKind.Variable));
+        items.AddRange(BuildCollectionScopeItems(collectionKinds));
+        items.AddRange(ExpressionOperatorItems);
+        items.AddRange(LiteralItems);
+        return DistinctAndSort(items);
+    }
+
+    private static IReadOnlyList<CompletionItem> BuildEventAssertCompletions(
+        string eventName,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> eventArgs)
+    {
+        var items = new List<CompletionItem>();
+        items.AddRange(ExpressionOperatorItems);
+        items.AddRange(LiteralItems);
+
+        if (eventArgs.TryGetValue(eventName, out var argsForEvent))
+        {
+            items.AddRange(BuildItems(argsForEvent, CompletionItemKind.Variable));
+            items.Add(new CompletionItem { Label = eventName + ".", Kind = CompletionItemKind.Module });
+            items.AddRange(BuildItems(argsForEvent.Select(arg => eventName + "." + arg), CompletionItemKind.Field));
+        }
+
+        return DistinctAndSort(items);
+    }
+
+    private static IReadOnlyList<CompletionItem> BuildCollectionScopeItems(
+        IReadOnlyDictionary<string, PreceptCollectionKind> collectionKinds)
+    {
+        var items = new List<CompletionItem>();
+        foreach (var pair in collectionKinds)
+        {
+            items.Add(new CompletionItem { Label = pair.Key + ".", Kind = CompletionItemKind.Module });
+            items.AddRange(BuildCollectionMemberItems(pair.Key, pair.Value));
+        }
+
+        return items;
+    }
+
+    private static IReadOnlyList<CompletionItem> BuildCollectionMemberItems(string collectionName, PreceptCollectionKind? kind)
+    {
+        var items = new List<CompletionItem>
+        {
+            new() { Label = collectionName + ".count", Kind = CompletionItemKind.Property, Detail = "Number of elements" }
+        };
+
+        if (kind is null or PreceptCollectionKind.Set)
+        {
+            items.Add(new CompletionItem { Label = collectionName + ".min", Kind = CompletionItemKind.Property, Detail = "Minimum element" });
+            items.Add(new CompletionItem { Label = collectionName + ".max", Kind = CompletionItemKind.Property, Detail = "Maximum element" });
+        }
+
+        if (kind is null or PreceptCollectionKind.Queue or PreceptCollectionKind.Stack)
+            items.Add(new CompletionItem { Label = collectionName + ".peek", Kind = CompletionItemKind.Property, Detail = "Front/top element" });
+
+        return items;
     }
 
     private static IReadOnlyList<string> CollectTopLevelDataFields(string[] lines)
@@ -633,8 +683,74 @@ internal sealed class PreceptAnalyzer
 
         // Validate rules
         ValidateRuleDiagnostics(model, lines, dataFieldKinds, eventArgKinds, collectionFieldMap, diagnostics);
+        AddAuditDiagnostics(model, lines, diagnostics);
 
         return diagnostics;
+    }
+
+    private static void AddAuditDiagnostics(PreceptDefinition model, string[] lines, List<Diagnostic> diagnostics)
+    {
+        var allStates = model.States.Select(static state => state.Name).ToList();
+        var transitionRows = model.TransitionRows ?? Array.Empty<PreceptTransitionRow>();
+        var graph = allStates.ToDictionary(static state => state, static _ => new HashSet<string>(StringComparer.Ordinal), StringComparer.Ordinal);
+        var referencedEvents = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var row in transitionRows)
+        {
+            referencedEvents.Add(row.EventName);
+
+            if (row.Outcome is not PreceptStateTransition transition)
+                continue;
+
+            if (string.Equals(row.FromState, "any", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var state in allStates)
+                    graph[state].Add(transition.TargetState);
+            }
+            else if (graph.TryGetValue(row.FromState, out var neighbors))
+            {
+                neighbors.Add(transition.TargetState);
+            }
+        }
+
+        var reachable = new HashSet<string>(StringComparer.Ordinal) { model.InitialState.Name };
+        var queue = new Queue<string>();
+        queue.Enqueue(model.InitialState.Name);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            foreach (var neighbor in graph[current])
+            {
+                if (reachable.Add(neighbor))
+                    queue.Enqueue(neighbor);
+            }
+        }
+
+        foreach (var state in allStates.Where(state => !reachable.Contains(state)))
+        {
+            var lineIndex = FindStateLine(lines, state);
+            diagnostics.Add(CreateDiagnostic(lines, lineIndex, DiagnosticSeverity.Warning, $"State '{state}' is unreachable from the initial state."));
+        }
+
+        foreach (var state in allStates)
+        {
+            var outgoingRows = transitionRows.Where(row =>
+                string.Equals(row.FromState, state, StringComparison.Ordinal) ||
+                string.Equals(row.FromState, "any", StringComparison.OrdinalIgnoreCase)).ToArray();
+
+            if (outgoingRows.Length == 0 || outgoingRows.Any(row => row.Outcome is PreceptStateTransition))
+                continue;
+
+            var lineIndex = FindStateLine(lines, state);
+            diagnostics.Add(CreateDiagnostic(lines, lineIndex, DiagnosticSeverity.Hint, $"State '{state}' is a dead end: all outgoing rows reject or stay in place."));
+        }
+
+        foreach (var eventName in model.Events.Select(static evt => evt.Name).Where(eventName => !referencedEvents.Contains(eventName)))
+        {
+            var lineIndex = FindEventLine(lines, eventName);
+            diagnostics.Add(CreateDiagnostic(lines, lineIndex, DiagnosticSeverity.Hint, $"Event '{eventName}' is orphaned: it is declared but never referenced in transition rows."));
+        }
     }
 
     private static void ValidateRuleDiagnostics(
@@ -745,6 +861,33 @@ internal sealed class PreceptAnalyzer
                 return i;
         }
         return 0;
+    }
+
+    private static int FindEventLine(string[] lines, string eventName)
+    {
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var trimmed = lines[i].TrimStart();
+            if (trimmed.StartsWith($"event {eventName}", StringComparison.Ordinal))
+                return i;
+        }
+
+        return 0;
+    }
+
+    private static Diagnostic CreateDiagnostic(string[] lines, int lineIndex, DiagnosticSeverity severity, string message)
+    {
+        var safeLineIndex = Math.Min(Math.Max(lineIndex, 0), Math.Max(lines.Length - 1, 0));
+        var lineLength = safeLineIndex < lines.Length ? lines[safeLineIndex].Length : 1;
+        return new Diagnostic
+        {
+            Severity = severity,
+            Message = message,
+            Source = "precept",
+            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                new Position(safeLineIndex, 0),
+                new Position(safeLineIndex, Math.Max(1, lineLength)))
+        };
     }
 
     private static Dictionary<string, StaticValueKind> BuildSymbolKinds(

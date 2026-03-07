@@ -13,6 +13,9 @@ internal static class Program
                 .WithOutput(Console.OpenStandardOutput())
                 .WithHandler<PreceptTextDocumentSyncHandler>()
                 .WithHandler<PreceptCompletionHandler>()
+                .WithHandler<PreceptHoverHandler>()
+                .WithHandler<PreceptDefinitionHandler>()
+                .WithHandler<PreceptDocumentSymbolHandler>()
                 .WithHandler<PreceptSemanticTokensHandler>()
                 .WithHandler<PreceptPreviewHandler>();
         });
