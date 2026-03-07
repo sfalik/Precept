@@ -1,5 +1,7 @@
 # Precept MCP Server Design
 
+**Status:** Implemented (2026-03-06)
+
 ## Purpose
 
 An MCP (Model Context Protocol) server that exposes DSL parsing, validation, structural analysis, and runtime execution as tools callable by Copilot (and any other MCP host). This enables semantic understanding of `.precept` files beyond what plain text reading provides.

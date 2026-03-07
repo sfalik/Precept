@@ -1,0 +1,72 @@
+precept BankAccount
+
+field AccountHolder as string nullable
+field Balance as number default 0
+invariant Balance >= 0 because "Balance cannot be negative"
+field DailyWithdrawals as number default 0
+invariant DailyWithdrawals >= 0 because "Daily withdrawal count cannot be negative"
+field DailyWithdrawalLimit as number default 3
+field OverdraftProtection as boolean default false
+field FreezeReason as string nullable
+
+state Pending initial
+state Active
+state Frozen
+state Closed
+
+event Open with HolderName as string, InitialDeposit as number default 0
+on Open assert HolderName != "" because "Account holder name is required"
+on Open assert InitialDeposit >= 0 because "Initial deposit cannot be negative"
+
+event Deposit with Amount as number
+on Deposit assert Amount > 0 because "Deposit amount must be positive"
+
+event Withdraw with Amount as number
+on Withdraw assert Amount > 0 because "Withdrawal amount must be positive"
+
+event Transfer with Amount as number, ToAccount as string
+on Transfer assert Amount > 0 because "Transfer amount must be positive"
+on Transfer assert ToAccount != "" because "Target account is required"
+
+event EnableOverdraft
+event DisableOverdraft
+
+event ResetDailyLimits
+
+event Freeze with Reason as string
+on Freeze assert Reason != "" because "Freeze reason is required"
+
+event Unfreeze
+
+event CloseAccount
+
+from Pending on Open -> set AccountHolder = Open.HolderName -> set Balance = Open.InitialDeposit -> transition Active
+
+from Active on Deposit -> set Balance = Balance + Deposit.Amount -> no transition
+
+from Active on Withdraw when Withdraw.Amount <= Balance && DailyWithdrawals < DailyWithdrawalLimit -> set Balance = Balance - Withdraw.Amount -> set DailyWithdrawals = DailyWithdrawals + 1 -> no transition
+from Active on Withdraw when Withdraw.Amount > Balance -> reject "Insufficient funds"
+from Active on Withdraw -> reject "Daily withdrawal limit reached"
+
+from Active on Transfer when Transfer.Amount <= Balance -> set Balance = Balance - Transfer.Amount -> no transition
+from Active on Transfer -> reject "Insufficient funds for transfer"
+
+from Active on EnableOverdraft when !OverdraftProtection -> set OverdraftProtection = true -> no transition
+from Active on EnableOverdraft -> reject "Overdraft protection is already enabled"
+
+from Active on DisableOverdraft when OverdraftProtection -> set OverdraftProtection = false -> no transition
+from Active on DisableOverdraft -> reject "Overdraft protection is not enabled"
+
+from Active on ResetDailyLimits -> set DailyWithdrawals = 0 -> no transition
+
+from Active on Freeze -> set FreezeReason = Freeze.Reason -> transition Frozen
+
+from Active on CloseAccount when Balance == 0 -> transition Closed
+from Active on CloseAccount -> reject "Account must have zero balance before closing"
+
+from Frozen on Unfreeze -> set FreezeReason = null -> transition Active
+
+from Frozen on Deposit -> set Balance = Balance + Deposit.Amount -> no transition
+
+from Frozen on CloseAccount when Balance == 0 -> set FreezeReason = null -> transition Closed
+from Frozen on CloseAccount -> reject "Account must have zero balance before closing"

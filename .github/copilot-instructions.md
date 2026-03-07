@@ -81,6 +81,15 @@ For every new or changed DSL construct:
 
 Semantic tokens are now catalog-driven via `PreceptTokenMeta.GetCategory()`. When adding a new token kind to the `PreceptToken` enum, apply the appropriate `[TokenCategory]` attribute — the semantic tokens handler picks it up automatically. No manual handler edits needed for standard keyword/type/operator additions.
 
+## MCP Tool Sync
+
+The MCP server tools in `tools/Precept.Mcp/Tools/` are thin wrappers around core APIs. When core types or behavior change, check whether MCP DTOs need updates:
+
+- When core model types change (`PreceptDefinition`, `PreceptField`, `PreceptState`, `PreceptEvent`, `PreceptTransitionRow`, etc.), check whether MCP tool DTOs in `tools/Precept.Mcp/Tools/` need corresponding updates.
+- When `ConstructCatalog` or `ConstraintCatalog` records gain or lose properties, verify `LanguageTool.cs` serialization still matches `McpServerDesign.md § precept_language` output format.
+- When the fire pipeline stages change, update the static `FirePipeline` array in `LanguageTool.cs`.
+- The MCP tools are **thin wrappers** — never duplicate domain logic. If a tool method exceeds ~30 lines of non-serialization code, the logic probably belongs in `src/Precept/`.
+
 ## Scope Discipline
 
 - Keep doc updates focused and factual.

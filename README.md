@@ -138,6 +138,32 @@ Precept isn't just a library; it's an authoring experience. The accompanying VS 
 
 ---
 
+## 🤖 MCP Server (Copilot Integration)
+
+Precept includes an MCP (Model Context Protocol) server that exposes DSL parsing, validation, structural analysis, and runtime execution as tools callable by Copilot and any MCP-compatible host. This enables semantic understanding of `.precept` files beyond plain text reading.
+
+### Tools
+
+| Tool | Purpose |
+|------|---------|
+| `precept_validate` | Parse and compile a `.precept` file, return structured diagnostics |
+| `precept_schema` | Return the full typed structure — states, fields, events, transitions |
+| `precept_audit` | Graph analysis — reachability, dead ends, terminal states, orphaned events |
+| `precept_run` | Execute a step-by-step event scenario, return outcomes |
+| `precept_language` | Full DSL reference — vocabulary, constructs, constraints, pipeline |
+| `precept_inspect` | From a state+data snapshot, preview what every event would do |
+
+### Setup
+
+The workspace includes a `.vscode/mcp.json` that registers the server with Copilot automatically. No manual configuration is required — Copilot discovers the six tools when the workspace is open.
+
+The server runs via stdio and is launched on demand:
+```
+dotnet run --project tools/Precept.Mcp
+```
+
+---
+
 ## 🧠 The Problem It Solves
 
 Most complex entities start simple. But as business requirements grow, the rules governing their lifecycles scatter across your codebase:

@@ -15,7 +15,7 @@
 | 3 | Add Test Gaps | Done | Added 27 new tests: 2 StateAssert/EventAssert SourceLine tests (Category A, required parser fix to track SourceLine for state/event assert declarations); 5 CoerceEventArguments tests (Category B); 17 sample file Theory tests across all samples/*.precept files (Category C/E); 4 ParseWithDiagnostics tests (Category D). Also fixed a broken LS test (PreceptPreviewRulesTests scope "topLevel" → "invariant") that was broken by Item 0 but not caught at the time. 394 tests now passing. |
 | 4 | Implement Editable Fields Runtime | Done | Runtime `Update()` API with `IUpdatePatchBuilder`, editability enforcement per state, type checking, patch conflict detection, invariant/state-assert validation post-edit, atomic rollback. `Inspect(instance)` returns `EditableFields`. `Inspect(instance, patch)` hypothetical-patch validation. 48 tests in `PreceptEditTests.cs`. 442 total tests passing. |
 | 5 | Implement ConstraintCatalog | Done | Tier 3 catalog in `src/Precept/Dsl/ConstraintCatalog.cs`: `LanguageConstraint` record (Id, Phase, Rule, MessageTemplate, Severity) with `FormatMessage()` template substitution. 37 constraints registered (C1–C25 parse, C26–C32 compile, C33–C37 runtime) covering all 39 throw sites across `PreceptParser.cs` and `PreceptRuntime.cs`. Every throw updated with `// SYNC:CONSTRAINT:Cnn` comment and catalog-sourced message via `FormatMessage()`. `ConstraintCatalog.Constraints` exposed as `IReadOnlyList<LanguageConstraint>` for consumers (LS diagnostics, MCP). `ParseWithDiagnostics` also updated. 447 tests passing, zero behavioral changes. |
-| 6 | Implement MCP Server | Not Started | New capability |
+| 6 | Implement MCP Server | Done | 6 MCP tools (`precept_validate`, `precept_schema`, `precept_audit`, `precept_run`, `precept_language`, `precept_inspect`) in `tools/Precept.Mcp/`. 39 integration tests in `test/Precept.Mcp.Tests/`. VS Code extension registers MCP server via `package.json`. README, McpServerDesign.md, and copilot-instructions.md updated. 486 total tests passing. |
 
 ---
 
@@ -558,7 +558,7 @@ ask me for clarification before proceeding — do not guess.
 | RuntimeApiDesign naming | Stale | Misleads developers |
 | Constraint Catalog (Tier 3) | Not implemented | Blocks MCP `precept_language` |
 | Editable Fields runtime | Not implemented | Parser-only; no `Update()` API |
-| MCP Server | Not implemented | Depends on Items 0, 5 |
+| MCP Server | Implemented | 6 tools, 39 tests, VS Code registered |
 | 5 design-specified state assert checks | Not implemented | Subsumption, contradiction, deadlock, duplicate, coverage |
 
 ### Compile-Time Checks: Design vs Implementation
