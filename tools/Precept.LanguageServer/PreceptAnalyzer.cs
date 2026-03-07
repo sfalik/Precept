@@ -310,6 +310,11 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null)\\s*$", RegexOptions.IgnoreCase))
             return [CommaItem];
 
+        // After a comma in an event arg list, the user is starting the next arg name.
+        // Avoid unrelated global keyword fallback in this position.
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+.*\\,\\s*$", RegexOptions.IgnoreCase))
+            return Array.Empty<CompletionItem>();
+
         if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)\\s+$", RegexOptions.IgnoreCase))
             return [NullableItem, DefaultItem, CommaItem];
 

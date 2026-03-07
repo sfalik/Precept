@@ -381,6 +381,23 @@ public class PreceptAnalyzerCompletionTests
     }
 
     [Fact]
+    public void Completions_AfterEventArgComma_StartsNextArgumentNameWithoutKeywordNoise()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Submit with Comment as string, $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().NotContain("as");
+        completions.Should().NotContain("with");
+        completions.Should().NotContain("field");
+    }
+
+    [Fact]
     public void Completions_AfterFieldScalarType_SuggestsNullableAndDefault()
     {
         const string text = """

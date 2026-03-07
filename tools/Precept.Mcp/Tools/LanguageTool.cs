@@ -35,42 +35,50 @@ public static class LanguageTool
 
         foreach (var token in Enum.GetValues<PreceptToken>())
         {
-            var category = PreceptTokenMeta.GetCategory(token);
+            var categories = PreceptTokenMeta.GetCategories(token);
             var symbol = PreceptTokenMeta.GetSymbol(token);
             var description = PreceptTokenMeta.GetDescription(token);
 
-            if (category is null) continue;
+            if (categories.Count == 0) continue;
 
-            switch (category.Value)
+            foreach (var category in categories)
             {
-                case TokenCategory.Control when symbol is not null:
-                    controlKeywords.Add(symbol);
-                    break;
-                case TokenCategory.Declaration when symbol is not null:
-                    declarationKeywords.Add(symbol);
-                    break;
-                case TokenCategory.Action when symbol is not null:
-                    actionKeywords.Add(symbol);
-                    break;
-                case TokenCategory.Outcome when symbol is not null:
-                    outcomeKeywords.Add(symbol);
-                    break;
-                case TokenCategory.Type when symbol is not null:
-                    typeKeywords.Add(symbol);
-                    break;
-                case TokenCategory.Literal when symbol is not null:
-                    literalKeywords.Add(symbol);
-                    break;
-                case TokenCategory.Operator when symbol is not null:
-                    var (precedence, arity) = GetOperatorInfo(token);
-                    operators.Add(new OperatorDto(symbol, precedence, arity, description ?? ""));
-                    break;
+                switch (category)
+                {
+                    case TokenCategory.Control when symbol is not null:
+                        controlKeywords.Add(symbol);
+                        break;
+                    case TokenCategory.Declaration when symbol is not null:
+                        declarationKeywords.Add(symbol);
+                        break;
+                    case TokenCategory.Action when symbol is not null:
+                        actionKeywords.Add(symbol);
+                        break;
+                    case TokenCategory.Outcome when symbol is not null:
+                        outcomeKeywords.Add(symbol);
+                        break;
+                    case TokenCategory.Type when symbol is not null:
+                        typeKeywords.Add(symbol);
+                        break;
+                    case TokenCategory.Literal when symbol is not null:
+                        literalKeywords.Add(symbol);
+                        break;
+                    case TokenCategory.Operator when symbol is not null:
+                        var (precedence, arity) = GetOperatorInfo(token);
+                        operators.Add(new OperatorDto(symbol, precedence, arity, description ?? ""));
+                        break;
+                }
             }
         }
 
         return new VocabularyDto(
-            controlKeywords, actionKeywords, declarationKeywords,
-            outcomeKeywords, typeKeywords, literalKeywords, operators);
+                    controlKeywords,
+                    actionKeywords,
+                    declarationKeywords,
+                    outcomeKeywords,
+                    typeKeywords,
+                    literalKeywords,
+                    operators);
     }
 
     private static (int Precedence, string Arity) GetOperatorInfo(PreceptToken token) => token switch

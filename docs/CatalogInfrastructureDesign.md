@@ -332,7 +332,8 @@ Every enforcement point is marked with `// SYNC:CONSTRAINT:Cnn`. Copilot sees th
 | **Constraint enforcement exists** | Every registered `LanguageConstraint` has a matching `// SYNC:CONSTRAINT:Cnn` comment in the source. And vice versa — every SYNC comment has a catalog entry. |
 | **Constraint triggers** | Every registered constraint has a `[Theory]` test case with a violating input that produces the expected error. |
 | **Token attributes complete** | Every `PreceptToken` member has `[TokenCategory]` and `[TokenDescription]` attributes. Keyword/operator/punctuation members also have `[TokenSymbol]`. |
-| **Documentation constraints match** | The constraint list in `docs/DesignNotes.md § DSL Syntax Contract` matches `ConstraintCatalog.Constraints` — same IDs, same rules. |
+| **Multi-role token categories** | Tokens that serve as type keywords in the parser (e.g. collection types `set`, `queue`, `stack`) carry `TokenCategory.Type` among their categories. |
+| **Documentation constraints match** | ~~Originally targeted `docs/DesignNotes.md § DSL Syntax Contract`.~~ **Superseded** — the `ConstraintCatalog` is now the single source of truth for constraint documentation. The original target doc was archived to `docs/archive/DesignNotes-legacy.md` and is frozen. The MCP `precept_language` tool serializes `ConstraintCatalog.Constraints` directly, eliminating the separate documentation copy this test was designed to guard. |
 | **Reference sample coverage** | At least one `.precept` sample file uses every construct registered in `ConstructCatalog`. |
 
 ### Layer 3: Copilot Instructions (Behavioral)

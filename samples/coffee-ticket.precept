@@ -1,0 +1,65 @@
+precept CoffeeTicket
+
+field TotalDue as number default 0
+field Drinks as number default 0
+field Modifiers as set of string
+field KitchenQueue as queue of string
+field AddedItemsLog as stack of string
+field LastRemovedItem as string nullable
+
+invariant TotalDue >= 0 because "Total cannot be negative"
+
+state OpenTicket initial
+state Paid
+state Preparing
+state ReadyForPickup
+state HandedOff
+
+in OpenTicket edit TotalDue, Drinks
+to Paid -> clear AddedItemsLog
+
+event AddDrink with DrinkName as string, Price as number
+event UndoLastDrink with Refund as number
+event ToggleModifier with Modifier as string
+event ApplyCoupon with DiscountPercent as number default 10
+event Pay
+event SendToKitchen
+event FinishNextDrink
+event HandToCustomer
+
+from OpenTicket on AddDrink -> 
+    set Drinks = Drinks + 1 ->
+    set TotalDue = TotalDue + AddDrink.Price ->
+    push AddedItemsLog AddDrink.DrinkName ->
+    enqueue KitchenQueue AddDrink.DrinkName ->
+    no transition
+
+from OpenTicket on UndoLastDrink when AddedItemsLog.count > 0 ->
+    set Drinks = Drinks - 1 ->
+    set TotalDue = TotalDue - UndoLastDrink.Refund ->
+    pop AddedItemsLog into LastRemovedItem ->
+    no transition
+
+from OpenTicket on ToggleModifier when Modifiers contains ToggleModifier.Modifier -> 
+    remove Modifiers ToggleModifier.Modifier -> 
+    no transition
+
+from OpenTicket on ToggleModifier -> 
+    add Modifiers ToggleModifier.Modifier -> 
+    no transition
+
+from OpenTicket on ApplyCoupon -> 
+    set TotalDue = TotalDue - ((TotalDue * ApplyCoupon.DiscountPercent) / 100) -> 
+    no transition
+
+from OpenTicket on Pay when TotalDue >= 0 && Drinks > 0 -> transition Paid
+
+from Paid on SendToKitchen -> transition Preparing
+
+from Preparing on FinishNextDrink when KitchenQueue.count > 0 -> 
+    dequeue KitchenQueue -> 
+    no transition
+
+from Preparing on FinishNextDrink when KitchenQueue.count == 0 -> transition ReadyForPickup
+
+from ReadyForPickup on HandToCustomer -> transition HandedOff

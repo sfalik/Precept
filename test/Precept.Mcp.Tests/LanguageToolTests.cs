@@ -21,34 +21,39 @@ public class LanguageToolTests
     }
 
     [Fact]
-    public void EveryKeywordInTokenEnumAppears()
+    public void EveryKeywordInTokenEnumAppearsInAllMatchingVocabularyLists()
     {
         var result = LanguageTool.Run();
-        var allKeywords = result.Vocabulary.ControlKeywords
-            .Concat(result.Vocabulary.ActionKeywords)
-            .Concat(result.Vocabulary.DeclarationKeywords)
-            .Concat(result.Vocabulary.OutcomeKeywords)
-            .Concat(result.Vocabulary.TypeKeywords)
-            .Concat(result.Vocabulary.LiteralKeywords)
-            .ToHashSet(StringComparer.Ordinal);
 
-        // Count tokens with keyword-like categories
-        var expectedCategories = new[]
+        // Map each keyword category to its vocabulary list
+        var listByCategory = new Dictionary<TokenCategory, IReadOnlyList<string>>
         {
-            TokenCategory.Control, TokenCategory.Declaration,
-            TokenCategory.Action, TokenCategory.Outcome,
-            TokenCategory.Type, TokenCategory.Literal
+            [TokenCategory.Control] = result.Vocabulary.ControlKeywords,
+            [TokenCategory.Declaration] = result.Vocabulary.DeclarationKeywords,
+            [TokenCategory.Action] = result.Vocabulary.ActionKeywords,
+            [TokenCategory.Outcome] = result.Vocabulary.OutcomeKeywords,
+            [TokenCategory.Type] = result.Vocabulary.TypeKeywords,
+            [TokenCategory.Literal] = result.Vocabulary.LiteralKeywords,
         };
+
+        var failures = new List<string>();
 
         foreach (var token in Enum.GetValues<PreceptToken>())
         {
-            var cat = PreceptTokenMeta.GetCategory(token);
             var sym = PreceptTokenMeta.GetSymbol(token);
-            if (cat is not null && expectedCategories.Contains(cat.Value) && sym is not null)
+            if (sym is null) continue;
+
+            // Check every category the token carries, not just the primary one
+            foreach (var category in PreceptTokenMeta.GetCategories(token))
             {
-                allKeywords.Should().Contain(sym, $"token {token} with symbol '{sym}' should be in vocabulary");
+                if (!listByCategory.TryGetValue(category, out var list)) continue;
+                if (!list.Contains(sym))
+                    failures.Add($"{token} ({sym}): missing from {category} vocabulary list");
             }
         }
+
+        failures.Should().BeEmpty(
+            "every token must appear in the vocabulary list for each of its categories");
     }
 
     [Fact]

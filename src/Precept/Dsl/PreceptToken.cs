@@ -21,8 +21,9 @@ public enum TokenCategory
     Value
 }
 
-/// <summary>Classifies a <see cref="PreceptToken"/> member into a semantic group.</summary>
-[AttributeUsage(AttributeTargets.Field)]
+/// <summary>Classifies a <see cref="PreceptToken"/> member into a semantic group.
+/// A token may carry multiple categories (e.g. <c>set</c> is both Action and Type).</summary>
+[AttributeUsage(AttributeTargets.Field, AllowMultiple = true)]
 public sealed class TokenCategoryAttribute(TokenCategory category) : Attribute
 {
     public TokenCategory Category { get; } = category;
@@ -160,7 +161,8 @@ public enum PreceptToken
     // ═══ Keywords: actions ═══
 
     [TokenCategory(TokenCategory.Action)]
-    [TokenDescription("Assigns a value to a field")]
+    [TokenCategory(TokenCategory.Type)]
+    [TokenDescription("Assigns a value to a field; also a collection type")]
     [TokenSymbol("set")]
     Set,
 
@@ -417,7 +419,7 @@ public enum PreceptToken
 /// </summary>
 public static class PreceptTokenMeta
 {
-    private static readonly Dictionary<PreceptToken, TokenCategoryAttribute?> _categories = [];
+    private static readonly Dictionary<PreceptToken, TokenCategoryAttribute[]> _categories = [];
     private static readonly Dictionary<PreceptToken, TokenDescriptionAttribute?> _descriptions = [];
     private static readonly Dictionary<PreceptToken, TokenSymbolAttribute?> _symbols = [];
 
@@ -427,7 +429,7 @@ public static class PreceptTokenMeta
         {
             var fi = typeof(PreceptToken).GetField(member.ToString())!;
             _categories[member] = fi.GetCustomAttributes(typeof(TokenCategoryAttribute), false)
-                .Cast<TokenCategoryAttribute>().FirstOrDefault();
+                .Cast<TokenCategoryAttribute>().ToArray();
             _descriptions[member] = fi.GetCustomAttributes(typeof(TokenDescriptionAttribute), false)
                 .Cast<TokenDescriptionAttribute>().FirstOrDefault();
             _symbols[member] = fi.GetCustomAttributes(typeof(TokenSymbolAttribute), false)
@@ -435,8 +437,15 @@ public static class PreceptTokenMeta
         }
     }
 
+    /// <summary>Returns the primary (first declared) category, or null if none.</summary>
     public static TokenCategory? GetCategory(PreceptToken token)
-        => _categories.GetValueOrDefault(token)?.Category;
+        => _categories.GetValueOrDefault(token) is { Length: > 0 } cats ? cats[0].Category : null;
+
+    /// <summary>Returns all categories for a token (supports dual-role tokens like <c>set</c>).</summary>
+    public static IReadOnlyList<TokenCategory> GetCategories(PreceptToken token)
+        => _categories.GetValueOrDefault(token) is { } cats
+            ? cats.Select(c => c.Category).ToArray()
+            : [];
 
     public static string? GetDescription(PreceptToken token)
         => _descriptions.GetValueOrDefault(token)?.Description;
@@ -445,10 +454,10 @@ public static class PreceptTokenMeta
         => _symbols.GetValueOrDefault(token)?.Symbol;
 
     /// <summary>
-    /// Returns all tokens that have the specified category.
+    /// Returns all tokens that have the specified category (primary or secondary).
     /// </summary>
     public static IEnumerable<PreceptToken> GetByCategory(TokenCategory category)
-        => _categories.Where(kv => kv.Value?.Category == category).Select(kv => kv.Key);
+        => _categories.Where(kv => kv.Value.Any(c => c.Category == category)).Select(kv => kv.Key);
 
     /// <summary>
     /// Returns a dictionary mapping lowercase word-token symbol text to token kind.
@@ -456,8 +465,8 @@ public static class PreceptTokenMeta
     /// automatically adds it to this dictionary (zero drift).
     /// Includes all tokens with purely alphabetic symbols (keywords + keyword-operators
     /// like <c>contains</c>). Non-alphabetic symbols (operators, punctuation) are excluded.
-    /// For the dual-use <c>set</c> keyword (action + type), the first enum member wins
-    /// via <see cref="Dictionary{TKey,TValue}.TryAdd"/>.
+    /// Dual-role tokens like <c>set</c> (Action + Type) appear once — the first
+    /// enum member wins via <see cref="Dictionary{TKey,TValue}.TryAdd"/>.
     /// </summary>
     public static IReadOnlyDictionary<string, PreceptToken> BuildKeywordDictionary()
     {
