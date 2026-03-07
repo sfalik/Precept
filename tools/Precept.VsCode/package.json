@@ -44,6 +44,11 @@
         "icon": "$(open-preview)"
       },
       {
+        "command": "precept.togglePreviewLocking",
+        "title": "Toggle Preview Locking",
+        "icon": "$(lock)"
+      },
+      {
         "command": "precept.showLanguageServerMode",
         "title": "Show Language Server Mode",
         "icon": "$(server-process)"
@@ -61,6 +66,9 @@
         {
           "command": "precept.openPreview",
           "when": "editorLangId == precept"
+        },
+        {
+          "command": "precept.togglePreviewLocking"
         },
         {
           "command": "precept.showLanguageServerMode"

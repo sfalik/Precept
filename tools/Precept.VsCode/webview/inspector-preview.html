@@ -815,7 +815,8 @@
   <div class="header">
     <div>
       <strong>State Diagram</strong>
-      <span class="muted"> · __FILE_NAME__</span>
+      <span id="source-file-name" class="muted"> · __FILE_NAME__</span>
+      <span id="preview-mode" class="muted"> · __PREVIEW_MODE__</span>
     </div>
     <div class="actions">
       <button id="edit-btn" class="action-btn" type="button" title="Enter edit mode for editable fields.">Edit</button>
@@ -864,6 +865,8 @@
     };
     const eventArgValues = {};
     let currentEditableFields = [];
+    let currentSourceFileName = '__FILE_NAME__';
+    let previewLocked = false;
 
     function getEventArgDefinitions(eventName) {
       const status = currentEventStatuses.find((s) => s.name === eventName);
@@ -1069,6 +1072,8 @@
     const saveButton = document.getElementById('save-btn');
     const cancelButton = document.getElementById('cancel-btn');
     const resetButton = document.getElementById('reset-btn');
+    const sourceFileNameLabel = document.getElementById('source-file-name');
+    const previewModeLabel = document.getElementById('preview-mode');
 
     let selectedTransitionIndex = 0;
     let hoveredEventName = null;
@@ -1100,6 +1105,16 @@
     let previewRequestId = 1;
     const previewPendingRequests = new Map();
     let latestSnapshotSequence = 0;
+
+    function renderSourceInfo() {
+      if (sourceFileNameLabel) {
+        sourceFileNameLabel.textContent = ` · ${currentSourceFileName}`;
+      }
+
+      if (previewModeLabel) {
+        previewModeLabel.textContent = previewLocked ? ' · Locked to current file' : ' · Following active editor';
+      }
+    }
 
 
 
@@ -3308,6 +3323,13 @@
         return;
       }
 
+      if (message.type === 'sourceInfo') {
+        currentSourceFileName = typeof message.fileName === 'string' ? message.fileName : currentSourceFileName;
+        previewLocked = Boolean(message.locked);
+        renderSourceInfo();
+        return;
+      }
+
       if (message.type === 'snapshot') {
         if (typeof message.snapshotSequence === 'number') {
           if (message.snapshotSequence < latestSnapshotSequence) {
@@ -3332,6 +3354,7 @@
     vscodeApi.postMessage({ type: 'ready' });
     void reloadSnapshot();
 
+    renderSourceInfo();
     renderAll();
   </script>
 </body>

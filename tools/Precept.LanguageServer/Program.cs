@@ -15,6 +15,7 @@ internal static class Program
                 .WithHandler<PreceptCompletionHandler>()
                 .WithHandler<PreceptHoverHandler>()
                 .WithHandler<PreceptDefinitionHandler>()
+                .WithHandler<PreceptCodeActionHandler>()
                 .WithHandler<PreceptDocumentSymbolHandler>()
                 .WithHandler<PreceptSemanticTokensHandler>()
                 .WithHandler<PreceptPreviewHandler>();

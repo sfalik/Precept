@@ -2,17 +2,30 @@ precept BankAccount
 
 field AccountHolder as string nullable
 field Balance as number default 0
-invariant Balance >= 0 because "Balance cannot be negative"
+invariant (OverdraftProtection && Balance >= -OverdraftLimit) || (!OverdraftProtection && Balance >= 0) because "Balance cannot exceed the allowed overdraft range"
 field DailyWithdrawals as number default 0
 invariant DailyWithdrawals >= 0 because "Daily withdrawal count cannot be negative"
+invariant DailyWithdrawals <= DailyWithdrawalLimit because "Daily withdrawals cannot exceed the configured limit"
 field DailyWithdrawalLimit as number default 3
+invariant DailyWithdrawalLimit > 0 because "Daily withdrawal limit must be positive"
 field OverdraftProtection as boolean default false
+field OverdraftLimit as number default 250
+invariant OverdraftLimit >= 0 because "Overdraft limit cannot be negative"
 field FreezeReason as string nullable
+field CurrentBusinessDay as number default 0
+invariant CurrentBusinessDay >= 0 because "Business day counter cannot be negative"
 
 state Pending initial
 state Active
+in Active assert AccountHolder != null && AccountHolder != "" because "Active accounts must have an account holder"
+in Active assert FreezeReason == null because "Active accounts cannot carry a freeze reason"
 state Frozen
+in Frozen assert AccountHolder != null && AccountHolder != "" because "Frozen accounts must have an account holder"
+in Frozen assert FreezeReason != null && FreezeReason != "" because "Frozen accounts require a freeze reason"
 state Closed
+in Closed assert AccountHolder != null && AccountHolder != "" because "Closed accounts must retain an account holder"
+in Closed assert Balance == 0 because "Closed accounts must have a zero balance"
+in Closed assert FreezeReason == null because "Closed accounts cannot carry a freeze reason"
 
 event Open with HolderName as string, InitialDeposit as number default 0
 on Open assert HolderName != "" because "Account holder name is required"
@@ -31,7 +44,7 @@ on Transfer assert ToAccount != "" because "Target account is required"
 event EnableOverdraft
 event DisableOverdraft
 
-event ResetDailyLimits
+event AdvanceBusinessDay with DayNumber as number
 
 event Freeze with Reason as string
 on Freeze assert Reason != "" because "Freeze reason is required"
@@ -41,23 +54,31 @@ event Unfreeze
 event CloseAccount
 
 from Pending on Open -> set AccountHolder = Open.HolderName -> set Balance = Open.InitialDeposit -> transition Active
+from Pending on AdvanceBusinessDay when AdvanceBusinessDay.DayNumber > CurrentBusinessDay -> set CurrentBusinessDay = AdvanceBusinessDay.DayNumber -> set DailyWithdrawals = 0 -> no transition
+from Pending on AdvanceBusinessDay -> reject "Business day must move forward"
 
 from Active on Deposit -> set Balance = Balance + Deposit.Amount -> no transition
 
 from Active on Withdraw when Withdraw.Amount <= Balance && DailyWithdrawals < DailyWithdrawalLimit -> set Balance = Balance - Withdraw.Amount -> set DailyWithdrawals = DailyWithdrawals + 1 -> no transition
-from Active on Withdraw when Withdraw.Amount > Balance -> reject "Insufficient funds"
-from Active on Withdraw -> reject "Daily withdrawal limit reached"
+from Active on Withdraw when OverdraftProtection && Withdraw.Amount > Balance && Withdraw.Amount <= Balance + OverdraftLimit && DailyWithdrawals < DailyWithdrawalLimit -> set Balance = Balance - Withdraw.Amount -> set DailyWithdrawals = DailyWithdrawals + 1 -> no transition
+from Active on Withdraw when OverdraftProtection && Withdraw.Amount > Balance + OverdraftLimit -> reject "Amount exceeds overdraft limit"
+from Active on Withdraw when DailyWithdrawals >= DailyWithdrawalLimit -> reject "Daily withdrawal limit reached"
+from Active on Withdraw -> reject "Insufficient funds"
 
 from Active on Transfer when Transfer.Amount <= Balance -> set Balance = Balance - Transfer.Amount -> no transition
+from Active on Transfer when OverdraftProtection && Transfer.Amount > Balance && Transfer.Amount <= Balance + OverdraftLimit -> set Balance = Balance - Transfer.Amount -> no transition
+from Active on Transfer when OverdraftProtection && Transfer.Amount > Balance + OverdraftLimit -> reject "Transfer exceeds overdraft limit"
 from Active on Transfer -> reject "Insufficient funds for transfer"
 
 from Active on EnableOverdraft when !OverdraftProtection -> set OverdraftProtection = true -> no transition
 from Active on EnableOverdraft -> reject "Overdraft protection is already enabled"
 
-from Active on DisableOverdraft when OverdraftProtection -> set OverdraftProtection = false -> no transition
-from Active on DisableOverdraft -> reject "Overdraft protection is not enabled"
+from Active on DisableOverdraft when OverdraftProtection && Balance >= 0 -> set OverdraftProtection = false -> no transition
+from Active on DisableOverdraft when !OverdraftProtection -> reject "Overdraft protection is not enabled"
+from Active on DisableOverdraft -> reject "Overdraft protection cannot be disabled while balance is negative"
 
-from Active on ResetDailyLimits -> set DailyWithdrawals = 0 -> no transition
+from Active on AdvanceBusinessDay when AdvanceBusinessDay.DayNumber > CurrentBusinessDay -> set CurrentBusinessDay = AdvanceBusinessDay.DayNumber -> set DailyWithdrawals = 0 -> no transition
+from Active on AdvanceBusinessDay -> reject "Business day must move forward"
 
 from Active on Freeze -> set FreezeReason = Freeze.Reason -> transition Frozen
 
@@ -67,6 +88,9 @@ from Active on CloseAccount -> reject "Account must have zero balance before clo
 from Frozen on Unfreeze -> set FreezeReason = null -> transition Active
 
 from Frozen on Deposit -> set Balance = Balance + Deposit.Amount -> no transition
+from Frozen on AdvanceBusinessDay when AdvanceBusinessDay.DayNumber > CurrentBusinessDay -> set CurrentBusinessDay = AdvanceBusinessDay.DayNumber -> set DailyWithdrawals = 0 -> no transition
+from Frozen on AdvanceBusinessDay -> reject "Business day must move forward"
 
 from Frozen on CloseAccount when Balance == 0 -> set FreezeReason = null -> transition Closed
 from Frozen on CloseAccount -> reject "Account must have zero balance before closing"
+

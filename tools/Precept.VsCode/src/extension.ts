@@ -11,8 +11,11 @@ import {
 
 let client: LanguageClient | undefined;
 let clientStartPromise: Promise<void> | undefined;
-const previewPanels = new Map<string, vscode.WebviewPanel>();
 const snapshotSequenceByPanel = new WeakMap<vscode.WebviewPanel, number>();
+let currentPreviewPanel: vscode.WebviewPanel | undefined;
+let currentPreviewDocumentUri: vscode.Uri | undefined;
+let previewFollowActiveEditor = true;
+let extensionContext: vscode.ExtensionContext | undefined;
 let elkLayoutEngine: any | undefined;
 let languageServerRestartTimer: NodeJS.Timeout | undefined;
 let languageServerRestartInProgress = false;
@@ -41,10 +44,6 @@ interface LanguageServerLaunchInfo {
   cwd: string;
   buildDllPath?: string;
   runtimeDllPath?: string;
-}
-
-function getPreviewPanelKey(uri: vscode.Uri): string {
-  return uri.toString().toLowerCase();
 }
 
 function nextSnapshotSequence(panel: vscode.WebviewPanel): number {
@@ -100,7 +99,13 @@ interface TransitionLike {
 
 type PreviewLayoutMode = "spacious" | "balanced" | "compact" | "orthogonal" | "top-down";
 
+interface PreviewTarget {
+  uri: vscode.Uri;
+  fileName: string;
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  extensionContext = context;
   const outputChannel = vscode.window.createOutputChannel("Precept");
   context.subscriptions.push(outputChannel);
 
@@ -115,6 +120,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     void openInspectorPreviewPanel(context, outputChannel);
   });
   context.subscriptions.push(openPreviewDisposable);
+
+  const togglePreviewLockingDisposable = vscode.commands.registerCommand("precept.togglePreviewLocking", () => {
+    void togglePreviewLocking(outputChannel);
+  });
+  context.subscriptions.push(togglePreviewLockingDisposable);
 
   const showLanguageServerModeDisposable = vscode.commands.registerCommand("precept.showLanguageServerMode", () => {
     showLanguageServerMode(outputChannel);
@@ -183,32 +193,55 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
 
   const changeSubscription = vscode.workspace.onDidChangeTextDocument((event) => {
-    const panel = previewPanels.get(getPreviewPanelKey(event.document.uri));
-    if (!panel) {
+    if (!currentPreviewPanel || !currentPreviewDocumentUri) {
       return;
     }
 
-    void sendSnapshotToPanel(panel, event.document, outputChannel);
+    if (event.document.uri.toString() !== currentPreviewDocumentUri.toString()) {
+      return;
+    }
+
+    void sendSnapshotToPanel(currentPreviewPanel, event.document, outputChannel);
   });
   context.subscriptions.push(changeSubscription);
 
   const saveSubscription = vscode.workspace.onDidSaveTextDocument((document) => {
-    const panel = previewPanels.get(getPreviewPanelKey(document.uri));
-    if (!panel) {
+    if (!currentPreviewPanel || !currentPreviewDocumentUri) {
       return;
     }
 
-    void sendSnapshotToPanel(panel, document, outputChannel);
+    if (document.uri.toString() !== currentPreviewDocumentUri.toString()) {
+      return;
+    }
+
+    void sendSnapshotToPanel(currentPreviewPanel, document, outputChannel);
   });
   context.subscriptions.push(saveSubscription);
+
+  const activeEditorSubscription = vscode.window.onDidChangeActiveTextEditor((editor) => {
+    if (!previewFollowActiveEditor || !currentPreviewPanel) {
+      return;
+    }
+
+    const target = getPreviewTargetFromEditor(editor);
+    if (!target) {
+      return;
+    }
+
+    void retargetPreviewPanel(currentPreviewPanel, target, context, outputChannel, false);
+  });
+  context.subscriptions.push(activeEditorSubscription);
 }
 
 export async function deactivate(): Promise<void> {
-  for (const panel of previewPanels.values()) {
-    panel.dispose();
+  if (currentPreviewPanel) {
+    currentPreviewPanel.dispose();
   }
 
-  previewPanels.clear();
+  currentPreviewPanel = undefined;
+  currentPreviewDocumentUri = undefined;
+  previewFollowActiveEditor = true;
+  extensionContext = undefined;
 
   if (languageServerRestartTimer) {
     clearTimeout(languageServerRestartTimer);
@@ -634,24 +667,22 @@ function pruneLanguageServerRuntimeDirectories(runtimeRoot: string, activeRuntim
 }
 
 async function openInspectorPreviewPanel(context: vscode.ExtensionContext, output: vscode.OutputChannel): Promise<void> {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor || editor.document.languageId !== "precept") {
+  const target = getPreviewTargetFromEditor(vscode.window.activeTextEditor);
+  if (!target) {
     void vscode.window.showInformationMessage("Open a .precept file first to launch Preview.");
     return;
   }
 
-  const document = editor.document;
-  const panelKey = getPreviewPanelKey(document.uri);
-  const existingPanel = previewPanels.get(panelKey);
-  if (existingPanel) {
-    existingPanel.reveal(vscode.ViewColumn.Beside, true);
-    await sendSnapshotToPanel(existingPanel, document, output);
+  if (currentPreviewPanel) {
+    previewFollowActiveEditor = true;
+    currentPreviewPanel.reveal(vscode.ViewColumn.Beside, true);
+    await retargetPreviewPanel(currentPreviewPanel, target, context, output, true);
     return;
   }
 
   const panel = vscode.window.createWebviewPanel(
     "preceptPreview",
-    `Preview ${path.basename(document.fileName)}`,
+    getPreviewPanelTitle(target.fileName),
     vscode.ViewColumn.Beside,
     {
       enableScripts: true,
@@ -659,10 +690,15 @@ async function openInspectorPreviewPanel(context: vscode.ExtensionContext, outpu
     }
   );
 
-  previewPanels.set(panelKey, panel);
+  currentPreviewPanel = panel;
+  previewFollowActiveEditor = true;
 
   panel.onDidDispose(() => {
-    previewPanels.delete(panelKey);
+    if (currentPreviewPanel === panel) {
+      currentPreviewPanel = undefined;
+      currentPreviewDocumentUri = undefined;
+      previewFollowActiveEditor = true;
+    }
   });
 
   panel.onDidChangeViewState((event) => {
@@ -670,7 +706,16 @@ async function openInspectorPreviewPanel(context: vscode.ExtensionContext, outpu
       return;
     }
 
-    void sendSnapshotToPanel(event.webviewPanel, document, output);
+    const previewUri = currentPreviewDocumentUri;
+    if (!previewUri) {
+      return;
+    }
+
+    void getDocumentByUri(previewUri)
+      .then((document) => sendSnapshotToPanel(event.webviewPanel, document, output))
+      .catch((error) => {
+        output.appendLine(`Preview refresh failed: ${String(error)}`);
+      });
   });
 
   panel.webview.onDidReceiveMessage(async (message) => {
@@ -679,7 +724,12 @@ async function openInspectorPreviewPanel(context: vscode.ExtensionContext, outpu
     }
 
     if (message.type === "ready") {
-      await sendSnapshotToPanel(panel, document, output);
+      if (!currentPreviewDocumentUri) {
+        return;
+      }
+
+      const readyDocument = await getDocumentByUri(currentPreviewDocumentUri);
+      await sendSnapshotToPanel(panel, readyDocument, output);
       return;
     }
 
@@ -693,10 +743,15 @@ async function openInspectorPreviewPanel(context: vscode.ExtensionContext, outpu
       return;
     }
 
-    const liveDocument = await getDocumentByUri(document.uri);
+    const previewUri = currentPreviewDocumentUri;
+    if (!previewUri) {
+      return;
+    }
+
+    const liveDocument = await getDocumentByUri(previewUri);
     const request: PreviewRequest = {
       action,
-      uri: document.uri.toString(),
+      uri: liveDocument.uri.toString(),
       text: liveDocument.getText(),
       eventName: typeof message.eventName === "string" ? message.eventName : undefined,
       args: typeof message.args === "object" && message.args !== null ? message.args as Record<string, unknown> : undefined,
@@ -713,7 +768,86 @@ async function openInspectorPreviewPanel(context: vscode.ExtensionContext, outpu
     });
   });
 
-  panel.webview.html = await getInspectorPreviewHtml(context, output, document.fileName);
+  await retargetPreviewPanel(panel, target, context, output, true);
+}
+
+function getPreviewTargetFromEditor(editor: vscode.TextEditor | undefined): PreviewTarget | undefined {
+  if (!editor || editor.document.languageId !== "precept") {
+    return undefined;
+  }
+
+  return {
+    uri: editor.document.uri,
+    fileName: editor.document.fileName
+  };
+}
+
+function isSamePreviewTarget(left: vscode.Uri | undefined, right: vscode.Uri): boolean {
+  return !!left && left.toString() === right.toString();
+}
+
+function getPreviewPanelTitle(fileName: string): string {
+  const suffix = previewFollowActiveEditor ? "" : " [Locked]";
+  return `Preview ${path.basename(fileName)}${suffix}`;
+}
+
+async function retargetPreviewPanel(
+  panel: vscode.WebviewPanel,
+  target: PreviewTarget,
+  context: vscode.ExtensionContext,
+  output: vscode.OutputChannel,
+  resetWebviewState: boolean
+): Promise<void> {
+  const targetChanged = !isSamePreviewTarget(currentPreviewDocumentUri, target.uri);
+  currentPreviewDocumentUri = target.uri;
+  panel.title = getPreviewPanelTitle(target.fileName);
+
+  if (targetChanged || resetWebviewState) {
+    panel.webview.html = await getInspectorPreviewHtml(context, output, target.fileName, previewFollowActiveEditor);
+    return;
+  }
+
+  const document = await getDocumentByUri(target.uri);
+  await sendSnapshotToPanel(panel, document, output);
+  void postSourceInfoToPanel(panel, target.fileName);
+}
+
+function postSourceInfoToPanel(panel: vscode.WebviewPanel, fileName: string): Thenable<boolean> {
+  return panel.webview.postMessage({
+    type: "sourceInfo",
+    fileName: path.basename(fileName),
+    locked: !previewFollowActiveEditor
+  });
+}
+
+async function togglePreviewLocking(output: vscode.OutputChannel): Promise<void> {
+  if (!currentPreviewPanel || !currentPreviewDocumentUri) {
+    void vscode.window.showInformationMessage("Open Preview first to toggle preview locking.");
+    return;
+  }
+
+  previewFollowActiveEditor = !previewFollowActiveEditor;
+
+  if (previewFollowActiveEditor) {
+    const activeTarget = getPreviewTargetFromEditor(vscode.window.activeTextEditor);
+    if (activeTarget && !isSamePreviewTarget(currentPreviewDocumentUri, activeTarget.uri) && extensionContext) {
+      await retargetPreviewPanel(currentPreviewPanel, activeTarget, extensionContext, output, true);
+      return;
+    }
+  }
+
+  try {
+    const document = await getDocumentByUri(currentPreviewDocumentUri);
+    currentPreviewPanel.title = getPreviewPanelTitle(document.fileName);
+    void postSourceInfoToPanel(currentPreviewPanel, document.fileName);
+  } catch (error) {
+    output.appendLine(`Preview lock toggle failed: ${String(error)}`);
+  }
+
+  const message = previewFollowActiveEditor
+    ? "Precept Preview now follows the active .precept editor."
+    : "Precept Preview is now locked to the current .precept file.";
+  void vscode.window.showInformationMessage(message);
 }
 
 async function sendSnapshotToPanel(
@@ -988,15 +1122,19 @@ async function getDocumentByUri(uri: vscode.Uri): Promise<vscode.TextDocument> {
 async function getInspectorPreviewHtml(
   context: vscode.ExtensionContext,
   output: vscode.OutputChannel,
-  filePath: string
+  filePath: string,
+  isDynamicPreview: boolean
 ): Promise<string> {
   const previewTemplatePath = path.join(context.extensionPath, "webview", "inspector-preview.html");
 
   try {
     const rawHtml = await fs.promises.readFile(previewTemplatePath, "utf8");
     const displayFileName = escapeHtml(path.basename(filePath));
+    const previewModeLabel = escapeHtml(isDynamicPreview ? "Following active editor" : "Locked to current file");
 
-    return rawHtml.replace(/__FILE_NAME__/g, displayFileName);
+    return rawHtml
+      .replace(/__FILE_NAME__/g, displayFileName)
+      .replace(/__PREVIEW_MODE__/g, previewModeLabel);
   } catch (error) {
     output.appendLine(`Failed loading Preview HTML: ${String(error)}`);
     return `<!doctype html><html><body style=\"background:#1e1e1e;color:#fff;font-family:Segoe UI,Arial,sans-serif;padding:16px\"><h2>Preview</h2><p>Failed to load preview template at:<br>${escapeHtml(previewTemplatePath)}</p></body></html>`;
