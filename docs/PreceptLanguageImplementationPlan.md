@@ -29,7 +29,14 @@ While adding typed completions to the language server (e.g., offering only boole
 
 ### Scope note
 
-This is intentionally not a general semantic-model layer. The current direction is to keep the shared checker and `TypeContext` internal, then selectively consume them in tooling where the value is clear.
+This is intentionally not a general semantic-model layer. `PreceptTypeContext` and `PreceptTypeChecker` are `internal` — no public API surface, no caching layer, no incremental updates. The DSL is small enough that re-parsing and re-checking per completion request is sub-millisecond.
+
+Two patterns emerged for typed completions:
+
+- **Full re-check** (set RHS, collection mutation values): calls `PreceptTypeChecker.Check()` inline, gets `TypeContext` scopes and symbols, filters candidates. Correct even with narrowing.
+- **Lightweight dictionaries** (`dequeue`/`pop into`): uses `FieldTypeKinds` and `CollectionInnerTypes` pre-computed during `PreceptDocumentIntellisense.Analyze()`. No re-check needed — just field-to-field type comparison.
+
+If future typed completion features pile up and create pressure, the upgrade path is: introduce a cached semantic model (`PreceptSemanticModel`) that parses once per edit cycle and exposes resolved types, scopes, and diagnostics to all consumers. That's the Roslyn/rust-analyzer pattern — but premature until the performance ceiling is actually hit.
 
 ### Remaining work
 
