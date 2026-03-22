@@ -16,25 +16,31 @@ public class InspectToolTests
     {
         var data = new Dictionary<string, object?>
         {
-            ["Assignee"] = "alice",
-            ["Priority"] = 3.0,
-            ["BlockReason"] = null,
-            ["Resolution"] = null
+            ["RequesterName"] = "Jordan",
+            ["Location"] = "Plant 1",
+            ["IssueSummary"] = "Leaking valve",
+            ["AssignedTechnician"] = null,
+            ["EstimatedHours"] = 0.0,
+            ["ActualHours"] = 0.0,
+            ["Urgent"] = false,
+            ["PartsApproved"] = false,
+            ["CompletionNote"] = null,
+            ["CancellationReason"] = null
         };
         var eventArgs = new Dictionary<string, Dictionary<string, object?>>
         {
-            ["Block"] = new() { ["Reason"] = "Waiting on infra" }
+            ["Assign"] = new() { ["Technician"] = "alice", ["Estimate"] = 3.0 }
         };
 
-        var result = InspectTool.Run(SamplePath("bugtracker.precept"), "InProgress", data, eventArgs);
+        var result = InspectTool.Run(SamplePath("maintenance-work-order.precept"), "Open", data, eventArgs);
 
         result.Error.Should().BeNull();
-        result.CurrentState.Should().Be("InProgress");
+        result.CurrentState.Should().Be("Open");
 
-        var blockEvent = result.Events.FirstOrDefault(e => e.Event == "Block");
-        blockEvent.Should().NotBeNull();
-        blockEvent!.Outcome.Should().Be("Accepted");
-        blockEvent.ResultState.Should().Be("Blocked");
+        var assignEvent = result.Events.FirstOrDefault(e => e.Event == "Assign");
+        assignEvent.Should().NotBeNull();
+        assignEvent!.Outcome.Should().Be("Accepted");
+        assignEvent.ResultState.Should().Be("Scheduled");
     }
 
     [Fact]
@@ -42,17 +48,23 @@ public class InspectToolTests
     {
         var data = new Dictionary<string, object?>
         {
-            ["Assignee"] = "alice",
-            ["Priority"] = 3.0,
-            ["BlockReason"] = null,
-            ["Resolution"] = null
+            ["RequesterName"] = "Jordan",
+            ["Location"] = "Plant 1",
+            ["IssueSummary"] = "Leaking valve",
+            ["AssignedTechnician"] = "alice",
+            ["EstimatedHours"] = 3.0,
+            ["ActualHours"] = 0.0,
+            ["Urgent"] = false,
+            ["PartsApproved"] = true,
+            ["CompletionNote"] = null,
+            ["CancellationReason"] = null
         };
 
-        var result = InspectTool.Run(SamplePath("bugtracker.precept"), "InProgress", data);
+        var result = InspectTool.Run(SamplePath("maintenance-work-order.precept"), "InProgress", data);
 
-        var approveEvent = result.Events.FirstOrDefault(e => e.Event == "Approve");
-        approveEvent.Should().NotBeNull();
-        approveEvent!.Outcome.Should().Be("NotDefined");
+        var approvePartsEvent = result.Events.FirstOrDefault(e => e.Event == "ApproveParts");
+        approvePartsEvent.Should().NotBeNull();
+        approvePartsEvent!.Outcome.Should().Be("NotDefined");
     }
 
     [Fact]
@@ -60,19 +72,25 @@ public class InspectToolTests
     {
         var data = new Dictionary<string, object?>
         {
-            ["Assignee"] = null,
-            ["Priority"] = 3.0,
-            ["BlockReason"] = null,
-            ["Resolution"] = null
+            ["RequesterName"] = "Jordan",
+            ["Location"] = "Plant 1",
+            ["IssueSummary"] = "Leaking valve",
+            ["AssignedTechnician"] = null,
+            ["EstimatedHours"] = 0.0,
+            ["ActualHours"] = 0.0,
+            ["Urgent"] = false,
+            ["PartsApproved"] = false,
+            ["CompletionNote"] = null,
+            ["CancellationReason"] = null
         };
 
-        var result = InspectTool.Run(SamplePath("bugtracker.precept"), "Triage", data);
+        var result = InspectTool.Run(SamplePath("maintenance-work-order.precept"), "Open", data);
 
-        // Assign requires "User" arg which wasn't supplied
         var assignEvent = result.Events.FirstOrDefault(e => e.Event == "Assign");
         assignEvent.Should().NotBeNull();
         assignEvent!.RequiresArgs.Should().BeTrue();
-        assignEvent.RequiredArgs.Should().ContainSingle(a => a.Name == "User");
+        assignEvent.RequiredArgs.Should().Contain(a => a.Name == "Technician");
+        assignEvent.RequiredArgs.Should().Contain(a => a.Name == "Estimate");
     }
 
     [Fact]
@@ -80,22 +98,28 @@ public class InspectToolTests
     {
         var data = new Dictionary<string, object?>
         {
-            ["Assignee"] = null,
-            ["Priority"] = 3.0,
-            ["BlockReason"] = null,
-            ["Resolution"] = null
+            ["RequesterName"] = "Jordan",
+            ["Location"] = "Plant 1",
+            ["IssueSummary"] = "Leaking valve",
+            ["AssignedTechnician"] = null,
+            ["EstimatedHours"] = 0.0,
+            ["ActualHours"] = 0.0,
+            ["Urgent"] = false,
+            ["PartsApproved"] = false,
+            ["CompletionNote"] = null,
+            ["CancellationReason"] = null
         };
         var eventArgs = new Dictionary<string, Dictionary<string, object?>>
         {
-            ["Assign"] = new() { ["User"] = "alice" }
+            ["Assign"] = new() { ["Technician"] = "alice", ["Estimate"] = 3.0 }
         };
 
-        var result = InspectTool.Run(SamplePath("bugtracker.precept"), "Triage", data, eventArgs);
+        var result = InspectTool.Run(SamplePath("maintenance-work-order.precept"), "Open", data, eventArgs);
 
         var assignEvent = result.Events.FirstOrDefault(e => e.Event == "Assign");
         assignEvent.Should().NotBeNull();
         assignEvent!.Outcome.Should().Be("Accepted");
-        assignEvent.ResultState.Should().Be("Open");
+        assignEvent.ResultState.Should().Be("Scheduled");
     }
 
     [Fact]
@@ -103,13 +127,19 @@ public class InspectToolTests
     {
         var data = new Dictionary<string, object?>
         {
-            ["Assignee"] = "alice",
-            ["Priority"] = 3.0,
-            ["BlockReason"] = null,
-            ["Resolution"] = null
+            ["RequesterName"] = "Jordan",
+            ["Location"] = "Plant 1",
+            ["IssueSummary"] = "Leaking valve",
+            ["AssignedTechnician"] = "alice",
+            ["EstimatedHours"] = 3.0,
+            ["ActualHours"] = 0.0,
+            ["Urgent"] = false,
+            ["PartsApproved"] = true,
+            ["CompletionNote"] = null,
+            ["CancellationReason"] = null
         };
 
-        var result = InspectTool.Run(SamplePath("bugtracker.precept"), "InProgress", data);
+        var result = InspectTool.Run(SamplePath("maintenance-work-order.precept"), "InProgress", data);
 
         // First events should be actionable (Accepted/AcceptedInPlace), then not-defined/etc., then requiresArgs
         var events = result.Events.ToList();

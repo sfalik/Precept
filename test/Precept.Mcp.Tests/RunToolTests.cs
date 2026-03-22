@@ -16,15 +16,16 @@ public class RunToolTests
     {
         var steps = new List<RunStep>
         {
-            new("Assign", new() { ["User"] = "alice" }),
+            new("Submit", new() { ["Requester"] = "Jordan", ["WorkLocation"] = "Plant 1", ["Summary"] = "Leaking valve" }),
+            new("Assign", new() { ["Technician"] = "alice", ["Estimate"] = 3.0 }),
             new("StartWork")
         };
 
-        var result = RunTool.Run(SamplePath("bugtracker.precept"), steps: steps);
+        var result = RunTool.Run(SamplePath("maintenance-work-order.precept"), steps: steps);
 
         result.Error.Should().BeNull();
         result.AbortedAt.Should().BeNull();
-        result.Steps.Should().HaveCount(2);
+        result.Steps.Should().HaveCount(3);
         result.FinalState.Should().Be("InProgress");
     }
 
@@ -37,7 +38,7 @@ public class RunToolTests
             new("StartWork")
         };
 
-        var result = RunTool.Run(SamplePath("bugtracker.precept"), steps: steps);
+        var result = RunTool.Run(SamplePath("maintenance-work-order.precept"), steps: steps);
 
         result.Error.Should().BeNull();
         result.AbortedAt.Should().Be(1);
@@ -48,11 +49,11 @@ public class RunToolTests
     [Fact]
     public void EmptySteps_ReturnsInitialState()
     {
-        var result = RunTool.Run(SamplePath("bugtracker.precept"), steps: []);
+        var result = RunTool.Run(SamplePath("maintenance-work-order.precept"), steps: []);
 
         result.Error.Should().BeNull();
         result.AbortedAt.Should().BeNull();
-        result.FinalState.Should().Be("Triage");
+        result.FinalState.Should().Be("Draft");
         result.Steps.Should().BeEmpty();
     }
 
@@ -61,16 +62,16 @@ public class RunToolTests
     {
         var steps = new List<RunStep>
         {
-            new("Prioritize", new() { ["Level"] = 5.0 })
+            new("Submit", new() { ["Requester"] = "Jordan", ["WorkLocation"] = "Plant 1", ["Summary"] = "Leaking valve" })
         };
 
-        var result = RunTool.Run(SamplePath("bugtracker.precept"), steps: steps);
+        var result = RunTool.Run(SamplePath("maintenance-work-order.precept"), steps: steps);
 
         result.Error.Should().BeNull();
         result.AbortedAt.Should().BeNull();
         result.Steps.Should().HaveCount(1);
-        result.Steps[0].Outcome.Should().Be("AcceptedInPlace");
-        result.FinalData!["Priority"].Should().Be(5.0);
+        result.Steps[0].Outcome.Should().Be("Accepted");
+        result.FinalData!["RequesterName"].Should().Be("Jordan");
     }
 
     [Fact]

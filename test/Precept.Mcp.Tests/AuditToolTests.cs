@@ -14,7 +14,7 @@ public class AuditToolTests
     [Fact]
     public void FullyConnectedGraph_NoIssues()
     {
-        var result = AuditTool.Run(SamplePath("bugtracker.precept"));
+        var result = AuditTool.Run(SamplePath("maintenance-work-order.precept"));
 
         result.Error.Should().BeNull();
         result.AllStates.Should().NotBeEmpty();
