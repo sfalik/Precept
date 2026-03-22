@@ -193,7 +193,7 @@ Blank              := (whitespace only)
 
 Notes:
 - `Invariant` = data truth. Always holds, checked post-commit. May reference any declared fields.
-- `StateInAssert` = state-scoped field invariant. Checked post-commit on any transition where the resulting state is the named state (entry **and** AcceptedInPlace).
+- `StateInAssert` = state-scoped field invariant. Checked post-commit on any transition where the resulting state is the named state (entry **and** NoTransition).
 - `StateToAssert` = entry gate. Checked post-commit only when crossing **into** the named state from a different state.
 - `StateFromAssert` = exit gate. Checked post-commit only when crossing **out of** the named state to a different state.
 - All three state assert forms evaluate against the **proposed world** (post-mutation, pre-commit). Fields-scoped.
@@ -342,7 +342,7 @@ Three forms, each with a distinct temporal scope:
 
 | Preposition | Meaning | When checked |
 |---|---|---|
-| `in <State>` | State-scoped field invariant | After **any** transition resulting in `<State>` (entry **and** AcceptedInPlace) |
+| `in <State>` | State-scoped field invariant | After **any** transition resulting in `<State>` (entry **and** NoTransition) |
 | `to <State>` | Entry gate | Only when crossing **into** `<State>` from a different state |
 | `from <State>` | Exit gate | Only when crossing **out of** `<State>` to a different state |
 
@@ -428,7 +428,7 @@ Execution order:
 3. Entry actions (`to <TargetState> ->`) run third
 4. Validation (asserts, invariants) runs last
 
-For `no transition` / AcceptedInPlace: no exit or entry actions fire (you didn't leave or arrive).
+For `no transition` / NoTransition: no exit or entry actions fire (you didn't leave or arrive).
 
 Disambiguation:
 - `to Open assert ...` — validation (next token: `assert`)
@@ -611,7 +611,7 @@ from <StateTarget> on <EventName> [when <BoolExpr>] [-> <Action>]* -> <Outcome>
 | Outcome | Meaning |
 |---|---|
 | `transition <State>` | Move to the named state |
-| `no transition` | Accept the event, apply mutations, stay in current state (AcceptedInPlace) |
+| `no transition` | Accept the event, apply mutations, stay in current state (NoTransition) |
 | `reject "<reason>"` | Reject the event with the given reason |
 
 ### Multi-state and `any`
@@ -642,14 +642,14 @@ If Row 1's `when` is true, it wins. Otherwise Row 2 (no `when`) catches the rest
 
 | Condition | Result |
 |---|---|
-| No rows exist for `(state, event)` | `NotDefined` |
-| Rows exist but no `when` guard matches | `NotApplicable` |
-| A row matches and its outcome is `transition` | `Accepted` |
-| A row matches and its outcome is `no transition` | `AcceptedInPlace` |
+| No rows exist for `(state, event)` | `Undefined` |
+| Rows exist but no `when` guard matches | `Unmatched` |
+| A row matches and its outcome is `transition` | `Transition` |
+| A row matches and its outcome is `no transition` | `NoTransition` |
 | A row matches and its outcome is `reject` | `Rejected` |
-| A row matches but post-commit validation fails | `Rejected` (rolled back) |
+| A row matches but post-commit validation fails | `ConstraintFailure` (rolled back) |
 
-`NotApplicable` is **terminal** — the Inspect API uses it to signal "this event doesn't apply right now."
+`Unmatched` is **terminal** — the Inspect API uses it to signal "this event doesn't apply right now."
 
 ### Actions (mutation vocabulary)
 
@@ -699,7 +699,7 @@ For `no transition`: steps 3 and 5 are skipped (no state change). `in <State>` a
 | Unknown state/event | `from` references undeclared state; `on` references undeclared event | Error |
 | Unknown field | `set` targets undeclared field; mutation targets non-collection field | Error |
 
-No catch-all row is required — if all guarded rows fail, the result is `NotApplicable`.
+No catch-all row is required — if all guarded rows fail, the result is `Unmatched`.
 
 ### Diagnostic severity policy (Locked)
 
@@ -924,7 +924,7 @@ Locked in this discussion:
 - Sectionless flat-statement design: all statements are keyword-anchored, no section headers. The recommended ordering (fields → states → events → transitions) is a convention enforced by language server IntelliSense prioritization, not by grammar.
 - `invariant` = static data truth (fields); checked post-commit, always
 - `assert` = movement truth (states + events); checked when something happens
-  - `in <State> assert` — state-scoped field invariant; entry **and** AcceptedInPlace
+  - `in <State> assert` — state-scoped field invariant; entry **and** NoTransition
   - `to <State> assert` — entry gate; only on cross-state entry
   - `from <State> assert` — exit gate; only on cross-state exit
   - `on <Event> assert` — event-fire constraint, arg-only
@@ -939,7 +939,7 @@ Locked in this discussion:
 - Transition rows: `from <StateTarget> on <Event> [when <Guard>] -> <actions> -> <outcome>`
 - `->` pipeline: sequential, read-your-writes, separates context from actions
 - First-match evaluation for multiple rows on same `(state, event)`; no catch-all required
-- `when` = applicability precondition → `NotApplicable` if no row matches
+- `when` = applicability precondition → `Unmatched` if no row matches
 - Execution order: event asserts → when guard → exit actions → row mutations → entry actions → validation
 - Coverage warning (not error) for reachable `(state, event)` pairs without transition rows
 - Unreachable row after unguarded row = compile-time error

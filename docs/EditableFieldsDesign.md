@@ -459,23 +459,23 @@ EventInspectionResult inspectResolve = engine.Inspect(instance, "Resolve");
 // inspectResolve.Outcome == Transition (with guard status)
 
 // Hypothetical-patch inspect: validate edits before applying
-PreceptInspectionResult dryRun = engine.Inspect(instance, patch => patch.Set("Priority", 99));
+InspectionResult dryRun = engine.Inspect(instance, patch => patch.Set("Priority", 99));
 // dryRun.EditableFields[Priority].Violation.Reason == "Priority must be between 1 and 5"
 // No commit — instance is unchanged
 
 // Rules enforcement: priority out of range
-PreceptUpdateResult badEdit = engine.Update(instance, patch => patch
+UpdateResult badEdit = engine.Update(instance, patch => patch
     .Set("Priority", 99)
 );
-// badEdit.Outcome == Blocked
-// badEdit.Reasons => ["Priority must be between 1 and 5"]
+// badEdit.Outcome == ConstraintFailure
+// badEdit.Violations => ["Priority must be between 1 and 5"]
 
 // Not editable in current state
-PreceptUpdateResult wrongState = engine.Update(instance, patch => patch
+UpdateResult wrongState = engine.Update(instance, patch => patch
     .Set("ResolutionSummary", "Fixed it")
 );
-// wrongState.Outcome == NotAllowed
-// wrongState.Reasons => ["Field 'ResolutionSummary' is not editable in state 'InProgress'"]
+// wrongState.Outcome == UneditableField
+// wrongState.Violations => ["Field 'ResolutionSummary' is not editable in state 'InProgress'"]
 ```
 
 ## Grammar Extension
@@ -653,7 +653,7 @@ Implement the editable fields feature for the Precept state machine DSL as speci
 **Model:** Add `PreceptEditBlock(string State, IReadOnlyList<string> FieldNames, int SourceLine = 0)` record. Add `IReadOnlyList<PreceptEditBlock>? EditBlocks = null` to `PreceptDefinition`. Parser expands `in any edit` into one `PreceptEditBlock` per declared state and `in State1, State2 edit` into one per listed state (same expansion as state asserts).
 
 **Runtime API:**
-- Add `Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)` on `PreceptEngine`, returning `PreceptUpdateResult`.
+- Add `Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)` on `PreceptEngine`, returning `UpdateResult`.
 - `IUpdatePatchBuilder` supports: `Set` (scalars), `Add`/`Remove` (sets), `Enqueue`/`Dequeue` (queues), `Push`/`Pop` (stacks), `Replace` and `Clear` (all collections).
 - Validation sequence: editability check → type check → atomic mutation on working copy → invariant/`in <CurrentState>` assert evaluation → commit or rollback.
 - Outcomes: `UpdateOutcome.Update`, `UneditableField`, `ConstraintFailure`, `InvalidInput`.

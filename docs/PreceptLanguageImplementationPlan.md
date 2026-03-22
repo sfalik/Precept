@@ -169,7 +169,7 @@ All 18 sample files already use dotted form exclusively — no sample changes ne
 
 **Implementation prompt:**
 
-Register new constraint C46 in `src/Precept/Dsl/ConstraintCatalog.cs` for non-boolean rule positions. The checker currently infers guard/assert expression types but doesn’t enforce that the result is boolean. Add a check after `TryInferExpressionKind()` returns for `when` guards, `invariant`, `in/to/from assert`, and `on assert` expressions: if the inferred kind doesn’t include `StaticValueKind.Boolean`, emit C46.
+Register new constraint C44 in `src/Precept/Dsl/ConstraintCatalog.cs` for non-boolean rule positions. The checker currently infers guard/assert expression types but doesn’t enforce that the result is boolean. Add a check after `TryInferExpressionKind()` returns for `when` guards, `invariant`, `in/to/from assert`, and `on assert` expressions: if the inferred kind doesn’t include `StaticValueKind.Boolean`, emit C44.
 
 The validation positions are spread across `ValidateTransitionRows()` (for `when` guards), and the invariant/assert validation loops. Search for where `row.WhenGuard` is validated and where assert expressions are checked.
 
@@ -267,14 +267,14 @@ All design discussions for the current compile-time expansion wave (Phases D–H
 
 **Rule:** overload an existing code when the new condition is the same conceptual error category. Introduce a new code only when a genuinely new category emerges.
 
-Existing codes C38–C45 are stable and will not be split. C44 (duplicate state assert) and C45 (subsumed state assert) were added for compile-time structural checks on state assert declarations. The message text within each code provides the specificity (e.g., C41 covers all binary operator type errors but the message names the exact operator and operand types).
+Existing codes C38–C43 are stable and will not be split. The message text within each code provides the specificity (e.g., C41 covers all binary operator type errors but the message names the exact operator and operand types).
 
 **Planned new codes for upcoming phases:**
 
 | Code | Category | Phase | Trigger |
 |---|---|---|---|
-| C46 | Non-boolean rule position | F | `invariant`, `assert`, or `when` expression that doesn’t produce boolean |
-| C47 | Identical-guard duplicate row | G | Two rows for the same `(state, event)` with the same guard expression |
+| C44 | Non-boolean rule position | F | `invariant`, `assert`, or `when` expression that doesn’t produce boolean |
+| C45 | Identical-guard duplicate row | G | Two rows for the same `(state, event)` with the same guard expression |
 
 **Reuse of existing codes:**
 
@@ -732,18 +732,18 @@ Current:
 
 New (per design doc):
 1. **Event asserts** (`on <Event> assert`) — arg-only context, pre-transition. If false → `Rejected`.
-2. **First-match row selection** — iterate rows for `(state, event)`, evaluate `when` guards. First match wins. No match → `NotApplicable`.
+2. **First-match row selection** — iterate rows for `(state, event)`, evaluate `when` guards. First match wins. No match → `Unmatched`.
 3. **Exit actions** (`from <SourceState> ->`) — run automatic exit mutations.
 4. **Row mutations** (`-> set ...`, `-> add ...`, etc.) — the matched row's action chain.
 5. **Entry actions** (`to <TargetState> ->`) — run automatic entry mutations.
-6. **Validation** — invariants, state asserts (`in`/`to`/`from` with correct temporal scoping), collect-all. If any fail → full rollback, `Rejected`.
+6. **Validation** — invariants, state asserts (`in`/`to`/`from` with correct temporal scoping), collect-all. If any fail → full rollback, `ConstraintFailure`.
 
 ### State assert evaluation logic
 
 ```
 Given: sourceState, targetState, proposedData
 
-if sourceState == targetState (AcceptedInPlace or no transition):
+if sourceState == targetState (NoTransition):
     evaluate all `in <sourceState>` asserts
 else (state transition):
     evaluate all `from <sourceState>` asserts
@@ -794,12 +794,12 @@ else (state transition):
 - [ ] Tokenizer tests: specific token sequences for each statement form
 - [ ] Parser combinator unit tests: each combinator in isolation
 - [ ] `invariant` evaluation (always, post-commit)
-- [ ] `in <State> assert` — checked on entry + AcceptedInPlace
+- [ ] `in <State> assert` — checked on entry + NoTransition
 - [ ] `to <State> assert` — checked only on cross-state entry
 - [ ] `from <State> assert` — checked only on cross-state exit
 - [ ] State entry/exit actions — execution order verification
 - [ ] First-match row evaluation (guarded + unguarded fallback)
-- [ ] `when` guard → `NotApplicable` when no row matches
+- [ ] `when` guard → `Unmatched` when no row matches
 - [ ] Multi-state targets (`Open, InProgress`) and `any`
 - [ ] `because` sentinel parsing (expressions with various operators before `because`)
 - [ ] `event Name with args` syntax
@@ -1054,7 +1054,7 @@ The public API surface (`PreceptParser.Parse`, `PreceptCompiler.Compile`, `Prece
 | Section | Change needed |
 |---|---|
 | Fire pipeline stages | Rewrite: `when` moves from block-level pre-step to per-row guard during first-match selection. if/else if/else clauses replaced by ordered first-match rows. New stages for state exit actions (step 3) and entry actions (step 5). |
-| Inspect semantics | Update: no block-level `when`; row-level `when` guards during first-match. `NotApplicable` when no row matches. |
+| Inspect semantics | Update: no block-level `when`; row-level `when` guards during first-match. `Unmatched` when no row matches. |
 | Compile validation | Expand: add 5 state assert checks (subsumption, duplication, initial-state, contradiction, deadlock) + transition checks (coverage warning, unreachable row error). |
 | Model Types table | Rewrite: `DslRule` → `DslInvariant`, `DslStateAssert`, `DslEventAssert`. `DslTransition` → `DslTransitionRow`. `DslClause` → eliminated. |
 | CheckCompatibility | Minor: "data rules + state entry rules" → "invariants + `in <CurrentState>` asserts" |
