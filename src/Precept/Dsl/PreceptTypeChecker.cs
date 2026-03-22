@@ -105,6 +105,7 @@ internal static class PreceptTypeChecker
 
         var stateAssertNarrowings = BuildStateAssertNarrowings(model, dataFieldKinds);
         ValidateTransitionRows(model, dataFieldKinds, eventArgKinds, collectionFieldMap, stateAssertNarrowings, diagnostics, expressions, scopes);
+        ValidateStateActions(model, dataFieldKinds, collectionFieldMap, stateAssertNarrowings, diagnostics, expressions, scopes);
         ValidateRules(model, dataFieldKinds, eventArgKinds, diagnostics, expressions, scopes);
 
         return new PreceptTypeCheckResult(diagnostics, new PreceptTypeContext(expressions, scopes));
@@ -231,6 +232,76 @@ internal static class PreceptTypeChecker
                         eventName);
                 }
             }
+        }
+    }
+
+    private static void ValidateStateActions(
+        PreceptDefinition model,
+        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
+        IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> stateAssertNarrowings,
+        List<PreceptTypeDiagnostic> diagnostics,
+        List<PreceptTypeExpressionInfo> expressions,
+        List<PreceptTypeScopeInfo> scopes)
+    {
+        if (model.StateActions is null || model.StateActions.Count == 0)
+            return;
+
+        foreach (var action in model.StateActions)
+        {
+            // Build data-only symbols with collection accessors, narrowed by state asserts
+            var baseSymbols = new Dictionary<string, StaticValueKind>(
+                stateAssertNarrowings.TryGetValue(action.State, out var narrowed) ? narrowed : dataFieldKinds,
+                StringComparer.Ordinal);
+
+            foreach (var col in model.CollectionFields)
+            {
+                var innerKind = MapScalarTypeToKind(col.InnerType);
+                baseSymbols[$"{col.Name}.count"] = StaticValueKind.Number;
+
+                if (col.CollectionKind == PreceptCollectionKind.Set)
+                {
+                    baseSymbols[$"{col.Name}.min"] = innerKind;
+                    baseSymbols[$"{col.Name}.max"] = innerKind;
+                }
+
+                if (col.CollectionKind is PreceptCollectionKind.Queue or PreceptCollectionKind.Stack)
+                    baseSymbols[$"{col.Name}.peek"] = innerKind;
+            }
+
+            scopes.Add(new PreceptTypeScopeInfo(
+                action.SourceLine,
+                "state-action",
+                new Dictionary<string, StaticValueKind>(baseSymbols, StringComparer.Ordinal),
+                action.State));
+
+            foreach (var assignment in action.SetAssignments)
+            {
+                if (!dataFieldKinds.TryGetValue(assignment.Key, out var targetKind))
+                    continue;
+
+                ValidateExpression(
+                    assignment.Expression,
+                    assignment.ExpressionText,
+                    assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine,
+                    baseSymbols,
+                    targetKind,
+                    $"set target '{assignment.Key}'",
+                    diagnostics,
+                    expressions,
+                    stateContext: action.State);
+            }
+
+            ValidateCollectionMutations(
+                action.CollectionMutations,
+                baseSymbols,
+                dataFieldKinds,
+                collectionFieldMap,
+                diagnostics,
+                expressions,
+                action.State,
+                action.SourceLine,
+                eventName: null);
         }
     }
 

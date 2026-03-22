@@ -193,6 +193,146 @@ public class PreceptTypeCheckerTests
             .WithMessage("*PRECEPT042*");
     }
 
+    [Fact]
+    public void Check_StateAction_SetTypeMismatch_ProducesC39()
+    {
+        const string dsl = """
+            precept M
+            field Score as number default 0
+            state Open initial
+            state Closed
+            event Close
+            from Open on Close -> transition Closed
+            to Closed -> set Score = "not a number"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C39");
+        result.Diagnostics[0].Message.Should().Contain("set target 'Score'");
+        result.Diagnostics[0].StateContext.Should().Be("Closed");
+    }
+
+    [Fact]
+    public void Check_StateAction_NullFlowViolation_ProducesC42()
+    {
+        const string dsl = """
+            precept M
+            field Value as number default 0
+            field MaybeNull as number nullable
+            state Open initial
+            state Closed
+            event Close
+            from Open on Close -> transition Closed
+            to Closed -> set Value = MaybeNull
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C42");
+        result.Diagnostics[0].StateContext.Should().Be("Closed");
+    }
+
+    [Fact]
+    public void Check_StateAction_CollectionMutationTypeMismatch_ProducesC39()
+    {
+        const string dsl = """
+            precept M
+            field Log as queue of string
+            state Open initial
+            state Closed
+            event Close
+            from Open on Close -> transition Closed
+            to Closed -> enqueue Log 42
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C39");
+        result.Diagnostics[0].Message.Should().Contain("enqueue Log");
+    }
+
+    [Fact]
+    public void Check_StateAction_WithStateAssertNarrowing_NarrowsSuccessfully()
+    {
+        const string dsl = """
+            precept M
+            field Value as number default 0
+            field MaybeNull as number nullable
+            state Open initial
+            state Closed
+            in Closed assert MaybeNull != null because "closed requires value"
+            event Close
+            from Open on Close -> transition Closed
+            to Closed -> set Value = MaybeNull
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_StateAction_PopIntoWrongType_ProducesC43()
+    {
+        const string dsl = """
+            precept M
+            field LastItem as number default 0
+            field Steps as stack of string
+            state Open initial
+            state Closed
+            event Close
+            from Open on Close -> transition Closed
+            from Closed -> pop Steps into LastItem
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C43");
+        result.Diagnostics[0].Message.Should().Contain("cannot assign string to target 'LastItem' of type number");
+    }
+
+    [Fact]
+    public void Check_StateAction_ValidSetAndMutation_ProducesNoDiagnostics()
+    {
+        const string dsl = """
+            precept M
+            field Score as number default 0
+            field Log as queue of string
+            state Open initial
+            state Closed
+            event Close
+            from Open on Close -> transition Closed
+            to Closed -> set Score = Score + 1 -> enqueue Log "closed"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_StateAction_Scope_RegisteredAsStateAction()
+    {
+        const string dsl = """
+            precept M
+            field Score as number default 0
+            state Open initial
+            state Closed
+            event Close
+            from Open on Close -> transition Closed
+            to Closed -> set Score = 1
+            """;
+
+        var result = Check(dsl);
+
+        result.TypeContext.Scopes.Should().Contain(s => s.ScopeKind == "state-action" && s.StateContext == "Closed");
+    }
+
     private static PreceptTypeCheckResult Check(string dsl)
     {
         var model = PreceptParser.Parse(dsl);

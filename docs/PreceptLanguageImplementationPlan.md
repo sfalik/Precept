@@ -6,6 +6,69 @@ Spec: `docs/PreceptLanguageDesign.md`
 
 This plan implements the full-stack language redesign: new Superpower-based parser, updated model, updated runtime, language server, grammar, tests, samples, and docs.
 
+## Implemented Follow-Up: Shared Type Checking
+
+### Motivation
+
+While adding typed completions to the language server (e.g., offering only boolean fields on the RHS of `set BoolField =`), we discovered that `PreceptTypeContext` scope lookups were returning wrong results. Every transition row in the parsed model had `SourceLine = 0`, so when the analyzer asked "what type scope applies at this cursor position?", all rows collapsed together and the wrong `transition-actions` scope was selected.
+
+**Root cause:** The Superpower parser was not propagating source line numbers from keyword tokens into `TransitionRowResult` or action result types. The model had no line attribution for transition rows.
+
+**What that uncovered:** Fixing the parser line propagation forced a closer look at how the analyzer performed type inference. The analyzer maintained ~635 lines of its own parallel type logic — `TryInferKind()`, `ApplyNarrowing()`, `ValidateExpression()`, `ValidateCollectionMutations()`, `BuildSymbolKinds()`, `IsAssignable()` — that was diverging from compile-time behavior. Bugs fixed in one place wouldn't be fixed in the other, and new constraints had to be implemented twice.
+
+**Decision:** Extract all expression/type checking into a shared `PreceptTypeChecker` in core so the compiler, language server, and MCP tools all get the same diagnostics from a single source of truth. See `/memories/repo/type-checker-design.md` for the full design decisions table.
+
+### What changed
+
+- **Parser source-line propagation:** `TransitionRowResult.SourceLine` and all action parsers now carry `SourceLine` from the keyword token's `Span.Position.Line`. This flows through `PreceptTransitionRow` so type scopes and diagnostics can be attributed to the correct row.
+- **Shared type checker:** `PreceptTypeChecker.Check(PreceptDefinition)` returns `PreceptTypeCheckResult` containing diagnostics and a `PreceptTypeContext` with resolved types per expression position. Implements `StaticValueKind` flags-based type representation, null-flow narrowing (within-row `when` guards + cross-row negation), state assert narrowing (`in State assert X != null` propagates into `from State` rows), and per-state `from any` expansion.
+- **Constraint codes C38–C43:** Six new compile-time diagnostics (`PRECEPT038`–`PRECEPT043`) covering unknown identifiers, expression type mismatches, unary/binary operator errors, null-flow violations, and collection `pop`/`dequeue into` target mismatches.
+- **`PreceptCompiler.Validate(model)`:** Non-throwing validation path so consumers (MCP `precept_validate` tool, future CLI) can return all diagnostics structurally instead of throwing on the first error.
+- **Analyzer delegation:** ~635 lines of duplicate type logic removed from the analyzer. It now calls the shared checker and consumes `PreceptTypeContext` for IDE features.
+- **Typed completions:** `PreceptTypeContext` powers typed `set` RHS completions and typed collection mutation value completions in the analyzer.
+
+### Scope note
+
+This is intentionally not a general semantic-model layer. The current direction is to keep the shared checker and `TypeContext` internal, then selectively consume them in tooling where the value is clear.
+
+### Remaining work
+
+#### Phase A: State action type checking (gap)
+
+The type checker validates transition rows and rules but skips `PreceptStateAction` entirely. State actions hold `SetAssignments` and `CollectionMutations` — the same expression types already validated in transition rows.
+
+- Add `ValidateStateActions()` to `PreceptTypeChecker` — reuse `ValidateExpression` and `ValidateCollectionMutations` with a data-only symbol scope (no event args, since state actions aren't event-scoped).
+- Apply state assert narrowing for `to`/`from` prepositions.
+- Tests: type mismatch in `to State -> set`, null-flow violation in state action, collection mutation type error.
+- Verify MCP `precept_validate` surfaces these diagnostics (no MCP changes needed — `Validate()` already calls `Check()`).
+
+#### Phase B: Typed `dequeue`/`pop ... into` completions
+
+Completion scenario #4a (`dequeue QueueField into `) returns all scalar data fields unfiltered. It should filter to fields whose type matches the collection's inner type.
+
+- Add `TryBuildTypedDequeuePopIntoCompletions()` in the analyzer.
+- Use `PreceptTypeChecker.MapFieldContractKind()` to get the collection's inner type.
+- Filter candidate fields by `IsAssignableKind`.
+- Fallback: if type resolution fails, return untyped list (existing behavior).
+- Tests: typed `into` completions for queue/stack with different inner types.
+
+#### Phase C: Consolidate minor analyzer helpers
+
+Two small analyzer methods duplicate checker logic:
+
+| Analyzer method | Checker equivalent |
+|---|---|
+| `MapCollectionInnerTypeKind(PreceptScalarType)` | `MapScalarTypeToKind(PreceptScalarType)` (private) |
+| `TryGetLiteralKind(string)` | `MapLiteralKind(object?)` |
+
+- Expose `MapScalarTypeToKind` as a public wrapper on the checker.
+- Replace `MapCollectionInnerTypeKind` calls with the checker's method.
+- `TryGetLiteralKind` operates on string labels (completion context) vs objects (checker context) — add an overload or leave it if the difference is justified.
+
+#### Deferred: Guard expression typed completions
+
+`BuildGuardCompletions` returns all fields without type filtering. After `when`, only boolean-yielding expressions are valid. However, filtering to "boolean fields only" would be wrong — `when X > 5` is valid even though `X` is number. Completions would need to suggest fields that *could participate in* a boolean expression, which is significantly more complex. The type checker already catches invalid guards via C39. Defer unless user demand surfaces.
+
 ### Mandatory vs. Advisory
 
 This plan contains two kinds of guidance — know which is which:
