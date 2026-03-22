@@ -33,7 +33,7 @@ This is intentionally not a general semantic-model layer. The current direction 
 
 ### Remaining work
 
-#### Phase A: State action type checking (gap)
+#### Phase A: State action type checking — DONE
 
 The type checker validates transition rows and rules but skips `PreceptStateAction` entirely. State actions hold `SetAssignments` and `CollectionMutations` — the same expression types already validated in transition rows.
 
@@ -42,7 +42,7 @@ The type checker validates transition rows and rules but skips `PreceptStateActi
 - Tests: type mismatch in `to State -> set`, null-flow violation in state action, collection mutation type error.
 - Verify MCP `precept_validate` surfaces these diagnostics (no MCP changes needed — `Validate()` already calls `Check()`).
 
-#### Phase B: Typed `dequeue`/`pop ... into` completions
+#### Phase B: Typed `dequeue`/`pop ... into` completions — DONE
 
 Completion scenario #4a (`dequeue QueueField into `) returns all scalar data fields unfiltered. It should filter to fields whose type matches the collection's inner type.
 
@@ -52,22 +52,18 @@ Completion scenario #4a (`dequeue QueueField into `) returns all scalar data fie
 - Fallback: if type resolution fails, return untyped list (existing behavior).
 - Tests: typed `into` completions for queue/stack with different inner types.
 
-#### Phase C: Consolidate minor analyzer helpers
+#### Phase C: Consolidate minor analyzer helpers — DONE
 
-Two small analyzer methods duplicate checker logic:
+Both duplicate helpers have been replaced with public wrappers on `PreceptTypeChecker`:
 
-| Analyzer method | Checker equivalent |
-|---|---|
-| `MapCollectionInnerTypeKind(PreceptScalarType)` | `MapScalarTypeToKind(PreceptScalarType)` (private) |
-| `TryGetLiteralKind(string)` | `MapLiteralKind(object?)` |
+- `MapCollectionInnerTypeKind` → `PreceptTypeChecker.MapScalarType()`
+- `TryGetLiteralKind` → `PreceptTypeChecker.TryGetLiteralKind(string, out StaticValueKind)`
 
-- Expose `MapScalarTypeToKind` as a public wrapper on the checker.
-- Replace `MapCollectionInnerTypeKind` calls with the checker's method.
-- `TryGetLiteralKind` operates on string labels (completion context) vs objects (checker context) — add an overload or leave it if the difference is justified.
+Zero type-related logic remains in the analyzer.
 
-#### Deferred: Guard expression typed completions
+#### Not applicable: Guard expression typed completions
 
-`BuildGuardCompletions` returns all fields without type filtering. After `when`, only boolean-yielding expressions are valid. However, filtering to "boolean fields only" would be wrong — `when X > 5` is valid even though `X` is number. Completions would need to suggest fields that *could participate in* a boolean expression, which is significantly more complex. The type checker already catches invalid guards via C39. Defer unless user demand surfaces.
+Guard completions do not need type filtering. All field types can participate in valid `when` expressions: numbers via comparison (`Count > 0`), strings via equality/null checks (`Name != null`), booleans directly (`IsActive`). Mid-expression type filtering (e.g., after `when X && `) would require partial expression parsing at the cursor — disproportionate complexity for marginal UX benefit. The type checker already catches invalid guards via C39.
 
 ### Mandatory vs. Advisory
 
