@@ -782,6 +782,57 @@ in Draft edit Email
 
 ---
 
+## Compile-Time Type Checking (Locked)
+
+The compiler performs expression-level type checking as a compile-blocking phase. All expression positions are validated against a `StaticValueKind` type system (`string`, `number`, `boolean`, `null`, and unions thereof).
+
+### What is checked
+
+| Expression position | Expected type | Symbol scope |
+|---|---|---|
+| `when` guard | boolean | data fields + event args + collection accessors |
+| `set` assignment RHS | target field type | data fields + event args + collection accessors (narrowed by prior `when`) |
+| `add`/`remove`/`push`/`enqueue` value | collection inner type | data fields + event args + collection accessors |
+| `dequeue`/`pop into` target | collection inner type assignable to target field | data fields only |
+| `invariant` expression | boolean | data fields + collection accessors |
+| `in`/`to`/`from` state assert | boolean | data fields + collection accessors |
+| `on` event assert | boolean | event args only |
+| State action `set`/mutations | same as transition rows | data fields + collection accessors (no event args) |
+
+### Null-flow narrowing
+
+Nullable fields (`string nullable`, `number nullable`) carry a `T|null` union kind. Assigning a nullable value to a non-nullable target is a type error unless the value has been narrowed.
+
+Narrowing sources:
+- **`when` guard:** `when Field != null` narrows `Field` from `T|null` to `T` for the row's action scope.
+- **Cross-row negation:** An unguarded row following a `when Field != null` row inherits the negation — `Field` remains `T|null`.
+- **State assert propagation:** `in State assert Field != null` narrows `Field` to `T` for all `from State on ...` transition rows and `to`/`from State -> ...` state actions.
+
+### `from any` expansion
+
+Type checking for `from any` rows expands to per-state checking. Each state may have different assert-derived narrowings, so a row that type-checks in one state may fail in another. Diagnostics report the specific state that has the problem.
+
+### Constraint codes
+
+| Code | Diagnostic |
+|---|---|
+| C38 / PRECEPT038 | Unknown identifier in expression |
+| C39 / PRECEPT039 | Expression type mismatch (expected vs actual kind) |
+| C40 / PRECEPT040 | Unary operator type error (`!` on non-boolean, `-` on non-number) |
+| C41 / PRECEPT041 | Binary operator type error (includes `contains` RHS mismatch) |
+| C42 / PRECEPT042 | Null-flow violation (assigning `T\|null` to `T` without narrowing) |
+| C43 / PRECEPT043 | Collection `pop`/`dequeue into` target type mismatch |
+
+### Design principle
+
+Per philosophy #8 ("Sound static analysis only"), compile-time type checks never produce false positives. If the checker reports an error, it is a real type violation. This is achieved by conservative narrowing — narrowing only applies when the guard condition structurally guarantees the refinement.
+
+### Implementation boundary
+
+The type checker is internal infrastructure (`PreceptTypeChecker`), not a public semantic model. It produces diagnostics and a `TypeContext` consumed by the compiler, language server, and MCP tools. There is no caching layer or incremental analysis — the checker runs from scratch on each invocation. This is sufficient for the current DSL scale and avoids premature abstraction.
+
+---
+
 ## Status
 
 Locked in this discussion:
