@@ -6,8 +6,11 @@
 - Implement Phase 9: remove extension MCP registration, remove `Precept Dev` from `.vscode/mcp.json`, rewrite plugin `.mcp.json` for distribution, publish plugin.
  
 ## Language Design and Implementation
-- All compile-time policy decisions for Phases D–G are locked: equality, collection mutation nullability, event-arg scope, event-assert scope, static impossibility boundary, diagnostic severity, and diagnostic code policy. See `PreceptLanguageDesign.md` Status section and `PreceptLanguageImplementationPlan.md` locked policy sections.
-- Deliver the next checker hardening pass across compiler, analyzer, MCP validation, tests, and docs so scope rules, boolean-only rule positions, collection contracts, and multi-diagnostic coverage all stay aligned.
+- Implement Phase D: Equality and null-compatible comparison policy — enforce same-family equality in `PreceptTypeChecker`, align runtime evaluator, add tests. See implementation prompt in `PreceptLanguageImplementationPlan.md`.
+- Implement Phase E: Scope and narrowing hardening — remove bare arg names from transition row symbol tables, enforce dotted form, add event-arg narrowing tests. See implementation prompt.
+- Implement Phase F: Rule-position strictness and collection contracts — register C44, reject non-boolean expressions in invariants/asserts/guards, harden `contains` coverage. See implementation prompt.
+- Implement Phase G: Identical-guard duplicate detection — register C45, detect duplicate guards in `ValidateTransitionRows()`. See implementation prompt.
+- Implement Phase H: Coverage and tooling sync — fix `MapTypeDiagnostic` severity mapping, verify completions, catalog drift for C44/C45, README sync. See implementation prompt.
 
 ## Validation Design and Implementation
 - Finish the validation-attribution design by walking the remaining scenarios and locking how targets and sources are reported for guard failures, `NotApplicable`, edit-time validation, and mixed field-plus-arg constraints.
