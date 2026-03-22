@@ -40,7 +40,7 @@ Transport: **stdio** (default for local MCP servers launched by VS Code).
 
 ### 1. `precept_validate`
 
-**Purpose:** Parse and compile a `.precept` file. Returns structured diagnostics. This is the primary correctness gate — equivalent to reading the VS Code Problems panel but without requiring the extension to be running.
+**Purpose:** Parse and validate a `.precept` file. Returns structured diagnostics. This is the primary correctness gate — equivalent to reading the VS Code Problems panel but without requiring the extension to be running.
 
 **Input:**
 ```json
@@ -65,12 +65,13 @@ Transport: **stdio** (default for local MCP servers launched by VS Code).
 {
   "valid": false,
   "diagnostics": [
-    { "line": 12, "message": "compile-time rule violation: rule \"Priority must be between 1 and 5\" on field 'Priority' is violated by the field's default value." }
+    { "line": 12, "message": "set target 'Value' type mismatch: expected number but expression produces number|null.", "code": "PRECEPT042" },
+    { "line": 12, "message": "unknown identifier 'Missing'.", "code": "PRECEPT038" }
   ]
 }
 ```
 
-**Implementation:** `PreceptParser.Parse(text)` + `PreceptCompiler.Compile(model)`. Catches `InvalidOperationException` / `ArgumentException` thrown by the compiler and maps them to diagnostics using the existing `LineErrorRegex` already present in `PreceptAnalyzer`.
+**Implementation:** `PreceptParser.ParseWithDiagnostics(text)` for syntax/shape errors, then `PreceptCompiler.Validate(model)` for shared compile-phase type diagnostics (`PRECEPT038`-`PRECEPT043`). If shared validation succeeds, the tool still calls `PreceptCompiler.Compile(model)` to surface remaining compile-time runtime checks that are not part of the shared type checker. The result preserves diagnostic codes structurally via `{ line, message, code }` entries and returns all shared type diagnostics instead of stopping at the first error.
 
 ---
 

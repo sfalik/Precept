@@ -67,7 +67,7 @@ await builder.Build().RunAsync();
 
 ## Phase 1: `precept_validate`
 
-**Goal:** Parse + compile a `.precept` file, return structured diagnostics.
+**Goal:** Parse + validate a `.precept` file, return structured diagnostics including shared type-checker codes.
 
 **New file:** `tools/Precept.Mcp/Tools/ValidateTool.cs`
 
@@ -88,6 +88,15 @@ public static class ValidateTool
         if (model is null || diagnostics.Count > 0)
             return new(false, null, 0, 0, diagnostics.Select(ToDiagnosticDto).ToList());
 
+        var validation = PreceptCompiler.Validate(model);
+        if (validation.HasErrors)
+        {
+            return new(false, model.Name, 0, 0,
+                validation.Diagnostics
+                    .Select(d => new DiagnosticDto(d.Line, d.Message, d.DiagnosticCode))
+                    .ToList());
+        }
+
         try
         {
             var engine = PreceptCompiler.Compile(model);
@@ -103,13 +112,14 @@ public static class ValidateTool
 
 ### Input/Output
 
-Per `McpServerDesign.md § precept_validate`. Input: `{ "path": "..." }`. Output: `{ "valid", "machineName", "stateCount", "eventCount", "diagnostics" }`.
+Per `McpServerDesign.md § precept_validate`. Input: `{ "path": "..." }`. Output: `{ "valid", "machineName", "stateCount", "eventCount", "diagnostics" }`, where each diagnostic may include a stable `code` such as `PRECEPT038`-`PRECEPT043`.
 
 ### Tests
 
 - [ ] Valid file → `valid: true`, zero diagnostics
 - [ ] Syntax error → `valid: false`, diagnostic with line number
-- [ ] Compile-time constraint violation → `valid: false`, diagnostic with constraint ID
+- [ ] Shared type-check violation → `valid: false`, diagnostic with stable PRECEPT code
+- [ ] Multiple shared type-check violations → returns all shared type diagnostics, not just the first one
 - [ ] Missing file → graceful error (not unhandled exception)
 
 ### Checkpoint
