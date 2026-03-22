@@ -2,13 +2,13 @@
 
 Date: 2026-03-04
 
-Status: **Runtime implemented.** Parser/model support was included in the language redesign; the runtime `Update` API, `IUpdatePatchBuilder`, editability enforcement, invariant/assert validation, and `Inspect` integration are now implemented.
+Status: **Runtime implemented.** Parser/model support was included in the language redesign; the runtime `Update` API, `IUpdatePatchBuilder`, editability enforcement, invariant/assert rule evaluation, and `Inspect` integration are now implemented.
 
 > **Inspector UX note (2026-03-06):** The preview inspector applies direct field edits in explicit **Edit** mode. While typing, draft values are validated through `Inspect(...)`-based preview checks and violations are surfaced inline; runtime data is not committed until the user clicks **Save**. **Cancel** discards draft edits.
 >
 > The preview contract distinguishes between:
 > - **Field-level errors**: violations attributed to specific edited fields and surfaced inline on those fields only.
-> - **Form-level errors**: violations that cannot be attributed to one field alone and are surfaced in the draft validation banner.
+> - **Form-level errors**: violations that cannot be attributed to one field alone and are surfaced in the draft rule violation banner.
 >
 > Attribution is owned by the preview service layer, not the webview. The webview renders the authoritative `EditableFields[i].Violation`, `FieldErrors`, and `FormErrors` returned by `inspectUpdate`; it does not infer ownership client-side from the raw runtime payload.
 
@@ -175,8 +175,8 @@ public sealed record PreceptDefinition(
     IReadOnlyList<PreceptField> Fields,
     IReadOnlyList<PreceptCollectionField> CollectionFields,
     IReadOnlyList<PreceptInvariant>? Invariants = null,
-    IReadOnlyList<PreceptStateAssert>? StateAsserts = null,
-    IReadOnlyList<PreceptEventAssert>? EventAsserts = null,
+    IReadOnlyList<StateAssertion>? StateAsserts = null,
+    IReadOnlyList<EventAssertion>? EventAsserts = null,
     IReadOnlyList<PreceptEditBlock>? EditBlocks = null);  // <-- NEW
 ```
 
@@ -198,7 +198,7 @@ This precomputed map makes `Update` validation O(1) per field.
 A single new method on `PreceptEngine`, following the same instance-parameter pattern as `Fire`:
 
 ```csharp
-PreceptUpdateResult Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
+UpdateResult Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
 ```
 
 The caller passes the current instance; `Update` returns a result containing the updated instance (or null on failure). Instances remain immutable records — `Update` returns a new instance via `with` expression, just like `Fire`.
@@ -245,47 +245,52 @@ var result = engine.Update(instance, patch => patch
     .Remove("Tags", "low-priority")
 );
 
-if (result.Outcome == PreceptUpdateOutcome.Updated)
+if (result.IsSuccess)
 {
     instance = result.UpdatedInstance!; // new immutable instance with updated data
 }
 ```
 
-### Validation sequence
+### Rule evaluation sequence
 
 When `Update` is called, the runtime executes the following steps in order:
 
-1. **Editability check** — For each field in the patch, verify the field is editable in the current state (union of matching `in ... edit` declarations). If any field is not editable, the entire update is rejected with `NotAllowed` outcome. No partial application.
+1. **Editability check** — For each field in the patch, verify the field is editable in the current state (union of matching `in ... edit` declarations). If any field is not editable, the entire update is rejected with `UneditableField` outcome. No partial application.
 
 2. **Type check** — Verify each value matches the declared field type. Scalar type mismatches, null on non-nullable fields, and wrong-typed collection elements are rejected.
 
 3. **Atomic mutation** — Apply all patch operations to a working copy of instance data, in declaration order within the patch. This is the same working-copy pattern used by `set` assignments in transitions.
 
-4. **Rules evaluation** — Evaluate invariants, state asserts (`in <CurrentState>` asserts), and field invariants against the post-mutation working copy. If any fail, all mutations are rolled back and the outcome is `Blocked` with violated rule reasons. (Note: state asserts are checked because the data must remain valid for the state we're in, even though no state entry occurs.)
+4. **Constraint evaluation** — Evaluate invariants, state asserts (`in <CurrentState>` asserts), and field invariants against the post-mutation working copy. If any fail, all mutations are rolled back and the outcome is `ConstraintFailure` with violations. (Note: state asserts are checked because the data must remain valid for the state we're in, even though no state entry occurs.)
 
 5. **Commit** — If all validations pass, the working copy replaces the live instance data.
 
 ### Outcome kinds
 
 ```csharp
-public enum PreceptUpdateOutcome
+public enum UpdateOutcome
 {
-    Updated,      // Success — all fields modified, all rules passed
-    NotAllowed,   // One or more fields not editable in current state
-    Blocked,      // Rules violated — reasons collected
-    Invalid       // Type mismatch, unknown field, or patch conflict
+    // Success
+    Update,              // All fields modified, all constraints passed
+
+    // Failure
+    ConstraintFailure,   // Constraints violated — violations collected
+    UneditableField,     // One or more fields not editable in current state
+    InvalidInput         // Type mismatch, unknown field, or patch conflict
 }
 ```
 
 ```csharp
-public sealed record PreceptUpdateResult(
-    PreceptUpdateOutcome Outcome,
-    IReadOnlyList<string> Reasons,
-    PreceptInstance? UpdatedInstance  // null when not Updated
-);
+public sealed record UpdateResult(
+    UpdateOutcome Outcome,
+    IReadOnlyList<ConstraintViolation> Violations,
+    PreceptInstance? UpdatedInstance)
+{
+    public bool IsSuccess => Outcome is UpdateOutcome.Update;
+}
 ```
 
-`Updated` is a new outcome kind — distinct from `Accepted` (which implies a lifecycle event was processed). The caller sees "data was edited" vs. "an event was fired" as different categories. `PreceptUpdateOutcome` is a separate enum from `PreceptOutcomeKind` because `Update` and `Fire` are fundamentally different operations with different outcome semantics.
+`Update` is a new outcome kind — distinct from `Transition` (which implies a lifecycle event was processed). The caller sees "data was edited" vs. "an event was fired" as different categories. `UpdateOutcome` is a separate enum from `TransitionOutcome` because `Update` and `Fire` are fundamentally different operations with different outcome semantics.
 
 ### Patch conflict rules
 
@@ -309,19 +314,19 @@ Both share the same rules evaluation infrastructure. A field modified by `Update
 
 ### Editable fields on the aggregate `Inspect` result
 
-The engine already has an aggregate `Inspect(instance)` method that returns `PreceptInspectionResult(CurrentState, InstanceData, Events[])` — a full snapshot for rendering an inspector view. Editable field information is state-level, not event-level — it answers "what fields can be edited in this state?" regardless of any event context. This makes it a natural extension of the aggregate inspect result.
+The engine already has an aggregate `Inspect(instance)` method that returns `InspectionResult(CurrentState, InstanceData, Events[])` — a full snapshot for rendering an inspector view. Editable field information is state-level, not event-level — it answers "what fields can be edited in this state?" regardless of any event context. This makes it a natural extension of the aggregate inspect result.
 
-Extend `PreceptInspectionResult` with an `EditableFields` collection:
+Extend `InspectionResult` with an `EditableFields` collection:
 
 ```csharp
-public sealed record PreceptInspectionResult(
+public sealed record InspectionResult(
     string CurrentState,
     IReadOnlyDictionary<string, object?> InstanceData,
-    IReadOnlyList<PreceptEventInspectionResult> Events,
+    IReadOnlyList<EventInspectionResult> Events,
     IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null);  // <-- NEW
 ```
 
-Each entry provides enough metadata for the host to render edit controls, and carries a back-pointer to an associated `PreceptViolation` (populated during hypothetical-patch inspection):
+Each entry provides enough metadata for the host to render edit controls, and carries a back-pointer to an associated `ConstraintViolation` (populated during hypothetical-patch inspection):
 
 ```csharp
 public sealed record PreceptEditableFieldInfo(
@@ -329,27 +334,28 @@ public sealed record PreceptEditableFieldInfo(
     string FieldType,        // composite type: "string", "number", "boolean", "set<string>", "queue<number>", etc.
     bool IsNullable,
     object? CurrentValue,    // Current field value (scalar or collection)
-    PreceptViolation? Violation = null);  // non-null when a patch inspection found a violation implicating this field
+    ConstraintViolation? Violation = null);  // non-null when a patch inspection found a violation implicating this field
 ```
 
-### `PreceptViolation` — structured violation with field attribution
+### `ConstraintViolation` — structured violation with field attribution
 
 A violation carries both a human-readable reason and a list of all `PreceptEditableFieldInfo` objects it implicates. This allows the host to highlight every field involved in a multi-field constraint (e.g. `A + B <= 100` implicates both `A` and `B`):
 
 ```csharp
-public sealed record PreceptViolation(
-    string Reason,
-    IReadOnlyList<PreceptEditableFieldInfo> AffectedFields);  // direct object references (runtime only — not serialized)
+public sealed record ConstraintViolation(
+    string Message,
+    ConstraintSource Source,
+    IReadOnlyList<ConstraintTarget> Targets);
 ```
 
-The bidirectional references (`FieldInfo.Violation` and `Violation.AffectedFields`) form an object graph that is safe in C# but never serialized directly. The preview protocol uses indices instead (see Preview Protocol Extension).
+The bidirectional references (`FieldInfo.Violation` and `Violation.Targets`) form an object graph that is safe in C# but never serialized directly. The preview protocol uses indices instead (see Preview Protocol Extension).
 
 ### `Inspect(instance, patches)` — hypothetical-patch inspection
 
-A new `Inspect` overload applies a patch to a working copy of instance data, runs the full validation pipeline (editability check, type check, invariant/assert evaluation), and returns a `PreceptInspectionResult` with violations reflected in `EditableFields`. **No commit occurs** — the session instance is unchanged. This is the runtime primitive used for per-keystroke validation in the preview UI.
+A new `Inspect` overload applies a patch to a working copy of instance data, runs the full rule evaluation pipeline (editability check, type check, invariant/assert evaluation), and returns an `InspectionResult` with violations reflected in `EditableFields`. **No commit occurs** — the session instance is unchanged. This is the runtime primitive used for per-keystroke rule checking in the preview UI.
 
 ```csharp
-PreceptInspectionResult Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
+InspectionResult Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
 ```
 
 The returned `EditableFields` is the same as for `Inspect(instance)`, but each `PreceptEditableFieldInfo` whose field is implicated in a violation has its `Violation` property set.
@@ -358,7 +364,7 @@ When no edit declarations exist, `EditableFields` is `null`. Otherwise, it conta
 
 ### Relationship to per-event Inspect
 
-The per-event `Inspect(instance, eventName)` returns `PreceptEventInspectionResult` and is unchanged. The aggregate `Inspect(instance)` now also carries editable field metadata. The new `Inspect(instance, patches)` overload adds hypothetical-patch validation without committing. All three answer different questions:
+The per-event `Inspect(instance, eventName)` returns `EventInspectionResult` and is unchanged. The aggregate `Inspect(instance)` now also carries editable field metadata. The new `Inspect(instance, patches)` overload adds hypothetical-patch rule evaluation without committing. All three answer different questions:
 
 - **`Inspect(instance, eventName)`**: "What happens if I fire this event?"
 - **`Inspect(instance)`**: "What data can I edit in this state, and what are the current values?"
@@ -427,30 +433,30 @@ PreceptEngine engine = PreceptCompiler.Compile(definition);
 PreceptInstance instance = engine.CreateInstance();
 
 // Lifecycle: assign a technician (event pipeline)
-PreceptFireResult fireResult = engine.Fire(instance, "Assign", new Dictionary<string, object?>
+FireResult fireResult = engine.Fire(instance, "Assign", new Dictionary<string, object?>
 {
     ["Technician"] = "Alice"
 });
-// fireResult.Outcome == Accepted, state => InProgress
+// fireResult.Outcome == Transition, state => InProgress
 instance = fireResult.UpdatedInstance!;
 
 // Data editing: update notes and priority (no event needed)
-PreceptUpdateResult editResult = engine.Update(instance, patch => patch
+UpdateResult editResult = engine.Update(instance, patch => patch
     .Set("Notes", "Customer prefers morning appointments")
     .Set("Priority", 1)
     .Add("Tags", "urgent")
 );
-// editResult.Outcome == Updated, state unchanged (InProgress)
+// editResult.Outcome == Update, state unchanged (InProgress)
 instance = editResult.UpdatedInstance!;
 
 // Full snapshot: events + editable fields in one call
-PreceptInspectionResult snapshot = engine.Inspect(instance);
+InspectionResult snapshot = engine.Inspect(instance);
 // snapshot.EditableFields => [Notes, Priority, Tags, Description, EstimatedHours, AssignedTo]
 // snapshot.Events => per-event inspection results for all relevant events
 
 // Per-event inspect: see what happens if we fire a specific event
-PreceptEventInspectionResult inspectResolve = engine.Inspect(instance, "Resolve");
-// inspectResolve.Outcome == Accepted (with guard status)
+EventInspectionResult inspectResolve = engine.Inspect(instance, "Resolve");
+// inspectResolve.Outcome == Transition (with guard status)
 
 // Hypothetical-patch inspect: validate edits before applying
 PreceptInspectionResult dryRun = engine.Inspect(instance, patch => patch.Set("Priority", 99));
@@ -543,7 +549,7 @@ IReadOnlyList<PreceptPreviewEditableField>? EditableFields = null,
 IReadOnlyList<PreceptPreviewViolation>? Violations = null
 ```
 
-The handler translates the runtime's object graph (bidirectional `PreceptViolation`/`PreceptEditableFieldInfo` refs) into stable indices. Each `EditableFields[i].ViolationIndex` points into `Violations[j]`, and each `Violations[j].AffectedFieldIndexes` lists the indices back into `EditableFields`. This lets the webview:
+The handler translates the runtime's object graph (bidirectional `ConstraintViolation`/`PreceptEditableFieldInfo` refs) into stable indices. Each `EditableFields[i].ViolationIndex` points into `Violations[j]`, and each `Violations[j].AffectedFieldIndexes` lists the indices back into `EditableFields`. This lets the webview:
 
 - Turn an input red using `field.violationIndex != null`
 - Show the reason using `snapshot.violations[field.violationIndex].reason`
@@ -650,15 +656,15 @@ Implement the editable fields feature for the Precept state machine DSL as speci
 - Add `Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)` on `PreceptEngine`, returning `PreceptUpdateResult`.
 - `IUpdatePatchBuilder` supports: `Set` (scalars), `Add`/`Remove` (sets), `Enqueue`/`Dequeue` (queues), `Push`/`Pop` (stacks), `Replace` and `Clear` (all collections).
 - Validation sequence: editability check → type check → atomic mutation on working copy → invariant/`in <CurrentState>` assert evaluation → commit or rollback.
-- Outcomes: `PreceptUpdateOutcome.Updated`, `NotAllowed`, `Blocked`, `Invalid`.
+- Outcomes: `UpdateOutcome.Update`, `UneditableField`, `ConstraintFailure`, `InvalidInput`.
 - Patch conflicts detected at build time: duplicate Set on same scalar, Replace + granular on same collection, Set on collection field, granular op on scalar field.
-- `PreceptUpdateResult(PreceptUpdateOutcome Outcome, IReadOnlyList<string> Reasons, PreceptInstance? UpdatedInstance)`.
+- `UpdateResult(UpdateOutcome Outcome, IReadOnlyList<ConstraintViolation> Violations, PreceptInstance? UpdatedInstance)`.
 
 **Inspect integration:**
-- Add `IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null` to `PreceptInspectionResult`.
-- `PreceptEditableFieldInfo(string FieldName, string FieldType, bool IsNullable, object? CurrentValue, PreceptViolation? Violation = null)`. `FieldType` is composite: `"string"`, `"set<string>"`, `"queue<number>"`, etc. No separate `CollectionType` property.
-- Add `PreceptViolation(string Reason, IReadOnlyList<PreceptEditableFieldInfo> AffectedFields)` — bidirectional object refs, runtime-only, never serialized directly.
-- Add `Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)` overload: applies patch to working copy, runs full validation pipeline, returns `PreceptInspectionResult` with violations reflected in `EditableFields`. **No commit.** Used for per-keystroke validation.
+- Add `IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null` to `InspectionResult`.
+- `PreceptEditableFieldInfo(string FieldName, string FieldType, bool IsNullable, object? CurrentValue, ConstraintViolation? Violation = null)`. `FieldType` is composite: `"string"`, `"set<string>"`, `"queue<number>"`, etc. No separate `CollectionType` property.
+- Add `ConstraintViolation(string Message, ConstraintSource Source, IReadOnlyList<ConstraintTarget> Targets)` — structured violation with attribution.
+- Add `Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)` overload: applies patch to working copy, runs full validation pipeline, returns `InspectionResult` with violations reflected in `EditableFields`. **No commit.** Used for per-keystroke validation.
 - The aggregate `engine.Inspect(instance)` returns event statuses AND editable field info in one call. `engine.Inspect(instance, patches)` does the same with hypothetical patch evaluation.
 
 **Preview protocol (`PreceptPreviewProtocol.cs`):**

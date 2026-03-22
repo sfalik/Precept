@@ -356,15 +356,15 @@ Implement `tools/Precept.Cli/Program.cs` and supporting files. Follow the thin-h
 
 **Output formatting (REPL):**
 - `state` → plain text line.
-- `events` → formatted list; prefix each event with a colored indicator from `engine.Inspect(instance).Events`: green `●` for `Accepted`, yellow `●` for `AcceptedInPlace`, red `●` for `Rejected`, dim `○` for `NotDefined`/`NotApplicable`.
+- `events` → formatted list; prefix each event with a colored indicator from `engine.Inspect(instance).Events`: green `●` for `Transition`, yellow `●` for `NoTransition`, red `●` for `Rejected`/`ConstraintFailure`, dim `○` for `Undefined`/`Unmatched`.
 - `inspect`/`fire` → outcome line (colored), target/previous→new state, reasons list if non-empty.
 - `data` → use `Spectre.Console.Json` for pretty-printed colorized JSON.
 - `rules` → violations as a red list, or green "All rules satisfied."
 
 **Exit code mapping:**
-- `DslOutcomeKind.Accepted` or `AcceptedInPlace` → 0
-- `DslOutcomeKind.Rejected` → 1
-- `DslOutcomeKind.NotDefined` → 2
+- `TransitionOutcome.Transition` or `NoTransition` → 0
+- `TransitionOutcome.Rejected` or `ConstraintFailure` → 1
+- `TransitionOutcome.Undefined` → 2
 - Parse/compile error → 3
 - Runtime or input error → 4
 

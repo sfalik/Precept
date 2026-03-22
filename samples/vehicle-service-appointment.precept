@@ -29,7 +29,6 @@ in ReadyForPickup assert PickupContacted because "Customers must be notified bef
 from AwaitingApproval assert RecommendedServices.count > 0 because "Approval cannot finish with an empty recommendation list"
 
 to ReadyForPickup -> set PickupContacted = true
-to ReadyForPickup assert PickupContacted because "Ready vehicles must be marked as contacted"
 
 event CheckIn with Customer as string, Plate as string, Advisor as string
 on CheckIn assert Customer != "" because "A customer name is required"

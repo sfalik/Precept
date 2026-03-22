@@ -89,22 +89,22 @@ Creates a new workflow instance, optionally pre-seeded with field data and start
 ### `Inspect` (per-event)
 
 ```csharp
-public PreceptEventInspectionResult Inspect(
+public EventInspectionResult Inspect(
     PreceptInstance instance,
     string eventName,
     IReadOnlyDictionary<string, object?>? eventArguments = null)
 
-public PreceptEventInspectionResult Inspect(
+public EventInspectionResult Inspect(
     string currentState,
     string eventName,
     IReadOnlyDictionary<string, object?>? eventArguments = null)
 ```
 
-Non-mutating evaluation of a single event. Returns `PreceptEventInspectionResult`. The `PreceptInstance` overload also runs a compatibility check before evaluating; the `string currentState` overload skips that check and is used internally by the aggregate `Inspect`.
+Non-mutating evaluation of a single event. Returns `EventInspectionResult`. The `PreceptInstance` overload also runs a compatibility check before evaluating; the `string currentState` overload skips that check and is used internally by the aggregate `Inspect`.
 
 **Semantics:**
-- Verifies schema compatibility via `CheckCompatibility` before evaluating. On failure, returns `NotDefined`.
-- Evaluates the `when` precondition (if present) against instance data alone, before argument validation. If false, returns `NotApplicable`.
+- Verifies schema compatibility via `CheckCompatibility` before evaluating. On failure, returns `Undefined`.
+- Evaluates the `when` precondition (if present) against instance data alone, before argument validation. If false, returns `Unmatched`.
 - Accepts calls with missing/partial event arguments — this is a discovery API. `RequiredEventArgumentKeys` on the result tells callers what is needed before `Fire`.
 - When event arguments are provided, validates them against the event's argument contract. Unknown keys are rejected.
 - Evaluates ordered `if`/`else if`/`else` guards; the first matching clause determines the outcome.
@@ -117,10 +117,10 @@ Arguments are only validated and event rules are only run when `eventArguments !
 ### `Inspect` (aggregate)
 
 ```csharp
-public PreceptInspectionResult Inspect(PreceptInstance instance)
+public InspectionResult Inspect(PreceptInstance instance)
 ```
 
-Evaluates all events that have at least one transition from the instance's current state, returning a single `PreceptInspectionResult` with the current state, serialized data, per-event results, and editable field metadata.
+Evaluates all events that have at least one transition from the instance's current state, returning a single `InspectionResult` with the current state, serialized data, per-event results, and editable field metadata.
 
 - Events are ordered by declaration position.
 - Each event is evaluated as `Inspect(instance, eventName)` with no event arguments (discovery mode).
@@ -132,36 +132,36 @@ Use this as the primary API for rendering a state-machine inspector view.
 ### `Inspect` (hypothetical patch)
 
 ```csharp
-public PreceptInspectionResult Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
+public InspectionResult Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
 ```
 
-Applies a hypothetical patch to a working copy of instance data, runs the full validation pipeline (editability check, type check, invariant/assert evaluation), and returns a `PreceptInspectionResult` with violations reflected in `EditableFields`. **No commit occurs** — the instance is unchanged. Used for per-keystroke validation in the preview UI.
+Applies a hypothetical patch to a working copy of instance data, runs the full rule evaluation pipeline (editability check, type check, invariant/assert evaluation), and returns an `InspectionResult` with violations reflected in `EditableFields`. **No commit occurs** — the instance is unchanged. Used for per-keystroke rule checking in the preview UI.
 
 ### `Update`
 
 ```csharp
-public PreceptUpdateResult Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
+public UpdateResult Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
 ```
 
-Atomically updates editable fields. Only fields declared in an `in <State> edit` block for the current state are mutable. Validation sequence: editability check → type check → atomic mutation on working copy → invariant/state-assert evaluation → commit or rollback. Returns `PreceptUpdateResult`.
+Atomically updates editable fields. Only fields declared in an `in <State> edit` block for the current state are mutable. Evaluation sequence: editability check → type check → atomic mutation on working copy → invariant/state-assert evaluation → commit or rollback. Returns `UpdateResult`.
 
 ### `Fire`
 
 ```csharp
-public PreceptFireResult Fire(
+public FireResult Fire(
     PreceptInstance instance,
     string eventName,
     IReadOnlyDictionary<string, object?>? eventArguments = null)
 ```
 
-Mutating event execution. Returns `PreceptFireResult`.
+Mutating event execution. Returns `FireResult`.
 
 **Evaluation stages (in order, with full rollback on any failure):**
 
-1. **Compatibility check** — same as `CheckCompatibility`; returns `NotDefined` if incompatible.
+1. **Compatibility check** — same as `CheckCompatibility`; returns `Undefined` if incompatible.
 2. **Event argument validation** — validates types against the event's argument contract; returns `Rejected` on unknown keys or wrong types.
 3. **Event rules** — evaluated against event-argument-only context (field data does not shadow args); returns `Rejected` on violation.
-4. **`when` precondition** — if present and false, returns `NotApplicable`.
+4. **`when` precondition** — if present and false, returns `Unmatched`.
 5. **Guard evaluation** — evaluates ordered `if`/`else if`/`else` clauses; returns `Rejected` if all guards fail.
 6. **`set` assignments** — executed on a working copy of instance data; returns `Rejected` if an expression fails or the result violates a field's declared type.
 7. **Collection mutations** — `add`/`remove`/`enqueue`/`dequeue`/`push`/`pop`/`clear` operations on working copies.
@@ -170,7 +170,7 @@ Mutating event execution. Returns `PreceptFireResult`.
 
 On any rejection, the original instance is unchanged — all stages are fully rolled back.
 
-On success, returns `PreceptFireResult` with `UpdatedInstance != null`. The `UpdatedInstance` carries the new `CurrentState`, the updated `InstanceData`, and the current `UpdatedAt` timestamp.
+On success, returns `FireResult` with `UpdatedInstance != null`. The `UpdatedInstance` carries the new `CurrentState`, the updated `InstanceData`, and the current `UpdatedAt` timestamp.
 
 `no transition` outcomes execute `set` and collection mutations but do **not** trigger state rules.
 
@@ -251,40 +251,48 @@ There are no `__collection__` prefix keys in instances returned by the engine. T
 
 ## Result Types
 
-### `PreceptOutcomeKind`
+### `TransitionOutcome`
 
 ```csharp
-public enum PreceptOutcomeKind
+public enum TransitionOutcome
 {
-    NotDefined,      // Event or state is unknown to the engine
-    NotApplicable,   // 'when' precondition was false
-    Rejected,        // Guard evaluation or rule check blocked the event
-    Accepted,        // Event fired; state changed to TargetState / NewState
-    AcceptedInPlace  // 'no transition' outcome; state unchanged, data may change
+    // Success
+    Transition,          // Event fired; state changed to TargetState / NewState
+    NoTransition,        // 'no transition' outcome; state unchanged, data may change
+
+    // Failure
+    Rejected,            // Explicit reject outcome in transition row
+    ConstraintFailure,   // Invariant or state assert violated post-mutation
+    Unmatched,           // All when-guards failed, no row matched
+    Undefined            // Event or state is unknown to the engine
 }
 ```
 
-### `PreceptEventInspectionResult`
+### `EventInspectionResult`
 
 ```csharp
-public sealed record PreceptEventInspectionResult(
-    PreceptOutcomeKind Outcome,
+public sealed record EventInspectionResult(
+    TransitionOutcome Outcome,
     string CurrentState,
     string EventName,
-    string? TargetState,           // null unless Outcome is Accepted or AcceptedInPlace
-    IReadOnlyList<string> RequiredEventArgumentKeys,  // non-nullable required args
-    IReadOnlyList<string> Reasons) // non-empty when Outcome is Rejected or NotDefined
+    string? TargetState,           // null unless Outcome is Transition or NoTransition
+    IReadOnlyList<string> RequiredEventArgumentKeys,
+    IReadOnlyList<ConstraintViolation> Violations)
+{
+    public bool IsSuccess => Outcome is TransitionOutcome.Transition
+                          or TransitionOutcome.NoTransition;
+}
 ```
 
-Returned by the per-event `Inspect` overload. `TargetState` is populated for `Accepted` (the transition target) and `AcceptedInPlace` (same as `CurrentState`).
+Returned by the per-event `Inspect` overload. `TargetState` is populated for `Transition` (the transition target) and `NoTransition` (same as `CurrentState`).
 
-### `PreceptInspectionResult`
+### `InspectionResult`
 
 ```csharp
-public sealed record PreceptInspectionResult(
+public sealed record InspectionResult(
     string CurrentState,
     IReadOnlyDictionary<string, object?> InstanceData,
-    IReadOnlyList<PreceptEventInspectionResult> Events,
+    IReadOnlyList<EventInspectionResult> Events,
     IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null)
 ```
 
@@ -298,57 +306,57 @@ public sealed record PreceptEditableFieldInfo(
     string FieldType,        // "string", "number", "set<string>", etc.
     bool IsNullable,
     object? CurrentValue,
-    PreceptViolation? Violation = null)
+    ConstraintViolation? Violation = null)
 ```
 
-Metadata for one editable field. `Violation` is populated only by `Inspect(instance, patch)` when a hypothetical patch fails a rule.
+Metadata for one editable field. `Violation` is populated only by `Inspect(instance, patch)` when a hypothetical patch fails a constraint.
 
-### `PreceptViolation`
-
-```csharp
-public sealed record PreceptViolation(
-    string Reason,
-    IReadOnlyList<PreceptEditableFieldInfo> AffectedFields)
-```
-
-Bidirectional object reference — runtime only, never serialized directly.
-
-### `PreceptUpdateResult`
+### `UpdateResult`
 
 ```csharp
-public sealed record PreceptUpdateResult(
-    PreceptUpdateOutcome Outcome,
-    IReadOnlyList<string> Reasons,
-    PreceptInstance? UpdatedInstance)   // null unless Outcome is Updated
-```
-
-Returned by `Update`. `UpdatedInstance` is non-null only when `Outcome` is `Updated`.
-
-### `PreceptUpdateOutcome`
-
-```csharp
-public enum PreceptUpdateOutcome
+public sealed record UpdateResult(
+    UpdateOutcome Outcome,
+    IReadOnlyList<ConstraintViolation> Violations,
+    PreceptInstance? UpdatedInstance)
 {
-    Updated,      // All fields modified, all rules passed
-    NotAllowed,   // One or more fields not editable in current state
-    Blocked,      // Rules violated — reasons collected
-    Invalid       // Type mismatch, unknown field, patch conflict, or empty patch
+    public bool IsSuccess => Outcome is UpdateOutcome.Update;
 }
 ```
 
-### `PreceptFireResult`
+Returned by `Update`. `UpdatedInstance` is non-null only when `Outcome` is `Update`.
+
+### `UpdateOutcome`
 
 ```csharp
-public sealed record PreceptFireResult(
-    PreceptOutcomeKind Outcome,
-    string PreviousState,
-    string EventName,
-    string? NewState,              // null unless Outcome is Accepted or AcceptedInPlace
-    IReadOnlyList<string> Reasons, // non-empty when Outcome is Rejected or NotDefined
-    PreceptInstance? UpdatedInstance) // null unless Outcome is Accepted or AcceptedInPlace
+public enum UpdateOutcome
+{
+    // Success
+    Update,              // All fields modified, all constraints passed
+
+    // Failure
+    ConstraintFailure,   // Constraints violated — violations collected
+    UneditableField,     // One or more fields not editable in current state
+    InvalidInput         // Type mismatch, unknown field, patch conflict, or empty patch
+}
 ```
 
-`UpdatedInstance` is non-null only when the event was accepted. On any rejection, `UpdatedInstance` is `null` and the original instance is unchanged. `NewState` equals `PreviousState` for `AcceptedInPlace`.
+### `FireResult`
+
+```csharp
+public sealed record FireResult(
+    TransitionOutcome Outcome,
+    string PreviousState,
+    string EventName,
+    string? NewState,
+    IReadOnlyList<ConstraintViolation> Violations,
+    PreceptInstance? UpdatedInstance)
+{
+    public bool IsSuccess => Outcome is TransitionOutcome.Transition
+                          or TransitionOutcome.NoTransition;
+}
+```
+
+`UpdatedInstance` is non-null only when the event was accepted. On any rejection, `UpdatedInstance` is `null` and the original instance is unchanged. `NewState` equals `PreviousState` for `NoTransition`.
 
 ### `PreceptCompatibilityResult`
 
@@ -392,14 +400,15 @@ var rawArgs = new Dictionary<string, object?> { ["Amount"] = jsonElement };
 var args    = engine.CoerceEventArguments("Pay", rawArgs);
 var result  = engine.Fire(instance, "Pay", args);
 
-if (result.Outcome == PreceptOutcomeKind.Accepted)
+if (result.IsSuccess)
 {
     instance = result.UpdatedInstance!;  // advance to new instance
     // persist instance...
 }
 else
 {
-    Console.WriteLine($"Rejected: {string.Join(", ", result.Reasons)}");
+    foreach (var v in result.Violations)
+        Console.WriteLine(v.Message);
 }
 
 // 6. Direct field editing (for fields declared with `in <State> edit`)
@@ -407,7 +416,7 @@ var editResult = engine.Update(instance, patch => patch
     .Set("Notes", "Customer called back")
     .Set("Priority", 1.0));
 
-if (editResult.Outcome == PreceptUpdateOutcome.Updated)
+if (editResult.IsSuccess)
     instance = editResult.UpdatedInstance!;
 ```
 
@@ -425,13 +434,13 @@ The following types are returned by `PreceptParser.Parse` and consumed by `Prece
 | `PreceptEventArg` | One typed argument: name, `PreceptScalarType`, nullability, optional default |
 | `PreceptField` | One scalar data field: name, `PreceptScalarType`, nullability, optional default |
 | `PreceptCollectionField` | One collection field: name, `PreceptCollectionKind`, `PreceptScalarType` inner type |
-| `PreceptInvariant` | A global data constraint: `invariant <expr> because "reason"` — always holds |
-| `PreceptStateAssert` | A state-scoped assert: `in/to/from <State> assert <expr> because "reason"` |
-| `PreceptEventAssert` | An event-scoped arg validator: `on <Event> assert <expr> because "reason"` |
+| `PreceptInvariant` | A global data rule: `invariant <expr> because "reason"` — always holds |
+| `StateAssertion` | A state-scoped assert: `in/to/from <State> assert <expr> because "reason"` |
+| `EventAssertion` | An event-scoped arg validator: `on <Event> assert <expr> because "reason"` |
 | `PreceptTransitionRow` | One flat transition row: `from <State> on <Event> [when <expr>] → <outcome>` |
-| `PreceptStateTransition` | Row outcome: `transition <State>` |
-| `PreceptRejection` | Row outcome: `reject "<message>"` |
-| `PreceptNoTransition` | Row outcome: `no transition` |
+| `StateTransition` | Row outcome: `transition <State>` |
+| `Rejection` | Row outcome: `reject "<message>"` |
+| `NoTransition` | Row outcome: `no transition` |
 | `PreceptEditBlock` | Editable field declaration: `in <State> edit <Field>, ...` |
 
 ### Scalar and Collection Enums

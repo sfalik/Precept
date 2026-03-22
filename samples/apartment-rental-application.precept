@@ -26,8 +26,6 @@ state Declined
 in Approved assert MonthlyIncome >= RequestedRent * 3 because "Approved applicants must satisfy the 3x rent rule"
 in MoveInReady assert DepositPaid && LeaseSigned because "Move-in ready applications need both a deposit and a signed lease"
 
-to MoveInReady assert DepositPaid && LeaseSigned because "Move-in readiness requires the final move-in paperwork"
-
 event Submit with Name as string, Income as number, Rent as number, Score as number, Household as number default 1
 on Submit assert Name != "" because "An applicant name is required"
 on Submit assert Income >= 0 because "Income cannot be negative"

@@ -103,10 +103,11 @@ var preview = engine.Inspect(instance, "Approve", new Dictionary<string, object?
     ["ApprovedAmount"] = 45_000.0
 });
 
-if (preview.Outcome == PreceptOutcomeKind.Rejected)
+if (preview.Outcome == TransitionOutcome.Rejected)
 {
     // Output: "Approval requires verified documents, strong credit, and affordable debt load"
-    Console.WriteLine(string.Join(", ", preview.Reasons));
+    foreach (var v in preview.Violations)
+        Console.WriteLine(v.Message);
 }
 else
 {
@@ -116,7 +117,7 @@ else
         ["ApprovedAmount"] = 45_000.0
     });
 
-    if (result.Outcome == PreceptOutcomeKind.Accepted)
+    if (result.IsSuccess)
     {
         var updated = result.UpdatedInstance!;
         Console.WriteLine($"State: {updated.CurrentState}"); // Approved
@@ -128,10 +129,10 @@ else
 var editResult = engine.Update(instance, patch => patch
     .Set("Notes", "Customer called back"));
 
-if (editResult.Outcome == PreceptUpdateOutcome.Updated)
+if (editResult.IsSuccess)
 {
     instance = editResult.UpdatedInstance!;
-    // Invariants and state asserts are enforced — same safety net as Fire
+    // Rules are enforced — same safety net as Fire
 }
 ```
 
@@ -199,7 +200,7 @@ Precept isn't just a library; it's an authoring experience. The accompanying VS 
 - **Document Outline:** The editor exposes a structured symbol tree for the precept, including fields, states, events, and event arguments.
 - **Shared Type Diagnostics:** Expression typing, null-flow narrowing, collection mutation checks, and `from any` state-aware analysis now come from the core compiler, so the language server and MCP validation surface the same `PRECEPT038`-`PRECEPT043` errors. The MCP `precept_validate` result includes those diagnostic codes structurally, and returns all shared type diagnostics instead of stopping at the first one.
 - **Structural Diagnostics:** Real-time diagnostics now surface unreachable states, dead-end states, orphaned events, and reject-only state/event pairs that likely model unsupported events as explicit rejections.
-- **Quick Fixes:** Reject-only state/event pair warnings offer a quick fix to remove the rows and restore `NotDefined` semantics for unsupported events, and orphaned event warnings offer a quick fix to remove the unused event declaration and its event asserts.
+- **Quick Fixes:** Reject-only state/event pair warnings offer a quick fix to remove the rows and restore `Undefined` semantics for unsupported events, and orphaned event warnings offer a quick fix to remove the unused event declaration and its event asserts.
 - **Interactive Inspector:** Fire events and edit data against a live, mock instance in VS Code. The preview behaves like Markdown preview by default: one right-side preview follows the active `.precept` editor, and you can lock it to the current file with **Toggle Preview Locking**. Field edits use explicit **Edit** mode with **Save/Cancel**; validation runs live via inspect while typing, field-level errors stay attached only to the fields that caused them, and values are committed only when **Save** is clicked.
 - **Live Diagramming:** A dynamic state-transition diagram renders as you type.
 - **Null-Flow Analysis:** Real-time squiggles warn you if a guard path might access an unsafe null value.
@@ -235,7 +236,7 @@ The VS Code extension continues to provide all editor features (language server,
 
 Most complex entities start simple. But as business requirements grow, the rules governing their lifecycles scatter across your codebase:
 - **State transitions** land in `switch` statements or scattered handler logic.
-- **Data validation** gets pushed into ORMs, FluentValidation, or entity constructors.
+- **Data validation** gets pushed into ORMs, FluentValidation, or entity constructors — separate from the rules that depend on it.
 - **Side effects** trigger asynchronously with no guarantee the data is ready.
 
 Eventually, the system drifts. An entity ends up in a `Shipped` state without a `TrackingNumber`. When stakeholders ask, "Under what exact conditions can an Order be refunded?", developers have to traverse six different classes to find the answer.
@@ -257,14 +258,14 @@ The overall vision: a domain expert describes what they want in natural language
 ## 🏗️ The Pillars of Precept
 
 ### 1. The Universal Safety Net (`invariant`)
-In most systems, validation is bound to *actions* (e.g., "Validate this API payload"). In Precept, constraints are bound to the *data itself*.
+In most systems, validation is bound to *actions* (e.g., "Validate this API payload"). In Precept, rules are bound to the *data itself*.
 
-When you declare `invariant Balance >= 0 because "Balance cannot be negative"`, that precept is absolute. Whether a complex workflow transition deducts from the balance, or a user directly edits a field via an administrative override, the engine enforces the invariant upon completion. If it fails, the entire transaction rolls back.
+When you declare `invariant Balance >= 0 because "Balance cannot be negative"`, that rule is absolute. Whether a complex workflow transition deducts from the balance, or a user directly edits a field via an administrative override, the engine enforces the rule upon completion. If it fails, the entire transaction rolls back.
 
-State-scoped asserts (`in <State> assert ... because "..."`) and event-scoped asserts (`on <Event> assert ... because "..."`) let you enforce constraints exactly where they apply.
+State-scoped asserts (`in <State> assert ... because "..."`) and event-scoped asserts (`on <Event> assert ... because "..."`) let you enforce rules exactly where they apply.
 
 ### 2. Pure Inspection (`Inspect` before `Fire`)
-Because Precept enforces rigorous grammar constraints—expressions evaluate, statements mutate—it is impossible for a transition guard to accidentally mutate data. This allows the `Inspect` API to safely preview any action, returning a precise outcome with specific error reasons—all without saving a thing.
+Because Precept enforces rigorous grammar constraints—expressions evaluate, statements mutate—it is impossible for a transition guard to accidentally mutate data. This allows the `Inspect` API to safely preview any action, returning a precise outcome with specific constraint violations—all without saving a thing.
 
 ### 3. Atomic, Deterministic Mutations
 A Precept transition either completely succeeds or entirely rolls back. Every evaluation is deterministic: the same definitions and the same data will *always* result in the same outcome.

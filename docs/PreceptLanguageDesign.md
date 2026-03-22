@@ -914,7 +914,7 @@ All policy questions for the current compile-time expansion wave have been locke
 
 ### Diagnostic code policy (Locked)
 
-Overload an existing code when the new condition is the same conceptual error category. Introduce a new code only for genuinely new categories. Existing codes C38–C43 are stable — the message text within each code provides specificity. New codes start at C44.
+Overload an existing code when the new condition is the same conceptual error category. Introduce a new code only for genuinely new categories. Existing codes C38–C45 are stable — the message text within each code provides specificity. New codes start at C46.
 
 ---
 
@@ -949,7 +949,7 @@ Locked in this discussion:
 - Event-assert scope: permanently arg-only. Field references in event asserts are a compile-time error (C14/C15/C16). Validation combining event args with field state belongs in `when` guards, not event asserts.
 - Static impossibility boundary: the compile-time checker proves contradictions only from type information and null-flow narrowing (single-symbol, local reasoning). Additionally, identical-guard duplicate rows for the same `(state, event)` are a compile-time error. No cross-field arithmetic reasoning — the inspector handles data-dependent impossibility.
 - Diagnostic severity: three-tier model. **Error** = provably wrong (blocks compilation). **Warning** = structural quality concern (does not block). **Hint** = informational observation. The checker never guesses; uncertain cases are left to the inspector.
-- Diagnostic codes: overload existing codes for same conceptual category; new codes only for genuinely new categories. C38–C43 are stable and will not be split. New codes start at C44.
+- Diagnostic codes: overload existing codes for same conceptual category; new codes only for genuinely new categories. C38–C45 are stable and will not be split. New codes start at C46.
 
 Not yet locked:
 - Full EBNF and tokenization rules

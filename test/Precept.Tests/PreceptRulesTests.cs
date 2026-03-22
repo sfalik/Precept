@@ -459,6 +459,172 @@ public class PreceptRulesTests
     }
 
     // ========================================================================================
+    // COMPILE-TIME — duplicate and subsumed state assert detection
+    // ========================================================================================
+
+    [Fact]
+    public void Compile_DuplicateStateAssert_SamePrepositionStateExpression_Throws()
+    {
+        const string dsl = """
+            precept Test
+            field Score as number default 0
+            state Idle initial
+            state Active
+            in Active assert Score >= 0 because "first"
+            in Active assert Score >= 0 because "duplicate"
+            event Go
+            from Idle on Go -> transition Active
+            """;
+
+        var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Duplicate state assert*in Active assert*Score >= 0*");
+    }
+
+    [Fact]
+    public void Compile_DuplicateStateAssert_DifferentPreposition_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            field Score as number default 0
+            state Idle initial
+            state Active
+            in Active assert Score >= 0 because "in-scope"
+            to Active assert Score >= 0 because "entry-scope"
+            event Go
+            from Idle on Go -> transition Active
+            """;
+
+        // Not a duplicate (different prepositions) — but subsumption will catch this
+        // This test verifies the duplicate check alone doesn't flag it
+        var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        // This will throw for subsumption (C45), not duplicate (C44)
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Subsumed state assert*");
+    }
+
+    [Fact]
+    public void Compile_DuplicateStateAssert_DifferentExpression_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            field Score as number default 10
+            field Limit as number default 100
+            state Idle initial
+            state Active
+            in Active assert Score >= 0 because "score check"
+            in Active assert Limit > 0 because "limit check"
+            event Go
+            from Idle on Go -> transition Active
+            """;
+
+        var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Compile_DuplicateStateAssert_DifferentState_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            field Score as number default 10
+            state Idle initial
+            state Active
+            state Done
+            in Active assert Score >= 0 because "active check"
+            in Done assert Score >= 0 because "done check"
+            event Go
+            from Idle on Go -> transition Active
+            """;
+
+        var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Compile_SubsumedAssert_ToRedundantWithIn_Throws()
+    {
+        const string dsl = """
+            precept Test
+            field Score as number default 0
+            state Idle initial
+            state Active
+            in Active assert Score >= 0 because "in covers entry and in-place"
+            to Active assert Score >= 0 because "to only covers entry — redundant"
+            event Go
+            from Idle on Go -> transition Active
+            """;
+
+        var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Subsumed state assert*to Active assert*Score >= 0*redundant*in Active assert*");
+    }
+
+    [Fact]
+    public void Compile_SubsumedAssert_DifferentExpression_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            field Score as number default 10
+            field Limit as number default 100
+            state Idle initial
+            state Active
+            in Active assert Score >= 0 because "score check"
+            to Active assert Limit > 0 because "limit check"
+            event Go
+            from Idle on Go -> transition Active
+            """;
+
+        var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Compile_SubsumedAssert_FromNotSubsumedByIn_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            field Score as number default 10
+            state Idle initial
+            state Active
+            state Done
+            in Active assert Score >= 0 because "in-active check"
+            from Active assert Score >= 0 because "exit check is distinct"
+            event Go
+            from Idle on Go -> transition Active
+            from Active on Go -> transition Done
+            """;
+
+        var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Compile_SubsumedAssert_ToWithoutMatchingIn_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            field Score as number default 0
+            state Idle initial
+            state Active
+            to Active assert Score >= 0 because "entry only"
+            event Go
+            from Idle on Go -> transition Active
+            """;
+
+        var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        act.Should().NotThrow();
+    }
+
+    // ========================================================================================
     // RUNTIME — event rules (checked before guard, fire path)
     // ========================================================================================
 

@@ -23,7 +23,7 @@ One keyword (`rule`), one expression grammar, four attachment positions:
 | **Field rule** (indented under a scalar field declaration) | The declaring field only | After fire commits all sets | Single-field value bounds |
 | **Top-level rule** (unindented, after field declarations) | All instance data fields declared above | After fire commits all sets | Cross-field data invariants |
 | **State rule** (indented under a state declaration) | All instance data fields | On entry to the state (including self-transitions) | State entry contracts |
-| **Event rule** (indented under an event declaration) | Event arguments only | Before guard evaluation | Input validation |
+| **Event rule** (indented under an event declaration) | Event arguments only | Before guard evaluation | Input rules |
 
 ### Syntax
 
@@ -55,7 +55,7 @@ state Draft initial
 state Paid
   rule Balance == 0 "Must have zero balance to be Paid"
 
-# Event rules — input validation (event args only)
+# Event rules — input rules (event args only)
 event Checkout
   number PaymentAmount
   rule PaymentAmount > 0 "Payment must be positive"
@@ -105,7 +105,7 @@ Authors choose placement by locality — a single-field rule can be written as a
 
 ### Event rule scope restriction
 
-Event rules may only reference event argument identifiers. They cannot see instance data fields. This keeps event rules focused on input validation ("is this call well-formed?") and avoids overlap with guards ("which branch fires given the current state?").
+Event rules may only reference event argument identifiers. They cannot see instance data fields. This keeps event rules focused on input correctness ("is this call well-formed?") and avoids overlap with guards ("which branch fires given the current state?").
 
 Rationale: if event rules could reference instance data, there would be two places to put a condition like `Amount <= Balance` — as an event rule or as a guard — violating the single-obvious-style principle. With the scope restriction, event rules validate *inputs*, guards evaluate *routing*, and field/top-level rules protect *results*.
 

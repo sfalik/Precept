@@ -147,6 +147,8 @@ The change site is `PreceptTypeChecker.BuildSymbolKinds()` in `src/Precept/Dsl/P
 
 Event assert scope is already enforced by the parser (`src/Precept/Dsl/PreceptParser.cs` lines 963–998, constraints C14/C15/C16). The checker’s event-assert validation builds symbols with bare keys only (no dotted form needed since scope is arg-only).
 
+Note: `TryGetIdentifierKey()` (~line 983) builds the dictionary key from the parsed expression — `Name` for bare identifiers, `Name.Member` for dotted. After removing bare keys from the symbol table, bare arg names in transition rows will fail to resolve → C38 (unknown identifier). Narrowing via `TryApplyNullComparisonNarrowing()` also uses `TryGetIdentifierKey`, so narrowing will only work on the dotted form in transition scope — which is the correct behavior.
+
 All 18 sample files already use dotted form exclusively — no sample changes needed. Existing tests that use bare arg names in transition rows will need updating to use dotted form (search for undotted event-arg references in `test/Precept.Tests/`). Add tests to `test/Precept.Tests/PreceptTypeCheckerTests.cs`. Run the full suite before committing.
 
 ### Phase F: Rule-position strictness and collection contracts
@@ -167,13 +169,13 @@ All 18 sample files already use dotted form exclusively — no sample changes ne
 
 **Implementation prompt:**
 
-Register new constraint C44 in `src/Precept/Dsl/ConstraintCatalog.cs` for non-boolean rule positions. The checker currently infers guard/assert expression types but doesn’t enforce that the result is boolean. Add a check after `TryInferExpressionKind()` returns for `when` guards, `invariant`, `in/to/from assert`, and `on assert` expressions: if the inferred kind doesn’t include `StaticValueKind.Boolean`, emit C44.
+Register new constraint C46 in `src/Precept/Dsl/ConstraintCatalog.cs` for non-boolean rule positions. The checker currently infers guard/assert expression types but doesn’t enforce that the result is boolean. Add a check after `TryInferExpressionKind()` returns for `when` guards, `invariant`, `in/to/from assert`, and `on assert` expressions: if the inferred kind doesn’t include `StaticValueKind.Boolean`, emit C46.
 
 The validation positions are spread across `ValidateTransitionRows()` (for `when` guards), and the invariant/assert validation loops. Search for where `row.WhenGuard` is validated and where assert expressions are checked.
 
 Collection mutation nullability is already implemented and tested (C42). The remaining collection work is `contains` hardening — verify existing C41 coverage for `contains` LHS/RHS mismatches is complete.
 
-Add a C44 trigger fixture to `test/Precept.Tests/CatalogDriftTests.cs`. Add tests to `PreceptTypeCheckerTests.cs`. Run the full suite before committing.
+Add a C46 trigger fixture to `test/Precept.Tests/CatalogDriftTests.cs`. Add tests to `PreceptTypeCheckerTests.cs`. Run the full suite before committing.
 
 ### Phase G: Additional sound static reasoning
 
@@ -196,11 +198,11 @@ Add a C44 trigger fixture to `test/Precept.Tests/CatalogDriftTests.cs`. Add test
 
 **Implementation prompt:**
 
-Register new constraint C45 in `src/Precept/Dsl/ConstraintCatalog.cs` for identical-guard duplicate rows. The detection site is `PreceptTypeChecker.ValidateTransitionRows()` in `src/Precept/Dsl/PreceptTypeChecker.cs`, which already iterates rows grouped by `(state, event)` in source-line order. Before processing each row, compare its `WhenText` (or normalized AST) against prior rows in the same group. If an identical guard is found, emit C45.
+Register new constraint C47 in `src/Precept/Dsl/ConstraintCatalog.cs` for identical-guard duplicate rows. The detection site is `PreceptTypeChecker.ValidateTransitionRows()` in `src/Precept/Dsl/PreceptTypeChecker.cs`, which already iterates rows grouped by `(state, event)` in source-line order. Before processing each row, compare its `WhenText` (or normalized AST) against prior rows in the same group. If an identical guard is found, emit C47.
 
 Non-nullable `== null` is already covered by Phase D (C41). Post-narrowing null contradictions are automatically caught because cross-row narrowing strips the `Null` flag, and then Phase D’s equality check rejects `NonNullableField == null`.
 
-Use normalized `WhenText` comparison (trimmed, whitespace-collapsed) rather than AST equality — simpler and sufficient since authors rarely write semantically-identical but syntactically-different guards. Add a C45 trigger fixture to `CatalogDriftTests.cs`. Run the full suite before committing.
+Use normalized `WhenText` comparison (trimmed, whitespace-collapsed) rather than AST equality — simpler and sufficient since authors rarely write semantically-identical but syntactically-different guards. Add a C47 trigger fixture to `CatalogDriftTests.cs`. Run the full suite before committing.
 
 ### Phase H: Coverage and tooling sync
 
@@ -219,7 +221,7 @@ After Phases D–G are complete, do a sweep:
 
 2. **Completion filtering:** Verify that `PreceptAnalyzer.GetCompletions()` still produces correctly filtered candidates after the equality and scope changes. The typed-set-RHS and collection-value completions use `PreceptTypeContext` — confirm they still work with the tighter symbol tables.
 
-3. **Catalog drift:** Ensure `CatalogDriftTests.EveryConstraint_CanBeTriggered` covers C44 and C45 trigger fixtures.
+3. **Catalog drift:** Ensure `CatalogDriftTests.EveryConstraint_CanBeTriggered` covers C46 and C47 trigger fixtures.
 
 4. **README sync:** Review `README.md` for any claims about equality semantics, event-arg access, or diagnostic behavior that need updating.
 
@@ -265,14 +267,14 @@ All design discussions for the current compile-time expansion wave (Phases D–H
 
 **Rule:** overload an existing code when the new condition is the same conceptual error category. Introduce a new code only when a genuinely new category emerges.
 
-Existing codes C38–C43 are stable and will not be split. The message text within each code provides the specificity (e.g., C41 covers all binary operator type errors but the message names the exact operator and operand types).
+Existing codes C38–C45 are stable and will not be split. C44 (duplicate state assert) and C45 (subsumed state assert) were added for compile-time structural checks on state assert declarations. The message text within each code provides the specificity (e.g., C41 covers all binary operator type errors but the message names the exact operator and operand types).
 
 **Planned new codes for upcoming phases:**
 
 | Code | Category | Phase | Trigger |
 |---|---|---|---|
-| C44 | Non-boolean rule position | F | `invariant`, `assert`, or `when` expression that doesn’t produce boolean |
-| C45 | Identical-guard duplicate row | G | Two rows for the same `(state, event)` with the same guard expression |
+| C46 | Non-boolean rule position | F | `invariant`, `assert`, or `when` expression that doesn’t produce boolean |
+| C47 | Identical-guard duplicate row | G | Two rows for the same `(state, event)` with the same guard expression |
 
 **Reuse of existing codes:**
 

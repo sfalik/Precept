@@ -357,4 +357,20 @@ public static class ConstraintCatalog
         "C43", "compile",
         "Collection pop/dequeue targets must accept the collection inner type.",
         "{message}");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Compile-phase structural constraints (C44–C45)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Duplicate assert: same preposition, state, and expression text appearing more than once.</summary>
+    public static readonly LanguageConstraint C44 = Register(
+        "C44", "compile",
+        "Duplicate assert: same preposition, state, and expression appearing more than once.",
+        "Duplicate state assert: '{preposition} {state} assert {expression}' appears more than once (line {sourceLine}).");
+
+    /// <summary>Subsumed assert: 'to' assert is redundant when an identical 'in' assert exists on the same state.</summary>
+    public static readonly LanguageConstraint C45 = Register(
+        "C45", "compile",
+        "Subsumed assert: 'to' assert is redundant when an identical 'in' assert exists on the same state.",
+        "Subsumed state assert: 'to {state} assert {expression}' is redundant — an identical 'in {state} assert' already covers entry (line {sourceLine}).");
 }

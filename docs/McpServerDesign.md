@@ -189,12 +189,12 @@ Fields:
 ```json
 {
   "steps": [
-    { "step": 1, "event": "Assign",       "outcome": "AcceptedInPlace", "state": "Open",       "data": { "Assignee": "alice", ... } },
-    { "step": 2, "event": "StartWork",    "outcome": "Accepted",        "state": "InProgress",  "data": { ... } },
-    { "step": 3, "event": "Block",        "outcome": "Accepted",        "state": "Blocked",     "data": { "BlockReason": "Waiting on infra", ... } },
-    { "step": 4, "event": "Unblock",      "outcome": "Accepted",        "state": "InProgress",  "data": { "BlockReason": null, ... } },
-    { "step": 5, "event": "SubmitReview", "outcome": "Accepted",        "state": "InReview",    "data": { ... } },
-    { "step": 6, "event": "Approve",      "outcome": "Accepted",        "state": "Resolved",    "data": { "Resolution": "Approved", ... } }
+    { "step": 1, "event": "Assign",       "outcome": "NoTransition",    "state": "Open",       "data": { "Assignee": "alice", ... } },
+    { "step": 2, "event": "StartWork",    "outcome": "Transition",      "state": "InProgress",  "data": { ... } },
+    { "step": 3, "event": "Block",        "outcome": "Transition",      "state": "Blocked",     "data": { "BlockReason": "Waiting on infra", ... } },
+    { "step": 4, "event": "Unblock",      "outcome": "Transition",      "state": "InProgress",  "data": { "BlockReason": null, ... } },
+    { "step": 5, "event": "SubmitReview", "outcome": "Transition",      "state": "InReview",    "data": { ... } },
+    { "step": 6, "event": "Approve",      "outcome": "Transition",      "state": "Resolved",    "data": { "Resolution": "Approved", ... } }
   ],
   "finalState": "Resolved",
   "finalData": { "Assignee": "alice", "Priority": 3, "BlockReason": null, "Resolution": "Approved" },
@@ -202,9 +202,9 @@ Fields:
 }
 ```
 
-If a step fails (Rejected, NotDefined, NotApplicable), execution stops and `abortedAt` is set to that step number with an explanation.
+If a step fails (Rejected, ConstraintFailure, Undefined, Unmatched), execution stops and `abortedAt` is set to that step number with an explanation.
 
-**Implementation:** `PreceptEngine.CreateInstance(initialData)` then `engine.Fire(instance, event, args)` in a loop, threading the updated `DslWorkflowInstance` through each step. Maps `DslFireResult` outcome kinds to outcome strings.
+**Implementation:** `PreceptEngine.CreateInstance(initialData)` then `engine.Fire(instance, event, args)` in a loop, threading the updated instance through each step. Maps `FireResult` outcome kinds to outcome strings.
 
 ---
 
@@ -270,11 +270,11 @@ Unlike the other tools (which operate on a specific `.precept` file), this tool 
     { "id": "C11", "phase": "compile", "rule": "Initial state entry asserts ('in' and 'to') must pass against default data." },
     { "id": "C12", "phase": "compile", "rule": "A literal 'set' assignment in a transition row must not violate invariants." },
     { "id": "C13", "phase": "runtime", "rule": "Event asserts are evaluated first (Stage 1). Failure → Rejected." },
-    { "id": "C14", "phase": "runtime", "rule": "Transition rows are evaluated in source order; first 'when' guard that is true (or absent) wins (Stage 2). No match → NotApplicable." },
+    { "id": "C14", "phase": "runtime", "rule": "Transition rows are evaluated in source order; first 'when' guard that is true (or absent) wins (Stage 2). No match → Unmatched." },
     { "id": "C15", "phase": "runtime", "rule": "Exit actions run before row mutations, which run before entry actions (Stage 3→4→5)." },
-    { "id": "C16", "phase": "runtime", "rule": "Invariants are checked after all mutations commit. Failure → full rollback, Rejected." },
-    { "id": "C17", "phase": "runtime", "rule": "State asserts ('in'/'to'/'from') are checked with correct temporal scoping after mutations. Failure → full rollback, Rejected." },
-    { "id": "C18", "phase": "runtime", "rule": "'dequeue' from empty queue or 'pop' from empty stack → Rejected." },
+    { "id": "C16", "phase": "runtime", "rule": "Invariants are checked after all mutations commit. Failure → full rollback, ConstraintFailure." },
+    { "id": "C17", "phase": "runtime", "rule": "State asserts ('in'/'to'/'from') are checked with correct temporal scoping after mutations. Failure → full rollback, ConstraintFailure." },
+    { "id": "C18", "phase": "runtime", "rule": "'dequeue' from empty queue or 'pop' from empty stack → ConstraintFailure." },
     { "id": "C19", "phase": "runtime", "rule": "Non-nullable event args without a default are required — caller must supply them." },
     { "id": "C20", "phase": "runtime", "rule": "'set' assignments execute in declaration order with read-your-writes semantics." }
   ],
@@ -287,18 +287,19 @@ Unlike the other tools (which operate on a specific `.precept` file), this tool 
   ],
   "firePipeline": [
     { "stage": 1, "name": "Event asserts", "description": "Validate event args against 'on <Event> assert' rules. Failure → Rejected." },
-    { "stage": 2, "name": "Row selection", "description": "Iterate transition rows for (state, event) in source order. First 'when' match wins. No match → NotApplicable." },
+    { "stage": 2, "name": "Row selection", "description": "Iterate transition rows for (state, event) in source order. First 'when' match wins. No match → Unmatched." },
     { "stage": 3, "name": "Exit actions", "description": "Run 'from <SourceState> ->' automatic mutations." },
     { "stage": 4, "name": "Row mutations", "description": "Execute the matched row's '-> set/add/remove/...' action chain in declaration order." },
     { "stage": 5, "name": "Entry actions", "description": "Run 'to <TargetState> ->' automatic mutations." },
-    { "stage": 6, "name": "Validation", "description": "Check invariants, state asserts (in/to/from with temporal scoping). Any failure → full rollback, Rejected." }
+    { "stage": 6, "name": "Constraint evaluation", "description": "Check invariants, state asserts (in/to/from with temporal scoping). Any failure → full rollback, ConstraintFailure." }
   ],
   "outcomeKinds": [
-    { "kind": "Accepted", "description": "Event handled, state changed.", "mutated": true },
-    { "kind": "AcceptedInPlace", "description": "Event handled via 'no transition', data may change but state stays.", "mutated": true },
-    { "kind": "Rejected", "description": "Event matched but blocked (assert failure, invariant violation, empty collection op, reject outcome).", "mutated": false },
-    { "kind": "NotDefined", "description": "No transition rows exist for this event in the current state.", "mutated": false },
-    { "kind": "NotApplicable", "description": "Transition rows exist but no 'when' guard matched.", "mutated": false }
+    { "kind": "Transition", "description": "Event handled, state changed.", "mutated": true },
+    { "kind": "NoTransition", "description": "Event handled via 'no transition', data may change but state stays.", "mutated": true },
+    { "kind": "Rejected", "description": "Author's explicit reject outcome.", "mutated": false },
+    { "kind": "ConstraintFailure", "description": "Event matched but blocked by constraint violation (invariant, assert, empty collection op).", "mutated": false },
+    { "kind": "Unmatched", "description": "Transition rows exist but no 'when' guard matched.", "mutated": false },
+    { "kind": "Undefined", "description": "No transition rows exist for this event in the current state.", "mutated": false }
   ]
 }
 ```
@@ -311,11 +312,11 @@ The response is assembled from three core infrastructure components, all defined
 |---|---|---|---|
 | **1. Vocabulary** | Keywords, operators, types | `PreceptToken` enum with `[TokenCategory]` and `[TokenDescription]` attributes — reflected at runtime | **Zero** — the enum IS the parser's token set |
 | **2. Constructs** | Statement forms, examples | `ConstructCatalog` — parser combinators registered with syntax templates, descriptions, and parseable examples | **Near-zero** — co-located with parser; examples validated by tests |
-| **3. Semantics** | Constraints, scopes, pipeline, outcomes | `ConstraintCatalog` — each constraint is a record with ID, phase, and description, co-located with enforcement code | **Near-zero** — constraint descriptions serve as error messages; tests verify enforcement |
+| **3. Semantics** | Constraints, scopes, pipeline, outcomes | `DiagnosticCatalog` — each diagnostic is a record with ID, phase, and description, co-located with enforcement code | **Near-zero** — diagnostic descriptions serve as error messages; tests verify enforcement |
 
 #### Implementation
 
-The tool serializes `ConstructCatalog.Constructs` + `ConstraintCatalog.Constraints` + reflected `PreceptToken` vocabulary into the JSON response. No MCP-specific data files — everything comes from core infrastructure that also powers parser error messages, language server hovers, and completions.
+The tool serializes `ConstructCatalog.Constructs` + `DiagnosticCatalog.Diagnostics` + reflected `PreceptToken` vocabulary into the JSON response. No MCP-specific data files — everything comes from core infrastructure that also powers parser error messages, language server hovers, and completions.
 
 ---
 
@@ -350,30 +351,30 @@ The `eventArgs` field is optional. When provided, the specified args are used fo
   "events": [
     {
       "event": "Block",
-      "outcome": "Accepted",
+      "outcome": "Transition",
       "resultState": "Blocked",
       "resultData": { "Assignee": "alice", "Priority": 3, "BlockReason": "Waiting on infra", "Resolution": null }
     },
     {
       "event": "Reassign",
-      "outcome": "AcceptedInPlace",
+      "outcome": "NoTransition",
       "resultState": "InProgress",
       "resultData": { "Assignee": "bob", "Priority": 3, "BlockReason": null, "Resolution": null }
     },
     {
       "event": "SubmitReview",
-      "outcome": "Accepted",
+      "outcome": "Transition",
       "resultState": "InReview",
       "resultData": { "Assignee": "alice", "Priority": 3, "BlockReason": null, "Resolution": null }
     },
     {
       "event": "Approve",
-      "outcome": "NotDefined",
+      "outcome": "Undefined",
       "reason": "No transition from InProgress on Approve"
     },
     {
       "event": "Close",
-      "outcome": "NotDefined",
+      "outcome": "Undefined",
       "reason": "No transition from InProgress on Close"
     },
     {
@@ -386,9 +387,9 @@ The `eventArgs` field is optional. When provided, the specified args are used fo
 }
 ```
 
-Events are grouped implicitly: actionable events (Accepted/AcceptedInPlace) first, then unavailable (NotDefined/NotApplicable/Rejected), then those needing args. This ordering is a presentation convenience — the JSON array is sorted by outcome kind.
+Events are grouped implicitly: actionable events (Transition/NoTransition) first, then unavailable (Undefined/Unmatched/Rejected/ConstraintFailure), then those needing args. This ordering is a presentation convenience — the JSON array is sorted by outcome kind.
 
-**Implementation:** `PreceptEngine.CreateInstance(state, data)` then `engine.Inspect(instance)` — which internally calls `engine.Fire()` per event in a read-only snapshot mode. For events with caller-supplied args (from `eventArgs`), those args are passed. For events with required args not supplied, report `requiresArgs` instead of calling Fire. Maps `DslInspectionResult` entries to the output format.
+**Implementation:** `PreceptEngine.CreateInstance(state, data)` then `engine.Inspect(instance)` — which internally calls `engine.Fire()` per event in a read-only snapshot mode. For events with caller-supplied args (from `eventArgs`), those args are passed. For events with required args not supplied, report `requiresArgs` instead of calling Fire. Maps `InspectionResult` entries to the output format.
 
 ---
 

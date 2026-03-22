@@ -1612,6 +1612,10 @@ public static class PreceptCompiler
     {
         ThrowIfValidationFailed(Validate(model));
 
+        // Structural checks: duplicate and subsumed state asserts
+        ValidateDuplicateStateAsserts(model);
+        ValidateSubsumedStateAsserts(model);
+
         var defaultData = BuildDefaultData(model);
 
         // 1. Validate invariants against default values
@@ -1725,6 +1729,55 @@ public static class PreceptCompiler
             foreach (var row in model.TransitionRows)
                 foreach (var assignment in row.SetAssignments)
                     CheckLiteralAssignment(assignment);
+        }
+    }
+
+    // SYNC:CONSTRAINT:C44
+    private static void ValidateDuplicateStateAsserts(PreceptDefinition model)
+    {
+        if (model.StateAsserts is not { Count: > 1 })
+            return;
+
+        var seen = new HashSet<(PreceptAssertPreposition, string, string)>();
+        foreach (var sa in model.StateAsserts)
+        {
+            if (!seen.Add((sa.Preposition, sa.State, sa.ExpressionText)))
+            {
+                var prep = sa.Preposition.ToString().ToLowerInvariant();
+                throw new InvalidOperationException(
+                    ConstraintCatalog.C44.FormatMessage(
+                        ("preposition", prep), ("state", sa.State),
+                        ("expression", sa.ExpressionText), ("sourceLine", sa.SourceLine)));
+            }
+        }
+    }
+
+    // SYNC:CONSTRAINT:C45
+    private static void ValidateSubsumedStateAsserts(PreceptDefinition model)
+    {
+        if (model.StateAsserts is not { Count: > 1 })
+            return;
+
+        var inAsserts = new HashSet<(string State, string Expr)>();
+        foreach (var sa in model.StateAsserts)
+        {
+            if (sa.Preposition == PreceptAssertPreposition.In)
+                inAsserts.Add((sa.State, sa.ExpressionText));
+        }
+
+        if (inAsserts.Count == 0)
+            return;
+
+        foreach (var sa in model.StateAsserts)
+        {
+            if (sa.Preposition == PreceptAssertPreposition.To &&
+                inAsserts.Contains((sa.State, sa.ExpressionText)))
+            {
+                throw new InvalidOperationException(
+                    ConstraintCatalog.C45.FormatMessage(
+                        ("state", sa.State), ("expression", sa.ExpressionText),
+                        ("sourceLine", sa.SourceLine)));
+            }
         }
     }
 

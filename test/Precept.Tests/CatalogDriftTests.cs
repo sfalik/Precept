@@ -453,6 +453,12 @@ public class CatalogDriftTests
         // C32: Literal set assignment violates invariant
         ["C32"] = new(H + "field Balance as number default 100\ninvariant Balance >= 0 because \"no negative\"\n" + S2 + "event Go\nfrom A on Go -> set Balance = -5 -> transition B\n", "violates invariant"),
 
+        // C44: Duplicate state assert (same preposition, state, expression)
+        ["C44"] = new(H + "field X as number default 10\n" + S2 + "in B assert X > 0 because \"first\"\nin B assert X > 0 because \"duplicate\"\nevent Go\nfrom A on Go -> transition B\n", "Duplicate state assert"),
+
+        // C45: Subsumed state assert (to redundant with identical in)
+        ["C45"] = new(H + "field X as number default 10\n" + S2 + "in B assert X > 0 because \"in covers entry\"\nto B assert X > 0 because \"to is redundant\"\nevent Go\nfrom A on Go -> transition B\n", "Subsumed state assert"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state

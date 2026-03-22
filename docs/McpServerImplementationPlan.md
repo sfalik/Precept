@@ -217,7 +217,7 @@ Per `McpServerDesign.md § precept_audit`. Input: `{ "path": "..." }`. Output: `
 2. `PreceptEngine.CreateInstance(initialData)` — start from initial state with caller-supplied data (or defaults).
 3. Loop through `steps`: call `engine.Fire(instance, event, args)` per step.
 4. On each step, record `{ step, event, outcome, state, data }`.
-5. If a step's outcome is `Rejected`, `NotDefined`, or `NotApplicable`, set `abortedAt` and stop.
+5. If a step's outcome is `Rejected`, `ConstraintFailure`, `Undefined`, or `Unmatched`, set `abortedAt` and stop.
 6. Return the full step log + `finalState` + `finalData`.
 
 ### Input/Output
@@ -228,7 +228,7 @@ Per `McpServerDesign.md § precept_run`. Input: `{ path, initialData?, steps }`.
 
 - [ ] Happy path (all steps Accepted) → correct final state/data, `abortedAt` null
 - [ ] Step rejected mid-sequence → `abortedAt` set, earlier steps present, later steps absent
-- [ ] Step with `NotDefined` → aborted with explanation
+- [ ] Step with `Undefined` → aborted with explanation
 - [ ] Empty steps array → immediate return with initial state as final
 - [ ] Steps with event args → args passed through correctly
 - [ ] Invalid file → error before execution starts
@@ -254,7 +254,7 @@ Assemble the response from three core infrastructure sources (all in `src/Precep
 |---|---|
 | `vocabulary` | Reflect `[TokenCategory]`, `[TokenDescription]`, `[TokenSymbol]` on `PreceptToken` enum members. Group by category. Operators include precedence and arity from a small lookup table in the tool. |
 | `constructs` | Serialize `ConstructCatalog.Constructs` directly. |
-| `constraints` | Serialize `ConstraintCatalog.Constraints` directly (ID, phase, rule). |
+| `constraints` | Serialize `DiagnosticCatalog.Constraints` directly (ID, phase, rule). |
 | `expressionScopes` | Static data — 5 entries describing what identifiers are allowed in each expression position. |
 | `firePipeline` | Static data — 6 stages. |
 | `outcomeKinds` | Static data — 5 outcome kinds. |
@@ -270,7 +270,7 @@ Per `McpServerDesign.md § precept_language`. Input: `{}` (no parameters). Outpu
 - [ ] Output contains all vocabulary categories (control, declaration, action, outcome, type, literal, operator)
 - [ ] Every keyword in the token enum appears in the vocabulary
 - [ ] `constructs` array matches `ConstructCatalog.Constructs` count
-- [ ] `constraints` array matches `ConstraintCatalog.Constraints` count
+- [ ] `constraints` array matches `DiagnosticCatalog.Constraints` count
 - [ ] `expressionScopes` has 5 entries
 - [ ] `firePipeline` has 6 stages
 - [ ] `outcomeKinds` has 5 entries
@@ -296,8 +296,8 @@ Per `McpServerDesign.md § precept_language`. Input: `{}` (no parameters). Outpu
 3. For each declared event:
    - If the event has required args and the caller didn't supply them in `eventArgs`, report `requiresArgs` with the arg list.
    - Otherwise, call `engine.Fire(instance, event, args)` with a snapshot copy of the instance (read-only).
-   - Map the `DslFireResult` to `{ event, outcome, resultState?, resultData?, reason? }`.
-4. Sort results: actionable outcomes first (Accepted/AcceptedInPlace), then unavailable (NotDefined/NotApplicable/Rejected), then `requiresArgs`.
+   - Map the `FireResult` to `{ event, outcome, resultState?, resultData?, reason? }`.
+4. Sort results: actionable outcomes first (Transition/NoTransition), then unavailable (Undefined/Unmatched/Rejected/ConstraintFailure), then `requiresArgs`.
 
 ### Input/Output
 
@@ -305,9 +305,9 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 
 ### Tests
 
-- [ ] Event that transitions → `outcome: "Accepted"`, correct `resultState`
-- [ ] Event not defined for state → `outcome: "NotDefined"`, `reason` present
-- [ ] Event with guard that doesn't match → `outcome: "NotApplicable"`
+- [ ] Event that transitions → `outcome: "Transition"`, correct `resultState`
+- [ ] Event not defined for state → `outcome: "Undefined"`, `reason` present
+- [ ] Event with guard that doesn't match → `outcome: "Unmatched"`
 - [ ] Event with required args not supplied → `requiresArgs: true`, arg list present
 - [ ] Event with args supplied via `eventArgs` → evaluated with those args
 - [ ] Result ordering: actionable before unavailable before requiresArgs
@@ -350,10 +350,10 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
   }
   ```
 - [ ] Move the MCP launcher script from `tools/Precept.VsCode/scripts/start-precept-mcp.js` to `tools/scripts/start-precept-mcp.js` and update `.vscode/mcp.json` to reference the new location
-- [ ] Create `tools/scripts/toggle-plugin.js` — reads/writes `chat.pluginLocations` in `.vscode/settings.json`
-- [ ] Add `plugin: enable` and `plugin: disable` tasks to `.vscode/tasks.json`
-- [ ] Rename existing extension tasks: `extension: loop local install` → `extension: install`, `extension: loop local uninstall` → `extension: uninstall`
-- [ ] Remove the `extension: watch` task (unused in the local install loop)
+- [x] Create `tools/scripts/toggle-plugin.js` — reads/writes `chat.pluginLocations` in `.vscode/settings.json` *(already implemented)*
+- [x] Add `plugin: enable` and `plugin: disable` tasks to `.vscode/tasks.json` *(already implemented)*
+- [x] Rename existing extension tasks: `extension: loop local install` → `extension: install`, `extension: loop local uninstall` → `extension: uninstall` *(already implemented)*
+- [x] Remove the `extension: watch` task (unused in the local install loop) *(already implemented)*
 - [ ] Test locally using `chat.pluginLocations` setting pointing to the plugin directory
 - [ ] Verify Copilot lists all 6 precept tools from the plugin's MCP server
 - [ ] Test with at least 2 sample files per tool
@@ -427,7 +427,7 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 
 **MCP Tool Sync** (new section in copilot-instructions):
 - When core model types change (`DslWorkflowModel`, `DslField`, `DslState`, `DslEvent`, `DslTransitionRow`, etc.), check whether MCP tool DTOs in `tools/Precept.Mcp/Tools/` need corresponding updates.
-- When `ConstructCatalog` or `ConstraintCatalog` records gain or lose properties, verify `LanguageTool.cs` serialization still matches `McpServerDesign.md § precept_language` output format.
+- When `ConstructCatalog` or `DiagnosticCatalog` records gain or lose properties, verify `LanguageTool.cs` serialization still matches `McpServerDesign.md § precept_language` output format.
 - When the fire pipeline stages change, update the static `firePipeline` array in `LanguageTool.cs`.
 - The MCP tools are **thin wrappers** — never duplicate domain logic. If a tool method exceeds ~30 lines of non-serialization code, the logic probably belongs in `src/Precept/`.
 
@@ -539,10 +539,10 @@ Use this prompt to begin implementation in a new Copilot Chat session:
 >
 > 1. Execute the phases in order (0 through 9), committing at each checkpoint.
 > 2. Each phase must end with `dotnet build` and `dotnet test` passing before moving to the next.
-> 3. Tools are **thin wrappers** — all domain logic lives in `src/Precept/`. The MCP project calls `PreceptParser`, `PreceptCompiler`, `PreceptEngine`, `ConstructCatalog`, and `ConstraintCatalog` directly.
+> 3. Tools are **thin wrappers** — all domain logic lives in `src/Precept/`. The MCP project calls `PreceptParser`, `PreceptCompiler`, `PreceptEngine`, `ConstructCatalog`, and `DiagnosticCatalog` directly.
 > 4. Every tool returns structured JSON — no prose-only responses.
 > 5. Every tool has integration tests in `test/Precept.Mcp.Tests/` that call the tool method directly (no MCP transport).
-> 6. For `precept_language` (Phase 5), vocabulary comes from reflecting token enum attributes, constructs from `ConstructCatalog.Constructs`, and constraints from `ConstraintCatalog.Constraints`. The static sections (`expressionScopes`, `firePipeline`, `outcomeKinds`) are constant arrays in the tool class.
+> 6. For `precept_language` (Phase 5), vocabulary comes from reflecting token enum attributes, constructs from `ConstructCatalog.Constructs`, and constraints from `DiagnosticCatalog.Constraints`. The static sections (`expressionScopes`, `firePipeline`, `outcomeKinds`) are constant arrays in the tool class.
 > 7. For the agent plugin (Phase 7), create the plugin directory structure at `tools/Precept.Plugin/` with `plugin.json` and dev `.mcp.json` (launcher-based). Move the MCP launcher script to `tools/scripts/start-precept-mcp.js`. Create the `toggle-plugin.js` script and add `plugin: enable`/`plugin: disable` tasks. Rename extension tasks (`extension: install`, `extension: uninstall`) and remove `extension: watch`.
 > 8. For agent and skill content (Phase 8), follow the [Agent Skills specification](https://agentskills.io/specification) for SKILL.md format and the [VS Code custom agents docs](https://code.visualstudio.com/docs/copilot/customization/custom-agents) for the agent file format.
 > 9. In Phase 9, remove the MCP server registration from the VS Code extension (`registerMcpServerDefinitionProvider` and `mcpServerDefinitionProviders` in package.json), remove `Precept Dev` from `.vscode/mcp.json`, rewrite the plugin's `.mcp.json` for distribution (`dotnet tool run precept-mcp`), and update README and design docs.

@@ -42,7 +42,7 @@ The solution is to make the language knowledge **data** that lives in one place 
 │    MCP constructs                                    │
 ├─────────────────────────────────────────────────────┤
 │  Tier 3: Semantics                                  │
-│  ConstraintCatalog — enforcement points register     │
+│  DiagnosticCatalog — enforcement points register     │
 │  ID + phase + rule + message template + severity     │
 │  → error messages, LS diagnostics (with codes),      │
 │    MCP constraints                                   │
@@ -195,11 +195,11 @@ The example must parse successfully — this is validated by a test (see Drift D
 
 ---
 
-## Tier 3: Constraint Catalog
+## Tier 3: Diagnostic Catalog
 
 ### Registry
 
-**File:** `src/Precept/Dsl/ConstraintCatalog.cs`
+**File:** `src/Precept/Dsl/DiagnosticCatalog.cs`
 
 ```csharp
 public sealed record LanguageConstraint(
@@ -215,7 +215,7 @@ public enum ConstraintSeverity
     Warning
 }
 
-public static class ConstraintCatalog
+public static class DiagnosticCatalog
 {
     private static readonly List<LanguageConstraint> _constraints = [];
     public static IReadOnlyList<LanguageConstraint> Constraints => _constraints;
@@ -237,7 +237,7 @@ Each constraint carries a message template with placeholders for contextual valu
 
 ```csharp
 // SYNC:CONSTRAINT:C7
-static readonly LanguageConstraint C7 = ConstraintCatalog.Register(
+static readonly LanguageConstraint C7 = DiagnosticCatalog.Register(
     "C7", "parse",
     "Non-nullable fields without 'default' are a parse error.",
     "Field '{fieldName}' is non-nullable and has no default value.",
@@ -259,7 +259,7 @@ Each enforcement point is marked with a `// SYNC:CONSTRAINT:Cnn` comment and reg
 
 ```csharp
 // SYNC:CONSTRAINT:C9
-static readonly LanguageConstraint C9 = ConstraintCatalog.Register(
+static readonly LanguageConstraint C9 = DiagnosticCatalog.Register(
     "C9", "parse",
     "Each (state, event) pair may only appear in transition rows that share compatible guards — no duplicate unguarded rows.",
     "Duplicate unguarded transition row for ({stateName}, {eventName}).",
@@ -268,11 +268,11 @@ static readonly LanguageConstraint C9 = ConstraintCatalog.Register(
 
 ### Consumer Wiring
 
-| Consumer | How it uses ConstraintCatalog |
+| Consumer | How it uses DiagnosticCatalog |
 |---|---|
 | **Parser/compiler/engine error messages** | Error messages are derived from `MessageTemplate` with contextual values filled in. The constraint `Rule` is available as supplementary context. |
 | **Language server diagnostics** | Each diagnostic carries the constraint ID as a diagnostic code (e.g., `PRECEPT007` from `C7`). Severity maps to LSP `DiagnosticSeverity`. The `Rule` text becomes the diagnostic message or detail. |
-| **MCP `precept_language`** | Serializes `ConstraintCatalog.Constraints` into the `constraints` array (ID, phase, rule). `MessageTemplate` and `Severity` are available but may be omitted from the MCP response for brevity. |
+| **MCP `precept_language`** | Serializes `DiagnosticCatalog.Constraints` into the `constraints` array (ID, phase, rule). `MessageTemplate` and `Severity` are available but may be omitted from the MCP response for brevity. |
 | **`copilot-instructions.md`** | The existence of SYNC comments is documented as a rule — Copilot knows to maintain them when editing enforcement code. |
 
 ### Diagnostic Code Derivation
@@ -333,14 +333,14 @@ Every enforcement point is marked with `// SYNC:CONSTRAINT:Cnn`. Copilot sees th
 | **Constraint triggers** | Every registered constraint has a `[Theory]` test case with a violating input that produces the expected error. |
 | **Token attributes complete** | Every `PreceptToken` member has `[TokenCategory]` and `[TokenDescription]` attributes. Keyword/operator/punctuation members also have `[TokenSymbol]`. |
 | **Multi-role token categories** | Tokens that serve as type keywords in the parser (e.g. collection types `set`, `queue`, `stack`) carry `TokenCategory.Type` among their categories. |
-| **Documentation constraints match** | ~~Originally targeted `docs/DesignNotes.md § DSL Syntax Contract`.~~ **Superseded** — the `ConstraintCatalog` is now the single source of truth for constraint documentation. The original target doc was archived to `docs/archive/DesignNotes-legacy.md` and is frozen. The MCP `precept_language` tool serializes `ConstraintCatalog.Constraints` directly, eliminating the separate documentation copy this test was designed to guard. |
+| **Documentation constraints match** | ~~Originally targeted `docs/DesignNotes.md § DSL Syntax Contract`.~~ **Superseded** — the `DiagnosticCatalog` is now the single source of truth for constraint documentation. The original target doc was archived to `docs/archive/DesignNotes-legacy.md` and is frozen. The MCP `precept_language` tool serializes `DiagnosticCatalog.Constraints` directly, eliminating the separate documentation copy this test was designed to guard. |
 | **Reference sample coverage** | At least one `.precept` sample file uses every construct registered in `ConstructCatalog`. |
 
 ### Layer 3: Copilot Instructions (Behavioral)
 
 `copilot-instructions.md` includes explicit rules:
 - When adding a new keyword, update the token enum with all three attributes
-- When adding a new enforcement point, register the constraint with `ConstraintCatalog.Register()` and add a `// SYNC:CONSTRAINT:Cnn` comment
+- When adding a new enforcement point, register the constraint with `DiagnosticCatalog.Register()` and add a `// SYNC:CONSTRAINT:Cnn` comment
 - When adding a new parser combinator, register it with `ConstructCatalog.Register()` with a parseable example
 - SYNC comments, tests, and catalog registrations must all agree
 
