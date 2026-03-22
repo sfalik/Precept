@@ -38,6 +38,19 @@ Two patterns emerged for typed completions:
 
 If future typed completion features pile up and create pressure, the upgrade path is: introduce a cached semantic model (`PreceptSemanticModel`) that parses once per edit cycle and exposes resolved types, scopes, and diagnostics to all consumers. That's the Roslyn/rust-analyzer pattern — but premature until the performance ceiling is actually hit.
 
+### Why compile-time checking is a strategic strength
+
+Compile-time checking is not just defensive validation. It is one of the core reasons to author workflows in a DSL instead of embedding rules directly in application code or configuration.
+
+The bar for Precept should be:
+
+- if a workflow references a name that cannot exist, fail at compile time
+- if an operator can never make sense for the operand types, fail at compile time
+- if nullability has not been made explicit, fail at compile time
+- if scope makes a reference invalid, fail at compile time
+
+Runtime rejection should be reserved for cases that genuinely depend on runtime data and cannot be proven statically. That keeps preview, inspect, language-server diagnostics, and compile output aligned around a single contract: catch as much real semantic intent as possible before execution.
+
 ### Remaining work
 
 #### Phase A: State action type checking — DONE
@@ -71,6 +84,215 @@ Zero type-related logic remains in the analyzer.
 #### Not applicable: Guard expression typed completions
 
 Guard completions do not need type filtering. All field types can participate in valid `when` expressions: numbers via comparison (`Count > 0`), strings via equality/null checks (`Name != null`), booleans directly (`IsActive`). Mid-expression type filtering (e.g., after `when X && `) would require partial expression parsing at the cursor — disproportionate complexity for marginal UX benefit. The type checker already catches invalid guards via C39.
+
+## Planned Follow-Up: Compile-Time Checking Expansion
+
+The redesign phases are complete, but the compile-time checker is intentionally still narrower than the language direction. The next follow-up work should deepen semantic checking, not broaden syntax.
+
+### Phase D: Equality and null-compatible comparison policy
+
+**Why this comes first:** equality is the largest remaining inconsistency in the operator surface. Arithmetic, logical operators, ordered comparisons, and nullability are compile-checked strictly; equality must now match that bar.
+
+**Locked policy:** equality is allowed only for compatible operands.
+
+- Same-family scalar comparisons are allowed: `string`, `number`, and `boolean` compare only against their own family.
+- `null` participates only with a nullable operand of the same family, or with `null` itself.
+- No implicit coercions are performed for equality.
+- `NonNullableField == null` and `NonNullableField != null` are compile-time errors.
+- Incompatible equality comparisons reuse the existing binary-operator diagnostic family (`C41 / PRECEPT041`).
+- Update `PreceptTypeChecker` and runtime evaluator together so compile-time and runtime semantics stay aligned.
+- Update `docs/PreceptLanguageDesign.md` with the locked rule table.
+
+**Minimum tests:**
+
+- same-type equality accepted for `string`, `number`, `boolean`
+- cross-type equality rejected at compile time
+- nullable-to-same-family equality accepted without requiring narrowing
+- `== null` / `!= null` valid only for nullable operands
+- non-nullable `== null` / `!= null` rejected at compile time
+
+**Implementation prompt:**
+
+The change site is `PreceptTypeChecker.TryInferBinaryKind()` in `src/Precept/Dsl/PreceptTypeChecker.cs`. The `case "=="` / `case "!="` branch (~line 752) currently checks only that both sides are inferable (`leftKind != None && rightKind != None`) without verifying type compatibility. Replace this with same-family checking: strip the `Null` flag from both sides, verify the non-null families match (or one side is pure `Null` and the other is nullable). Incompatible operands produce C41. Also reject `NonNullableField == null` / `!= null` by checking whether one side is `Null` and the other lacks the `Null` flag.
+
+The runtime evaluator in `src/Precept/Dsl/PreceptExpressionEvaluator.cs` (lines 177–188) has a `TryToNumber` fallback for `==`/`!=` that silently coerces types. Remove the numeric fallback so runtime behavior matches the stricter compile-time policy. After the type checker rejects cross-type equality at compile time, the runtime path should only see same-type operands (or null).
+
+Add tests to `test/Precept.Tests/PreceptTypeCheckerTests.cs`. Verify all 18 samples still compile clean. Run the full test suite (602+ tests) before committing.
+
+### Phase E: Scope and narrowing hardening
+
+**Goal:** make symbol visibility and null narrowing equally strict across fields, event args, guards, asserts, and state actions.
+
+**Locked policy:** transition rows require dotted event-arg form (`EventName.ArgName`). Bare arg names are valid only in event asserts.
+
+- Remove bare arg names from transition row symbol tables in `BuildSymbolKinds()` — only dotted keys (`EventName.ArgName`) should be added for transition scope.
+- Add explicit tests and diagnostics for nullable event-arg narrowing in `when` guards using dotted form.
+- Reject cross-event arg references (`EventB.Arg`) when checking a row for `EventA`.
+- Reject bare arg names in transition row expressions as unknown identifiers (C38).
+- Keep event asserts arg-only and make field references compile-blocking.
+- Verify parenthesized and compound guard forms preserve narrowing only where structurally sound.
+
+**Minimum tests:**
+
+- event arg narrowed by `when Event.Arg != null` (dotted form)
+- bare arg name in transition row rejected as unknown identifier
+- event arg not narrowed without explicit guard
+- field reference inside event assert rejected
+- cross-event arg reference rejected
+- parenthesized narrowing forms accepted/rejected as designed
+
+**Implementation prompt:**
+
+The change site is `PreceptTypeChecker.BuildSymbolKinds()` in `src/Precept/Dsl/PreceptTypeChecker.cs`. Currently it adds event args as both bare (`symbols[pair.Key]`) and dotted (`symbols[$"{eventName}.{pair.Key}"]`). Remove the bare key line for non-assert scopes so transition rows only see dotted keys. The method receives the scope context — add a parameter or flag to distinguish transition-row scope from event-assert scope.
+
+Event assert scope is already enforced by the parser (`src/Precept/Dsl/PreceptParser.cs` lines 963–998, constraints C14/C15/C16). The checker’s event-assert validation builds symbols with bare keys only (no dotted form needed since scope is arg-only).
+
+All 18 sample files already use dotted form exclusively — no sample changes needed. Existing tests that use bare arg names in transition rows will need updating to use dotted form (search for undotted event-arg references in `test/Precept.Tests/`). Add tests to `test/Precept.Tests/PreceptTypeCheckerTests.cs`. Run the full suite before committing.
+
+### Phase F: Rule-position strictness and collection contracts
+
+**Goal:** ensure every boolean-only and collection-only position has uniform compile-time semantics.
+
+- Reject non-boolean expressions in invariants, state asserts, event asserts, and `when` guards with the same diagnostic category.
+- Collection mutation nullability is locked: `T|null` values into non-nullable collections require prior narrowing (C42). Already implemented and tested.
+- Decide whether collection membership/equality can participate in stronger compile-time reasoning without false positives.
+
+**Minimum tests:**
+
+- invariant with non-boolean expression rejected
+- state assert with non-boolean expression rejected
+- event assert with non-boolean expression rejected
+- collection mutation from nullable source without narrowing rejected
+- `contains` mismatch coverage for invalid lhs/rhs shapes
+
+**Implementation prompt:**
+
+Register new constraint C44 in `src/Precept/Dsl/ConstraintCatalog.cs` for non-boolean rule positions. The checker currently infers guard/assert expression types but doesn’t enforce that the result is boolean. Add a check after `TryInferExpressionKind()` returns for `when` guards, `invariant`, `in/to/from assert`, and `on assert` expressions: if the inferred kind doesn’t include `StaticValueKind.Boolean`, emit C44.
+
+The validation positions are spread across `ValidateTransitionRows()` (for `when` guards), and the invariant/assert validation loops. Search for where `row.WhenGuard` is validated and where assert expressions are checked.
+
+Collection mutation nullability is already implemented and tested (C42). The remaining collection work is `contains` hardening — verify existing C41 coverage for `contains` LHS/RHS mismatches is complete.
+
+Add a C44 trigger fixture to `test/Precept.Tests/CatalogDriftTests.cs`. Add tests to `PreceptTypeCheckerTests.cs`. Run the full suite before committing.
+
+### Phase G: Additional sound static reasoning
+
+**Goal:** add only those higher-order diagnostics that remain clearly correct.
+
+**Locked policy:** compile-time impossibility is limited to type+null-flow reasoning plus identical-guard duplicate detection. No cross-field or arithmetic reasoning.
+
+- Non-nullable `== null` / `!= null` is already a C41 error under the locked equality policy.
+- Post-narrowing null contradictions (e.g., `when Value == null -> no transition` followed by `when Value == null -> ...`) are caught by narrowing + C41.
+- Identical-guard duplicate rows for the same `(state, event)` are a compile-time error. Detection is AST or normalized-text equality of the `when` expression.
+- No cross-field arithmetic reasoning (e.g., `Amount > 100 && Amount < 50`) — the inspector handles these.
+- Keep the no-false-positives rule: if a proof requires speculative cross-field reasoning, prefer runtime/inspect over compile-time error.
+
+**Minimum tests:**
+
+- identical-guard duplicate row detected as compile-time error
+- non-identical guards on same `(state, event)` accepted
+- post-narrowing null contradiction caught via C41
+- no false-positive cases for non-local expressions
+
+**Implementation prompt:**
+
+Register new constraint C45 in `src/Precept/Dsl/ConstraintCatalog.cs` for identical-guard duplicate rows. The detection site is `PreceptTypeChecker.ValidateTransitionRows()` in `src/Precept/Dsl/PreceptTypeChecker.cs`, which already iterates rows grouped by `(state, event)` in source-line order. Before processing each row, compare its `WhenText` (or normalized AST) against prior rows in the same group. If an identical guard is found, emit C45.
+
+Non-nullable `== null` is already covered by Phase D (C41). Post-narrowing null contradictions are automatically caught because cross-row narrowing strips the `Null` flag, and then Phase D’s equality check rejects `NonNullableField == null`.
+
+Use normalized `WhenText` comparison (trimmed, whitespace-collapsed) rather than AST equality — simpler and sufficient since authors rarely write semantically-identical but syntactically-different guards. Add a C45 trigger fixture to `CatalogDriftTests.cs`. Run the full suite before committing.
+
+### Phase H: Coverage and tooling sync
+
+**Goal:** make the checker changes cheap to maintain by expanding tests and keeping tooling/docs aligned.
+
+- Add regression tests for every newly locked compile-time rule.
+- Add analyzer completion tests wherever tighter compile-time rules affect candidate filtering.
+- Add catalog drift tests for any new constraint codes or changed messages.
+- Keep README and design docs synchronized in the same change pass.
+
+**Implementation prompt:**
+
+After Phases D–G are complete, do a sweep:
+
+1. **Analyzer severity fix:** `MapTypeDiagnostic()` in `tools/Precept.LanguageServer/PreceptAnalyzer.cs` (~line 956) hardcodes `DiagnosticSeverity.Error`. Change it to read `diagnostic.Constraint.Severity` and map `ConstraintSeverity.Warning` to `DiagnosticSeverity.Warning`. This connects the `ConstraintSeverity` enum (already in `ConstraintCatalog.cs`) to LSP reporting.
+
+2. **Completion filtering:** Verify that `PreceptAnalyzer.GetCompletions()` still produces correctly filtered candidates after the equality and scope changes. The typed-set-RHS and collection-value completions use `PreceptTypeContext` — confirm they still work with the tighter symbol tables.
+
+3. **Catalog drift:** Ensure `CatalogDriftTests.EveryConstraint_CanBeTriggered` covers C44 and C45 trigger fixtures.
+
+4. **README sync:** Review `README.md` for any claims about equality semantics, event-arg access, or diagnostic behavior that need updating.
+
+5. **Run the full suite** (all 3 test projects) and confirm green before committing.
+
+## Additional test coverage to add
+
+These coverage items should be added to the implementation plan even if the implementation itself is split across several commits.
+
+### Core checker coverage
+
+- [ ] Equality rule matrix: same-type comparisons, cross-type rejection, nullable-compatible cases
+- [ ] `== null` and `!= null` semantics for nullable and non-nullable operands
+- [ ] Event-arg null narrowing in transition guards
+- [ ] Cross-event arg reference rejection
+- [ ] Event-assert scope isolation (data-field references rejected)
+- [ ] Non-boolean invariant rejection
+- [ ] Non-boolean state-assert rejection
+- [ ] Non-boolean event-assert rejection
+- [ ] Parenthesized narrowing cases
+- [ ] Nested unary expression typing
+- [ ] Multiple diagnostics in a single validation run (3+ independent errors)
+
+### Collection and mutation coverage
+
+- [ ] Nullable value used in `add` / `enqueue` / `push` without narrowing
+- [ ] `pop` / `dequeue into` target incompatible with source inner type
+- [ ] `contains` with invalid lhs shape
+- [ ] `contains` with rhs type mismatch
+
+### Language-server and integration coverage
+
+- [ ] Analyzer completions remain type-filtered after equality-rule changes
+- [ ] Narrowed event-arg scopes appear correctly in `PreceptTypeContext`
+- [ ] `from any` expansion still attributes diagnostics to the specific state
+- [ ] Workflow compile-blocking behavior mirrors `PreceptCompiler.Validate()` diagnostics
+
+## Design discussions required to finalize the next wave
+
+All design discussions for the current compile-time expansion wave (Phases D–H) have been resolved. No open questions remain.
+
+### Diagnostic code policy (Locked)
+
+**Rule:** overload an existing code when the new condition is the same conceptual error category. Introduce a new code only when a genuinely new category emerges.
+
+Existing codes C38–C43 are stable and will not be split. The message text within each code provides the specificity (e.g., C41 covers all binary operator type errors but the message names the exact operator and operand types).
+
+**Planned new codes for upcoming phases:**
+
+| Code | Category | Phase | Trigger |
+|---|---|---|---|
+| C44 | Non-boolean rule position | F | `invariant`, `assert`, or `when` expression that doesn’t produce boolean |
+| C45 | Identical-guard duplicate row | G | Two rows for the same `(state, event)` with the same guard expression |
+
+**Reuse of existing codes:**
+
+| Existing code | New condition | Rationale |
+|---|---|---|
+| C38 (unknown identifier) | Bare arg name in transition row | Not in symbol table — same category as any unknown identifier |
+| C38 (unknown identifier) | Cross-event arg reference | `EventB.Arg` not in scope for `EventA` row — same resolution failure |
+| C41 (binary operator) | Incompatible equality operands | Same conceptual error as other binary operator type mismatches |
+
+Overhead per new code: ~6 lines total (4–5 in `ConstraintCatalog.cs`, 1–2 in `CatalogDriftTests.cs`). Language server and MCP tools require zero per-code changes.
+
+### Diagnostic severity policy (Locked)
+
+All diagnostics follow the existing three-tier model already established in the language server:
+
+- **Error**: provably wrong — type contradictions, null-flow violations, structural impossibilities (unreachable rows, identical-guard duplicates). Blocks compilation.
+- **Warning**: probably wrong — structural quality observations from audit-style analysis (reject-only pairs, orphaned events, unreachable states, missing coverage). Does not block compilation.
+- **Hint**: informational — dead-end states, empty precepts.
+
+The `ConstraintSeverity` enum in `ConstraintCatalog` already supports `Error` and `Warning`. The `MapTypeDiagnostic` method in the analyzer should respect `Constraint.Severity` rather than hardcoding `Error`. New type-checker diagnostics that are provable contradictions use `Error`; any future structural-quality diagnostics promoted from the analyzer to the checker should use `Warning`.
 
 ### Mandatory vs. Advisory
 
@@ -557,7 +779,7 @@ else (state transition):
 
 1. **Expression parser tests** (`DslExpressionParserTests.cs`, `DslExpressionParserEdgeCaseTests.cs`) — likely minimal changes if the expression parser API stays `DslExpressionParser.Parse(string)`. If expressions are fully integrated into Superpower, these tests either test the expression combinator in isolation or remain as integration tests.
 
-2. **Expression evaluator tests** (`DslExpressionRuntimeEvaluatorBehaviorTests.cs`) — unchanged (evaluator doesn't change).
+2. **Expression evaluator tests** (`DslExpressionRuntimeEvaluatorBehaviorTests.cs`) — keep pure runtime-valid expression tests here. Any expression that is intentionally compile-invalid belongs in type-checker / compiler tests instead of runtime-fire tests.
 
 3. **Workflow tests** (`DslWorkflowTests.cs`) — rewrite all embedded DSL strings to new syntax. Test behavior stays the same.
 
@@ -594,6 +816,11 @@ else (state transition):
 - [ ] Token attributes: every `PreceptToken` member has `[TokenCategory]` and `[TokenDescription]`; keyword/operator/punctuation members have `[TokenSymbol]`
 - [ ] Documentation constraints match: constraint list in `docs/DesignNotes.md § DSL Syntax Contract` matches `ConstraintCatalog.Constraints` (same IDs, same rules)
 - [ ] Reference sample coverage: at least one `.precept` sample file uses every construct registered in `ConstructCatalog`
+- [ ] Equality rule matrix and null-comparison coverage once the comparison policy is locked
+- [ ] Event-arg narrowing and event-assert scope-isolation coverage
+- [ ] Non-boolean rule-position coverage for invariants, state asserts, event asserts, and guards
+- [ ] Collection-mutation nullability coverage across `add`, `enqueue`, and `push`
+- [ ] Multi-diagnostic validation coverage with 3+ independent compile-time errors
 
 ### Checkpoint
 
@@ -1077,10 +1304,10 @@ Remove `rule` keyword from `KeywordItems` (line ~1552, marked "Legacy (block-syn
 
 ## Completion Summary
 
-**Status:** All 10 phases completed on `feature/language-redesign`. Pending final commit.
-**Date completed:** 2026-03-06
-**Final test count:** 370/370 passing (348 core + 22 language server).
-**Sample files:** 17 `.precept` files migrated to new syntax.
+**Status:** Core language-redesign phases completed on `feature/language-redesign`. Compile-time checking expansion is planned next.
+**Date completed:** 2026-03-06 for the redesign; follow-up planning updated 2026-03-22.
+**Current test count:** 602/602 passing (487 core + 73 language server + 42 MCP).
+**Sample files:** 18 `.precept` files migrated to new syntax.
 
 ### Commit History
 
@@ -1098,6 +1325,7 @@ Remove `rule` keyword from `KeywordItems` (line ~1552, marked "Legacy (block-syn
 | `2d16881` | 8 | TextMate grammar rewrite for new syntax |
 | `c6dad27` | 9 | Documentation — archived old README/DesignNotes, promoted new README, updated copilot-instructions |
 | TBD | 10 | Legacy parser removal, design-required parser validations, expression operator completeness, 370/370 tests green |
+| TBD | Follow-up | Compile-time checking expansion: equality policy, scope hardening, stricter rule checking, expanded test coverage |
 
 ### Deviations from Plan
 

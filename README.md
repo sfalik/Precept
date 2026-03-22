@@ -21,6 +21,7 @@
    ```bash
    code --install-extension AuthorName.precept-vscode
    ```
+3. **Install the Copilot agent plugin** *(optional — requires `chat.plugins.enabled`)*: In VS Code, run `Chat: Install Plugin From Source` and provide the plugin repo URL. This adds the MCP tools, Precept Author agent, and companion skills to Copilot.
 
 ---
 
@@ -222,18 +223,11 @@ Precept includes an MCP (Model Context Protocol) server that exposes DSL parsing
 | `precept_language` | Full DSL reference — vocabulary, constructs, constraints, pipeline |
 | `precept_inspect` | From a state+data snapshot, preview what every event would do |
 
-### Bundled with the Extension
+### Agent Plugin
 
-When the VS Code extension is packaged for distribution (`npm run package:dist`), a self-contained build of the MCP server is bundled inside the VSIX for each supported platform (win-x64, linux-x64, osx-arm64). The extension registers the server via the `mcpServerDefinitionProviders` contribution point in `package.json` and the `vscode.lm.registerMcpServerDefinitionProvider()` API so that VS Code discovers and launches it automatically — no manual `mcp.json` configuration, no .NET SDK prerequisite, and no separate install step.
+The MCP server, a custom **Precept Author** agent, and two companion skills (`precept-authoring`, `precept-debugging`) are distributed as a Copilot agent plugin — separate from the VS Code extension. Install the plugin from the marketplace or directly from the Git repository, and all six tools, the agent, and the skills are available in any workspace.
 
-### Development Setup
-
-During development in this repo, the MCP server runs from source via `.vscode/mcp.json`, bypassing the bundled binary. The workspace launcher builds and shadow-copies the server on demand:
-```
-node tools/Precept.VsCode/scripts/start-precept-mcp.js
-```
-
-On each launch, the launcher builds `tools/Precept.Mcp/Precept.Mcp.csproj` into `temp/dev-mcp`, copies that build into a fresh shadow runtime under `temp/dev-mcp/runtime/run-*`, and runs the copied `Precept.Mcp.dll`. This keeps the live MCP process off the default `bin/Debug` output so rebuilding the project does not collide with the running server.
+The VS Code extension continues to provide all editor features (language server, syntax highlighting, preview panel, commands). It does not carry MCP server binaries or Copilot customization content.
 
 ---
 
@@ -247,6 +241,18 @@ Most complex entities start simple. But as business requirements grow, the rules
 Eventually, the system drifts. An entity ends up in a `Shipped` state without a `TrackingNumber`. When stakeholders ask, "Under what exact conditions can an Order be refunded?", developers have to traverse six different classes to find the answer.
 
 Precept fixes this by treating the lifecycle of an entity as an executable contract.
+
+## 🤖 Designed for AI
+
+Precept is readable by humans and writable by hand — but it is *designed* to work exceptionally well with AI. Every syntax and semantics decision produces properties that AI agents can exploit:
+
+- **Deterministic semantics.** The same precept + the same data = the same outcome, every time. An AI can reason about behavior without worrying about hidden state, timing, or side effects.
+- **Structured tool APIs.** The MCP server exposes six tools (`precept_validate`, `precept_schema`, `precept_audit`, `precept_run`, `precept_inspect`, `precept_language`) that return typed JSON — not prose. An AI can validate its own work, inspect runtime behavior, and iterate without human intervention.
+- **Language reference as data.** `precept_language` returns the complete DSL vocabulary, construct forms, semantic constraints, expression scopes, and fire pipeline as structured JSON. The AI doesn't need training data or examples to know what the language supports — it can query the authoritative specification at tool-call time.
+- **Safe preview before commit.** `Inspect` and `precept_inspect` let an AI explore "what happens if I fire this event?" from any state without mutating anything. This makes trial-and-error exploration safe and cheap.
+- **Closed validation loop.** An AI can write a precept, validate it, audit its structure, run scenarios against it, and fix issues — all through tool calls, without ever needing a terminal, a build step, or human feedback.
+
+The overall vision: a domain expert describes what they want in natural language, the AI authors the precept, and the toolchain guarantees correctness. The human reviews a readable contract; the AI does the heavy lifting.
 
 ## 🏗️ The Pillars of Precept
 
@@ -270,33 +276,78 @@ Precept acknowledges that entirely different ceremonies apply to different types
 
 Both paths are safely watched by the exact same invariant engine. Direct editing isn't a hack; it is a first-class feature protected by the same ironclad invariants.
 
-## VS Code Extension Local Loop (Contributors)
+## Local Development Loop (Contributors)
 
-Use the installed extension in your normal VS Code window.
+This repo produces two VS Code artifacts: the **extension** (editor features) and the **agent plugin** (Copilot features). Both are developed locally from `tools/` and follow the same edit → build → reload cycle.
 
-Recommended setup: keep `local.precept-vscode` installed for day-to-day work in that window. Use the packaging tasks only when you need to refresh the installed extension code after TypeScript or webview changes.
+### Prerequisites
 
-When you change C# language-server or runtime code:
+Enable the agent plugins preview in your user settings:
+
+```json
+{ "chat.plugins.enabled": true }
+```
+
+### Tasks
+
+All dev tasks are in `.vscode/tasks.json`, runnable via **Tasks: Run Task** (`Ctrl+Shift+P` → `Tasks: Run Task`):
+
+| Task | What it does |
+|------|-------------|
+| `build` | Builds the language server to `temp/dev-language-server/` |
+| `extension: install` | Builds + installs the extension from `tools/Precept.VsCode/` |
+| `extension: uninstall` | Uninstalls the local extension |
+| `plugin: enable` | Registers `tools/Precept.Plugin/` in workspace `chat.pluginLocations` |
+| `plugin: disable` | Unregisters the plugin from `chat.pluginLocations` |
+
+### Extension changes
+
+The extension provides the language server, syntax highlighting, preview panel, and commands.
+
+**C# language-server or runtime code:**
 
 1. Run `Build Task` / `Ctrl+Shift+B`.
-2. The default `build` task compiles `tools/Precept.LanguageServer/Precept.LanguageServer.csproj` into `temp/dev-language-server` with `--artifacts-path`.
+2. The default `build` task compiles into `temp/dev-language-server` with `--artifacts-path`.
 3. The installed extension detects the new DLL, creates a fresh shadow copy under `temp/dev-language-server/runtime`, and restarts the language client automatically.
 
-When you change TypeScript extension-host code or webview code:
+**TypeScript extension-host or webview code:**
 
-1. Run `extension: loop local install`.
+1. Run task: `extension: install`.
 2. Run `Developer: Reload Window`.
 
-When you change MCP server code:
+The status bar shows `Precept LS: Dev`. Click it, or run `Precept: Show Language Server Mode`, to inspect the active launch paths.
 
-1. Run `Developer: Reload Window`.
-2. Trigger any MCP-backed action.
-3. The launcher rebuilds `tools/Precept.Mcp` into `temp/dev-mcp`, creates a fresh shadow copy under `temp/dev-mcp/runtime`, and starts the new runtime on demand.
+### Plugin changes
 
-On first activation, the installed extension bootstraps the dev language-server artifacts under `temp/dev-language-server` if they are missing.
+The plugin provides the Precept Author agent, companion skills, and MCP server tools for Copilot.
 
-The status bar shows `Precept LS: Dev`. Click it, or run `Precept: Show Language Server Mode`, to inspect the active launch paths in the output channel.
+**Agent or skill markdown:**
 
-Use `npm run loop:local` only as the command-line equivalent of `extension: loop local install`.
+1. Edit files in `tools/Precept.Plugin/agents/` or `tools/Precept.Plugin/skills/`.
+2. Run `Developer: Reload Window`.
+3. The agent appears in the Chat agents picker; skills appear in the `/` slash command menu.
 
-Use `extension: loop local uninstall` or `npm run loop:local:uninstall` only if you want to remove the installed local VSIX from your profile.
+**MCP server C# code:**
+
+1. Edit source in `tools/Precept.Mcp/`.
+2. Run `Developer: Reload Window`, then trigger any MCP-backed action.
+3. The plugin's launcher rebuilds `tools/Precept.Mcp` into `temp/dev-mcp`, creates a fresh shadow copy under `temp/dev-mcp/runtime`, and starts the new runtime on demand.
+
+**First-time setup:**
+
+1. Run task: `plugin: enable` (one time — stays enabled across reloads).
+2. Run `Developer: Reload Window`.
+3. Verify: the Precept Author agent appears in Chat, the 6 precept tools appear in the tools list.
+
+To stop loading the plugin, run task: `plugin: disable`, then reload.
+
+### File locking
+
+Both the language server and MCP server use shadow-copy launchers to avoid file locking during rebuilds:
+
+| Server | Build output | Running process locks | Rebuild safe? |
+|--------|-------------|----------------------|---------------|
+| Language server | `temp/dev-language-server/bin/` | `temp/dev-language-server/runtime/` | Yes |
+| MCP server | `temp/dev-mcp/bin/` | `temp/dev-mcp/runtime/run-*/` | Yes |
+
+The running process never locks the build output directory. Old runtime copies are pruned automatically on the next launch; locked directories are silently skipped.

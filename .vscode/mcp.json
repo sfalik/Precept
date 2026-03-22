@@ -1,6 +1,6 @@
 {
   "servers": {
-    "precept": {
+    "Precept Dev": {
       "command": "node",
       "args": ["tools/Precept.VsCode/scripts/start-precept-mcp.js"],
       "type": "stdio"

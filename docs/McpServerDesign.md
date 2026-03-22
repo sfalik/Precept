@@ -1,10 +1,17 @@
 # Precept MCP Server Design
 
-**Status:** Implemented (2026-03-06)
+**Status:** Implemented (2026-03-06); packaging and Copilot workflow design updated (2026-03-22)
 
 ## Purpose
 
 An MCP (Model Context Protocol) server that exposes DSL parsing, validation, structural analysis, and runtime execution as tools callable by Copilot (and any other MCP host). This enables semantic understanding of `.precept` files beyond what plain text reading provides.
+
+This design also defines the distribution strategy for the MCP server and companion Copilot customizations (agent + skills). The delivery is split across two vehicles:
+
+- **VS Code extension** — editor features only (language server, syntax highlighting, preview panel, commands)
+- **Agent plugin** — Copilot features only (MCP server, custom agent, skills)
+
+This split reflects the principle that the MCP server and Copilot customizations exist solely for AI consumption and have no reason to live in the editor extension.
 
 ## Project Location
 
@@ -385,27 +392,227 @@ Events are grouped implicitly: actionable events (Accepted/AcceptedInPlace) firs
 
 ---
 
-## Registration in VS Code
+## Agent Plugin Distribution
 
-`tools/Precept.VsCode/package.json` would gain an MCP server entry:
+The MCP server, custom agent, and skills are distributed as a **Copilot agent plugin** — a self-contained bundle that users install once and that works across any workspace. Agent plugins are a Preview feature (`chat.plugins.enabled`) that bundle any combination of agents, skills, MCP servers, hooks, and slash commands into a single installable unit.
+
+This replaces the earlier design where the VS Code extension bundled the MCP server via `registerMcpServerDefinitionProvider()` and scaffolded skills into `.github/skills/`. The plugin model eliminates the scaffolding problem entirely — Copilot discovers plugin-provided agents, skills, and MCP servers automatically without workspace file creation.
+
+### Why Plugin Instead of Extension
+
+| Concern | Extension | Plugin |
+|---|---|---|
+| MCP server registration | `registerMcpServerDefinitionProvider()` | `.mcp.json` at plugin root |
+| Skills | No native API; must scaffold into workspace | Discovered automatically from plugin `skills/` |
+| Agents | No native API; must scaffold into workspace | Discovered automatically from plugin `agents/` |
+| Trust model | Implicit (extension is trusted) | Implicit on install (plugin MCP servers are implicitly trusted) |
+| Update mechanism | VS Code extension marketplace updates | Plugin marketplace updates (auto-checked every 24h) |
+| User setup | Zero (extension activation) | One-time install from marketplace or Git URL |
+| Works in any workspace | Yes (extension is global) | Yes (plugin is global once installed) |
+
+The VS Code extension continues to provide all editor features: language server (diagnostics, completions, semantic tokens, code actions), syntax highlighting (TextMate grammar), preview panel, and commands. It no longer carries MCP server binaries or Copilot customization content.
+
+### Plugin Directory Structure
+
+```
+tools/Precept.Plugin/
+├── .github/plugin/
+│   └── plugin.json           # Plugin metadata and configuration
+├── agents/
+│   └── precept-author.md     # Precept Author custom agent
+├── skills/
+│   ├── precept-authoring/
+│   │   └── SKILL.md          # Authoring workflow skill
+│   └── precept-debugging/
+│       └── SKILL.md          # Debugging/diagnosis skill
+├── .mcp.json                 # MCP server definition (dev: launcher, dist: dotnet tool)
+└── README.md
+```
+
+### plugin.json
 
 ```json
-"mcpServers": {
-  "precept": {
-    "command": "dotnet",
-    "args": ["run", "--project", "${workspaceFolder}/tools/Precept.Mcp"],
-    "type": "stdio"
+{
+  "name": "precept",
+  "description": "Precept DSL authoring, validation, and debugging tools for GitHub Copilot.",
+  "version": "1.0.0",
+  "author": { "name": "Precept" },
+  "repository": "https://github.com/<org>/precept-plugin",
+  "license": "MIT",
+  "keywords": ["precept", "dsl", "state-machine", "workflow", "domain-integrity"],
+  "agents": ["./agents"],
+  "skills": [
+    "./skills/precept-authoring",
+    "./skills/precept-debugging"
+  ]
+}
+```
+
+### .mcp.json (Distribution)
+
+```json
+{
+  "mcpServers": {
+    "precept": {
+      "command": "dotnet",
+      "args": ["tool", "run", "precept-mcp"],
+      "env": {}
+    }
   }
 }
 ```
 
-This makes all six tools available to Copilot in agent mode without any additional setup.
+The distributed plugin uses `dotnet tool run precept-mcp` to launch the MCP server. This requires .NET on the user's machine but eliminates per-platform binary bundling entirely — the dotnet tool restores and runs the correct binary automatically. End users must have the .NET SDK installed (same prerequisite as using the Precept NuGet package).
+
+### .mcp.json (Development)
+
+During development in this repo, the plugin's `.mcp.json` uses a launcher script instead:
+
+```json
+{
+  "mcpServers": {
+    "precept": {
+      "command": "node",
+      "args": ["../../scripts/start-precept-mcp.js"]
+    }
+  }
+}
+```
+
+The launcher (`tools/scripts/start-precept-mcp.js`) builds from source, shadow-copies the output, and runs the copy — preventing file locking during rebuilds. At publish time, CI rewrites the `.mcp.json` to the `dotnet tool run` form. The launcher script is not included in the published plugin.
+
+### Distribution Channels
+
+The plugin can be distributed through multiple channels:
+
+1. **Marketplace listing** — submit to `github/awesome-copilot` or a dedicated marketplace repo. Users discover and install via the Extensions view (`@agentPlugins`).
+2. **Direct Git install** — users run `Chat: Install Plugin From Source` with the plugin repo URL. No marketplace needed.
+3. **Workspace recommendation** — repos using Precept can recommend the plugin via workspace settings:
+
+```json
+{
+  "enabledPlugins": {
+    "precept@awesome-copilot": true
+  }
+}
+```
+
+4. **Local development** — register the plugin directory via `chat.pluginLocations` setting during development:
+
+```json
+{
+  "chat.pluginLocations": {
+    "/path/to/precept-plugin": true
+  }
+}
+```
+
+### Developer Inner Loop
+
+This repo produces two VS Code artifacts: the **extension** (editor features) and the **agent plugin** (Copilot features). Both are developed locally from `tools/` and follow the same edit → build → reload cycle.
+
+#### Prerequisites
+
+Enable the agent plugins preview in your user settings:
+
+```json
+{ "chat.plugins.enabled": true }
+```
+
+#### Tasks
+
+All dev tasks are in `.vscode/tasks.json`, runnable via **Tasks: Run Task**:
+
+| Task | What it does |
+|------|-------------|
+| `build` | Builds the language server to `temp/dev-language-server/` |
+| `extension: install` | Builds + installs the extension from `tools/Precept.VsCode/` |
+| `extension: uninstall` | Uninstalls the local extension |
+| `plugin: enable` | Registers `tools/Precept.Plugin/` in workspace `chat.pluginLocations` |
+| `plugin: disable` | Unregisters the plugin from `chat.pluginLocations` |
+
+#### Edit → Test cycle
+
+**Extension changes** (language server, syntax, preview, commands):
+
+1. For C# changes: run `Build Task` / `Ctrl+Shift+B`. The extension detects the new DLL, shadow-copies it, and restarts automatically.
+2. For TypeScript/webview changes: run task `extension: install`, then `Developer: Reload Window`.
+
+**Plugin changes** (agent, skills, MCP tools):
+
+1. For agent/skill markdown: edit in `tools/Precept.Plugin/`, then `Developer: Reload Window`.
+2. For MCP server C#: edit in `tools/Precept.Mcp/`, then `Developer: Reload Window` and trigger any MCP action. The launcher rebuilds and shadow-copies on demand.
+3. First-time setup: run task `plugin: enable` (one time), then `Developer: Reload Window`.
+
+The toggle script (`tools/scripts/toggle-plugin.js`) updates `chat.pluginLocations` in `.vscode/settings.json`. To stop loading the plugin, run task `plugin: disable` and reload.
+
+#### File locking safety
+
+Both the language server and MCP server use shadow-copy launchers to avoid file locking:
+
+| Server | Build output | Running process locks | Rebuild safe? |
+|--------|-------------|----------------------|---------------|
+| Language server | `temp/dev-language-server/bin/` | `temp/dev-language-server/runtime/` | Yes |
+| MCP server | `temp/dev-mcp/bin/` | `temp/dev-mcp/runtime/run-*/` | Yes |
+
+The running process never locks the build output directory. Old runtime copies are pruned on the next launch; locked directories are silently skipped. The MCP tools read `.precept` files via momentary `File.ReadAllText()` (no held locks), and the language server reads exclusively from LSP in-memory buffers (never from disk).
+
+#### Development vs Distribution
+
+| Concern | Development (this repo) | Distribution (end users) |
+|---|---|---|
+| MCP server launch | Launcher script (build + shadow copy) | `dotnet tool run precept-mcp` |
+| Plugin registration | `chat.pluginLocations` → `./tools/Precept.Plugin` | Marketplace install or Git URL |
+| Extension registration | `extension: install` task | VS Code Marketplace |
+| Plugin toggle | `plugin: enable` / `plugin: disable` tasks | Extensions panel |
+
+### Precept Author Agent
+
+The plugin ships a custom agent (`precept-author.md`) that provides an opinionated authoring workflow. The agent:
+
+- Restricts tools to read, edit, search, and all Precept MCP tools (no terminal, no destructive operations)
+- Treats `precept_language` as the authoritative DSL reference — not local files or training data
+- Follows a mandatory validate → audit → inspect loop after every edit
+- Is invocable from the agents dropdown and as a subagent from default Agent mode
+
+The agent is the primary vehicle for high-quality Precept authoring across any workspace. It provides stronger workflow isolation than a skill alone, enforcing the correct tool sequence as its core identity rather than as a suggestion.
+
+### Companion Skills
+
+Two skills provide targeted capabilities accessible as slash commands and via automatic model invocation:
+
+**`precept-authoring`** — standardizes the creation and editing workflow:
+- If the workspace already contains `.precept` files, read one representative file first to match local conventions
+- If no `.precept` files exist, rely on `precept_language` plus task requirements
+- Call `precept_schema` when editing an existing file
+- Validate with `precept_validate`, review with `precept_audit`
+- After creating or editing a precept, include a Mermaid `stateDiagram-v2` diagram showing the resulting state machine to confirm the design with the user
+- The skill must be repo-agnostic — it cannot assume `samples/` exists
+
+**`precept-debugging`** — standardizes diagnosis and behavior tracing:
+- Inspect shape with `precept_schema`
+- Diagnose correctness with `precept_validate`
+- Review structural quality with `precept_audit`
+- Explore runtime behavior with `precept_inspect` and `precept_run`
+- When explaining structure or transition behavior, include a focused Mermaid `stateDiagram-v2` diagram showing only the relevant states and transitions
+
+Both skills include a "Mermaid Diagrams" section that teaches the model how to generate full or partial state diagrams from `precept_schema` + `precept_audit` data. Diagrams are rendered natively by VS Code Chat — no separate tool is needed. The extension's interactive preview panel (ELK + custom SVG) remains independent; the skill-generated Mermaid diagrams serve a different purpose (conversation-embedded, focused, partial).
+
+Both skills follow the [Agent Skills specification](https://agentskills.io/specification):
+- `name` must be lowercase kebab-case, match the parent directory name, max 64 chars
+- `description` must be explicit and trigger-oriented for reliable discovery
+- Keep `SKILL.md` body under 500 lines; move detailed reference to separate files
+- Progressive disclosure: metadata (~100 tokens) → instructions (<5000 tokens) → resources (on demand)
 
 ---
 
 ## Build Order
 
 `Precept.Mcp.csproj` sits alongside the language server in `tools/` and is included in `Precept.slnx`. It depends only on `Precept.csproj` — not on the language server project.
+
+The plugin assembly work depends on the MCP project existing first. The agent and skill content can be drafted in parallel with MCP tool development since they are plain markdown files. The plugin packaging step combines MCP server (via `dotnet tool run`) + agent + skills into the final plugin directory structure.
+
+The VS Code extension has no dependency on the plugin — they are separate distribution artifacts. The extension's `registerMcpServerDefinitionProvider()` is removed once the plugin is the shipping path for MCP. The MCP launcher script (`tools/scripts/start-precept-mcp.js`) is shared infrastructure used by both the plugin's dev `.mcp.json` and (temporarily) the workspace `.vscode/mcp.json` during the transition.
 
 ---
 

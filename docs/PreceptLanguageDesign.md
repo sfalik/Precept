@@ -16,6 +16,7 @@ Backwards compatibility is **not** a requirement for this design.
 - **Tooling-friendly**: keyword-anchored statements, deterministic parse, predictable IntelliSense.
 - **Keyword-anchored flat statements**: every statement begins with a recognizable keyword — no section headers, no indentation. The parser and language server rely on keyword anchoring alone.
 - **Explicit nullability**: use `nullable` rather than punctuation-based null markers.
+- **Compile-time-first semantics**: catch authoring mistakes as early as possible. Type, scope, nullability, and structural workflow errors should fail at compile time whenever the compiler can prove them soundly.
 
 ## Design Philosophy
 
@@ -35,13 +36,15 @@ These principles have driven every syntax and semantics decision:
 
 7. **Self-contained rows.** Each transition row is independently readable. No shared context with sibling rows — if a mutation appears in two rows, it's explicit in both.
 
-8. **Sound static analysis only.** Compile-time checks never produce false positives. If the checker can't prove a contradiction, it assumes satisfiable. Exotic cases get a pass; the inspector catches the rest via simulation.
+8. **Sound, compile-time-first static analysis.** Compile-time checking is a product feature, not an implementation detail. The DSL should reject real semantic mistakes early, but never guess. If the checker can't prove a contradiction, it assumes satisfiable. Exotic or data-dependent cases get a pass; the inspector catches the rest via simulation.
 
 9. **Tooling drives syntax.** IntelliSense, diagnostics, and preview are first-class design constraints. Keyword anchoring enables predictable suggestions. The language server uses semantic ordering to prioritize completions based on what has already been declared. Syntax choices that degrade the tooling experience are rejected even if they're more concise.
 
 10. **Consistent prepositions.** `from`, `to`, `in`, `on` carry the same meaning everywhere they appear. `from` = leaving a state. `to` = entering a state. `in` = while in a state. `on` = when an event fires. The token after the identifier (`assert`, `->`, `on`, body keywords) determines the kind of statement — the preposition's meaning never changes.
 
 11. **`->` means "do something."** The arrow introduces an action — a mutation, an outcome, or a side effect. It separates the *context* (what state, what event, what condition) from the *action* (what to do about it). Sequential execution, read-your-writes. Uniform across transition rows and state entry/exit actions.
+
+12. **AI is a first-class consumer.** The DSL is readable by humans and writable by hand, but its properties are chosen to make AI authoring reliable. Deterministic semantics (no hidden state, no side effects) mean an AI can reason about outcomes. Keyword-anchored flat statements mean an AI can parse and generate without tracking indentation context. Structured tool APIs (MCP) return typed JSON that an AI can validate, audit, and iterate against without human feedback. The language reference itself is queryable as data (`precept_language`), so the AI never relies on training-data recall for syntax. The intended workflow: a domain expert describes intent, the AI authors the precept, and the toolchain closes the correctness loop.
 
 ## Non-Goals
 
@@ -545,7 +548,8 @@ Uniqueness:
 Scope (Locked):
 - `<BoolExpr>` may reference **only** that event’s argument identifiers.
 - Dotted access on args is permitted if the underlying expression language supports it (e.g., `items.count`).
-- Referencing any non-arg identifier is a parse/validation error.
+- Referencing any non-arg identifier (including fields) is a parse/validation error.
+- Validation that combines event args with field state belongs in `when` guards on transition rows, not in event asserts. Event asserts answer "is this event well-formed?" — `when` guards answer "does this event apply given the current state?"
 
 Semantics (Locked ordering):
 - Event asserts run **before** transition selection.
@@ -662,11 +666,14 @@ If Row 1's `when` is true, it wins. Otherwise Row 2 (no `when`) catches the rest
 
 Actions execute left-to-right with read-your-writes — each action sees the results of prior actions.
 
-### Expression scope in transitions
+### Expression scope in transitions (Locked)
 
-- `when` guards: fields + event args (`EventName.ArgName`)
-- `set` / mutation RHS: fields + event args (`EventName.ArgName`)
-- Event arg access via dotted form: `Submit.items`, `Cancel.reason`
+- `when` guards: fields + event args (dotted form only: `EventName.ArgName`)
+- `set` / mutation RHS: fields + event args (dotted form only: `EventName.ArgName`)
+- Bare arg names (e.g., `reason` instead of `Cancel.reason`) are **not valid** in transition rows — they could collide with field names and are ambiguous when multiple events share arg names.
+- Bare arg names are valid only inside event asserts (`on <Event> assert`), where scope is arg-only and no collision is possible.
+- Narrowing applies to the exact symbol form used. In transition guards, `when Cancel.reason != null` narrows the dotted key `Cancel.reason`; no cross-form mirroring is needed.
+- Cross-event arg references are invalid: a row for `on EventA` cannot reference `EventB.Arg`.
 
 ### Execution pipeline
 
@@ -687,11 +694,24 @@ For `no transition`: steps 3 and 5 are skipped (no state change). `in <State>` a
 |---|---|---|
 | Coverage | Reachable `(state, event)` pair has no transition rows | Warning |
 | Unreachable row | A row follows an unguarded row for the same `(state, event)` | Error |
+| Identical-guard duplicate | A row has the same guard as a prior row for the same `(state, event)` | Error |
 | Missing outcome | Row has no outcome (`transition`, `no transition`, or `reject`) | Error |
 | Unknown state/event | `from` references undeclared state; `on` references undeclared event | Error |
 | Unknown field | `set` targets undeclared field; mutation targets non-collection field | Error |
 
 No catch-all row is required — if all guarded rows fail, the result is `NotApplicable`.
+
+### Diagnostic severity policy (Locked)
+
+All diagnostics follow a three-tier severity model:
+
+| Severity | Meaning | Examples |
+|---|---|---|
+| **Error** | Provably wrong — the checker can prove a contradiction from types, null-flow, or structural rules. Blocks compilation. | Type mismatches (C39–C41), null-flow violations (C42), unknown identifiers (C38), unreachable rows, identical-guard duplicates, missing outcomes |
+| **Warning** | Probably wrong — structural quality issue that is almost certainly a mistake but could be intentional. Does not block compilation. | Reject-only state/event pairs, events that never succeed, unreachable states, orphaned events, missing coverage |
+| **Hint** | Informational — observation that may or may not indicate a problem. | Dead-end states, empty precept (no events) |
+
+The rule: if the checker can **prove** it, it’s an **error**. If the analyzer can **observe** a structural concern, it’s a **warning** or **hint**. The checker never guesses — uncertain cases are left to the inspector.
 
 ### Focused example
 
@@ -786,6 +806,17 @@ in Draft edit Email
 
 The compiler performs expression-level type checking as a compile-blocking phase. All expression positions are validated against a `StaticValueKind` type system (`string`, `number`, `boolean`, `null`, and unions thereof).
 
+### Why this is a key DSL strength
+
+Precept is not meant to be a thin syntax wrapper over runtime behavior. A major part of the DSL's value is that workflows can be validated *before* they are fired:
+
+- invalid identifier references should be rejected before runtime
+- incompatible operator usage should be rejected before runtime
+- nullable-to-non-nullable flows should be rejected unless the DSL makes the narrowing explicit
+- scope mistakes should be rejected where they are authored, not discovered during preview or fire
+
+This matches the broader design direction of explicit null handling and deterministic tooling. Authors should be able to trust that a green compile means the workflow is semantically coherent within the set of rules the compiler claims to understand.
+
 ### What is checked
 
 | Expression position | Expected type | Symbol scope |
@@ -808,6 +839,40 @@ Narrowing sources:
 - **Cross-row negation:** An unguarded row following a `when Field != null` row inherits the negation — `Field` remains `T|null`.
 - **State assert propagation:** `in State assert Field != null` narrows `Field` to `T` for all `from State on ...` transition rows and `to`/`from State -> ...` state actions.
 
+### Equality and null-comparison policy (Locked)
+
+Equality is compile-checked strictly. `==` and `!=` are valid only for **compatible** operand kinds. Precept does not perform implicit coercions for equality.
+
+Compatible operand rules:
+
+1. Both operands are from the same scalar family (`string`, `number`, or `boolean`), with `null` optionally present on either side.
+2. One operand is `null` and the other operand is a nullable scalar.
+3. Both operands are `null`.
+
+Rejected at compile time:
+
+- cross-family comparisons such as `number == string`, `boolean == number`, or `string == boolean`
+- comparisons between `null` and a non-nullable scalar
+- any equality comparison where one side cannot be resolved to a known compatible kind
+
+This means:
+
+- `Name == "x"` is valid when `Name` is `string` or `string nullable`
+- `Count == 0` is valid when `Count` is `number` or `number nullable`
+- `IsOpen == true` is valid when `IsOpen` is `boolean` or `boolean nullable`
+- `Name == null` is valid only when `Name` is `string nullable`
+- `Count == null` is valid only when `Count` is `number nullable`
+- `IsOpen == null` is valid only when `IsOpen` is `boolean nullable`
+- `Balance == "0"` is invalid
+- `Flag == 1` is invalid
+- `NonNullableName == null` is invalid
+
+Runtime semantics must match the compile-time rule:
+
+- same-family non-null values compare by value
+- nullable comparisons are allowed only when the types are compatible
+- no string/number/boolean coercion is ever performed
+
 ### `from any` expansion
 
 Type checking for `from any` rows expands to per-state checking. Each state may have different assert-derived narrowings, so a row that type-checks in one state may fail in another. Diagnostics report the specific state that has the problem.
@@ -825,11 +890,31 @@ Type checking for `from any` rows expands to per-state checking. Each state may 
 
 ### Design principle
 
-Per philosophy #8 ("Sound static analysis only"), compile-time type checks never produce false positives. If the checker reports an error, it is a real type violation. This is achieved by conservative narrowing — narrowing only applies when the guard condition structurally guarantees the refinement.
+Per philosophy #8, compile-time type checks never produce false positives. If the checker reports an error, it is a real type violation. This is achieved by conservative narrowing — narrowing only applies when the guard condition structurally guarantees the refinement.
 
 ### Implementation boundary
 
 The type checker is internal infrastructure (`PreceptTypeChecker`), not a public semantic model. It produces diagnostics and a `TypeContext` consumed by the compiler, language server, and MCP tools. There is no caching layer or incremental analysis — the checker runs from scratch on each invocation. This is sufficient for the current DSL scale and avoids premature abstraction.
+
+### Planned expansion areas (not yet locked)
+
+The current type-checking surface is intentionally conservative and already compile-blocking, but there are additional areas where the language likely wants stronger early validation.
+
+| Area | Current behavior | Likely direction |
+|---|---|---|
+| Event-arg scope and narrowing (Locked) | Transition rows require dotted form (`Event.Arg`); event asserts use bare arg names. Narrowing applies to exact symbol form. | No design change needed — enforce dotted-only in transition row symbol tables and add tests |
+| Event-assert scope isolation (Locked) | Event asserts are arg-only; field references are a compile-time error (C14/C15/C16) | No change needed — arg+state validation belongs in `when` guards, not event asserts |
+| Boolean-only rule positions | `when`, `assert`, and `invariant` are expected to produce boolean | Continue hardening so every non-boolean rule position is rejected uniformly |
+| Collection mutation contracts (Locked) | Inner-type and `into` checks exist; nullable values require explicit narrowing | No change needed — existing C42 null-flow violation enforces this consistently across all collection verbs |
+| Provable impossible conditions (Locked) | Type and null-flow reasoning catches non-nullable null comparisons and post-narrowing contradictions; identical-guard duplicate rows are detectable | No cross-field or arithmetic reasoning. Inspector handles data-dependent impossibility. Add identical-guard duplicate detection as a compile-time error. |
+
+### Design questions to finalize before widening the checker
+
+All policy questions for the current compile-time expansion wave have been locked. No open design questions remain for Phases D–G.
+
+### Diagnostic code policy (Locked)
+
+Overload an existing code when the new condition is the same conceptual error category. Introduce a new code only for genuinely new categories. Existing codes C38–C43 are stable — the message text within each code provides specificity. New codes start at C44.
 
 ---
 
@@ -859,6 +944,12 @@ Locked in this discussion:
 - Coverage warning (not error) for reachable `(state, event)` pairs without transition rows
 - Unreachable row after unguarded row = compile-time error
 - Editable field declarations: `in <StateTarget> edit <FieldList>` — flat comma-separated syntax, `in` preposition (consistent with "while residing in"), additive across declarations, `any` support. Syntax and model included in language redesign; runtime `Update` API deferred (see `docs/EditableFieldsDesign.md`).
+- Collection mutation nullability: `add`/`enqueue`/`push`/`remove` with a `T|null` value into a non-nullable collection require prior narrowing. The shared type checker enforces this via C42 (null-flow violation). Guard narrowing (`when Value != null`) and cross-branch narrowing (prior row handles null case) both satisfy the requirement.
+- Event-arg reference form: transition rows (guards, set RHS, mutation values) require the dotted form (`EventName.ArgName`). Bare arg names are valid only inside event asserts (`on <Event> assert`), where scope is arg-only. Narrowing applies to the exact symbol form used — no cross-form mirroring. Cross-event arg references (`EventB.Arg` in a row for `EventA`) are invalid.
+- Event-assert scope: permanently arg-only. Field references in event asserts are a compile-time error (C14/C15/C16). Validation combining event args with field state belongs in `when` guards, not event asserts.
+- Static impossibility boundary: the compile-time checker proves contradictions only from type information and null-flow narrowing (single-symbol, local reasoning). Additionally, identical-guard duplicate rows for the same `(state, event)` are a compile-time error. No cross-field arithmetic reasoning — the inspector handles data-dependent impossibility.
+- Diagnostic severity: three-tier model. **Error** = provably wrong (blocks compilation). **Warning** = structural quality concern (does not block). **Hint** = informational observation. The checker never guesses; uncertain cases are left to the inspector.
+- Diagnostic codes: overload existing codes for same conceptual category; new codes only for genuinely new categories. C38–C43 are stable and will not be split. New codes start at C44.
 
 Not yet locked:
 - Full EBNF and tokenization rules

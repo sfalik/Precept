@@ -22,7 +22,7 @@
             }
         },
         {
-            "label": "extension: loop local install",
+            "label": "extension: install",
             "type": "shell",
             "command": "npm",
             "args": [
@@ -35,7 +35,7 @@
             "problemMatcher": []
         },
         {
-            "label": "extension: loop local uninstall",
+            "label": "extension: uninstall",
             "type": "shell",
             "command": "npm",
             "args": [
@@ -48,37 +48,24 @@
             "problemMatcher": []
         },
         {
-            "label": "extension: watch",
+            "label": "plugin: enable",
             "type": "shell",
-            "command": "npm",
+            "command": "node",
             "args": [
-                "run",
-                "dev:watch"
+                "${workspaceFolder}/tools/scripts/toggle-plugin.js",
+                "--enable"
             ],
-            "options": {
-                "cwd": "${workspaceFolder}/tools/Precept.VsCode"
-            },
-            "isBackground": true,
-            "problemMatcher": [
-                {
-                    "owner": "typescript",
-                    "fileLocation": "relative",
-                    "pattern": {
-                        "regexp": "^(.*)\\((\\d+),(\\d+)\\):\\s+(error|warning)\\s+(TS\\d+):\\s+(.*)$",
-                        "file": 1,
-                        "line": 2,
-                        "column": 3,
-                        "severity": 4,
-                        "code": 5,
-                        "message": 6
-                    },
-                    "background": {
-                        "activeOnStart": true,
-                        "beginsPattern": "Starting compilation in watch mode",
-                        "endsPattern": "Found\\s+\\d+\\s+errors?\\.\\s+Watching for file changes"
-                    }
-                }
-            ]
+            "problemMatcher": []
+        },
+        {
+            "label": "plugin: disable",
+            "type": "shell",
+            "command": "node",
+            "args": [
+                "${workspaceFolder}/tools/scripts/toggle-plugin.js",
+                "--disable"
+            ],
+            "problemMatcher": []
         }
     ]
 }

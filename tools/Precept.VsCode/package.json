@@ -86,7 +86,7 @@
     "mcpServerDefinitionProviders": [
       {
         "id": "precept.mcpServer",
-        "label": "Precept MCP"
+        "label": "Precept"
       }
     ],
     "configuration": {

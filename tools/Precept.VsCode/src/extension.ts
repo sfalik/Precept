@@ -1168,7 +1168,7 @@ function registerMcpServerProvider(context: vscode.ExtensionContext): void {
 
         return [
           new vscode.McpStdioServerDefinition(
-            "Precept MCP",
+            "Precept",
             serverPath,
             [],
             {},

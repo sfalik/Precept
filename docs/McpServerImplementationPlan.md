@@ -6,6 +6,8 @@ Prerequisite: Language redesign complete (`docs/PreceptLanguageImplementationPla
 
 This plan builds the MCP server as a new project in `tools/Precept.Mcp/`. Each phase adds one tool, fully tested, before moving to the next. The core `src/Precept/` infrastructure (catalogs, parser, runtime) is already in place from the language redesign — this plan only adds tool wrappers and MCP transport.
 
+Planning update (2026-03-22): the distribution phases now target an **agent plugin** for MCP server, custom agent, and skills — instead of the earlier approach where the VS Code extension bundled MCP and scaffolded skills into the workspace. The plugin model eliminates all scaffolding; Copilot discovers plugin-provided agents, skills, and MCP servers automatically. The VS Code extension retains only editor features (language server, syntax highlighting, preview panel, commands).
+
 ---
 
 ## Guiding Principles
@@ -14,6 +16,7 @@ This plan builds the MCP server as a new project in `tools/Precept.Mcp/`. Each p
 2. **Thin wrappers.** Tools call existing core APIs (`PreceptParser`, `PreceptCompiler`, `PreceptEngine`, catalogs). No domain logic in the MCP project.
 3. **Structured JSON output.** Every tool returns well-typed JSON so Copilot can reason about results programmatically — no prose-only responses.
 4. **Test every tool in isolation.** Each tool gets integration tests that call the tool method directly (no MCP transport overhead). Asserts on JSON shape and semantic correctness.
+5. **Plugin for Copilot, extension for editor.** The MCP server, agent, and skills ship as a Copilot agent plugin — separate from the VS Code extension. The extension retains only editor features. No scaffolding of workspace files.
 
 ---
 
@@ -316,51 +319,110 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 
 ---
 
-## Phase 7: VS Code Registration + Integration
+## Phase 7: Agent Plugin Structure + MCP Packaging
 
-**Goal:** The six tools are callable by Copilot in agent mode from VS Code with zero manual setup.
+**Goal:** Create the agent plugin directory structure with MCP server binaries, so the six tools are callable by Copilot with zero manual setup after plugin installation.
 
 ### Steps
 
-- [ ] Add MCP server entry to `tools/Precept.VsCode/package.json`:
-
-```json
-"mcpServers": {
-  "precept": {
-    "command": "dotnet",
-    "args": ["run", "--project", "${workspaceFolder}/tools/Precept.Mcp"],
-    "type": "stdio"
+- [ ] Create plugin directory structure at `tools/Precept.Plugin/`:
+  ```
+  tools/Precept.Plugin/
+  ├── .github/plugin/
+  │   └── plugin.json
+  ├── agents/
+  ├── skills/
+  │   ├── precept-authoring/
+  │   └── precept-debugging/
+  ├── .mcp.json
+  └── README.md
+  ```
+- [ ] Create `plugin.json` with name, description, version, agents, and skills arrays
+- [ ] Create dev `.mcp.json` referencing the shared launcher script:
+  ```json
+  {
+    "mcpServers": {
+      "precept": {
+        "command": "node",
+        "args": ["../../scripts/start-precept-mcp.js"]
+      }
+    }
   }
-}
-```
-
-- [ ] Verify `dotnet run --project tools/Precept.Mcp` starts cleanly and responds to MCP `initialize` + `tools/list` requests
-- [ ] End-to-end test: in a VS Code window with the extension loaded, Copilot can list and call all six tools
-- [ ] Verify tool descriptions appear in Copilot's tool list
+  ```
+- [ ] Move the MCP launcher script from `tools/Precept.VsCode/scripts/start-precept-mcp.js` to `tools/scripts/start-precept-mcp.js` and update `.vscode/mcp.json` to reference the new location
+- [ ] Create `tools/scripts/toggle-plugin.js` — reads/writes `chat.pluginLocations` in `.vscode/settings.json`
+- [ ] Add `plugin: enable` and `plugin: disable` tasks to `.vscode/tasks.json`
+- [ ] Rename existing extension tasks: `extension: loop local install` → `extension: install`, `extension: loop local uninstall` → `extension: uninstall`
+- [ ] Remove the `extension: watch` task (unused in the local install loop)
+- [ ] Test locally using `chat.pluginLocations` setting pointing to the plugin directory
+- [ ] Verify Copilot lists all 6 precept tools from the plugin's MCP server
 - [ ] Test with at least 2 sample files per tool
 
 ### Checkpoint
 
-- Extension loads without errors
-- Copilot lists 6 precept tools
-- `precept_validate`, `precept_schema`, and `precept_run` produce correct results on `samples/bugtracker.precept`
+- Plugin loads without errors when registered via `chat.pluginLocations`
+- Copilot lists 6 precept tools from the plugin's MCP server
+- `precept_validate`, `precept_schema`, and `precept_run` produce correct results
+- Dev tasks (`extension: install`, `extension: uninstall`, `plugin: enable`, `plugin: disable`) work correctly
+- `.vscode/mcp.json` references the moved launcher at `tools/scripts/start-precept-mcp.js`
 
 ---
 
-## Phase 8: Documentation
+## Phase 8: Agent and Skill Content
 
-**Goal:** README and design docs reflect the MCP server as implemented.
+**Goal:** Draft and test the Precept Author agent and two companion skills that ship inside the agent plugin.
+
+### Steps
+
+- [ ] Draft `agents/precept-author.md` with:
+    - YAML frontmatter: name, description, tools restricted to `read`, `edit`, `search`, and all `precept/*` MCP tools
+    - Body instructions: opinionated authoring workflow, `precept_language` as DSL authority, mandatory validate → audit → inspect loop
+    - Handoff to debugging skill for diagnosis workflows
+- [ ] Draft `skills/precept-authoring/SKILL.md` with:
+    - Frontmatter: name `precept-authoring`, description with explicit trigger phrases
+    - Body: step-by-step creation/editing workflow using MCP tools in prescribed order
+    - Repo-agnostic: no assumption that `samples/` exists; prefer local `.precept` files for convention matching, fall back to `precept_language`
+    - Mermaid Diagrams section: after creating/editing a precept, include a `stateDiagram-v2` diagram of the resulting state machine; use `precept_schema` for transition data
+- [ ] Draft `skills/precept-debugging/SKILL.md` with:
+    - Frontmatter: name `precept-debugging`, description with explicit trigger phrases
+    - Body: diagnosis workflow using `precept_schema` → `precept_validate` → `precept_audit` → `precept_inspect` → `precept_run`
+    - Mermaid Diagrams section: when explaining structure or transition behavior, include a focused `stateDiagram-v2` showing only the relevant subset; annotate guards in brackets, mark reject branches, annotate audit findings (unreachable/dead-end states)
+- [ ] Validate all files against the [Agent Skills specification](https://agentskills.io/specification):
+    - `name` lowercase kebab-case, matches parent directory, max 64 chars
+    - `description` max 1024 chars, specific and trigger-oriented
+    - `SKILL.md` body under 500 lines
+- [ ] Test the agent by selecting it from the agents dropdown and authoring a precept from scratch
+- [ ] Test skills via `/precept-authoring` and `/precept-debugging` slash commands
+- [ ] Verify the agent and skills discover and invoke MCP tools in the correct order
+
+### Checkpoint
+
+- The agent appears in the agents dropdown when plugin is loaded locally
+- Both skills appear in the `/` slash command menu
+- Agent correctly restricts its tool set and follows the prescribed workflow
+- Skills are valid markdown with valid YAML frontmatter per agentskills.io spec
+
+---
+
+## Phase 9: Documentation + Distribution
+
+**Goal:** README and design docs reflect the agent plugin distribution model. Plugin is published to a distribution channel.
 
 ### Steps
 
 - [ ] Update `README.md`:
   - Add MCP Server section describing the 6 tools and how to use them
-  - Add setup instructions (the `mcpServers` entry happens automatically via the extension)
-  - Update Current Status to include MCP server
+    - Add setup instructions: install the Precept agent plugin (marketplace or Git URL)
+    - Document the Precept Author agent and companion skills
+  - Update Current Status to include MCP server and agent plugin
 - [ ] Update `docs/McpServerDesign.md`:
-  - Mark as "Implemented" with date
-  - Note any deviations from the original design discovered during implementation
+    - Ensure plugin distribution model is accurately documented
 - [ ] Verify `docs/CatalogInfrastructureDesign.md` cross-references are still accurate
+- [ ] Remove `registerMcpServerDefinitionProvider()` from VS Code extension (MCP now lives in plugin)
+- [ ] Remove `mcpServerDefinitionProviders` contribution from `tools/Precept.VsCode/package.json`
+- [ ] Remove `Precept Dev` entry from `.vscode/mcp.json` (MCP is now provided by the plugin)
+- [ ] Update distribution `.mcp.json` to use `dotnet tool run precept-mcp` (CI rewrites the dev launcher form)
+- [ ] Publish plugin to a distribution channel (Git repo for direct install, and/or submit to `awesome-copilot`)
 - [ ] Add MCP sync rule to `.github/copilot-instructions.md`:
 
 **MCP Tool Sync** (new section in copilot-instructions):
@@ -372,9 +434,12 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 ### Checkpoint
 
 - README accurately describes all 6 tools
+- README accurately describes agent plugin installation and Precept Author agent
 - No aspirational claims presented as implemented
-- Design doc marked as implemented
+- Design doc documents plugin distribution model accurately
 - Copilot-instructions includes MCP Tool Sync section
+- Extension no longer registers MCP server provider
+- Plugin is published and installable
 
 ---
 
@@ -397,11 +462,22 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 | `test/Precept.Mcp.Tests/RunToolTests.cs` | **New** | 4 |
 | `test/Precept.Mcp.Tests/LanguageToolTests.cs` | **New** | 5 |
 | `test/Precept.Mcp.Tests/InspectToolTests.cs` | **New** | 6 |
-| `tools/Precept.VsCode/package.json` | **Edit** — add `mcpServers` entry | 7 |
+| `tools/Precept.VsCode/package.json` | **Edit** — remove MCP provider contributions | 9 |
+| `tools/Precept.VsCode/src/extension.ts` | **Edit** — remove MCP provider registration | 9 |
+| `tools/Precept.Plugin/.github/plugin/plugin.json` | **New** — plugin metadata | 7 |
+| `tools/Precept.Plugin/.mcp.json` | **New** — MCP server definition (dev: launcher, dist: dotnet tool) | 7 |
+| `tools/Precept.Plugin/agents/precept-author.md` | **New** — Precept Author custom agent | 8 |
+| `tools/Precept.Plugin/skills/precept-authoring/SKILL.md` | **New** — authoring workflow skill | 8 |
+| `tools/Precept.Plugin/skills/precept-debugging/SKILL.md` | **New** — debugging workflow skill | 8 |
+| `tools/Precept.Plugin/README.md` | **New** — plugin documentation | 8 |
+| `tools/scripts/start-precept-mcp.js` | **Move** from `tools/Precept.VsCode/scripts/` | 7 |
+| `tools/scripts/toggle-plugin.js` | **New** — toggle `chat.pluginLocations` in workspace settings | 7 |
+| `.vscode/tasks.json` | **Edit** — rename extension tasks, remove watch, add plugin tasks | 7 |
+| `.vscode/mcp.json` | **Edit** — update launcher path; remove in Phase 9 | 7, 9 |
 | `Precept.slnx` | **Edit** — add `Precept.Mcp` project | 0 |
-| `README.md` | **Edit** — MCP server section | 8 |
-| `docs/McpServerDesign.md` | **Edit** — mark implemented | 8 |
-| `.github/copilot-instructions.md` | **Edit** — add MCP Tool Sync section | 8 |
+| `README.md` | **Edit** — MCP server and Copilot skill setup section | 9 |
+| `docs/McpServerDesign.md` | **Edit** — packaging and skill delivery design | 9 |
+| `.github/copilot-instructions.md` | **Edit** — add MCP Tool Sync section | 9 |
 
 ## Dependency Graph
 
@@ -420,12 +496,16 @@ Phase 5: precept_language (catalogs — zero file dependency, could be any order
     ↓
 Phase 6: precept_inspect (PreceptEngine.Inspect — builds on Phase 4's runtime knowledge)
     ↓
-Phase 7: VS Code registration
+Phase 7: Agent plugin structure + MCP packaging
     ↓
-Phase 8: Documentation
+Phase 8: Agent and skill content (can be drafted in parallel with 1-6)
+    ↓
+Phase 9: Documentation + distribution
 ```
 
 Phases 5 and 6 are interchangeable. Phase 5 (`precept_language`) has no dependency on any other tool and could be implemented at any point after Phase 0. It's placed here so the more commonly used tools (`validate`, `schema`, `audit`, `run`) are built first.
+
+Phase 8 (agent and skill content) is markdown-only work that can proceed in parallel with any of Phases 1-6. However, testing the skills against MCP tools requires Phase 6 to be complete. Phase 7 requires the MCP binary build from Phase 6. Phase 9 depends on both 7 and 8.
 
 ## Estimated Scope
 
@@ -438,9 +518,10 @@ Phases 5 and 6 are interchangeable. Phase 5 (`precept_language`) has no dependen
 | 4. `precept_run` | ~100 | Low (thin wrapper over engine) |
 | 5. `precept_language` | ~200 | Low (reflection + static data) |
 | 6. `precept_inspect` | ~130 | Low-Medium (arg detection logic) |
-| 7. VS Code registration | ~10 | Low |
-| 8. Documentation | ~150 | Low |
-| **Total** | **~970** | |
+| 7. Agent plugin structure + MCP packaging | ~80 | Low-Medium (launcher move + toggle script) |
+| 8. Agent and skill content | ~300 | Medium (prompt engineering) |
+| 9. Documentation + distribution | ~180 | Low |
+| **Total** | **~1,210** | |
 
 ---
 
@@ -456,12 +537,15 @@ Use this prompt to begin implementation in a new Copilot Chat session:
 >
 > Then:
 >
-> 1. Execute the phases in order (0 through 8), committing at each checkpoint.
+> 1. Execute the phases in order (0 through 9), committing at each checkpoint.
 > 2. Each phase must end with `dotnet build` and `dotnet test` passing before moving to the next.
 > 3. Tools are **thin wrappers** — all domain logic lives in `src/Precept/`. The MCP project calls `PreceptParser`, `PreceptCompiler`, `PreceptEngine`, `ConstructCatalog`, and `ConstraintCatalog` directly.
 > 4. Every tool returns structured JSON — no prose-only responses.
 > 5. Every tool has integration tests in `test/Precept.Mcp.Tests/` that call the tool method directly (no MCP transport).
 > 6. For `precept_language` (Phase 5), vocabulary comes from reflecting token enum attributes, constructs from `ConstructCatalog.Constructs`, and constraints from `ConstraintCatalog.Constraints`. The static sections (`expressionScopes`, `firePipeline`, `outcomeKinds`) are constant arrays in the tool class.
-> 7. Follow the project's copilot-instructions (`.github/copilot-instructions.md`) for documentation sync — update README and design docs in Phase 8.
+> 7. For the agent plugin (Phase 7), create the plugin directory structure at `tools/Precept.Plugin/` with `plugin.json` and dev `.mcp.json` (launcher-based). Move the MCP launcher script to `tools/scripts/start-precept-mcp.js`. Create the `toggle-plugin.js` script and add `plugin: enable`/`plugin: disable` tasks. Rename extension tasks (`extension: install`, `extension: uninstall`) and remove `extension: watch`.
+> 8. For agent and skill content (Phase 8), follow the [Agent Skills specification](https://agentskills.io/specification) for SKILL.md format and the [VS Code custom agents docs](https://code.visualstudio.com/docs/copilot/customization/custom-agents) for the agent file format.
+> 9. In Phase 9, remove the MCP server registration from the VS Code extension (`registerMcpServerDefinitionProvider` and `mcpServerDefinitionProviders` in package.json), remove `Precept Dev` from `.vscode/mcp.json`, rewrite the plugin's `.mcp.json` for distribution (`dotnet tool run precept-mcp`), and update README and design docs.
+> 10. Follow the project's copilot-instructions (`.github/copilot-instructions.md`) for documentation sync.
 >
 > Begin with Phase 0: create the project scaffolding and add it to the solution.
