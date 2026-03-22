@@ -181,7 +181,7 @@ Per `McpServerDesign.md § precept_schema`. Input: `{ "path": "..." }`. Output: 
 2. BFS from `initialState` → `reachableStates`.
 3. `unreachableStates` = all states − reachable states.
 4. `terminalStates` = states with zero outgoing transitions.
-5. `deadEndStates` = non-terminal states where all outgoing rows have `NoTransition` or `Rejection` outcomes only.
+5. `deadEndStates` = non-terminal states where all outgoing rows have `NoTransition` or `Rejected` outcomes only.
 6. `orphanedEvents` = declared events not referenced in any transition row.
 7. `warnings` = human-readable descriptions for any non-empty problem sets.
 
@@ -226,7 +226,7 @@ Per `McpServerDesign.md § precept_run`. Input: `{ path, initialData?, steps }`.
 
 ### Tests
 
-- [ ] Happy path (all steps Accepted) → correct final state/data, `abortedAt` null
+- [ ] Happy path (all steps Transition/NoTransition) → correct final state/data, `abortedAt` null
 - [ ] Step rejected mid-sequence → `abortedAt` set, earlier steps present, later steps absent
 - [ ] Step with `Undefined` → aborted with explanation
 - [ ] Empty steps array → immediate return with initial state as final
