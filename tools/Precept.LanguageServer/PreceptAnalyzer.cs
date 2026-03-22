@@ -567,7 +567,7 @@ internal sealed class PreceptAnalyzer
         if (scope is null)
             return null;
 
-        var expectedKind = MapCollectionInnerTypeKind(target.InnerType);
+        var expectedKind = PreceptTypeChecker.MapScalarType(target.InnerType);
         var baseline = BuildExpressionCompletions(
             model.Fields.Select(static field => field.Name).ToArray(),
             currentEvent,
@@ -589,7 +589,7 @@ internal sealed class PreceptAnalyzer
         if (!collectionInnerTypes.TryGetValue(collectionFieldName, out var innerType))
             return null;
 
-        var innerKind = MapCollectionInnerTypeKind(innerType);
+        var innerKind = PreceptTypeChecker.MapScalarType(innerType);
         if (innerKind == StaticValueKind.None)
             return null;
 
@@ -630,7 +630,7 @@ internal sealed class PreceptAnalyzer
         IReadOnlyDictionary<string, PreceptCollectionKind> collectionKinds)
     {
         if (item.Kind == CompletionItemKind.Constant)
-            return TryGetLiteralKind(item.Label, out var literalKind) && PreceptTypeChecker.IsAssignableKind(literalKind, expectedKind);
+            return PreceptTypeChecker.TryGetLiteralKind(item.Label, out var literalKind) && PreceptTypeChecker.IsAssignableKind(literalKind, expectedKind);
 
         if (item.Kind == CompletionItemKind.Module)
             return true;
@@ -671,32 +671,6 @@ internal sealed class PreceptAnalyzer
 
         fieldName = string.Empty;
         return false;
-    }
-
-    private static StaticValueKind MapCollectionInnerTypeKind(PreceptScalarType innerType)
-        => innerType switch
-        {
-            PreceptScalarType.String => StaticValueKind.String,
-            PreceptScalarType.Number => StaticValueKind.Number,
-            PreceptScalarType.Boolean => StaticValueKind.Boolean,
-            _ => StaticValueKind.None
-        };
-
-    private static bool TryGetLiteralKind(string label, out StaticValueKind kind)
-    {
-        switch (label)
-        {
-            case "true":
-            case "false":
-                kind = StaticValueKind.Boolean;
-                return true;
-            case "null":
-                kind = StaticValueKind.Null;
-                return true;
-            default:
-                kind = StaticValueKind.None;
-                return false;
-        }
     }
 
     private static bool TryGetCollectionName(string label, out string collectionName)

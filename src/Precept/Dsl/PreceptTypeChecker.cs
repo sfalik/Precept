@@ -115,6 +115,25 @@ internal static class PreceptTypeChecker
 
     internal static StaticValueKind MapFieldContractKind(PreceptEventArg arg) => MapKind(arg.Type, arg.IsNullable);
 
+    internal static StaticValueKind MapScalarType(PreceptScalarType type) => MapScalarTypeToKind(type);
+
+    internal static bool TryGetLiteralKind(string label, out StaticValueKind kind)
+    {
+        switch (label)
+        {
+            case "true":
+            case "false":
+                kind = StaticValueKind.Boolean;
+                return true;
+            case "null":
+                kind = StaticValueKind.Null;
+                return true;
+            default:
+                kind = StaticValueKind.None;
+                return false;
+        }
+    }
+
     internal static bool IsAssignableKind(StaticValueKind actual, StaticValueKind expected) => IsAssignable(actual, expected);
 
     internal static string FormatKinds(StaticValueKind kinds)
