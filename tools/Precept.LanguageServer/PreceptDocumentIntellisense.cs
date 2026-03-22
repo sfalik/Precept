@@ -38,6 +38,8 @@ internal static class PreceptDocumentIntellisense
                 StringComparer.Ordinal)
             : CollectEventArgs(lines);
         var collectionKinds = BuildCollectionKinds(model, lines);
+        var collectionInnerTypes = BuildCollectionInnerTypes(model, lines);
+        var fieldTypeKinds = BuildFieldTypeKinds(model, lines);
         var declarations = BuildDeclarations(lines, model);
         var documentSymbols = BuildDocumentSymbols(lines, model, declarations);
 
@@ -51,6 +53,8 @@ internal static class PreceptDocumentIntellisense
             collections,
             eventArgs,
             collectionKinds,
+            collectionInnerTypes,
+            fieldTypeKinds,
             declarations,
             documentSymbols);
     }
@@ -712,6 +716,59 @@ internal static class PreceptDocumentIntellisense
         return kinds;
     }
 
+    private static IReadOnlyDictionary<string, PreceptScalarType> BuildCollectionInnerTypes(PreceptDefinition? model, string[] lines)
+    {
+        if (model is not null)
+        {
+            return model.CollectionFields.ToDictionary(
+                static field => field.Name,
+                static field => field.InnerType,
+                StringComparer.Ordinal);
+        }
+
+        var types = new Dictionary<string, PreceptScalarType>(StringComparer.Ordinal);
+        foreach (var line in lines)
+        {
+            var match = CollectionFieldDeclRegex.Match(line);
+            if (!match.Success)
+                continue;
+
+            types[match.Groups["name"].Value] = ParseScalarType(match.Groups["type"].Value);
+        }
+
+        return types;
+    }
+
+    private static IReadOnlyDictionary<string, StaticValueKind> BuildFieldTypeKinds(PreceptDefinition? model, string[] lines)
+    {
+        if (model is not null)
+        {
+            return model.Fields.ToDictionary(
+                static field => field.Name,
+                PreceptTypeChecker.MapFieldContractKind,
+                StringComparer.Ordinal);
+        }
+
+        var kinds = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
+        foreach (var line in lines)
+        {
+            var match = FieldDeclRegex.Match(line);
+            if (!match.Success)
+                continue;
+
+            var kind = ParseScalarType(match.Groups["type"].Value) switch
+            {
+                PreceptScalarType.String => StaticValueKind.String,
+                PreceptScalarType.Number => StaticValueKind.Number,
+                PreceptScalarType.Boolean => StaticValueKind.Boolean,
+                _ => StaticValueKind.None
+            };
+            kinds[match.Groups["name"].Value] = kind;
+        }
+
+        return kinds;
+    }
+
     private static string[] CollectIdentifiers(string[] lines, Regex regex)
         => lines
             .Select(line => regex.Match(line))
@@ -794,6 +851,8 @@ internal sealed record PreceptDocumentInfo(
     IReadOnlyList<string> CollectionFields,
     IReadOnlyDictionary<string, IReadOnlyList<string>> EventArgs,
     IReadOnlyDictionary<string, PreceptCollectionKind> CollectionKinds,
+    IReadOnlyDictionary<string, PreceptScalarType> CollectionInnerTypes,
+    IReadOnlyDictionary<string, StaticValueKind> FieldTypeKinds,
     PreceptDeclarationIndex Declarations,
     IReadOnlyList<DocumentSymbol> DocumentSymbols);
 

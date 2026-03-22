@@ -140,9 +140,11 @@ internal sealed class PreceptAnalyzer
         // Mutation verb lines: suggest collection field names after add/remove/enqueue/dequeue/push/pop/clear
         if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*(?:add|remove|enqueue|dequeue|push|pop|clear)(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
         {
-            // After "dequeue <Field> into" or "pop <Field> into", suggest scalar data fields
-            if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*(?:dequeue|pop)\\s+[A-Za-z_][A-Za-z0-9_]*\\s+into(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
-                return BuildItems(dataFields, CompletionItemKind.Field);
+            // After "dequeue <Field> into" or "pop <Field> into", suggest scalar data fields filtered by collection inner type
+            var intoMatch = Regex.Match(beforeCursor, "(?:^|->)\\s*(?:dequeue|pop)\\s+(?<col>[A-Za-z_][A-Za-z0-9_]*)\\s+into(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase);
+            if (intoMatch.Success)
+                return TryBuildTypedDequeuePopIntoCompletions(intoMatch.Groups["col"].Value, dataFields, info.CollectionInnerTypes, info.FieldTypeKinds)
+                    ?? BuildItems(dataFields, CompletionItemKind.Field);
 
             // After "dequeue <Field>" or "pop <Field>", suggest "into" keyword and collection fields
             if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*(?:dequeue|pop)\\s+[A-Za-z_][A-Za-z0-9_]*(?:\\s+[^\\n]*)?$", RegexOptions.IgnoreCase))
@@ -576,6 +578,27 @@ internal sealed class PreceptAnalyzer
         return DistinctAndSort(baseline.Where(item =>
             item.Kind is CompletionItemKind.Operator or CompletionItemKind.Snippet ||
             IsTypedExpressionCompletionItem(item, scope.Symbols, expectedKind, dataFieldNames, eventName, collectionKinds)));
+    }
+
+    private static IReadOnlyList<CompletionItem>? TryBuildTypedDequeuePopIntoCompletions(
+        string collectionFieldName,
+        IReadOnlyList<string> dataFields,
+        IReadOnlyDictionary<string, PreceptScalarType> collectionInnerTypes,
+        IReadOnlyDictionary<string, StaticValueKind> fieldTypeKinds)
+    {
+        if (!collectionInnerTypes.TryGetValue(collectionFieldName, out var innerType))
+            return null;
+
+        var innerKind = MapCollectionInnerTypeKind(innerType);
+        if (innerKind == StaticValueKind.None)
+            return null;
+
+        var compatible = dataFields
+            .Where(name => fieldTypeKinds.TryGetValue(name, out var fieldKind)
+                && PreceptTypeChecker.IsAssignableKind(innerKind, fieldKind))
+            .ToArray();
+
+        return BuildItems(compatible, CompletionItemKind.Field);
     }
 
     private static string BuildCompletionParseText(

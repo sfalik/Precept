@@ -618,6 +618,68 @@ public class PreceptAnalyzerCompletionTests
         completions.Should().NotContain("set", "collection types not valid as inner type");
     }
 
+    [Fact]
+    public void Completions_DequeueInto_FiltersToMatchingFieldType()
+    {
+        const string text = """
+            precept M
+            field Name as string default ""
+            field Count as number default 0
+            field Active as boolean default false
+            field Log as queue of string
+            state A initial
+            event Process
+            from A on Process -> dequeue Log into $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Name");
+        completions.Should().NotContain("Count");
+        completions.Should().NotContain("Active");
+    }
+
+    [Fact]
+    public void Completions_PopInto_FiltersToMatchingFieldType()
+    {
+        const string text = """
+            precept M
+            field Name as string default ""
+            field Score as number default 0
+            field Steps as stack of number
+            state A initial
+            event Undo
+            from A on Undo -> pop Steps into $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Score");
+        completions.Should().NotContain("Name");
+    }
+
+    [Fact]
+    public void Completions_DequeueInto_NullableFieldAcceptsNonNullableInnerType()
+    {
+        const string text = """
+            precept M
+            field Result as string nullable
+            field Exact as string default ""
+            field Queue as queue of string
+            state A initial
+            event Process
+            from A on Process -> dequeue Queue into $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Result");
+        completions.Should().Contain("Exact");
+    }
+
     private static (string text, Position position) ExtractPosition(string textWithMarker)
     {
         var index = textWithMarker.IndexOf("$$", StringComparison.Ordinal);
