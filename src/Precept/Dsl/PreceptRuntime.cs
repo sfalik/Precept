@@ -1564,7 +1564,7 @@ public sealed class PreceptEngine
 
 public static class PreceptCompiler
 {
-    public static PreceptEngine Compile(PreceptDefinition model)
+    internal static PreceptCompileValidationResult Validate(PreceptDefinition model)
     {
         // SYNC:CONSTRAINT:C26
         if (model is null)
@@ -1578,14 +1578,40 @@ public static class PreceptCompiler
         if (!model.States.Contains(model.InitialState))
             throw new InvalidOperationException(ConstraintCatalog.C28.FormatMessage(("stateName", model.InitialState.Name), ("workflowName", model.Name)));
 
-        // Compile-time constraint validations
+        // SYNC:CONSTRAINT:C38
+        // SYNC:CONSTRAINT:C39
+        // SYNC:CONSTRAINT:C40
+        // SYNC:CONSTRAINT:C41
+        // SYNC:CONSTRAINT:C42
+        // SYNC:CONSTRAINT:C43
+        var typeCheck = PreceptTypeChecker.Check(model);
+        return new PreceptCompileValidationResult(typeCheck.Diagnostics, typeCheck.TypeContext);
+    }
+
+    public static PreceptEngine Compile(PreceptDefinition model)
+    {
         ValidateConstraintsAtCompileTime(model);
 
         return new PreceptEngine(model);
     }
 
+    private static void ThrowIfValidationFailed(PreceptCompileValidationResult validation)
+    {
+        if (validation.HasErrors)
+        {
+            var first = validation.Diagnostics[0];
+            var location = first.Line > 0 ? $"Line {first.Line}: " : string.Empty;
+            var stateContext = string.IsNullOrWhiteSpace(first.StateContext)
+                ? string.Empty
+                : $" [state {first.StateContext}]";
+            throw new InvalidOperationException($"{location}{first.DiagnosticCode}{stateContext}: {first.Message}");
+        }
+    }
+
     private static void ValidateConstraintsAtCompileTime(PreceptDefinition model)
     {
+        ThrowIfValidationFailed(Validate(model));
+
         var defaultData = BuildDefaultData(model);
 
         // 1. Validate invariants against default values

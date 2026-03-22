@@ -317,4 +317,44 @@ public static class ConstraintCatalog
         "C37", "runtime",
         "ResolveTransition requires a non-empty event name.",
         "Event name is required.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Compile-phase type constraints (C38–C43)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Identifiers used in expressions must resolve in the current scope.</summary>
+    public static readonly LanguageConstraint C38 = Register(
+        "C38", "compile",
+        "Identifiers used in expressions must resolve in the current scope.",
+        "Unknown identifier '{identifier}'.");
+
+    /// <summary>Expressions assigned to typed targets must produce assignable values.</summary>
+    public static readonly LanguageConstraint C39 = Register(
+        "C39", "compile",
+        "Expressions assigned to typed targets must produce assignable values.",
+        "{context} type mismatch: expected {expected} but expression produces {actual}.");
+
+    /// <summary>Unary operators must be applied to operands of the correct type.</summary>
+    public static readonly LanguageConstraint C40 = Register(
+        "C40", "compile",
+        "Unary operators must be applied to operands of the correct type.",
+        "{message}");
+
+    /// <summary>Binary operators must be applied to operands of compatible types.</summary>
+    public static readonly LanguageConstraint C41 = Register(
+        "C41", "compile",
+        "Binary operators must be applied to operands of compatible types.",
+        "{message}");
+
+    /// <summary>Nullable values must be narrowed before assignment to non-nullable targets.</summary>
+    public static readonly LanguageConstraint C42 = Register(
+        "C42", "compile",
+        "Nullable values must be narrowed before assignment to non-nullable targets.",
+        "{context} type mismatch: expected {expected} but expression produces {actual}.");
+
+    /// <summary>Collection pop/dequeue targets must accept the collection inner type.</summary>
+    public static readonly LanguageConstraint C43 = Register(
+        "C43", "compile",
+        "Collection pop/dequeue targets must accept the collection inner type.",
+        "{message}");
 }

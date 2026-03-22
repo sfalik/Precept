@@ -14,10 +14,10 @@ public class ValidateToolTests
     [Fact]
     public void ValidFile_ReturnsSuccess()
     {
-        var result = ValidateTool.Run(SamplePath("bugtracker.precept"));
+        var result = ValidateTool.Run(SamplePath("maintenance-work-order.precept"));
 
         result.Valid.Should().BeTrue();
-        result.MachineName.Should().Be("BugTracker");
+        result.MachineName.Should().Be("MaintenanceWorkOrder");
         result.StateCount.Should().BeGreaterThan(0);
         result.EventCount.Should().BeGreaterThan(0);
         result.Diagnostics.Should().BeEmpty();
@@ -58,6 +58,64 @@ public class ValidateToolTests
 
             result.Valid.Should().BeFalse();
             result.Diagnostics.Should().NotBeEmpty();
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void TypeCheckViolation_ReturnsInvalidWithSharedDiagnosticCode()
+    {
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, """
+                precept Test
+                field Value as number default 0
+                field RetryCount as number nullable
+                state A initial
+                state B
+                event Go
+                from A on Go -> set Value = RetryCount -> transition B
+                """);
+
+            var result = ValidateTool.Run(tempFile);
+
+            result.Valid.Should().BeFalse();
+            result.Diagnostics.Should().ContainSingle();
+            result.Diagnostics[0].Code.Should().Be("PRECEPT042");
+            result.Diagnostics[0].Message.Should().Contain("set target 'Value' type mismatch");
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void MultipleTypeCheckViolations_ReturnAllSharedDiagnostics()
+    {
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, """
+                precept Test
+                field Value as number default 0
+                field Name as string default ""
+                field RetryCount as number nullable
+                state A initial
+                state B
+                event Go
+                from A on Go -> set Value = RetryCount -> set Name = Missing -> transition B
+                """);
+
+            var result = ValidateTool.Run(tempFile);
+
+            result.Valid.Should().BeFalse();
+            result.Diagnostics.Should().HaveCount(2);
+            result.Diagnostics.Select(d => d.Code).Should().BeEquivalentTo(["PRECEPT042", "PRECEPT038"]);
         }
         finally
         {

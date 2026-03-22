@@ -226,6 +226,8 @@ public static class PreceptParser
         Token.EqualTo(PreceptToken.Null)
             .Value((PreceptExpression)new PreceptLiteralExpression(null));
 
+    #pragma warning disable CS8603, CS8620
+
     private static readonly TokenListParser<PreceptToken, PreceptExpression> DottedIdentifier =
         Token.EqualTo(PreceptToken.Identifier)
             .Then(id =>
@@ -236,9 +238,22 @@ public static class PreceptParser
                 .Or(Superpower.Parse.Return<PreceptToken, PreceptExpression>(
                     new PreceptIdentifierExpression(id.ToText()))));
 
+    private static TokenListParser<PreceptToken, PreceptExpression> BoolExprRef()
+        => BoolExpr;
+
+    private static TokenListParser<PreceptToken, PreceptExpression> UnaryRef()
+        => Unary;
+
+    private static readonly TokenListParser<PreceptToken, string?> OptionalIntoFieldParser =
+        (from _into in Token.EqualTo(PreceptToken.Into)
+         from identifier in Token.EqualTo(PreceptToken.Identifier)
+         select (string?)identifier.ToText())
+        .Try()
+        .Or(Superpower.Parse.Return<PreceptToken, string?>(null));
+
     private static readonly TokenListParser<PreceptToken, PreceptExpression> ParenExpr =
         from _lp in Token.EqualTo(PreceptToken.LeftParen)
-        from inner in Superpower.Parse.Ref(() => BoolExpr)
+        from inner in Superpower.Parse.Ref(BoolExprRef)
         from _rp in Token.EqualTo(PreceptToken.RightParen)
         select (PreceptExpression)new PreceptParenthesizedExpression(inner);
 
@@ -254,12 +269,12 @@ public static class PreceptParser
     // Level 4: Unary (! and unary -)
     private static readonly TokenListParser<PreceptToken, PreceptExpression> Unary =
         Token.EqualTo(PreceptToken.Not)
-            .IgnoreThen(Superpower.Parse.Ref(() => Unary))
+            .IgnoreThen(Superpower.Parse.Ref(UnaryRef))
             .Select(expr => (PreceptExpression)new PreceptUnaryExpression("!", expr))
         .Try()
         .Or(
             Token.EqualTo(PreceptToken.Minus)
-                .IgnoreThen(Superpower.Parse.Ref(() => Unary))
+                .IgnoreThen(Superpower.Parse.Ref(UnaryRef))
                 .Select(expr => (PreceptExpression)new PreceptUnaryExpression("-", expr))
             .Try()
             .Or(Atom));
@@ -442,61 +457,63 @@ public static class PreceptParser
         select (ParsedAction)new SetAction(new PreceptSetAssignment(
             field.ToText(),
             ReconstituteExpr(expr),
-            expr));
+            expr,
+            SourceLine: kw.Span.Position.Line));
 
     private static readonly TokenListParser<PreceptToken, ParsedAction> AddActionParser =
         from kw in Token.EqualTo(PreceptToken.Add)
         from field in Token.EqualTo(PreceptToken.Identifier)
         from expr in BoolExpr
         select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
-            PreceptCollectionMutationVerb.Add, field.ToText(), ReconstituteExpr(expr), expr));
+            PreceptCollectionMutationVerb.Add, field.ToText(), ReconstituteExpr(expr), expr,
+            SourceLine: kw.Span.Position.Line));
 
     private static readonly TokenListParser<PreceptToken, ParsedAction> RemoveActionParser =
         from kw in Token.EqualTo(PreceptToken.Remove)
         from field in Token.EqualTo(PreceptToken.Identifier)
         from expr in BoolExpr
         select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
-            PreceptCollectionMutationVerb.Remove, field.ToText(), ReconstituteExpr(expr), expr));
+            PreceptCollectionMutationVerb.Remove, field.ToText(), ReconstituteExpr(expr), expr,
+            SourceLine: kw.Span.Position.Line));
 
     private static readonly TokenListParser<PreceptToken, ParsedAction> EnqueueActionParser =
         from kw in Token.EqualTo(PreceptToken.Enqueue)
         from field in Token.EqualTo(PreceptToken.Identifier)
         from expr in BoolExpr
         select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
-            PreceptCollectionMutationVerb.Enqueue, field.ToText(), ReconstituteExpr(expr), expr));
+            PreceptCollectionMutationVerb.Enqueue, field.ToText(), ReconstituteExpr(expr), expr,
+            SourceLine: kw.Span.Position.Line));
 
     private static readonly TokenListParser<PreceptToken, ParsedAction> DequeueActionParser =
         from kw in Token.EqualTo(PreceptToken.Dequeue)
         from field in Token.EqualTo(PreceptToken.Identifier)
-        from intoField in Token.EqualTo(PreceptToken.Into)
-            .IgnoreThen(Token.EqualTo(PreceptToken.Identifier))
-            .Select(t => t.ToText())
-            .OptionalOrDefault()
+        from intoField in OptionalIntoFieldParser
         select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
-            PreceptCollectionMutationVerb.Dequeue, field.ToText(), null, null, intoField));
+            PreceptCollectionMutationVerb.Dequeue, field.ToText(), null, null, intoField,
+            SourceLine: kw.Span.Position.Line));
 
     private static readonly TokenListParser<PreceptToken, ParsedAction> PushActionParser =
         from kw in Token.EqualTo(PreceptToken.Push)
         from field in Token.EqualTo(PreceptToken.Identifier)
         from expr in BoolExpr
         select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
-            PreceptCollectionMutationVerb.Push, field.ToText(), ReconstituteExpr(expr), expr));
+            PreceptCollectionMutationVerb.Push, field.ToText(), ReconstituteExpr(expr), expr,
+            SourceLine: kw.Span.Position.Line));
 
     private static readonly TokenListParser<PreceptToken, ParsedAction> PopActionParser =
         from kw in Token.EqualTo(PreceptToken.Pop)
         from field in Token.EqualTo(PreceptToken.Identifier)
-        from intoField in Token.EqualTo(PreceptToken.Into)
-            .IgnoreThen(Token.EqualTo(PreceptToken.Identifier))
-            .Select(t => t.ToText())
-            .OptionalOrDefault()
+        from intoField in OptionalIntoFieldParser
         select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
-            PreceptCollectionMutationVerb.Pop, field.ToText(), null, null, intoField));
+            PreceptCollectionMutationVerb.Pop, field.ToText(), null, null, intoField,
+            SourceLine: kw.Span.Position.Line));
 
     private static readonly TokenListParser<PreceptToken, ParsedAction> ClearActionParser =
         from kw in Token.EqualTo(PreceptToken.Clear)
         from field in Token.EqualTo(PreceptToken.Identifier)
         select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
-            PreceptCollectionMutationVerb.Clear, field.ToText(), null, null));
+            PreceptCollectionMutationVerb.Clear, field.ToText(), null, null,
+            SourceLine: kw.Span.Position.Line));
 
     private static readonly TokenListParser<PreceptToken, ParsedAction> AnyAction =
         SetActionParser
@@ -733,20 +750,26 @@ public static class PreceptParser
     // Transition Rows
     // ═══════════════════════════════════════════════════════════════════
 
+    private static readonly TokenListParser<PreceptToken, PreceptExpression?> OptionalWhenGuardParser =
+        (from _when in Token.EqualTo(PreceptToken.When)
+         from expr in BoolExpr
+         select (PreceptExpression?)expr)
+        .Try()
+        .Or(Superpower.Parse.Return<PreceptToken, PreceptExpression?>(null));
+
     // from <StateTarget> on <Event> [when <BoolExpr>] [-> <actions>]* -> <outcome>
     private static readonly TokenListParser<PreceptToken, StatementResult> TransitionRowParser =
-        (from _ in Token.EqualTo(PreceptToken.From)
+        (from kwFrom in Token.EqualTo(PreceptToken.From)
          from states in StateTarget
          from __ in Token.EqualTo(PreceptToken.On)
          from eventName in Token.EqualTo(PreceptToken.Identifier)
-         from whenGuard in Token.EqualTo(PreceptToken.When)
-             .IgnoreThen(BoolExpr)
-             .OptionalOrDefault()
+         from whenGuard in OptionalWhenGuardParser
          from actionsAndOutcome in Token.EqualTo(PreceptToken.Arrow)
              .IgnoreThen(AnyAction.Try().Or(Outcome.Select(o => (ParsedAction)new OutcomeAction(o))))
              .AtLeastOnce()
          select (StatementResult)new TransitionRowResult(
-             states, eventName.ToText(), whenGuard, actionsAndOutcome))
+             states, eventName.ToText(), whenGuard, actionsAndOutcome,
+             SourceLine: kwFrom.Span.Position.Line))
         .Named("transition row")
             .Register(new ConstructInfo(
                 "transition-row",
@@ -754,6 +777,8 @@ public static class PreceptParser
                 "top-level",
                 "Maps a (state, event) pair to actions and an outcome",
                 "from Open on Submit -> transition Closed"));
+
+    #pragma warning restore CS8603, CS8620
 
     /// <summary>Wraps an outcome as a parsed action for the unified action pipeline.</summary>
     private sealed record OutcomeAction(PreceptClauseOutcome Outcome) : ParsedAction;
@@ -776,7 +801,7 @@ public static class PreceptParser
         ParsedAction[] Actions) : StatementResult;
     private sealed record EditResult(string[] States, string[] Fields) : StatementResult;
     private sealed record TransitionRowResult(string[] States, string EventName,
-        PreceptExpression? WhenGuard, ParsedAction[] ActionsAndOutcome) : StatementResult;
+        PreceptExpression? WhenGuard, ParsedAction[] ActionsAndOutcome, int SourceLine = 0) : StatementResult;
 
     /// <summary>Union parser: tries each statement kind in priority order.</summary>
     private static readonly TokenListParser<PreceptToken, StatementResult> Statement =
@@ -924,7 +949,7 @@ public static class PreceptParser
                         transitionRows.Add(new PreceptTransitionRow(
                             stateName, trr.EventName, outcome, rowSets, 
                             rowMutations.Count > 0 ? rowMutations : null,
-                            whenText, trr.WhenGuard));
+                            whenText, trr.WhenGuard, trr.SourceLine));
                     });
                     break;
             }

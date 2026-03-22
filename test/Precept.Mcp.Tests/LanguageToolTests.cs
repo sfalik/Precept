@@ -73,6 +73,15 @@ public class LanguageToolTests
     }
 
     [Fact]
+    public void ConstraintsIncludeSharedTypeCheckingRange()
+    {
+        var result = LanguageTool.Run();
+
+        result.Constraints.Select(constraint => constraint.Id)
+            .Should().Contain(["C38", "C39", "C40", "C41", "C42", "C43"]);
+    }
+
+    [Fact]
     public void ExpressionScopesHasFiveEntries()
     {
         var result = LanguageTool.Run();

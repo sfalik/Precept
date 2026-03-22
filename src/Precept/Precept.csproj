@@ -6,6 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Precept.LanguageServer" />
+    <InternalsVisibleTo Include="Precept.Mcp" />
     <InternalsVisibleTo Include="Precept.Tests" />
     <InternalsVisibleTo Include="Precept.LanguageServer.Tests" />
   </ItemGroup>

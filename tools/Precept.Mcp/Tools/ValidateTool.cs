@@ -8,7 +8,7 @@ namespace Precept.Mcp.Tools;
 [McpServerToolType]
 public static class ValidateTool
 {
-    private static readonly Regex LineErrorRegex = new(@"^Line\s+(?<line>\d+)\s*:\s*(?<message>.+)$", RegexOptions.Compiled);
+    private static readonly Regex LineErrorRegex = new(@"^Line\s+(?<line>\d+)\s*:\s*(?<code>PRECEPT\d+)\s*(?:\[[^\]]+\])?\s*:\s*(?<message>.+)$", RegexOptions.Compiled);
 
     [McpServerTool(Name = "precept_validate")]
     [Description("Parse and compile a .precept file. Returns structured diagnostics.")]
@@ -24,7 +24,16 @@ public static class ValidateTool
         if (model is null || diagnostics.Count > 0)
         {
             return new(false, null, 0, 0,
-                diagnostics.Select(d => new DiagnosticDto(d.Line, d.Message)).ToList());
+                diagnostics.Select(d => new DiagnosticDto(d.Line, d.Message, d.Code)).ToList());
+        }
+
+        var validation = PreceptCompiler.Validate(model);
+        if (validation.HasErrors)
+        {
+            return new(false, model.Name, 0, 0,
+                validation.Diagnostics
+                    .Select(d => new DiagnosticDto(d.Line, d.Message, d.DiagnosticCode))
+                    .ToList());
         }
 
         try
@@ -42,7 +51,7 @@ public static class ValidateTool
     {
         var match = LineErrorRegex.Match(message);
         if (match.Success && int.TryParse(match.Groups["line"].Value, out var line))
-            return new(line, match.Groups["message"].Value);
+            return new(line, match.Groups["message"].Value, match.Groups["code"].Value);
         return new(0, message);
     }
 }
@@ -54,4 +63,4 @@ public sealed record ValidateResult(
     int EventCount,
     IReadOnlyList<DiagnosticDto> Diagnostics);
 
-public sealed record DiagnosticDto(int Line, string Message);
+public sealed record DiagnosticDto(int Line, string Message, string? Code = null);

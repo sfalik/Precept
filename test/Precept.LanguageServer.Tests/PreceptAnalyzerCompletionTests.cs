@@ -207,6 +207,34 @@ public class PreceptAnalyzerCompletionTests
     }
 
     [Fact]
+    public void Completions_ArrowSetAssignmentMidLine_UsesTypeContextToFilterIncompatibleSymbols()
+    {
+        const string text = """
+            precept M
+            field Value as number default 0
+            field RetryCount as number nullable
+            field Notes as string default ""
+            state A initial
+            state B
+            event Go with Count as number, Reason as string
+            from A on Go when RetryCount != null -> set Value = $$ -> transition B
+            from A on Go -> reject "blocked"
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Value");
+        completions.Should().Contain("RetryCount");
+        completions.Should().Contain("Go.Count");
+        completions.Should().NotContain("Notes");
+        completions.Should().NotContain("Go.Reason");
+        completions.Should().NotContain("true");
+        completions.Should().NotContain("false");
+        completions.Should().NotContain("null");
+    }
+
+    [Fact]
     public void Completions_ArrowRejectMidLine_SuggestsStringSnippet()
     {
         const string text = """
@@ -238,6 +266,34 @@ public class PreceptAnalyzerCompletionTests
         var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
 
         completions.Should().Contain("Items");
+    }
+
+    [Fact]
+    public void Completions_ArrowAddValueMidLine_UsesTypeContextToFilterIncompatibleSymbols()
+    {
+        const string text = """
+            precept M
+            field Names as set of string
+            field Name as string default ""
+            field Count as number default 0
+            field Scores as set of number
+            state A initial
+            state B
+            event AddName with RequestedName as string, Amount as number
+            from A on AddName -> add Names $$ -> transition B
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Name");
+        completions.Should().Contain("AddName.RequestedName");
+        completions.Should().NotContain("Count");
+        completions.Should().NotContain("AddName.Amount");
+        completions.Should().NotContain("Scores.count");
+        completions.Should().NotContain("true");
+        completions.Should().NotContain("false");
+        completions.Should().NotContain("null");
     }
 
     [Fact]
