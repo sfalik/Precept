@@ -489,6 +489,24 @@ public class CatalogDriftTests
             var engine = PreceptCompiler.Compile(PreceptParser.Parse(H + S));
             engine.Inspect("A", "");
         }),
+
+        // C38: Unknown identifier in expression
+        ["C38"] = new(H + "field X as number default 0\n" + S2 + "event Go\nfrom A on Go -> set X = Missing -> transition B\n", "PRECEPT038"),
+
+        // C39: Expression type mismatch
+        ["C39"] = new(H + "field X as number default 0\n" + S2 + "event Go\nfrom A on Go -> set X = \"text\" -> transition B\n", "PRECEPT039"),
+
+        // C40: Unary operator type error
+        ["C40"] = new(H + "field X as boolean default false\nfield Y as string default \"\"\n" + S2 + "event Go\nfrom A on Go -> set X = !Y -> transition B\n", "PRECEPT040"),
+
+        // C41: Binary operator type error
+        ["C41"] = new(H + "field X as number default 0\nfield Y as string default \"\"\n" + S2 + "event Go\nfrom A on Go -> set X = Y - 1 -> transition B\n", "PRECEPT041"),
+
+        // C42: Null-flow violation
+        ["C42"] = new(H + "field X as number default 0\nfield Y as number nullable\n" + S2 + "event Go\nfrom A on Go -> set X = Y -> transition B\n", "PRECEPT042"),
+
+        // C43: Collection pop/dequeue into target type mismatch
+        ["C43"] = new(H + "field X as number default 0\nfield Items as stack of string\n" + S2 + "event Go\nfrom A on Go when Items.count > 0 -> pop Items into X -> transition B\n", "PRECEPT043"),
     };
 
     // ════════════════════════════════════════════════════════════════════

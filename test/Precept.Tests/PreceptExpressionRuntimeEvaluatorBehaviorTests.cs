@@ -57,17 +57,14 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     public void Fire_Set_StringConcat_IsApplied()
     {
         var fire = FireForSet(
-            "string Prefix\nstring Message",
+            "string Prefix\nstring Suffix\nstring Message",
             "Message",
-            "Prefix + Go.EventText",
+            "Prefix + Suffix",
             new Dictionary<string, object?>
             {
                 ["Prefix"] = "Reason: ",
+                ["Suffix"] = "Accident",
                 ["Message"] = ""
-            },
-            new Dictionary<string, object?>
-            {
-                ["EventText"] = "Accident"
             });
 
         (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
@@ -77,19 +74,9 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     [Fact]
     public void Fire_Set_MixedStringAndNumberConcat_IsRejected()
     {
-        var fire = FireForSet(
-            "string Prefix\nnumber Count\nstring Message",
-            "Message",
-            "Prefix + Count",
-            new Dictionary<string, object?>
-            {
-                ["Prefix"] = "Count: ",
-                ["Count"] = 2d,
-                ["Message"] = ""
-            });
-
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle(r => r.Contains("operator '+' requires number+number or string+string", StringComparison.Ordinal));
+        var dsl = BuildDslForSet("string Prefix\nnumber Count\nstring Message", "Message", "Prefix + Count");
+        var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
+        ex.Message.Should().Contain("PRECEPT041");
     }
 
     [Fact]
@@ -146,80 +133,45 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     [Fact]
     public void Fire_Set_BooleanAndWithNonBooleanOperand_IsRejected()
     {
-        var fire = FireForSet(
-            "boolean Flag\nnumber Count\nboolean Result",
-            "Result",
-            "Flag && Count",
-            new Dictionary<string, object?>
-            {
-                ["Flag"] = true,
-                ["Count"] = 1d,
-                ["Result"] = false
-            });
-
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle(r => r.Contains("operator '&&' requires boolean operands", StringComparison.Ordinal));
+        var dsl = BuildDslForSet("boolean Flag\nnumber Count\nboolean Result", "Result", "Flag && Count");
+        var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
+        ex.Message.Should().Contain("PRECEPT041");
     }
 
     [Fact]
     public void Fire_Set_BooleanAnd_WithNonBooleanLeftOperand_IsRejected()
     {
-        var fire = FireForSet(
-            "number Count\nboolean Flag\nboolean Result",
-            "Result",
-            "Count && Flag",
-            new Dictionary<string, object?>
-            {
-                ["Count"] = 1d,
-                ["Flag"] = true,
-                ["Result"] = false
-            });
-
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle(r => r.Contains("operator '&&' requires boolean operands", StringComparison.Ordinal));
+        var dsl = BuildDslForSet("number Count\nboolean Flag\nboolean Result", "Result", "Count && Flag");
+        var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
+        ex.Message.Should().Contain("PRECEPT041");
     }
 
     [Fact]
     public void Fire_Set_UnaryOperandResolutionFailure_IsRejected()
     {
-        var fire = FireForSet(
-            "number Output",
-            "Output",
-            "-Missing",
-            new Dictionary<string, object?>
-            {
-                ["Output"] = 0d
-            });
-
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle(r => r.Contains("data key 'Missing' was not provided", StringComparison.Ordinal));
+        var dsl = BuildDslForSet("number Output", "Output", "-Missing");
+        var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
+        ex.Message.Should().Contain("PRECEPT038");
     }
 
     [Theory]
-    [InlineData("-", "operator '-' requires numeric operands")]
-    [InlineData("*", "operator '*' requires numeric operands")]
-    [InlineData("/", "operator '/' requires numeric operands")]
-    [InlineData("%", "operator '%' requires numeric operands")]
-    [InlineData(">=", "operator '>=' requires numeric operands")]
-    [InlineData("<", "operator '<' requires numeric operands")]
-    [InlineData("<=", "operator '<=' requires numeric operands")]
-    public void Fire_Set_NonNumericOperands_AreRejected(string op, string expectedMessage)
+    [InlineData("-")]
+    [InlineData("*")]
+    [InlineData("/")]
+    [InlineData("%")]
+    [InlineData(">=")]
+    [InlineData("<")]
+    [InlineData("<=")]
+    public void Fire_Set_NonNumericOperands_AreRejected(string op)
     {
         var targetField = op is ">=" or "<" or "<=" ? "ResultBool" : "ResultNum";
         var declarations = op is ">=" or "<" or "<="
             ? "string Input\nboolean ResultBool"
             : "string Input\nnumber ResultNum";
 
-        var fire = FireForSet(
-            declarations,
-            targetField,
-            $"Input {op} 1",
-            op is ">=" or "<" or "<="
-                ? new Dictionary<string, object?> { ["Input"] = "text", ["ResultBool"] = false }
-                : new Dictionary<string, object?> { ["Input"] = "text", ["ResultNum"] = 0d });
-
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle(r => r.Contains(expectedMessage, StringComparison.Ordinal));
+        var dsl = BuildDslForSet(declarations, targetField, $"Input {op} 1");
+        var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
+        ex.Message.Should().Contain("PRECEPT041");
     }
 
     [Theory]
@@ -250,17 +202,9 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     [Fact]
     public void Fire_Set_UnknownIdentifier_IsRejected()
     {
-        var fire = FireForSet(
-            "number Output",
-            "Output",
-            "Missing + 1",
-            new Dictionary<string, object?>
-            {
-                ["Output"] = 0d
-            });
-
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle(r => r.Contains("data key 'Missing' was not provided", StringComparison.Ordinal));
+        var dsl = BuildDslForSet("number Output", "Output", "Missing + 1");
+        var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
+        ex.Message.Should().Contain("PRECEPT038");
     }
 
     [Fact]
@@ -324,12 +268,9 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     [Fact]
     public void Inspect_Guard_NonBooleanResult_IsRejectedWithConfiguredReason()
     {
-        var inspect = InspectForGuard(
-            "1 + 1",
-            new Dictionary<string, object?>());
-
-        (inspect.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        inspect.Reasons.Should().ContainSingle("blocked");
+        var dsl = BuildDslForGuard("1 + 1");
+        var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
+        ex.Message.Should().Contain("PRECEPT039");
     }
 
     [Fact]
@@ -349,88 +290,55 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     [Fact]
     public void Fire_Set_UnaryNot_WithNonBooleanOperand_IsRejected()
     {
-        var fire = FireForSet(
-            "number Input\nboolean Result",
-            "Result",
-            "!Input",
-            new Dictionary<string, object?>
-            {
-                ["Input"] = 1d,
-                ["Result"] = false
-            });
-
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle(r => r.Contains("operator '!' requires boolean operand", StringComparison.Ordinal));
+        var dsl = BuildDslForSet("number Input\nboolean Result", "Result", "!Input");
+        var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
+        ex.Message.Should().Contain("PRECEPT040");
     }
 
     [Fact]
     public void Fire_Set_UnaryMinus_WithNonNumericOperand_IsRejected()
     {
-        var fire = FireForSet(
-            "string Input\nnumber Result",
-            "Result",
-            "-Input",
-            new Dictionary<string, object?>
-            {
-                ["Input"] = "x",
-                ["Result"] = 0d
-            });
-
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle(r => r.Contains("unary '-' requires numeric operand", StringComparison.Ordinal));
+        var dsl = BuildDslForSet("string Input\nnumber Result", "Result", "-Input");
+        var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
+        ex.Message.Should().Contain("PRECEPT040");
     }
 
     [Fact]
     public void Fire_Set_BooleanOr_WithNonBooleanLeftOperand_IsRejected()
     {
-        var fire = FireForSet(
-            "number Count\nboolean Flag\nboolean Result",
-            "Result",
-            "Count || Flag",
-            new Dictionary<string, object?>
-            {
-                ["Count"] = 1d,
-                ["Flag"] = true,
-                ["Result"] = false
-            });
-
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle(r => r.Contains("operator '||' requires boolean operands", StringComparison.Ordinal));
+        var dsl = BuildDslForSet("number Count\nboolean Flag\nboolean Result", "Result", "Count || Flag");
+        var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
+        ex.Message.Should().Contain("PRECEPT041");
     }
 
     [Fact]
     public void Fire_Set_BooleanOr_WithNonBooleanRightOperand_IsRejected()
     {
-        var fire = FireForSet(
-            "boolean Flag\nnumber Count\nboolean Result",
-            "Result",
-            "Flag || Count",
-            new Dictionary<string, object?>
-            {
-                ["Flag"] = false,
-                ["Count"] = 1d,
-                ["Result"] = false
-            });
-
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle(r => r.Contains("operator '||' requires boolean operands", StringComparison.Ordinal));
+        var dsl = BuildDslForSet("boolean Flag\nnumber Count\nboolean Result", "Result", "Flag || Count");
+        var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
+        ex.Message.Should().Contain("PRECEPT041");
     }
 
     [Fact]
     public void Fire_Set_OrderedComparison_WithNonNumericOperand_IsRejected()
     {
-        var fire = FireForSet(
-            "string Input\nboolean Result",
-            "Result",
-            "Input > 0",
-            new Dictionary<string, object?>
-            {
-                ["Input"] = "text",
-                ["Result"] = false
-            });
+        var dsl = BuildDslForSet("string Input\nboolean Result", "Result", "Input > 0");
+        var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
+        ex.Message.Should().Contain("PRECEPT041");
+    }
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle(r => r.Contains("operator '>' requires numeric operands", StringComparison.Ordinal));
+    private static string BuildDslForSet(string declarations, string targetField, string expression)
+    {
+        var normalizedDeclarations = ConvertToNewSyntaxFields(declarations);
+
+        return $$"""
+            precept Calc
+            {{normalizedDeclarations}}
+            state A initial
+            state B
+            event Go with EventNum as number nullable, EventText as string nullable
+            from A on Go -> set {{targetField}} = {{expression}} -> transition B
+            """;
     }
 
     private static PreceptFireResult FireForSet(
@@ -440,17 +348,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
         IReadOnlyDictionary<string, object?> instanceData,
         IReadOnlyDictionary<string, object?>? eventArgs = null)
     {
-        var normalizedDeclarations = ConvertToNewSyntaxFields(declarations);
-
-        var dsl = $$"""
-            precept Calc
-            {{normalizedDeclarations}}
-            state A initial
-            state B
-            event Go with EventNum as number nullable, EventText as string nullable
-            from A on Go -> set {{targetField}} = {{expression}} -> transition B
-            """;
-
+        var dsl = BuildDslForSet(declarations, targetField, expression);
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
         var instance = workflow.CreateInstance("A", instanceData);
         return workflow.Fire(instance, "Go", eventArgs);
@@ -520,18 +418,24 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
         return string.Join(Environment.NewLine, updated);
     }
 
-    private static PreceptEventInspectionResult InspectForGuard(string guardExpression, IReadOnlyDictionary<string, object?> data)
+    private static string BuildDslForGuard(string guardExpression)
     {
-        var dsl = $$"""
+        return $$"""
             precept Guards
             field Flag as boolean default false
             field OtherFlag as boolean default false
+            field MissingFlag as boolean default false
             state A initial
             state B
             event Go
             from A on Go when {{guardExpression}} -> transition B
             from A on Go -> reject "blocked"
             """;
+    }
+
+    private static PreceptEventInspectionResult InspectForGuard(string guardExpression, IReadOnlyDictionary<string, object?> data)
+    {
+        var dsl = BuildDslForGuard(guardExpression);
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
         return workflow.Inspect(workflow.CreateInstance("A", data), "Go");

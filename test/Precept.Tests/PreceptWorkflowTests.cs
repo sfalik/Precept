@@ -375,8 +375,7 @@ public class PreceptWorkflowTests
     [Fact]
     public void Inspect_InvalidGuardExpression_UsesConfiguredReason()
     {
-        // Guard 'Flag > 0' compares a boolean to a number → operator '>' requires numeric
-        // operands → evaluation fails → engine skips to the next row (the reject fallback).
+        // Guard 'Flag > 0' compares a boolean to a number → type checker rejects at compile time.
         const string dsl = """
             precept Workflow
             field Flag as boolean default false
@@ -387,17 +386,8 @@ public class PreceptWorkflowTests
             from A on Go -> reject "Both flags must be true"
             """;
 
-        var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
-        var data = new Dictionary<string, object?>
-        {
-            ["Flag"] = true
-        };
-
-        var inspection = workflow.Inspect(workflow.CreateInstance("A", data), "Go");
-
-        (inspection.Outcome is PreceptOutcomeKind.NotDefined).Should().BeFalse();
-        (inspection.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        inspection.Reasons.Should().ContainSingle("Both flags must be true");
+        var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
+        ex.Message.Should().Contain("PRECEPT041");
     }
 
     [Fact]
@@ -575,6 +565,7 @@ public class PreceptWorkflowTests
     [Fact]
     public void Fire_Instance_MultipleSets_Failure_RollsBackBatch()
     {
+        // Assigning a string literal to a number field → type checker rejects at compile time.
         const string dsl = """
             precept Counters
             field CarsWaiting as number default 0
@@ -585,21 +576,8 @@ public class PreceptWorkflowTests
             from Red on Advance -> set CarsWaiting = CarsWaiting + 1 -> set LastCarsWaiting = "bad" -> transition Green
             """;
 
-        var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
-        var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
-        {
-            ["CarsWaiting"] = 1d,
-            ["LastCarsWaiting"] = 0d
-        });
-
-        var fire = workflow.Fire(instance, "Advance");
-
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        fire.NewState.Should().BeNull();
-        fire.UpdatedInstance.Should().BeNull();
-        fire.Reasons.Should().ContainSingle(r => r.Contains("Data assignment failed", StringComparison.Ordinal));
-        instance.InstanceData["CarsWaiting"].Should().Be(1d);
-        instance.InstanceData["LastCarsWaiting"].Should().Be(0d);
+        var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
+        ex.Message.Should().Contain("PRECEPT039");
     }
 
     [Fact]
@@ -657,6 +635,8 @@ public class PreceptWorkflowTests
     [Fact]
     public void Fire_Instance_DataAssignment_StringConcat_WithNullOperand_IsRejected()
     {
+        // Concatenating a non-nullable string with a nullable event arg → type checker
+        // rejects '+' because operand types are not both exactly string.
         const string dsl = """
             precept Alerts
             field Prefix as string default ""
@@ -668,18 +648,8 @@ public class PreceptWorkflowTests
             from Red on Emergency -> set Message = Prefix + Emergency.Reason -> transition FlashingRed
             """;
 
-        var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
-        var instance = workflow.CreateInstance("Red", new Dictionary<string, object?>
-        {
-            ["Prefix"] = "Reason: ",
-            ["ReasonText"] = null,
-            ["Message"] = ""
-        });
-
-        var fire = workflow.Fire(instance, "Emergency", new Dictionary<string, object?> { ["Reason"] = null });
-
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle(r => r.Contains("operator '+' requires number+number or string+string", StringComparison.Ordinal));
+        var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
+        ex.Message.Should().Contain("PRECEPT041");
     }
 
     [Fact]
@@ -1876,23 +1846,24 @@ public class PreceptWorkflowTests
     // ════════════════════════════════════════════════════════════════════
 
     [Theory]
-    [InlineData("bank-loan")]
-    [InlineData("bugtracker")]
-    [InlineData("document-signing")]
-    [InlineData("ecommerce")]
-    [InlineData("elevator")]
-    [InlineData("hotel-booking")]
-    [InlineData("job-application")]
-    [InlineData("loan")]
-    [InlineData("package-delivery")]
-    [InlineData("patient-admission")]
-    [InlineData("restaurant-order")]
-    [InlineData("smarthome")]
-    [InlineData("subscription")]
-    [InlineData("support-ticket")]
-    [InlineData("test")]
-    [InlineData("trafficlight")]
-    [InlineData("vending-machine")]
+    [InlineData("apartment-rental-application")]
+    [InlineData("building-access-badge-request")]
+    [InlineData("clinic-appointment-scheduling")]
+    [InlineData("event-registration")]
+    [InlineData("hiring-pipeline")]
+    [InlineData("insurance-claim")]
+    [InlineData("it-helpdesk-ticket")]
+    [InlineData("library-hold-request")]
+    [InlineData("loan-application")]
+    [InlineData("maintenance-work-order")]
+    [InlineData("parcel-locker-pickup")]
+    [InlineData("refund-request")]
+    [InlineData("restaurant-waitlist")]
+    [InlineData("subscription-cancellation-retention")]
+    [InlineData("travel-reimbursement")]
+    [InlineData("utility-outage-report")]
+    [InlineData("vehicle-service-appointment")]
+    [InlineData("warranty-repair-request")]
     public void SampleFile_ParsesAndCompilesClean(string sampleName)
     {
         var path = Path.Combine(FindSamplesDir(), sampleName + ".precept");
