@@ -99,14 +99,14 @@ public class CatalogDriftTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // Test 2: SYNC comment ↔ ConstraintCatalog bidirectional check
+    // Test 2: SYNC comment ↔ DiagnosticCatalog bidirectional check
     // ════════════════════════════════════════════════════════════════════
 
     private static readonly Regex SyncCommentRegex = new(
         @"//\s*SYNC:CONSTRAINT:(?<id>C\d+)", RegexOptions.Compiled);
 
     [Fact]
-    public void SyncComments_MatchConstraintCatalog()
+    public void SyncComments_MatchDiagnosticCatalog()
     {
         // Find source files that may contain SYNC comments
         var srcRoot = FindRepoRoot();
@@ -120,15 +120,15 @@ public class CatalogDriftTests
                 syncIds.Add(match.Groups["id"].Value);
         }
 
-        var catalogIds = ConstraintCatalog.Constraints.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
+        var catalogIds = DiagnosticCatalog.Constraints.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
 
         // Every SYNC comment must have a catalog entry
         var orphanedSyncs = syncIds.Except(catalogIds).ToList();
         orphanedSyncs.Should().BeEmpty(
-            "every // SYNC:CONSTRAINT:Cnn comment should have a matching ConstraintCatalog entry");
+            "every // SYNC:CONSTRAINT:Cnn comment should have a matching DiagnosticCatalog entry");
 
         // Every catalog entry should have at least one SYNC comment (for parse/compile phase constraints)
-        var parseCompileIds = ConstraintCatalog.Constraints
+        var parseCompileIds = DiagnosticCatalog.Constraints
             .Where(c => c.Phase is "parse" or "compile")
             .Select(c => c.Id)
             .ToHashSet(StringComparer.Ordinal);
@@ -225,9 +225,9 @@ public class CatalogDriftTests
     [Fact]
     public void DiagnosticCodes_FollowPreceptNNNFormat()
     {
-        foreach (var constraint in ConstraintCatalog.Constraints)
+        foreach (var constraint in DiagnosticCatalog.Constraints)
         {
-            var code = ConstraintCatalog.ToDiagnosticCode(constraint.Id);
+            var code = DiagnosticCatalog.ToDiagnosticCode(constraint.Id);
             code.Should().MatchRegex(@"^PRECEPT\d{3}$",
                 $"constraint {constraint.Id} diagnostic code should be PRECEPTnnn");
         }
@@ -274,7 +274,7 @@ public class CatalogDriftTests
     [MemberData(nameof(ConstraintTriggerData))]
     public void EveryConstraint_CanBeTriggered(string constraintId, string phase)
     {
-        var constraint = ConstraintCatalog.Constraints.Single(c => c.Id == constraintId);
+        var constraint = DiagnosticCatalog.Constraints.Single(c => c.Id == constraintId);
         var trigger = ConstraintTriggers[constraintId];
         string? errorMessage = null;
 
@@ -310,7 +310,7 @@ public class CatalogDriftTests
     }
 
     public static IEnumerable<object[]> ConstraintTriggerData()
-        => ConstraintCatalog.Constraints.Select(c => new object[] { c.Id, c.Phase });
+        => DiagnosticCatalog.Constraints.Select(c => new object[] { c.Id, c.Phase });
 
     private sealed record TriggerInput(string Dsl, string ExpectedFragment, Action? DirectAction = null);
 
@@ -344,7 +344,7 @@ public class CatalogDriftTests
         {
             // The tokenizer won't produce invalid number tokens normally,
             // so we verify the constraint exists and its message is well-formed.
-            var msg = ConstraintCatalog.C5.FormatMessage(("value", "NaN"));
+            var msg = DiagnosticCatalog.C5.FormatMessage(("value", "NaN"));
             if (!msg.Contains("Invalid number"))
                 throw new InvalidOperationException("Constraint C5 message template is broken");
             throw new InvalidOperationException(msg);

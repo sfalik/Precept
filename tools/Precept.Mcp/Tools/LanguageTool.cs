@@ -16,7 +16,7 @@ public static class LanguageTool
         var constructs = ConstructCatalog.Constructs
             .Select(c => new ConstructDto(c.Form, c.Context, c.Description, c.Example))
             .ToList();
-        var constraints = ConstraintCatalog.Constraints
+        var constraints = DiagnosticCatalog.Constraints
             .Select(c => new ConstraintDto(c.Id, c.Phase, c.Rule))
             .ToList();
 

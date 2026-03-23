@@ -69,7 +69,7 @@ public class LanguageToolTests
     {
         var result = LanguageTool.Run();
 
-        result.Constraints.Should().HaveCount(ConstraintCatalog.Constraints.Count);
+        result.Constraints.Should().HaveCount(DiagnosticCatalog.Constraints.Count);
     }
 
     [Fact]

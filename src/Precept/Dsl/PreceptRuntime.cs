@@ -140,11 +140,11 @@ public sealed class PreceptEngine
     {
         // SYNC:CONSTRAINT:C33
         if (string.IsNullOrWhiteSpace(initialState))
-            throw new ArgumentException(ConstraintCatalog.C33.FormatMessage(), nameof(initialState));
+            throw new ArgumentException(DiagnosticCatalog.C33.FormatMessage(), nameof(initialState));
 
         // SYNC:CONSTRAINT:C34
         if (!States.Contains(initialState, StringComparer.Ordinal))
-            throw new InvalidOperationException(ConstraintCatalog.C34.FormatMessage(("stateName", initialState), ("workflowName", Name)));
+            throw new InvalidOperationException(DiagnosticCatalog.C34.FormatMessage(("stateName", initialState), ("workflowName", Name)));
 
         var data = BuildInitialInstanceData(instanceData);
         // SYNC:CONSTRAINT:C35
@@ -948,10 +948,10 @@ public sealed class PreceptEngine
     {
         // SYNC:CONSTRAINT:C36
         if (string.IsNullOrWhiteSpace(currentState))
-            throw new ArgumentException(ConstraintCatalog.C36.FormatMessage(), nameof(currentState));
+            throw new ArgumentException(DiagnosticCatalog.C36.FormatMessage(), nameof(currentState));
         // SYNC:CONSTRAINT:C37
         if (string.IsNullOrWhiteSpace(eventName))
-            throw new ArgumentException(ConstraintCatalog.C37.FormatMessage(), nameof(eventName));
+            throw new ArgumentException(DiagnosticCatalog.C37.FormatMessage(), nameof(eventName));
 
         if (!States.Contains(currentState, StringComparer.Ordinal))
             return TransitionResolution.NotDefined($"Unknown state '{currentState}'.");
@@ -1555,7 +1555,7 @@ public sealed class PreceptEngine
 
 public static class PreceptCompiler
 {
-    internal static PreceptCompileValidationResult Validate(PreceptDefinition model)
+    internal static CompileResult Validate(PreceptDefinition model)
     {
         // SYNC:CONSTRAINT:C26
         if (model is null)
@@ -1563,11 +1563,11 @@ public static class PreceptCompiler
 
         // SYNC:CONSTRAINT:C27
         if (string.IsNullOrWhiteSpace(model.InitialState.Name))
-            throw new InvalidOperationException(ConstraintCatalog.C27.FormatMessage());
+            throw new InvalidOperationException(DiagnosticCatalog.C27.FormatMessage());
 
         // SYNC:CONSTRAINT:C28
         if (!model.States.Contains(model.InitialState))
-            throw new InvalidOperationException(ConstraintCatalog.C28.FormatMessage(("stateName", model.InitialState.Name), ("workflowName", model.Name)));
+            throw new InvalidOperationException(DiagnosticCatalog.C28.FormatMessage(("stateName", model.InitialState.Name), ("workflowName", model.Name)));
 
         // SYNC:CONSTRAINT:C38
         // SYNC:CONSTRAINT:C39
@@ -1576,7 +1576,7 @@ public static class PreceptCompiler
         // SYNC:CONSTRAINT:C42
         // SYNC:CONSTRAINT:C43
         var typeCheck = PreceptTypeChecker.Check(model);
-        return new PreceptCompileValidationResult(typeCheck.Diagnostics, typeCheck.TypeContext);
+        return new CompileResult(typeCheck.Diagnostics, typeCheck.TypeContext);
     }
 
     public static PreceptEngine Compile(PreceptDefinition model)
@@ -1586,7 +1586,7 @@ public static class PreceptCompiler
         return new PreceptEngine(model);
     }
 
-    private static void ThrowIfValidationFailed(PreceptCompileValidationResult validation)
+    private static void ThrowIfValidationFailed(CompileResult validation)
     {
         if (validation.HasErrors)
         {
@@ -1618,7 +1618,7 @@ public static class PreceptCompiler
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
                     // SYNC:CONSTRAINT:C29
                     throw new InvalidOperationException(
-                        ConstraintCatalog.C29.FormatMessage(("reason", inv.Reason)));
+                        DiagnosticCatalog.C29.FormatMessage(("reason", inv.Reason)));
             }
         }
 
@@ -1637,7 +1637,7 @@ public static class PreceptCompiler
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
                     // SYNC:CONSTRAINT:C30
                     throw new InvalidOperationException(
-                        ConstraintCatalog.C30.FormatMessage(("reason", sa.Reason), ("stateName", initialStateName)));
+                        DiagnosticCatalog.C30.FormatMessage(("reason", sa.Reason), ("stateName", initialStateName)));
             }
         }
 
@@ -1678,7 +1678,7 @@ public static class PreceptCompiler
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
                     // SYNC:CONSTRAINT:C31
                     throw new InvalidOperationException(
-                        ConstraintCatalog.C31.FormatMessage(("reason", ea.Reason), ("eventName", ea.EventName)));
+                        DiagnosticCatalog.C31.FormatMessage(("reason", ea.Reason), ("eventName", ea.EventName)));
             }
         }
 
@@ -1710,7 +1710,7 @@ public static class PreceptCompiler
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
                     // SYNC:CONSTRAINT:C32
                     throw new InvalidOperationException(
-                        ConstraintCatalog.C32.FormatMessage(("sourceLine", assignment.SourceLine), ("key", assignment.Key), ("expression", assignment.ExpressionText), ("reason", inv.Reason)));
+                        DiagnosticCatalog.C32.FormatMessage(("sourceLine", assignment.SourceLine), ("key", assignment.Key), ("expression", assignment.ExpressionText), ("reason", inv.Reason)));
             }
         }
 
@@ -1736,7 +1736,7 @@ public static class PreceptCompiler
             {
                 var prep = sa.Anchor.ToString().ToLowerInvariant();
                 throw new InvalidOperationException(
-                    ConstraintCatalog.C44.FormatMessage(
+                    DiagnosticCatalog.C44.FormatMessage(
                         ("preposition", prep), ("state", sa.State),
                         ("expression", sa.ExpressionText), ("sourceLine", sa.SourceLine)));
             }
@@ -1765,7 +1765,7 @@ public static class PreceptCompiler
                 inAsserts.Contains((sa.State, sa.ExpressionText)))
             {
                 throw new InvalidOperationException(
-                    ConstraintCatalog.C45.FormatMessage(
+                    DiagnosticCatalog.C45.FormatMessage(
                         ("state", sa.State), ("expression", sa.ExpressionText),
                         ("sourceLine", sa.SourceLine)));
             }

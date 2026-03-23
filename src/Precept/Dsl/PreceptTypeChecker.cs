@@ -21,7 +21,7 @@ internal sealed record PreceptTypeDiagnostic(
     int Column = 0,
     string? StateContext = null)
 {
-    public string DiagnosticCode => ConstraintCatalog.ToDiagnosticCode(Constraint.Id);
+    public string DiagnosticCode => DiagnosticCatalog.ToDiagnosticCode(Constraint.Id);
 }
 
 internal sealed record PreceptTypeExpressionInfo(
@@ -70,7 +70,7 @@ internal sealed record PreceptTypeCheckResult(
     public bool HasErrors => Diagnostics.Count > 0;
 }
 
-internal sealed record PreceptCompileValidationResult(
+internal sealed record CompileResult(
     IReadOnlyList<PreceptTypeDiagnostic> Diagnostics,
     PreceptTypeContext TypeContext)
 {
@@ -530,8 +530,8 @@ internal static class PreceptTypeChecker
         }
 
         var constraint = HasFlag(actualKind, StaticValueKind.Null) && !HasFlag(expectedKind, StaticValueKind.Null)
-            ? ConstraintCatalog.C42
-            : ConstraintCatalog.C39;
+            ? DiagnosticCatalog.C42
+            : DiagnosticCatalog.C39;
 
         expressions.Add(new PreceptTypeExpressionInfo(
             sourceLine,
@@ -569,7 +569,7 @@ internal static class PreceptTypeChecker
                 if (!symbols.TryGetValue(key, out kind))
                 {
                     diagnostic = new PreceptTypeDiagnostic(
-                        ConstraintCatalog.C38,
+                        DiagnosticCatalog.C38,
                         $"unknown identifier '{key}'.",
                         0);
                     return false;
@@ -591,7 +591,7 @@ internal static class PreceptTypeChecker
                     if (!IsExactly(operandKind, StaticValueKind.Boolean))
                     {
                         diagnostic = new PreceptTypeDiagnostic(
-                            ConstraintCatalog.C40,
+                            DiagnosticCatalog.C40,
                             "operator '!' requires boolean operand.",
                             0);
                         return false;
@@ -606,7 +606,7 @@ internal static class PreceptTypeChecker
                     if (!IsExactly(operandKind, StaticValueKind.Number))
                     {
                         diagnostic = new PreceptTypeDiagnostic(
-                            ConstraintCatalog.C40,
+                            DiagnosticCatalog.C40,
                             "unary '-' requires numeric operand.",
                             0);
                         return false;
@@ -617,7 +617,7 @@ internal static class PreceptTypeChecker
                 }
 
                 diagnostic = new PreceptTypeDiagnostic(
-                    ConstraintCatalog.C40,
+                    DiagnosticCatalog.C40,
                     $"unsupported unary operator '{unary.Operator}'.",
                     0);
                 return false;
@@ -628,7 +628,7 @@ internal static class PreceptTypeChecker
 
             default:
                 diagnostic = new PreceptTypeDiagnostic(
-                    ConstraintCatalog.C39,
+                    DiagnosticCatalog.C39,
                     "unsupported expression node.",
                     0);
                 return false;
@@ -653,7 +653,7 @@ internal static class PreceptTypeChecker
 
                 if (!IsExactly(leftKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptTypeDiagnostic(ConstraintCatalog.C41, "operator '&&' requires boolean operands.", 0);
+                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41, "operator '&&' requires boolean operands.", 0);
                     return false;
                 }
 
@@ -663,7 +663,7 @@ internal static class PreceptTypeChecker
 
                 if (!IsExactly(rightKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptTypeDiagnostic(ConstraintCatalog.C41, "operator '&&' requires boolean operands.", 0);
+                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41, "operator '&&' requires boolean operands.", 0);
                     return false;
                 }
 
@@ -678,7 +678,7 @@ internal static class PreceptTypeChecker
 
                 if (!IsExactly(leftKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptTypeDiagnostic(ConstraintCatalog.C41, "operator '||' requires boolean operands.", 0);
+                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41, "operator '||' requires boolean operands.", 0);
                     return false;
                 }
 
@@ -688,7 +688,7 @@ internal static class PreceptTypeChecker
 
                 if (!IsExactly(rightKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptTypeDiagnostic(ConstraintCatalog.C41, "operator '||' requires boolean operands.", 0);
+                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41, "operator '||' requires boolean operands.", 0);
                     return false;
                 }
 
@@ -717,7 +717,7 @@ internal static class PreceptTypeChecker
                     return true;
                 }
 
-                diagnostic = new PreceptTypeDiagnostic(ConstraintCatalog.C41, "operator '+' requires number+number or string+string.", 0);
+                diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41, "operator '+' requires number+number or string+string.", 0);
                 return false;
             }
 
@@ -737,7 +737,7 @@ internal static class PreceptTypeChecker
                 if (!IsExactly(leftKind, StaticValueKind.Number) || !IsExactly(rightKind, StaticValueKind.Number))
                 {
                     diagnostic = new PreceptTypeDiagnostic(
-                        ConstraintCatalog.C41,
+                        DiagnosticCatalog.C41,
                         $"operator '{binary.Operator}' requires numeric operands.",
                         0);
                     return false;
@@ -762,7 +762,7 @@ internal static class PreceptTypeChecker
             {
                 if (binary.Left is not PreceptIdentifierExpression { Member: null } collectionIdentifier)
                 {
-                    diagnostic = new PreceptTypeDiagnostic(ConstraintCatalog.C41, "'contains' requires a collection field on the left side.", 0);
+                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41, "'contains' requires a collection field on the left side.", 0);
                     return false;
                 }
 
@@ -772,7 +772,7 @@ internal static class PreceptTypeChecker
                 var collectionKey = $"{collectionIdentifier.Name}.count";
                 if (!symbols.ContainsKey(collectionKey))
                 {
-                    diagnostic = new PreceptTypeDiagnostic(ConstraintCatalog.C38, $"unknown identifier '{collectionIdentifier.Name}'.", 0);
+                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C38, $"unknown identifier '{collectionIdentifier.Name}'.", 0);
                     return false;
                 }
 
@@ -792,7 +792,7 @@ internal static class PreceptTypeChecker
                 if (innerKind != StaticValueKind.None && !IsAssignable(rightKind, innerKind))
                 {
                     diagnostic = new PreceptTypeDiagnostic(
-                        ConstraintCatalog.C41,
+                        DiagnosticCatalog.C41,
                         $"operator 'contains' requires RHS of type {FormatKinds(innerKind)} but expression produces {FormatKinds(rightKind)}.",
                         0);
                     return false;
@@ -803,7 +803,7 @@ internal static class PreceptTypeChecker
             }
 
             default:
-                diagnostic = new PreceptTypeDiagnostic(ConstraintCatalog.C41, $"unsupported binary operator '{binary.Operator}'.", 0);
+                diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41, $"unsupported binary operator '{binary.Operator}'.", 0);
                 return false;
         }
     }
@@ -944,7 +944,7 @@ internal static class PreceptTypeChecker
                         break;
 
                     diagnostics.Add(new PreceptTypeDiagnostic(
-                        ConstraintCatalog.C43,
+                        DiagnosticCatalog.C43,
                         $"'{mutation.Verb.ToString().ToLowerInvariant()} {mutation.TargetField} into {mutation.IntoField}': cannot assign {FormatKinds(innerKind)} to target '{mutation.IntoField}' of type {FormatKinds(intoKind)}.",
                         line,
                         StateContext: stateContext));
