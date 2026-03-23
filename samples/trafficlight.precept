@@ -36,11 +36,11 @@ event ClearEmergency
 from any on VehiclesArrive -> set VehiclesWaiting = VehiclesWaiting + VehiclesArrive.Count -> no transition
 from any on LeftTurnRequest -> set LeftTurnQueued = true -> no transition
 
-from Red on Advance when LeftTurnQueued -> set CycleCount = CycleCount + 1 -> transition FlashingGreen
-from Red on Advance when VehiclesWaiting > 0 -> set CycleCount = CycleCount + 1 -> transition Green
+from Red on Advance when LeftTurnQueued -> set LeftTurnQueued = false -> set CycleCount = CycleCount + 1 -> transition FlashingGreen
+from Red on Advance when VehiclesWaiting > 0 -> set VehiclesWaiting = 0 -> set CycleCount = CycleCount + 1 -> transition Green
 from Red on Advance -> reject "No demand detected at red"
 
-from FlashingGreen on Advance -> set CycleCount = CycleCount + 1 -> transition Green
+from FlashingGreen on Advance -> set VehiclesWaiting = 0 -> set CycleCount = CycleCount + 1 -> transition Green
 from Green on Advance -> set CycleCount = CycleCount + 1 -> transition Yellow
 from Yellow on Advance -> transition Red
 
