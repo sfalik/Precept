@@ -58,8 +58,8 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active", new Dictionary<string, object?> { ["Balance"] = 100.0 });
         var result = wf.Fire(inst, "Spend", new Dictionary<string, object?> { ["Amount"] = 200.0 });
 
-        result.Outcome.Should().Be(TransitionOutcome.Rejected);
-        result.Reasons.Should().ContainSingle(r => r.Contains("Balance must be non-negative"));
+        result.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("Balance must be non-negative");
     }
 
     [Fact]
@@ -112,8 +112,8 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active", new Dictionary<string, object?> { ["X"] = 10.0, ["Y"] = 10.0 });
         var result = wf.Fire(inst, "Adjust", new Dictionary<string, object?> { ["Dx"] = -20.0, ["Dy"] = -20.0 });
 
-        result.Outcome.Should().Be(TransitionOutcome.Rejected);
-        result.Reasons.Should().HaveCountGreaterThanOrEqualTo(2);
+        result.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
+        result.Violations.Should().HaveCountGreaterThanOrEqualTo(2);
     }
 
     [Fact]
@@ -132,8 +132,8 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active", new Dictionary<string, object?> { ["Counter"] = 5.0 });
         var result = wf.Fire(inst, "Reduce");
 
-        result.Outcome.Should().Be(TransitionOutcome.Rejected);
-        result.Reasons.Should().ContainSingle(r => r.Contains("Counter non-negative"));
+        result.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("Counter non-negative");
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -156,8 +156,8 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active", new Dictionary<string, object?> { ["Score"] = 10.0 });
         var result = wf.Fire(inst, "Adjust");
 
-        result.Outcome.Should().Be(TransitionOutcome.Rejected);
-        result.Reasons.Should().ContainSingle(r => r.Contains("Score positive while active"));
+        result.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("Score positive while active");
     }
 
     [Fact]
@@ -177,8 +177,8 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Draft", new Dictionary<string, object?> { ["Score"] = 5.0 });
         var result = wf.Fire(inst, "Publish");
 
-        result.Outcome.Should().Be(TransitionOutcome.Rejected);
-        result.Reasons.Should().ContainSingle(r => r.Contains("Need enough score to publish"));
+        result.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("Need enough score to publish");
     }
 
     [Fact]
@@ -219,8 +219,8 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active", new Dictionary<string, object?> { ["ClearedForExit"] = false });
         var result = wf.Fire(inst, "Finish");
 
-        result.Outcome.Should().Be(TransitionOutcome.Rejected);
-        result.Reasons.Should().ContainSingle(r => r.Contains("Must be cleared before leaving Active"));
+        result.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("Must be cleared before leaving Active");
     }
 
     [Fact]
@@ -239,8 +239,8 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active", new Dictionary<string, object?> { ["Score"] = 10.0 });
         var result = wf.Fire(inst, "Penalize", new Dictionary<string, object?> { ["Amount"] = 15.0 });
 
-        result.Outcome.Should().Be(TransitionOutcome.Rejected);
-        result.Reasons.Should().ContainSingle(r => r.Contains("Score must be positive to enter Active"));
+        result.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("Score must be positive to enter Active");
     }
 
     [Fact]
@@ -286,7 +286,7 @@ public class NewSyntaxRuntimeTests
         var result = wf.Fire(inst, "Pay", new Dictionary<string, object?> { ["Amount"] = -5.0 });
 
         result.Outcome.Should().Be(TransitionOutcome.Rejected);
-        result.Reasons.Should().ContainSingle(r => r.Contains("Payment must be positive"));
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("Payment must be positive");
     }
 
     [Fact]
@@ -475,7 +475,7 @@ public class NewSyntaxRuntimeTests
         var result = wf.Fire(inst, "Bad");
 
         result.Outcome.Should().Be(TransitionOutcome.Rejected);
-        result.Reasons.Should().ContainSingle(r => r.Contains("Not allowed"));
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("Not allowed");
     }
 
     [Fact]
@@ -643,7 +643,7 @@ public class NewSyntaxRuntimeTests
         // Negative amount blocked by event assert
         var r1 = wf.Fire(inst, "Purchase", new Dictionary<string, object?> { ["Amount"] = -10.0 });
         r1.Outcome.Should().Be(TransitionOutcome.Rejected);
-        r1.Reasons.Should().ContainSingle(r => r.Contains("Amount must be positive"));
+        r1.Violations.Should().ContainSingle().Which.Message.Should().Contain("Amount must be positive");
 
         // Valid purchase -> exit actions → row mutations → entry actions → validation
         var r2 = wf.Fire(inst, "Purchase", new Dictionary<string, object?> { ["Amount"] = 50.0 });
@@ -676,7 +676,7 @@ public class NewSyntaxRuntimeTests
         inspection.Events.Should().HaveCount(2);
 
         var finishResult = inspection.Events.First(e => e.EventName == "Finish");
-        finishResult.Outcome.Should().Be(TransitionOutcome.Rejected);
+        finishResult.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
 
         var retryResult = inspection.Events.First(e => e.EventName == "Retry");
         (retryResult.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();

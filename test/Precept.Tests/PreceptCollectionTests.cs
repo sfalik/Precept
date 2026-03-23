@@ -548,7 +548,7 @@ public class PreceptCollectionRuntimeTests
         var fire = workflow.Fire(instance, "Deq");
 
         (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle().Which.Should().Contain("empty queue");
+        fire.Violations.Should().ContainSingle().Which.Message.Should().Contain("empty queue");
     }
 
     [Fact]
@@ -569,7 +569,7 @@ public class PreceptCollectionRuntimeTests
         var fire = workflow.Fire(instance, "Pop");
 
         (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle().Which.Should().Contain("empty stack");
+        fire.Violations.Should().ContainSingle().Which.Message.Should().Contain("empty stack");
     }
 
     [Fact]

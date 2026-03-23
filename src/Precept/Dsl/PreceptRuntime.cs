@@ -268,12 +268,12 @@ public sealed class PreceptEngine
 
         // Verify the instance satisfies all current constraints (invariants + state asserts).
         var internalData = HydrateInstanceData(instance.InstanceData);
-        var ruleViolations = new List<string>();
+        var ruleViolations = new List<ConstraintViolation>();
         ruleViolations.AddRange(EvaluateInvariants(internalData));
         ruleViolations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, internalData));
         if (ruleViolations.Count > 0)
             return PreceptCompatibilityResult.NotCompatible(
-                $"Instance violates {ruleViolations.Count} rule(s): {string.Join("; ", ruleViolations)}");
+                $"Instance violates {ruleViolations.Count} rule(s): {string.Join("; ", ruleViolations.Select(v => v.Message))}");
 
         return PreceptCompatibilityResult.Compatible();
     }
@@ -302,7 +302,7 @@ public sealed class PreceptEngine
             TransitionResolutionKind.Unmatched => EventInspectionResult.Unmatched(currentState, eventName),
             TransitionResolutionKind.NoTransition => EventInspectionResult.NoTransition(currentState, eventName),
             TransitionResolutionKind.Undefined => EventInspectionResult.Undefined(currentState, eventName, resolution.NotDefinedReason!),
-            _ => EventInspectionResult.Rejected(currentState, eventName, resolution.Reasons)
+            _ => EventInspectionResult.Rejected(currentState, eventName, resolution.Violations)
         };
     }
 
@@ -339,7 +339,7 @@ public sealed class PreceptEngine
         // Inspect is a discovery API — it intentionally accepts calls with missing/partial event arguments
         // so callers can determine required args via RequiredEventArgumentKeys before firing.
         if (eventArguments != null && !TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
-            return EventInspectionResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
+            return EventInspectionResult.Rejected(instance.CurrentState, eventName, new[] { ConstraintViolation.Simple(eventArgError!) });
 
         var evaluationArguments = BuildEvaluationData(internalData, eventName, eventArguments);
 
@@ -362,7 +362,7 @@ public sealed class PreceptEngine
             return EventInspectionResult.NoTransition(instance.CurrentState, eventName);
 
         if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.MatchedRow is null)
-            return EventInspectionResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
+            return EventInspectionResult.Rejected(instance.CurrentState, eventName, resolution.Violations);
 
         var matchedRow = resolution.MatchedRow;
         var targetState = ((StateTransition)matchedRow.Outcome).TargetState;
@@ -396,7 +396,7 @@ public sealed class PreceptEngine
         var violations = CollectConstraintViolations(
             instance.CurrentState, targetState, simulatedData);
         if (violations.Count > 0)
-            return EventInspectionResult.Rejected(instance.CurrentState, eventName, violations);
+            return EventInspectionResult.ConstraintFailure(instance.CurrentState, eventName, violations);
 
         return EventInspectionResult.Transitioned(
             instance.CurrentState,
@@ -507,7 +507,7 @@ public sealed class PreceptEngine
         CommitCollections(updatedData, workingCollections);
 
         // Evaluate rules on working copy
-        var violations = new List<string>();
+        var violations = new List<ConstraintViolation>();
         violations.AddRange(EvaluateInvariants(updatedData));
         violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, updatedData));
 
@@ -517,7 +517,7 @@ public sealed class PreceptEngine
         // Map violations to affected fields
         var patchedFieldNames = new HashSet<string>(
             operations.Select(op => op.FieldName), StringComparer.Ordinal);
-        var violation = string.Join("; ", violations);
+        var violation = string.Join("; ", violations.Select(v => v.Message));
 
         var resultInfos = editableFieldInfos.Select(info =>
             patchedFieldNames.Contains(info.FieldName)
@@ -618,12 +618,11 @@ public sealed class PreceptEngine
         var compatibility = CheckCompatibility(instance);
         if (!compatibility.IsCompatible)
         {
-            var reasons = new[] { compatibility.Reason! };
-            return FireResult.Undefined(instance.CurrentState, eventName, reasons);
+            return FireResult.Undefined(instance.CurrentState, eventName, new[] { compatibility.Reason! });
         }
 
         if (!TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
-            return FireResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
+            return FireResult.Rejected(instance.CurrentState, eventName, new[] { ConstraintViolation.Simple(eventArgError!) });
 
         var evaluationArguments = BuildEvaluationData(internalData, eventName, eventArguments);
 
@@ -641,7 +640,7 @@ public sealed class PreceptEngine
             return FireResult.Unmatched(instance.CurrentState, eventName);
 
         if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.MatchedRow is null)
-            return FireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
+            return FireResult.Rejected(instance.CurrentState, eventName, resolution.Violations);
 
         var matchedRow = resolution.MatchedRow;
         var updatedData = new Dictionary<string, object?>(internalData, StringComparer.Ordinal);
@@ -653,16 +652,16 @@ public sealed class PreceptEngine
             // Row mutations only (no exit/entry actions for no-transition)
             var mutError = ExecuteRowMutations(matchedRow, updatedData, workingCollections, eventName, eventArguments);
             if (mutError is not null)
-                return FireResult.Rejected(instance.CurrentState, eventName, new[] { mutError });
+                return FireResult.Rejected(instance.CurrentState, eventName, new[] { ConstraintViolation.Simple(mutError) });
 
             CommitCollections(updatedData, workingCollections);
 
             // Validate: invariants + 'in' asserts for current state
-            var violations = new List<string>();
+            var violations = new List<ConstraintViolation>();
             violations.AddRange(EvaluateInvariants(updatedData));
             violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, updatedData));
             if (violations.Count > 0)
-                return FireResult.Rejected(instance.CurrentState, eventName, violations);
+                return FireResult.ConstraintFailure(instance.CurrentState, eventName, violations);
 
             var noTransitionUpdated = instance with
             {
@@ -683,7 +682,7 @@ public sealed class PreceptEngine
         // Stage 4: Row mutations (set assignments + collection mutations)
         var rowMutError = ExecuteRowMutations(matchedRow, updatedData, workingCollections, eventName, eventArguments);
         if (rowMutError is not null)
-            return FireResult.Rejected(instance.CurrentState, eventName, new[] { rowMutError });
+            return FireResult.Rejected(instance.CurrentState, eventName, new[] { ConstraintViolation.Simple(rowMutError) });
 
         // Stage 5: Entry actions (to <targetState> -> ...)
         ExecuteStateActions(AssertAnchor.To, targetState,
@@ -695,7 +694,7 @@ public sealed class PreceptEngine
         var validationViolations = CollectConstraintViolations(
             instance.CurrentState, targetState, updatedData);
         if (validationViolations.Count > 0)
-            return FireResult.Rejected(instance.CurrentState, eventName, validationViolations);
+            return FireResult.ConstraintFailure(instance.CurrentState, eventName, validationViolations);
 
         var updated = instance with
         {
@@ -759,7 +758,7 @@ public sealed class PreceptEngine
         CommitCollections(updatedData, workingCollections);
 
         // Stage 4: Rules evaluation (invariants + 'in' state asserts)
-        var violations = new List<string>();
+        var violations = new List<ConstraintViolation>();
         violations.AddRange(EvaluateInvariants(updatedData));
         violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, updatedData));
         if (violations.Count > 0)
@@ -933,9 +932,9 @@ public sealed class PreceptEngine
     /// Evaluates all invariants and the current state's 'in' asserts against the
     /// instance's current data. Returns a flat list of violation reason strings.
     /// </summary>
-    internal IReadOnlyList<string> EvaluateCurrentRules(PreceptInstance instance)
+    internal IReadOnlyList<ConstraintViolation> EvaluateCurrentRules(PreceptInstance instance)
     {
-        var violations = new List<string>();
+        var violations = new List<ConstraintViolation>();
         violations.AddRange(EvaluateInvariants(instance.InstanceData));
         violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, instance.InstanceData));
         return violations;
@@ -984,20 +983,15 @@ public sealed class PreceptEngine
             {
                 StateTransition => TransitionResolution.Accepted(row),
                 NoTransition => TransitionResolution.NoTransition(row),
-                Rejection rej => TransitionResolution.Rejected(new[]
-                {
-                    string.IsNullOrWhiteSpace(rej.Reason)
-                        ? (reasons.FirstOrDefault() ?? $"No transition for '{eventName}' from '{currentState}'.")
-                        : rej.Reason!
-                }),
-                _ => TransitionResolution.Rejected(reasons)
+                Rejection rej => TransitionResolution.RejectedByRow(rej, eventName, row.SourceLine),
+                _ => TransitionResolution.RejectedWithStrings(reasons)
             };
         }
 
         // No row matched — if all had guards, NotApplicable; otherwise Rejected.
         if (rows.All(r => r.WhenGuard is not null))
             return TransitionResolution.NotApplicable();
-        return TransitionResolution.Rejected(reasons);
+        return TransitionResolution.RejectedWithStrings(reasons);
     }
 
     private enum TransitionResolutionKind
@@ -1013,22 +1007,39 @@ public sealed class PreceptEngine
         TransitionResolutionKind Kind,
         PreceptTransitionRow? MatchedRow,
         string? NotDefinedReason,
-        IReadOnlyList<string> Reasons)
+        IReadOnlyList<ConstraintViolation> Violations)
     {
         internal static TransitionResolution Accepted(PreceptTransitionRow row) =>
-            new(TransitionResolutionKind.Transition, row, null, Array.Empty<string>());
+            new(TransitionResolutionKind.Transition, row, null, Array.Empty<ConstraintViolation>());
 
-        internal static TransitionResolution Rejected(IReadOnlyList<string> reasons) =>
-            new(TransitionResolutionKind.Rejected, null, null, reasons);
+        internal static TransitionResolution RejectedByRow(Rejection rej, string eventName, int sourceLine)
+        {
+            var reason = string.IsNullOrWhiteSpace(rej.Reason)
+                ? $"Event '{eventName}' was rejected."
+                : rej.Reason!;
+            var violation = new ConstraintViolation(
+                reason,
+                new ConstraintSource.TransitionRejectionSource(reason, eventName, sourceLine),
+                new ConstraintTarget[] { new ConstraintTarget.EventTarget(eventName) });
+            return new(TransitionResolutionKind.Rejected, null, null, new[] { violation });
+        }
+
+        internal static TransitionResolution RejectedWithStrings(IReadOnlyList<string> reasons)
+        {
+            var violations = reasons.Select(r => new ConstraintViolation(r,
+                new ConstraintSource.TransitionRejectionSource(r, "", 0),
+                new ConstraintTarget[] { new ConstraintTarget.DefinitionTarget() })).ToList();
+            return new(TransitionResolutionKind.Rejected, null, null, violations);
+        }
 
         internal static TransitionResolution NotDefined(string reason) =>
-            new(TransitionResolutionKind.Undefined, null, reason, new[] { reason });
+            new(TransitionResolutionKind.Undefined, null, reason, Array.Empty<ConstraintViolation>());
 
         internal static TransitionResolution NoTransition(PreceptTransitionRow row) =>
-            new(TransitionResolutionKind.NoTransition, row, null, Array.Empty<string>());
+            new(TransitionResolutionKind.NoTransition, row, null, Array.Empty<ConstraintViolation>());
 
         internal static TransitionResolution NotApplicable() =>
-            new(TransitionResolutionKind.Unmatched, null, null, Array.Empty<string>());
+            new(TransitionResolutionKind.Unmatched, null, null, Array.Empty<ConstraintViolation>());
     }
 
     private IReadOnlyList<string> GetRequiredEventArgumentKeys(string eventName)
@@ -1207,32 +1218,54 @@ public sealed class PreceptEngine
 
     // ---- Constraint evaluation helpers ----
 
-    private IReadOnlyList<string> EvaluateEventAssertions(string eventName, IReadOnlyDictionary<string, object?> evaluationData)
+    private IReadOnlyList<ConstraintViolation> EvaluateEventAssertions(string eventName, IReadOnlyDictionary<string, object?> evaluationData)
     {
         if (!_eventAssertMap.TryGetValue(eventName, out var asserts) || asserts.Count == 0)
-            return Array.Empty<string>();
+            return Array.Empty<ConstraintViolation>();
 
-        var violations = new List<string>();
+        var violations = new List<ConstraintViolation>();
         foreach (var assert in asserts)
         {
             var result = PreceptExpressionRuntimeEvaluator.Evaluate(assert.Expression, evaluationData);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                violations.Add(assert.Reason);
+            {
+                var subjects = ExpressionSubjects.ExtractForEventAssert(assert.Expression, eventName);
+                var targets = new List<ConstraintTarget>();
+                foreach (var (evt, arg) in subjects.ArgReferences)
+                    targets.Add(new ConstraintTarget.EventArgTarget(evt, arg));
+                targets.Add(new ConstraintTarget.EventTarget(eventName));
+
+                violations.Add(new ConstraintViolation(
+                    assert.Reason,
+                    new ConstraintSource.EventAssertionSource(assert.ExpressionText, assert.Reason, eventName, assert.SourceLine),
+                    targets));
+            }
         }
         return violations;
     }
 
-    private IReadOnlyList<string> EvaluateInvariants(IReadOnlyDictionary<string, object?> data)
+    private IReadOnlyList<ConstraintViolation> EvaluateInvariants(IReadOnlyDictionary<string, object?> data)
     {
         if (_invariants.Count == 0)
-            return Array.Empty<string>();
+            return Array.Empty<ConstraintViolation>();
 
-        var violations = new List<string>();
+        var violations = new List<ConstraintViolation>();
         foreach (var inv in _invariants)
         {
             var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, data);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                violations.Add(inv.Reason);
+            {
+                var subjects = ExpressionSubjects.Extract(inv.Expression);
+                var targets = new List<ConstraintTarget>();
+                foreach (var fieldName in subjects.FieldReferences)
+                    targets.Add(new ConstraintTarget.FieldTarget(fieldName));
+                targets.Add(new ConstraintTarget.DefinitionTarget());
+
+                violations.Add(new ConstraintViolation(
+                    inv.Reason,
+                    new ConstraintSource.InvariantSource(inv.ExpressionText, inv.Reason, inv.SourceLine),
+                    targets));
+            }
         }
         return violations;
     }
@@ -1240,18 +1273,29 @@ public sealed class PreceptEngine
     /// <summary>
     /// Evaluates state asserts for a given preposition and state.
     /// </summary>
-    private IReadOnlyList<string> EvaluateStateAssertions(
+    private IReadOnlyList<ConstraintViolation> EvaluateStateAssertions(
         AssertAnchor preposition, string state, IReadOnlyDictionary<string, object?> data)
     {
         if (!_stateAssertMap.TryGetValue((preposition, state), out var asserts) || asserts.Count == 0)
-            return Array.Empty<string>();
+            return Array.Empty<ConstraintViolation>();
 
-        var violations = new List<string>();
+        var violations = new List<ConstraintViolation>();
         foreach (var assert in asserts)
         {
             var result = PreceptExpressionRuntimeEvaluator.Evaluate(assert.Expression, data);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
-                violations.Add(assert.Reason);
+            {
+                var subjects = ExpressionSubjects.Extract(assert.Expression);
+                var targets = new List<ConstraintTarget>();
+                foreach (var fieldName in subjects.FieldReferences)
+                    targets.Add(new ConstraintTarget.FieldTarget(fieldName));
+                targets.Add(new ConstraintTarget.StateTarget(assert.State, assert.Anchor));
+
+                violations.Add(new ConstraintViolation(
+                    assert.Reason,
+                    new ConstraintSource.StateAssertionSource(assert.ExpressionText, assert.Reason, assert.State, assert.Anchor, assert.SourceLine),
+                    targets));
+            }
         }
         return violations;
     }
@@ -1259,10 +1303,10 @@ public sealed class PreceptEngine
     /// <summary>
     /// Collects all validation violations post-mutation: invariants + preposition-aware state asserts.
     /// </summary>
-    private IReadOnlyList<string> CollectConstraintViolations(
+    private IReadOnlyList<ConstraintViolation> CollectConstraintViolations(
         string sourceState, string targetState, IReadOnlyDictionary<string, object?> data)
     {
-        var violations = new List<string>();
+        var violations = new List<ConstraintViolation>();
 
         // Invariants (always)
         violations.AddRange(EvaluateInvariants(data));
@@ -1575,6 +1619,8 @@ public static class PreceptCompiler
         // SYNC:CONSTRAINT:C41
         // SYNC:CONSTRAINT:C42
         // SYNC:CONSTRAINT:C43
+        // SYNC:CONSTRAINT:C46
+        // SYNC:CONSTRAINT:C47
         var typeCheck = PreceptTypeChecker.Check(model);
         return new CompileResult(typeCheck.Diagnostics, typeCheck.TypeContext);
     }
@@ -1826,25 +1872,29 @@ public sealed record EventInspectionResult(
     string EventName,
     string? TargetState,
     IReadOnlyList<string> RequiredEventArgumentKeys,
-    IReadOnlyList<string> Reasons)
+    IReadOnlyList<ConstraintViolation> Violations)
 {
     public bool IsSuccess => Outcome is TransitionOutcome.Transition
         or TransitionOutcome.NoTransition;
 
     internal static EventInspectionResult Transitioned(string state, string evt, string target, IReadOnlyList<string> requiredEventArgumentKeys) =>
-        new(TransitionOutcome.Transition, state, evt, target, requiredEventArgumentKeys, Array.Empty<string>());
+        new(TransitionOutcome.Transition, state, evt, target, requiredEventArgumentKeys, Array.Empty<ConstraintViolation>());
 
     internal static EventInspectionResult NoTransition(string state, string evt) =>
-        new(TransitionOutcome.NoTransition, state, evt, state, Array.Empty<string>(), Array.Empty<string>());
+        new(TransitionOutcome.NoTransition, state, evt, state, Array.Empty<string>(), Array.Empty<ConstraintViolation>());
 
     internal static EventInspectionResult Undefined(string state, string evt, string reason) =>
-        new(TransitionOutcome.Undefined, state, evt, null, Array.Empty<string>(), new[] { reason });
+        new(TransitionOutcome.Undefined, state, evt, null, Array.Empty<string>(),
+            new[] { ConstraintViolation.Simple(reason) });
 
     internal static EventInspectionResult Unmatched(string state, string evt) =>
-        new(TransitionOutcome.Unmatched, state, evt, null, Array.Empty<string>(), Array.Empty<string>());
+        new(TransitionOutcome.Unmatched, state, evt, null, Array.Empty<string>(), Array.Empty<ConstraintViolation>());
 
-    internal static EventInspectionResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(TransitionOutcome.Rejected, state, evt, null, Array.Empty<string>(), reasons);
+    internal static EventInspectionResult Rejected(string state, string evt, IReadOnlyList<ConstraintViolation> violations) =>
+        new(TransitionOutcome.Rejected, state, evt, null, Array.Empty<string>(), violations);
+
+    internal static EventInspectionResult ConstraintFailure(string state, string evt, IReadOnlyList<ConstraintViolation> violations) =>
+        new(TransitionOutcome.ConstraintFailure, state, evt, null, Array.Empty<string>(), violations);
 }
 
 public sealed record InspectionResult(
@@ -1870,16 +1920,21 @@ public enum UpdateOutcome
 
 public sealed record UpdateResult(
     UpdateOutcome Outcome,
-    IReadOnlyList<string> Reasons,
+    IReadOnlyList<ConstraintViolation> Violations,
     PreceptInstance? UpdatedInstance)
 {
     public bool IsSuccess => Outcome is UpdateOutcome.Update;
 
     internal static UpdateResult Succeeded(PreceptInstance updated) =>
-        new(UpdateOutcome.Update, Array.Empty<string>(), updated);
+        new(UpdateOutcome.Update, Array.Empty<ConstraintViolation>(), updated);
+
+    internal static UpdateResult Failed(UpdateOutcome outcome, IReadOnlyList<ConstraintViolation> violations) =>
+        new(outcome, violations, null);
 
     internal static UpdateResult Failed(UpdateOutcome outcome, IReadOnlyList<string> reasons) =>
-        new(outcome, reasons, null);
+        new(outcome, reasons.Select(r => new ConstraintViolation(r,
+            new ConstraintSource.InvariantSource("", r),
+            new[] { new ConstraintTarget.DefinitionTarget() as ConstraintTarget })).ToList(), null);
 }
 
 public interface IUpdatePatchBuilder
@@ -2039,26 +2094,32 @@ public sealed record FireResult(
     string PreviousState,
     string EventName,
     string? NewState,
-    IReadOnlyList<string> Reasons,
+    IReadOnlyList<ConstraintViolation> Violations,
     PreceptInstance? UpdatedInstance)
 {
     public bool IsSuccess => Outcome is TransitionOutcome.Transition
         or TransitionOutcome.NoTransition;
 
     internal static FireResult Transitioned(string state, string evt, string newState, PreceptInstance updated) =>
-        new(TransitionOutcome.Transition, state, evt, newState, Array.Empty<string>(), updated);
+        new(TransitionOutcome.Transition, state, evt, newState, Array.Empty<ConstraintViolation>(), updated);
 
     internal static FireResult NoTransition(string state, string evt, PreceptInstance updated) =>
-        new(TransitionOutcome.NoTransition, state, evt, state, Array.Empty<string>(), updated);
+        new(TransitionOutcome.NoTransition, state, evt, state, Array.Empty<ConstraintViolation>(), updated);
 
     internal static FireResult Undefined(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(TransitionOutcome.Undefined, state, evt, null, reasons, null);
+        new(TransitionOutcome.Undefined, state, evt, null,
+            reasons.Select(r => new ConstraintViolation(r,
+                new ConstraintSource.InvariantSource("", r),
+                new[] { new ConstraintTarget.DefinitionTarget() as ConstraintTarget })).ToList(), null);
 
     internal static FireResult Unmatched(string state, string evt) =>
-        new(TransitionOutcome.Unmatched, state, evt, null, Array.Empty<string>(), null);
+        new(TransitionOutcome.Unmatched, state, evt, null, Array.Empty<ConstraintViolation>(), null);
 
-    internal static FireResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(TransitionOutcome.Rejected, state, evt, null, reasons, null);
+    internal static FireResult Rejected(string state, string evt, IReadOnlyList<ConstraintViolation> violations) =>
+        new(TransitionOutcome.Rejected, state, evt, null, violations, null);
+
+    internal static FireResult ConstraintFailure(string state, string evt, IReadOnlyList<ConstraintViolation> violations) =>
+        new(TransitionOutcome.ConstraintFailure, state, evt, null, violations, null);
 }
 
 public enum TransitionOutcome

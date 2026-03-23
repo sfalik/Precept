@@ -459,6 +459,12 @@ public class CatalogDriftTests
         // C45: Subsumed state assert (to redundant with identical in)
         ["C45"] = new(H + "field X as number default 10\n" + S2 + "in B assert X > 0 because \"in covers entry\"\nto B assert X > 0 because \"to is redundant\"\nevent Go\nfrom A on Go -> transition B\n", "Subsumed state assert"),
 
+        // C46: Non-boolean expression in rule position (guard, invariant, assert)
+        ["C46"] = new(H + "field X as number default 0\n" + S2 + "event Go\nfrom A on Go when X -> transition B\nfrom A on Go -> reject \"blocked\"\n", "PRECEPT046"),
+
+        // C47: Identical guard on duplicate transition rows for the same state+event pair
+        ["C47"] = new(H + "field X as number default 0\n" + S2 + "event Go\nfrom A on Go when X > 0 -> transition B\nfrom A on Go when X > 0 -> reject \"blocked\"\n", "PRECEPT047"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state

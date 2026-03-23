@@ -359,7 +359,7 @@ public static class DiagnosticCatalog
         "{message}");
 
     // ═══════════════════════════════════════════════════════════════
-    // Compile-phase structural constraints (C44–C45)
+    // Compile-phase structural constraints (C44–C47)
     // ═══════════════════════════════════════════════════════════════
 
     /// <summary>Duplicate assert: same preposition, state, and expression text appearing more than once.</summary>
@@ -373,4 +373,16 @@ public static class DiagnosticCatalog
         "C45", "compile",
         "Subsumed assert: 'to' assert is redundant when an identical 'in' assert exists on the same state.",
         "Subsumed state assert: 'to {state} assert {expression}' is redundant — an identical 'in {state} assert' already covers entry (line {sourceLine}).");
+
+    /// <summary>Expressions in rule positions (guards, invariants, asserts) must produce a boolean value.</summary>
+    public static readonly LanguageConstraint C46 = Register(
+        "C46", "compile",
+        "Expressions in rule positions (guards, invariants, asserts) must produce a boolean value.",
+        "{context} must be a boolean expression, but expression produces {actual}.");
+
+    /// <summary>Identical guard on duplicate transition rows for the same state+event pair.</summary>
+    public static readonly LanguageConstraint C47 = Register(
+        "C47", "compile",
+        "Identical guard on duplicate transition rows for the same state+event pair.",
+        "Duplicate guard: '{guard}' appears more than once for '{state}' on '{event}' (duplicate at line {sourceLine}).");
 }

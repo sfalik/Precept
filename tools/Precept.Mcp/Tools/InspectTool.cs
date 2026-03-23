@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Linq;
 using ModelContextProtocol.Server;
 using Precept;
 
@@ -98,7 +99,7 @@ public static class InspectTool
                 fireResult.UpdatedInstance is not null
                     ? ToDictionary(fireResult.UpdatedInstance.InstanceData)
                     : null,
-                fireResult.Reasons.Count > 0 ? string.Join("; ", fireResult.Reasons) : null,
+                fireResult.Violations.Count > 0 ? string.Join("; ", fireResult.Violations.Select(v => v.Message)) : null,
                 false,
                 null,
                 null);

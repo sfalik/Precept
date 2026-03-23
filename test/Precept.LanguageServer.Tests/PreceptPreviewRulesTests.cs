@@ -67,8 +67,37 @@ public class PreceptPreviewRulesTests
         var violations = definition.EvaluateCurrentRules(instance);
 
         violations.Should().HaveCount(2, "both field rules are violated by the supplied data");
-        violations.Should().Contain("Balance must not go negative");
-        violations.Should().Contain("Quantity must stay positive");
+        violations.Should().Contain(v => v.Message == "Balance must not go negative");
+        violations.Should().Contain(v => v.Message == "Quantity must stay positive");
+    }
+
+    // ── PreceptPreviewHandler — snapshot includes ActiveRuleViolations ──────────
+
+    [Fact]
+    public async Task Snapshot_ActiveRuleViolations_IsNull_WhenCurrentInstanceSatisfiesAllRules()
+    {
+        // Verifies the BuildSnapshot wiring: EvaluateCurrentRules returns empty → property is null
+        // (not an empty array) so the webview banner stays hidden.
+        const string dsl = """
+            precept M
+            field Balance as number default 100
+            invariant Balance >= 0 because "Balance must not go negative"
+            state Active initial
+            event Debit with Amount as number
+            from Active on Debit -> set Balance = Balance - Debit.Amount -> transition Active
+            """;
+
+        var (handler, uri) = CreateHandler();
+        var response = await handler.Handle(
+            new PreceptPreviewRequest("snapshot", uri, Text: dsl),
+            CancellationToken.None);
+
+        response.Success.Should().BeTrue();
+        response.Snapshot.Should().NotBeNull();
+
+        // No violations for the default instance (Balance=100 satisfies Balance >= 0)
+        response.Snapshot!.ActiveRuleViolations.Should().BeNull(
+            "BuildSnapshot should return null (not an empty array) when EvaluateCurrentRules is empty");
     }
 
     // ── PreceptPreviewHandler — snapshot includes RuleDefinitions ─────────────────

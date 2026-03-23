@@ -333,6 +333,359 @@ public class PreceptTypeCheckerTests
         result.TypeContext.Scopes.Should().Contain(s => s.ScopeKind == "state-action" && s.StateContext == "Closed");
     }
 
+    // ─── Phase D: Equality type-compatibility ───────────────────────
+    [Fact]
+    public void Check_SameTypeEquality_String_Passes()
+    {
+        const string dsl = """
+            precept M
+            field Name as string default ""
+            state A initial
+            state B
+            event Go
+            from A on Go when Name == "open" -> transition B
+            from A on Go -> reject "blocked"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_SameTypeEquality_Number_Passes()
+    {
+        const string dsl = """
+            precept M
+            field Count as number default 0
+            state A initial
+            state B
+            event Go
+            from A on Go when Count == 0 -> transition B
+            from A on Go -> reject "blocked"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_SameTypeEquality_Boolean_Passes()
+    {
+        const string dsl = """
+            precept M
+            field Active as boolean default false
+            state A initial
+            state B
+            event Go
+            from A on Go when Active == false -> transition B
+            from A on Go -> reject "blocked"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_CrossTypeEquality_StringVsNumber_ProducesC41()
+    {
+        const string dsl = """
+            precept M
+            field Name as string default ""
+            field Count as number default 0
+            state A initial
+            state B
+            event Go
+            from A on Go when Name == Count -> transition B
+            from A on Go -> reject "blocked"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C41");
+        result.Diagnostics[0].Message.Should().Contain("same type");
+    }
+
+    [Fact]
+    public void Check_NullEquality_NonNullableStringField_ProducesC41()
+    {
+        const string dsl = """
+            precept M
+            field Name as string default ""
+            state A initial
+            state B
+            event Go
+            from A on Go when Name == null -> transition B
+            from A on Go -> reject "blocked"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C41");
+        result.Diagnostics[0].Message.Should().Contain("non-nullable");
+    }
+
+    [Fact]
+    public void Check_NullEquality_NullableStringField_Passes()
+    {
+        const string dsl = """
+            precept M
+            field Tag as string nullable
+            state A initial
+            state B
+            event Go
+            from A on Go when Tag != null -> transition B
+            from A on Go -> reject "blocked"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_NullableToNonNullableEquality_SameFamily_Passes()
+    {
+        const string dsl = """
+            precept M
+            field Best as string default ""
+            field Tag as string nullable
+            state A initial
+            state B
+            event Go
+            from A on Go when Tag != Best -> transition B
+            from A on Go -> reject "blocked"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    // ─── Phase E: Bare event arg in transition row ──────────────────
+    [Fact]
+    public void Check_BareEventArgInTransitionGuard_ProducesC38()
+    {
+        const string dsl = """
+            precept M
+            state A initial
+            state B
+            event Go with Count as number
+            from A on Go when Count > 0 -> transition B
+            from A on Go -> reject "blocked"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C38");
+        result.Diagnostics[0].Message.Should().Contain("'Count'");
+    }
+
+    [Fact]
+    public void Check_DottedEventArgInTransitionGuard_Passes()
+    {
+        const string dsl = """
+            precept M
+            state A initial
+            state B
+            event Go with Count as number
+            from A on Go when Go.Count > 0 -> transition B
+            from A on Go -> reject "blocked"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DottedEventArgNullNarrowing_NarrowsSuccessfully()
+    {
+        const string dsl = """
+            precept M
+            field Total as number default 0
+            state A initial
+            state B
+            event Go with Amount as number nullable
+            from A on Go when Go.Amount != null -> set Total = Go.Amount -> transition B
+            from A on Go -> reject "blocked"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_BareEventArgInTransitionSet_ProducesC38()
+    {
+        const string dsl = """
+            precept M
+            field Total as number default 0
+            state A initial
+            state B
+            event Go with Amount as number
+            from A on Go -> set Total = Amount -> transition B
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C38");
+        result.Diagnostics[0].Message.Should().Contain("'Amount'");
+    }
+
+    [Fact]
+    public void Check_EventAssertStillAcceptsBareArgName()
+    {
+        const string dsl = """
+            precept M
+            state A initial
+            event Go with Count as number
+            on Go assert Count > 0 because "count must be positive"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    // ─── Phase F: Rule-position non-boolean → C46 ───────────────────
+    [Fact]
+    public void Check_NumericExpressionInGuard_ProducesC46()
+    {
+        const string dsl = """
+            precept M
+            field Count as number default 0
+            state A initial
+            state B
+            event Go
+            from A on Go when Count -> transition B
+            from A on Go -> reject "blocked"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C46");
+        result.Diagnostics[0].Message.Should().Contain("when predicate");
+    }
+
+    [Fact]
+    public void Check_StringExpressionInInvariant_ProducesC46()
+    {
+        const string dsl = """
+            precept M
+            field Name as string default ""
+            state A initial
+            invariant Name because "non-boolean invariant"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C46");
+        result.Diagnostics[0].Message.Should().Contain("invariant");
+    }
+
+    [Fact]
+    public void Check_BooleanExpressionInGuard_Passes_NoC46()
+    {
+        const string dsl = """
+            precept M
+            field Active as boolean default true
+            state A initial
+            state B
+            event Go
+            from A on Go when Active -> transition B
+            from A on Go -> reject "blocked"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_NumberInStateAssert_ProducesC46()
+    {
+        const string dsl = """
+            precept M
+            field Balance as number default 10
+            state Open initial
+            in Open assert Balance because "non-boolean assert"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C46");
+    }
+
+    // ─── Phase G: Duplicate guard detection (C47) ───────────────────
+    [Fact]
+    public void Check_IdenticalGuardsOnSameStateEvent_ProducesC47()
+    {
+        const string dsl = """
+            precept M
+            field Count as number default 0
+            state A initial
+            state B
+            event Go
+            from A on Go when Count > 0 -> transition B
+            from A on Go when Count > 0 -> reject "duplicate"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C47");
+        result.Diagnostics[0].Message.Should().Contain("Count > 0");
+    }
+
+    [Fact]
+    public void Check_DifferentGuardsOnSameStateEvent_Passes()
+    {
+        const string dsl = """
+            precept M
+            field Count as number default 0
+            state A initial
+            state B
+            event Go
+            from A on Go when Count > 0 -> transition B
+            from A on Go when Count == 0 -> reject "zero count"
+            from A on Go -> reject "fallback"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_IdenticalGuardNormalizedWhitespace_ProducesC47()
+    {
+        const string dsl = """
+            precept M
+            field Count as number default 0
+            state A initial
+            state B
+            event Go
+            from A on Go when Count > 0 -> transition B
+            from A on Go when Count  >  0 -> reject "duplicate with extra spaces"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C47");
+    }
+
     private static PreceptTypeCheckResult Check(string dsl)
     {
         var model = PreceptParser.Parse(dsl);

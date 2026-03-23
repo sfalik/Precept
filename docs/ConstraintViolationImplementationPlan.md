@@ -700,10 +700,10 @@ Build and run all tests one final time. When finished, update the Status Tracker
 | 1 | Result type & enum renames | Completed | ~234 references for outcome enum across source/test/tools |
 | 2 | Catalog & compile result renames | Completed | File rename + ~50 class references |
 | 3 | Runtime method renames + IsSuccess | Completed | 3 methods + 3 computed properties |
-| 4 | Structured constraint violations | Not started | New types + behavioral change |
-| 5 | Test migration | Not started | All test files updated + new tests |
-| 6 | LS, visualizer & MCP consumer updates | Not started | Handler + protocol + webview + MCP tools + tests |
-| 7 | Documentation & cleanup | Not started | Final sweep |
+| 4 | Structured constraint violations | Completed | New types (ConstraintViolation, ConstraintTarget, ConstraintSource, ExpressionSubjects) + Reasons→Violations + Rejected/ConstraintFailure outcome split. Build passes; tests fail (expected). |
+| 5 | Test migration | Completed | All test files migrated (.Reasons→.Violations, outcome enum updates); new PreceptConstraintViolationTests.cs added (IsSuccess × 3 result types, Scenarios 1–5 & 7, ConstraintFailure vs Rejected). 649 tests passing. |
+| 6 | LS, visualizer & MCP consumer updates | Completed | All consumer updates were done in Phase 4. Phase 6 additions: (1) `EventInspectionResult.Undefined` now propagates `reason` into `Violations` via `ConstraintViolation.Simple(reason)`; (2) `BuildSnapshot` now populates `ActiveRuleViolations` from `EvaluateCurrentRules(instance)` so the webview rule-violations banner is correctly wired; (3) new `Snapshot_ActiveRuleViolations_IsNull_WhenCurrentInstanceSatisfiesAllRules` LS test added. 650 tests passing. |
+| 7 | Documentation & cleanup | Completed | README verified clean (no stale API names). @ToDo.md Group 3 marked ✅. CleanupAndNextSteps.md Item 7 added. 650 tests passing. |
 
 ---
 

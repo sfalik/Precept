@@ -30,7 +30,7 @@ public class PreceptWorkflowTests
         (inspection.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         inspection.Outcome.Should().Be(TransitionOutcome.Transition);
         inspection.TargetState.Should().Be("Green");
-        inspection.Reasons.Should().BeEmpty();
+        inspection.Violations.Should().BeEmpty();
     }
 
     [Fact]
@@ -109,7 +109,7 @@ public class PreceptWorkflowTests
         (inspection.Outcome is TransitionOutcome.Undefined).Should().BeFalse();
         (inspection.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         inspection.TargetState.Should().Be("Green");
-        inspection.Reasons.Should().BeEmpty();
+        inspection.Violations.Should().BeEmpty();
     }
 
     [Fact]
@@ -133,7 +133,7 @@ public class PreceptWorkflowTests
         (inspection.Outcome is TransitionOutcome.Undefined).Should().BeFalse();
         (inspection.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         inspection.TargetState.Should().BeNull();
-        inspection.Reasons.Should().ContainSingle("Cars waiting required");
+        inspection.Violations.Should().ContainSingle().Which.Message.Should().Be("Cars waiting required");
     }
 
     [Fact]
@@ -155,7 +155,7 @@ public class PreceptWorkflowTests
 
         (inspection.Outcome is TransitionOutcome.Undefined).Should().BeFalse();
         (inspection.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
-        inspection.Reasons.Should().ContainSingle("Cars waiting required");
+        inspection.Violations.Should().ContainSingle().Which.Message.Should().Be("Cars waiting required");
     }
 
     [Fact]
@@ -178,7 +178,7 @@ public class PreceptWorkflowTests
 
         (inspection.Outcome is TransitionOutcome.Undefined).Should().BeFalse();
         (inspection.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
-        inspection.Reasons.Should().ContainSingle("Feature must be enabled");
+        inspection.Violations.Should().ContainSingle().Which.Message.Should().Be("Feature must be enabled");
     }
 
     [Fact]
@@ -208,7 +208,7 @@ public class PreceptWorkflowTests
 
         (inspection.Outcome is TransitionOutcome.Undefined).Should().BeFalse();
         (inspection.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
-        inspection.Reasons.Should().ContainSingle("No eligible transition");
+        inspection.Violations.Should().ContainSingle().Which.Message.Should().Be("No eligible transition");
     }
 
     [Fact]
@@ -411,7 +411,7 @@ public class PreceptWorkflowTests
         (fire.Outcome is TransitionOutcome.Undefined).Should().BeFalse();
         (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire.NewState.Should().Be("Green");
-        fire.Reasons.Should().BeEmpty();
+        fire.Violations.Should().BeEmpty();
     }
 
     [Fact]
@@ -505,7 +505,7 @@ public class PreceptWorkflowTests
 
         (fire.Outcome is TransitionOutcome.Undefined).Should().BeFalse();
         (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle(r => r.Contains("required argument 'Reason'", StringComparison.Ordinal));
+        fire.Violations.Should().ContainSingle().Which.Message.Should().Contain("required argument 'Reason'");
     }
 
     [Fact]
@@ -806,10 +806,10 @@ public class PreceptWorkflowTests
         (rejected.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         (withConflictingArg.Outcome is TransitionOutcome.Undefined).Should().BeFalse();
         (withConflictingArg.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
-        withConflictingArg.Reasons.Should().ContainSingle("Feature must be enabled");
+        withConflictingArg.Violations.Should().ContainSingle().Which.Message.Should().Be("Feature must be enabled");
         (rejectedWithUnrelatedArgs.Outcome is TransitionOutcome.Undefined).Should().BeFalse();
         (rejectedWithUnrelatedArgs.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
-        rejectedWithUnrelatedArgs.Reasons.Should().NotBeEmpty();
+        rejectedWithUnrelatedArgs.Violations.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -835,7 +835,7 @@ public class PreceptWorkflowTests
 
         inspection.Outcome.Should().Be(TransitionOutcome.Undefined);
         (inspection.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
-        inspection.Reasons.Should().ContainSingle(r => r.Contains("workflow", StringComparison.Ordinal));
+        inspection.Violations.Should().ContainSingle().Which.Message.Should().Contain("workflow");
     }
 
     [Fact]
@@ -856,7 +856,7 @@ public class PreceptWorkflowTests
         (fire.Outcome is TransitionOutcome.Undefined).Should().BeFalse();
         (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire.NewState.Should().Be("Yellow");
-        fire.Reasons.Should().BeEmpty();
+        fire.Violations.Should().BeEmpty();
     }
 
     [Fact]
@@ -877,7 +877,7 @@ public class PreceptWorkflowTests
         fire.Outcome.Should().Be(TransitionOutcome.Undefined);
         (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         fire.NewState.Should().BeNull();
-        fire.Reasons.Should().ContainSingle();
+        fire.Violations.Should().ContainSingle();
     }
 
     [Fact]
@@ -1004,7 +1004,7 @@ public class PreceptWorkflowTests
         (inspection.Outcome is TransitionOutcome.Undefined).Should().BeFalse();
         (inspection.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         inspection.Outcome.Should().Be(TransitionOutcome.Rejected);
-        inspection.Reasons.Should().ContainSingle("No cars waiting");
+        inspection.Violations.Should().ContainSingle().Which.Message.Should().Be("No cars waiting");
     }
 
     [Fact]
@@ -1171,7 +1171,7 @@ public class PreceptWorkflowTests
         workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 1 }), "Advance").TargetState.Should().Be("Yellow");
         var rejected = workflow.Inspect(workflow.CreateInstance("Red", new Dictionary<string, object?> { ["CarsWaiting"] = 0 }), "Advance");
         rejected.Outcome.Should().Be(TransitionOutcome.Rejected);
-        rejected.Reasons.Should().ContainSingle("No cars waiting");
+        rejected.Violations.Should().ContainSingle().Which.Message.Should().Be("No cars waiting");
     }
 
     [Fact]
@@ -1676,7 +1676,7 @@ public class PreceptWorkflowTests
         var fire = workflow.Fire(instance, "Submit");
 
         (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
-        fire.Reasons.Should().ContainSingle(r => r.Contains("required argument 'Reason'", StringComparison.Ordinal));
+        fire.Violations.Should().ContainSingle().Which.Message.Should().Contain("required argument 'Reason'");
     }
 
     [Fact]

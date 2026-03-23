@@ -58,7 +58,7 @@ from CheckedOut on ReturnBook -> set CurrentBorrower = null -> transition OnShel
 from OnShelf on ProcessNextHold when HoldQueue.count > 0 -> dequeue HoldQueue into PromotedPatron -> transition HoldReady
 from OnShelf on ProcessNextHold -> reject "There is no waiting patron to promote"
 
-from HoldReady on CollectHold when ReadyPatron != null && CollectHold.PatronId == ReadyPatron -> set CurrentBorrower = CollectHold.PatronId -> push BorrowerHistory CollectHold.PatronId -> transition CheckedOut
+from HoldReady on CollectHold when CollectHold.PatronId == ReadyPatron -> set CurrentBorrower = CollectHold.PatronId -> push BorrowerHistory CollectHold.PatronId -> transition CheckedOut
 from HoldReady on CollectHold -> reject "Only the ready patron can collect this hold"
 
 from OnShelf on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition

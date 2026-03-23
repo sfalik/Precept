@@ -175,15 +175,9 @@ internal static class PreceptExpressionRuntimeEvaluator
                 return EvaluationResult.Fail("operator '%' requires numeric operands.");
 
             case "==":
-                if (TryToNumber(leftOperand, out var leftNumberForEq) && TryToNumber(rightOperand, out var rightNumberForEq))
-                    return EvaluationResult.Ok(leftNumberForEq == rightNumberForEq);
-
                 return EvaluationResult.Ok(Equals(leftOperand, rightOperand));
 
             case "!=":
-                if (TryToNumber(leftOperand, out var leftNumberForNeq) && TryToNumber(rightOperand, out var rightNumberForNeq))
-                    return EvaluationResult.Ok(leftNumberForNeq != rightNumberForNeq);
-
                 return EvaluationResult.Ok(!Equals(leftOperand, rightOperand));
 
             case ">":

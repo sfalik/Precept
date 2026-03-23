@@ -694,7 +694,8 @@ For `no transition`: steps 3 and 5 are skipped (no state change). `in <State>` a
 |---|---|---|
 | Coverage | Reachable `(state, event)` pair has no transition rows | Warning |
 | Unreachable row | A row follows an unguarded row for the same `(state, event)` | Error |
-| Identical-guard duplicate | A row has the same guard as a prior row for the same `(state, event)` | Error |
+| Identical-guard duplicate | A row has the same guard as a prior row for the same `(state, event)` (C47) | Error |
+| Non-boolean rule position | `when` guard, `invariant`, or `assert` expression does not produce a boolean (C46) | Error |
 | Missing outcome | Row has no outcome (`transition`, `no transition`, or `reject`) | Error |
 | Unknown state/event | `from` references undeclared state; `on` references undeclared event | Error |
 | Unknown field | `set` targets undeclared field; mutation targets non-collection field | Error |
@@ -707,7 +708,7 @@ All diagnostics follow a three-tier severity model:
 
 | Severity | Meaning | Examples |
 |---|---|---|
-| **Error** | Provably wrong — the checker can prove a contradiction from types, null-flow, or structural rules. Blocks compilation. | Type mismatches (C39–C41), null-flow violations (C42), unknown identifiers (C38), unreachable rows, identical-guard duplicates, missing outcomes |
+| **Error** | Provably wrong — the checker can prove a contradiction from types, null-flow, or structural rules. Blocks compilation. | Type mismatches (C39–C41), null-flow violations (C42), unknown identifiers (C38), non-boolean rule positions (C46), identical-guard duplicates (C47), unreachable rows, missing outcomes |
 | **Warning** | Probably wrong — structural quality issue that is almost certainly a mistake but could be intentional. Does not block compilation. | Reject-only state/event pairs, events that never succeed, unreachable states, orphaned events, missing coverage |
 | **Hint** | Informational — observation that may or may not indicate a problem. | Dead-end states, empty precept (no events) |
 

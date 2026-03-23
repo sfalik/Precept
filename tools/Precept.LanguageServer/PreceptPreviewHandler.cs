@@ -4,6 +4,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Precept;
 using System.Collections.Concurrent;
+using System.Linq;
 
 namespace Precept.LanguageServer;
 
@@ -77,7 +78,7 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
             request.EventName!,
             outcome,
             inspect.TargetState,
-            inspect.Reasons,
+            inspect.Violations.Select(v => v.Message).ToArray(),
             args);
 
         return new PreceptPreviewResponse(true, InspectResult: eventStatus);
@@ -100,8 +101,9 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
 
         if (fire.Outcome is not (TransitionOutcome.Transition or TransitionOutcome.NoTransition))
         {
-            var reason = fire.Reasons.FirstOrDefault() ?? $"Event '{request.EventName}' did not fire.";
-            return new PreceptPreviewResponse(false, Error: reason, Errors: fire.Reasons, Snapshot: BuildSnapshot(session));
+            var reasons = fire.Violations.Select(v => v.Message).ToArray();
+            var reason = reasons.FirstOrDefault() ?? $"Event '{request.EventName}' did not fire.";
+            return new PreceptPreviewResponse(false, Error: reason, Errors: reasons, Snapshot: BuildSnapshot(session));
         }
 
         return new PreceptPreviewResponse(true, Snapshot: BuildSnapshot(session));
@@ -125,8 +127,9 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
 
         if (result.Outcome != UpdateOutcome.Update || result.UpdatedInstance is null)
         {
-            var reason = result.Reasons.FirstOrDefault() ?? "Update failed.";
-            return new PreceptPreviewResponse(false, Error: reason, Errors: result.Reasons, Snapshot: BuildSnapshot(session));
+            var reasons = result.Violations.Select(v => v.Message).ToArray();
+            var reason = reasons.FirstOrDefault() ?? "Update failed.";
+            return new PreceptPreviewResponse(false, Error: reason, Errors: reasons, Snapshot: BuildSnapshot(session));
         }
 
         session.Instance = result.UpdatedInstance;
@@ -198,7 +201,7 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
                 continue;
             }
 
-            var reason = fire.Reasons.FirstOrDefault() ?? "blocked/undefined";
+            var reason = fire.Violations.Select(v => v.Message).FirstOrDefault() ?? "blocked/undefined";
             messages.Add($"{step.EventName}: {reason}");
             return new PreceptPreviewResponse(false, Error: reason, Snapshot: BuildSnapshot(session), ReplayMessages: messages);
         }
@@ -280,11 +283,12 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
                 {
                     TransitionOutcome.Transition => "enabled",
                     TransitionOutcome.NoTransition => "noTransition",
+                    TransitionOutcome.ConstraintFailure => "blocked",
                     TransitionOutcome.Rejected => "blocked",
                     _ => "undefined"
                 };
 
-                return new PreceptPreviewEventStatus(inspect.EventName, outcome, inspect.TargetState, inspect.Reasons, args);
+                return new PreceptPreviewEventStatus(inspect.EventName, outcome, inspect.TargetState, inspect.Violations.Select(v => v.Message).ToArray(), args);
             })
             .ToArray();
 
@@ -319,6 +323,11 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
         foreach (var ea in session.Model.EventAsserts ?? Array.Empty<EventAssertion>())
             ruleDefinitions.Add(new PreceptPreviewRuleInfo($"event:{ea.EventName}", ea.ExpressionText, ea.Reason));
 
+        var activeRuleViolations = session.Engine.EvaluateCurrentRules(session.Instance);
+        var activeViolationMessages = activeRuleViolations.Count > 0
+            ? activeRuleViolations.Select(v => v.Message).ToArray()
+            : null;
+
         return new PreceptPreviewSnapshot(
             session.Engine.Name,
             session.Instance.CurrentState,
@@ -327,7 +336,7 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
             events,
             new Dictionary<string, object?>(session.Instance.InstanceData, StringComparer.Ordinal),
             diagnostics,
-            null,
+            activeViolationMessages,
             ruleDefinitions.Count > 0 ? ruleDefinitions : null,
             MapEditableFields(inspectionResult.EditableFields));
     }

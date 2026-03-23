@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Precept;
 
@@ -187,10 +188,36 @@ internal static class PreceptTypeChecker
 
                 IReadOnlyDictionary<string, StaticValueKind> branchSymbols = baseSymbols;
 
+                // C47: detect identical guard text for the same (state, event) group
+                var seenGuards = new Dictionary<string, int>(StringComparer.Ordinal);
+
                 foreach (var item in stateGroup.OrderBy(x => x.Row.SourceLine))
                 {
                     var row = item.Row;
                     IReadOnlyDictionary<string, StaticValueKind> setSymbols = branchSymbols;
+
+                    // C47: duplicate guard detection for this (state, event) group
+                    if (row.WhenGuard is not null && !string.IsNullOrWhiteSpace(row.WhenText))
+                    {
+                        var normalizedGuard = Regex.Replace(
+                            row.WhenText!.Trim(), @"\s+", " ");
+                        if (seenGuards.TryGetValue(normalizedGuard, out var firstLine))
+                        {
+                            diagnostics.Add(new PreceptTypeDiagnostic(
+                                DiagnosticCatalog.C47,
+                                DiagnosticCatalog.C47.FormatMessage(
+                                    ("guard", normalizedGuard),
+                                    ("state", item.State),
+                                    ("event", eventName),
+                                    ("sourceLine", firstLine)),
+                                row.SourceLine,
+                                StateContext: item.State));
+                        }
+                        else
+                        {
+                            seenGuards[normalizedGuard] = row.SourceLine;
+                        }
+                    }
 
                     if (row.WhenGuard is not null && !string.IsNullOrWhiteSpace(row.WhenText))
                     {
@@ -209,7 +236,8 @@ internal static class PreceptTypeChecker
                             "when predicate",
                             diagnostics,
                             expressions,
-                            stateContext: item.State);
+                            stateContext: item.State,
+                            isBooleanRulePosition: true);
 
                         setSymbols = ApplyNarrowing(row.WhenGuard, branchSymbols, assumeTrue: true);
                         branchSymbols = ApplyNarrowing(row.WhenGuard, branchSymbols, assumeTrue: false);
@@ -362,7 +390,8 @@ internal static class PreceptTypeChecker
                     StaticValueKind.Boolean,
                     "invariant",
                     diagnostics,
-                    expressions);
+                    expressions,
+                    isBooleanRulePosition: true);
             }
         }
 
@@ -379,7 +408,8 @@ internal static class PreceptTypeChecker
                     $"state assert on '{stateAssert.State}'",
                     diagnostics,
                     expressions,
-                    stateContext: stateAssert.State);
+                    stateContext: stateAssert.State,
+                    isBooleanRulePosition: true);
             }
         }
 
@@ -403,7 +433,8 @@ internal static class PreceptTypeChecker
                     $"event assert on '{eventAssert.EventName}'",
                     diagnostics,
                     expressions,
-                    eventName: eventAssert.EventName);
+                    eventName: eventAssert.EventName,
+                    isBooleanRulePosition: true);
             }
         }
     }
@@ -472,7 +503,8 @@ internal static class PreceptTypeChecker
         {
             foreach (var pair in eventArgs)
             {
-                symbols[pair.Key] = pair.Value;
+                // Only dotted form (EventName.ArgName) is valid in transition-row scope.
+                // Bare arg names are valid only in event-assert scope (see BuildEventAssertSymbols).
                 symbols[$"{eventName}.{pair.Key}"] = pair.Value;
             }
         }
@@ -505,7 +537,8 @@ internal static class PreceptTypeChecker
         List<PreceptTypeDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         string? stateContext = null,
-        string? eventName = null)
+        string? eventName = null,
+        bool isBooleanRulePosition = false)
     {
         if (!TryInferKind(expression, symbols, out var actualKind, out var diagnostic))
         {
@@ -529,9 +562,20 @@ internal static class PreceptTypeChecker
             return;
         }
 
-        var constraint = HasFlag(actualKind, StaticValueKind.Null) && !HasFlag(expectedKind, StaticValueKind.Null)
-            ? DiagnosticCatalog.C42
-            : DiagnosticCatalog.C39;
+        LanguageConstraint constraint;
+        string message;
+        if (isBooleanRulePosition)
+        {
+            constraint = DiagnosticCatalog.C46;
+            message = $"{expectedLabel} must be a boolean expression, but expression produces {FormatKinds(actualKind)}.";
+        }
+        else
+        {
+            constraint = HasFlag(actualKind, StaticValueKind.Null) && !HasFlag(expectedKind, StaticValueKind.Null)
+                ? DiagnosticCatalog.C42
+                : DiagnosticCatalog.C39;
+            message = $"{expectedLabel} type mismatch: expected {FormatKinds(expectedKind)} but expression produces {FormatKinds(actualKind)}.";
+        }
 
         expressions.Add(new PreceptTypeExpressionInfo(
             sourceLine,
@@ -543,7 +587,7 @@ internal static class PreceptTypeChecker
 
         diagnostics.Add(new PreceptTypeDiagnostic(
             constraint,
-            $"{expectedLabel} type mismatch: expected {FormatKinds(expectedKind)} but expression produces {FormatKinds(actualKind)}.",
+            message,
             sourceLine,
             StateContext: stateContext));
     }
@@ -751,12 +795,42 @@ internal static class PreceptTypeChecker
 
             case "==":
             case "!=":
-                if (!TryInferKind(binary.Left, symbols, out _, out diagnostic) ||
-                    !TryInferKind(binary.Right, symbols, out _, out diagnostic))
+            {
+                if (!TryInferKind(binary.Left, symbols, out var leftEqKind, out diagnostic) ||
+                    !TryInferKind(binary.Right, symbols, out var rightEqKind, out diagnostic))
                     return false;
+
+                var leftEqFamily = leftEqKind & ~StaticValueKind.Null;
+                var rightEqFamily = rightEqKind & ~StaticValueKind.Null;
+                var leftIsNull = leftEqKind == StaticValueKind.Null;
+                var rightIsNull = rightEqKind == StaticValueKind.Null;
+
+                // null literal compared to a non-nullable operand is always wrong
+                if (leftIsNull && !HasFlag(rightEqKind, StaticValueKind.Null))
+                {
+                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41,
+                        $"operator '{binary.Operator}' cannot compare non-nullable {FormatKinds(rightEqKind)} with null.", 0);
+                    return false;
+                }
+
+                if (rightIsNull && !HasFlag(leftEqKind, StaticValueKind.Null))
+                {
+                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41,
+                        $"operator '{binary.Operator}' cannot compare non-nullable {FormatKinds(leftEqKind)} with null.", 0);
+                    return false;
+                }
+
+                // Cross-type equality: both sides have non-null scalar families that differ
+                if (leftEqFamily != StaticValueKind.None && rightEqFamily != StaticValueKind.None && leftEqFamily != rightEqFamily)
+                {
+                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41,
+                        $"operator '{binary.Operator}' requires operands of the same type, but found {FormatKinds(leftEqKind)} and {FormatKinds(rightEqKind)}.", 0);
+                    return false;
+                }
 
                 kind = StaticValueKind.Boolean;
                 return true;
+            }
 
             case "contains":
             {

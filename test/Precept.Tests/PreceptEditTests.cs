@@ -177,8 +177,7 @@ public class PreceptEditTests
         var result = engine.Update(instance, p => p.Set("ResolutionSummary", "fixed"));
 
         result.Outcome.Should().Be(UpdateOutcome.UneditableField);
-        result.Reasons.Should().ContainSingle()
-            .Which.Should().Contain("ResolutionSummary").And.Contain("Open");
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("ResolutionSummary").And.Contain("Open");
         result.UpdatedInstance.Should().BeNull();
     }
 
@@ -247,8 +246,7 @@ public class PreceptEditTests
         var result = engine.Update(instance, p => p.Set("Priority", 99.0));
 
         result.Outcome.Should().Be(UpdateOutcome.ConstraintFailure);
-        result.Reasons.Should().ContainSingle()
-            .Which.Should().Contain("Priority must be between 1 and 5");
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("Priority must be between 1 and 5");
         result.UpdatedInstance.Should().BeNull();
     }
 
@@ -276,8 +274,7 @@ public class PreceptEditTests
         // In Resolved, ResolutionSummary is editable. Setting it to null violates the assert.
         var r3 = engine.Update(r2.UpdatedInstance!, p => p.Set("ResolutionSummary", null));
         r3.Outcome.Should().Be(UpdateOutcome.ConstraintFailure);
-        r3.Reasons.Should().ContainSingle()
-            .Which.Should().Contain("Resolution requires a summary");
+        r3.Violations.Should().ContainSingle().Which.Message.Should().Contain("Resolution requires a summary");
     }
 
     // ─── Update: type validation ───
@@ -325,8 +322,7 @@ public class PreceptEditTests
             .Set("Notes", "second"));
 
         result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
-        result.Reasons.Should().ContainSingle()
-            .Which.Should().Contain("Duplicate Set");
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("Duplicate Set");
     }
 
     [Fact]
@@ -336,8 +332,7 @@ public class PreceptEditTests
 
         var result = engine.Update(instance, p => { });
         result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
-        result.Reasons.Should().ContainSingle()
-            .Which.Should().Contain("empty");
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("empty");
     }
 
     // ─── Update: collection operations ───
@@ -456,8 +451,7 @@ public class PreceptEditTests
 
         var result = engine.Update(instance, p => p.Set("Tags", "wrong"));
         result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
-        result.Reasons.Should().ContainSingle()
-            .Which.Should().Contain("Replace");
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("Replace");
     }
 
     [Fact]
@@ -479,8 +473,7 @@ public class PreceptEditTests
             .Add("Tags", "b"));
 
         result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
-        result.Reasons.Should().ContainSingle()
-            .Which.Should().Contain("Cannot combine Replace");
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("Cannot combine Replace");
     }
 
     [Fact]
@@ -490,8 +483,7 @@ public class PreceptEditTests
 
         var result = engine.Update(instance, p => p.Dequeue("Queue"));
         result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
-        result.Reasons.Should().ContainSingle()
-            .Which.Should().Contain("empty");
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("empty");
     }
 
     [Fact]
@@ -501,8 +493,7 @@ public class PreceptEditTests
 
         var result = engine.Update(instance, p => p.Pop("Stack"));
         result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
-        result.Reasons.Should().ContainSingle()
-            .Which.Should().Contain("empty");
+        result.Violations.Should().ContainSingle().Which.Message.Should().Contain("empty");
     }
 
     // ─── Update: atomicity ───

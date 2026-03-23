@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Linq;
 using ModelContextProtocol.Server;
 using Precept;
 
@@ -78,7 +79,7 @@ public static class RunTool
                 fireResult.UpdatedInstance is not null
                     ? ToDictionary(fireResult.UpdatedInstance.InstanceData)
                     : ToDictionary(instance.InstanceData),
-                fireResult.Reasons.Count > 0 ? string.Join("; ", fireResult.Reasons) : null));
+                fireResult.Violations.Count > 0 ? string.Join("; ", fireResult.Violations.Select(v => v.Message)) : null));
 
             if (fireResult.Outcome is TransitionOutcome.Rejected
                 or TransitionOutcome.ConstraintFailure

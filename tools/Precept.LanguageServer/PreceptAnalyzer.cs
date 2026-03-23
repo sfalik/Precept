@@ -951,9 +951,13 @@ internal sealed class PreceptAnalyzer
             ? diagnostic.Message
             : $"{diagnostic.Message} [state {diagnostic.StateContext}]";
 
+        var severity = diagnostic.Constraint.Severity == ConstraintSeverity.Warning
+            ? DiagnosticSeverity.Warning
+            : DiagnosticSeverity.Error;
+
         return new Diagnostic
         {
-            Severity = DiagnosticSeverity.Error,
+            Severity = severity,
             Message = message,
             Source = "precept",
             Code = new DiagnosticCode(diagnostic.DiagnosticCode),

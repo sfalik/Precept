@@ -218,7 +218,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
             });
 
         (inspect.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
-        inspect.Reasons.Should().ContainSingle("blocked");
+        inspect.Violations.Should().ContainSingle().Which.Message.Should().Be("blocked");
     }
 
     [Fact]
@@ -270,7 +270,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     {
         var dsl = BuildDslForGuard("1 + 1");
         var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
-        ex.Message.Should().Contain("PRECEPT039");
+        ex.Message.Should().Contain("PRECEPT046");
     }
 
     [Fact]
@@ -284,7 +284,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
             });
 
         (inspect.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
-        inspect.Reasons.Should().ContainSingle("blocked");
+        inspect.Violations.Should().ContainSingle().Which.Message.Should().Be("blocked");
     }
 
     [Fact]
