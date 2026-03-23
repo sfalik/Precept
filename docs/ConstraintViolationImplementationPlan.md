@@ -696,10 +696,10 @@ Build and run all tests one final time. When finished, update the Status Tracker
 
 | Phase | Description | Status | Notes |
 |-------|-------------|--------|-------|
-| 0 | Model type renames | Not started | 6 types + 2 property renames |
-| 1 | Result type & enum renames | Not started | ~234 references for outcome enum across source/test/tools |
-| 2 | Catalog & compile result renames | Not started | File rename + ~50 class references |
-| 3 | Runtime method renames + IsSuccess | Not started | 3 methods + 3 computed properties |
+| 0 | Model type renames | Completed | 6 types + 2 property renames |
+| 1 | Result type & enum renames | Completed | ~234 references for outcome enum across source/test/tools |
+| 2 | Catalog & compile result renames | Completed | File rename + ~50 class references |
+| 3 | Runtime method renames + IsSuccess | Completed | 3 methods + 3 computed properties |
 | 4 | Structured constraint violations | Not started | New types + behavioral change |
 | 5 | Test migration | Not started | All test files updated + new tests |
 | 6 | LS, visualizer & MCP consumer updates | Not started | Handler + protocol + webview + MCP tools + tests |
@@ -715,7 +715,7 @@ Build and run all tests one final time. When finished, update the Status Tracker
 | `src/Precept/Dsl/PreceptRuntime.cs` | Major edit — result types, enums, factories, violation production | 1, 3, 4 |
 | `src/Precept/Dsl/PreceptParser.cs` | Edit — model type references, DiagnosticCatalog | 0, 2 |
 | `src/Precept/Dsl/PreceptTypeChecker.cs` | Edit — CompileResult rename, Anchor property | 0, 2 |
-| `src/Precept/Dsl/ConstraintCatalog.cs` | **Rename** → `DiagnosticCatalog.cs`, class rename | 2 |
+| `src/Precept/Dsl/DiagnosticCatalog.cs` | Renamed from `ConstraintCatalog.cs`, class rename | 2 |
 | `tools/Precept.LanguageServer/PreceptAnalyzer.cs` | Edit — Anchor property reference | 0 |
 | `tools/Precept.LanguageServer/PreceptPreviewHandler.cs` | Edit — outcome switch, Violations | 0, 1, 6 |
 | `tools/Precept.LanguageServer/PreceptPreviewProtocol.cs` | Edit — violation DTO fields | 6 |

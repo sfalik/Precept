@@ -270,7 +270,7 @@ public sealed class PreceptEngine
         var internalData = HydrateInstanceData(instance.InstanceData);
         var ruleViolations = new List<string>();
         ruleViolations.AddRange(EvaluateInvariants(internalData));
-        ruleViolations.AddRange(EvaluateStateAsserts(AssertAnchor.In, instance.CurrentState, internalData));
+        ruleViolations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, internalData));
         if (ruleViolations.Count > 0)
             return PreceptCompatibilityResult.NotCompatible(
                 $"Instance violates {ruleViolations.Count} rule(s): {string.Join("; ", ruleViolations)}");
@@ -286,7 +286,7 @@ public sealed class PreceptEngine
         var evaluationData = BuildDirectEvaluationData(eventName, eventArguments);
 
         // Check event asserts first
-        var eventAssertViolations = EvaluateEventAsserts(eventName, evaluationData);
+        var eventAssertViolations = EvaluateEventAssertions(eventName, evaluationData);
         if (eventAssertViolations.Count > 0)
             return EventInspectionResult.Rejected(currentState, eventName, eventAssertViolations);
 
@@ -346,7 +346,7 @@ public sealed class PreceptEngine
         // Check event asserts — only when caller provides event arguments.
         if (eventArguments != null)
         {
-            var eventAssertViolations = EvaluateEventAsserts(eventName, BuildDirectEvaluationData(eventName, eventArguments));
+            var eventAssertViolations = EvaluateEventAssertions(eventName, BuildDirectEvaluationData(eventName, eventArguments));
             if (eventAssertViolations.Count > 0)
                 return EventInspectionResult.Rejected(instance.CurrentState, eventName, eventAssertViolations);
         }
@@ -393,7 +393,7 @@ public sealed class PreceptEngine
         CommitCollections(simulatedData, simulatedCollections);
 
         // Validate invariants + state asserts
-        var violations = CollectValidationViolations(
+        var violations = CollectConstraintViolations(
             instance.CurrentState, targetState, simulatedData);
         if (violations.Count > 0)
             return EventInspectionResult.Rejected(instance.CurrentState, eventName, violations);
@@ -509,7 +509,7 @@ public sealed class PreceptEngine
         // Evaluate rules on working copy
         var violations = new List<string>();
         violations.AddRange(EvaluateInvariants(updatedData));
-        violations.AddRange(EvaluateStateAsserts(AssertAnchor.In, instance.CurrentState, updatedData));
+        violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, updatedData));
 
         if (violations.Count == 0)
             return baseResult;
@@ -628,7 +628,7 @@ public sealed class PreceptEngine
         var evaluationArguments = BuildEvaluationData(internalData, eventName, eventArguments);
 
         // Stage 1: Event asserts (args-only context, pre-transition)
-        var eventAssertViolations = EvaluateEventAsserts(eventName, BuildDirectEvaluationData(eventName, eventArguments));
+        var eventAssertViolations = EvaluateEventAssertions(eventName, BuildDirectEvaluationData(eventName, eventArguments));
         if (eventAssertViolations.Count > 0)
             return FireResult.Rejected(instance.CurrentState, eventName, eventAssertViolations);
 
@@ -660,7 +660,7 @@ public sealed class PreceptEngine
             // Validate: invariants + 'in' asserts for current state
             var violations = new List<string>();
             violations.AddRange(EvaluateInvariants(updatedData));
-            violations.AddRange(EvaluateStateAsserts(AssertAnchor.In, instance.CurrentState, updatedData));
+            violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, updatedData));
             if (violations.Count > 0)
                 return FireResult.Rejected(instance.CurrentState, eventName, violations);
 
@@ -692,7 +692,7 @@ public sealed class PreceptEngine
         CommitCollections(updatedData, workingCollections);
 
         // Stage 6: Validation (invariants + state asserts, collect-all)
-        var validationViolations = CollectValidationViolations(
+        var validationViolations = CollectConstraintViolations(
             instance.CurrentState, targetState, updatedData);
         if (validationViolations.Count > 0)
             return FireResult.Rejected(instance.CurrentState, eventName, validationViolations);
@@ -761,7 +761,7 @@ public sealed class PreceptEngine
         // Stage 4: Rules evaluation (invariants + 'in' state asserts)
         var violations = new List<string>();
         violations.AddRange(EvaluateInvariants(updatedData));
-        violations.AddRange(EvaluateStateAsserts(AssertAnchor.In, instance.CurrentState, updatedData));
+        violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, updatedData));
         if (violations.Count > 0)
             return UpdateResult.Failed(UpdateOutcome.ConstraintFailure, violations);
 
@@ -937,7 +937,7 @@ public sealed class PreceptEngine
     {
         var violations = new List<string>();
         violations.AddRange(EvaluateInvariants(instance.InstanceData));
-        violations.AddRange(EvaluateStateAsserts(AssertAnchor.In, instance.CurrentState, instance.InstanceData));
+        violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, instance.InstanceData));
         return violations;
     }
 
@@ -1207,7 +1207,7 @@ public sealed class PreceptEngine
 
     // ---- Constraint evaluation helpers ----
 
-    private IReadOnlyList<string> EvaluateEventAsserts(string eventName, IReadOnlyDictionary<string, object?> evaluationData)
+    private IReadOnlyList<string> EvaluateEventAssertions(string eventName, IReadOnlyDictionary<string, object?> evaluationData)
     {
         if (!_eventAssertMap.TryGetValue(eventName, out var asserts) || asserts.Count == 0)
             return Array.Empty<string>();
@@ -1240,7 +1240,7 @@ public sealed class PreceptEngine
     /// <summary>
     /// Evaluates state asserts for a given preposition and state.
     /// </summary>
-    private IReadOnlyList<string> EvaluateStateAsserts(
+    private IReadOnlyList<string> EvaluateStateAssertions(
         AssertAnchor preposition, string state, IReadOnlyDictionary<string, object?> data)
     {
         if (!_stateAssertMap.TryGetValue((preposition, state), out var asserts) || asserts.Count == 0)
@@ -1259,7 +1259,7 @@ public sealed class PreceptEngine
     /// <summary>
     /// Collects all validation violations post-mutation: invariants + preposition-aware state asserts.
     /// </summary>
-    private IReadOnlyList<string> CollectValidationViolations(
+    private IReadOnlyList<string> CollectConstraintViolations(
         string sourceState, string targetState, IReadOnlyDictionary<string, object?> data)
     {
         var violations = new List<string>();
@@ -1270,15 +1270,15 @@ public sealed class PreceptEngine
         if (string.Equals(sourceState, targetState, StringComparison.Ordinal))
         {
             // AcceptedInPlace / self-transition: evaluate 'to' + 'in' asserts
-            violations.AddRange(EvaluateStateAsserts(AssertAnchor.To, targetState, data));
-            violations.AddRange(EvaluateStateAsserts(AssertAnchor.In, sourceState, data));
+            violations.AddRange(EvaluateStateAssertions(AssertAnchor.To, targetState, data));
+            violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, sourceState, data));
         }
         else
         {
             // State transition: evaluate 'from' source + 'to' target + 'in' target
-            violations.AddRange(EvaluateStateAsserts(AssertAnchor.From, sourceState, data));
-            violations.AddRange(EvaluateStateAsserts(AssertAnchor.To, targetState, data));
-            violations.AddRange(EvaluateStateAsserts(AssertAnchor.In, targetState, data));
+            violations.AddRange(EvaluateStateAssertions(AssertAnchor.From, sourceState, data));
+            violations.AddRange(EvaluateStateAssertions(AssertAnchor.To, targetState, data));
+            violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, targetState, data));
         }
 
         return violations;
@@ -1828,6 +1828,9 @@ public sealed record EventInspectionResult(
     IReadOnlyList<string> RequiredEventArgumentKeys,
     IReadOnlyList<string> Reasons)
 {
+    public bool IsSuccess => Outcome is TransitionOutcome.Transition
+        or TransitionOutcome.NoTransition;
+
     internal static EventInspectionResult Transitioned(string state, string evt, string target, IReadOnlyList<string> requiredEventArgumentKeys) =>
         new(TransitionOutcome.Transition, state, evt, target, requiredEventArgumentKeys, Array.Empty<string>());
 
@@ -1870,6 +1873,8 @@ public sealed record UpdateResult(
     IReadOnlyList<string> Reasons,
     PreceptInstance? UpdatedInstance)
 {
+    public bool IsSuccess => Outcome is UpdateOutcome.Update;
+
     internal static UpdateResult Succeeded(PreceptInstance updated) =>
         new(UpdateOutcome.Update, Array.Empty<string>(), updated);
 
@@ -2037,6 +2042,9 @@ public sealed record FireResult(
     IReadOnlyList<string> Reasons,
     PreceptInstance? UpdatedInstance)
 {
+    public bool IsSuccess => Outcome is TransitionOutcome.Transition
+        or TransitionOutcome.NoTransition;
+
     internal static FireResult Transitioned(string state, string evt, string newState, PreceptInstance updated) =>
         new(TransitionOutcome.Transition, state, evt, newState, Array.Empty<string>(), updated);
 
