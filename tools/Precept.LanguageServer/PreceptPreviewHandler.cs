@@ -59,27 +59,7 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
         var session = sessionOrError.Session;
         var coercedArgs = session.Engine.CoerceEventArguments(request.EventName!, request.Args);
         var inspect = session.Engine.Inspect(session.Instance, request.EventName!, coercedArgs);
-        var evt = session.Engine.Events.FirstOrDefault(e => string.Equals(e.Name, request.EventName, StringComparison.Ordinal));
-        var args = (evt?.Args ?? Array.Empty<PreceptEventArg>())
-            .Select(arg => new PreceptPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable, arg.HasDefaultValue, arg.DefaultValue))
-            .ToArray();
-
-        var outcome = inspect.Outcome switch
-        {
-            TransitionOutcome.Transition => "enabled",
-            TransitionOutcome.NoTransition => "noTransition",
-            TransitionOutcome.ConstraintFailure => "blocked",
-            TransitionOutcome.Rejected => "blocked",
-            TransitionOutcome.Unmatched => "notApplicable",
-            _ => "undefined"
-        };
-
-        var eventStatus = new PreceptPreviewEventStatus(
-            request.EventName!,
-            outcome,
-            inspect.TargetState,
-            inspect.Violations.Select(v => v.Message).ToArray(),
-            args);
+        var eventStatus = MapEventStatus(session.Engine, inspect);
 
         return new PreceptPreviewResponse(true, InspectResult: eventStatus);
     }
@@ -272,24 +252,7 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
         var inspectionResult = session.Engine.Inspect(session.Instance);
 
         var events = inspectionResult.Events
-            .Select(inspect =>
-            {
-                var evt = session.Engine.Events.FirstOrDefault(e => string.Equals(e.Name, inspect.EventName, StringComparison.Ordinal));
-                var args = (evt?.Args ?? Array.Empty<PreceptEventArg>())
-                    .Select(arg => new PreceptPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable, arg.HasDefaultValue, arg.DefaultValue))
-                    .ToArray();
-
-                var outcome = inspect.Outcome switch
-                {
-                    TransitionOutcome.Transition => "enabled",
-                    TransitionOutcome.NoTransition => "noTransition",
-                    TransitionOutcome.ConstraintFailure => "blocked",
-                    TransitionOutcome.Rejected => "blocked",
-                    _ => "undefined"
-                };
-
-                return new PreceptPreviewEventStatus(inspect.EventName, outcome, inspect.TargetState, inspect.Violations.Select(v => v.Message).ToArray(), args);
-            })
+            .Select(inspect => MapEventStatus(session.Engine, inspect))
             .ToArray();
 
         var transitions = (session.Model.TransitionRows ?? Array.Empty<PreceptTransitionRow>())
@@ -348,6 +311,146 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
             ef.IsNullable,
             ef.CurrentValue,
             ef.Violation)).ToArray();
+
+    private static PreceptPreviewEventStatus MapEventStatus(PreceptEngine engine, EventInspectionResult inspect)
+    {
+        var evt = engine.Events.FirstOrDefault(e => string.Equals(e.Name, inspect.EventName, StringComparison.Ordinal));
+        var args = (evt?.Args ?? Array.Empty<PreceptEventArg>())
+            .Select(arg => new PreceptPreviewEventArg(arg.Name, arg.Type.ToString().ToLowerInvariant(), arg.IsNullable, arg.HasDefaultValue, arg.DefaultValue))
+            .ToArray();
+
+        var outcome = inspect.Outcome switch
+        {
+            TransitionOutcome.Transition => "enabled",
+            TransitionOutcome.NoTransition => "noTransition",
+            TransitionOutcome.ConstraintFailure => "blocked",
+            TransitionOutcome.Rejected => "blocked",
+            TransitionOutcome.Unmatched => "notApplicable",
+            _ => "undefined"
+        };
+
+        var (argErrors, eventErrors) = AttributeEventViolations(
+            inspect.EventName,
+            inspect.Violations,
+            evt?.Args ?? Array.Empty<PreceptEventArg>());
+
+        return new PreceptPreviewEventStatus(
+            inspect.EventName,
+            outcome,
+            inspect.TargetState,
+            inspect.Violations.Select(v => v.Message).ToArray(),
+            args,
+            argErrors,
+            eventErrors);
+    }
+
+    private static (IReadOnlyDictionary<string, IReadOnlyList<string>>? ArgErrors, IReadOnlyList<string>? EventErrors) AttributeEventViolations(
+        string eventName,
+        IReadOnlyList<ConstraintViolation> violations,
+        IReadOnlyList<PreceptEventArg> argDefinitions)
+    {
+        if (violations.Count == 0)
+            return (null, null);
+
+        var knownArgNames = new HashSet<string>(argDefinitions.Select(arg => arg.Name), StringComparer.Ordinal);
+        var argErrors = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var eventErrors = new List<string>();
+
+        foreach (var violation in violations)
+        {
+            var attributed = false;
+
+            foreach (var target in violation.Targets)
+            {
+                switch (target)
+                {
+                    case ConstraintTarget.EventArgTarget eventArgTarget when string.Equals(eventArgTarget.EventName, eventName, StringComparison.Ordinal):
+                        if (!argErrors.TryGetValue(eventArgTarget.ArgName, out var messages))
+                        {
+                            messages = new List<string>();
+                            argErrors[eventArgTarget.ArgName] = messages;
+                        }
+
+                        messages.Add(violation.Message);
+                        attributed = true;
+                        break;
+
+                    case ConstraintTarget.EventTarget eventTarget when string.Equals(eventTarget.EventName, eventName, StringComparison.Ordinal):
+                        eventErrors.Add(violation.Message);
+                        attributed = true;
+                        break;
+                }
+            }
+
+            if (attributed)
+                continue;
+
+            if (TryExtractEventArgName(eventName, violation.Message, knownArgNames, out var argName))
+            {
+                if (!argErrors.TryGetValue(argName, out var messages))
+                {
+                    messages = new List<string>();
+                    argErrors[argName] = messages;
+                }
+
+                messages.Add(violation.Message);
+                continue;
+            }
+
+            eventErrors.Add(violation.Message);
+        }
+
+        return (
+            argErrors.Count > 0
+                ? argErrors.ToDictionary(kvp => kvp.Key, kvp => (IReadOnlyList<string>)kvp.Value.ToArray(), StringComparer.Ordinal)
+                : null,
+            eventErrors.Count > 0 ? eventErrors.ToArray() : null);
+    }
+
+    private static bool TryExtractEventArgName(
+        string eventName,
+        string message,
+        IReadOnlySet<string> knownArgNames,
+        out string argName)
+    {
+        const string requiredPrefix = "Event argument validation failed: required argument '";
+        const string unknownPrefix = "Event argument validation failed: unknown argument '";
+        const string scalarPrefix = "Event argument validation failed: '";
+
+        static string? ExtractQuotedValue(string text, string prefix)
+        {
+            if (!text.StartsWith(prefix, StringComparison.Ordinal))
+                return null;
+
+            var start = prefix.Length;
+            var end = text.IndexOf('\'', start);
+            return end > start ? text[start..end] : null;
+        }
+
+        var requiredArg = ExtractQuotedValue(message, requiredPrefix);
+        if (requiredArg is not null && message.Contains($"for event '{eventName}'", StringComparison.Ordinal))
+        {
+            argName = requiredArg;
+            return true;
+        }
+
+        var unknownArg = ExtractQuotedValue(message, unknownPrefix);
+        if (unknownArg is not null && message.Contains($"for event '{eventName}'", StringComparison.Ordinal))
+        {
+            argName = unknownArg;
+            return true;
+        }
+
+        var scalarArg = ExtractQuotedValue(message, scalarPrefix);
+        if (scalarArg is not null && knownArgNames.Contains(scalarArg))
+        {
+            argName = scalarArg;
+            return true;
+        }
+
+        argName = string.Empty;
+        return false;
+    }
 
     private static InspectionResult InspectDraftPatch(PreviewSession session, IReadOnlyDictionary<string, object?> patch)
         => session.Engine.Inspect(session.Instance, builder =>

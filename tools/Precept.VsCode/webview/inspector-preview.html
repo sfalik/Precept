@@ -246,8 +246,9 @@
 
     .event-content {
       display: flex;
+      flex-direction: column;
       align-items: stretch;
-      gap: 6px;
+      gap: 4px;
       flex: 1;
       min-width: 0;
       overflow: visible;
@@ -256,16 +257,15 @@
 
     .event-reason {
       color: var(--err);
-      font-size: 11px;
-      line-height: 1.35;
-      opacity: 0.7;
+      font-size: 10px;
+      line-height: 1.3;
+      opacity: 0.92;
       transition: opacity 120ms ease;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      flex: 1;
+      display: block;
+      overflow: visible;
+      flex: 0 0 auto;
       min-width: 0;
+      margin-top: 1px;
     }
 
     .event-entry.is-selected .event-reason,
@@ -333,11 +333,20 @@
     .event-args-inline {
       display: flex;
       flex-wrap: nowrap;
-      align-items: stretch;
+      align-items: flex-start;
       gap: 6px;
       min-width: 0;
       overflow-x: auto;
       overflow-y: visible;
+    }
+
+    .arg-field-stack {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: stretch;
+      min-width: 0;
+      max-width: 140px;
+      gap: 2px;
     }
 
     .arg-field {
@@ -348,6 +357,14 @@
       border: 1px solid var(--border);
       min-width: 70px;
       max-width: 140px;
+    }
+
+    .arg-field.violation {
+      border-color: var(--err);
+    }
+
+    .arg-field.violation .arg-label {
+      color: var(--err);
     }
 
     .arg-field.is-null input {
@@ -405,6 +422,10 @@
 
     .arg-field.boolean {
       min-width: auto;
+      max-width: none;
+    }
+
+    .arg-field-stack.boolean {
       max-width: none;
     }
 
@@ -480,9 +501,10 @@
 
     .data-value-stack {
       display: inline-flex;
-      align-items: center;
+      align-items: flex-end;
       justify-content: flex-end;
       min-width: 0;
+      flex-direction: column;
     }
 
     .data-list li:last-child {
@@ -565,6 +587,15 @@
       opacity: 0.25;
       cursor: default;
       pointer-events: none;
+    }
+
+    .data-edit-violation-msg {
+      display: block;
+      color: var(--err);
+      font-size: 10px;
+      line-height: 1.3;
+      margin-top: 2px;
+      word-break: break-word;
     }
 
     .data-edit-shell .data-edit-input {
@@ -1195,12 +1226,18 @@
       }
 
       const rawArgs = raw.args ?? raw.Args;
+      const rawArgErrors = raw.argErrors ?? raw.ArgErrors;
+      const rawEventErrors = raw.eventErrors ?? raw.EventErrors;
       return {
         name: String(raw.name ?? raw.Name ?? ''),
         outcome: String(raw.outcome ?? raw.Outcome ?? 'undefined').toLowerCase(),
         targetState: raw.targetState ?? raw.TargetState ?? null,
         reasons: Array.isArray(raw.reasons ?? raw.Reasons)
           ? (raw.reasons ?? raw.Reasons).map((reason) => String(reason))
+          : [],
+        argErrors: normalizeNamedErrors(rawArgErrors),
+        eventErrors: Array.isArray(rawEventErrors)
+          ? rawEventErrors.map((error) => String(error))
           : [],
         args: Array.isArray(rawArgs)
           ? rawArgs.map((arg) => ({
@@ -1214,10 +1251,52 @@
       };
     }
 
+    function normalizeNamedErrors(rawNamedErrors) {
+      const normalized = new Map();
+      if (!rawNamedErrors || typeof rawNamedErrors !== 'object') {
+        return normalized;
+      }
+
+      Object.entries(rawNamedErrors).forEach(([name, errors]) => {
+        if (!Array.isArray(errors) || errors.length === 0) {
+          return;
+        }
+
+        normalized.set(String(name), errors.map((error) => String(error)));
+      });
+
+      return normalized;
+    }
+
     function formatArgDefault(value) {
       if (value === null || value === undefined) return 'null';
       if (typeof value === 'string') return value;
       return String(value);
+    }
+
+    function getLiveEventStatus(eventName) {
+      return currentEventStatuses.find((status) => status.name === eventName) ?? null;
+    }
+
+    function getEventArgViolationText(eventName, argName) {
+      const status = getLiveEventStatus(eventName);
+      const errors = status?.argErrors instanceof Map ? status.argErrors.get(argName) : null;
+      return errors && errors.length > 0 ? errors.join(' · ') : null;
+    }
+
+    function getInlineEventReasonText(eventName, evaluation) {
+      const status = getLiveEventStatus(eventName);
+      if (status) {
+        if (Array.isArray(status.eventErrors) && status.eventErrors.length > 0) {
+          return status.eventErrors.join(' · ');
+        }
+
+        if (status.argErrors instanceof Map && status.argErrors.size > 0) {
+          return '';
+        }
+      }
+
+      return getEvaluationReason(evaluation);
     }
 
     function parseLayoutPayload(layoutPayload, fallbackBounds) {
@@ -2542,6 +2621,10 @@
           const argDefs = getEventArgDefinitions(eventName);
           const inlineArgs = argDefs.length > 0
             ? `<span class="event-args-inline">${argDefs.map((arg) => {
+                const violationText = getEventArgViolationText(eventName, arg.name);
+                const violationMsg = violationText
+                  ? `<span class="data-edit-violation-msg">${String(violationText).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`
+                  : '';
                 const userVal = eventArgValues[eventName + ':' + arg.name];
                 const displayVal = userVal !== undefined ? userVal : (arg.hasDefaultValue ? formatArgDefault(arg.defaultValue) : '');
                 const placeholder = arg.hasDefaultValue
@@ -2551,24 +2634,25 @@
                     : '';
                 const isNull = arg.isNullable && (userVal === null || (userVal === undefined && !arg.hasDefaultValue));
                 const nullClass = isNull ? ' is-null' : '';
+                const violationClass = violationText ? ' violation' : '';
                 const nullBtn = arg.isNullable
                   ? `<button class="arg-null-btn" data-event="${eventName}" data-event-arg="${arg.name}" type="button" title="Set to null">×</button>`
                   : '';
                 if (arg.type === 'boolean' && !arg.isNullable) {
                   const trueActive = displayVal === 'true' || displayVal === true ? ' active' : '';
                   const falseActive = displayVal === 'false' || displayVal === false ? ' active' : '';
-                  return `<span class="arg-field boolean"><span class="arg-label">${arg.name}</span><button class="bool-seg${trueActive}" data-event="${eventName}" data-event-arg="${arg.name}" data-val="true" type="button">true</button><button class="bool-seg${falseActive}" data-event="${eventName}" data-event-arg="${arg.name}" data-val="false" type="button">false</button></span>`;
+                  return `<span class="arg-field-stack boolean"><span class="arg-field boolean${violationClass}"><span class="arg-label">${arg.name}</span><button class="bool-seg${trueActive}" data-event="${eventName}" data-event-arg="${arg.name}" data-val="true" type="button">true</button><button class="bool-seg${falseActive}" data-event="${eventName}" data-event-arg="${arg.name}" data-val="false" type="button">false</button></span>${violationMsg}</span>`;
                 }
                 if (arg.type === 'boolean' && arg.isNullable) {
                   const trueActive = !isNull && (displayVal === 'true' || displayVal === true) ? ' active' : '';
                   const falseActive = !isNull && (displayVal === 'false' || displayVal === false) ? ' active' : '';
-                  return `<span class="arg-field boolean${nullClass}"><span class="arg-label">${arg.name}</span><button class="bool-seg${trueActive}" data-event="${eventName}" data-event-arg="${arg.name}" data-val="true" type="button">true</button><button class="bool-seg${falseActive}" data-event="${eventName}" data-event-arg="${arg.name}" data-val="false" type="button">false</button>${nullBtn}</span>`;
+                  return `<span class="arg-field-stack boolean"><span class="arg-field boolean${nullClass}${violationClass}"><span class="arg-label">${arg.name}</span><button class="bool-seg${trueActive}" data-event="${eventName}" data-event-arg="${arg.name}" data-val="true" type="button">true</button><button class="bool-seg${falseActive}" data-event="${eventName}" data-event-arg="${arg.name}" data-val="false" type="button">false</button>${nullBtn}</span>${violationMsg}</span>`;
                 }
                 const textVal = isNull ? '' : displayVal.toString();
-                return `<span class="arg-field${nullClass}"><span class="arg-label">${arg.name}</span><input data-event="${eventName}" data-event-arg="${arg.name}" type="text" placeholder="${isNull ? 'null' : placeholder}" value="${textVal.replace(/"/g, '&quot;')}">${nullBtn}</span>`;
+                return `<span class="arg-field-stack"><span class="arg-field${nullClass}${violationClass}"><span class="arg-label">${arg.name}</span><input data-event="${eventName}" data-event-arg="${arg.name}" type="text" placeholder="${isNull ? 'null' : placeholder}" value="${textVal.replace(/"/g, '&quot;')}">${nullBtn}</span>${violationMsg}</span>`;
               }).join('')}</span>`
             : '';
-          const reasonText = getEvaluationReason(evaluation);
+          const reasonText = getInlineEventReasonText(eventName, evaluation);
           const escapedReason = reasonText
             ? reasonText
               .replace(/&/g, '&amp;')
@@ -2954,6 +3038,22 @@
             shell.removeAttribute('title');
           }
         }
+
+        const stack = input.closest('.data-value-stack');
+        if (stack) {
+          let msgEl = stack.querySelector(`.data-edit-violation-msg[data-field="${fieldName}"]`);
+          if (violationText) {
+            if (!msgEl) {
+              msgEl = document.createElement('span');
+              msgEl.className = 'data-edit-violation-msg';
+              msgEl.dataset.field = fieldName;
+              stack.appendChild(msgEl);
+            }
+            msgEl.textContent = violationText;
+          } else if (msgEl) {
+            msgEl.remove();
+          }
+        }
       });
 
       renderDraftValidationBanner();
@@ -3109,6 +3209,9 @@
             const nullToggle = showNullToggle
               ? `<button class="data-edit-null-toggle" data-field="${canonicalFieldName}" data-ui-key="${key}" title="Set to null">×</button>`
               : '';
+            const violationMsg = violationText
+              ? `<span class="data-edit-violation-msg" data-field="${canonicalFieldName}">${String(violationText).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`
+              : '';
 
             let inputHtml;
             if (isNull) {
@@ -3131,7 +3234,7 @@
             return `
               <li>
                 <span class="data-key">${key}${ruleIcon}</span>
-                <span class="data-value-stack">${inputHtml}</span>
+                <span class="data-value-stack">${inputHtml}${violationMsg}</span>
               </li>
             `;
           }

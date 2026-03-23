@@ -54,7 +54,9 @@ internal sealed record PreceptPreviewEventStatus(
     string Outcome,
     string? TargetState,
     IReadOnlyList<string> Reasons,
-    IReadOnlyList<PreceptPreviewEventArg> Args);
+    IReadOnlyList<PreceptPreviewEventArg> Args,
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? ArgErrors = null,
+    IReadOnlyList<string>? EventErrors = null);
 
 internal sealed record PreceptPreviewEventArg(string Name, string Type, bool IsNullable, bool HasDefaultValue, object? DefaultValue);
 

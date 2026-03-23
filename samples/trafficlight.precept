@@ -1,0 +1,50 @@
+precept TrafficLight
+
+# A traffic-light controller with emergency-flashing mode. Vehicles queue up,
+# the light cycles through standard phases, and an authorized Emergency event
+# forces flashing red until explicitly cleared.
+
+field VehiclesWaiting as number default 0
+field CycleCount as number default 0
+field LeftTurnQueued as boolean default false
+field EmergencyReason as string nullable
+
+invariant VehiclesWaiting >= 0 because "Vehicles waiting cannot be negative"
+invariant CycleCount >= 0 because "Cycle count cannot be negative"
+
+state Red initial
+state FlashingGreen
+state Green
+state Yellow
+state FlashingRed
+
+in Red edit VehiclesWaiting, LeftTurnQueued
+
+event Advance
+
+event Emergency with AuthorizedBy as string, Reason as string
+on Emergency assert AuthorizedBy != "" because "AuthorizedBy is required"
+on Emergency assert Reason != "" because "Reason is required"
+
+event VehiclesArrive with Count as number default 5
+on VehiclesArrive assert Count > 0 because "Vehicle count must be positive"
+
+event LeftTurnRequest
+
+event ClearEmergency
+
+from any on VehiclesArrive -> set VehiclesWaiting = VehiclesWaiting + VehiclesArrive.Count -> no transition
+from any on LeftTurnRequest -> set LeftTurnQueued = true -> no transition
+
+from Red on Advance when LeftTurnQueued -> set CycleCount = CycleCount + 1 -> transition FlashingGreen
+from Red on Advance when VehiclesWaiting > 0 -> set CycleCount = CycleCount + 1 -> transition Green
+from Red on Advance -> reject "No demand detected at red"
+
+from FlashingGreen on Advance -> set CycleCount = CycleCount + 1 -> transition Green
+from Green on Advance -> set CycleCount = CycleCount + 1 -> transition Yellow
+from Yellow on Advance -> transition Red
+
+from any on Emergency -> set EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason -> transition FlashingRed
+
+from FlashingRed on Advance -> set CycleCount = CycleCount + 1 -> no transition
+from FlashingRed on ClearEmergency -> set EmergencyReason = null -> transition Red
