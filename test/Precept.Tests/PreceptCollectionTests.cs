@@ -401,7 +401,7 @@ public class PreceptCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire.UpdatedInstance.Should().NotBeNull();
         var collection = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         collection.Should().NotBeNull();
@@ -428,12 +428,12 @@ public class PreceptCollectionRuntimeTests
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Step1");
-        (fire1.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire1.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         var col1 = fire1.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col1!.Count.Should().Be(3);
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance, "Step2");
-        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         var col2 = fire2.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col2!.Count.Should().Be(2);
         col2.Contains(5d).Should().BeFalse();
@@ -460,12 +460,12 @@ public class PreceptCollectionRuntimeTests
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Enq");
-        (fire1.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire1.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         var col1 = fire1.UpdatedInstance!.InstanceData["Tasks"] as List<object>;
         col1!.Count.Should().Be(2);
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance, "Deq");
-        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         var col2 = fire2.UpdatedInstance!.InstanceData["Tasks"] as List<object>;
         col2!.Count.Should().Be(1);
         // "first" was dequeued, "second" remains
@@ -491,13 +491,13 @@ public class PreceptCollectionRuntimeTests
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Push");
-        (fire1.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire1.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         var col1 = fire1.UpdatedInstance!.InstanceData["History"] as List<object>;
         col1!.Count.Should().Be(2);
         col1[^1].Should().Be(20d);
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance, "Pop");
-        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         var col2 = fire2.UpdatedInstance!.InstanceData["History"] as List<object>;
         col2!.Count.Should().Be(1);
         col2[^1].Should().Be(10d);
@@ -547,7 +547,7 @@ public class PreceptCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Deq");
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         fire.Reasons.Should().ContainSingle().Which.Should().Contain("empty queue");
     }
 
@@ -568,7 +568,7 @@ public class PreceptCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Pop");
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         fire.Reasons.Should().ContainSingle().Which.Should().Contain("empty stack");
     }
 
@@ -594,7 +594,7 @@ public class PreceptCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -620,7 +620,7 @@ public class PreceptCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire2.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
     }
 
     [Fact]
@@ -645,7 +645,7 @@ public class PreceptCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -671,7 +671,7 @@ public class PreceptCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -697,7 +697,7 @@ public class PreceptCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -723,7 +723,7 @@ public class PreceptCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -749,7 +749,7 @@ public class PreceptCollectionRuntimeTests
         var fire1 = workflow.Fire(instance, "Add");
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Check");
 
-        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire2.NewState.Should().Be("C");
     }
 
@@ -771,7 +771,7 @@ public class PreceptCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Contains(5d).Should().BeTrue();
     }
@@ -793,7 +793,7 @@ public class PreceptCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Request", new Dictionary<string, object?> { ["Floor"] = 7 });
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Contains(7d).Should().BeTrue();
     }
@@ -814,7 +814,7 @@ public class PreceptCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        fire.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        fire.Outcome.Should().Be(TransitionOutcome.NoTransition);
         fire.UpdatedInstance.Should().NotBeNull();
         var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Count.Should().Be(1);
@@ -839,7 +839,7 @@ public class PreceptCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["Count"].Should().Be(1d);
         var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Contains(3d).Should().BeTrue();
@@ -864,10 +864,10 @@ public class PreceptCollectionRuntimeTests
         var instance = workflow.CreateInstance();
 
         var fire1 = workflow.Fire(instance, "Go");
-        (fire1.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire1.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
 
         var fire2 = workflow.Fire(fire1.UpdatedInstance!, "Go");
-        (fire2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire2.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire2.NewState.Should().Be("C");
         var col = fire2.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Count.Should().Be(2);
@@ -918,7 +918,7 @@ public class PreceptCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.Count.Should().Be(1);
     }
@@ -940,7 +940,7 @@ public class PreceptCollectionRuntimeTests
 
         var fire = workflow.Fire(instance, "Go");
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.OfType<double>().DefaultIfEmpty(double.NaN).Min().Should().Be(1d);
         col.Max().Should().Be(7d);
@@ -965,7 +965,7 @@ public class PreceptCollectionRuntimeTests
         var fire = workflow.Fire(instance, "Go");
 
         // Second dequeue on empty queue should reject
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         // Original instance should be unmodified
         var col = instance.InstanceData["Tasks"] as List<object>;
         col!.Count.Should().Be(0);

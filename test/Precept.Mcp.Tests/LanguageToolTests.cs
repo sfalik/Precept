@@ -98,11 +98,11 @@ public class LanguageToolTests
     }
 
     [Fact]
-    public void OutcomeKindsHasFiveEntries()
+    public void OutcomeKindsHasSixEntries()
     {
         var result = LanguageTool.Run();
 
-        result.OutcomeKinds.Should().HaveCount(5);
+        result.OutcomeKinds.Should().HaveCount(6);
     }
 
     [Fact]

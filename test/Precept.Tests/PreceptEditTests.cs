@@ -132,7 +132,7 @@ public class PreceptEditTests
 
         var result = engine.Update(instance, p => p.Set("Notes", "hello"));
 
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        result.Outcome.Should().Be(UpdateOutcome.Update);
         result.UpdatedInstance.Should().NotBeNull();
         result.UpdatedInstance!.InstanceData["Notes"].Should().Be("hello");
         result.UpdatedInstance.CurrentState.Should().Be("Open");
@@ -147,7 +147,7 @@ public class PreceptEditTests
             .Set("Notes", "caller rang back")
             .Set("Priority", 1.0));
 
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        result.Outcome.Should().Be(UpdateOutcome.Update);
         result.UpdatedInstance!.InstanceData["Notes"].Should().Be("caller rang back");
         result.UpdatedInstance.InstanceData["Priority"].Should().Be(1.0);
     }
@@ -159,10 +159,10 @@ public class PreceptEditTests
 
         // First set Notes, then clear it
         var r1 = engine.Update(instance, p => p.Set("Notes", "some text"));
-        r1.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r1.Outcome.Should().Be(UpdateOutcome.Update);
 
         var r2 = engine.Update(r1.UpdatedInstance!, p => p.Set("Notes", null));
-        r2.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r2.Outcome.Should().Be(UpdateOutcome.Update);
         r2.UpdatedInstance!.InstanceData["Notes"].Should().BeNull();
     }
 
@@ -176,7 +176,7 @@ public class PreceptEditTests
         // ResolutionSummary is only editable in Resolved, not Open
         var result = engine.Update(instance, p => p.Set("ResolutionSummary", "fixed"));
 
-        result.Outcome.Should().Be(PreceptUpdateOutcome.NotAllowed);
+        result.Outcome.Should().Be(UpdateOutcome.UneditableField);
         result.Reasons.Should().ContainSingle()
             .Which.Should().Contain("ResolutionSummary").And.Contain("Open");
         result.UpdatedInstance.Should().BeNull();
@@ -189,18 +189,18 @@ public class PreceptEditTests
 
         // Description is editable in Open
         var r1 = engine.Update(instance, p => p.Set("Description", "new desc"));
-        r1.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r1.Outcome.Should().Be(UpdateOutcome.Update);
 
         // Move to Resolved
         var r2 = engine.Fire(r1.UpdatedInstance!, "Assign", new Dictionary<string, object?> { ["Technician"] = "Alice" });
-        r2.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        r2.Outcome.Should().Be(TransitionOutcome.Transition);
 
         var r3 = engine.Fire(r2.UpdatedInstance!, "Resolve", new Dictionary<string, object?> { ["Summary"] = "done" });
-        r3.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        r3.Outcome.Should().Be(TransitionOutcome.Transition);
 
         // Description is NOT editable in Resolved
         var r4 = engine.Update(r3.UpdatedInstance!, p => p.Set("Description", "late change"));
-        r4.Outcome.Should().Be(PreceptUpdateOutcome.NotAllowed);
+        r4.Outcome.Should().Be(UpdateOutcome.UneditableField);
     }
 
     [Fact]
@@ -210,7 +210,7 @@ public class PreceptEditTests
 
         // Notes is editable in any state — test in Open
         var r1 = engine.Update(instance, p => p.Set("Notes", "open note"));
-        r1.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r1.Outcome.Should().Be(UpdateOutcome.Update);
 
         // Move to Resolved
         var r2 = engine.Fire(r1.UpdatedInstance!, "Assign", new Dictionary<string, object?> { ["Technician"] = "Bob" });
@@ -218,7 +218,7 @@ public class PreceptEditTests
 
         // Notes is still editable in Resolved
         var r4 = engine.Update(r3.UpdatedInstance!, p => p.Set("Notes", "resolved note"));
-        r4.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r4.Outcome.Should().Be(UpdateOutcome.Update);
         r4.UpdatedInstance!.InstanceData["Notes"].Should().Be("resolved note");
     }
 
@@ -233,7 +233,7 @@ public class PreceptEditTests
         var (engine, instance) = CompileAndCreate(dsl);
 
         var result = engine.Update(instance, p => p.Set("Notes", "test"));
-        result.Outcome.Should().Be(PreceptUpdateOutcome.NotAllowed);
+        result.Outcome.Should().Be(UpdateOutcome.UneditableField);
     }
 
     // ─── Update: invariant enforcement ───
@@ -246,7 +246,7 @@ public class PreceptEditTests
         // Priority must be 1-5
         var result = engine.Update(instance, p => p.Set("Priority", 99.0));
 
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Blocked);
+        result.Outcome.Should().Be(UpdateOutcome.ConstraintFailure);
         result.Reasons.Should().ContainSingle()
             .Which.Should().Contain("Priority must be between 1 and 5");
         result.UpdatedInstance.Should().BeNull();
@@ -258,7 +258,7 @@ public class PreceptEditTests
         var (engine, instance) = CompileAndCreate(WorkOrderDsl);
 
         var result = engine.Update(instance, p => p.Set("Priority", 5.0));
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        result.Outcome.Should().Be(UpdateOutcome.Update);
         result.UpdatedInstance!.InstanceData["Priority"].Should().Be(5.0);
     }
 
@@ -275,7 +275,7 @@ public class PreceptEditTests
 
         // In Resolved, ResolutionSummary is editable. Setting it to null violates the assert.
         var r3 = engine.Update(r2.UpdatedInstance!, p => p.Set("ResolutionSummary", null));
-        r3.Outcome.Should().Be(PreceptUpdateOutcome.Blocked);
+        r3.Outcome.Should().Be(UpdateOutcome.ConstraintFailure);
         r3.Reasons.Should().ContainSingle()
             .Which.Should().Contain("Resolution requires a summary");
     }
@@ -289,7 +289,7 @@ public class PreceptEditTests
 
         // Priority is a number, not a string
         var result = engine.Update(instance, p => p.Set("Priority", "not-a-number"));
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Invalid);
+        result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
     }
 
     [Fact]
@@ -300,7 +300,7 @@ public class PreceptEditTests
         // Unknown field
         var result = engine.Update(instance, p => p.Set("Nonexistent", "value"));
         // Field is not in editableFields, so NotAllowed
-        result.Outcome.Should().Be(PreceptUpdateOutcome.NotAllowed);
+        result.Outcome.Should().Be(UpdateOutcome.UneditableField);
     }
 
     [Fact]
@@ -310,7 +310,7 @@ public class PreceptEditTests
 
         // Priority is non-nullable number
         var result = engine.Update(instance, p => p.Set("Priority", null));
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Invalid);
+        result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
     }
 
     // ─── Update: patch conflict detection ───
@@ -324,7 +324,7 @@ public class PreceptEditTests
             .Set("Notes", "first")
             .Set("Notes", "second"));
 
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Invalid);
+        result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
         result.Reasons.Should().ContainSingle()
             .Which.Should().Contain("Duplicate Set");
     }
@@ -335,7 +335,7 @@ public class PreceptEditTests
         var (engine, instance) = CompileAndCreate(WorkOrderDsl);
 
         var result = engine.Update(instance, p => { });
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Invalid);
+        result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
         result.Reasons.Should().ContainSingle()
             .Which.Should().Contain("empty");
     }
@@ -361,7 +361,7 @@ public class PreceptEditTests
         var (engine, instance) = CompileAndCreate(CollectionDsl);
 
         var result = engine.Update(instance, p => p.Add("Tags", "urgent"));
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        result.Outcome.Should().Be(UpdateOutcome.Update);
 
         var tags = result.UpdatedInstance!.InstanceData["Tags"] as IEnumerable<object>;
         tags.Should().NotBeNull();
@@ -376,7 +376,7 @@ public class PreceptEditTests
         var r1 = engine.Update(instance, p => p.Add("Tags", "urgent"));
         var r2 = engine.Update(r1.UpdatedInstance!, p => p.Remove("Tags", "urgent"));
 
-        r2.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r2.Outcome.Should().Be(UpdateOutcome.Update);
         var tags = r2.UpdatedInstance!.InstanceData["Tags"] as IEnumerable<object>;
         tags.Should().NotContain("urgent");
     }
@@ -389,13 +389,13 @@ public class PreceptEditTests
         var r1 = engine.Update(instance, p => p
             .Enqueue("Queue", 1.0)
             .Enqueue("Queue", 2.0));
-        r1.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r1.Outcome.Should().Be(UpdateOutcome.Update);
 
         var queue = (r1.UpdatedInstance!.InstanceData["Queue"] as IEnumerable<object>)!.ToList();
         queue.Should().HaveCount(2);
 
         var r2 = engine.Update(r1.UpdatedInstance!, p => p.Dequeue("Queue"));
-        r2.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r2.Outcome.Should().Be(UpdateOutcome.Update);
 
         var queue2 = (r2.UpdatedInstance!.InstanceData["Queue"] as IEnumerable<object>)!.ToList();
         queue2.Should().HaveCount(1);
@@ -409,13 +409,13 @@ public class PreceptEditTests
         var r1 = engine.Update(instance, p => p
             .Push("Stack", "a")
             .Push("Stack", "b"));
-        r1.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r1.Outcome.Should().Be(UpdateOutcome.Update);
 
         var stack = (r1.UpdatedInstance!.InstanceData["Stack"] as IEnumerable<object>)!.ToList();
         stack.Should().HaveCount(2);
 
         var r2 = engine.Update(r1.UpdatedInstance!, p => p.Pop("Stack"));
-        r2.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r2.Outcome.Should().Be(UpdateOutcome.Update);
 
         var stack2 = (r2.UpdatedInstance!.InstanceData["Stack"] as IEnumerable<object>)!.ToList();
         stack2.Should().HaveCount(1);
@@ -429,7 +429,7 @@ public class PreceptEditTests
         var r1 = engine.Update(instance, p => p.Add("Tags", "old"));
         var r2 = engine.Update(r1.UpdatedInstance!, p => p.Replace("Tags", new object[] { "new1", "new2" }));
 
-        r2.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r2.Outcome.Should().Be(UpdateOutcome.Update);
         var tags = (r2.UpdatedInstance!.InstanceData["Tags"] as IEnumerable<object>)!.ToList();
         tags.Should().BeEquivalentTo(new[] { "new1", "new2" });
     }
@@ -444,7 +444,7 @@ public class PreceptEditTests
             .Add("Tags", "b"));
         var r2 = engine.Update(r1.UpdatedInstance!, p => p.Clear("Tags"));
 
-        r2.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r2.Outcome.Should().Be(UpdateOutcome.Update);
         var tags = (r2.UpdatedInstance!.InstanceData["Tags"] as IEnumerable<object>)!.ToList();
         tags.Should().BeEmpty();
     }
@@ -455,7 +455,7 @@ public class PreceptEditTests
         var (engine, instance) = CompileAndCreate(CollectionDsl);
 
         var result = engine.Update(instance, p => p.Set("Tags", "wrong"));
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Invalid);
+        result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
         result.Reasons.Should().ContainSingle()
             .Which.Should().Contain("Replace");
     }
@@ -466,7 +466,7 @@ public class PreceptEditTests
         var (engine, instance) = CompileAndCreate(WorkOrderDsl);
 
         var result = engine.Update(instance, p => p.Add("Notes", "item"));
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Invalid);
+        result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
     }
 
     [Fact]
@@ -478,7 +478,7 @@ public class PreceptEditTests
             .Replace("Tags", new object[] { "a" })
             .Add("Tags", "b"));
 
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Invalid);
+        result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
         result.Reasons.Should().ContainSingle()
             .Which.Should().Contain("Cannot combine Replace");
     }
@@ -489,7 +489,7 @@ public class PreceptEditTests
         var (engine, instance) = CompileAndCreate(CollectionDsl);
 
         var result = engine.Update(instance, p => p.Dequeue("Queue"));
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Invalid);
+        result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
         result.Reasons.Should().ContainSingle()
             .Which.Should().Contain("empty");
     }
@@ -500,7 +500,7 @@ public class PreceptEditTests
         var (engine, instance) = CompileAndCreate(CollectionDsl);
 
         var result = engine.Update(instance, p => p.Pop("Stack"));
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Invalid);
+        result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
         result.Reasons.Should().ContainSingle()
             .Which.Should().Contain("empty");
     }
@@ -514,13 +514,13 @@ public class PreceptEditTests
 
         // Set priority to valid first
         var r1 = engine.Update(instance, p => p.Set("Priority", 2.0));
-        r1.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r1.Outcome.Should().Be(UpdateOutcome.Update);
 
         // Now try to set priority AND notes — priority is invalid, atomically rolled back
         var r2 = engine.Update(r1.UpdatedInstance!, p => p
             .Set("Notes", "should not persist")
             .Set("Priority", 99.0));
-        r2.Outcome.Should().Be(PreceptUpdateOutcome.Blocked);
+        r2.Outcome.Should().Be(UpdateOutcome.ConstraintFailure);
 
         // Instance should be unchanged
         r1.UpdatedInstance!.InstanceData["Priority"].Should().Be(2.0);
@@ -535,7 +535,7 @@ public class PreceptEditTests
         var (engine, instance) = CompileAndCreate(WorkOrderDsl);
 
         var result = engine.Update(instance, p => p.Set("Notes", "data edit"));
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        result.Outcome.Should().Be(UpdateOutcome.Update);
         result.UpdatedInstance!.CurrentState.Should().Be("Open");
     }
 
@@ -548,11 +548,11 @@ public class PreceptEditTests
 
         // Edit Notes via Update
         var r1 = engine.Update(instance, p => p.Set("Notes", "initial note"));
-        r1.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r1.Outcome.Should().Be(UpdateOutcome.Update);
 
         // Fire event to transition
         var r2 = engine.Fire(r1.UpdatedInstance!, "Assign", new Dictionary<string, object?> { ["Technician"] = "Alice" });
-        r2.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        r2.Outcome.Should().Be(TransitionOutcome.Transition);
 
         // Notes survives the transition
         r2.UpdatedInstance!.InstanceData["Notes"].Should().Be("initial note");
@@ -560,7 +560,7 @@ public class PreceptEditTests
 
         // Can still edit Notes in new state
         var r3 = engine.Update(r2.UpdatedInstance!, p => p.Set("Notes", "updated after assign"));
-        r3.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r3.Outcome.Should().Be(UpdateOutcome.Update);
         r3.UpdatedInstance!.InstanceData["Notes"].Should().Be("updated after assign");
     }
 
@@ -669,7 +669,7 @@ public class PreceptEditTests
         result.EditableFields.Should().NotBeNull();
         var priorityInfo = result.EditableFields!.First(f => f.FieldName == "Priority");
         priorityInfo.Violation.Should().NotBeNull();
-        priorityInfo.Violation!.Reason.Should().Contain("Priority must be between 1 and 5");
+        priorityInfo.Violation.Should().Contain("Priority must be between 1 and 5");
     }
 
     [Fact]
@@ -714,14 +714,14 @@ public class PreceptEditTests
 
         // Both A and B should be editable
         var r1 = engine.Update(instance, p => p.Set("A", "yes"));
-        r1.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r1.Outcome.Should().Be(UpdateOutcome.Update);
 
         var r2 = engine.Update(instance, p => p.Set("B", "yes"));
-        r2.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        r2.Outcome.Should().Be(UpdateOutcome.Update);
 
         // C is not editable
         var r3 = engine.Update(instance, p => p.Set("C", "no"));
-        r3.Outcome.Should().Be(PreceptUpdateOutcome.NotAllowed);
+        r3.Outcome.Should().Be(UpdateOutcome.UneditableField);
     }
 
     [Fact]
@@ -789,7 +789,7 @@ public class PreceptEditTests
 
         // Tags is set<string>, adding a number should fail
         var result = engine.Update(instance, p => p.Add("Tags", 42.0));
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Invalid);
+        result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
     }
 
     [Fact]
@@ -799,7 +799,7 @@ public class PreceptEditTests
 
         // Tags is set<string> — replacing with numbers should fail
         var result = engine.Update(instance, p => p.Replace("Tags", new object[] { 1.0, 2.0 }));
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Invalid);
+        result.Outcome.Should().Be(UpdateOutcome.InvalidInput);
     }
 
     // ─── Multiple granular ops on same collection allowed ───
@@ -814,7 +814,7 @@ public class PreceptEditTests
             .Add("Tags", "b")
             .Add("Tags", "c"));
 
-        result.Outcome.Should().Be(PreceptUpdateOutcome.Updated);
+        result.Outcome.Should().Be(UpdateOutcome.Update);
         var tags = (result.UpdatedInstance!.InstanceData["Tags"] as IEnumerable<object>)!.ToList();
         tags.Should().HaveCount(3);
     }

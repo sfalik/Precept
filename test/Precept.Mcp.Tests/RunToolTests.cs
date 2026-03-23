@@ -43,7 +43,7 @@ public class RunToolTests
         result.Error.Should().BeNull();
         result.AbortedAt.Should().Be(1);
         result.Steps.Should().HaveCount(1);
-        result.Steps[0].Outcome.Should().Be("NotDefined");
+        result.Steps[0].Outcome.Should().Be("Undefined");
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public class RunToolTests
         result.Error.Should().BeNull();
         result.AbortedAt.Should().BeNull();
         result.Steps.Should().HaveCount(1);
-        result.Steps[0].Outcome.Should().Be("Accepted");
+        result.Steps[0].Outcome.Should().Be("Transition");
         result.FinalData!["RequesterName"].Should().Be("Jordan");
     }
 

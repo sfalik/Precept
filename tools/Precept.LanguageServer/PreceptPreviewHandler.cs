@@ -65,10 +65,11 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
 
         var outcome = inspect.Outcome switch
         {
-            PreceptOutcomeKind.Accepted => "enabled",
-            PreceptOutcomeKind.AcceptedInPlace => "noTransition",
-            PreceptOutcomeKind.Rejected => "blocked",
-            PreceptOutcomeKind.NotApplicable => "notApplicable",
+            TransitionOutcome.Transition => "enabled",
+            TransitionOutcome.NoTransition => "noTransition",
+            TransitionOutcome.ConstraintFailure => "blocked",
+            TransitionOutcome.Rejected => "blocked",
+            TransitionOutcome.Unmatched => "notApplicable",
             _ => "undefined"
         };
 
@@ -97,7 +98,7 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
         if (fire.UpdatedInstance is not null)
             session.Instance = fire.UpdatedInstance;
 
-        if (fire.Outcome is not (PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace))
+        if (fire.Outcome is not (TransitionOutcome.Transition or TransitionOutcome.NoTransition))
         {
             var reason = fire.Reasons.FirstOrDefault() ?? $"Event '{request.EventName}' did not fire.";
             return new PreceptPreviewResponse(false, Error: reason, Errors: fire.Reasons, Snapshot: BuildSnapshot(session));
@@ -122,7 +123,7 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
                 builder.Set(fieldName, UnwrapJToken(value));
         });
 
-        if (result.Outcome != PreceptUpdateOutcome.Updated || result.UpdatedInstance is null)
+        if (result.Outcome != UpdateOutcome.Update || result.UpdatedInstance is null)
         {
             var reason = result.Reasons.FirstOrDefault() ?? "Update failed.";
             return new PreceptPreviewResponse(false, Error: reason, Errors: result.Reasons, Snapshot: BuildSnapshot(session));
@@ -190,7 +191,7 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
         {
             var coercedStepArgs = session.Engine.CoerceEventArguments(step.EventName, step.Args);
             var fire = session.Engine.Fire(session.Instance, step.EventName, coercedStepArgs);
-            if ((fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace) && fire.UpdatedInstance is not null)
+            if ((fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition) && fire.UpdatedInstance is not null)
             {
                 session.Instance = fire.UpdatedInstance;
                 messages.Add($"{step.EventName}: {fire.PreviousState} -> {fire.NewState}");
@@ -277,9 +278,9 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
 
                 var outcome = inspect.Outcome switch
                 {
-                    PreceptOutcomeKind.Accepted => "enabled",
-                    PreceptOutcomeKind.AcceptedInPlace => "noTransition",
-                    PreceptOutcomeKind.Rejected => "blocked",
+                    TransitionOutcome.Transition => "enabled",
+                    TransitionOutcome.NoTransition => "noTransition",
+                    TransitionOutcome.Rejected => "blocked",
                     _ => "undefined"
                 };
 
@@ -337,9 +338,9 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
             ef.FieldType,
             ef.IsNullable,
             ef.CurrentValue,
-            ef.Violation?.Reason)).ToArray();
+            ef.Violation)).ToArray();
 
-    private static PreceptInspectionResult InspectDraftPatch(PreviewSession session, IReadOnlyDictionary<string, object?> patch)
+    private static InspectionResult InspectDraftPatch(PreviewSession session, IReadOnlyDictionary<string, object?> patch)
         => session.Engine.Inspect(session.Instance, builder =>
         {
             foreach (var (fieldName, value) in patch)

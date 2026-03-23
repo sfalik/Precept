@@ -26,7 +26,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
                 ["Output"] = 0d
             });
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["Output"].Should().Be(expected);
     }
 
@@ -49,7 +49,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
                 ["IsMatch"] = false
             });
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["IsMatch"].Should().Be(expected);
     }
 
@@ -67,7 +67,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
                 ["Message"] = ""
             });
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["Message"].Should().Be("Reason: Accident");
     }
 
@@ -92,7 +92,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
                 ["IsDisabled"] = false
             });
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["IsDisabled"].Should().Be(false);
     }
 
@@ -109,7 +109,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
                 ["Negated"] = 0d
             });
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["Negated"].Should().Be(-3d);
     }
 
@@ -126,7 +126,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
                 ["Output"] = 0d
             });
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["Output"].Should().Be(18d);
     }
 
@@ -195,7 +195,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
                 ["Output"] = 0d
             });
 
-        (fire.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         fire.UpdatedInstance!.InstanceData["Output"].Should().Be(expected);
     }
 
@@ -217,7 +217,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
                 ["Flag"] = false
             });
 
-        (inspect.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (inspect.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         inspect.Reasons.Should().ContainSingle("blocked");
     }
 
@@ -231,7 +231,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
                 ["Flag"] = true
             });
 
-        (inspect.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (inspect.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         inspect.TargetState.Should().Be("B");
     }
 
@@ -246,7 +246,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
                 ["OtherFlag"] = true
             });
 
-        (inspect.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (inspect.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         inspect.TargetState.Should().Be("B");
     }
 
@@ -261,7 +261,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
                 ["OtherFlag"] = true
             });
 
-        (inspect.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (inspect.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         inspect.TargetState.Should().Be("B");
     }
 
@@ -283,7 +283,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
                 ["Flag"] = true
             });
 
-        (inspect.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (inspect.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         inspect.Reasons.Should().ContainSingle("blocked");
     }
 
@@ -341,7 +341,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
             """;
     }
 
-    private static PreceptFireResult FireForSet(
+    private static FireResult FireForSet(
         string declarations,
         string targetField,
         string expression,
@@ -433,7 +433,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
             """;
     }
 
-    private static PreceptEventInspectionResult InspectForGuard(string guardExpression, IReadOnlyDictionary<string, object?> data)
+    private static EventInspectionResult InspectForGuard(string guardExpression, IReadOnlyDictionary<string, object?> data)
     {
         var dsl = BuildDslForGuard(guardExpression);
 

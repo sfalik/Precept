@@ -36,7 +36,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active", new Dictionary<string, object?> { ["Balance"] = 100.0 });
         var result = wf.Fire(inst, "Spend", new Dictionary<string, object?> { ["Amount"] = 50.0 });
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
         result.UpdatedInstance!.CurrentState.Should().Be("Done");
         result.UpdatedInstance.InstanceData["Balance"].Should().Be(50.0);
     }
@@ -58,7 +58,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active", new Dictionary<string, object?> { ["Balance"] = 100.0 });
         var result = wf.Fire(inst, "Spend", new Dictionary<string, object?> { ["Amount"] = 200.0 });
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        result.Outcome.Should().Be(TransitionOutcome.Rejected);
         result.Reasons.Should().ContainSingle(r => r.Contains("Balance must be non-negative"));
     }
 
@@ -112,7 +112,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active", new Dictionary<string, object?> { ["X"] = 10.0, ["Y"] = 10.0 });
         var result = wf.Fire(inst, "Adjust", new Dictionary<string, object?> { ["Dx"] = -20.0, ["Dy"] = -20.0 });
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        result.Outcome.Should().Be(TransitionOutcome.Rejected);
         result.Reasons.Should().HaveCountGreaterThanOrEqualTo(2);
     }
 
@@ -132,7 +132,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active", new Dictionary<string, object?> { ["Counter"] = 5.0 });
         var result = wf.Fire(inst, "Reduce");
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        result.Outcome.Should().Be(TransitionOutcome.Rejected);
         result.Reasons.Should().ContainSingle(r => r.Contains("Counter non-negative"));
     }
 
@@ -156,7 +156,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active", new Dictionary<string, object?> { ["Score"] = 10.0 });
         var result = wf.Fire(inst, "Adjust");
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        result.Outcome.Should().Be(TransitionOutcome.Rejected);
         result.Reasons.Should().ContainSingle(r => r.Contains("Score positive while active"));
     }
 
@@ -177,7 +177,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Draft", new Dictionary<string, object?> { ["Score"] = 5.0 });
         var result = wf.Fire(inst, "Publish");
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        result.Outcome.Should().Be(TransitionOutcome.Rejected);
         result.Reasons.Should().ContainSingle(r => r.Contains("Need enough score to publish"));
     }
 
@@ -198,7 +198,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Draft", new Dictionary<string, object?> { ["Score"] = 15.0 });
         var result = wf.Fire(inst, "Publish");
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
         result.UpdatedInstance!.CurrentState.Should().Be("Published");
     }
 
@@ -219,7 +219,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active", new Dictionary<string, object?> { ["ClearedForExit"] = false });
         var result = wf.Fire(inst, "Finish");
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        result.Outcome.Should().Be(TransitionOutcome.Rejected);
         result.Reasons.Should().ContainSingle(r => r.Contains("Must be cleared before leaving Active"));
     }
 
@@ -239,7 +239,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active", new Dictionary<string, object?> { ["Score"] = 10.0 });
         var result = wf.Fire(inst, "Penalize", new Dictionary<string, object?> { ["Amount"] = 15.0 });
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        result.Outcome.Should().Be(TransitionOutcome.Rejected);
         result.Reasons.Should().ContainSingle(r => r.Contains("Score must be positive to enter Active"));
     }
 
@@ -262,7 +262,7 @@ public class NewSyntaxRuntimeTests
 
         // Take 50 damage -> still alive
         var r1 = wf.Fire(inst, "TakeDamage", new Dictionary<string, object?> { ["Amount"] = 50.0 });
-        r1.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        r1.Outcome.Should().Be(TransitionOutcome.Transition);
         r1.UpdatedInstance!.InstanceData["Health"].Should().Be(50.0);
     }
 
@@ -285,7 +285,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active");
         var result = wf.Fire(inst, "Pay", new Dictionary<string, object?> { ["Amount"] = -5.0 });
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        result.Outcome.Should().Be(TransitionOutcome.Rejected);
         result.Reasons.Should().ContainSingle(r => r.Contains("Payment must be positive"));
     }
 
@@ -304,7 +304,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active");
         var result = wf.Fire(inst, "Pay", new Dictionary<string, object?> { ["Amount"] = 10.0 });
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
     }
 
     [Fact]
@@ -323,7 +323,7 @@ public class NewSyntaxRuntimeTests
         var result = wf.Inspect(inst, "Pay");
 
         // Inspect without args should not evaluate event asserts
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -347,7 +347,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("A", new Dictionary<string, object?> { ["EntryCount"] = 0.0 });
         var result = wf.Fire(inst, "Go");
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
         result.UpdatedInstance!.InstanceData["EntryCount"].Should().Be(1.0);
     }
 
@@ -368,7 +368,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("A", new Dictionary<string, object?> { ["ExitCount"] = 0.0 });
         var result = wf.Fire(inst, "Go");
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
         result.UpdatedInstance!.InstanceData["ExitCount"].Should().Be(1.0);
     }
 
@@ -391,7 +391,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("A", new Dictionary<string, object?> { ["Log"] = 0.0 });
         var result = wf.Fire(inst, "Go");
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
         // Exit sets Log=1, Row adds 100 → Log=101, Entry adds 10 → Log=111
         result.UpdatedInstance!.InstanceData["Log"].Should().Be(111.0);
     }
@@ -413,7 +413,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("A", new Dictionary<string, object?> { ["Counter"] = 0.0 });
         var result = wf.Fire(inst, "Ping");
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        result.Outcome.Should().Be(TransitionOutcome.NoTransition);
         // No transition means no exit/entry actions
         result.UpdatedInstance!.InstanceData["Counter"].Should().Be(0.0);
     }
@@ -437,7 +437,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("A");
         var result = wf.Fire(inst, "Go");
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
         result.UpdatedInstance!.CurrentState.Should().Be("B");
     }
 
@@ -456,7 +456,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("A", new Dictionary<string, object?> { ["Counter"] = 0.0 });
         var result = wf.Fire(inst, "Ping");
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        result.Outcome.Should().Be(TransitionOutcome.NoTransition);
         result.UpdatedInstance!.InstanceData["Counter"].Should().Be(1.0);
     }
 
@@ -474,7 +474,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("A");
         var result = wf.Fire(inst, "Bad");
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        result.Outcome.Should().Be(TransitionOutcome.Rejected);
         result.Reasons.Should().ContainSingle(r => r.Contains("Not allowed"));
     }
 
@@ -498,19 +498,19 @@ public class NewSyntaxRuntimeTests
         // Score 10 → Medium (first matching guard)
         var inst = wf.CreateInstance("Low", new Dictionary<string, object?> { ["Score"] = 10.0 });
         var result = wf.Fire(inst, "Evaluate");
-        result.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
         result.UpdatedInstance!.CurrentState.Should().Be("Medium");
 
         // Score 25 → High
         inst = wf.CreateInstance("Low", new Dictionary<string, object?> { ["Score"] = 25.0 });
         result = wf.Fire(inst, "Evaluate");
-        result.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
         result.UpdatedInstance!.CurrentState.Should().Be("High");
 
         // Score 5 → no transition (fallback)
         inst = wf.CreateInstance("Low", new Dictionary<string, object?> { ["Score"] = 5.0 });
         result = wf.Fire(inst, "Evaluate");
-        result.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        result.Outcome.Should().Be(TransitionOutcome.NoTransition);
     }
 
     [Fact]
@@ -529,7 +529,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("A", new Dictionary<string, object?> { ["Score"] = 5.0 });
         var result = wf.Fire(inst, "Go");
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.NotApplicable);
+        result.Outcome.Should().Be(TransitionOutcome.Unmatched);
     }
 
     [Fact]
@@ -549,7 +549,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Cart", new Dictionary<string, object?> { ["Total"] = 0.0 });
         var result = wf.Fire(inst, "AddAndCheckout", new Dictionary<string, object?> { ["Item"] = "Widget", ["Price"] = 9.99 });
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
         result.UpdatedInstance!.InstanceData["Total"].Should().Be(9.99);
     }
 
@@ -568,11 +568,11 @@ public class NewSyntaxRuntimeTests
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
         var res1 = wf.Fire(wf.CreateInstance("A"), "Reset");
-        res1.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        res1.Outcome.Should().Be(TransitionOutcome.Transition);
         res1.UpdatedInstance!.CurrentState.Should().Be("C");
 
         var res2 = wf.Fire(wf.CreateInstance("B"), "Reset");
-        res2.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        res2.Outcome.Should().Be(TransitionOutcome.Transition);
         res2.UpdatedInstance!.CurrentState.Should().Be("C");
     }
 
@@ -595,7 +595,7 @@ public class NewSyntaxRuntimeTests
         // Fire from B
         var inst = wf.CreateInstance("B", new Dictionary<string, object?> { ["X"] = 42.0 });
         var result = wf.Fire(inst, "Reset");
-        result.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
         result.UpdatedInstance!.CurrentState.Should().Be("A");
         result.UpdatedInstance.InstanceData["X"].Should().Be(0.0);
     }
@@ -614,7 +614,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("A");
         var result = wf.Fire(inst, "Unknown");
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.NotDefined);
+        result.Outcome.Should().Be(TransitionOutcome.Undefined);
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -642,12 +642,12 @@ public class NewSyntaxRuntimeTests
 
         // Negative amount blocked by event assert
         var r1 = wf.Fire(inst, "Purchase", new Dictionary<string, object?> { ["Amount"] = -10.0 });
-        r1.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        r1.Outcome.Should().Be(TransitionOutcome.Rejected);
         r1.Reasons.Should().ContainSingle(r => r.Contains("Amount must be positive"));
 
         // Valid purchase -> exit actions → row mutations → entry actions → validation
         var r2 = wf.Fire(inst, "Purchase", new Dictionary<string, object?> { ["Amount"] = 50.0 });
-        r2.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        r2.Outcome.Should().Be(TransitionOutcome.Transition);
         r2.UpdatedInstance!.CurrentState.Should().Be("Closed");
         r2.UpdatedInstance.InstanceData["Total"].Should().Be(50.0);
         r2.UpdatedInstance.InstanceData["OrderCount"].Should().Be(1.0);
@@ -676,10 +676,10 @@ public class NewSyntaxRuntimeTests
         inspection.Events.Should().HaveCount(2);
 
         var finishResult = inspection.Events.First(e => e.EventName == "Finish");
-        finishResult.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        finishResult.Outcome.Should().Be(TransitionOutcome.Rejected);
 
         var retryResult = inspection.Events.First(e => e.EventName == "Retry");
-        (retryResult.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (retryResult.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -729,7 +729,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("A");
         var result = wf.Fire(inst, "Tag", new Dictionary<string, object?> { ["Value"] = "important" });
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
     }
 
     [Fact]
@@ -750,13 +750,13 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("A");
 
         var r1 = wf.Fire(inst, "Enq", new Dictionary<string, object?> { ["Item"] = "first" });
-        r1.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        r1.Outcome.Should().Be(TransitionOutcome.NoTransition);
 
         var r2 = wf.Fire(r1.UpdatedInstance!, "Enq", new Dictionary<string, object?> { ["Item"] = "second" });
-        r2.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        r2.Outcome.Should().Be(TransitionOutcome.NoTransition);
 
         var r3 = wf.Fire(r2.UpdatedInstance!, "Deq");
-        r3.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        r3.Outcome.Should().Be(TransitionOutcome.NoTransition);
         r3.UpdatedInstance!.InstanceData["Last"].Should().Be("first");
     }
 
@@ -777,7 +777,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("A");
         var result = wf.Fire(inst, "Go");
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
         result.UpdatedInstance!.CurrentState.Should().Be("B");
     }
 
@@ -800,7 +800,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("A", new Dictionary<string, object?> { ["X"] = 0.0 });
         var result = wf.Fire(inst, "Compute", new Dictionary<string, object?> { ["Val"] = 4.0 });
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        result.Outcome.Should().Be(TransitionOutcome.NoTransition);
         result.UpdatedInstance!.InstanceData["X"].Should().Be(10.0); // (4+1)*2 = 10
     }
 
@@ -819,7 +819,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("A", new Dictionary<string, object?> { ["Msg"] = "hello" });
         var result = wf.Fire(inst, "Append", new Dictionary<string, object?> { ["Suffix"] = " world" });
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        result.Outcome.Should().Be(TransitionOutcome.NoTransition);
         result.UpdatedInstance!.InstanceData["Msg"].Should().Be("hello world");
     }
 
@@ -840,10 +840,10 @@ public class NewSyntaxRuntimeTests
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
         var inst1 = wf.CreateInstance("A", new Dictionary<string, object?> { ["X"] = 5.0, ["Y"] = 5.0 });
-        wf.Fire(inst1, "Go").Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        wf.Fire(inst1, "Go").Outcome.Should().Be(TransitionOutcome.Transition);
 
         var inst2 = wf.CreateInstance("A", new Dictionary<string, object?> { ["X"] = 5.0, ["Y"] = 0.0 });
-        wf.Fire(inst2, "Go").Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        wf.Fire(inst2, "Go").Outcome.Should().Be(TransitionOutcome.NoTransition);
     }
 
     [Fact]
@@ -862,10 +862,10 @@ public class NewSyntaxRuntimeTests
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
         var inst1 = wf.CreateInstance("A", new Dictionary<string, object?> { ["Name"] = "Alice" });
-        wf.Fire(inst1, "Go").Outcome.Should().Be(PreceptOutcomeKind.Accepted);
+        wf.Fire(inst1, "Go").Outcome.Should().Be(TransitionOutcome.Transition);
 
         var inst2 = wf.CreateInstance("A", new Dictionary<string, object?> { ["Name"] = null });
-        wf.Fire(inst2, "Go").Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        wf.Fire(inst2, "Go").Outcome.Should().Be(TransitionOutcome.NoTransition);
     }
 
     [Fact]
@@ -886,7 +886,7 @@ public class NewSyntaxRuntimeTests
 
         // Without adding to set, "admin" is not contained
         var r1 = wf.Fire(inst, "Go", new Dictionary<string, object?> { ["Role"] = "admin" });
-        r1.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        r1.Outcome.Should().Be(TransitionOutcome.Rejected);
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -982,6 +982,6 @@ public class NewSyntaxRuntimeTests
         var coerced = wf.CoerceEventArguments("Pay", rawArgs)!;
         var result = wf.Fire(inst, "Pay", coerced);
 
-        result.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        result.Outcome.Should().Be(TransitionOutcome.NoTransition);
     }
 }

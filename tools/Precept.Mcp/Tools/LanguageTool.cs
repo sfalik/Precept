@@ -114,20 +114,21 @@ public static class LanguageTool
     private static readonly IReadOnlyList<FirePipelineStageDto> FirePipeline =
     [
         new(1, "Event asserts", "Validate event args against 'on <Event> assert' rules. Failure → Rejected."),
-        new(2, "Row selection", "Iterate transition rows for (state, event) in source order. First 'when' match wins. No match → NotApplicable."),
+        new(2, "Row selection", "Iterate transition rows for (state, event) in source order. First 'when' match wins. No match → Unmatched."),
         new(3, "Exit actions", "Run 'from <SourceState> ->' automatic mutations."),
         new(4, "Row mutations", "Execute the matched row's '-> set/add/remove/...' action chain in declaration order."),
         new(5, "Entry actions", "Run 'to <TargetState> ->' automatic mutations."),
-        new(6, "Validation", "Check invariants, state asserts (in/to/from with temporal scoping). Any failure → full rollback, Rejected.")
+        new(6, "Validation", "Check invariants, state asserts (in/to/from with temporal scoping). Any failure → full rollback, ConstraintFailure.")
     ];
 
     private static readonly IReadOnlyList<OutcomeKindDto> OutcomeKinds =
     [
-        new("Accepted", "Event handled, state changed.", true),
-        new("AcceptedInPlace", "Event handled via 'no transition', data may change but state stays.", true),
-        new("Rejected", "Event matched but blocked (assert failure, invariant violation, empty collection op, reject outcome).", false),
-        new("NotDefined", "No transition rows exist for this event in the current state.", false),
-        new("NotApplicable", "Transition rows exist but no 'when' guard matched.", false)
+        new("Transition", "Event handled, state changed.", true),
+        new("NoTransition", "Event handled via 'no transition', data may change but state stays.", true),
+        new("Rejected", "Event matched but explicitly rejected by the authored workflow.", false),
+        new("ConstraintFailure", "Event matched but was rolled back because a constraint failed.", false),
+        new("Undefined", "No transition rows exist for this event in the current state.", false),
+        new("Unmatched", "Transition rows exist but no 'when' guard matched.", false)
     ];
 }
 

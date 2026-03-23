@@ -12,7 +12,7 @@ public class InspectToolTests
     private static string SamplePath(string fileName) => Path.Combine(SamplesDir, fileName);
 
     [Fact]
-    public void EventThatTransitions_ReturnsAccepted()
+    public void EventThatTransitions_ReturnsTransition()
     {
         var data = new Dictionary<string, object?>
         {
@@ -39,12 +39,12 @@ public class InspectToolTests
 
         var assignEvent = result.Events.FirstOrDefault(e => e.Event == "Assign");
         assignEvent.Should().NotBeNull();
-        assignEvent!.Outcome.Should().Be("Accepted");
+        assignEvent!.Outcome.Should().Be("Transition");
         assignEvent.ResultState.Should().Be("Scheduled");
     }
 
     [Fact]
-    public void EventNotDefined_ReturnsNotDefined()
+    public void EventUndefined_ReturnsUndefined()
     {
         var data = new Dictionary<string, object?>
         {
@@ -64,7 +64,7 @@ public class InspectToolTests
 
         var approvePartsEvent = result.Events.FirstOrDefault(e => e.Event == "ApproveParts");
         approvePartsEvent.Should().NotBeNull();
-        approvePartsEvent!.Outcome.Should().Be("NotDefined");
+        approvePartsEvent!.Outcome.Should().Be("Undefined");
     }
 
     [Fact]
@@ -118,7 +118,7 @@ public class InspectToolTests
 
         var assignEvent = result.Events.FirstOrDefault(e => e.Event == "Assign");
         assignEvent.Should().NotBeNull();
-        assignEvent!.Outcome.Should().Be("Accepted");
+        assignEvent!.Outcome.Should().Be("Transition");
         assignEvent.ResultState.Should().Be("Scheduled");
     }
 
@@ -141,12 +141,12 @@ public class InspectToolTests
 
         var result = InspectTool.Run(SamplePath("maintenance-work-order.precept"), "InProgress", data);
 
-        // First events should be actionable (Accepted/AcceptedInPlace), then not-defined/etc., then requiresArgs
+        // First events should be actionable (Transition/NoTransition), then unavailable, then requiresArgs
         var events = result.Events.ToList();
         var firstActionable = events.FindIndex(e =>
-            e.Outcome == "Accepted" || e.Outcome == "AcceptedInPlace");
+            e.Outcome == "Transition" || e.Outcome == "NoTransition");
         var firstUnavailable = events.FindIndex(e =>
-            e.Outcome == "NotDefined" || e.Outcome == "NotApplicable" || e.Outcome == "Rejected");
+            e.Outcome == "Undefined" || e.Outcome == "Unmatched" || e.Outcome == "Rejected" || e.Outcome == "ConstraintFailure");
         var firstRequiresArgs = events.FindIndex(e => e.RequiresArgs == true);
 
         if (firstActionable >= 0 && firstUnavailable >= 0)

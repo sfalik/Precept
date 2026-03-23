@@ -278,7 +278,7 @@ public sealed class PreceptEngine
         return PreceptCompatibilityResult.Compatible();
     }
 
-    public PreceptEventInspectionResult Inspect(
+    public EventInspectionResult Inspect(
         string currentState,
         string eventName,
         IReadOnlyDictionary<string, object?>? eventArguments = null)
@@ -288,32 +288,32 @@ public sealed class PreceptEngine
         // Check event asserts first
         var eventAssertViolations = EvaluateEventAsserts(eventName, evaluationData);
         if (eventAssertViolations.Count > 0)
-            return PreceptEventInspectionResult.Rejected(currentState, eventName, eventAssertViolations);
+            return EventInspectionResult.Rejected(currentState, eventName, eventAssertViolations);
 
         var resolution = ResolveTransition(currentState, eventName, evaluationData);
 
         return resolution.Kind switch
         {
-            TransitionResolutionKind.Accepted => PreceptEventInspectionResult.Accepted(
+            TransitionResolutionKind.Transition => EventInspectionResult.Transitioned(
                 currentState,
                 eventName,
                 ((StateTransition)resolution.MatchedRow!.Outcome).TargetState,
                 GetRequiredEventArgumentKeys(eventName)),
-            TransitionResolutionKind.NotApplicable => PreceptEventInspectionResult.NotApplicable(currentState, eventName),
-            TransitionResolutionKind.NoTransition => PreceptEventInspectionResult.AcceptedInPlace(currentState, eventName),
-            TransitionResolutionKind.NotDefined => PreceptEventInspectionResult.NotDefined(currentState, eventName, resolution.NotDefinedReason!),
-            _ => PreceptEventInspectionResult.Rejected(currentState, eventName, resolution.Reasons)
+            TransitionResolutionKind.Unmatched => EventInspectionResult.Unmatched(currentState, eventName),
+            TransitionResolutionKind.NoTransition => EventInspectionResult.NoTransition(currentState, eventName),
+            TransitionResolutionKind.Undefined => EventInspectionResult.Undefined(currentState, eventName, resolution.NotDefinedReason!),
+            _ => EventInspectionResult.Rejected(currentState, eventName, resolution.Reasons)
         };
     }
 
-    public PreceptEventInspectionResult Inspect(
+    public EventInspectionResult Inspect(
         PreceptInstance instance,
         string eventName,
         IReadOnlyDictionary<string, object?>? eventArguments = null)
     {
         var compatibility = CheckCompatibility(instance);
         if (!compatibility.IsCompatible)
-            return PreceptEventInspectionResult.NotDefined(instance.CurrentState, eventName, compatibility.Reason!);
+            return EventInspectionResult.Undefined(instance.CurrentState, eventName, compatibility.Reason!);
 
         // Hydrate clean InstanceData to internal format for engine evaluation
         var internalData = HydrateInstanceData(instance.InstanceData);
@@ -332,14 +332,14 @@ public sealed class PreceptEngine
                     return whenResult.Success && whenResult.Value is true;
                 });
                 if (!anyGuardPasses)
-                    return PreceptEventInspectionResult.NotApplicable(instance.CurrentState, eventName);
+                    return EventInspectionResult.Unmatched(instance.CurrentState, eventName);
             }
         }
 
         // Inspect is a discovery API — it intentionally accepts calls with missing/partial event arguments
         // so callers can determine required args via RequiredEventArgumentKeys before firing.
         if (eventArguments != null && !TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
-            return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
+            return EventInspectionResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
 
         var evaluationArguments = BuildEvaluationData(internalData, eventName, eventArguments);
 
@@ -348,21 +348,21 @@ public sealed class PreceptEngine
         {
             var eventAssertViolations = EvaluateEventAsserts(eventName, BuildDirectEvaluationData(eventName, eventArguments));
             if (eventAssertViolations.Count > 0)
-                return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, eventAssertViolations);
+                return EventInspectionResult.Rejected(instance.CurrentState, eventName, eventAssertViolations);
         }
 
         var resolution = ResolveTransition(instance.CurrentState, eventName, evaluationArguments);
-        if (resolution.Kind == TransitionResolutionKind.NotDefined)
-            return PreceptEventInspectionResult.NotDefined(instance.CurrentState, eventName, resolution.NotDefinedReason!);
+        if (resolution.Kind == TransitionResolutionKind.Undefined)
+            return EventInspectionResult.Undefined(instance.CurrentState, eventName, resolution.NotDefinedReason!);
 
-        if (resolution.Kind == TransitionResolutionKind.NotApplicable)
-            return PreceptEventInspectionResult.NotApplicable(instance.CurrentState, eventName);
+        if (resolution.Kind == TransitionResolutionKind.Unmatched)
+            return EventInspectionResult.Unmatched(instance.CurrentState, eventName);
 
         if (resolution.Kind == TransitionResolutionKind.NoTransition)
-            return PreceptEventInspectionResult.AcceptedInPlace(instance.CurrentState, eventName);
+            return EventInspectionResult.NoTransition(instance.CurrentState, eventName);
 
         if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.MatchedRow is null)
-            return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
+            return EventInspectionResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
 
         var matchedRow = resolution.MatchedRow;
         var targetState = ((StateTransition)matchedRow.Outcome).TargetState;
@@ -396,9 +396,9 @@ public sealed class PreceptEngine
         var violations = CollectValidationViolations(
             instance.CurrentState, targetState, simulatedData);
         if (violations.Count > 0)
-            return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, violations);
+            return EventInspectionResult.Rejected(instance.CurrentState, eventName, violations);
 
-        return PreceptEventInspectionResult.Accepted(
+        return EventInspectionResult.Transitioned(
             instance.CurrentState,
             eventName,
             targetState,
@@ -409,14 +409,14 @@ public sealed class PreceptEngine
     /// Inspects all events reachable from the instance's current state and returns a summary
     /// including the current state, serialized data, and per-event inspection results.
     /// </summary>
-    public PreceptInspectionResult Inspect(PreceptInstance instance)
+    public InspectionResult Inspect(PreceptInstance instance)
     {
         var compatibility = CheckCompatibility(instance);
         if (!compatibility.IsCompatible)
-            return new PreceptInspectionResult(
+            return new InspectionResult(
                 instance.CurrentState,
                 instance.InstanceData,
-                Array.Empty<PreceptEventInspectionResult>());
+                Array.Empty<EventInspectionResult>());
 
         var eventDeclarationOrder = Events
             .Select((e, i) => (e.Name, i))
@@ -436,16 +436,16 @@ public sealed class PreceptEngine
 
         var editableFieldInfos = BuildEditableFieldInfos(instance.CurrentState, instance.InstanceData);
 
-        return new PreceptInspectionResult(instance.CurrentState, instance.InstanceData, eventResults, editableFieldInfos);
+        return new InspectionResult(instance.CurrentState, instance.InstanceData, eventResults, editableFieldInfos);
     }
 
     /// <summary>
     /// Applies a hypothetical patch to a working copy of instance data, runs the full
-    /// validation pipeline, and returns a <see cref="PreceptInspectionResult"/> with
+    /// validation pipeline, and returns a <see cref="InspectionResult"/> with
     /// violations reflected in <see cref="PreceptEditableFieldInfo.Violation"/>.
     /// No commit occurs — the instance is unchanged.
     /// </summary>
-    public PreceptInspectionResult Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
+    public InspectionResult Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
     {
         var baseResult = Inspect(instance);
         var editableFieldInfos = baseResult.EditableFields;
@@ -472,15 +472,14 @@ public sealed class PreceptEngine
                 var matchesOp = operations.Any(op => string.Equals(op.FieldName, info.FieldName, StringComparison.Ordinal));
                 if (matchesOp)
                 {
-                    var violation = new PreceptViolation(conflictError, Array.Empty<PreceptEditableFieldInfo>());
-                    violatedInfos.Add(info with { Violation = violation });
+                    violatedInfos.Add(info with { Violation = conflictError });
                 }
                 else
                 {
                     violatedInfos.Add(info);
                 }
             }
-            return new PreceptInspectionResult(baseResult.CurrentState, baseResult.InstanceData, baseResult.Events, violatedInfos);
+            return new InspectionResult(baseResult.CurrentState, baseResult.InstanceData, baseResult.Events, violatedInfos);
         }
 
         // Check editability
@@ -493,9 +492,9 @@ public sealed class PreceptEngine
                 var reason = $"Field '{op.FieldName}' is not editable in state '{instance.CurrentState}'.";
                 var violatedInfos = editableFieldInfos.Select(info =>
                     string.Equals(info.FieldName, op.FieldName, StringComparison.Ordinal)
-                        ? info with { Violation = new PreceptViolation(reason, Array.Empty<PreceptEditableFieldInfo>()) }
+                        ? info with { Violation = reason }
                         : info).ToList();
-                return new PreceptInspectionResult(baseResult.CurrentState, baseResult.InstanceData, baseResult.Events, violatedInfos);
+                return new InspectionResult(baseResult.CurrentState, baseResult.InstanceData, baseResult.Events, violatedInfos);
             }
         }
 
@@ -518,22 +517,14 @@ public sealed class PreceptEngine
         // Map violations to affected fields
         var patchedFieldNames = new HashSet<string>(
             operations.Select(op => op.FieldName), StringComparer.Ordinal);
-        var violationObj = new PreceptViolation(
-            string.Join("; ", violations),
-            Array.Empty<PreceptEditableFieldInfo>());
+        var violation = string.Join("; ", violations);
 
         var resultInfos = editableFieldInfos.Select(info =>
             patchedFieldNames.Contains(info.FieldName)
-                ? info with { Violation = violationObj }
+                ? info with { Violation = violation }
                 : info).ToList();
 
-        // Wire up AffectedFields on the violation
-        var affectedFields = resultInfos.Where(f => f.Violation is not null).ToList();
-        violationObj = violationObj with { AffectedFields = affectedFields };
-        resultInfos = resultInfos.Select(info =>
-            info.Violation is not null ? info with { Violation = violationObj } : info).ToList();
-
-        return new PreceptInspectionResult(baseResult.CurrentState, baseResult.InstanceData, baseResult.Events, resultInfos);
+        return new InspectionResult(baseResult.CurrentState, baseResult.InstanceData, baseResult.Events, resultInfos);
     }
 
     /// <summary>
@@ -618,7 +609,7 @@ public sealed class PreceptEngine
         return value;
     }
 
-    public PreceptFireResult Fire(
+    public FireResult Fire(
         PreceptInstance instance,
         string eventName,
         IReadOnlyDictionary<string, object?>? eventArguments = null)
@@ -628,29 +619,29 @@ public sealed class PreceptEngine
         if (!compatibility.IsCompatible)
         {
             var reasons = new[] { compatibility.Reason! };
-            return PreceptFireResult.NotDefined(instance.CurrentState, eventName, reasons);
+            return FireResult.Undefined(instance.CurrentState, eventName, reasons);
         }
 
         if (!TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
-            return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
+            return FireResult.Rejected(instance.CurrentState, eventName, new[] { eventArgError! });
 
         var evaluationArguments = BuildEvaluationData(internalData, eventName, eventArguments);
 
         // Stage 1: Event asserts (args-only context, pre-transition)
         var eventAssertViolations = EvaluateEventAsserts(eventName, BuildDirectEvaluationData(eventName, eventArguments));
         if (eventAssertViolations.Count > 0)
-            return PreceptFireResult.Rejected(instance.CurrentState, eventName, eventAssertViolations);
+            return FireResult.Rejected(instance.CurrentState, eventName, eventAssertViolations);
 
         // Stage 2: First-match row selection
         var resolution = ResolveTransition(instance.CurrentState, eventName, evaluationArguments);
-        if (resolution.Kind == TransitionResolutionKind.NotDefined)
-            return PreceptFireResult.NotDefined(instance.CurrentState, eventName, new[] { resolution.NotDefinedReason! });
+        if (resolution.Kind == TransitionResolutionKind.Undefined)
+            return FireResult.Undefined(instance.CurrentState, eventName, new[] { resolution.NotDefinedReason! });
 
-        if (resolution.Kind == TransitionResolutionKind.NotApplicable)
-            return PreceptFireResult.NotApplicable(instance.CurrentState, eventName);
+        if (resolution.Kind == TransitionResolutionKind.Unmatched)
+            return FireResult.Unmatched(instance.CurrentState, eventName);
 
         if (resolution.Kind == TransitionResolutionKind.Rejected || resolution.MatchedRow is null)
-            return PreceptFireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
+            return FireResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
 
         var matchedRow = resolution.MatchedRow;
         var updatedData = new Dictionary<string, object?>(internalData, StringComparer.Ordinal);
@@ -662,7 +653,7 @@ public sealed class PreceptEngine
             // Row mutations only (no exit/entry actions for no-transition)
             var mutError = ExecuteRowMutations(matchedRow, updatedData, workingCollections, eventName, eventArguments);
             if (mutError is not null)
-                return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { mutError });
+                return FireResult.Rejected(instance.CurrentState, eventName, new[] { mutError });
 
             CommitCollections(updatedData, workingCollections);
 
@@ -671,7 +662,7 @@ public sealed class PreceptEngine
             violations.AddRange(EvaluateInvariants(updatedData));
             violations.AddRange(EvaluateStateAsserts(AssertAnchor.In, instance.CurrentState, updatedData));
             if (violations.Count > 0)
-                return PreceptFireResult.Rejected(instance.CurrentState, eventName, violations);
+                return FireResult.Rejected(instance.CurrentState, eventName, violations);
 
             var noTransitionUpdated = instance with
             {
@@ -679,7 +670,7 @@ public sealed class PreceptEngine
                 UpdatedAt = DateTimeOffset.UtcNow,
                 InstanceData = DehydrateData(updatedData)
             };
-            return PreceptFireResult.AcceptedInPlace(instance.CurrentState, eventName, noTransitionUpdated);
+            return FireResult.NoTransition(instance.CurrentState, eventName, noTransitionUpdated);
         }
 
         // ── Transition branch ──
@@ -692,7 +683,7 @@ public sealed class PreceptEngine
         // Stage 4: Row mutations (set assignments + collection mutations)
         var rowMutError = ExecuteRowMutations(matchedRow, updatedData, workingCollections, eventName, eventArguments);
         if (rowMutError is not null)
-            return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { rowMutError });
+            return FireResult.Rejected(instance.CurrentState, eventName, new[] { rowMutError });
 
         // Stage 5: Entry actions (to <targetState> -> ...)
         ExecuteStateActions(AssertAnchor.To, targetState,
@@ -704,7 +695,7 @@ public sealed class PreceptEngine
         var validationViolations = CollectValidationViolations(
             instance.CurrentState, targetState, updatedData);
         if (validationViolations.Count > 0)
-            return PreceptFireResult.Rejected(instance.CurrentState, eventName, validationViolations);
+            return FireResult.Rejected(instance.CurrentState, eventName, validationViolations);
 
         var updated = instance with
         {
@@ -714,7 +705,7 @@ public sealed class PreceptEngine
             InstanceData = DehydrateData(updatedData)
         };
 
-        return PreceptFireResult.Accepted(instance.CurrentState, eventName, targetState, updated);
+        return FireResult.Transitioned(instance.CurrentState, eventName, targetState, updated);
     }
 
     /// <summary>
@@ -722,7 +713,7 @@ public sealed class PreceptEngine
     /// <c>in &lt;State&gt; edit</c> block for the current state are mutable.
     /// After applying edits, evaluates all invariants and state asserts.
     /// </summary>
-    public PreceptUpdateResult Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
+    public UpdateResult Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
     {
         var builder = new UpdatePatchBuilder();
         patch(builder);
@@ -730,11 +721,11 @@ public sealed class PreceptEngine
         // Build-time conflict detection
         var conflictError = builder.ValidateConflicts(_fieldMap, _collectionFieldMap);
         if (conflictError is not null)
-            return PreceptUpdateResult.Failed(PreceptUpdateOutcome.Invalid, new[] { conflictError });
+            return UpdateResult.Failed(UpdateOutcome.InvalidInput, new[] { conflictError });
 
         var operations = builder.GetOperations();
         if (operations.Count == 0)
-            return PreceptUpdateResult.Failed(PreceptUpdateOutcome.Invalid, new[] { "Patch is empty." });
+            return UpdateResult.Failed(UpdateOutcome.InvalidInput, new[] { "Patch is empty." });
 
         // Stage 1: Editability check — all fields in patch must be editable in current state
         var editableFields = _editableFieldsByState.TryGetValue(instance.CurrentState, out var editable)
@@ -746,14 +737,14 @@ public sealed class PreceptEngine
                 notAllowed.Add($"Field '{op.FieldName}' is not editable in state '{instance.CurrentState}'.");
         }
         if (notAllowed.Count > 0)
-            return PreceptUpdateResult.Failed(PreceptUpdateOutcome.NotAllowed, notAllowed);
+            return UpdateResult.Failed(UpdateOutcome.UneditableField, notAllowed);
 
         // Stage 2: Type check + unknown field validation
         foreach (var op in operations)
         {
             var typeError = ValidateUpdateOperation(op);
             if (typeError is not null)
-                return PreceptUpdateResult.Failed(PreceptUpdateOutcome.Invalid, new[] { typeError });
+                return UpdateResult.Failed(UpdateOutcome.InvalidInput, new[] { typeError });
         }
 
         // Stage 3: Atomic mutation on working copy
@@ -763,7 +754,7 @@ public sealed class PreceptEngine
 
         var mutError = ApplyPatchOperations(operations, updatedData, workingCollections);
         if (mutError is not null)
-            return PreceptUpdateResult.Failed(PreceptUpdateOutcome.Invalid, new[] { mutError });
+            return UpdateResult.Failed(UpdateOutcome.InvalidInput, new[] { mutError });
 
         CommitCollections(updatedData, workingCollections);
 
@@ -772,7 +763,7 @@ public sealed class PreceptEngine
         violations.AddRange(EvaluateInvariants(updatedData));
         violations.AddRange(EvaluateStateAsserts(AssertAnchor.In, instance.CurrentState, updatedData));
         if (violations.Count > 0)
-            return PreceptUpdateResult.Failed(PreceptUpdateOutcome.Blocked, violations);
+            return UpdateResult.Failed(UpdateOutcome.ConstraintFailure, violations);
 
         // Stage 5: Commit
         var updated = instance with
@@ -781,7 +772,7 @@ public sealed class PreceptEngine
             InstanceData = DehydrateData(updatedData)
         };
 
-        return PreceptUpdateResult.Updated(updated);
+        return UpdateResult.Succeeded(updated);
     }
 
     private string? ValidateUpdateOperation(UpdatePatchOperation op)
@@ -1011,11 +1002,11 @@ public sealed class PreceptEngine
 
     private enum TransitionResolutionKind
     {
-        Accepted,
+        Transition,
         Rejected,
-        NotDefined,
+        Undefined,
         NoTransition,
-        NotApplicable
+        Unmatched
     }
 
     private sealed record TransitionResolution(
@@ -1025,19 +1016,19 @@ public sealed class PreceptEngine
         IReadOnlyList<string> Reasons)
     {
         internal static TransitionResolution Accepted(PreceptTransitionRow row) =>
-            new(TransitionResolutionKind.Accepted, row, null, Array.Empty<string>());
+            new(TransitionResolutionKind.Transition, row, null, Array.Empty<string>());
 
         internal static TransitionResolution Rejected(IReadOnlyList<string> reasons) =>
             new(TransitionResolutionKind.Rejected, null, null, reasons);
 
         internal static TransitionResolution NotDefined(string reason) =>
-            new(TransitionResolutionKind.NotDefined, null, reason, new[] { reason });
+            new(TransitionResolutionKind.Undefined, null, reason, new[] { reason });
 
         internal static TransitionResolution NoTransition(PreceptTransitionRow row) =>
             new(TransitionResolutionKind.NoTransition, row, null, Array.Empty<string>());
 
         internal static TransitionResolution NotApplicable() =>
-            new(TransitionResolutionKind.NotApplicable, null, null, Array.Empty<string>());
+            new(TransitionResolutionKind.Unmatched, null, null, Array.Empty<string>());
     }
 
     private IReadOnlyList<string> GetRequiredEventArgumentKeys(string eventName)
@@ -1829,34 +1820,34 @@ internal sealed class EmptyInstanceData : IReadOnlyDictionary<string, object?>
     System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
-public sealed record PreceptEventInspectionResult(
-    PreceptOutcomeKind Outcome,
+public sealed record EventInspectionResult(
+    TransitionOutcome Outcome,
     string CurrentState,
     string EventName,
     string? TargetState,
     IReadOnlyList<string> RequiredEventArgumentKeys,
     IReadOnlyList<string> Reasons)
 {
-    internal static PreceptEventInspectionResult Accepted(string state, string evt, string target, IReadOnlyList<string> requiredEventArgumentKeys) =>
-        new(PreceptOutcomeKind.Accepted, state, evt, target, requiredEventArgumentKeys, Array.Empty<string>());
+    internal static EventInspectionResult Transitioned(string state, string evt, string target, IReadOnlyList<string> requiredEventArgumentKeys) =>
+        new(TransitionOutcome.Transition, state, evt, target, requiredEventArgumentKeys, Array.Empty<string>());
 
-    internal static PreceptEventInspectionResult AcceptedInPlace(string state, string evt) =>
-        new(PreceptOutcomeKind.AcceptedInPlace, state, evt, state, Array.Empty<string>(), Array.Empty<string>());
+    internal static EventInspectionResult NoTransition(string state, string evt) =>
+        new(TransitionOutcome.NoTransition, state, evt, state, Array.Empty<string>(), Array.Empty<string>());
 
-    internal static PreceptEventInspectionResult NotDefined(string state, string evt, string reason) =>
-        new(PreceptOutcomeKind.NotDefined, state, evt, null, Array.Empty<string>(), new[] { reason });
+    internal static EventInspectionResult Undefined(string state, string evt, string reason) =>
+        new(TransitionOutcome.Undefined, state, evt, null, Array.Empty<string>(), new[] { reason });
 
-    internal static PreceptEventInspectionResult NotApplicable(string state, string evt) =>
-        new(PreceptOutcomeKind.NotApplicable, state, evt, null, Array.Empty<string>(), Array.Empty<string>());
+    internal static EventInspectionResult Unmatched(string state, string evt) =>
+        new(TransitionOutcome.Unmatched, state, evt, null, Array.Empty<string>(), Array.Empty<string>());
 
-    internal static PreceptEventInspectionResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(PreceptOutcomeKind.Rejected, state, evt, null, Array.Empty<string>(), reasons);
+    internal static EventInspectionResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
+        new(TransitionOutcome.Rejected, state, evt, null, Array.Empty<string>(), reasons);
 }
 
-public sealed record PreceptInspectionResult(
+public sealed record InspectionResult(
     string CurrentState,
     IReadOnlyDictionary<string, object?> InstanceData,
-    IReadOnlyList<PreceptEventInspectionResult> Events,
+    IReadOnlyList<EventInspectionResult> Events,
     IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null);
 
 public sealed record PreceptEditableFieldInfo(
@@ -1864,29 +1855,25 @@ public sealed record PreceptEditableFieldInfo(
     string FieldType,
     bool IsNullable,
     object? CurrentValue,
-    PreceptViolation? Violation = null);
+    string? Violation = null);
 
-public sealed record PreceptViolation(
-    string Reason,
-    IReadOnlyList<PreceptEditableFieldInfo> AffectedFields);
-
-public enum PreceptUpdateOutcome
+public enum UpdateOutcome
 {
-    Updated,
-    NotAllowed,
-    Blocked,
-    Invalid
+    Update,
+    UneditableField,
+    ConstraintFailure,
+    InvalidInput
 }
 
-public sealed record PreceptUpdateResult(
-    PreceptUpdateOutcome Outcome,
+public sealed record UpdateResult(
+    UpdateOutcome Outcome,
     IReadOnlyList<string> Reasons,
     PreceptInstance? UpdatedInstance)
 {
-    internal static PreceptUpdateResult Updated(PreceptInstance updated) =>
-        new(PreceptUpdateOutcome.Updated, Array.Empty<string>(), updated);
+    internal static UpdateResult Succeeded(PreceptInstance updated) =>
+        new(UpdateOutcome.Update, Array.Empty<string>(), updated);
 
-    internal static PreceptUpdateResult Failed(PreceptUpdateOutcome outcome, IReadOnlyList<string> reasons) =>
+    internal static UpdateResult Failed(UpdateOutcome outcome, IReadOnlyList<string> reasons) =>
         new(outcome, reasons, null);
 }
 
@@ -2042,35 +2029,36 @@ internal sealed class EmptyStringSet : IReadOnlySet<string>
     System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
-public sealed record PreceptFireResult(
-    PreceptOutcomeKind Outcome,
+public sealed record FireResult(
+    TransitionOutcome Outcome,
     string PreviousState,
     string EventName,
     string? NewState,
     IReadOnlyList<string> Reasons,
     PreceptInstance? UpdatedInstance)
 {
-    internal static PreceptFireResult Accepted(string state, string evt, string newState, PreceptInstance updated) =>
-        new(PreceptOutcomeKind.Accepted, state, evt, newState, Array.Empty<string>(), updated);
+    internal static FireResult Transitioned(string state, string evt, string newState, PreceptInstance updated) =>
+        new(TransitionOutcome.Transition, state, evt, newState, Array.Empty<string>(), updated);
 
-    internal static PreceptFireResult AcceptedInPlace(string state, string evt, PreceptInstance updated) =>
-        new(PreceptOutcomeKind.AcceptedInPlace, state, evt, state, Array.Empty<string>(), updated);
+    internal static FireResult NoTransition(string state, string evt, PreceptInstance updated) =>
+        new(TransitionOutcome.NoTransition, state, evt, state, Array.Empty<string>(), updated);
 
-    internal static PreceptFireResult NotDefined(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(PreceptOutcomeKind.NotDefined, state, evt, null, reasons, null);
+    internal static FireResult Undefined(string state, string evt, IReadOnlyList<string> reasons) =>
+        new(TransitionOutcome.Undefined, state, evt, null, reasons, null);
 
-    internal static PreceptFireResult NotApplicable(string state, string evt) =>
-        new(PreceptOutcomeKind.NotApplicable, state, evt, null, Array.Empty<string>(), null);
+    internal static FireResult Unmatched(string state, string evt) =>
+        new(TransitionOutcome.Unmatched, state, evt, null, Array.Empty<string>(), null);
 
-    internal static PreceptFireResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
-        new(PreceptOutcomeKind.Rejected, state, evt, null, reasons, null);
+    internal static FireResult Rejected(string state, string evt, IReadOnlyList<string> reasons) =>
+        new(TransitionOutcome.Rejected, state, evt, null, reasons, null);
 }
 
-public enum PreceptOutcomeKind
+public enum TransitionOutcome
 {
-    NotDefined,
-    NotApplicable,
+    Undefined,
+    Unmatched,
     Rejected,
-    Accepted,
-    AcceptedInPlace
+    ConstraintFailure,
+    Transition,
+    NoTransition
 }

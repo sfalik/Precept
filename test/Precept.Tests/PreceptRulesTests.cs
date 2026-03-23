@@ -645,8 +645,8 @@ public class PreceptRulesTests
 
         var result = workflow.Fire(instance, "Pay", new Dictionary<string, object?> { ["Amount"] = -10.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        result.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
+        result.Outcome.Should().Be(TransitionOutcome.Rejected);
         result.Reasons.Should().ContainSingle(r => r.Contains("Amount must be positive", StringComparison.Ordinal));
     }
 
@@ -667,7 +667,7 @@ public class PreceptRulesTests
 
         var result = workflow.Fire(instance, "Pay", new Dictionary<string, object?> { ["Amount"] = 50.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         result.NewState.Should().Be("Done");
     }
 
@@ -691,7 +691,7 @@ public class PreceptRulesTests
 
         var result = workflow.Fire(instance, "Pay", new Dictionary<string, object?> { ["Amount"] = -5.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         result.Reasons.Should().ContainSingle(r => r.Contains("Amount must be positive", StringComparison.Ordinal));
     }
 
@@ -717,7 +717,7 @@ public class PreceptRulesTests
             ["Fee"] = -5.0
         });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         result.Reasons.Should().HaveCount(2);
         result.Reasons.Should().Contain(r => r.Contains("Amount must be positive", StringComparison.Ordinal));
         result.Reasons.Should().Contain(r => r.Contains("Fee must be non-negative", StringComparison.Ordinal));
@@ -744,11 +744,11 @@ public class PreceptRulesTests
 
         // Arg value 500 satisfies the rule even though the machine field is 0
         var passing = workflow.Fire(instance, "Submit", new Dictionary<string, object?> { ["CreditScore"] = 500.0 });
-        (passing.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (passing.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
 
         // Arg value 100 violates the rule
         var failing = workflow.Fire(instance, "Submit", new Dictionary<string, object?> { ["CreditScore"] = 100.0 });
-        (failing.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (failing.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         failing.Reasons.Should().ContainSingle(r => r.Contains("Credit score must be at least 300", StringComparison.Ordinal));
     }
 
@@ -773,8 +773,8 @@ public class PreceptRulesTests
 
         var result = workflow.Fire(instance, "Debit", new Dictionary<string, object?> { ["Amount"] = 200.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        result.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
+        result.Outcome.Should().Be(TransitionOutcome.Rejected);
         result.Reasons.Should().ContainSingle(r => r.Contains("Balance must not go negative", StringComparison.Ordinal));
     }
 
@@ -795,7 +795,7 @@ public class PreceptRulesTests
 
         var result = workflow.Fire(instance, "Debit", new Dictionary<string, object?> { ["Amount"] = 30.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         result.UpdatedInstance!.InstanceData["Balance"].Should().Be(70.0);
     }
 
@@ -821,7 +821,7 @@ public class PreceptRulesTests
 
         var result = workflow.Fire(instance, "Debit", new Dictionary<string, object?> { ["Amount"] = 200.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         // UpdatedInstance is null on rejection meaning original data is unchanged
         result.UpdatedInstance.Should().BeNull();
     }
@@ -853,7 +853,7 @@ public class PreceptRulesTests
             ["QuantityAdjust"] = -50.0
         });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         result.Reasons.Should().HaveCount(2);
         result.Reasons.Should().Contain(r => r.Contains("Balance must not go negative", StringComparison.Ordinal));
         result.Reasons.Should().Contain(r => r.Contains("Quantity must be non-negative", StringComparison.Ordinal));
@@ -887,7 +887,7 @@ public class PreceptRulesTests
 
         var result = workflow.Fire(instance, "AdjustQuantity", new Dictionary<string, object?> { ["NewQty"] = 7.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         result.Reasons.Should().ContainSingle(r => r.Contains("Price must be consistent", StringComparison.Ordinal));
     }
 
@@ -919,7 +919,7 @@ public class PreceptRulesTests
             ["NewTotal"] = 30.0
         });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         result.UpdatedInstance!.InstanceData["Quantity"].Should().Be(3.0);
         result.UpdatedInstance.InstanceData["TotalPrice"].Should().Be(30.0);
     }
@@ -946,7 +946,7 @@ public class PreceptRulesTests
 
         var result = workflow.Fire(instance, "Checkout", new Dictionary<string, object?> { ["Payment"] = 0.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         result.Reasons.Should().ContainSingle(r => r.Contains("Must have paid something", StringComparison.Ordinal));
     }
 
@@ -968,7 +968,7 @@ public class PreceptRulesTests
 
         var result = workflow.Fire(instance, "Checkout", new Dictionary<string, object?> { ["Payment"] = 100.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         result.NewState.Should().Be("Paid");
     }
 
@@ -990,7 +990,7 @@ public class PreceptRulesTests
 
         var result = workflow.Fire(instance, "Penalize", new Dictionary<string, object?> { ["Points"] = 15.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         result.Reasons.Should().ContainSingle(r => r.Contains("Score must be positive while active", StringComparison.Ordinal));
     }
 
@@ -1016,7 +1016,7 @@ public class PreceptRulesTests
         var enterResult = workflow.Fire(
             workflow.CreateInstance("Lobby", new Dictionary<string, object?> { ["Score"] = 5.0 }),
             "Enter");
-        (enterResult.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (enterResult.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
 
         var instance = enterResult.UpdatedInstance!;
 
@@ -1024,8 +1024,8 @@ public class PreceptRulesTests
         var result = workflow.Fire(instance, "AttemptFail", new Dictionary<string, object?> { ["Penalty"] = 10.0 });
 
         // no-transition doesn't check state rules — should be accepted (no-transition outcome)
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
-        result.Outcome.Should().Be(PreceptOutcomeKind.AcceptedInPlace);
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
+        result.Outcome.Should().Be(TransitionOutcome.NoTransition);
         result.UpdatedInstance!.InstanceData["Score"].Should().Be(-5.0);
     }
 
@@ -1053,7 +1053,7 @@ public class PreceptRulesTests
         // Both event rule AND guard would reject, but event rule is checked first
         var result = workflow.Fire(instance, "Pay", new Dictionary<string, object?> { ["Amount"] = -10.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         // Should only have the event rule violation reason, not the guard rejection reason
         result.Reasons.Should().ContainSingle(r => r.Contains("Amount must be positive", StringComparison.Ordinal));
         result.Reasons.Should().NotContain(r => r.Contains("Not enough balance", StringComparison.Ordinal));
@@ -1078,7 +1078,7 @@ public class PreceptRulesTests
         // Setting to 0 satisfies Balance >= 0
         var result = workflow.Fire(instance, "ZeroOut");
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         result.UpdatedInstance!.InstanceData["Balance"].Should().Be(0.0);
     }
 
@@ -1106,7 +1106,7 @@ public class PreceptRulesTests
         // Debit of 50 keeps Balance = 50, rule 'Balance >= 0' passes
         var result = workflow.Fire(instance, "Debit", new Dictionary<string, object?> { ["Amount"] = 50.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         result.UpdatedInstance!.InstanceData["Balance"].Should().Be(50.0);
     }
 
@@ -1129,7 +1129,7 @@ public class PreceptRulesTests
         // Debiting 200 would make Balance = -150, violating the rule
         var result = workflow.Fire(instance, "Debit", new Dictionary<string, object?> { ["Amount"] = 200.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         result.Reasons.Should().ContainSingle(r => r.Contains("Balance must not go negative", StringComparison.Ordinal));
     }
 
@@ -1154,7 +1154,7 @@ public class PreceptRulesTests
         // Setting Balance to null via nullable arg — 'Balance == null || Balance >= 0' passes
         var result = workflow.Fire(instance, "ClearBalance", new Dictionary<string, object?> { ["NewBalance"] = null });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         result.UpdatedInstance!.InstanceData["Balance"].Should().BeNull();
     }
 
@@ -1180,13 +1180,13 @@ public class PreceptRulesTests
 
         // Add first two tags
         var r1 = workflow.Fire(instance, "AddTag", new Dictionary<string, object?> { ["Tag"] = "a" });
-        (r1.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (r1.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         var r2 = workflow.Fire(r1.UpdatedInstance!, "AddTag", new Dictionary<string, object?> { ["Tag"] = "b" });
-        (r2.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (r2.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
 
         // Third tag should violate the rule
         var r3 = workflow.Fire(r2.UpdatedInstance!, "AddTag", new Dictionary<string, object?> { ["Tag"] = "c" });
-        (r3.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (r3.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         r3.Reasons.Should().ContainSingle(r => r.Contains("Too many tags", StringComparison.Ordinal));
     }
 
@@ -1215,10 +1215,10 @@ public class PreceptRulesTests
         var resultFromDraft = workflow.Fire(instanceDraft, "Pay", new Dictionary<string, object?> { ["Payment"] = 0.0 });
         var resultFromReview = workflow.Fire(instanceReview, "Pay", new Dictionary<string, object?> { ["Payment"] = 50.0 });
 
-        (resultFromDraft.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (resultFromDraft.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         resultFromDraft.Reasons.Should().ContainSingle(r => r.Contains("Must have paid to be in Paid", StringComparison.Ordinal));
 
-        (resultFromReview.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (resultFromReview.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         resultFromReview.NewState.Should().Be("Paid");
     }
 
@@ -1243,8 +1243,8 @@ public class PreceptRulesTests
 
         var result = workflow.Inspect(instance, "Pay", new Dictionary<string, object?> { ["Amount"] = -10.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
-        result.Outcome.Should().Be(PreceptOutcomeKind.Rejected);
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
+        result.Outcome.Should().Be(TransitionOutcome.Rejected);
         result.Reasons.Should().ContainSingle(r => r.Contains("Amount must be positive", StringComparison.Ordinal));
     }
 
@@ -1265,7 +1265,7 @@ public class PreceptRulesTests
 
         var result = workflow.Inspect(instance, "Pay", new Dictionary<string, object?> { ["Amount"] = 50.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         result.TargetState.Should().Be("Done");
     }
 
@@ -1288,10 +1288,10 @@ public class PreceptRulesTests
         var instance = workflow.CreateInstance("Apply", new Dictionary<string, object?> { ["CreditScore"] = 0.0 });
 
         var passing = workflow.Inspect(instance, "Submit", new Dictionary<string, object?> { ["CreditScore"] = 500.0 });
-        (passing.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (passing.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
 
         var failing = workflow.Inspect(instance, "Submit", new Dictionary<string, object?> { ["CreditScore"] = 100.0 });
-        (failing.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (failing.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         failing.Reasons.Should().ContainSingle(r => r.Contains("Credit score must be at least 300", StringComparison.Ordinal));
     }
 
@@ -1312,7 +1312,7 @@ public class PreceptRulesTests
 
         var result = workflow.Inspect(instance, "Debit", new Dictionary<string, object?> { ["Amount"] = 200.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         result.Reasons.Should().ContainSingle(r => r.Contains("Balance must not go negative", StringComparison.Ordinal));
     }
 
@@ -1334,7 +1334,7 @@ public class PreceptRulesTests
 
         var result = workflow.Inspect(instance, "Checkout", new Dictionary<string, object?> { ["Payment"] = 0.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         result.Reasons.Should().ContainSingle(r => r.Contains("Must have paid", StringComparison.Ordinal));
     }
 
@@ -1356,7 +1356,7 @@ public class PreceptRulesTests
         // Calling inspect without args — should still return accepted (discovery) with RequiredEventArgumentKeys
         var result = workflow.Inspect(instance, "Pay");
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeTrue();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         result.RequiredEventArgumentKeys.Should().ContainSingle().Which.Should().Be("Amount");
     }
 
@@ -1380,7 +1380,7 @@ public class PreceptRulesTests
 
         var result = workflow.Inspect(workflow.CreateInstance("Idle"), "Pay", new Dictionary<string, object?> { ["Amount"] = -5.0 });
 
-        (result.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace).Should().BeFalse();
+        (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeFalse();
         result.Reasons.Should().ContainSingle(r => r.Contains("Amount must be positive", StringComparison.Ordinal));
     }
 

@@ -92,7 +92,7 @@ public static class InspectTool
             var dto = new InspectEventDto(
                 evt.Name,
                 fireResult.Outcome.ToString(),
-                fireResult.Outcome is PreceptOutcomeKind.Accepted or PreceptOutcomeKind.AcceptedInPlace
+                fireResult.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition
                     ? fireResult.NewState ?? fireResult.PreviousState
                     : null,
                 fireResult.UpdatedInstance is not null
@@ -106,7 +106,7 @@ public static class InspectTool
             eventResults.Add(dto);
         }
 
-        // Sort: actionable first (Accepted/AcceptedInPlace), then unavailable, then requiresArgs
+        // Sort: actionable first (Transition/NoTransition), then unavailable, then requiresArgs
         eventResults.Sort((a, b) =>
         {
             var orderA = GetSortOrder(a);
@@ -122,7 +122,7 @@ public static class InspectTool
         if (dto.RequiresArgs == true) return 3;
         return dto.Outcome switch
         {
-            "Accepted" or "AcceptedInPlace" => 1,
+            "Transition" or "NoTransition" => 1,
             _ => 2
         };
     }

@@ -80,9 +80,10 @@ public static class RunTool
                     : ToDictionary(instance.InstanceData),
                 fireResult.Reasons.Count > 0 ? string.Join("; ", fireResult.Reasons) : null));
 
-            if (fireResult.Outcome is PreceptOutcomeKind.Rejected
-                or PreceptOutcomeKind.NotDefined
-                or PreceptOutcomeKind.NotApplicable)
+            if (fireResult.Outcome is TransitionOutcome.Rejected
+                or TransitionOutcome.ConstraintFailure
+                or TransitionOutcome.Undefined
+                or TransitionOutcome.Unmatched)
             {
                 return new RunResult(
                     stepResults,
