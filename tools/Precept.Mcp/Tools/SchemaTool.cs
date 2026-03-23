@@ -73,9 +73,9 @@ public static class SchemaTool
         var guard = row.WhenText is not null ? $"if {row.WhenText}" : "else";
         var outcome = row.Outcome switch
         {
-            PreceptStateTransition t => $"transition {t.TargetState}",
-            PreceptRejection r => r.Reason is not null ? $"reject \"{r.Reason}\"" : "reject",
-            PreceptNoTransition => "no transition",
+            StateTransition t => $"transition {t.TargetState}",
+            Rejection r => r.Reason is not null ? $"reject \"{r.Reason}\"" : "reject",
+            NoTransition => "no transition",
             _ => "unknown"
         };
 

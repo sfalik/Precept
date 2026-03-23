@@ -989,7 +989,7 @@ internal sealed class PreceptAnalyzer
             if (!rowsByEvent.TryGetValue(evt.Name, out var rows) || rows.Length == 0)
                 continue;
 
-            if (rows.Any(static row => row.Outcome is not PreceptRejection))
+            if (rows.Any(static row => row.Outcome is not Rejection))
                 continue;
 
             var lineIndex = FindEventLine(lines, evt.Name);
@@ -1009,7 +1009,7 @@ internal sealed class PreceptAnalyzer
             .GroupBy(row => row.EventName, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
-                group => group.Any(static row => row.Outcome is not PreceptRejection),
+                group => group.Any(static row => row.Outcome is not Rejection),
                 StringComparer.Ordinal);
 
         return transitionRows
@@ -1017,7 +1017,7 @@ internal sealed class PreceptAnalyzer
             .Select(group =>
             {
                 var rows = group.OrderBy(static row => row.SourceLine).ToArray();
-                if (rows.Length == 0 || rows.Any(static row => row.Outcome is not PreceptRejection))
+                if (rows.Length == 0 || rows.Any(static row => row.Outcome is not Rejection))
                     return null;
 
                 var firstLineIndex = FindTransitionPairLine(lines, group.Key.FromState, group.Key.EventName);
@@ -1043,7 +1043,7 @@ internal sealed class PreceptAnalyzer
         {
             referencedEvents.Add(row.EventName);
 
-            if (row.Outcome is not PreceptStateTransition transition)
+            if (row.Outcome is not StateTransition transition)
                 continue;
 
             if (string.Equals(row.FromState, "any", StringComparison.OrdinalIgnoreCase))
@@ -1083,7 +1083,7 @@ internal sealed class PreceptAnalyzer
                 string.Equals(row.FromState, state, StringComparison.Ordinal) ||
                 string.Equals(row.FromState, "any", StringComparison.OrdinalIgnoreCase)).ToArray();
 
-            if (outgoingRows.Length == 0 || outgoingRows.Any(row => row.Outcome is PreceptStateTransition))
+            if (outgoingRows.Length == 0 || outgoingRows.Any(row => row.Outcome is StateTransition))
                 continue;
 
             var lineIndex = FindStateLine(lines, state);
@@ -1117,7 +1117,7 @@ internal sealed class PreceptAnalyzer
         if (model.StateAsserts is not null)
         {
             var statesWithToAsserts = model.StateAsserts
-                .Where(sa => sa.Preposition == PreceptAssertPreposition.To)
+                .Where(sa => sa.Anchor == AssertAnchor.To)
                 .Select(sa => sa.State)
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
@@ -1126,7 +1126,7 @@ internal sealed class PreceptAnalyzer
                 var targetedStates = new HashSet<string>(
                     (model.TransitionRows ?? Array.Empty<PreceptTransitionRow>())
                         .Select(r => r.Outcome)
-                        .OfType<PreceptStateTransition>()
+                        .OfType<StateTransition>()
                         .Select(st => st.TargetState),
                     StringComparer.Ordinal);
                 foreach (var stateName in statesWithToAsserts)

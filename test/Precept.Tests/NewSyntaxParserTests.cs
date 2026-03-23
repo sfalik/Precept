@@ -303,7 +303,7 @@ public class NewSyntaxParserTests
 
         model.StateAsserts.Should().HaveCount(1);
         var sa = model.StateAsserts![0];
-        sa.Preposition.Should().Be(PreceptAssertPreposition.In);
+        sa.Anchor.Should().Be(AssertAnchor.In);
         sa.State.Should().Be("Active");
         sa.Reason.Should().Be("Score must be positive while active");
     }
@@ -322,7 +322,7 @@ public class NewSyntaxParserTests
         var model = PreceptParser.Parse(dsl);
 
         var sa = model.StateAsserts![0];
-        sa.Preposition.Should().Be(PreceptAssertPreposition.To);
+        sa.Anchor.Should().Be(AssertAnchor.To);
         sa.State.Should().Be("Done");
     }
 
@@ -340,7 +340,7 @@ public class NewSyntaxParserTests
         var model = PreceptParser.Parse(dsl);
 
         var sa = model.StateAsserts![0];
-        sa.Preposition.Should().Be(PreceptAssertPreposition.From);
+        sa.Anchor.Should().Be(AssertAnchor.From);
         sa.State.Should().Be("Active");
     }
 
@@ -422,7 +422,7 @@ public class NewSyntaxParserTests
 
         model.StateActions.Should().HaveCount(1);
         var sa = model.StateActions![0];
-        sa.Preposition.Should().Be(PreceptAssertPreposition.To);
+        sa.Anchor.Should().Be(AssertAnchor.To);
         sa.State.Should().Be("Done");
         sa.SetAssignments.Should().HaveCount(1);
         sa.SetAssignments[0].Key.Should().Be("Counter");
@@ -442,7 +442,7 @@ public class NewSyntaxParserTests
         var model = PreceptParser.Parse(dsl);
 
         var sa = model.StateActions![0];
-        sa.Preposition.Should().Be(PreceptAssertPreposition.From);
+        sa.Anchor.Should().Be(AssertAnchor.From);
         sa.State.Should().Be("Active");
     }
 
@@ -546,7 +546,7 @@ public class NewSyntaxParserTests
         var row = model.TransitionRows![0];
         row.FromState.Should().Be("A");
         row.EventName.Should().Be("Go");
-        row.Outcome.Should().BeOfType<PreceptStateTransition>()
+        row.Outcome.Should().BeOfType<StateTransition>()
             .Which.TargetState.Should().Be("B");
         row.WhenGuard.Should().BeNull();
         row.SetAssignments.Should().BeEmpty();
@@ -603,7 +603,7 @@ public class NewSyntaxParserTests
         var model = PreceptParser.Parse(dsl);
 
         var row = model.TransitionRows![0];
-        row.Outcome.Should().BeOfType<PreceptNoTransition>();
+        row.Outcome.Should().BeOfType<NoTransition>();
     }
 
     [Fact]
@@ -619,7 +619,7 @@ public class NewSyntaxParserTests
         var model = PreceptParser.Parse(dsl);
 
         var row = model.TransitionRows![0];
-        row.Outcome.Should().BeOfType<PreceptRejection>()
+        row.Outcome.Should().BeOfType<Rejection>()
             .Which.Reason.Should().Be("Not allowed");
     }
 

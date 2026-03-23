@@ -912,15 +912,15 @@ public class PreceptWorkflowTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var guardedRow = machine.TransitionRows!.FirstOrDefault(r => r.Outcome is PreceptStateTransition);
+        var guardedRow = machine.TransitionRows!.FirstOrDefault(r => r.Outcome is StateTransition);
         guardedRow.Should().NotBeNull();
         guardedRow!.WhenText.Should().Be("CarsWaiting > 0");
         guardedRow!.SetAssignments.Should().ContainSingle();
         guardedRow!.SetAssignments[0].Key.Should().Be("CarsWaiting");
         guardedRow!.SetAssignments[0].ExpressionText.Should().Be("0");
-        var rejectRow = machine.TransitionRows.FirstOrDefault(r => r.Outcome is PreceptRejection);
+        var rejectRow = machine.TransitionRows.FirstOrDefault(r => r.Outcome is Rejection);
         rejectRow.Should().NotBeNull();
-        ((PreceptRejection)rejectRow!.Outcome).Reason.Should().Be("Cars waiting required");
+        ((Rejection)rejectRow!.Outcome).Reason.Should().Be("Cars waiting required");
     }
 
     [Fact]
@@ -979,9 +979,9 @@ public class PreceptWorkflowTests
 
         machine.TransitionRows.Should().NotBeNull();
         machine.TransitionRows!.Any(r => r.FromState == "Red").Should().BeTrue();
-        machine.TransitionRows.Any(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Green").Should().BeTrue();
-        machine.TransitionRows.Any(r => r.Outcome is PreceptRejection).Should().BeTrue();
-        ((PreceptRejection)machine.TransitionRows.Single(r => r.Outcome is PreceptRejection).Outcome).Reason.Should().Be("No cars waiting");
+        machine.TransitionRows.Any(r => r.Outcome is StateTransition st && st.TargetState == "Green").Should().BeTrue();
+        machine.TransitionRows.Any(r => r.Outcome is Rejection).Should().BeTrue();
+        ((Rejection)machine.TransitionRows.Single(r => r.Outcome is Rejection).Outcome).Reason.Should().Be("No cars waiting");
     }
 
     [Fact]

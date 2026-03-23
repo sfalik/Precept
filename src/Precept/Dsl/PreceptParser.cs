@@ -423,17 +423,17 @@ public static class PreceptParser
     private static readonly TokenListParser<PreceptToken, PreceptClauseOutcome> TransitionOutcome =
         Token.EqualTo(PreceptToken.Transition)
             .IgnoreThen(Token.EqualTo(PreceptToken.Identifier))
-            .Select(t => (PreceptClauseOutcome)new PreceptStateTransition(t.ToText()));
+            .Select(t => (PreceptClauseOutcome)new StateTransition(t.ToText()));
 
     private static readonly TokenListParser<PreceptToken, PreceptClauseOutcome> NoTransitionOutcome =
         Token.EqualTo(PreceptToken.No)
             .IgnoreThen(Token.EqualTo(PreceptToken.Transition))
-            .Value((PreceptClauseOutcome)new PreceptNoTransition());
+            .Value((PreceptClauseOutcome)new NoTransition());
 
     private static readonly TokenListParser<PreceptToken, PreceptClauseOutcome> RejectOutcome =
         Token.EqualTo(PreceptToken.Reject)
             .IgnoreThen(Token.EqualTo(PreceptToken.StringLiteral))
-            .Select(t => (PreceptClauseOutcome)new PreceptRejection(t.ToStringLiteralValue()));
+            .Select(t => (PreceptClauseOutcome)new Rejection(t.ToStringLiteralValue()));
 
     private static readonly TokenListParser<PreceptToken, PreceptClauseOutcome> Outcome =
         NoTransitionOutcome.Try()
@@ -664,9 +664,9 @@ public static class PreceptParser
          from __ in Token.EqualTo(PreceptToken.Because)
          from reason in Token.EqualTo(PreceptToken.StringLiteral)
          select (StatementResult)new StateAssertResult(
-             kw.Kind == PreceptToken.In ? PreceptAssertPreposition.In :
-             kw.Kind == PreceptToken.To ? PreceptAssertPreposition.To :
-             PreceptAssertPreposition.From,
+             kw.Kind == PreceptToken.In ? AssertAnchor.In :
+             kw.Kind == PreceptToken.To ? AssertAnchor.To :
+             AssertAnchor.From,
              states,
              ReconstituteExpr(expr), expr, reason.ToStringLiteralValue(),
              SourceLine: kw.Span.Position.Line))
@@ -686,7 +686,7 @@ public static class PreceptParser
          from expr in BoolExpr
          from __ in Token.EqualTo(PreceptToken.Because)
          from reason in Token.EqualTo(PreceptToken.StringLiteral)
-         select (StatementResult)new EventAssertResult(new PreceptEventAssert(
+         select (StatementResult)new EventAssertResult(new EventAssertion(
              eventName.ToText(), ReconstituteExpr(expr), expr, reason.ToStringLiteralValue(),
              SourceLine: kwOn.Span.Position.Line)))
         .Named("event assert")
@@ -702,9 +702,9 @@ public static class PreceptParser
     // ═══════════════════════════════════════════════════════════════════
 
     // to/from <StateTarget> -> <ActionChain>
-    private static readonly TokenListParser<PreceptToken, (PreceptAssertPreposition Prep, string[] States)> StateActionPrefix =
-        Token.EqualTo(PreceptToken.To).Value(PreceptAssertPreposition.To)
-            .Or(Token.EqualTo(PreceptToken.From).Value(PreceptAssertPreposition.From))
+    private static readonly TokenListParser<PreceptToken, (AssertAnchor Prep, string[] States)> StateActionPrefix =
+        Token.EqualTo(PreceptToken.To).Value(AssertAnchor.To)
+            .Or(Token.EqualTo(PreceptToken.From).Value(AssertAnchor.From))
             .Then(prep => StateTarget.Select(states => (prep, states)));
 
     private static readonly TokenListParser<PreceptToken, ParsedAction[]> ActionChain =
@@ -794,10 +794,10 @@ public static class PreceptParser
     private sealed record InvariantResult(PreceptInvariant Invariant) : StatementResult;
     private sealed record StateResult(PreceptState State, bool IsInitial) : StatementResult;
     private sealed record EventResult(PreceptEvent Event) : StatementResult;
-    private sealed record StateAssertResult(PreceptAssertPreposition Prep, string[] States,
+    private sealed record StateAssertResult(AssertAnchor Prep, string[] States,
         string ExprText, PreceptExpression Expr, string Reason, int SourceLine = 0) : StatementResult;
-    private sealed record EventAssertResult(PreceptEventAssert Assert) : StatementResult;
-    private sealed record StateActionResult(PreceptAssertPreposition Prep, string[] States,
+    private sealed record EventAssertResult(EventAssertion Assert) : StatementResult;
+    private sealed record StateActionResult(AssertAnchor Prep, string[] States,
         ParsedAction[] Actions) : StatementResult;
     private sealed record EditResult(string[] States, string[] Fields) : StatementResult;
     private sealed record TransitionRowResult(string[] States, string EventName,
@@ -850,9 +850,9 @@ public static class PreceptParser
         var fields = new List<PreceptField>();
         var collectionFields = new List<PreceptCollectionField>();
         var invariants = new List<PreceptInvariant>();
-        var stateAsserts = new List<PreceptStateAssert>();
+        var stateAsserts = new List<StateAssertion>();
         var stateActions = new List<PreceptStateAction>();
-        var eventAsserts = new List<PreceptEventAssert>();
+        var eventAsserts = new List<EventAssertion>();
         var transitionRows = new List<PreceptTransitionRow>();
         var editBlocks = new List<PreceptEditBlock>();
 
@@ -901,7 +901,7 @@ public static class PreceptParser
 
                 case StateAssertResult sar:
                     ExpandStateTargets(sar.States, states).ForEach(stateName =>
-                        stateAsserts.Add(new PreceptStateAssert(
+                        stateAsserts.Add(new StateAssertion(
                             sar.Prep, stateName, sar.ExprText, sar.Expr, sar.Reason, sar.SourceLine)));
                     break;
 

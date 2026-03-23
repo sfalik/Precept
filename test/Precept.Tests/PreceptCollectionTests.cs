@@ -109,7 +109,7 @@ public class PreceptCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        var row = machine.TransitionRows!.Single(r => r.Outcome is StateTransition st && st.TargetState == "Active");
         row.CollectionMutations.Should().ContainSingle();
         var mut = row.CollectionMutations![0];
         mut.Verb.Should().Be(PreceptCollectionMutationVerb.Add);
@@ -131,7 +131,7 @@ public class PreceptCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        var row = machine.TransitionRows!.Single(r => r.Outcome is StateTransition st && st.TargetState == "Active");
         row.CollectionMutations.Should().ContainSingle();
         var mut = row.CollectionMutations![0];
         mut.Verb.Should().Be(PreceptCollectionMutationVerb.Remove);
@@ -152,7 +152,7 @@ public class PreceptCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        var row = machine.TransitionRows!.Single(r => r.Outcome is StateTransition st && st.TargetState == "Active");
         row.CollectionMutations.Should().ContainSingle();
         var mut = row.CollectionMutations![0];
         mut.Verb.Should().Be(PreceptCollectionMutationVerb.Enqueue);
@@ -173,7 +173,7 @@ public class PreceptCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        var row = machine.TransitionRows!.Single(r => r.Outcome is StateTransition st && st.TargetState == "Active");
         row.CollectionMutations.Should().ContainSingle();
         var mut = row.CollectionMutations![0];
         mut.Verb.Should().Be(PreceptCollectionMutationVerb.Dequeue);
@@ -195,7 +195,7 @@ public class PreceptCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        var row = machine.TransitionRows!.Single(r => r.Outcome is StateTransition st && st.TargetState == "Active");
         row.CollectionMutations.Should().ContainSingle();
         var mut = row.CollectionMutations![0];
         mut.Verb.Should().Be(PreceptCollectionMutationVerb.Push);
@@ -216,7 +216,7 @@ public class PreceptCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        var row = machine.TransitionRows!.Single(r => r.Outcome is StateTransition st && st.TargetState == "Active");
         row.CollectionMutations.Should().ContainSingle();
         var mut = row.CollectionMutations![0];
         mut.Verb.Should().Be(PreceptCollectionMutationVerb.Pop);
@@ -237,7 +237,7 @@ public class PreceptCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        var row = machine.TransitionRows!.Single(r => r.Outcome is StateTransition st && st.TargetState == "Active");
         row.CollectionMutations.Should().ContainSingle();
         var mut = row.CollectionMutations![0];
         mut.Verb.Should().Be(PreceptCollectionMutationVerb.Clear);
@@ -329,7 +329,7 @@ public class PreceptCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        var row = machine.TransitionRows!.Single(r => r.Outcome is StateTransition st && st.TargetState == "Active");
         row.CollectionMutations.Should().HaveCount(3);
         row.CollectionMutations![0].Verb.Should().Be(PreceptCollectionMutationVerb.Add);
         row.CollectionMutations![0].ExpressionText.Should().Be("3");
@@ -356,7 +356,7 @@ public class PreceptCollectionParsingTests
         var machine = PreceptParser.Parse(dsl);
 
         machine.TransitionRows.Should().HaveCount(2);
-        var noTransRow = machine.TransitionRows!.Single(r => r.Outcome is PreceptNoTransition);
+        var noTransRow = machine.TransitionRows!.Single(r => r.Outcome is NoTransition);
         noTransRow.CollectionMutations.Should().ContainSingle();
         noTransRow.CollectionMutations![0].Verb.Should().Be(PreceptCollectionMutationVerb.Add);
     }
@@ -376,7 +376,7 @@ public class PreceptCollectionParsingTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var row = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Active");
+        var row = machine.TransitionRows!.Single(r => r.Outcome is StateTransition st && st.TargetState == "Active");
         row.CollectionMutations.Should().ContainSingle();
         row.CollectionMutations![0].ExpressionText.Should().Be("Target");
     }

@@ -14,12 +14,12 @@ public sealed class PreceptEngine
 
     // New constraint storage
     private readonly IReadOnlyList<PreceptInvariant> _invariants;
-    private readonly IReadOnlyList<PreceptEventAssert> _eventAsserts;
-    private readonly Dictionary<string, List<PreceptEventAssert>> _eventAssertMap;
-    private readonly IReadOnlyList<PreceptStateAssert> _stateAsserts;
+    private readonly IReadOnlyList<EventAssertion> _eventAsserts;
+    private readonly Dictionary<string, List<EventAssertion>> _eventAssertMap;
+    private readonly IReadOnlyList<StateAssertion> _stateAsserts;
     private readonly IReadOnlyList<PreceptStateAction> _stateActions;
-    private readonly Dictionary<(PreceptAssertPreposition Prep, string State), List<PreceptStateAssert>> _stateAssertMap;
-    private readonly Dictionary<(PreceptAssertPreposition Prep, string State), List<PreceptStateAction>> _stateActionMap;
+    private readonly Dictionary<(AssertAnchor Prep, string State), List<StateAssertion>> _stateAssertMap;
+    private readonly Dictionary<(AssertAnchor Prep, string State), List<PreceptStateAction>> _stateActionMap;
 
     // Editability: state → set of editable field names (union of all matching edit blocks)
     private readonly IReadOnlyDictionary<string, HashSet<string>> _editableFieldsByState;
@@ -72,27 +72,27 @@ public sealed class PreceptEngine
         _invariants = model.Invariants ?? Array.Empty<PreceptInvariant>();
 
         // Event asserts
-        _eventAsserts = model.EventAsserts ?? Array.Empty<PreceptEventAssert>();
-        _eventAssertMap = new Dictionary<string, List<PreceptEventAssert>>(StringComparer.Ordinal);
+        _eventAsserts = model.EventAsserts ?? Array.Empty<EventAssertion>();
+        _eventAssertMap = new Dictionary<string, List<EventAssertion>>(StringComparer.Ordinal);
         foreach (var ea in _eventAsserts)
         {
             if (!_eventAssertMap.TryGetValue(ea.EventName, out var list))
             {
-                list = new List<PreceptEventAssert>();
+                list = new List<EventAssertion>();
                 _eventAssertMap[ea.EventName] = list;
             }
             list.Add(ea);
         }
 
         // State asserts (preposition-aware)
-        _stateAsserts = model.StateAsserts ?? Array.Empty<PreceptStateAssert>();
-        _stateAssertMap = new Dictionary<(PreceptAssertPreposition Prep, string State), List<PreceptStateAssert>>();
+        _stateAsserts = model.StateAsserts ?? Array.Empty<StateAssertion>();
+        _stateAssertMap = new Dictionary<(AssertAnchor Prep, string State), List<StateAssertion>>();
         foreach (var sa in _stateAsserts)
         {
-            var key = (sa.Preposition, sa.State);
+            var key = (sa.Anchor, sa.State);
             if (!_stateAssertMap.TryGetValue(key, out var list))
             {
-                list = new List<PreceptStateAssert>();
+                list = new List<StateAssertion>();
                 _stateAssertMap[key] = list;
             }
             list.Add(sa);
@@ -100,10 +100,10 @@ public sealed class PreceptEngine
 
         // State actions (entry/exit automatic mutations)
         _stateActions = model.StateActions ?? Array.Empty<PreceptStateAction>();
-        _stateActionMap = new Dictionary<(PreceptAssertPreposition Prep, string State), List<PreceptStateAction>>();
+        _stateActionMap = new Dictionary<(AssertAnchor Prep, string State), List<PreceptStateAction>>();
         foreach (var sa in _stateActions)
         {
-            var key = (sa.Preposition, sa.State);
+            var key = (sa.Anchor, sa.State);
             if (!_stateActionMap.TryGetValue(key, out var list))
             {
                 list = new List<PreceptStateAction>();
@@ -270,7 +270,7 @@ public sealed class PreceptEngine
         var internalData = HydrateInstanceData(instance.InstanceData);
         var ruleViolations = new List<string>();
         ruleViolations.AddRange(EvaluateInvariants(internalData));
-        ruleViolations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.In, instance.CurrentState, internalData));
+        ruleViolations.AddRange(EvaluateStateAsserts(AssertAnchor.In, instance.CurrentState, internalData));
         if (ruleViolations.Count > 0)
             return PreceptCompatibilityResult.NotCompatible(
                 $"Instance violates {ruleViolations.Count} rule(s): {string.Join("; ", ruleViolations)}");
@@ -297,7 +297,7 @@ public sealed class PreceptEngine
             TransitionResolutionKind.Accepted => PreceptEventInspectionResult.Accepted(
                 currentState,
                 eventName,
-                ((PreceptStateTransition)resolution.MatchedRow!.Outcome).TargetState,
+                ((StateTransition)resolution.MatchedRow!.Outcome).TargetState,
                 GetRequiredEventArgumentKeys(eventName)),
             TransitionResolutionKind.NotApplicable => PreceptEventInspectionResult.NotApplicable(currentState, eventName),
             TransitionResolutionKind.NoTransition => PreceptEventInspectionResult.AcceptedInPlace(currentState, eventName),
@@ -365,14 +365,14 @@ public sealed class PreceptEngine
             return PreceptEventInspectionResult.Rejected(instance.CurrentState, eventName, resolution.Reasons);
 
         var matchedRow = resolution.MatchedRow;
-        var targetState = ((PreceptStateTransition)matchedRow.Outcome).TargetState;
+        var targetState = ((StateTransition)matchedRow.Outcome).TargetState;
 
         // Simulate full pipeline: exit actions → row mutations → entry actions
         var simulatedData = new Dictionary<string, object?>(internalData, StringComparer.Ordinal);
         var simulatedCollections = CloneCollections(simulatedData);
 
         // Exit actions
-        ExecuteStateActions(PreceptAssertPreposition.From, instance.CurrentState,
+        ExecuteStateActions(AssertAnchor.From, instance.CurrentState,
             simulatedData, simulatedCollections, eventName, eventArguments);
 
         // Row mutations
@@ -387,7 +387,7 @@ public sealed class PreceptEngine
             ExecuteCollectionMutations(mutations, simulatedCollections, simulatedData, eventName, eventArguments);
 
         // Entry actions
-        ExecuteStateActions(PreceptAssertPreposition.To, targetState,
+        ExecuteStateActions(AssertAnchor.To, targetState,
             simulatedData, simulatedCollections, eventName, eventArguments);
 
         CommitCollections(simulatedData, simulatedCollections);
@@ -510,7 +510,7 @@ public sealed class PreceptEngine
         // Evaluate rules on working copy
         var violations = new List<string>();
         violations.AddRange(EvaluateInvariants(updatedData));
-        violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.In, instance.CurrentState, updatedData));
+        violations.AddRange(EvaluateStateAsserts(AssertAnchor.In, instance.CurrentState, updatedData));
 
         if (violations.Count == 0)
             return baseResult;
@@ -657,7 +657,7 @@ public sealed class PreceptEngine
         var workingCollections = CloneCollections(updatedData);
 
         // ── No-transition branch ──
-        if (matchedRow.Outcome is PreceptNoTransition)
+        if (matchedRow.Outcome is NoTransition)
         {
             // Row mutations only (no exit/entry actions for no-transition)
             var mutError = ExecuteRowMutations(matchedRow, updatedData, workingCollections, eventName, eventArguments);
@@ -669,7 +669,7 @@ public sealed class PreceptEngine
             // Validate: invariants + 'in' asserts for current state
             var violations = new List<string>();
             violations.AddRange(EvaluateInvariants(updatedData));
-            violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.In, instance.CurrentState, updatedData));
+            violations.AddRange(EvaluateStateAsserts(AssertAnchor.In, instance.CurrentState, updatedData));
             if (violations.Count > 0)
                 return PreceptFireResult.Rejected(instance.CurrentState, eventName, violations);
 
@@ -683,10 +683,10 @@ public sealed class PreceptEngine
         }
 
         // ── Transition branch ──
-        var targetState = ((PreceptStateTransition)matchedRow.Outcome).TargetState;
+        var targetState = ((StateTransition)matchedRow.Outcome).TargetState;
 
         // Stage 3: Exit actions (from <sourceState> -> ...)
-        ExecuteStateActions(PreceptAssertPreposition.From, instance.CurrentState,
+        ExecuteStateActions(AssertAnchor.From, instance.CurrentState,
             updatedData, workingCollections, eventName, eventArguments);
 
         // Stage 4: Row mutations (set assignments + collection mutations)
@@ -695,7 +695,7 @@ public sealed class PreceptEngine
             return PreceptFireResult.Rejected(instance.CurrentState, eventName, new[] { rowMutError });
 
         // Stage 5: Entry actions (to <targetState> -> ...)
-        ExecuteStateActions(PreceptAssertPreposition.To, targetState,
+        ExecuteStateActions(AssertAnchor.To, targetState,
             updatedData, workingCollections, eventName, eventArguments);
 
         CommitCollections(updatedData, workingCollections);
@@ -770,7 +770,7 @@ public sealed class PreceptEngine
         // Stage 4: Rules evaluation (invariants + 'in' state asserts)
         var violations = new List<string>();
         violations.AddRange(EvaluateInvariants(updatedData));
-        violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.In, instance.CurrentState, updatedData));
+        violations.AddRange(EvaluateStateAsserts(AssertAnchor.In, instance.CurrentState, updatedData));
         if (violations.Count > 0)
             return PreceptUpdateResult.Failed(PreceptUpdateOutcome.Blocked, violations);
 
@@ -946,7 +946,7 @@ public sealed class PreceptEngine
     {
         var violations = new List<string>();
         violations.AddRange(EvaluateInvariants(instance.InstanceData));
-        violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.In, instance.CurrentState, instance.InstanceData));
+        violations.AddRange(EvaluateStateAsserts(AssertAnchor.In, instance.CurrentState, instance.InstanceData));
         return violations;
     }
 
@@ -991,9 +991,9 @@ public sealed class PreceptEngine
             // Guard passed (or no guard — unguarded row)
             return row.Outcome switch
             {
-                PreceptStateTransition => TransitionResolution.Accepted(row),
-                PreceptNoTransition => TransitionResolution.NoTransition(row),
-                PreceptRejection rej => TransitionResolution.Rejected(new[]
+                StateTransition => TransitionResolution.Accepted(row),
+                NoTransition => TransitionResolution.NoTransition(row),
+                Rejection rej => TransitionResolution.Rejected(new[]
                 {
                     string.IsNullOrWhiteSpace(rej.Reason)
                         ? (reasons.FirstOrDefault() ?? $"No transition for '{eventName}' from '{currentState}'.")
@@ -1250,7 +1250,7 @@ public sealed class PreceptEngine
     /// Evaluates state asserts for a given preposition and state.
     /// </summary>
     private IReadOnlyList<string> EvaluateStateAsserts(
-        PreceptAssertPreposition preposition, string state, IReadOnlyDictionary<string, object?> data)
+        AssertAnchor preposition, string state, IReadOnlyDictionary<string, object?> data)
     {
         if (!_stateAssertMap.TryGetValue((preposition, state), out var asserts) || asserts.Count == 0)
             return Array.Empty<string>();
@@ -1279,15 +1279,15 @@ public sealed class PreceptEngine
         if (string.Equals(sourceState, targetState, StringComparison.Ordinal))
         {
             // AcceptedInPlace / self-transition: evaluate 'to' + 'in' asserts
-            violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.To, targetState, data));
-            violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.In, sourceState, data));
+            violations.AddRange(EvaluateStateAsserts(AssertAnchor.To, targetState, data));
+            violations.AddRange(EvaluateStateAsserts(AssertAnchor.In, sourceState, data));
         }
         else
         {
             // State transition: evaluate 'from' source + 'to' target + 'in' target
-            violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.From, sourceState, data));
-            violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.To, targetState, data));
-            violations.AddRange(EvaluateStateAsserts(PreceptAssertPreposition.In, targetState, data));
+            violations.AddRange(EvaluateStateAsserts(AssertAnchor.From, sourceState, data));
+            violations.AddRange(EvaluateStateAsserts(AssertAnchor.To, targetState, data));
+            violations.AddRange(EvaluateStateAsserts(AssertAnchor.In, targetState, data));
         }
 
         return violations;
@@ -1297,7 +1297,7 @@ public sealed class PreceptEngine
     /// Executes state entry/exit actions (automatic mutations).
     /// </summary>
     private void ExecuteStateActions(
-        PreceptAssertPreposition preposition, string state,
+        AssertAnchor preposition, string state,
         Dictionary<string, object?> data, Dictionary<string, CollectionValue> workingCollections,
         string eventName, IReadOnlyDictionary<string, object?>? eventArguments)
     {
@@ -1639,7 +1639,7 @@ public static class PreceptCompiler
             {
                 if (!string.Equals(sa.State, initialStateName, StringComparison.Ordinal))
                     continue;
-                if (sa.Preposition is not (PreceptAssertPreposition.In or PreceptAssertPreposition.To))
+                if (sa.Anchor is not (AssertAnchor.In or AssertAnchor.To))
                     continue;
 
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(sa.Expression, defaultData);
@@ -1738,12 +1738,12 @@ public static class PreceptCompiler
         if (model.StateAsserts is not { Count: > 1 })
             return;
 
-        var seen = new HashSet<(PreceptAssertPreposition, string, string)>();
+        var seen = new HashSet<(AssertAnchor, string, string)>();
         foreach (var sa in model.StateAsserts)
         {
-            if (!seen.Add((sa.Preposition, sa.State, sa.ExpressionText)))
+            if (!seen.Add((sa.Anchor, sa.State, sa.ExpressionText)))
             {
-                var prep = sa.Preposition.ToString().ToLowerInvariant();
+                var prep = sa.Anchor.ToString().ToLowerInvariant();
                 throw new InvalidOperationException(
                     ConstraintCatalog.C44.FormatMessage(
                         ("preposition", prep), ("state", sa.State),
@@ -1761,7 +1761,7 @@ public static class PreceptCompiler
         var inAsserts = new HashSet<(string State, string Expr)>();
         foreach (var sa in model.StateAsserts)
         {
-            if (sa.Preposition == PreceptAssertPreposition.In)
+            if (sa.Anchor == AssertAnchor.In)
                 inAsserts.Add((sa.State, sa.ExpressionText));
         }
 
@@ -1770,7 +1770,7 @@ public static class PreceptCompiler
 
         foreach (var sa in model.StateAsserts)
         {
-            if (sa.Preposition == PreceptAssertPreposition.To &&
+            if (sa.Anchor == AssertAnchor.To &&
                 inAsserts.Contains((sa.State, sa.ExpressionText)))
             {
                 throw new InvalidOperationException(

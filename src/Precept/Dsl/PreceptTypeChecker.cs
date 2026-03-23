@@ -443,7 +443,7 @@ internal static class PreceptTypeChecker
             return result;
 
         foreach (var group in model.StateAsserts
-            .Where(static stateAssert => stateAssert.Preposition == PreceptAssertPreposition.In)
+            .Where(static stateAssert => stateAssert.Anchor == AssertAnchor.In)
             .GroupBy(static stateAssert => stateAssert.State, StringComparer.Ordinal))
         {
             IReadOnlyDictionary<string, StaticValueKind> narrowed = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);

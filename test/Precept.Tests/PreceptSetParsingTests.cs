@@ -24,7 +24,7 @@ public class PreceptSetParsingTests
         var machine = PreceptParser.Parse(dsl);
 
         machine.TransitionRows.Should().HaveCount(2);
-        var noTransRow = machine.TransitionRows!.Single(r => r.Outcome is PreceptNoTransition);
+        var noTransRow = machine.TransitionRows!.Single(r => r.Outcome is NoTransition);
         noTransRow.SetAssignments.Should().ContainSingle();
         noTransRow.SetAssignments[0].Key.Should().Be("Count");
     }
@@ -89,7 +89,7 @@ public class PreceptSetParsingTests
         var machine = PreceptParser.Parse(dsl);
 
         machine.TransitionRows.Should().HaveCount(2);
-        var elseRow = machine.TransitionRows!.Single(r => r.Outcome is PreceptStateTransition st && st.TargetState == "Red");
+        var elseRow = machine.TransitionRows!.Single(r => r.Outcome is StateTransition st && st.TargetState == "Red");
         elseRow.SetAssignments.Should().HaveCount(2);
         elseRow.SetAssignments[0].Key.Should().Be("Count");
         elseRow.SetAssignments[1].Key.Should().Be("Label");

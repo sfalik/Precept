@@ -290,14 +290,14 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
         var transitions = (session.Model.TransitionRows ?? Array.Empty<PreceptTransitionRow>())
             .Select(row => new PreceptPreviewTransition(
                 row.FromState,
-                row.Outcome is PreceptStateTransition st ? st.TargetState : row.FromState,
+                row.Outcome is StateTransition st ? st.TargetState : row.FromState,
                 row.EventName,
                 row.WhenText,
                 row.Outcome switch
                 {
-                    PreceptStateTransition => "transition",
-                    PreceptNoTransition => "noTransition",
-                    PreceptRejection => "reject",
+                    StateTransition => "transition",
+                    NoTransition => "noTransition",
+                    Rejection => "reject",
                     _ => "transition"
                 }))
             .ToArray();
@@ -313,9 +313,9 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
         var ruleDefinitions = new List<PreceptPreviewRuleInfo>();
         foreach (var inv in session.Model.Invariants ?? Array.Empty<PreceptInvariant>())
             ruleDefinitions.Add(new PreceptPreviewRuleInfo("invariant", inv.ExpressionText, inv.Reason));
-        foreach (var sa in session.Model.StateAsserts ?? Array.Empty<PreceptStateAssert>())
-            ruleDefinitions.Add(new PreceptPreviewRuleInfo($"state:{sa.Preposition.ToString().ToLowerInvariant()}:{sa.State}", sa.ExpressionText, sa.Reason));
-        foreach (var ea in session.Model.EventAsserts ?? Array.Empty<PreceptEventAssert>())
+        foreach (var sa in session.Model.StateAsserts ?? Array.Empty<StateAssertion>())
+            ruleDefinitions.Add(new PreceptPreviewRuleInfo($"state:{sa.Anchor.ToString().ToLowerInvariant()}:{sa.State}", sa.ExpressionText, sa.Reason));
+        foreach (var ea in session.Model.EventAsserts ?? Array.Empty<EventAssertion>())
             ruleDefinitions.Add(new PreceptPreviewRuleInfo($"event:{ea.EventName}", ea.ExpressionText, ea.Reason));
 
         return new PreceptPreviewSnapshot(

@@ -39,7 +39,7 @@ public static class AuditTool
         {
             referencedEvents.Add(row.EventName);
 
-            if (row.Outcome is PreceptStateTransition t)
+            if (row.Outcome is StateTransition t)
             {
                 // "any" means all states — expand
                 if (string.Equals(row.FromState, "any", StringComparison.OrdinalIgnoreCase))
@@ -102,7 +102,7 @@ public static class AuditTool
                 string.Equals(r.FromState, state, StringComparison.Ordinal) ||
                 string.Equals(r.FromState, "any", StringComparison.OrdinalIgnoreCase)).ToList();
 
-            if (outgoingRows.Count > 0 && outgoingRows.All(r => r.Outcome is PreceptNoTransition or PreceptRejection))
+            if (outgoingRows.Count > 0 && outgoingRows.All(r => r.Outcome is NoTransition or Rejection))
                 deadEnds.Add(state);
         }
 
