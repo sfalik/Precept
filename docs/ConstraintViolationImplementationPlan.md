@@ -217,7 +217,7 @@ These files map enum values to string output and must be updated manually (not c
 
 ### Affected files (besides PreceptRuntime.cs)
 
-All test files that assert on outcome values (~352 references to `PreceptOutcomeKind` alone):
+All test files that assert on outcome values (~234 references to `PreceptOutcomeKind` across source, test, and tool files):
 - `test/Precept.Tests/PreceptWorkflowTests.cs`
 - `test/Precept.Tests/NewSyntaxRuntimeTests.cs`
 - `test/Precept.Tests/PreceptCollectionTests.cs`
@@ -242,7 +242,7 @@ then wait for me to confirm or switch models.
 
 Read docs/ConstraintViolationImplementationPlan.md Phase 1 for the full rename list.
 
-This is the heaviest phase — ~352 references to PreceptOutcomeKind alone, plus all
+This is the heaviest phase — ~234 references to PreceptOutcomeKind, plus all
 result types. Strategy:
 
 1. Use IDE rename (vscode_renameSymbol) for each type name first:
@@ -697,7 +697,7 @@ Build and run all tests one final time. When finished, update the Status Tracker
 | Phase | Description | Status | Notes |
 |-------|-------------|--------|-------|
 | 0 | Model type renames | Not started | 6 types + 2 property renames |
-| 1 | Result type & enum renames | Not started | ~352+ references for outcome enum alone |
+| 1 | Result type & enum renames | Not started | ~234 references for outcome enum across source/test/tools |
 | 2 | Catalog & compile result renames | Not started | File rename + ~50 class references |
 | 3 | Runtime method renames + IsSuccess | Not started | 3 methods + 3 computed properties |
 | 4 | Structured constraint violations | Not started | New types + behavioral change |

@@ -684,7 +684,7 @@ When a transition row matches:
 3. **Exit actions** (`from <SourceState> ->`) — automatic mutations on leaving source state.
 4. **Row mutations** (`-> set ...`, `-> add ...`, etc.) — the row's own pipeline.
 5. **Entry actions** (`to <TargetState> ->`) — automatic mutations on entering target state.
-6. **Validation** — invariants, state asserts (`in`/`to`/`from`), field rules. Collect-all. If any fail → full rollback, `Rejected`.
+6. **Validation** — invariants, state asserts (`in`/`to`/`from`), field rules. Collect-all. If any fail → full rollback, `ConstraintFailure` (see `ConstraintViolationDesign.md` for the `Rejected` vs `ConstraintFailure` distinction — `Rejected` is reserved for author-explicit `reject` outcomes and event assert failures).
 
 For `no transition`: steps 3 and 5 are skipped (no state change). `in <State>` asserts still run (the resulting state is the current state).
 

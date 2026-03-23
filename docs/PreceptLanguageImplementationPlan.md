@@ -198,7 +198,7 @@ Add a C46 trigger fixture to `test/Precept.Tests/CatalogDriftTests.cs`. Add test
 
 **Implementation prompt:**
 
-Register new constraint C47 in `src/Precept/Dsl/ConstraintCatalog.cs` for identical-guard duplicate rows. The detection site is `PreceptTypeChecker.ValidateTransitionRows()` in `src/Precept/Dsl/PreceptTypeChecker.cs`, which already iterates rows grouped by `(state, event)` in source-line order. Before processing each row, compare its `WhenText` (or normalized AST) against prior rows in the same group. If an identical guard is found, emit C47.
+Register new constraint C47 in `src/Precept/Dsl/DiagnosticCatalog.cs` (renamed from `ConstraintCatalog.cs` in CV Phase 2) for identical-guard duplicate rows. The detection site is `PreceptTypeChecker.ValidateTransitionRows()` in `src/Precept/Dsl/PreceptTypeChecker.cs`, which already iterates rows grouped by `(state, event)` in source-line order. Before processing each row, compare its `WhenText` (or normalized AST) against prior rows in the same group. If an identical guard is found, emit C47.
 
 Non-nullable `== null` is already covered by Phase D (C41). Post-narrowing null contradictions are automatically caught because cross-row narrowing strips the `Null` flag, and then Phase D’s equality check rejects `NonNullableField == null`.
 
