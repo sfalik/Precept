@@ -12,12 +12,12 @@ CV 0-3 → Language D-H → CV 4-7 → MCP 7-9
 
 ---
 
-## Group 1: Naming Renames (CV Phases 0-3)
+## Group 1: Naming Renames (CV Phases 0-3) ✅
 
-- Implement [Phase 0](ConstraintViolationImplementationPlan.md#Phase-0-Model-Type-Renames-PreceptModelcs): Model type renames — `PreceptAssertPreposition` → `AssertAnchor`, `PreceptStateAssert` → `StateAssertion`, `PreceptEventAssert` → `EventAssertion`, `PreceptRejection` → `Rejection`, `PreceptStateTransition` → `StateTransition`, `PreceptNoTransition` → `NoTransition`, `.Preposition` → `.Anchor`.
-- Implement [Phase 1](ConstraintViolationImplementationPlan.md#Phase-1-Result-Type--Enum-Renames-PreceptRuntimecs): Result type & enum renames — `PreceptOutcomeKind` → `TransitionOutcome`, `PreceptUpdateOutcome` → `UpdateOutcome`, all result types drop `Precept` prefix, enum value renames, factory method renames.
-- Implement [Phase 2](ConstraintViolationImplementationPlan.md#Phase-2-Catalog--Compile-Result-Renames): Catalog & compile result renames — `ConstraintCatalog` → `DiagnosticCatalog` (file + class), `PreceptCompileValidationResult` → `CompileResult`.
-- Implement [Phase 3](ConstraintViolationImplementationPlan.md#Phase-3-Runtime-Method-Renames): Runtime method renames + `IsSuccess` — `CollectValidationViolations` → `CollectConstraintViolations`, `EvaluateEventAsserts` → `EvaluateEventAssertions`, `EvaluateStateAsserts` → `EvaluateStateAssertions`, add `IsSuccess` to result types.
+- [x] [Phase 0](ConstraintViolationImplementationPlan.md#Phase-0-Model-Type-Renames-PreceptModelcs): Model type renames — `PreceptAssertPreposition` → `AssertAnchor`, `PreceptStateAssert` → `StateAssertion`, `PreceptEventAssert` → `EventAssertion`, `PreceptRejection` → `Rejection`, `PreceptStateTransition` → `StateTransition`, `PreceptNoTransition` → `NoTransition`, `.Preposition` → `.Anchor`.
+- [x] [Phase 1](ConstraintViolationImplementationPlan.md#Phase-1-Result-Type--Enum-Renames-PreceptRuntimecs): Result type & enum renames — `PreceptOutcomeKind` → `TransitionOutcome`, `PreceptUpdateOutcome` → `UpdateOutcome`, all result types drop `Precept` prefix, enum value renames, factory method renames.
+- [x] [Phase 2](ConstraintViolationImplementationPlan.md#Phase-2-Catalog--Compile-Result-Renames): Catalog & compile result renames — `ConstraintCatalog` → `DiagnosticCatalog` (file + class), `PreceptCompileValidationResult` → `CompileResult`.
+- [x] [Phase 3](ConstraintViolationImplementationPlan.md#Phase-3-Runtime-Method-Renames): Runtime method renames + `IsSuccess` — `CollectValidationViolations` → `CollectConstraintViolations`, `EvaluateEventAsserts` → `EvaluateEventAssertions`, `EvaluateStateAsserts` → `EvaluateStateAssertions`, add `IsSuccess` to result types.
 
 ## Group 2: Language Checker Expansion (Language Phases D-H)
 
