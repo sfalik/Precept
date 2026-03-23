@@ -19,20 +19,20 @@ CV 0-3 → Language D-H → CV 4-7 → MCP 7-9
 - [x] [Phase 2](ConstraintViolationImplementationPlan.md#Phase-2-Catalog--Compile-Result-Renames): Catalog & compile result renames — `ConstraintCatalog` → `DiagnosticCatalog` (file + class), `PreceptCompileValidationResult` → `CompileResult`.
 - [x] [Phase 3](ConstraintViolationImplementationPlan.md#Phase-3-Runtime-Method-Renames): Runtime method renames + `IsSuccess` — `CollectValidationViolations` → `CollectConstraintViolations`, `EvaluateEventAsserts` → `EvaluateEventAssertions`, `EvaluateStateAsserts` → `EvaluateStateAssertions`, add `IsSuccess` to result types.
 
-## Group 2: Language Checker Expansion (Language Phases D-H)
+## Group 2: Language Checker Expansion (Language Phases D-H) ✅
 
-- Implement [Phase D](PreceptLanguageImplementationPlan.md#L92): Equality and null-compatible comparison policy — enforce same-family equality in `PreceptTypeChecker`, align runtime evaluator, add tests.
-- Implement [Phase E](PreceptLanguageImplementationPlan.md#L122): Scope and narrowing hardening — remove bare arg names from transition row symbol tables, enforce dotted form, add event-arg narrowing tests.
-- Implement [Phase F](PreceptLanguageImplementationPlan.md#L152): Rule-position strictness and collection contracts — register C46, reject non-boolean expressions in invariants/asserts/guards, harden `contains` coverage.
-- Implement [Phase G](PreceptLanguageImplementationPlan.md#L178): Additional sound static reasoning — register C47, detect duplicate guards in `ValidateTransitionRows()`.
-- Implement [Phase H](PreceptLanguageImplementationPlan.md#L205): Coverage and tooling sync — fix `MapTypeDiagnostic` severity mapping, verify completions, catalog drift for C46/C47, README sync.
+- [x] [Phase D](PreceptLanguageImplementationPlan.md#L92): Equality and null-compatible comparison policy — enforce same-family equality in `PreceptTypeChecker`, align runtime evaluator, add tests.
+- [x] [Phase E](PreceptLanguageImplementationPlan.md#L122): Scope and narrowing hardening — remove bare arg names from transition row symbol tables, enforce dotted form, add event-arg narrowing tests.
+- [x] [Phase F](PreceptLanguageImplementationPlan.md#L152): Rule-position strictness and collection contracts — register C46, reject non-boolean expressions in invariants/asserts/guards, harden `contains` coverage.
+- [x] [Phase G](PreceptLanguageImplementationPlan.md#L178): Additional sound static reasoning — register C47, detect duplicate guards in `ValidateTransitionRows()`.
+- [x] [Phase H](PreceptLanguageImplementationPlan.md#L205): Coverage and tooling sync — fix `MapTypeDiagnostic` severity mapping, verify completions, catalog drift for C46/C47, README sync.
 
-## Group 3: Structured Constraint Violations (CV Phases 4-7)
+## Group 3: Structured Constraint Violations (CV Phases 4-7) ✅
 
-- Implement [Phase 4](ConstraintViolationImplementationPlan.md#Phase-4-Structured-Constraint-Violations): Structured constraint violations — introduce `ConstraintViolation`, `ConstraintTarget`, `ConstraintSource`, `ExpressionSubjects`; replace `IReadOnlyList<string> Reasons` with `IReadOnlyList<ConstraintViolation> Violations`; split `Rejected` vs `ConstraintFailure`.
-- Implement [Phase 5](ConstraintViolationImplementationPlan.md#Phase-5-Test-Migration): Test migration — update all test assertions for new names, enum values, and structured violations; add scenario tests from design doc.
-- Implement [Phase 6](ConstraintViolationImplementationPlan.md#Phase-6-Language-Server-Visualizer--MCP-Consumer-Updates): Language server, visualizer & MCP consumer updates — `PreceptPreviewHandler`, `PreceptPreviewProtocol`, `inspector-preview.html`, `LanguageTool`, `RunTool`, `InspectTool`.
-- Implement [Phase 7](ConstraintViolationImplementationPlan.md#Phase-7-Documentation--Cleanup): Documentation & cleanup — final sweep for stale references.
+- [x] [Phase 4](ConstraintViolationImplementationPlan.md#Phase-4-Structured-Constraint-Violations): Structured constraint violations — introduce `ConstraintViolation`, `ConstraintTarget`, `ConstraintSource`, `ExpressionSubjects`; replace `IReadOnlyList<string> Reasons` with `IReadOnlyList<ConstraintViolation> Violations`; split `Rejected` vs `ConstraintFailure`.
+- [x] [Phase 5](ConstraintViolationImplementationPlan.md#Phase-5-Test-Migration): Test migration — update all test assertions for new names, enum values, and structured violations; add scenario tests from design doc.
+- [x] [Phase 6](ConstraintViolationImplementationPlan.md#Phase-6-Language-Server-Visualizer--MCP-Consumer-Updates): Language server, visualizer & MCP consumer updates — `PreceptPreviewHandler`, `PreceptPreviewProtocol`, `inspector-preview.html`, `LanguageTool`, `RunTool`, `InspectTool`.
+- [x] [Phase 7](ConstraintViolationImplementationPlan.md#Phase-7-Documentation--Cleanup): Documentation & cleanup — final sweep for stale references.
 
 ## Group 4: Copilot Authoring of Precept (MCP Phases 7-9)
 
@@ -48,6 +48,7 @@ CV 0-3 → Language D-H → CV 4-7 → MCP 7-9
 - **Same-preposition contradiction detection** — two asserts with the same preposition on the same state whose per-field domains are provably empty (e.g. `in Open assert X > 5` + `in Open assert X < 3`). Requires per-field interval/set analysis on expression ASTs. See [PreceptLanguageDesign.md](PreceptLanguageDesign.md) § Compile-time checks, item #4.
 - **Cross-preposition deadlock detection** — `in`/`to` vs `from` asserts on the same state whose conjoined per-field domains are empty, making the state provably unexitable. Requires interval analysis + reachability reasoning. See [PreceptLanguageDesign.md](PreceptLanguageDesign.md) § Compile-time checks, item #5.
 - **CLI design and implementation** — design exists in [CliDesign.md](CliDesign.md); implementation deferred. Audit for stale `Dsl*` naming when implementing.
+- **Structured violations in preview protocol** — carry full `ConstraintViolation` data (source kind, targets, expression text) through `PreceptPreviewProtocol` to the webview instead of flattened strings. Would enable richer inspector UI (field highlighting, constraint source differentiation). Currently `PreceptPreviewEventStatus.Reasons` is `IReadOnlyList<string>`.
 
 ## Ideas
 - Decide whether a standalone CLI is still needed if MCP already covers the same workflows.
