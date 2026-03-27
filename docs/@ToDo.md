@@ -34,10 +34,10 @@ CV 0-3 → Language D-H → CV 4-7 → Language I → MCP Redesign → MCP 7-9
 - [x] [Phase 6](ConstraintViolationImplementationPlan.md#Phase-6-Language-Server-Visualizer--MCP-Consumer-Updates): Language server, visualizer & MCP consumer updates — `PreceptPreviewHandler`, `PreceptPreviewProtocol`, `inspector-preview.html`, `LanguageTool`, `RunTool`, `InspectTool`.
 - [x] [Phase 7](ConstraintViolationImplementationPlan.md#Phase-7-Documentation--Cleanup): Documentation & cleanup — final sweep for stale references.
 
-## Group 4a: Graph Analysis Warning Diagnostics (Language Phase I)
+## Group 4a: Graph Analysis Warning Diagnostics (Language Phase I) ✅
 
-- Implement [Phase I](PreceptLanguageImplementationPlan.md#Phase-I-Graph-Analysis-Warning-Diagnostics): remove coverage warning C51, renumber graph diagnostics to C48–C53, eliminate throw-based compile validation, implement `PreceptAnalysis.Analyze()` (BFS reachability, orphaned events, dead-end detection, reject-only pairs, event-never-succeeds, empty precepts), add `ConstraintSeverity.Hint`, wire graph analysis into `Validate()`, add `CompileFromText(text)` composed pipeline, and confirm language server/MCP consumers use the structured result.
-- Executor note: use the implementation prompt in the linked Phase I section as the canonical change guide; keep this todo entry as scope/order only.
+- [x] [Phase I](PreceptLanguageImplementationPlan.md#Phase-I-Graph-Analysis-Warning-Diagnostics): remove coverage warning C51, renumber graph diagnostics to C48–C53, eliminate throw-based compile validation, implement `PreceptAnalysis.Analyze()` (BFS reachability, orphaned events, dead-end detection, reject-only pairs, event-never-succeeds, empty precepts), add `ConstraintSeverity.Hint`, wire graph analysis into `Validate()`, add `CompileFromText(text)` composed pipeline, and confirm language server/MCP consumers use the structured result.
+- Verification: full solution build plus `Precept.Tests`, `Precept.LanguageServer.Tests`, and `Precept.Mcp.Tests` pass; remaining output is limited to pre-existing nullable warnings.
 
 ## Group 4b: MCP Redesign (6→4 Tools)
 
