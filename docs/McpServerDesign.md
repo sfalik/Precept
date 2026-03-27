@@ -461,16 +461,15 @@ The VS Code extension continues to provide all editor features: language server 
 
 ```
 tools/Precept.Plugin/
-├── .github/plugin/
-│   └── plugin.json           # Plugin metadata and configuration
+├── plugin.json                    # Plugin metadata and configuration
 ├── agents/
-│   └── precept-author.md     # Precept Author custom agent
+│   └── precept-author.agent.md    # Precept Author custom agent
 ├── skills/
 │   ├── precept-authoring/
-│   │   └── SKILL.md          # Authoring workflow skill
+│   │   └── SKILL.md               # Authoring workflow skill
 │   └── precept-debugging/
-│       └── SKILL.md          # Debugging/diagnosis skill
-├── .mcp.json                 # MCP server definition (dev: launcher, dist: dotnet tool)
+│       └── SKILL.md               # Debugging/diagnosis skill
+├── .mcp.json                      # MCP server definition (dev: launcher, dist: dotnet tool)
 └── README.md
 ```
 
@@ -518,13 +517,13 @@ During development in this repo, the plugin's `.mcp.json` uses a launcher script
   "mcpServers": {
     "precept": {
       "command": "node",
-      "args": ["../../scripts/start-precept-mcp.js"]
+      "args": ["${CLAUDE_PLUGIN_ROOT}/../scripts/start-precept-mcp.js"]
     }
   }
 }
 ```
 
-The launcher (`tools/scripts/start-precept-mcp.js`) builds from source, shadow-copies the output, and runs the copy — preventing file locking during rebuilds. At publish time, CI rewrites the `.mcp.json` to the `dotnet tool run` form. The launcher script is not included in the published plugin.
+The `${CLAUDE_PLUGIN_ROOT}` token is expanded by VS Code to the plugin's absolute path at runtime, making the reference unambiguous regardless of working directory. The launcher (`tools/scripts/start-precept-mcp.js`) builds from source, shadow-copies the output, and runs the copy — preventing file locking during rebuilds. At publish time, CI rewrites the `.mcp.json` to the `dotnet tool run` form. The launcher script is not included in the published plugin.
 
 ### Distribution Channels
 
@@ -613,14 +612,14 @@ The running process never locks the build output directory. Old runtime copies a
 
 ### Precept Author Agent
 
-The plugin ships a custom agent (`precept-author.md`) that provides an opinionated authoring workflow. The agent:
+The plugin ships a custom agent (`precept-author.agent.md`) that establishes a lightweight persona with strict tool restrictions. The agent:
 
-- Restricts tools to read, edit, search, and all Precept MCP tools (no terminal, no destructive operations)
-- Treats `precept_language` as the authoritative DSL reference — not local files or training data
-- Follows a mandatory compile → inspect loop after every edit
+- Restricts tools to `read`, `edit`, `search`, `fetch`, and all `precept/*` MCP tools (no terminal, no destructive operations)
+- Treats `precept_language` as the authoritative DSL reference — never generate syntax from memory or training data
+- Establishes core principles: compile after every edit, match local `.precept` conventions when present, fall back to `precept_language` when no local files exist
 - Is invocable from the agents dropdown and as a subagent from default Agent mode
 
-The agent is the primary vehicle for high-quality Precept authoring across any workspace. It provides stronger workflow isolation than a skill alone, enforcing the correct tool sequence as its core identity rather than as a suggestion.
+The agent body is intentionally thin — it owns the **persona and tool restrictions**. Detailed workflows live in the companion skills, which VS Code auto-discovers and loads based on the user's request. This separation keeps the agent focused on identity ("what am I allowed to do") while skills handle procedure ("how do I do it").
 
 ### Companion Skills
 
@@ -654,7 +653,7 @@ Both skills follow the [Agent Skills specification](https://agentskills.io/speci
 
 The plugin assembly work depends on the MCP project existing first. The agent and skill content can be drafted in parallel with MCP tool development since they are plain markdown files. The plugin packaging step combines MCP server (via `dotnet tool run`) + agent + skills into the final plugin directory structure.
 
-The VS Code extension has no dependency on the plugin — they are separate distribution artifacts. The extension's `registerMcpServerDefinitionProvider()` is removed once the plugin is the shipping path for MCP. The MCP launcher script (`tools/scripts/start-precept-mcp.js`) is shared infrastructure used by both the plugin's dev `.mcp.json` and (temporarily) the workspace `.vscode/mcp.json` during the transition.
+The VS Code extension has no dependency on the plugin — they are separate distribution artifacts. The extension's `registerMcpServerDefinitionProvider()` is removed once the plugin is the shipping path for MCP. The `Precept Dev` entry in `.vscode/mcp.json` is removed when the plugin is created (Phase 7), since the plugin replaces it. The MCP launcher script (`tools/scripts/start-precept-mcp.js`) is shared infrastructure used by the plugin's dev `.mcp.json`.
 
 ---
 

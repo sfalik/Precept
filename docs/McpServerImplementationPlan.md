@@ -431,8 +431,7 @@ Use this prompt to execute the redesign phase in a new Copilot Chat session:
 - [ ] Create plugin directory structure at `tools/Precept.Plugin/`:
   ```
   tools/Precept.Plugin/
-  ├── .github/plugin/
-  │   └── plugin.json
+  ├── plugin.json
   ├── agents/
   ├── skills/
   │   ├── precept-authoring/
@@ -440,19 +439,20 @@ Use this prompt to execute the redesign phase in a new Copilot Chat session:
   ├── .mcp.json
   └── README.md
   ```
-- [ ] Create `plugin.json` with name, description, version, agents, and skills arrays
-- [ ] Create dev `.mcp.json` referencing the shared launcher script:
+- [ ] Create `plugin.json` at the plugin root with name, description, version, agents, and skills arrays
+- [ ] Create dev `.mcp.json` referencing the shared launcher script via `${CLAUDE_PLUGIN_ROOT}`:
   ```json
   {
     "mcpServers": {
       "precept": {
         "command": "node",
-        "args": ["../../scripts/start-precept-mcp.js"]
+        "args": ["${CLAUDE_PLUGIN_ROOT}/../scripts/start-precept-mcp.js"]
       }
     }
   }
   ```
-- [ ] Move the MCP launcher script from `tools/Precept.VsCode/scripts/start-precept-mcp.js` to `tools/scripts/start-precept-mcp.js` and update `.vscode/mcp.json` to reference the new location
+- [ ] Move the MCP launcher script from `tools/Precept.VsCode/scripts/start-precept-mcp.js` to `tools/scripts/start-precept-mcp.js`
+- [ ] Remove the `Precept Dev` entry from `.vscode/mcp.json` (the plugin now provides the MCP server)
 - [x] Create `tools/scripts/toggle-plugin.js` — reads/writes `chat.pluginLocations` in `.vscode/settings.json` *(already implemented)*
 - [x] Add `plugin: enable` and `plugin: disable` tasks to `.vscode/tasks.json` *(already implemented)*
 - [x] Rename existing extension tasks: `extension: loop local install` → `extension: install`, `extension: loop local uninstall` → `extension: uninstall` *(already implemented)*
@@ -467,7 +467,7 @@ Use this prompt to execute the redesign phase in a new Copilot Chat session:
 - Copilot lists 5 precept tools from the plugin's MCP server
 - `precept_compile`, `precept_inspect`, `precept_fire`, `precept_update` produce correct results
 - Dev tasks (`extension: install`, `extension: uninstall`, `plugin: enable`, `plugin: disable`) work correctly
-- `.vscode/mcp.json` references the moved launcher at `tools/scripts/start-precept-mcp.js`
+- `Precept Dev` entry no longer present in `.vscode/mcp.json`
 
 ### Phase 7 implementation prompt
 
@@ -477,7 +477,7 @@ Use this prompt to execute Phase 7 in a new Copilot Chat session:
 >
 > Before making changes, read the phase section and the related plugin/distribution guidance in full, then pause and recommend the most appropriate model for the work. Suggest `GPT-5.4` for balanced cross-file implementation, `Claude Sonnet` for faster medium-complexity edits, or `Claude Opus` for heavier design analysis or broader refactors. Let the user switch models in Copilot if desired, then continue.
 >
-> Create the plugin directory structure under `tools/Precept.Plugin/`, add `plugin.json`, add the dev `.mcp.json`, move the MCP launcher to `tools/scripts/start-precept-mcp.js`, and update local workspace wiring to load the plugin through `chat.pluginLocations`.
+> Create the plugin directory structure under `tools/Precept.Plugin/`, add `plugin.json` at the plugin root, add the dev `.mcp.json` using `${CLAUDE_PLUGIN_ROOT}` path expansion, move the MCP launcher to `tools/scripts/start-precept-mcp.js`, and remove the `Precept Dev` entry from `.vscode/mcp.json` (the plugin replaces it).
 >
 > Keep the existing completed task changes intact (`toggle-plugin.js`, renamed extension tasks, plugin enable/disable tasks). Only add the remaining missing structure and verify local loading.
 >
@@ -491,10 +491,10 @@ Use this prompt to execute Phase 7 in a new Copilot Chat session:
 
 ### Steps
 
-- [ ] Draft `agents/precept-author.md` with:
-    - YAML frontmatter: name, description, tools restricted to `read`, `edit`, `search`, and all `precept/*` MCP tools
-    - Body instructions: opinionated authoring workflow, `precept_language` as DSL authority, mandatory compile → inspect loop
-    - Handoff to debugging skill for diagnosis workflows
+- [ ] Draft `agents/precept-author.agent.md` with:
+    - YAML frontmatter: name, description, tools restricted to `read`, `edit`, `search`, `fetch`, and all `precept/*` MCP tools
+    - Body: lightweight persona and core principles — `precept_language` as DSL authority, compile after every edit, match local `.precept` conventions when present, fall back to `precept_language` when no local files exist
+    - The agent body is intentionally thin: it owns persona and tool restrictions; detailed workflows live in the companion skills (auto-discovered by VS Code based on the user's request)
 - [ ] Draft `skills/precept-authoring/SKILL.md` with:
     - Frontmatter: name `precept-authoring`, description with explicit trigger phrases
     - Body: step-by-step creation/editing workflow using MCP tools in prescribed order
@@ -527,7 +527,7 @@ Use this prompt to execute Phase 8 in a new Copilot Chat session:
 >
 > Before making changes, read the phase section and the linked agent/skill specifications in full, then pause and recommend the most appropriate model for the work. Suggest `GPT-5.4` for balanced cross-file implementation, `Claude Sonnet` for faster medium-complexity edits, or `Claude Opus` for heavier design analysis or broader refactors. Let the user switch models in Copilot if desired, then continue.
 >
-> Draft the Precept Author agent plus the `precept-authoring` and `precept-debugging` skills inside `tools/Precept.Plugin/`. Follow the linked agent and skill specs exactly. Keep the workflow opinionated: `precept_language` is the DSL authority, and compile/inspect/run are used in that order when diagnosing behavior.
+> Draft the Precept Author agent (`precept-author.agent.md`) plus the `precept-authoring` and `precept-debugging` skills inside `tools/Precept.Plugin/`. The agent should be a thin persona with tool restrictions; detailed workflows belong in the skills (VS Code auto-discovers them). Follow the linked agent and skill specs exactly. Keep the workflow opinionated: `precept_language` is the DSL authority, and compile/inspect/fire are used in that order when diagnosing behavior.
 >
 > Include Mermaid guidance exactly as described in the phase steps. Validate frontmatter, naming, and line-count constraints before finishing.
 >
@@ -551,16 +551,9 @@ Use this prompt to execute Phase 8 in a new Copilot Chat session:
 - [ ] Verify `docs/CatalogInfrastructureDesign.md` cross-references are still accurate
 - [ ] Remove `registerMcpServerDefinitionProvider()` from VS Code extension (MCP now lives in plugin)
 - [ ] Remove `mcpServerDefinitionProviders` contribution from `tools/Precept.VsCode/package.json`
-- [ ] Remove `Precept Dev` entry from `.vscode/mcp.json` (MCP is now provided by the plugin)
 - [ ] Update distribution `.mcp.json` to use `dotnet tool run precept-mcp` (CI rewrites the dev launcher form)
 - [ ] Publish plugin to a distribution channel (Git repo for direct install, and/or submit to `awesome-copilot`)
-- [ ] Add MCP sync rule to `.github/copilot-instructions.md`:
-
-**MCP Tool Sync** (new section in copilot-instructions):
-- When core model types change (`DslWorkflowModel`, `DslField`, `DslState`, `DslEvent`, `DslTransitionRow`, etc.), check whether MCP tool DTOs in `tools/Precept.Mcp/Tools/` need corresponding updates.
-- When `ConstructCatalog` or `DiagnosticCatalog` records gain or lose properties, verify `LanguageTool.cs` serialization still matches `McpServerDesign.md § precept_language` output format.
-- When the fire pipeline stages change, update the static `firePipeline` array in `LanguageTool.cs`.
-- The MCP tools are **thin wrappers** — never duplicate domain logic. If a tool method exceeds ~30 lines of non-serialization code, the logic probably belongs in `src/Precept/`.
+- [ ] Verify MCP sync rule in `.github/copilot-instructions.md` is still accurate (already exists with correct post-rename names; do not overwrite with stale `Dsl*` prefixes)
 
 ### Checkpoint
 
@@ -568,7 +561,7 @@ Use this prompt to execute Phase 8 in a new Copilot Chat session:
 - README accurately describes agent plugin installation and Precept Author agent
 - No aspirational claims presented as implemented
 - Design doc documents plugin distribution model accurately
-- Copilot-instructions includes MCP Tool Sync section
+- Copilot-instructions MCP Tool Sync section is verified accurate
 - Extension no longer registers MCP server provider
 - Plugin is published and installable
 

@@ -50,9 +50,9 @@ CV 0-3 → Language D-H → CV 4-7 → Language I → MCP Redesign → Update To
 
 ## Group 4c: Copilot Plugin, Agent, and Skills (MCP Phases 7-9)
 
-- Implement [Phase 7](McpServerImplementationPlan.md#Phase-7-Agent-Plugin-Structure--MCP-Packaging): create `tools/Precept.Plugin/` structure (plugin.json, dev .mcp.json), move launcher to `tools/scripts/`, verify plugin loads via `chat.pluginLocations`.
-- Implement [Phase 8](McpServerImplementationPlan.md#Phase-8-Agent-and-Skill-Content): draft Precept Author agent and authoring/debugging skills, validate against agentskills.io spec, test in Chat. Both skills include Mermaid diagramming instructions for full and partial state diagrams (no separate tool — skills use `precept_compile` output data).
-- Implement [Phase 9](McpServerImplementationPlan.md#Phase-9-Documentation--Distribution): remove extension MCP registration, remove `Precept Dev` from `.vscode/mcp.json`, rewrite plugin `.mcp.json` for distribution, publish plugin.
+- Implement [Phase 7](McpServerImplementationPlan.md#Phase-7-Agent-Plugin-Structure--MCP-Packaging): create `tools/Precept.Plugin/` structure (plugin.json at root, dev .mcp.json with `${CLAUDE_PLUGIN_ROOT}` path expansion), move launcher to `tools/scripts/`, remove `Precept Dev` from `.vscode/mcp.json`, verify plugin loads via `chat.pluginLocations`.
+- Implement [Phase 8](McpServerImplementationPlan.md#Phase-8-Agent-and-Skill-Content): draft thin Precept Author agent (`precept-author.agent.md` — persona + tool restrictions only) and authoring/debugging skills (detailed workflows), validate against agentskills.io spec, test in Chat. Agent relies on VS Code auto-discovery to load skills based on the user's request. Both skills include Mermaid diagramming instructions for full and partial state diagrams (no separate tool — skills use `precept_compile` output data).
+- Implement [Phase 9](McpServerImplementationPlan.md#Phase-9-Documentation--Distribution): remove extension MCP registration, verify MCP sync rule in `.github/copilot-instructions.md` is still accurate, rewrite plugin `.mcp.json` for distribution, publish plugin.
 - Executor note: use the phase-local prompts in [Phase 7](McpServerImplementationPlan.md#Phase-7-implementation-prompt), [Phase 8](McpServerImplementationPlan.md#Phase-8-implementation-prompt), and [Phase 9](McpServerImplementationPlan.md#Phase-9-implementation-prompt) as the canonical change guides; keep this todo entry as scope/order only.
 
 ---
