@@ -4,7 +4,7 @@ Date: 2025-03-05
 Spec: `docs/McpServerDesign.md`
 Prerequisite: Language redesign complete (`docs/PreceptLanguageImplementationPlan.md` — all 9 phases)
 
-> **Status (2026-03-26):** Phases 0–6 are implemented — the original 6-tool surface (validate, schema, audit, run, language, inspect) is live and tested. The MCP Redesign Phase below replaces that surface with 4 tools accepting text input and returning structured feedback. Phases 7–9 have been updated to reflect the new tool names.
+> **Status (2026-03-27):** Phases 0–6 are implemented — the original 6-tool surface (validate, schema, audit, run, language, inspect) is live and tested. The MCP Redesign Phase below replaces that surface with 4 tools accepting text input and returning structured feedback. Design decisions finalized 2026-03-27. Phases 7–9 have been updated to reflect the new tool names.
 
 This plan builds the MCP server as a new project in `tools/Precept.Mcp/`. Each phase adds one tool, fully tested, before moving to the next. The core `src/Precept/` infrastructure (catalogs, parser, runtime) is already in place from the language redesign — this plan only adds tool wrappers and MCP transport.
 
@@ -325,30 +325,45 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 
 > **Prerequisite:** Language Phase I (Graph Analysis Warning Diagnostics — C48–C53 plus structured compile validation cleanup) from `PreceptLanguageImplementationPlan.md`
 
-**Goal:** Replace the 6-tool surface (validate, schema, audit, run, language, inspect) with 4 tools (`precept_language`, `precept_compile`, `precept_inspect`, `precept_run`) that accept inline text, return structured diagnostics and violations, and enforce the thin-wrapper principle. See `McpServerDesign.md` for the full redesign spec.
+**Goal:** Replace the 6-tool surface (validate, schema, audit, run, language, inspect) with 4 tools (`precept_language`, `precept_compile`, `precept_inspect`, `precept_run`) that accept inline text, return structured feedback, and enforce the thin-wrapper principle. See `McpServerDesign.md` for the full redesign spec.
+
+### Design Decisions
+
+The following decisions were finalized during the design walkthrough (2026-03-27):
+
+1. **DiagnosticDto location:** Inline in `CompileTool.cs` — it is the sole consumer.
+2. **Schema DTOs location:** Inline in `CompileTool.cs`.
+3. **InspectTool delegation:** Uses `engine.Inspect(instance, eventName, args?)` per event — delegates to the core API instead of reimplementing the inspection loop.
+4. **ViolationDto shape:** Flat tagged records in a shared `Tools/ViolationDto.cs` file (used by both inspect and run).
+5. **CompileTool on partial failure:** Returns partial schema on validation errors, diagnostics-only on parse failure.
+6. **Graph analysis surface:** Diagnostics only — no legacy audit arrays.
+7. **CompileTool entry point:** `CompileFromText` as sole entry point.
+8. **Compile failure in inspect/run:** Short error string: `"Compilation failed. Use precept_compile to diagnose and fix errors first."` Only `precept_compile` surfaces structured diagnostics. This prevents diagnostic duplication and gives Copilot a clear signal chain: compile → fix → inspect/run.
+9. **Inspect instance echo:** Echoes the resolved snapshot (`state` + `data` with defaults applied) so Copilot can see what defaults were filled in.
+10. **Run tool shape:** Single-event execution. Takes `text`, `currentState`, `data`, `event`, `args` (same input shape as inspect). No batch. Copilot chains sequential calls to trace multi-step scenarios.
 
 ### Scope
 
-1. **New core API:** `PreceptCompiler.CompileFromText(string text)` — a composed pipeline that runs parse → type-check → graph analysis → compile, returning a single result with the compiled definition (if successful), partial model (on type errors), and all diagnostics.
-2. **New shared DTOs:** `DiagnosticDto` (line, column, message, code, severity), `ViolationDto` (message, source, targets), `ViolationSourceDto`, `ViolationTargetDto`.
+1. **Core API (already implemented):** `PreceptCompiler.CompileFromText(string text)` — a composed pipeline that runs parse → type-check → graph analysis → compile, returning a single result with the compiled definition (if successful), partial model (on type errors), and all diagnostics.
+2. **DTOs:** `DiagnosticDto` inline in `CompileTool.cs`; `ViolationDto` shared at `Tools/ViolationDto.cs`.
 3. **Replace tool files:**
    - `ValidateTool.cs` + `SchemaTool.cs` + `AuditTool.cs` → `CompileTool.cs`
-   - `InspectTool.cs` → rewritten to delegate to `engine.Inspect()` instead of reimplementing the inspection loop
-   - `RunTool.cs` → updated for text input and structured `ViolationDto` output
+   - `InspectTool.cs` → rewritten to delegate to `engine.Inspect()`, echo resolved snapshot, compile failure returns error string
+   - `RunTool.cs` → rewritten as single-event execution with state+data input, structured `ViolationDto` output, compile failure returns error string
    - `LanguageTool.cs` → unchanged (no file input)
 4. **Update all tests:** Rewrite test files to match new tool signatures, input shapes, and output DTOs.
 5. **Switch input contract:** All tools that previously took `string path` now take `string text`.
 
 ### Steps
 
-- [ ] Implement `PreceptCompiler.CompileFromText(text)` in core (`src/Precept/Dsl/`)
-- [ ] Add `ConstraintSeverity.Hint` to the severity enum
-- [ ] Implement graph analysis (C48–C53) in `PreceptAnalysis.Analyze()` and consume the structured validation result instead of exception parsing
-- [ ] Wire graph analysis into `CompileFromText` so warnings appear alongside type-check errors
-- [ ] Create shared DTO types in `tools/Precept.Mcp/Dtos/`
-- [ ] Implement `CompileTool.cs` — merges validate + schema + audit; returns full model + diagnostics
-- [ ] Rewrite `InspectTool.cs` — delegate to `engine.Inspect()`, project `InspectionResult` to DTOs
-- [ ] Update `RunTool.cs` — text input, structured `ViolationDto` per step
+- [x] Implement `PreceptCompiler.CompileFromText(text)` in core (`src/Precept/Dsl/`) — already done in Language Phase I
+- [x] Add `ConstraintSeverity.Hint` to the severity enum — already done in Language Phase I
+- [x] Implement graph analysis (C48–C53) in `PreceptAnalysis.Analyze()` and consume the structured validation result instead of exception parsing — already done in Language Phase I
+- [x] Wire graph analysis into `CompileFromText` so warnings appear alongside type-check errors — already done in Language Phase I
+- [ ] Create `ViolationDto.cs` at `tools/Precept.Mcp/Tools/ViolationDto.cs` — shared between inspect and run
+- [ ] Implement `CompileTool.cs` with inline `DiagnosticDto` and schema DTOs — merges validate + schema + audit; returns full model + diagnostics
+- [ ] Rewrite `InspectTool.cs` — delegate to `engine.Inspect()`, echo resolved snapshot, compile failure returns error string
+- [ ] Rewrite `RunTool.cs` — single-event with state+data+event+args input, structured `ViolationDto` output, compile failure returns error string
 - [ ] Delete `ValidateTool.cs`, `SchemaTool.cs`, `AuditTool.cs`
 - [ ] Rewrite test files for the new 4-tool surface
 - [ ] Update `Program.cs` if any registration changes are needed
@@ -364,10 +379,12 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 - [ ] `precept_compile`: dead-end state → hint-severity diagnostic (C50)
 - [ ] `precept_inspect`: text input + state + data → structured event outcomes with `ViolationDto`
 - [ ] `precept_inspect`: requires-args detection → `requiredArgs` reported
-- [ ] `precept_inspect`: compile errors in text → diagnostics, no runtime results
-- [ ] `precept_run`: text input + steps → step-by-step outcomes with `ViolationDto` arrays
-- [ ] `precept_run`: compile errors in text → diagnostics, no execution
-- [ ] `precept_run`: constraint failure mid-sequence → `abortedAt` set, structured violations on failing step
+- [ ] `precept_inspect`: compile errors in text → error string, no runtime results
+- [ ] `precept_inspect`: echoes resolved instance snapshot with defaults applied
+- [ ] `precept_run`: single event execution → outcome with `ViolationDto` array
+- [ ] `precept_run`: compile errors in text → error string, no execution
+- [ ] `precept_run`: constraint failure → structured violations on the result
+- [ ] `precept_run`: echoes resolved data snapshot with defaults applied
 - [ ] `precept_language`: unchanged behavior (regression)
 
 ### Checkpoint
@@ -376,6 +393,9 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 - All MCP tool tests green with new 4-tool surface
 - `precept_compile` returns warnings and hints alongside errors
 - `ViolationDto` preserves full `ConstraintViolation` structure (source hierarchy + targets)
+- `precept_inspect` and `precept_run` return error string on compile failure (not diagnostics)
+- `precept_run` is single-event (no batch)
+- `precept_inspect` echoes resolved instance snapshot
 - No domain logic in tool files beyond DTO projection
 
 ### Redesign implementation prompt
@@ -390,12 +410,12 @@ Use this prompt to execute the redesign phase in a new Copilot Chat session:
 >
 > Then:
 >
-> 1. Replace the old validate/schema/audit tool surface with `precept_compile`.
+> 1. Replace the old validate/schema/audit tool surface with `precept_compile` (inline `DiagnosticDto` + schema DTOs).
 > 2. Keep tool files as thin wrappers; domain logic belongs in `src/Precept/`.
 > 3. Use text input for all file-backed tools.
-> 4. Introduce shared DTOs for diagnostics and violations in `tools/Precept.Mcp/Dtos/`.
-> 5. Rewrite `InspectTool.cs` to delegate to `engine.Inspect()`.
-> 6. Update `RunTool.cs` for structured `ViolationDto` output.
+> 4. Create shared `ViolationDto.cs` at `Tools/` level (used by both inspect and run).
+> 5. Rewrite `InspectTool.cs` to delegate to `engine.Inspect()`, echo resolved snapshot, return error string on compile failure.
+> 6. Rewrite `RunTool.cs` as single-event execution with state+data+event+args input, structured `ViolationDto` output, error string on compile failure.
 > 7. Delete obsolete tool files after replacement coverage exists.
 > 8. Rewrite MCP tests to match the new 4-tool surface.
 > 9. End with `dotnet build` and all MCP tests passing.
@@ -404,7 +424,7 @@ Use this prompt to execute the redesign phase in a new Copilot Chat session:
 
 ## Phase 7: Agent Plugin Structure + MCP Packaging
 
-**Goal:** Create the agent plugin directory structure with MCP server binaries, so the six tools are callable by Copilot with zero manual setup after plugin installation.
+**Goal:** Create the agent plugin directory structure with MCP server binaries, so the four tools are callable by Copilot with zero manual setup after plugin installation.
 
 ### Steps
 
@@ -580,9 +600,8 @@ Use this prompt to execute Phase 9 in a new Copilot Chat session:
 | `tools/Precept.Mcp/Tools/RunTool.cs` | **New** → **Rewrite** (text input, structured violations) | 4 → Redesign |
 | `tools/Precept.Mcp/Tools/LanguageTool.cs` | **New** (unchanged in redesign) | 5 |
 | `tools/Precept.Mcp/Tools/InspectTool.cs` | **New** → **Rewrite** (delegate to engine.Inspect) | 6 → Redesign |
-| `tools/Precept.Mcp/Tools/CompileTool.cs` | **New** — merges validate + schema + audit | Redesign |
-| `tools/Precept.Mcp/Dtos/DiagnosticDto.cs` | **New** — shared diagnostic DTO | Redesign |
-| `tools/Precept.Mcp/Dtos/ViolationDto.cs` | **New** — shared violation DTO | Redesign |
+| `tools/Precept.Mcp/Tools/CompileTool.cs` | **New** — merges validate + schema + audit; inline DiagnosticDto + schema DTOs | Redesign |
+| `tools/Precept.Mcp/Tools/ViolationDto.cs` | **New** — shared violation DTO (inspect + run) | Redesign |
 | `src/Precept/Dsl/PreceptAnalysis.cs` | **New** — graph analysis (C48–C53) | Redesign (Language Phase I) |
 | `src/Precept/Dsl/PreceptCompiler.cs` | **Edit** — add `CompileFromText(text)` | Redesign (Language Phase I) |
 | `test/Precept.Mcp.Tests/Precept.Mcp.Tests.csproj` | **New** | 0 |
