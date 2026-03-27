@@ -8,10 +8,6 @@ namespace Precept.LanguageServer;
 
 internal sealed class PreceptAnalyzer
 {
-    internal const string RejectOnlyPairDiagnosticCode = "PA1001";
-    internal const string RejectOnlyPairSupportedElsewhereDiagnosticCode = "PA1002";
-    internal const string EventNeverSucceedsDiagnosticCode = "PA1003";
-
     private static readonly Regex LineErrorRegex = new("^Line\\s+(?<line>\\d+)\\s*:\\s*(?<message>.+)$", RegexOptions.Compiled);
     private static readonly Regex StateRegex = new("^\\s*state\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex EventRegex = new("^\\s*event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
@@ -75,22 +71,10 @@ internal sealed class PreceptAnalyzer
         if (model is null)
             return Array.Empty<Diagnostic>();
 
-        try
-        {
-            var typeDiagnostics = PreceptTypeChecker.Check(model);
-            if (typeDiagnostics.HasErrors)
-                return typeDiagnostics.Diagnostics.Select(MapTypeDiagnostic).ToArray();
-
-            PreceptCompiler.Compile(model);
-
-            var diagnostics = GetSemanticDiagnostics(model, lines);
-            return diagnostics.Count == 0 ? Array.Empty<Diagnostic>() : diagnostics;
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
-        {
-            var diagnostic = ToDiagnostic(ex.Message, lines);
-            return new[] { diagnostic };
-        }
+        var validation = PreceptCompiler.Validate(model);
+        var diagnostics = validation.Diagnostics.Select(MapValidationDiagnostic).ToList();
+        diagnostics.AddRange(GetSemanticDiagnostics(model, lines));
+        return diagnostics.Count == 0 ? Array.Empty<Diagnostic>() : diagnostics;
     }
 
     public IReadOnlyList<CompletionItem> GetCompletions(DocumentUri uri, Position position)
@@ -378,16 +362,18 @@ internal sealed class PreceptAnalyzer
         if (parseDiags.Count > 0 || model is null)
             return Array.Empty<RejectOnlyStateEventIssue>();
 
-        try
-        {
-            PreceptCompiler.Compile(model);
-        }
-        catch (Exception)
-        {
+        var validation = PreceptCompiler.Validate(model);
+        if (validation.HasErrors)
             return Array.Empty<RejectOnlyStateEventIssue>();
-        }
 
-        return AnalyzeRejectOnlyStateEventIssues(model, text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None));
+        return PreceptAnalysis.Analyze(model)
+            .RejectOnlyStateEventIssues
+            .Select(issue => new RejectOnlyStateEventIssue(
+                issue.StateName,
+                issue.EventName,
+                Math.Max(0, issue.SourceLine - 1),
+                issue.EventSucceedsElsewhere))
+            .ToArray();
     }
 
     internal IReadOnlyList<OrphanedEventIssue> GetOrphanedEventIssues(DocumentUri uri)
@@ -399,16 +385,14 @@ internal sealed class PreceptAnalyzer
         if (parseDiags.Count > 0 || model is null)
             return Array.Empty<OrphanedEventIssue>();
 
-        try
-        {
-            PreceptCompiler.Compile(model);
-        }
-        catch (Exception)
-        {
+        var validation = PreceptCompiler.Validate(model);
+        if (validation.HasErrors)
             return Array.Empty<OrphanedEventIssue>();
-        }
 
-        return AnalyzeOrphanedEventIssues(model, text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None));
+        return PreceptAnalysis.Analyze(model)
+            .OrphanedEventIssues
+            .Select(issue => new OrphanedEventIssue(issue.EventName, Math.Max(0, issue.SourceLine - 1)))
+            .ToArray();
     }
 
     private static IReadOnlyList<CompletionItem> BuildGuardCompletions(
@@ -913,47 +897,24 @@ internal sealed class PreceptAnalyzer
     {
         var diagnostics = new List<Diagnostic>();
 
-        if (model.Events.Count == 0)
-        {
-            var machineLine = 0;
-            for (var li = 0; li < lines.Length; li++)
-            {
-                if (lines[li].TrimStart().StartsWith("precept ", StringComparison.Ordinal))
-                {
-                    machineLine = li;
-                    break;
-                }
-            }
-
-            var lineLength = machineLine < lines.Length ? lines[machineLine].Length : 1;
-            diagnostics.Add(new Diagnostic
-            {
-                Severity = DiagnosticSeverity.Hint,
-                Message = "Precept has no events declared. It cannot respond to any input.",
-                Source = "precept",
-                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
-                    new Position(machineLine, 0),
-                    new Position(machineLine, Math.Max(1, lineLength)))
-            });
-        }
-
         AddEntryAssertDiagnostics(model, lines, diagnostics);
-        AddEventSurfaceDiagnostics(model, lines, diagnostics);
-        AddAuditDiagnostics(model, lines, diagnostics);
 
         return diagnostics;
     }
 
-    private static Diagnostic MapTypeDiagnostic(PreceptTypeDiagnostic diagnostic)
+    private static Diagnostic MapValidationDiagnostic(PreceptValidationDiagnostic diagnostic)
     {
         var lineIndex = Math.Max(0, diagnostic.Line - 1);
         var message = string.IsNullOrWhiteSpace(diagnostic.StateContext)
             ? diagnostic.Message
             : $"{diagnostic.Message} [state {diagnostic.StateContext}]";
 
-        var severity = diagnostic.Constraint.Severity == ConstraintSeverity.Warning
-            ? DiagnosticSeverity.Warning
-            : DiagnosticSeverity.Error;
+        var severity = diagnostic.Constraint.Severity switch
+        {
+            ConstraintSeverity.Warning => DiagnosticSeverity.Warning,
+            ConstraintSeverity.Hint => DiagnosticSeverity.Hint,
+            _ => DiagnosticSeverity.Error
+        };
 
         return new Diagnostic
         {
@@ -965,152 +926,6 @@ internal sealed class PreceptAnalyzer
                 new Position(lineIndex, Math.Max(0, diagnostic.Column)),
                 new Position(lineIndex, Math.Max(1, diagnostic.Column + 1)))
         };
-    }
-
-    private static void AddEventSurfaceDiagnostics(PreceptDefinition model, string[] lines, List<Diagnostic> diagnostics)
-    {
-        var rejectOnlyIssues = AnalyzeRejectOnlyStateEventIssues(model, lines);
-        foreach (var issue in rejectOnlyIssues)
-        {
-            var code = issue.EventSucceedsElsewhere
-                ? RejectOnlyPairSupportedElsewhereDiagnosticCode
-                : RejectOnlyPairDiagnosticCode;
-
-            var message = issue.EventSucceedsElsewhere
-                ? $"Event '{issue.EventName}' has successful behavior in other states, but in state '{issue.StateName}' it is defined only as rejection. If '{issue.EventName}' is unsupported in '{issue.StateName}', remove all 'from {issue.StateName} on {issue.EventName}' rows so the outcome is NotDefined."
-                : $"All rows for event '{issue.EventName}' in state '{issue.StateName}' reject. This makes the event part of the state's contract surface while ensuring it can never succeed. Remove the pair if the event should be unavailable here.";
-
-            diagnostics.Add(CreateDiagnostic(lines, issue.FirstLineIndex, DiagnosticSeverity.Warning, message, code));
-        }
-
-        var transitionRows = model.TransitionRows ?? Array.Empty<PreceptTransitionRow>();
-        var rowsByEvent = transitionRows
-            .GroupBy(row => row.EventName, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
-
-        foreach (var evt in model.Events)
-        {
-            if (!rowsByEvent.TryGetValue(evt.Name, out var rows) || rows.Length == 0)
-                continue;
-
-            if (rows.Any(static row => row.Outcome is not Rejection))
-                continue;
-
-            var lineIndex = FindEventLine(lines, evt.Name);
-            diagnostics.Add(CreateDiagnostic(
-                lines,
-                lineIndex,
-                DiagnosticSeverity.Warning,
-                $"Event '{evt.Name}' is declared and referenced in transition rows, but it never succeeds in any state. Remove the event, remove the reject-only rows, or add a successful transition/no-transition path.",
-                EventNeverSucceedsDiagnosticCode));
-        }
-    }
-
-    private static IReadOnlyList<RejectOnlyStateEventIssue> AnalyzeRejectOnlyStateEventIssues(PreceptDefinition model, string[] lines)
-    {
-        var transitionRows = model.TransitionRows ?? Array.Empty<PreceptTransitionRow>();
-        var eventHasSuccessfulPath = transitionRows
-            .GroupBy(row => row.EventName, StringComparer.Ordinal)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Any(static row => row.Outcome is not Rejection),
-                StringComparer.Ordinal);
-
-        return transitionRows
-            .GroupBy(row => (row.FromState, row.EventName))
-            .Select(group =>
-            {
-                var rows = group.OrderBy(static row => row.SourceLine).ToArray();
-                if (rows.Length == 0 || rows.Any(static row => row.Outcome is not Rejection))
-                    return null;
-
-                var firstLineIndex = FindTransitionPairLine(lines, group.Key.FromState, group.Key.EventName);
-                return new RejectOnlyStateEventIssue(
-                    group.Key.FromState,
-                    group.Key.EventName,
-                    firstLineIndex,
-                    eventHasSuccessfulPath.TryGetValue(group.Key.EventName, out var succeedsElsewhere) && succeedsElsewhere);
-            })
-            .Where(static issue => issue is not null)
-            .Cast<RejectOnlyStateEventIssue>()
-            .ToArray();
-    }
-
-    private static void AddAuditDiagnostics(PreceptDefinition model, string[] lines, List<Diagnostic> diagnostics)
-    {
-        var allStates = model.States.Select(static state => state.Name).ToList();
-        var transitionRows = model.TransitionRows ?? Array.Empty<PreceptTransitionRow>();
-        var graph = allStates.ToDictionary(static state => state, static _ => new HashSet<string>(StringComparer.Ordinal), StringComparer.Ordinal);
-        var referencedEvents = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var row in transitionRows)
-        {
-            referencedEvents.Add(row.EventName);
-
-            if (row.Outcome is not StateTransition transition)
-                continue;
-
-            if (string.Equals(row.FromState, "any", StringComparison.OrdinalIgnoreCase))
-            {
-                foreach (var state in allStates)
-                    graph[state].Add(transition.TargetState);
-            }
-            else if (graph.TryGetValue(row.FromState, out var neighbors))
-            {
-                neighbors.Add(transition.TargetState);
-            }
-        }
-
-        var reachable = new HashSet<string>(StringComparer.Ordinal) { model.InitialState.Name };
-        var queue = new Queue<string>();
-        queue.Enqueue(model.InitialState.Name);
-
-        while (queue.Count > 0)
-        {
-            var current = queue.Dequeue();
-            foreach (var neighbor in graph[current])
-            {
-                if (reachable.Add(neighbor))
-                    queue.Enqueue(neighbor);
-            }
-        }
-
-        foreach (var state in allStates.Where(state => !reachable.Contains(state)))
-        {
-            var lineIndex = FindStateLine(lines, state);
-            diagnostics.Add(CreateDiagnostic(lines, lineIndex, DiagnosticSeverity.Warning, $"State '{state}' is unreachable from the initial state."));
-        }
-
-        foreach (var state in allStates)
-        {
-            var outgoingRows = transitionRows.Where(row =>
-                string.Equals(row.FromState, state, StringComparison.Ordinal) ||
-                string.Equals(row.FromState, "any", StringComparison.OrdinalIgnoreCase)).ToArray();
-
-            if (outgoingRows.Length == 0 || outgoingRows.Any(row => row.Outcome is StateTransition))
-                continue;
-
-            var lineIndex = FindStateLine(lines, state);
-            diagnostics.Add(CreateDiagnostic(lines, lineIndex, DiagnosticSeverity.Hint, $"State '{state}' is a dead end: all outgoing rows reject or stay in place."));
-        }
-
-        foreach (var eventName in model.Events.Select(static evt => evt.Name).Where(eventName => !referencedEvents.Contains(eventName)))
-        {
-            var lineIndex = FindEventLine(lines, eventName);
-            diagnostics.Add(CreateDiagnostic(lines, lineIndex, DiagnosticSeverity.Warning, $"Event '{eventName}' is orphaned: it is declared but never referenced in transition rows."));
-        }
-    }
-
-    private static IReadOnlyList<OrphanedEventIssue> AnalyzeOrphanedEventIssues(PreceptDefinition model, string[] lines)
-    {
-        var referencedEvents = new HashSet<string>(
-            (model.TransitionRows ?? Array.Empty<PreceptTransitionRow>()).Select(static row => row.EventName),
-            StringComparer.Ordinal);
-
-        return model.Events
-            .Where(evt => !referencedEvents.Contains(evt.Name))
-            .Select(evt => new OrphanedEventIssue(evt.Name, FindEventLine(lines, evt.Name)))
-            .ToArray();
     }
 
     private static void AddEntryAssertDiagnostics(
@@ -1163,57 +978,6 @@ internal sealed class PreceptAnalyzer
                 return i;
         }
         return 0;
-    }
-
-    private static int FindEventLine(string[] lines, string eventName)
-    {
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var trimmed = lines[i].TrimStart();
-            if (trimmed.StartsWith($"event {eventName}", StringComparison.Ordinal))
-                return i;
-        }
-
-        return 0;
-    }
-
-    private static int FindTransitionPairLine(string[] lines, string stateName, string eventName)
-    {
-        var prefix = $"from {stateName} on {eventName}";
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var trimmed = lines[i].TrimStart();
-            if (trimmed.StartsWith(prefix, StringComparison.Ordinal))
-                return i;
-        }
-
-        return 0;
-    }
-
-    private static Diagnostic CreateDiagnostic(string[] lines, int lineIndex, DiagnosticSeverity severity, string message, string? code = null)
-    {
-        var safeLineIndex = Math.Min(Math.Max(lineIndex, 0), Math.Max(lines.Length - 1, 0));
-        var lineLength = safeLineIndex < lines.Length ? lines[safeLineIndex].Length : 1;
-        var range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
-            new Position(safeLineIndex, 0),
-            new Position(safeLineIndex, Math.Max(1, lineLength)));
-
-        return code is null
-            ? new Diagnostic
-            {
-                Severity = severity,
-                Message = message,
-                Source = "precept",
-                Range = range
-            }
-            : new Diagnostic
-            {
-                Code = code,
-                Severity = severity,
-                Message = message,
-                Source = "precept",
-                Range = range
-            };
     }
 
     private static IReadOnlyList<string> CollectIdentifiers(string text, Regex regex)

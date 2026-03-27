@@ -47,7 +47,7 @@ public static class PreceptParser
         }
         var result = RawFileParser.TryParse(tokens);
         if (result.HasValue && result.Remainder.IsAtEnd)
-            return AssembleModel(result.Value.Name, result.Value.Statements);
+            return AssembleModel(result.Value.Header.Name, result.Value.Header.SourceLine, result.Value.Statements);
 
         // SYNC:CONSTRAINT:C3
         throw DiagnosticCatalog.C3.ToException();
@@ -85,7 +85,7 @@ public static class PreceptParser
         {
             try
             {
-                var model = AssembleModel(result.Value.Name, result.Value.Statements);
+                var model = AssembleModel(result.Value.Header.Name, result.Value.Header.SourceLine, result.Value.Statements);
                 return (model, diagnostics);
             }
             catch (InvalidOperationException ex)
@@ -555,10 +555,10 @@ public static class PreceptParser
     // ═══════════════════════════════════════════════════════════════════
 
     // precept <Name>
-    private static readonly TokenListParser<PreceptToken, string> PreceptHeader =
-        Token.EqualTo(PreceptToken.Precept)
-            .IgnoreThen(Token.EqualTo(PreceptToken.Identifier))
-            .Select(t => t.ToText())
+    private static readonly TokenListParser<PreceptToken, (string Name, int SourceLine)> PreceptHeader =
+        (from kw in Token.EqualTo(PreceptToken.Precept)
+         from name in Token.EqualTo(PreceptToken.Identifier)
+         select (name.ToText(), kw.Span.Position.Line))
             .Named("precept declaration")
             .Register(new ConstructInfo(
                 "precept-header",
@@ -612,7 +612,7 @@ public static class PreceptParser
         (from kw in Token.EqualTo(PreceptToken.State)
          from name in Token.EqualTo(PreceptToken.Identifier)
          from initial in Token.EqualTo(PreceptToken.Initial).Value(true).OptionalOrDefault(false)
-         select (StatementResult)new StateResult(new PreceptState(name.ToText()), initial))
+         select (StatementResult)new StateResult(new PreceptState(name.ToText(), kw.Span.Position.Line), initial))
         .Named("state declaration")
             .Register(new ConstructInfo(
                 "state-declaration",
@@ -640,7 +640,7 @@ public static class PreceptParser
              .IgnoreThen(EventArg.AtLeastOnceDelimitedBy(Token.EqualTo(PreceptToken.Comma)))
              .OptionalOrDefault(Array.Empty<PreceptEventArg>())
          select (StatementResult)new EventResult(new PreceptEvent(
-             name.ToText(), args.ToList())))
+             name.ToText(), args.ToList(), kw.Span.Position.Line)))
         .Named("event declaration")
             .Register(new ConstructInfo(
                 "event-declaration",
@@ -833,7 +833,7 @@ public static class PreceptParser
     /// AssembleModel is called separately after confirming IsAtEnd, so partial
     /// parses of old-syntax files can fall through to the legacy parser.
     /// </summary>
-    private static readonly TokenListParser<PreceptToken, (string Name, StatementResult[] Statements)> RawFileParser =
+    private static readonly TokenListParser<PreceptToken, ((string Name, int SourceLine) Header, StatementResult[] Statements)> RawFileParser =
         from header in PreceptHeader
         from statements in Statement.Many()
         select (header, statements);
@@ -842,7 +842,7 @@ public static class PreceptParser
     /// Assembles individual parsed statements into a <see cref="PreceptDefinition"/>.
     /// Validates structural constraints (one initial state, no duplicates, etc.).
     /// </summary>
-    private static PreceptDefinition AssembleModel(string name, StatementResult[] statements)
+    private static PreceptDefinition AssembleModel(string name, int sourceLine, StatementResult[] statements)
     {
         var states = new List<PreceptState>();
         PreceptState? initialState = null;
@@ -1091,7 +1091,8 @@ public static class PreceptParser
             stateActions.Count > 0 ? stateActions : null,
             eventAsserts.Count > 0 ? eventAsserts : null,
             transitionRows.Count > 0 ? transitionRows : null,
-            editBlocks.Count > 0 ? editBlocks : null);
+            editBlocks.Count > 0 ? editBlocks : null,
+            sourceLine);
     }
 
     /// <summary>Expands 'any' to all declared state names, or returns the list as-is.</summary>

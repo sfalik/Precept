@@ -23,7 +23,7 @@ public class PreceptAnalyzerEventSurfaceTests
         var diagnostics = Analyze(text);
 
         diagnostics.Any(diagnostic =>
-            diagnostic.Message.Contains("contract surface", StringComparison.Ordinal))
+            diagnostic.Message.Contains("ends in reject", StringComparison.Ordinal))
             .Should().BeTrue();
     }
 
@@ -44,7 +44,7 @@ public class PreceptAnalyzerEventSurfaceTests
         var diagnostics = Analyze(text);
 
         diagnostics.Any(diagnostic =>
-            diagnostic.Message.Contains("successful behavior in other states", StringComparison.Ordinal))
+            diagnostic.Message.Contains("ends in reject", StringComparison.Ordinal))
             .Should().BeTrue();
     }
 
@@ -65,7 +65,7 @@ public class PreceptAnalyzerEventSurfaceTests
         var diagnostics = Analyze(text);
 
         diagnostics.Any(diagnostic =>
-            diagnostic.Message.Contains("never succeeds in any state", StringComparison.Ordinal))
+            diagnostic.Message.Contains("can never succeed from any reachable state", StringComparison.Ordinal))
             .Should().BeTrue();
     }
 
@@ -82,7 +82,7 @@ public class PreceptAnalyzerEventSurfaceTests
 
         var diagnostics = Analyze(text);
         var orphaned = diagnostics.First(diagnostic =>
-            diagnostic.Message.Contains("orphaned", StringComparison.OrdinalIgnoreCase));
+            diagnostic.Message.Contains("never referenced", StringComparison.OrdinalIgnoreCase));
 
         orphaned.Severity.Should().Be(DiagnosticSeverity.Warning);
     }

@@ -21,7 +21,7 @@ While adding typed completions to the language server (e.g., offering only boole
 ### What changed
 
 - **Parser source-line propagation:** `TransitionRowResult.SourceLine` and all action parsers now carry `SourceLine` from the keyword token's `Span.Position.Line`. This flows through `PreceptTransitionRow` so type scopes and diagnostics can be attributed to the correct row.
-- **Shared type checker:** `PreceptTypeChecker.Check(PreceptDefinition)` returns `PreceptTypeCheckResult` containing diagnostics and a `PreceptTypeContext` with resolved types per expression position. Implements `StaticValueKind` flags-based type representation, null-flow narrowing (within-row `when` guards + cross-row negation), state assert narrowing (`in State assert X != null` propagates into `from State` rows), and per-state `from any` expansion.
+- **Shared type checker:** `PreceptTypeChecker.Check(PreceptDefinition)` returns `TypeCheckResult` containing diagnostics and a `PreceptTypeContext` with resolved types per expression position. Implements `StaticValueKind` flags-based type representation, null-flow narrowing (within-row `when` guards + cross-row negation), state assert narrowing (`in State assert X != null` propagates into `from State` rows), and per-state `from any` expansion.
 - **Constraint codes C38–C43:** Six new compile-time diagnostics (`PRECEPT038`–`PRECEPT043`) covering unknown identifiers, expression type mismatches, unary/binary operator errors, null-flow violations, and collection `pop`/`dequeue into` target mismatches.
 - **`PreceptCompiler.Validate(model)`:** Non-throwing validation path so consumers (MCP `precept_validate` tool, future CLI) can return all diagnostics structurally instead of throwing on the first error.
 - **Analyzer delegation:** ~635 lines of duplicate type logic removed from the analyzer. It now calls the shared checker and consumes `PreceptTypeContext` for IDE features.
@@ -113,6 +113,8 @@ The redesign phases are complete, but the compile-time checker is intentionally 
 
 **Implementation prompt:**
 
+Before making changes in a new Copilot Chat session, read the relevant design sections and this phase in full, then pause and recommend the most appropriate model for the work before continuing. Suggest `GPT-5.4` for balanced cross-file implementation, `Claude Sonnet` for faster medium-complexity edits, or `Claude Opus` for heavier design analysis or broader refactors. Let the user switch models if desired, then continue with implementation.
+
 The change site is `PreceptTypeChecker.TryInferBinaryKind()` in `src/Precept/Dsl/PreceptTypeChecker.cs`. The `case "=="` / `case "!="` branch (~line 752) currently checks only that both sides are inferable (`leftKind != None && rightKind != None`) without verifying type compatibility. Replace this with same-family checking: strip the `Null` flag from both sides, verify the non-null families match (or one side is pure `Null` and the other is nullable). Incompatible operands produce C41. Also reject `NonNullableField == null` / `!= null` by checking whether one side is `Null` and the other lacks the `Null` flag.
 
 The runtime evaluator in `src/Precept/Dsl/PreceptExpressionEvaluator.cs` (lines 177–188) has a `TryToNumber` fallback for `==`/`!=` that silently coerces types. Remove the numeric fallback so runtime behavior matches the stricter compile-time policy. After the type checker rejects cross-type equality at compile time, the runtime path should only see same-type operands (or null).
@@ -143,6 +145,8 @@ Add tests to `test/Precept.Tests/PreceptTypeCheckerTests.cs`. Verify all 18 samp
 
 **Implementation prompt:**
 
+Before making changes in a new Copilot Chat session, read the relevant design sections and this phase in full, then pause and recommend the most appropriate model for the work before continuing. Suggest `GPT-5.4` for balanced cross-file implementation, `Claude Sonnet` for faster medium-complexity edits, or `Claude Opus` for heavier design analysis or broader refactors. Let the user switch models if desired, then continue with implementation.
+
 The change site is `PreceptTypeChecker.BuildSymbolKinds()` in `src/Precept/Dsl/PreceptTypeChecker.cs`. Currently it adds event args as both bare (`symbols[pair.Key]`) and dotted (`symbols[$"{eventName}.{pair.Key}"]`). Remove the bare key line for non-assert scopes so transition rows only see dotted keys. The method receives the scope context — add a parameter or flag to distinguish transition-row scope from event-assert scope.
 
 Event assert scope is already enforced by the parser (`src/Precept/Dsl/PreceptParser.cs` lines 963–998, constraints C14/C15/C16). The checker’s event-assert validation builds symbols with bare keys only (no dotted form needed since scope is arg-only).
@@ -169,7 +173,9 @@ All 18 sample files already use dotted form exclusively — no sample changes ne
 
 **Implementation prompt:**
 
-Register new constraint C44 in `src/Precept/Dsl/ConstraintCatalog.cs` for non-boolean rule positions. The checker currently infers guard/assert expression types but doesn’t enforce that the result is boolean. Add a check after `TryInferExpressionKind()` returns for `when` guards, `invariant`, `in/to/from assert`, and `on assert` expressions: if the inferred kind doesn’t include `StaticValueKind.Boolean`, emit C44.
+Before making changes in a new Copilot Chat session, read the relevant design sections and this phase in full, then pause and recommend the most appropriate model for the work before continuing. Suggest `GPT-5.4` for balanced cross-file implementation, `Claude Sonnet` for faster medium-complexity edits, or `Claude Opus` for heavier design analysis or broader refactors. Let the user switch models if desired, then continue with implementation.
+
+Register new constraint C44 in `src/Precept/Dsl/DiagnosticCatalog.cs` for non-boolean rule positions. The checker currently infers guard/assert expression types but doesn’t enforce that the result is boolean. Add a check after `TryInferExpressionKind()` returns for `when` guards, `invariant`, `in/to/from assert`, and `on assert` expressions: if the inferred kind doesn’t include `StaticValueKind.Boolean`, emit C44.
 
 The validation positions are spread across `ValidateTransitionRows()` (for `when` guards), and the invariant/assert validation loops. Search for where `row.WhenGuard` is validated and where assert expressions are checked.
 
@@ -198,6 +204,8 @@ Add a C46 trigger fixture to `test/Precept.Tests/CatalogDriftTests.cs`. Add test
 
 **Implementation prompt:**
 
+Before making changes in a new Copilot Chat session, read the relevant design sections and this phase in full, then pause and recommend the most appropriate model for the work before continuing. Suggest `GPT-5.4` for balanced cross-file implementation, `Claude Sonnet` for faster medium-complexity edits, or `Claude Opus` for heavier design analysis or broader refactors. Let the user switch models if desired, then continue with implementation.
+
 Register new constraint C47 in `src/Precept/Dsl/DiagnosticCatalog.cs` (renamed from `ConstraintCatalog.cs` in CV Phase 2) for identical-guard duplicate rows. The detection site is `PreceptTypeChecker.ValidateTransitionRows()` in `src/Precept/Dsl/PreceptTypeChecker.cs`, which already iterates rows grouped by `(state, event)` in source-line order. Before processing each row, compare its `WhenText` (or normalized AST) against prior rows in the same group. If an identical guard is found, emit C47.
 
 Non-nullable `== null` is already covered by Phase D (C41). Post-narrowing null contradictions are automatically caught because cross-row narrowing strips the `Null` flag, and then Phase D’s equality check rejects `NonNullableField == null`.
@@ -215,9 +223,11 @@ Use normalized `WhenText` comparison (trimmed, whitespace-collapsed) rather than
 
 **Implementation prompt:**
 
+Before making changes in a new Copilot Chat session, read the relevant design sections and this phase in full, then pause and recommend the most appropriate model for the work before continuing. Suggest `GPT-5.4` for balanced cross-file implementation, `Claude Sonnet` for faster medium-complexity edits, or `Claude Opus` for heavier design analysis or broader refactors. Let the user switch models if desired, then continue with implementation.
+
 After Phases D–G are complete, do a sweep:
 
-1. **Analyzer severity fix:** `MapTypeDiagnostic()` in `tools/Precept.LanguageServer/PreceptAnalyzer.cs` (~line 956) hardcodes `DiagnosticSeverity.Error`. Change it to read `diagnostic.Constraint.Severity` and map `ConstraintSeverity.Warning` to `DiagnosticSeverity.Warning`. This connects the `ConstraintSeverity` enum (already in `ConstraintCatalog.cs`) to LSP reporting.
+1. **Analyzer severity fix:** `MapValidationDiagnostic()` in `tools/Precept.LanguageServer/PreceptAnalyzer.cs` (~line 956) hardcodes `DiagnosticSeverity.Error`. Change it to read `diagnostic.Constraint.Severity` and map `ConstraintSeverity.Warning` to `DiagnosticSeverity.Warning`. This connects the `ConstraintSeverity` enum (already in `DiagnosticCatalog.cs`) to LSP reporting.
 
 2. **Completion filtering:** Verify that `PreceptAnalyzer.GetCompletions()` still produces correctly filtered candidates after the equality and scope changes. The typed-set-RHS and collection-value completions use `PreceptTypeContext` — confirm they still work with the tighter symbol tables.
 
@@ -226,6 +236,129 @@ After Phases D–G are complete, do a sweep:
 4. **README sync:** Review `README.md` for any claims about equality semantics, event-arg access, or diagnostic behavior that need updating.
 
 5. **Run the full suite** (all 3 test projects) and confirm green before committing.
+
+### Phase I: Graph Analysis Warning Diagnostics
+
+**Status:** Not yet implemented
+**Prerequisite:** Phases D–H complete (type checker expansion, severity mapping fix)
+
+**Goal:** Finish the compiler pipeline cleanup needed for graph diagnostics: remove throw-based compile validation, register warning-severity and hint-severity graph diagnostics in core, add declaration source anchoring, and expose a composed compile-from-text pipeline. This completes the diagnostic severity model described in `PreceptLanguageDesign.md` § Diagnostic severity policy and makes tooling consume one structured validation result instead of mixing diagnostics with exception parsing.
+
+**New constraint IDs:**
+
+| Code | Severity | Finding | Message Template |
+|---|---|---|---|
+| C48 | Warning | Unreachable state | "State '{State}' is unreachable from the initial state." |
+| C49 | Warning | Orphaned event | "Event '{Event}' is declared but never referenced in any transition row." |
+| C50 | Hint | Dead-end state | "State '{State}' has outgoing transitions but all reject or no-transition — no path forward." |
+| C51 | Warning | Reject-only pair | "Every transition row for ({State}, {Event}) ends in reject — the event can never succeed from this state. Remove the rows and let Undefined handle it." |
+| C52 | Warning | Event never succeeds | "Event '{Event}' can never succeed from any reachable state — every reachable state either has no rows or all rows reject for that event." |
+| C53 | Hint | Empty precept | "Precept '{Name}' declares no events." |
+
+**Implementation steps:**
+
+1. **Refactor compile validation into `Validate()`** — move the remaining throw-based compile checks in `src/Precept/Dsl/PreceptRuntime.cs` into structured diagnostic collection:
+    - C29 invariant violations against default data
+    - C30 initial-state assert violations against default data
+    - C31 event-assert violations against default argument defaults
+    - C32 literal set assignments that violate invariants
+    - C44 duplicate state asserts
+    - C45 subsumed `to` assert when identical `in` assert exists
+    `Compile()` remains as a thin wrapper that throws only if `Validate()` reports error-severity diagnostics.
+
+2. **Fix diagnostic result semantics** — `ValidationResult.HasErrors` must key off `ConstraintSeverity.Error`, not `Diagnostics.Count > 0`. Warning/hint diagnostics must never block compilation.
+
+3. **Add declaration source metadata** — extend `PreceptDefinition`, `PreceptState`, and `PreceptEvent` with source-line information in `src/Precept/Dsl/PreceptModel.cs`, and populate those fields from `PreceptParser`. Graph diagnostics should anchor to declarations directly instead of re-deriving positions from raw text.
+
+4. **Register C48–C53 in `DiagnosticCatalog`** — six new `LanguageConstraint` entries with `ConstraintSeverity.Warning` (C48, C49, C51, C52) and `ConstraintSeverity.Hint` (C50, C53). Add the `Hint` member to the `ConstraintSeverity` enum.
+
+5. **Implement `PreceptAnalysis.Analyze(PreceptDefinition)`** in `src/Precept/Dsl/PreceptAnalysis.cs` — new static class with a single public method that performs:
+   - BFS from initial state → reachable states
+   - Unreachable states = all states − reachable (C48)
+   - Orphaned events = declared events not referenced in any transition row (C49)
+   - Dead-end states = non-terminal states where all outgoing rows have `NoTransition` or `Rejection` outcomes (C50)
+    - Reject-only pairs = (state, event) pairs where every row ends in `Rejection` (C51)
+    - Event never succeeds = events with at least one transition row where every reachable state either has no rows for that event or only reject rows (C52)
+    - Empty precept = `definition.Events.Count == 0` (C53)
+    - Terminal states in structured output (not a diagnostic)
+    - Returns `AnalysisResult` with structured findings plus graph diagnostics
+
+6. **Wire graph analysis into `Validate()`** — run `PreceptAnalysis.Analyze(model)` after type checking and compile-time default-data checks. Graph analysis should run whenever parsing succeeded and a model exists, even if type errors are present, but it must only emit structural findings that do not depend on successful expression evaluation.
+
+7. **Add `CompileFromText(string text)` to `PreceptCompiler`** — a composed pipeline that runs `ParseWithDiagnostics` → `Validate` → `PreceptEngine` construction when no blocking diagnostics exist. Return a structured result carrying:
+    - diagnostics only on parse failure
+    - parsed model + diagnostics on validation failure
+    - parsed model + compiled engine + diagnostics on success
+    Tooling should consume this structured result instead of parsing exception strings.
+
+8. **Update tooling consumers in the same pass** — the language server and MCP wrappers must consume the new structured validation/analysis result instead of keeping separate graph logic or regex-parsing compile exceptions.
+
+9. **Confirm language server severity mapping** — Phase H already fixed `MapValidationDiagnostic()` to read `Constraint.Severity`. Verify that Warning and Hint diagnostics appear correctly in the VS Code Problems panel with the right severity icons.
+
+**Tests:**
+
+- [ ] Fully connected graph → no C48–C53 diagnostics
+- [ ] Definition with unreachable state → C48 warning with state name
+- [ ] Definition with orphaned event → C49 warning with event name
+- [ ] Definition with dead-end state → C50 hint with state name
+- [ ] Definition with reject-only (state, event) pair → C51 warning
+- [ ] Definition with event that never succeeds from any reachable state → C52 warning
+- [ ] Empty precept (no events) → C53 hint
+- [ ] Terminal states (no outgoing transitions) → **not** flagged as dead-ends (terminal is intentional)
+- [ ] `from any` expansion → correctly marks all states as having outgoing transitions
+- [ ] Reject-only pair where some rows have guards and some don't → still C51 if all outcomes are reject
+- [ ] Event with reject-only pairs in some states but success in others → **not** C52
+- [ ] Warnings do not block compilation — `ValidationResult.HasErrors` remains false
+- [ ] Compile-time default-data violations (C29–C32) aggregate as diagnostics instead of failing fast via exceptions
+- [ ] Duplicate and subsumed state-assert violations (C44/C45) aggregate as diagnostics instead of failing fast via exceptions
+- [ ] `CompileFromText` returns engine + model + warnings on valid input
+- [ ] `CompileFromText` returns diagnostics only on parse failure
+- [ ] `CompileFromText` returns partial model + diagnostics on type errors
+- [ ] Catalog drift test covers C48–C53 trigger fixtures
+- [ ] Language server shows C48–C53 in Problems panel with correct severity
+- [ ] MCP validate/compile surfaces structured diagnostics without regex recovery from thrown messages
+
+**Implementation prompt:**
+
+Before making changes in a new Copilot Chat session, read the relevant design sections and this phase in full, then pause and recommend the most appropriate model for the work before continuing. Suggest `GPT-5.4` for balanced cross-file implementation, `Claude Sonnet` for faster medium-complexity edits, or `Claude Opus` for heavier design analysis or broader refactors. Let the user switch models if desired, then continue with implementation.
+
+1. **Add `ConstraintSeverity.Hint`** to the enum in `src/Precept/Dsl/DiagnosticCatalog.cs` and update the language server severity mapping.
+
+2. **Remove throw-based compile validation** from `PreceptCompiler.Validate()` by converting C29–C32 and C44/C45 into structured diagnostics collected during validation instead of `InvalidOperationException` control flow.
+
+3. **Register C48–C53** in `src/Precept/Dsl/DiagnosticCatalog.cs` after the existing C47 registration. Use `ConstraintSeverity.Warning` for C48, C49, C51, C52 and `ConstraintSeverity.Hint` for C50, C53.
+
+4. **Add declaration source lines** to `PreceptDefinition`, `PreceptState`, and `PreceptEvent`, and populate them in `PreceptParser` so graph diagnostics can anchor to declarations directly.
+
+5. **Create `src/Precept/Dsl/PreceptAnalysis.cs`** — a new static class with a single public method `Analyze(PreceptDefinition definition)` returning an `AnalysisResult` record with:
+    - BFS reachability
+    - unreachable states (C48)
+    - orphaned events (C49)
+    - dead-end states (C50)
+    - reject-only pairs (C51)
+    - events that never succeed (C52)
+    - empty precept hint (C53)
+    - terminal states in structured output only
+
+6. **Wire graph analysis into `PreceptCompiler.Validate()`** and ensure `ValidationResult.HasErrors` stays false for warning/hint-only results.
+
+7. **Add `CompileFromText(string text)`** to `PreceptCompiler` and make it the structured entry point for tooling. It should return diagnostics only on parse failure, parsed model + diagnostics on validation failure, and model + engine + diagnostics on success.
+
+8. **Update the language server and MCP wrappers** to consume `Validate()` / `CompileFromText()` directly. Remove duplicate graph diagnostics from the analyzer and stop parsing compile exception strings in MCP wrappers.
+
+9. **Add trigger fixtures and focused tests** for C48–C53, warning-only validation, aggregated compile-time diagnostics, and `CompileFromText` result shapes.
+
+Run all three test projects (`Precept.Tests`, `Precept.LanguageServer.Tests`, `Precept.Mcp.Tests`) before committing. Verify all 19 sample files still compile clean.
+
+**Checkpoint:**
+
+- `dotnet build` passes
+- All tests green (core + language server + MCP)
+- `precept_validate` MCP tool (current implementation) surfaces warning/hint diagnostics without exception parsing
+- VS Code Problems panel shows warning/hint icons for graph findings
+- All 19 sample files produce zero C51/C52 warnings (no sample uses reject-only anti-pattern)
+
+---
 
 ## Additional test coverage to add
 
@@ -275,6 +408,12 @@ Existing codes C38–C43 are stable and will not be split. The message text with
 |---|---|---|---|
 | C44 | Non-boolean rule position | F | `invariant`, `assert`, or `when` expression that doesn’t produce boolean |
 | C45 | Identical-guard duplicate row | G | Two rows for the same `(state, event)` with the same guard expression |
+| C48 | Unreachable state | I | State not reachable from initial via BFS |
+| C49 | Orphaned event | I | Event declared but never referenced in `from … on` rows |
+| C50 | Dead-end state | I | Non-terminal state where all outgoing transitions reject or no-transition |
+| C51 | Reject-only pair | I | Every row for a (state, event) pair ends in `reject` |
+| C52 | Event never succeeds | I | Event has rows but every reachable state either has no rows or all rows reject for that event |
+| C53 | Empty precept | I | Precept declares no events |
 
 **Reuse of existing codes:**
 
@@ -284,17 +423,17 @@ Existing codes C38–C43 are stable and will not be split. The message text with
 | C38 (unknown identifier) | Cross-event arg reference | `EventB.Arg` not in scope for `EventA` row — same resolution failure |
 | C41 (binary operator) | Incompatible equality operands | Same conceptual error as other binary operator type mismatches |
 
-Overhead per new code: ~6 lines total (4–5 in `ConstraintCatalog.cs`, 1–2 in `CatalogDriftTests.cs`). Language server and MCP tools require zero per-code changes.
+Overhead per new code: ~6 lines total (4–5 in `DiagnosticCatalog.cs`, 1–2 in `CatalogDriftTests.cs`). Language server and MCP tools require zero per-code changes.
 
 ### Diagnostic severity policy (Locked)
 
 All diagnostics follow the existing three-tier model already established in the language server:
 
 - **Error**: provably wrong — type contradictions, null-flow violations, structural impossibilities (unreachable rows, identical-guard duplicates). Blocks compilation.
-- **Warning**: probably wrong — structural quality observations from audit-style analysis (reject-only pairs, orphaned events, unreachable states, missing coverage). Does not block compilation.
+- **Warning**: probably wrong — structural quality observations from graph analysis (reject-only pairs, events that never succeed, orphaned events, unreachable states). Does not block compilation. **Key principle:** `reject` is for conditional denial within a state where some paths succeed. If an event can never succeed from a state, the rows should not exist — `Undefined` is the correct outcome. Writing reject-only rows for structurally unavailable events is an anti-pattern (see `PreceptLanguageDesign.md` § Reject vs Undefined).
 - **Hint**: informational — dead-end states, empty precepts.
 
-The `ConstraintSeverity` enum in `ConstraintCatalog` already supports `Error` and `Warning`. The `MapTypeDiagnostic` method in the analyzer should respect `Constraint.Severity` rather than hardcoding `Error`. New type-checker diagnostics that are provable contradictions use `Error`; any future structural-quality diagnostics promoted from the analyzer to the checker should use `Warning`.
+The `ConstraintSeverity` enum in `DiagnosticCatalog` already supports `Error`, `Warning`, and `Hint`. The `MapValidationDiagnostic` method in the analyzer should respect `Constraint.Severity` rather than hardcoding `Error`. New type-checker diagnostics that are provable contradictions use `Error`; any future structural-quality diagnostics promoted from the analyzer to the checker should use `Warning` or `Hint` as appropriate.
 
 ### Mandatory vs. Advisory
 
@@ -310,7 +449,7 @@ This plan contains two kinds of guidance — know which is which:
 - **Preserve list** — files marked "unchanged" must not be modified.
 
 **Advisory (one reasonable approach — adapt freely):**
-- **Catalog infrastructure patterns** — `ConstructCatalog.Register`, `ConstraintCatalog`, `// SYNC:CONSTRAINT:Cnn` markers, `MessageTemplate` with placeholders. The *requirement* is that parser constructs and semantic constraints are introspectable at runtime (for language server features and future MCP serialization). The specific C# patterns shown are suggestions. If a simpler approach emerges (static arrays, source generators, well-organized constants), use it.
+- **Catalog infrastructure patterns** — `ConstructCatalog.Register`, `DiagnosticCatalog`, `// SYNC:CONSTRAINT:Cnn` markers, `MessageTemplate` with placeholders. The *requirement* is that parser constructs and semantic constraints are introspectable at runtime (for language server features and future MCP serialization). The specific C# patterns shown are suggestions. If a simpler approach emerges (static arrays, source generators, well-organized constants), use it.
 - **Superpower-specific techniques** — `Parse.Chain` for precedence, keyword recognition callbacks, tokenizer rule ordering. These describe how Superpower *probably* works based on documentation. If the actual API differs or offers better patterns, follow the library, not this plan.
 - **Language server implementation details** — attribute-driven `SemanticTypeMap`, `BuildFromAttributes()` reflection, the `Previous token(s) → Suggest` lookup table. These are one approach. The *requirement* is that semantic tokens and completions derive from the token stream (not regex). How that mapping is structured is flexible.
 - **Error recovery strategy** — "Skip to next statement-starting keyword" is a reasonable heuristic, but Superpower may have its own error recovery patterns that work better.
@@ -668,7 +807,7 @@ Consumers:
 
 Semantic constraints are declared as data alongside their enforcement code. This is **core infrastructure** — not MCP-specific. The constraint descriptions serve as error messages, power language server diagnostics, and are serialized by the MCP `precept_language` tool.
 
-**New file:** `src/Precept/Dsl/ConstraintCatalog.cs`
+**New file:** `src/Precept/Dsl/DiagnosticCatalog.cs`
 
 ```csharp
 public sealed record LanguageConstraint(
@@ -680,7 +819,7 @@ public sealed record LanguageConstraint(
 
 public enum ConstraintSeverity { Error, Warning }
 
-public static class ConstraintCatalog
+public static class DiagnosticCatalog
 {
     private static readonly List<LanguageConstraint> _constraints = [];
     public static IReadOnlyList<LanguageConstraint> Constraints => _constraints;
@@ -700,7 +839,7 @@ Usage at each enforcement point in parser/compiler/engine:
 
 ```csharp
 // SYNC:CONSTRAINT:C7
-static readonly LanguageConstraint C7 = ConstraintCatalog.Register(
+static readonly LanguageConstraint C7 = DiagnosticCatalog.Register(
     "C7", "parse",
     "Non-nullable fields without 'default' are a parse error.",
     "Field '{fieldName}' is non-nullable and has no default value.");
@@ -712,7 +851,7 @@ if (!field.HasDefault && !field.IsNullable)
 Consumers:
 - **Parser/compiler/engine error messages:** `MessageTemplate` with contextual placeholders IS the error message — the `Rule` property provides the general description, while the template produces the specific diagnostic. No duplication.
 - **Language server diagnostics:** Each diagnostic carries a stable code (`C7` → `PRECEPT007`), the constraint's `Severity` mapped to LSP `DiagnosticSeverity`, and the formatted message. The `Rule` is available as supplementary detail.
-- **MCP `precept_language`:** Serializes `ConstraintCatalog.Constraints` directly (ID, phase, rule)
+- **MCP `precept_language`:** Serializes `DiagnosticCatalog.Constraints` directly (ID, phase, rule)
 - **`// SYNC:CONSTRAINT:Cnn` comments:** Copilot-visible markers at each enforcement point
 
 Drift defense:
@@ -816,7 +955,7 @@ else (state transition):
 - [ ] Constraint catalog: every registered constraint has a violating input that triggers the expected error
 - [ ] Constraint catalog: every `// SYNC:CONSTRAINT:Cnn` comment has a matching registry entry, and vice versa
 - [ ] Token attributes: every `PreceptToken` member has `[TokenCategory]` and `[TokenDescription]`; keyword/operator/punctuation members have `[TokenSymbol]`
-- [ ] Documentation constraints match: constraint list in `docs/DesignNotes.md § DSL Syntax Contract` matches `ConstraintCatalog.Constraints` (same IDs, same rules)
+- [ ] Documentation constraints match: constraint list in `docs/DesignNotes.md § DSL Syntax Contract` matches `DiagnosticCatalog.Constraints` (same IDs, same rules)
 - [ ] Reference sample coverage: at least one `.precept` sample file uses every construct registered in `ConstructCatalog`
 - [ ] Equality rule matrix and null-comparison coverage once the comparison policy is locked
 - [ ] Event-arg narrowing and event-assert scope-isolation coverage
@@ -1079,11 +1218,11 @@ Add these **new sections**:
 **Catalog Sync (Non-Negotiable):**
 - When adding a keyword to `PreceptToken`: add `[TokenCategory]`, `[TokenDescription]`, and `[TokenSymbol]` attributes. This auto-updates the tokenizer keyword dictionary, semantic tokens, and completions.
 - When adding a parser construct: call `.Register()` with a `ConstructInfo` that includes a parseable `Example`. The example is validated by CI tests.
-- When adding or modifying a semantic constraint: call `ConstraintCatalog.Register()` with ID, phase, rule, `MessageTemplate`, and `Severity`. Add a `// SYNC:CONSTRAINT:Cnn` comment at the enforcement site. Never add one without the other.
+- When adding or modifying a semantic constraint: call `DiagnosticCatalog.Register()` with ID, phase, rule, `MessageTemplate`, and `Severity`. Add a `// SYNC:CONSTRAINT:Cnn` comment at the enforcement site. Never add one without the other.
 - When modifying a constraint's `Rule` text: update the matching entry in `docs/DesignNotes.md § DSL Syntax Contract` — the documentation-match test enforces parity.
 
 **SYNC Comment Rule:**
-- Every `// SYNC:CONSTRAINT:Cnn` comment must have a matching `ConstraintCatalog.Register()` call, and vice versa. CI tests enforce both directions.
+- Every `// SYNC:CONSTRAINT:Cnn` comment must have a matching `DiagnosticCatalog.Register()` call, and vice versa. CI tests enforce both directions.
 
 ### Checkpoint
 
@@ -1102,7 +1241,7 @@ Add these **new sections**:
 | `src/Precept/Dsl/PreceptToken.cs` | **New** — token enum with `[TokenCategory]`/`[TokenDescription]` attributes | 1 |
 | `src/Precept/Dsl/PreceptTokenizer.cs` | **New** | 1 |
 | `src/Precept/Dsl/ConstructCatalog.cs` | **New** — parser construct registry (core infrastructure) | 3 |
-| `src/Precept/Dsl/ConstraintCatalog.cs` | **New** — semantic constraint registry (core infrastructure) | 4 |
+| `src/Precept/Dsl/DiagnosticCatalog.cs` | **New** — semantic constraint registry (core infrastructure) | 4 |
 | `src/Precept/Dsl/PreceptModel.cs` | **Major edit** — new records, remove `DslRule`/`DslClause`/`DslTransition` | 2 |
 | `src/Precept/Dsl/PreceptParser.cs` | **Full rewrite** — Superpower combinators | 3 |
 | `src/Precept/Dsl/PreceptExpressionParser.cs` | **Remove** — expressions integrated into parser | 3 |
@@ -1183,7 +1322,7 @@ Three core infrastructure components from this plan directly support the MCP ser
 
 1. **Token enum attributes** (Phase 1) — `[TokenCategory]`, `[TokenDescription]`, and `[TokenSymbol]` on each `PreceptToken` member. Used by the tokenizer keyword dictionary, language server completions/semantic tokens, and reflected by MCP `precept_language` for vocabulary.
 2. **Construct catalog** (Phase 3) — `ConstructCatalog` registered alongside parser combinators. Used by parser error messages, language server hovers/completions, and serialized by MCP `precept_language` for construct forms.
-3. **Constraint catalog** (Phase 4) — `ConstraintCatalog` registered alongside enforcement code, with `MessageTemplate` and `Severity` properties. Used as error message templates (with contextual placeholders) and diagnostic codes in the parser/compiler/engine/language server, and serialized by MCP `precept_language` for semantic rules.
+3. **Constraint catalog** (Phase 4) — `DiagnosticCatalog` registered alongside enforcement code, with `MessageTemplate` and `Severity` properties. Used as error message templates (with contextual placeholders) and diagnostic codes in the parser/compiler/engine/language server, and serialized by MCP `precept_language` for semantic rules.
 
 See `docs/CatalogInfrastructureDesign.md` for the full architecture rationale, consumer matrix, and drift defense strategy.
 
@@ -1331,7 +1470,7 @@ Remove `rule` keyword from `KeywordItems` (line ~1552, marked "Legacy (block-syn
 
 ### Deviations from Plan
 
-1. **ConstructCatalog / ConstraintCatalog not implemented.** The plan called for runtime registries with `Register()` calls and `// SYNC:CONSTRAINT:Cnn` markers (advisory). Constraints are enforced inline in the parser and runtime without a separate catalog layer. This infrastructure can be added later if needed for MCP server serialization.
+1. **ConstructCatalog / DiagnosticCatalog not implemented.** The original plan called for runtime registries with `Register()` calls and `// SYNC:CONSTRAINT:Cnn` markers (advisory). That later changed: both catalogs are now implemented in core and are used by the parser, runtime, language server, and MCP tooling.
 
 2. **Expression parser fully integrated (resolved in Phase 10).** The plan called for removing the separate expression parser and integrating expressions into the Superpower parser. Through Phases 3–9 the expression combinators (`BoolExpr`, `Factor`, `Term`, etc.) lived in `PreceptParser.cs` as Superpower combinators, with the legacy archive files (`PreceptExpressionParser.cs.bak`, `PreceptLegacyExpressionParser.cs`) retained. Phase 10 deleted all archive/legacy expression parser files. No separate expression parser module exists — expressions are fully inline in `PreceptParser.cs`.
 
@@ -1368,6 +1507,8 @@ Use this prompt to begin implementation in a new Copilot Chat session:
 > 4. `docs/RuntimeApiDesign.md` — the current runtime API surface and fire pipeline (what to preserve vs. update)
 > 5. `.github/copilot-instructions.md` — mandatory sync rules for docs, grammar, intellisense, and syntax highlighting
 >
+> After reading those documents, pause before editing and recommend the most appropriate implementation model to the user. Suggest `GPT-5.4` for balanced cross-file implementation, `Claude Sonnet` for faster medium-complexity edits, or `Claude Opus` for heavier design analysis or broader refactors. Let the user switch models in Copilot if desired, then continue.
+>
 > Then:
 >
 > 1. Create a new branch `feature/language-redesign` from the current HEAD.
@@ -1375,7 +1516,7 @@ Use this prompt to begin implementation in a new Copilot Chat session:
 > 3. Each phase must end with `dotnet build` passing before moving to the next.
 > 4. Follow the "tokenize once, consume everywhere" principle — the Superpower `TokenList<PreceptToken>` is the shared foundation for the parser, language server semantic tokens, completions, and diagnostics.
 > 5. Preserve the files listed in the Preserve List — do not modify `PreceptExpressionEvaluator.cs`, the `DslExpression` record hierarchy, `DslWorkflowInstance`, `DslFireResult`, or any file under `tools/Precept.VsCode/src/`.
-> 6. The three catalog tiers (token attributes, `ConstructCatalog`, `ConstraintCatalog`) are core infrastructure — they must have stable, serializable shapes because a future MCP server will reflect them. See `docs/McpServerDesign.md` for that context, but do not implement the MCP server in this branch.
+> 6. The three catalog tiers (token attributes, `ConstructCatalog`, `DiagnosticCatalog`) are core infrastructure — they must have stable, serializable shapes because a future MCP server will reflect them. See `docs/McpServerDesign.md` for that context, but do not implement the MCP server in this branch.
 > 7. The public runtime API (`PreceptEngine` methods, result types, `DslWorkflowInstance`) must not change signatures. Internal pipeline restructuring (first-match rows, preposition-scoped asserts, entry/exit actions) is expected.
 > 8. Include editable field declarations (`in <StateTarget> edit <FieldList>`) in the parser and model. The `Edit` token, `DslEditBlock` record, `EditDecl` parser combinator, and language server support (completions after `in ... edit`, semantic tokens for `edit` keyword and field references) are part of this redesign. The runtime `Update` API, `IUpdatePatchBuilder`, and inspect integration are **deferred** to a follow-on task — see `docs/EditableFieldsDesign.md` for the full runtime design.
 >

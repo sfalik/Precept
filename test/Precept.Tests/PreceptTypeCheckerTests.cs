@@ -686,7 +686,7 @@ public class PreceptTypeCheckerTests
         result.Diagnostics[0].Constraint.Id.Should().Be("C47");
     }
 
-    private static PreceptTypeCheckResult Check(string dsl)
+    private static TypeCheckResult Check(string dsl)
     {
         var model = PreceptParser.Parse(dsl);
         return PreceptTypeChecker.Check(model);

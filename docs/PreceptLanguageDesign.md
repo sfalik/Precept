@@ -1,12 +1,10 @@
-# Precept Language Design (Proposed)
+# Precept Language Design
 
 Date: 2026-03-05
 
-This document captures the **proposed** next-step surface syntax and semantics for the Precept DSL, based on the ongoing redesign discussion (goal: a parser/tooling-friendly grammar that does **not** rely on indentation/offside rules).
+This document captures the surface syntax and semantics for the Precept DSL — a parser/tooling-friendly grammar that does **not** rely on indentation/offside rules. The language described here is fully implemented and is the current DSL.
 
-This is **not** the current implemented DSL. The currently implemented language (regex/imperative parser) remains documented in `docs/DesignNotes.md` and `README.md`.
-
-Backwards compatibility is **not** a requirement for this design.
+Legacy documentation (`docs/archive/DesignNotes-legacy.md`, `docs/archive/README-legacy.md`) describes the earlier regex/imperative parser and is archived.
 
 ---
 
@@ -112,7 +110,7 @@ The language server uses this ordering for IntelliSense: it prioritizes completi
 
 - Lines starting with `#` are comments.
 - Blank lines are ignored.
-- Inline comments are allowed after a statement (exact lexical rule TBD, but intended to match the current implementation’s “strip inline comment” behavior).
+- Inline comments are allowed after a statement: `#` followed by any text to end-of-line. The tokenizer strips comments before parsing.
 
 ---
 
@@ -288,18 +286,17 @@ field Email as string nullable
 field Tags as set of string default ["priority", "vip"]
 ```
 
-### Field invariants (Proposed; reasons required)
+### Field invariants (Locked)
 
-We keep data integrity rules adjacent to fields.
+Data integrity rules live adjacent to fields.
 
 Form:
 
 - `invariant <BoolExpr> because "<Reason>"`
 
 Notes:
-- Intended meaning: evaluated after a successful transition/mutation commit; if false, the event is rejected with the given reason.
-- Scope (what identifiers are allowed inside `<BoolExpr>`) is proposed as:
-  - identifiers may reference any declared field names (including collection fields, via their accessors like `.count`).
+- Evaluated after a successful transition/mutation commit; if false, the event is rejected with the given reason.
+- Scope: `<BoolExpr>` may reference any declared field names (including collection fields, via their accessors like `.count`).
 
 Example:
 
@@ -317,8 +314,6 @@ field MaxAmount as number default 100
 invariant MaxAmount >= MinAmount because "MaxAmount must be >= MinAmount"
 ```
 
-Open question:
-- Should invariants be required to appear *after* all field declarations (for simpler parsing and clearer “declaration then constraints” flow), or can they be interleaved freely?
 
 ---
 
@@ -436,7 +431,7 @@ Disambiguation:
 
 ---
 
-## Editable Fields (Locked: syntax only — runtime deferred)
+## Editable Fields (Locked)
 
 Editable field declarations specify which fields can be modified directly (via the runtime `Update` API) while residing in a state. They use the `in` preposition because editability is about what you can do **while in** a state — consistent with `in <State> assert` (state-scoped invariants).
 
@@ -499,9 +494,9 @@ public sealed record DslEditBlock(
 
 `DslWorkflowModel` gains an optional `IReadOnlyList<DslEditBlock>? EditBlocks` property.
 
-### Runtime (deferred)
+### Runtime
 
-The runtime `Update` API, `IUpdatePatchBuilder`, validation pipeline, and inspect integration are defined in `docs/EditableFieldsDesign.md` and will be implemented as a follow-on task after the language redesign lands. The parser and model support for `in <State> edit` is included in the language redesign to avoid a second breaking change to the tokenizer/parser/LS pipeline.
+The runtime `Update` API, `IUpdatePatchBuilder`, validation pipeline, and inspect integration are fully implemented. See `docs/EditableFieldsDesign.md` for the design.
 
 ---
 
@@ -543,7 +538,7 @@ Form:
 - `on <EventName> assert <BoolExpr> because "<Reason>"`
 
 Uniqueness:
-- At most one `on <EventName> assert` per event name.
+- Multiple `on <EventName> assert` statements are allowed for the same event — all are evaluated, and any failure rejects the event.
 
 Scope (Locked):
 - `<BoolExpr>` may reference **only** that event’s argument identifiers.
@@ -651,6 +646,23 @@ If Row 1's `when` is true, it wins. Otherwise Row 2 (no `when`) catches the rest
 
 `Unmatched` is **terminal** — the Inspect API uses it to signal "this event doesn't apply right now."
 
+#### Reject vs Undefined: when to use which (Locked)
+
+`reject` is for **conditional denial** — the event has transition rows for this state, some paths succeed, but a specific input combination is rejected with a reason:
+
+```precept
+from Submitted on Cancel when Cancel.reason == "fraud"
+    -> set Balance = 0 -> transition Canceled
+from Submitted on Cancel
+    -> reject "Only fraud cancellation allowed from Submitted"
+```
+
+`reject` is **not** for declaring that an event is structurally unavailable in a state. If an event can never succeed from a state regardless of input, the correct design is to have **no transition rows** for that (state, event) pair — letting the result be `Undefined`. Writing `from Draft on Approve -> reject "Cannot approve from Draft"` is an anti-pattern: it is strictly worse than omitting the row, because it adds maintenance burden, clutters the transition table, obscures the event's actual reachability, and delivers no functional value over `Undefined`.
+
+The analyzer enforces this:
+- **C51 (Warning):** A (state, event) pair where every row ends in `reject` — the event can structurally never succeed from that state. Remove the rows and let `Undefined` handle it.
+- **C52 (Warning):** An event where every reachable state either has no rows or all rows reject for that event — the event can never succeed from any reachable state.
+
 ### Actions (mutation vocabulary)
 
 | Action | Form |
@@ -690,15 +702,22 @@ For `no transition`: steps 3 and 5 are skipped (no state change). `in <State>` a
 
 ### Compile-time checks
 
-| Check | Condition | Severity |
-|---|---|---|
-| Coverage | Reachable `(state, event)` pair has no transition rows | Warning |
-| Unreachable row | A row follows an unguarded row for the same `(state, event)` | Error |
-| Identical-guard duplicate | A row has the same guard as a prior row for the same `(state, event)` (C47) | Error |
-| Non-boolean rule position | `when` guard, `invariant`, or `assert` expression does not produce a boolean (C46) | Error |
-| Missing outcome | Row has no outcome (`transition`, `no transition`, or `reject`) | Error |
-| Unknown state/event | `from` references undeclared state; `on` references undeclared event | Error |
-| Unknown field | `set` targets undeclared field; mutation targets non-collection field | Error |
+| Check | Condition | Severity | ID |
+|---|---|---|---|
+| Unreachable row | A row follows an unguarded row for the same `(state, event)` | Error | C25 |
+| Identical-guard duplicate | A row has the same guard as a prior row for the same `(state, event)` | Error | C47 |
+| Non-boolean rule position | `when` guard, `invariant`, or `assert` expression does not produce a boolean | Error | C46 |
+| Missing outcome | Row has no outcome (`transition`, `no transition`, or `reject`) | Error | C10 |
+| Unknown state/event | `from` references undeclared state; `on` references undeclared event | Error | — |
+| Unknown field | `set` targets undeclared field; mutation targets non-collection field | Error | — |
+| Unreachable state | State cannot be reached from the initial state by any transition path | Warning | C48 |
+| Orphaned event | Event declared but never referenced in any `from … on` transition row | Warning | C49 |
+| Dead-end state | Non-terminal state where all outgoing transitions reject or no-transition | Hint | C50 |
+| Reject-only pair | Every row for a (state, event) pair ends in `reject` — event can never succeed from this state | Warning | C51 |
+| Event never succeeds | Event has rows but every reachable state either has no rows or all rows reject for that event | Warning | C52 |
+| Empty precept | Precept declares no events | Hint | C53 |
+
+Checks C48–C53 are graph-level structural analysis, evaluated after parsing succeeds as part of structured compile validation. They do not block compilation unless an error-severity diagnostic is also present — they are advisory diagnostics that surface structural quality issues in the VS Code Problems panel and in MCP tool output. See Phase I in `PreceptLanguageImplementationPlan.md` for implementation details.
 
 No catch-all row is required — if all guarded rows fail, the result is `Unmatched`.
 
@@ -709,10 +728,20 @@ All diagnostics follow a three-tier severity model:
 | Severity | Meaning | Examples |
 |---|---|---|
 | **Error** | Provably wrong — the checker can prove a contradiction from types, null-flow, or structural rules. Blocks compilation. | Type mismatches (C39–C41), null-flow violations (C42), unknown identifiers (C38), non-boolean rule positions (C46), identical-guard duplicates (C47), unreachable rows, missing outcomes |
-| **Warning** | Probably wrong — structural quality issue that is almost certainly a mistake but could be intentional. Does not block compilation. | Reject-only state/event pairs, events that never succeed, unreachable states, orphaned events, missing coverage |
-| **Hint** | Informational — observation that may or may not indicate a problem. | Dead-end states, empty precept (no events) |
+| **Warning** | Probably wrong — structural quality issue that is almost certainly a mistake but could be intentional. Does not block compilation. | Reject-only (state, event) pairs (C51), events that never succeed (C52), unreachable states (C48), orphaned events (C49) |
+| **Hint** | Informational — observation that may or may not indicate a problem. | Dead-end states (C50), empty precept (C53) |
 
 The rule: if the checker can **prove** it, it’s an **error**. If the analyzer can **observe** a structural concern, it’s a **warning** or **hint**. The checker never guesses — uncertain cases are left to the inspector.
+
+### Validation pipeline (Locked)
+
+Compile-time validation is fully structured:
+
+1. Parse text into a `PreceptDefinition` plus parse diagnostics.
+2. Run shared compile validation, which collects type diagnostics, compile-time default-data/assert diagnostics, and graph diagnostics in one pass.
+3. Only construct `PreceptEngine` when no error-severity diagnostics exist.
+
+Expected author mistakes are reported as diagnostics, not as exception-driven control flow. `Compile()` may still throw as a convenience wrapper, but tooling surfaces (`CompileFromText`, language server, MCP) consume structured diagnostics directly.
 
 ### Focused example
 
@@ -756,7 +785,7 @@ from Signing on RecordSignature
 
 ---
 
-## Minimal Example (Proposed)
+## Minimal Example
 
 ```precept
 precept Order

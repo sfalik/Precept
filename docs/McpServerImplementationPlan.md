@@ -4,6 +4,8 @@ Date: 2025-03-05
 Spec: `docs/McpServerDesign.md`
 Prerequisite: Language redesign complete (`docs/PreceptLanguageImplementationPlan.md` — all 9 phases)
 
+> **Status (2026-03-26):** Phases 0–6 are implemented — the original 6-tool surface (validate, schema, audit, run, language, inspect) is live and tested. The MCP Redesign Phase below replaces that surface with 4 tools accepting text input and returning structured feedback. Phases 7–9 have been updated to reflect the new tool names.
+
 This plan builds the MCP server as a new project in `tools/Precept.Mcp/`. Each phase adds one tool, fully tested, before moving to the next. The core `src/Precept/` infrastructure (catalogs, parser, runtime) is already in place from the language redesign — this plan only adds tool wrappers and MCP transport.
 
 Planning update (2026-03-22): the distribution phases now target an **agent plugin** for MCP server, custom agent, and skills — instead of the earlier approach where the VS Code extension bundled MCP and scaffolded skills into the workspace. The plugin model eliminates all scaffolding; Copilot discovers plugin-provided agents, skills, and MCP servers automatically. The VS Code extension retains only editor features (language server, syntax highlighting, preview panel, commands).
@@ -319,6 +321,87 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 
 ---
 
+## MCP Redesign Phase: 6→4 Tools with Text Input
+
+> **Prerequisite:** Language Phase I (Graph Analysis Warning Diagnostics — C48–C53 plus structured compile validation cleanup) from `PreceptLanguageImplementationPlan.md`
+
+**Goal:** Replace the 6-tool surface (validate, schema, audit, run, language, inspect) with 4 tools (`precept_language`, `precept_compile`, `precept_inspect`, `precept_run`) that accept inline text, return structured diagnostics and violations, and enforce the thin-wrapper principle. See `McpServerDesign.md` for the full redesign spec.
+
+### Scope
+
+1. **New core API:** `PreceptCompiler.CompileFromText(string text)` — a composed pipeline that runs parse → type-check → graph analysis → compile, returning a single result with the compiled definition (if successful), partial model (on type errors), and all diagnostics.
+2. **New shared DTOs:** `DiagnosticDto` (line, column, message, code, severity), `ViolationDto` (message, source, targets), `ViolationSourceDto`, `ViolationTargetDto`.
+3. **Replace tool files:**
+   - `ValidateTool.cs` + `SchemaTool.cs` + `AuditTool.cs` → `CompileTool.cs`
+   - `InspectTool.cs` → rewritten to delegate to `engine.Inspect()` instead of reimplementing the inspection loop
+   - `RunTool.cs` → updated for text input and structured `ViolationDto` output
+   - `LanguageTool.cs` → unchanged (no file input)
+4. **Update all tests:** Rewrite test files to match new tool signatures, input shapes, and output DTOs.
+5. **Switch input contract:** All tools that previously took `string path` now take `string text`.
+
+### Steps
+
+- [ ] Implement `PreceptCompiler.CompileFromText(text)` in core (`src/Precept/Dsl/`)
+- [ ] Add `ConstraintSeverity.Hint` to the severity enum
+- [ ] Implement graph analysis (C48–C53) in `PreceptAnalysis.Analyze()` and consume the structured validation result instead of exception parsing
+- [ ] Wire graph analysis into `CompileFromText` so warnings appear alongside type-check errors
+- [ ] Create shared DTO types in `tools/Precept.Mcp/Dtos/`
+- [ ] Implement `CompileTool.cs` — merges validate + schema + audit; returns full model + diagnostics
+- [ ] Rewrite `InspectTool.cs` — delegate to `engine.Inspect()`, project `InspectionResult` to DTOs
+- [ ] Update `RunTool.cs` — text input, structured `ViolationDto` per step
+- [ ] Delete `ValidateTool.cs`, `SchemaTool.cs`, `AuditTool.cs`
+- [ ] Rewrite test files for the new 4-tool surface
+- [ ] Update `Program.cs` if any registration changes are needed
+- [ ] Verify language server diagnostic mapping still works (LS calls same core APIs)
+
+### Tests
+
+- [ ] `precept_compile`: valid input → full schema + zero diagnostics
+- [ ] `precept_compile`: type errors → partial schema + error-severity diagnostics with codes
+- [ ] `precept_compile`: parse failure → diagnostics only, no schema
+- [ ] `precept_compile`: unreachable state → warning-severity diagnostic (C48)
+- [ ] `precept_compile`: orphaned event → warning-severity diagnostic (C49)
+- [ ] `precept_compile`: dead-end state → hint-severity diagnostic (C50)
+- [ ] `precept_inspect`: text input + state + data → structured event outcomes with `ViolationDto`
+- [ ] `precept_inspect`: requires-args detection → `requiredArgs` reported
+- [ ] `precept_inspect`: compile errors in text → diagnostics, no runtime results
+- [ ] `precept_run`: text input + steps → step-by-step outcomes with `ViolationDto` arrays
+- [ ] `precept_run`: compile errors in text → diagnostics, no execution
+- [ ] `precept_run`: constraint failure mid-sequence → `abortedAt` set, structured violations on failing step
+- [ ] `precept_language`: unchanged behavior (regression)
+
+### Checkpoint
+
+- `dotnet build` passes (entire solution)
+- All MCP tool tests green with new 4-tool surface
+- `precept_compile` returns warnings and hints alongside errors
+- `ViolationDto` preserves full `ConstraintViolation` structure (source hierarchy + targets)
+- No domain logic in tool files beyond DTO projection
+
+### Redesign implementation prompt
+
+Use this prompt to execute the redesign phase in a new Copilot Chat session:
+
+> Implement the MCP redesign in `docs/McpServerImplementationPlan.md` under `MCP Redesign Phase: 6→4 Tools with Text Input`, using `docs/McpServerDesign.md` as the external contract.
+>
+> Prerequisite: `docs/PreceptLanguageImplementationPlan.md` Phase I must already be complete, including C48–C53 diagnostics, `ConstraintSeverity.Hint`, `PreceptAnalysis.Analyze()`, structured compile validation, and `PreceptCompiler.CompileFromText(string text)`.
+>
+> Before making changes, read the redesign phase and the linked design doc in full, then pause and recommend the most appropriate model for the work. Suggest `GPT-5.4` for balanced cross-file implementation, `Claude Sonnet` for faster medium-complexity edits, or `Claude Opus` for heavier design analysis or broader refactors. Let the user switch models in Copilot if desired, then continue.
+>
+> Then:
+>
+> 1. Replace the old validate/schema/audit tool surface with `precept_compile`.
+> 2. Keep tool files as thin wrappers; domain logic belongs in `src/Precept/`.
+> 3. Use text input for all file-backed tools.
+> 4. Introduce shared DTOs for diagnostics and violations in `tools/Precept.Mcp/Dtos/`.
+> 5. Rewrite `InspectTool.cs` to delegate to `engine.Inspect()`.
+> 6. Update `RunTool.cs` for structured `ViolationDto` output.
+> 7. Delete obsolete tool files after replacement coverage exists.
+> 8. Rewrite MCP tests to match the new 4-tool surface.
+> 9. End with `dotnet build` and all MCP tests passing.
+
+---
+
 ## Phase 7: Agent Plugin Structure + MCP Packaging
 
 **Goal:** Create the agent plugin directory structure with MCP server binaries, so the six tools are callable by Copilot with zero manual setup after plugin installation.
@@ -355,16 +438,30 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 - [x] Rename existing extension tasks: `extension: loop local install` → `extension: install`, `extension: loop local uninstall` → `extension: uninstall` *(already implemented)*
 - [x] Remove the `extension: watch` task (unused in the local install loop) *(already implemented)*
 - [ ] Test locally using `chat.pluginLocations` setting pointing to the plugin directory
-- [ ] Verify Copilot lists all 6 precept tools from the plugin's MCP server
+- [ ] Verify Copilot lists all 4 precept tools from the plugin's MCP server
 - [ ] Test with at least 2 sample files per tool
 
 ### Checkpoint
 
 - Plugin loads without errors when registered via `chat.pluginLocations`
-- Copilot lists 6 precept tools from the plugin's MCP server
-- `precept_validate`, `precept_schema`, and `precept_run` produce correct results
+- Copilot lists 4 precept tools from the plugin's MCP server
+- `precept_compile`, `precept_inspect`, and `precept_run` produce correct results
 - Dev tasks (`extension: install`, `extension: uninstall`, `plugin: enable`, `plugin: disable`) work correctly
 - `.vscode/mcp.json` references the moved launcher at `tools/scripts/start-precept-mcp.js`
+
+### Phase 7 implementation prompt
+
+Use this prompt to execute Phase 7 in a new Copilot Chat session:
+
+> Implement Phase 7 in `docs/McpServerImplementationPlan.md`: `Agent Plugin Structure + MCP Packaging`.
+>
+> Before making changes, read the phase section and the related plugin/distribution guidance in full, then pause and recommend the most appropriate model for the work. Suggest `GPT-5.4` for balanced cross-file implementation, `Claude Sonnet` for faster medium-complexity edits, or `Claude Opus` for heavier design analysis or broader refactors. Let the user switch models in Copilot if desired, then continue.
+>
+> Create the plugin directory structure under `tools/Precept.Plugin/`, add `plugin.json`, add the dev `.mcp.json`, move the MCP launcher to `tools/scripts/start-precept-mcp.js`, and update local workspace wiring to load the plugin through `chat.pluginLocations`.
+>
+> Keep the existing completed task changes intact (`toggle-plugin.js`, renamed extension tasks, plugin enable/disable tasks). Only add the remaining missing structure and verify local loading.
+>
+> End with local verification that Copilot lists the Precept tools from the plugin MCP server.
 
 ---
 
@@ -376,17 +473,17 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 
 - [ ] Draft `agents/precept-author.md` with:
     - YAML frontmatter: name, description, tools restricted to `read`, `edit`, `search`, and all `precept/*` MCP tools
-    - Body instructions: opinionated authoring workflow, `precept_language` as DSL authority, mandatory validate → audit → inspect loop
+    - Body instructions: opinionated authoring workflow, `precept_language` as DSL authority, mandatory compile → inspect loop
     - Handoff to debugging skill for diagnosis workflows
 - [ ] Draft `skills/precept-authoring/SKILL.md` with:
     - Frontmatter: name `precept-authoring`, description with explicit trigger phrases
     - Body: step-by-step creation/editing workflow using MCP tools in prescribed order
     - Repo-agnostic: no assumption that `samples/` exists; prefer local `.precept` files for convention matching, fall back to `precept_language`
-    - Mermaid Diagrams section: after creating/editing a precept, include a `stateDiagram-v2` diagram of the resulting state machine; use `precept_schema` for transition data
+    - Mermaid Diagrams section: after creating/editing a precept, include a `stateDiagram-v2` diagram of the resulting state machine; use `precept_compile` for transition data
 - [ ] Draft `skills/precept-debugging/SKILL.md` with:
     - Frontmatter: name `precept-debugging`, description with explicit trigger phrases
-    - Body: diagnosis workflow using `precept_schema` → `precept_validate` → `precept_audit` → `precept_inspect` → `precept_run`
-    - Mermaid Diagrams section: when explaining structure or transition behavior, include a focused `stateDiagram-v2` showing only the relevant subset; annotate guards in brackets, mark reject branches, annotate audit findings (unreachable/dead-end states)
+    - Body: diagnosis workflow using `precept_compile` → `precept_inspect` → `precept_run`
+    - Mermaid Diagrams section: when explaining structure or transition behavior, include a focused `stateDiagram-v2` showing only the relevant subset; annotate guards in brackets, mark reject branches, annotate warning/hint findings (unreachable/dead-end states)
 - [ ] Validate all files against the [Agent Skills specification](https://agentskills.io/specification):
     - `name` lowercase kebab-case, matches parent directory, max 64 chars
     - `description` max 1024 chars, specific and trigger-oriented
@@ -402,6 +499,20 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 - Agent correctly restricts its tool set and follows the prescribed workflow
 - Skills are valid markdown with valid YAML frontmatter per agentskills.io spec
 
+### Phase 8 implementation prompt
+
+Use this prompt to execute Phase 8 in a new Copilot Chat session:
+
+> Implement Phase 8 in `docs/McpServerImplementationPlan.md`: `Agent and Skill Content`.
+>
+> Before making changes, read the phase section and the linked agent/skill specifications in full, then pause and recommend the most appropriate model for the work. Suggest `GPT-5.4` for balanced cross-file implementation, `Claude Sonnet` for faster medium-complexity edits, or `Claude Opus` for heavier design analysis or broader refactors. Let the user switch models in Copilot if desired, then continue.
+>
+> Draft the Precept Author agent plus the `precept-authoring` and `precept-debugging` skills inside `tools/Precept.Plugin/`. Follow the linked agent and skill specs exactly. Keep the workflow opinionated: `precept_language` is the DSL authority, and compile/inspect/run are used in that order when diagnosing behavior.
+>
+> Include Mermaid guidance exactly as described in the phase steps. Validate frontmatter, naming, and line-count constraints before finishing.
+>
+> End with local validation that the agent appears in the dropdown, both skills appear in slash commands, and the tool invocation order is correct.
+
 ---
 
 ## Phase 9: Documentation + Distribution
@@ -411,7 +522,7 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 ### Steps
 
 - [ ] Update `README.md`:
-  - Add MCP Server section describing the 6 tools and how to use them
+  - Add MCP Server section describing the 4 tools and how to use them
     - Add setup instructions: install the Precept agent plugin (marketplace or Git URL)
     - Document the Precept Author agent and companion skills
   - Update Current Status to include MCP server and agent plugin
@@ -433,13 +544,27 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 
 ### Checkpoint
 
-- README accurately describes all 6 tools
+- README accurately describes all 4 tools
 - README accurately describes agent plugin installation and Precept Author agent
 - No aspirational claims presented as implemented
 - Design doc documents plugin distribution model accurately
 - Copilot-instructions includes MCP Tool Sync section
 - Extension no longer registers MCP server provider
 - Plugin is published and installable
+
+### Phase 9 implementation prompt
+
+Use this prompt to execute Phase 9 in a new Copilot Chat session:
+
+> Implement Phase 9 in `docs/McpServerImplementationPlan.md`: `Documentation + Distribution`.
+>
+> Before making changes, read the phase section and all referenced distribution/documentation guidance in full, then pause and recommend the most appropriate model for the work. Suggest `GPT-5.4` for balanced cross-file implementation, `Claude Sonnet` for faster medium-complexity edits, or `Claude Opus` for heavier design analysis or broader refactors. Let the user switch models in Copilot if desired, then continue.
+>
+> Update `README.md`, `docs/McpServerDesign.md`, and any affected cross-references so they describe the plugin-based MCP distribution model accurately. Remove MCP server registration from the VS Code extension, remove the local `Precept Dev` MCP entry, and convert the plugin distribution `.mcp.json` to the published form.
+>
+> Follow `.github/copilot-instructions.md` for mandatory documentation sync and MCP tool sync guidance. Do not leave aspirational claims in the docs.
+>
+> End with a consistency pass: docs match implementation, extension no longer owns MCP registration, and the plugin is ready for publication.
 
 ---
 
@@ -449,19 +574,25 @@ Per `McpServerDesign.md § precept_inspect`. Input: `{ path, currentState, data,
 |---|---|---|
 | `tools/Precept.Mcp/Precept.Mcp.csproj` | **New** | 0 |
 | `tools/Precept.Mcp/Program.cs` | **New** | 0 |
-| `tools/Precept.Mcp/Tools/ValidateTool.cs` | **New** | 1 |
-| `tools/Precept.Mcp/Tools/SchemaTool.cs` | **New** | 2 |
-| `tools/Precept.Mcp/Tools/AuditTool.cs` | **New** | 3 |
-| `tools/Precept.Mcp/Tools/RunTool.cs` | **New** | 4 |
-| `tools/Precept.Mcp/Tools/LanguageTool.cs` | **New** | 5 |
-| `tools/Precept.Mcp/Tools/InspectTool.cs` | **New** | 6 |
+| `tools/Precept.Mcp/Tools/ValidateTool.cs` | **New** → **Delete** | 1 → Redesign |
+| `tools/Precept.Mcp/Tools/SchemaTool.cs` | **New** → **Delete** | 2 → Redesign |
+| `tools/Precept.Mcp/Tools/AuditTool.cs` | **New** → **Delete** | 3 → Redesign |
+| `tools/Precept.Mcp/Tools/RunTool.cs` | **New** → **Rewrite** (text input, structured violations) | 4 → Redesign |
+| `tools/Precept.Mcp/Tools/LanguageTool.cs` | **New** (unchanged in redesign) | 5 |
+| `tools/Precept.Mcp/Tools/InspectTool.cs` | **New** → **Rewrite** (delegate to engine.Inspect) | 6 → Redesign |
+| `tools/Precept.Mcp/Tools/CompileTool.cs` | **New** — merges validate + schema + audit | Redesign |
+| `tools/Precept.Mcp/Dtos/DiagnosticDto.cs` | **New** — shared diagnostic DTO | Redesign |
+| `tools/Precept.Mcp/Dtos/ViolationDto.cs` | **New** — shared violation DTO | Redesign |
+| `src/Precept/Dsl/PreceptAnalysis.cs` | **New** — graph analysis (C48–C53) | Redesign (Language Phase I) |
+| `src/Precept/Dsl/PreceptCompiler.cs` | **Edit** — add `CompileFromText(text)` | Redesign (Language Phase I) |
 | `test/Precept.Mcp.Tests/Precept.Mcp.Tests.csproj` | **New** | 0 |
-| `test/Precept.Mcp.Tests/ValidateToolTests.cs` | **New** | 1 |
-| `test/Precept.Mcp.Tests/SchemaToolTests.cs` | **New** | 2 |
-| `test/Precept.Mcp.Tests/AuditToolTests.cs` | **New** | 3 |
-| `test/Precept.Mcp.Tests/RunToolTests.cs` | **New** | 4 |
-| `test/Precept.Mcp.Tests/LanguageToolTests.cs` | **New** | 5 |
-| `test/Precept.Mcp.Tests/InspectToolTests.cs` | **New** | 6 |
+| `test/Precept.Mcp.Tests/ValidateToolTests.cs` | **New** → **Delete** | 1 → Redesign |
+| `test/Precept.Mcp.Tests/SchemaToolTests.cs` | **New** → **Delete** | 2 → Redesign |
+| `test/Precept.Mcp.Tests/AuditToolTests.cs` | **New** → **Delete** | 3 → Redesign |
+| `test/Precept.Mcp.Tests/RunToolTests.cs` | **New** → **Rewrite** | 4 → Redesign |
+| `test/Precept.Mcp.Tests/LanguageToolTests.cs` | **New** (unchanged in redesign) | 5 |
+| `test/Precept.Mcp.Tests/InspectToolTests.cs` | **New** → **Rewrite** | 6 → Redesign |
+| `test/Precept.Mcp.Tests/CompileToolTests.cs` | **New** | Redesign |
 | `tools/Precept.VsCode/package.json` | **Edit** — remove MCP provider contributions | 9 |
 | `tools/Precept.VsCode/src/extension.ts` | **Edit** — remove MCP provider registration | 9 |
 | `tools/Precept.Plugin/.github/plugin/plugin.json` | **New** — plugin metadata | 7 |
@@ -496,56 +627,49 @@ Phase 5: precept_language (catalogs — zero file dependency, could be any order
     ↓
 Phase 6: precept_inspect (PreceptEngine.Inspect — builds on Phase 4's runtime knowledge)
     ↓
-Phase 7: Agent plugin structure + MCP packaging
+MCP Redesign: 6→4 tools (requires Language Phase I for structured validation + C48–C53 diagnostics)
     ↓
-Phase 8: Agent and skill content (can be drafted in parallel with 1-6)
+Phase 7: Agent plugin structure + MCP packaging (4 tools)
+    ↓
+Phase 8: Agent and skill content (can be drafted in parallel with Redesign)
     ↓
 Phase 9: Documentation + distribution
 ```
 
-Phases 5 and 6 are interchangeable. Phase 5 (`precept_language`) has no dependency on any other tool and could be implemented at any point after Phase 0. It's placed here so the more commonly used tools (`validate`, `schema`, `audit`, `run`) are built first.
-
-Phase 8 (agent and skill content) is markdown-only work that can proceed in parallel with any of Phases 1-6. However, testing the skills against MCP tools requires Phase 6 to be complete. Phase 7 requires the MCP binary build from Phase 6. Phase 9 depends on both 7 and 8.
+Phases 0–6 are complete — the original 6-tool surface is implemented and tested. The MCP Redesign Phase depends on Language Phase I (graph analysis warnings) from `PreceptLanguageImplementationPlan.md`. Phase 7 requires the redesigned MCP tools. Phase 8 (agent/skill markdown) can be drafted in parallel with the Redesign Phase but testing requires the redesigned tools. Phase 9 depends on both 7 and 8.
 
 ## Estimated Scope
 
-| Phase | New LOC (est.) | Risk |
-|---|---|---|
-| 0. Scaffolding | ~30 | None |
-| 1. `precept_validate` | ~80 | Low |
-| 2. `precept_schema` | ~120 | Low (model walking) |
-| 3. `precept_audit` | ~150 | Low-Medium (graph BFS) |
-| 4. `precept_run` | ~100 | Low (thin wrapper over engine) |
-| 5. `precept_language` | ~200 | Low (reflection + static data) |
-| 6. `precept_inspect` | ~130 | Low-Medium (arg detection logic) |
-| 7. Agent plugin structure + MCP packaging | ~80 | Low-Medium (launcher move + toggle script) |
-| 8. Agent and skill content | ~300 | Medium (prompt engineering) |
-| 9. Documentation + distribution | ~180 | Low |
-| **Total** | **~1,210** | |
+| Phase | New LOC (est.) | Risk | Status |
+|---|---|---|---|
+| 0. Scaffolding | ~30 | None | ✅ Done |
+| 1. `precept_validate` | ~80 | Low | ✅ Done |
+| 2. `precept_schema` | ~120 | Low (model walking) | ✅ Done |
+| 3. `precept_audit` | ~150 | Low-Medium (graph BFS) | ✅ Done |
+| 4. `precept_run` | ~100 | Low (thin wrapper over engine) | ✅ Done |
+| 5. `precept_language` | ~200 | Low (reflection + static data) | ✅ Done |
+| 6. `precept_inspect` | ~130 | Low-Medium (arg detection logic) | ✅ Done |
+| MCP Redesign | ~350 | Medium (core API + DTO + rewrite 4 tools + tests) | Not started |
+| 7. Agent plugin structure | ~80 | Low-Medium (launcher move + toggle script) | Not started |
+| 8. Agent and skill content | ~300 | Medium (prompt engineering) | Not started |
+| 9. Documentation + distribution | ~180 | Low | Not started |
+| **Total** | **~1,720** | |
 
 ---
 
-## Implementation Prompt
+## Execution note
 
-Use this prompt to begin implementation in a new Copilot Chat session:
+The MCP plan now keeps implementation prompts inside the relevant execution phases:
 
-> Implement the Precept MCP server described in `docs/McpServerDesign.md`, following the phased plan in `docs/McpServerImplementationPlan.md`.
->
-> Start by reading both documents in full, plus `docs/CatalogInfrastructureDesign.md` for the catalog architecture.
->
-> Prerequisites: The language redesign (`docs/PreceptLanguageImplementationPlan.md`) must be complete — the Superpower parser, catalogs, and runtime are assumed to exist in `src/Precept/`.
->
-> Then:
->
-> 1. Execute the phases in order (0 through 9), committing at each checkpoint.
-> 2. Each phase must end with `dotnet build` and `dotnet test` passing before moving to the next.
-> 3. Tools are **thin wrappers** — all domain logic lives in `src/Precept/`. The MCP project calls `PreceptParser`, `PreceptCompiler`, `PreceptEngine`, `ConstructCatalog`, and `DiagnosticCatalog` directly.
-> 4. Every tool returns structured JSON — no prose-only responses.
-> 5. Every tool has integration tests in `test/Precept.Mcp.Tests/` that call the tool method directly (no MCP transport).
-> 6. For `precept_language` (Phase 5), vocabulary comes from reflecting token enum attributes, constructs from `ConstructCatalog.Constructs`, and constraints from `DiagnosticCatalog.Constraints`. The static sections (`expressionScopes`, `firePipeline`, `outcomeKinds`) are constant arrays in the tool class.
-> 7. For the agent plugin (Phase 7), create the plugin directory structure at `tools/Precept.Plugin/` with `plugin.json` and dev `.mcp.json` (launcher-based). Move the MCP launcher script to `tools/scripts/start-precept-mcp.js`. Create the `toggle-plugin.js` script and add `plugin: enable`/`plugin: disable` tasks. Rename extension tasks (`extension: install`, `extension: uninstall`) and remove `extension: watch`.
-> 8. For agent and skill content (Phase 8), follow the [Agent Skills specification](https://agentskills.io/specification) for SKILL.md format and the [VS Code custom agents docs](https://code.visualstudio.com/docs/copilot/customization/custom-agents) for the agent file format.
-> 9. In Phase 9, remove the MCP server registration from the VS Code extension (`registerMcpServerDefinitionProvider` and `mcpServerDefinitionProviders` in package.json), remove `Precept Dev` from `.vscode/mcp.json`, rewrite the plugin's `.mcp.json` for distribution (`dotnet tool run precept-mcp`), and update README and design docs.
-> 10. Follow the project's copilot-instructions (`.github/copilot-instructions.md`) for documentation sync.
->
-> Begin with Phase 0: create the project scaffolding and add it to the solution.
+- Use `MCP Redesign Phase: 6→4 Tools with Text Input` for the tool-surface migration prompt.
+- Use `Phase 7 implementation prompt` for plugin structure and MCP packaging.
+- Use `Phase 8 implementation prompt` for agent and skill content.
+- Use `Phase 9 implementation prompt` for documentation and distribution.
+
+Cross-phase rules still apply everywhere:
+
+1. Keep MCP tools as thin wrappers over core APIs.
+2. Return structured JSON from tools.
+3. Keep tests in sync in the same change pass.
+4. End each phase with build/test verification before moving on.
+5. Keep docs synchronized with implementation in the same edit pass.

@@ -6,8 +6,7 @@ namespace Precept.Mcp.Tests;
 
 public class ValidateToolTests
 {
-    private static string SamplesDir =>
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "samples"));
+    private static string SamplesDir => TestPaths.SamplesDir;
 
     private static string SamplePath(string fileName) => Path.Combine(SamplesDir, fileName);
 
@@ -58,6 +57,34 @@ public class ValidateToolTests
 
             result.Valid.Should().BeFalse();
             result.Diagnostics.Should().NotBeEmpty();
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void WarningOnlyValidation_ReturnsValidWithDiagnostics()
+    {
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, """
+                precept Test
+                state A initial
+                state B
+                state Unreachable
+                event Go
+                from A on Go -> transition B
+                """);
+
+            var result = ValidateTool.Run(tempFile);
+
+            result.Valid.Should().BeTrue();
+            result.Diagnostics.Should().ContainSingle();
+            result.Diagnostics[0].Code.Should().Be("PRECEPT048");
+            result.Diagnostics[0].Severity.Should().Be("warning");
         }
         finally
         {

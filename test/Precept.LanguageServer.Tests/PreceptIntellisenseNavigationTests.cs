@@ -121,8 +121,8 @@ public class PreceptIntellisenseNavigationTests
         var diagnostics = analyzer.GetDiagnostics(uri).ToArray();
 
         diagnostics.Should().Contain(diagnostic => diagnostic.Message.Contains("Unreachable", StringComparison.Ordinal));
-        diagnostics.Should().Contain(diagnostic => diagnostic.Message.Contains("orphaned", StringComparison.OrdinalIgnoreCase));
-        diagnostics.Should().Contain(diagnostic => diagnostic.Message.Contains("dead end", StringComparison.OrdinalIgnoreCase));
+        diagnostics.Should().Contain(diagnostic => diagnostic.Message.Contains("never referenced", StringComparison.OrdinalIgnoreCase));
+        diagnostics.Should().Contain(diagnostic => diagnostic.Message.Contains("no path forward", StringComparison.OrdinalIgnoreCase));
     }
 
     private static (string text, Position position) ExtractPosition(string textWithMarker)

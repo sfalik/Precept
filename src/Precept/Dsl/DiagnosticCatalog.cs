@@ -13,7 +13,8 @@ namespace Precept;
 public enum ConstraintSeverity
 {
     Error,
-    Warning
+    Warning,
+    Hint
 }
 
 /// <summary>
@@ -385,4 +386,46 @@ public static class DiagnosticCatalog
         "C47", "compile",
         "Identical guard on duplicate transition rows for the same state+event pair.",
         "Duplicate guard: '{guard}' appears more than once for '{state}' on '{event}' (duplicate at line {sourceLine}).");
+
+    /// <summary>State cannot be reached from the initial state via any transition path.</summary>
+    public static readonly LanguageConstraint C48 = Register(
+        "C48", "compile",
+        "State cannot be reached from the initial state via any transition path.",
+        "State '{State}' is unreachable from the initial state.",
+        ConstraintSeverity.Warning);
+
+    /// <summary>Event is declared but never referenced in any transition row.</summary>
+    public static readonly LanguageConstraint C49 = Register(
+        "C49", "compile",
+        "Event is declared but never referenced in any transition row.",
+        "Event '{Event}' is declared but never referenced in any transition row.",
+        ConstraintSeverity.Warning);
+
+    /// <summary>Non-terminal state has outgoing rows but none can reach another state.</summary>
+    public static readonly LanguageConstraint C50 = Register(
+        "C50", "compile",
+        "Non-terminal state has outgoing rows but none can reach another state.",
+        "State '{State}' has outgoing transitions but all reject or no-transition — no path forward.",
+        ConstraintSeverity.Hint);
+
+    /// <summary>Every transition row for a state/event pair rejects, so the event can never succeed there.</summary>
+    public static readonly LanguageConstraint C51 = Register(
+        "C51", "compile",
+        "Every transition row for a state/event pair rejects, so the event can never succeed there.",
+        "Every transition row for ({State}, {Event}) ends in reject — the event can never succeed from this state. Remove the rows and let Undefined handle it.",
+        ConstraintSeverity.Warning);
+
+    /// <summary>Event can never succeed from any reachable state.</summary>
+    public static readonly LanguageConstraint C52 = Register(
+        "C52", "compile",
+        "Event can never succeed from any reachable state.",
+        "Event '{Event}' can never succeed from any reachable state — every reachable state either has no rows or all rows reject.",
+        ConstraintSeverity.Warning);
+
+    /// <summary>Precept declares no events.</summary>
+    public static readonly LanguageConstraint C53 = Register(
+        "C53", "compile",
+        "Precept declares no events.",
+        "Precept '{Name}' declares no events.",
+        ConstraintSeverity.Hint);
 }

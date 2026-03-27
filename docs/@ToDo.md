@@ -2,13 +2,13 @@
 
 ## Implementation Order
 
-The three workstreams below have cross-plan dependencies. Execute in this order:
+The workstreams below have cross-plan dependencies. Execute in this order:
 
 ```
-CV 0-3 → Language D-H → CV 4-7 → MCP 7-9
+CV 0-3 → Language D-H → CV 4-7 → Language I → MCP Redesign → MCP 7-9
 ```
 
-**Rationale:** Rename phases (CV 0-3) establish final naming so all subsequent code uses the settled names. Language checker expansion (D-H) then registers new diagnostics on `DiagnosticCatalog` (renamed in CV Phase 2). The structured violation model (CV 4-7) introduces `ConstraintViolation` and the `Rejected` / `ConstraintFailure` split. MCP plugin, agent, and skills (MCP 7-9) go last because they reference final outcome names and constraint terminology.
+**Rationale:** Rename phases (CV 0-3) establish final naming so all subsequent code uses the settled names. Language checker expansion (D-H) then registers new diagnostics on `DiagnosticCatalog` (renamed in CV Phase 2). The structured violation model (CV 4-7) introduces `ConstraintViolation` and the `Rejected` / `ConstraintFailure` split. Language Phase I adds graph analysis warnings (C48–C53) and cleans up compile validation so the MCP redesign can consume one structured diagnostic pipeline. The MCP Redesign Phase consolidates 6 tools into 4 with text input and structured output. MCP plugin, agent, and skills (MCP 7-9) go last because they reference the redesigned tool surface.
 
 ---
 
@@ -16,7 +16,7 @@ CV 0-3 → Language D-H → CV 4-7 → MCP 7-9
 
 - [x] [Phase 0](ConstraintViolationImplementationPlan.md#Phase-0-Model-Type-Renames-PreceptModelcs): Model type renames — `PreceptAssertPreposition` → `AssertAnchor`, `PreceptStateAssert` → `StateAssertion`, `PreceptEventAssert` → `EventAssertion`, `PreceptRejection` → `Rejection`, `PreceptStateTransition` → `StateTransition`, `PreceptNoTransition` → `NoTransition`, `.Preposition` → `.Anchor`.
 - [x] [Phase 1](ConstraintViolationImplementationPlan.md#Phase-1-Result-Type--Enum-Renames-PreceptRuntimecs): Result type & enum renames — `PreceptOutcomeKind` → `TransitionOutcome`, `PreceptUpdateOutcome` → `UpdateOutcome`, all result types drop `Precept` prefix, enum value renames, factory method renames.
-- [x] [Phase 2](ConstraintViolationImplementationPlan.md#Phase-2-Catalog--Compile-Result-Renames): Catalog & compile result renames — `ConstraintCatalog` → `DiagnosticCatalog` (file + class), `PreceptCompileValidationResult` → `CompileResult`.
+- [x] [Phase 2](ConstraintViolationImplementationPlan.md#Phase-2-Catalog--Validation-Result-Renames): Catalog & validation result renames — `ConstraintCatalog` → `DiagnosticCatalog` (file + class), `PreceptCompileValidationResult` → `CompileResult` → `ValidationResult`.
 - [x] [Phase 3](ConstraintViolationImplementationPlan.md#Phase-3-Runtime-Method-Renames): Runtime method renames + `IsSuccess` — `CollectValidationViolations` → `CollectConstraintViolations`, `EvaluateEventAsserts` → `EvaluateEventAssertions`, `EvaluateStateAsserts` → `EvaluateStateAssertions`, add `IsSuccess` to result types.
 
 ## Group 2: Language Checker Expansion (Language Phases D-H) ✅
@@ -25,7 +25,7 @@ CV 0-3 → Language D-H → CV 4-7 → MCP 7-9
 - [x] [Phase E](PreceptLanguageImplementationPlan.md#L122): Scope and narrowing hardening — remove bare arg names from transition row symbol tables, enforce dotted form, add event-arg narrowing tests.
 - [x] [Phase F](PreceptLanguageImplementationPlan.md#L152): Rule-position strictness and collection contracts — register C46, reject non-boolean expressions in invariants/asserts/guards, harden `contains` coverage.
 - [x] [Phase G](PreceptLanguageImplementationPlan.md#L178): Additional sound static reasoning — register C47, detect duplicate guards in `ValidateTransitionRows()`.
-- [x] [Phase H](PreceptLanguageImplementationPlan.md#L205): Coverage and tooling sync — fix `MapTypeDiagnostic` severity mapping, verify completions, catalog drift for C46/C47, README sync.
+- [x] [Phase H](PreceptLanguageImplementationPlan.md#L205): Coverage and tooling sync — fix `MapValidationDiagnostic` severity mapping, verify completions, catalog drift for C46/C47, README sync.
 
 ## Group 3: Structured Constraint Violations (CV Phases 4-7) ✅
 
@@ -34,11 +34,22 @@ CV 0-3 → Language D-H → CV 4-7 → MCP 7-9
 - [x] [Phase 6](ConstraintViolationImplementationPlan.md#Phase-6-Language-Server-Visualizer--MCP-Consumer-Updates): Language server, visualizer & MCP consumer updates — `PreceptPreviewHandler`, `PreceptPreviewProtocol`, `inspector-preview.html`, `LanguageTool`, `RunTool`, `InspectTool`.
 - [x] [Phase 7](ConstraintViolationImplementationPlan.md#Phase-7-Documentation--Cleanup): Documentation & cleanup — final sweep for stale references.
 
-## Group 4: Copilot Authoring of Precept (MCP Phases 7-9)
+## Group 4a: Graph Analysis Warning Diagnostics (Language Phase I)
 
-- Implement [Phase 7](McpServerImplementationPlan.md#L322): create `tools/Precept.Plugin/` structure (plugin.json, dev .mcp.json), move launcher to `tools/scripts/`, verify plugin loads via `chat.pluginLocations`.
-- Implement [Phase 8](McpServerImplementationPlan.md#L371): draft Precept Author agent and authoring/debugging skills, validate against agentskills.io spec, test in Chat. Both skills include Mermaid diagramming instructions for full and partial state diagrams (no separate tool — skills use `precept_schema` + `precept_audit` data).
-- Implement [Phase 9](McpServerImplementationPlan.md#L407): remove extension MCP registration, remove `Precept Dev` from `.vscode/mcp.json`, rewrite plugin `.mcp.json` for distribution, publish plugin.
+- Implement [Phase I](PreceptLanguageImplementationPlan.md#Phase-I-Graph-Analysis-Warning-Diagnostics): remove coverage warning C51, renumber graph diagnostics to C48–C53, eliminate throw-based compile validation, implement `PreceptAnalysis.Analyze()` (BFS reachability, orphaned events, dead-end detection, reject-only pairs, event-never-succeeds, empty precepts), add `ConstraintSeverity.Hint`, wire graph analysis into `Validate()`, add `CompileFromText(text)` composed pipeline, and confirm language server/MCP consumers use the structured result.
+- Executor note: use the implementation prompt in the linked Phase I section as the canonical change guide; keep this todo entry as scope/order only.
+
+## Group 4b: MCP Redesign (6→4 Tools)
+
+- Implement the [MCP Redesign Phase](McpServerImplementationPlan.md#MCP-Redesign-Phase-64-Tools-with-Text-Input): replace validate+schema+audit with `precept_compile`, rewrite `precept_inspect` to delegate to `engine.Inspect()`, update `precept_run` for text input and structured `ViolationDto`, create shared DTOs (`DiagnosticDto`, `ViolationDto`), delete old tool files, rewrite tests.
+- Executor note: use the [Redesign implementation prompt](McpServerImplementationPlan.md#Redesign-implementation-prompt) in the linked phase section as the canonical change guide; keep this todo entry as scope/order only.
+
+## Group 4c: Copilot Plugin, Agent, and Skills (MCP Phases 7-9)
+
+- Implement [Phase 7](McpServerImplementationPlan.md#Phase-7-Agent-Plugin-Structure--MCP-Packaging): create `tools/Precept.Plugin/` structure (plugin.json, dev .mcp.json), move launcher to `tools/scripts/`, verify plugin loads via `chat.pluginLocations`.
+- Implement [Phase 8](McpServerImplementationPlan.md#Phase-8-Agent-and-Skill-Content): draft Precept Author agent and authoring/debugging skills, validate against agentskills.io spec, test in Chat. Both skills include Mermaid diagramming instructions for full and partial state diagrams (no separate tool — skills use `precept_compile` output data).
+- Implement [Phase 9](McpServerImplementationPlan.md#Phase-9-Documentation--Distribution): remove extension MCP registration, remove `Precept Dev` from `.vscode/mcp.json`, rewrite plugin `.mcp.json` for distribution, publish plugin.
+- Executor note: use the phase-local prompts in [Phase 7](McpServerImplementationPlan.md#Phase-7-implementation-prompt), [Phase 8](McpServerImplementationPlan.md#Phase-8-implementation-prompt), and [Phase 9](McpServerImplementationPlan.md#Phase-9-implementation-prompt) as the canonical change guides; keep this todo entry as scope/order only.
 
 ---
 

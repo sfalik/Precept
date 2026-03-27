@@ -290,8 +290,14 @@ public class CatalogDriftTests
                     PreceptParser.Parse(trigger.Dsl);
                     break;
                 case "compile":
-                    PreceptCompiler.Compile(PreceptParser.Parse(trigger.Dsl));
+                {
+                    var validation = PreceptCompiler.Validate(PreceptParser.Parse(trigger.Dsl));
+                    var diagnostic = validation.Diagnostics.FirstOrDefault(d => d.Constraint.Id == constraintId);
+                    errorMessage = diagnostic is null
+                        ? null
+                        : $"{diagnostic.DiagnosticCode}: {diagnostic.Message}";
                     break;
+                }
                 case "runtime":
                     var engine = PreceptCompiler.Compile(PreceptParser.Parse(trigger.Dsl));
                     engine.CreateInstance();
@@ -464,6 +470,24 @@ public class CatalogDriftTests
 
         // C47: Identical guard on duplicate transition rows for the same state+event pair
         ["C47"] = new(H + "field X as number default 0\n" + S2 + "event Go\nfrom A on Go when X > 0 -> transition B\nfrom A on Go when X > 0 -> reject \"blocked\"\n", "PRECEPT047"),
+
+        // C48: Unreachable state
+        ["C48"] = new(H + "state A initial\nstate B\nstate C\nevent Go\nfrom A on Go -> transition B\n", "unreachable"),
+
+        // C49: Orphaned event
+        ["C49"] = new(H + S + "event Go\nevent Unused\nfrom A on Go -> no transition\n", "never referenced"),
+
+        // C50: Dead-end state
+        ["C50"] = new(H + "state A initial\nstate B\nevent Go\nfrom A on Go -> transition B\nfrom B on Go -> reject \"blocked\"\n", "no path forward"),
+
+        // C51: Reject-only pair
+        ["C51"] = new(H + S + "event Go\nfrom A on Go -> reject \"blocked\"\n", "ends in reject"),
+
+        // C52: Event never succeeds
+        ["C52"] = new(H + "state A initial\nstate B\nevent Move\nevent Stop\nfrom A on Move -> transition B\nfrom A on Stop -> reject \"blocked\"\nfrom B on Stop -> reject \"blocked\"\n", "never succeed"),
+
+        // C53: Empty precept
+        ["C53"] = new(H + S, "declares no events"),
 
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 

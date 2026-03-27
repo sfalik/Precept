@@ -6,8 +6,7 @@ namespace Precept.Mcp.Tests;
 
 public class RunToolTests
 {
-    private static string SamplesDir =>
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "samples"));
+    private static string SamplesDir => TestPaths.SamplesDir;
 
     private static string SamplePath(string fileName) => Path.Combine(SamplesDir, fileName);
 

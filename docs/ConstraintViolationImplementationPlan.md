@@ -42,7 +42,7 @@ These are combined because the violation model introduces `ConstraintViolation` 
 | `PreceptEventInspectionResult` | `EventInspectionResult` | PreceptRuntime.cs |
 | `PreceptInspectionResult` | `InspectionResult` | PreceptRuntime.cs |
 | `PreceptViolation` | DELETED (replaced by `ConstraintViolation`) | PreceptRuntime.cs |
-| `PreceptCompileValidationResult` | `CompileResult` | PreceptTypeChecker.cs |
+| `PreceptCompileValidationResult` | `ValidationResult` | PreceptTypeChecker.cs |
 | `ConstraintCatalog` | `DiagnosticCatalog` | ConstraintCatalog.cs → DiagnosticCatalog.cs |
 
 ### Enum Value Renames
@@ -285,16 +285,16 @@ When finished, update the Status Tracker table at the bottom of this document.
 
 ---
 
-## Phase 2: Catalog & Compile Result Renames
+## Phase 2: Catalog & Validation Result Renames
 
-**Goal:** Rename `ConstraintCatalog` → `DiagnosticCatalog` (class + file) and `PreceptCompileValidationResult` → `CompileResult`.
+**Goal:** Rename `ConstraintCatalog` → `DiagnosticCatalog` (class + file) and `PreceptCompileValidationResult` → `ValidationResult`.
 
 ### Steps
 
 1. Rename file: `src/Precept/Dsl/ConstraintCatalog.cs` → `src/Precept/Dsl/DiagnosticCatalog.cs`.
 2. Rename class: `ConstraintCatalog` → `DiagnosticCatalog`.
 3. Update all `ConstraintCatalog.` references across the codebase (~50+ sites in parser, runtime, MCP tools).
-4. Rename `PreceptCompileValidationResult` → `CompileResult` (internal type, ~5 references).
+4. Rename `PreceptCompileValidationResult` → `ValidationResult` (internal type, ~5 references).
 
 ### Affected files
 
@@ -303,7 +303,7 @@ When finished, update the Status Tracker table at the bottom of this document.
 | `src/Precept/Dsl/DiagnosticCatalog.cs` (renamed) | Class declaration |
 | `src/Precept/Dsl/PreceptParser.cs` | All `ConstraintCatalog.Cnn` references |
 | `src/Precept/Dsl/PreceptRuntime.cs` | Runtime constraint references |
-| `src/Precept/Dsl/PreceptTypeChecker.cs` | `PreceptCompileValidationResult` → `CompileResult` |
+| `src/Precept/Dsl/PreceptTypeChecker.cs` | `PreceptCompileValidationResult` → `ValidationResult` |
 | `tools/Precept.Mcp/Tools/LanguageTool.cs` | `ConstraintCatalog.Constraints` |
 | `tools/Precept.Mcp/Tools/ValidateTool.cs` | If it references the catalog |
 
@@ -332,7 +332,7 @@ Read docs/ConstraintViolationImplementationPlan.md Phase 2 for the rename list.
 2. Use IDE rename to rename the class ConstraintCatalog → DiagnosticCatalog.
    This will update all ~50+ references across parser/runtime/MCP.
 
-3. Use IDE rename to rename PreceptCompileValidationResult → CompileResult.
+3. Use IDE rename to rename PreceptCompileValidationResult → ValidationResult.
 
 4. Do NOT rename ConstraintViolationException — it stays as-is (different concept).
 
@@ -714,7 +714,7 @@ Build and run all tests one final time. When finished, update the Status Tracker
 | `src/Precept/Dsl/PreceptModel.cs` | Major edit — 6 type renames, 2 property renames, new constraint types | 0, 4 |
 | `src/Precept/Dsl/PreceptRuntime.cs` | Major edit — result types, enums, factories, violation production | 1, 3, 4 |
 | `src/Precept/Dsl/PreceptParser.cs` | Edit — model type references, DiagnosticCatalog | 0, 2 |
-| `src/Precept/Dsl/PreceptTypeChecker.cs` | Edit — CompileResult rename, Anchor property | 0, 2 |
+| `src/Precept/Dsl/PreceptTypeChecker.cs` | Edit — ValidationResult rename, Anchor property | 0, 2 |
 | `src/Precept/Dsl/DiagnosticCatalog.cs` | Renamed from `ConstraintCatalog.cs`, class rename | 2 |
 | `tools/Precept.LanguageServer/PreceptAnalyzer.cs` | Edit — Anchor property reference | 0 |
 | `tools/Precept.LanguageServer/PreceptPreviewHandler.cs` | Edit — outcome switch, Violations | 0, 1, 6 |

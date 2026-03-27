@@ -299,7 +299,7 @@ public sealed record UpdateResult(
 
 **Compile-time vs runtime vocabulary:**
 - "Constraints" = runtime data rules (invariants, assertions, rejections) that produce `ConstraintViolation`
-- "Diagnostics" = compile-time DSL checks (`DiagnosticCatalog`, `CompileResult`)
+- "Diagnostics" = compile-time DSL checks (`DiagnosticCatalog`, `ValidationResult`)
 
 ## Scenarios (Agreed)
 
@@ -606,15 +606,15 @@ Alternatives considered:
 
 Renaming to `DiagnosticCatalog` separates the vocabularies cleanly. `ConstraintViolationException` stays as-is — it's thrown by the catalog infrastructure and represents a violation of a *language* constraint (a registered diagnostic), which is a different concept from a runtime `ConstraintViolation`.
 
-### Why `CompileResult` (not other alternatives)
+### Why `ValidationResult` (not other alternatives)
 
 `PreceptCompileValidationResult` was verbose and included "Validation," which clashes with the runtime vocabulary where "validation" was being removed in favor of "constraint." Alternatives considered:
 
 - `CompileDiagnosticResult` — accurate but unnecessarily long for an internal type
 - `CompilationResult` — slightly more formal than needed
-- `CompileResult` — simplest, clear, follows the pattern of short result type names (`FireResult`, `UpdateResult`)
+- `ValidationResult` — clearer now that `PreceptCompiler.Validate()` is the primary structured compile-time entry point for diagnostics.
 
-The simplest option was chosen. This type is internal (~5 references), so brevity is preferred.
+The current name matches the behavior better: the type represents structured validation output, not engine construction.
 
 ### Why the middle-ground prefix convention
 
@@ -624,4 +624,4 @@ Three approaches were evaluated:
 2. **Prefix nothing** — clean but risks collision with common C# types (`Field`, `State`, `Event`, `Instance`)
 3. **Middle-ground** — keep `Precept` on types whose bare names are too generic for C#; drop it on domain-specific types
 
-The middle-ground was chosen. Types that keep `Precept`: `PreceptField`, `PreceptState`, `PreceptEvent`, `PreceptInstance`, `PreceptDefinition`, `PreceptRuntime`, `PreceptEngine`, `PreceptCompiler`, `PreceptInvariant`, `PreceptTransitionRow`, `PreceptEditableFieldInfo`. Types that drop it: `FireResult`, `EventInspectionResult`, `ConstraintViolation`, `TransitionOutcome`, `AssertAnchor`, `StateAssertion`, `EventAssertion`, `Rejection`, `StateTransition`, `NoTransition`, `CompileResult`, etc.
+The middle-ground was chosen. Types that keep `Precept`: `PreceptField`, `PreceptState`, `PreceptEvent`, `PreceptInstance`, `PreceptDefinition`, `PreceptRuntime`, `PreceptEngine`, `PreceptCompiler`, `PreceptInvariant`, `PreceptTransitionRow`, `PreceptEditableFieldInfo`. Types that drop it: `FireResult`, `EventInspectionResult`, `ConstraintViolation`, `TransitionOutcome`, `AssertAnchor`, `StateAssertion`, `EventAssertion`, `Rejection`, `StateTransition`, `NoTransition`, `ValidationResult`, etc.

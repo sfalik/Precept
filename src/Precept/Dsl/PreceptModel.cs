@@ -14,14 +14,17 @@ public sealed record PreceptDefinition(
     IReadOnlyList<PreceptStateAction>? StateActions = null,
     IReadOnlyList<EventAssertion>? EventAsserts = null,
     IReadOnlyList<PreceptTransitionRow>? TransitionRows = null,
-    IReadOnlyList<PreceptEditBlock>? EditBlocks = null);
+    IReadOnlyList<PreceptEditBlock>? EditBlocks = null,
+    int SourceLine = 0);
 
 public sealed record PreceptState(
-    string Name);
+    string Name,
+    int SourceLine = 0);
 
 public sealed record PreceptEvent(
     string Name,
-    IReadOnlyList<PreceptEventArg> Args);
+    IReadOnlyList<PreceptEventArg> Args,
+    int SourceLine = 0);
 
 public sealed record PreceptEventArg(
     string Name,

@@ -34,7 +34,7 @@ public class PreceptCodeActionTests
         var uri = DocumentUri.From($"file:///tmp/{Guid.NewGuid():N}.precept");
         analyzer.SetDocumentText(uri, text);
         var diagnostics = analyzer.GetDiagnostics(uri).ToArray();
-        var targetDiagnostic = diagnostics.First(d => d.Message.Contains("successful behavior in other states", StringComparison.Ordinal));
+        var targetDiagnostic = diagnostics.First(d => d.Message.Contains("ends in reject", StringComparison.Ordinal));
 
         var handler = new PreceptCodeActionHandler();
         var actions = await handler.Handle(
@@ -91,7 +91,7 @@ public class PreceptCodeActionTests
         var uri = DocumentUri.From($"file:///tmp/{Guid.NewGuid():N}.precept");
         analyzer.SetDocumentText(uri, text);
         var diagnostics = analyzer.GetDiagnostics(uri).ToArray();
-        var targetDiagnostic = diagnostics.First(d => d.Message.Contains("orphaned", StringComparison.OrdinalIgnoreCase));
+        var targetDiagnostic = diagnostics.First(d => d.Message.Contains("never referenced", StringComparison.OrdinalIgnoreCase));
 
         var handler = new PreceptCodeActionHandler();
         var actions = await handler.Handle(

@@ -15,7 +15,7 @@ internal enum StaticValueKind
     Null = 8
 }
 
-internal sealed record PreceptTypeDiagnostic(
+internal sealed record PreceptValidationDiagnostic(
     LanguageConstraint Constraint,
     string Message,
     int Line,
@@ -64,25 +64,25 @@ internal sealed class PreceptTypeContext(
     }
 }
 
-internal sealed record PreceptTypeCheckResult(
-    IReadOnlyList<PreceptTypeDiagnostic> Diagnostics,
+internal sealed record TypeCheckResult(
+    IReadOnlyList<PreceptValidationDiagnostic> Diagnostics,
     PreceptTypeContext TypeContext)
 {
-    public bool HasErrors => Diagnostics.Count > 0;
+    public bool HasErrors => Diagnostics.Any(static diagnostic => diagnostic.Constraint.Severity == ConstraintSeverity.Error);
 }
 
-internal sealed record CompileResult(
-    IReadOnlyList<PreceptTypeDiagnostic> Diagnostics,
+internal sealed record ValidationResult(
+    IReadOnlyList<PreceptValidationDiagnostic> Diagnostics,
     PreceptTypeContext TypeContext)
 {
-    public bool HasErrors => Diagnostics.Count > 0;
+    public bool HasErrors => Diagnostics.Any(static diagnostic => diagnostic.Constraint.Severity == ConstraintSeverity.Error);
 }
 
 internal static class PreceptTypeChecker
 {
-    public static PreceptTypeCheckResult Check(PreceptDefinition model)
+    public static TypeCheckResult Check(PreceptDefinition model)
     {
-        var diagnostics = new List<PreceptTypeDiagnostic>();
+        var diagnostics = new List<PreceptValidationDiagnostic>();
         var expressions = new List<PreceptTypeExpressionInfo>();
         var scopes = new List<PreceptTypeScopeInfo>();
 
@@ -109,7 +109,7 @@ internal static class PreceptTypeChecker
         ValidateStateActions(model, dataFieldKinds, collectionFieldMap, stateAssertNarrowings, diagnostics, expressions, scopes);
         ValidateRules(model, dataFieldKinds, eventArgKinds, diagnostics, expressions, scopes);
 
-        return new PreceptTypeCheckResult(diagnostics, new PreceptTypeContext(expressions, scopes));
+        return new TypeCheckResult(diagnostics, new PreceptTypeContext(expressions, scopes));
     }
 
     internal static StaticValueKind MapFieldContractKind(PreceptField field) => MapKind(field.Type, field.IsNullable);
@@ -156,7 +156,7 @@ internal static class PreceptTypeChecker
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> stateAssertNarrowings,
-        List<PreceptTypeDiagnostic> diagnostics,
+        List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
     {
@@ -203,7 +203,7 @@ internal static class PreceptTypeChecker
                             row.WhenText!.Trim(), @"\s+", " ");
                         if (seenGuards.TryGetValue(normalizedGuard, out var firstLine))
                         {
-                            diagnostics.Add(new PreceptTypeDiagnostic(
+                            diagnostics.Add(new PreceptValidationDiagnostic(
                                 DiagnosticCatalog.C47,
                                 DiagnosticCatalog.C47.FormatMessage(
                                     ("guard", normalizedGuard),
@@ -287,7 +287,7 @@ internal static class PreceptTypeChecker
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> stateAssertNarrowings,
-        List<PreceptTypeDiagnostic> diagnostics,
+        List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
     {
@@ -356,7 +356,7 @@ internal static class PreceptTypeChecker
         PreceptDefinition model,
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
-        List<PreceptTypeDiagnostic> diagnostics,
+        List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
     {
@@ -534,7 +534,7 @@ internal static class PreceptTypeChecker
         IReadOnlyDictionary<string, StaticValueKind> symbols,
         StaticValueKind expectedKind,
         string expectedLabel,
-        List<PreceptTypeDiagnostic> diagnostics,
+        List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         string? stateContext = null,
         string? eventName = null,
@@ -585,7 +585,7 @@ internal static class PreceptTypeChecker
             stateContext,
             eventName));
 
-        diagnostics.Add(new PreceptTypeDiagnostic(
+        diagnostics.Add(new PreceptValidationDiagnostic(
             constraint,
             message,
             sourceLine,
@@ -596,7 +596,7 @@ internal static class PreceptTypeChecker
         PreceptExpression expression,
         IReadOnlyDictionary<string, StaticValueKind> symbols,
         out StaticValueKind kind,
-        out PreceptTypeDiagnostic? diagnostic)
+        out PreceptValidationDiagnostic? diagnostic)
     {
         kind = StaticValueKind.None;
         diagnostic = null;
@@ -612,7 +612,7 @@ internal static class PreceptTypeChecker
                 var key = identifier.Member is null ? identifier.Name : $"{identifier.Name}.{identifier.Member}";
                 if (!symbols.TryGetValue(key, out kind))
                 {
-                    diagnostic = new PreceptTypeDiagnostic(
+                    diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C38,
                         $"unknown identifier '{key}'.",
                         0);
@@ -634,7 +634,7 @@ internal static class PreceptTypeChecker
                 {
                     if (!IsExactly(operandKind, StaticValueKind.Boolean))
                     {
-                        diagnostic = new PreceptTypeDiagnostic(
+                        diagnostic = new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C40,
                             "operator '!' requires boolean operand.",
                             0);
@@ -649,7 +649,7 @@ internal static class PreceptTypeChecker
                 {
                     if (!IsExactly(operandKind, StaticValueKind.Number))
                     {
-                        diagnostic = new PreceptTypeDiagnostic(
+                        diagnostic = new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C40,
                             "unary '-' requires numeric operand.",
                             0);
@@ -660,7 +660,7 @@ internal static class PreceptTypeChecker
                     return true;
                 }
 
-                diagnostic = new PreceptTypeDiagnostic(
+                diagnostic = new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C40,
                     $"unsupported unary operator '{unary.Operator}'.",
                     0);
@@ -671,7 +671,7 @@ internal static class PreceptTypeChecker
                 return TryInferBinaryKind(binary, symbols, out kind, out diagnostic);
 
             default:
-                diagnostic = new PreceptTypeDiagnostic(
+                diagnostic = new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C39,
                     "unsupported expression node.",
                     0);
@@ -683,7 +683,7 @@ internal static class PreceptTypeChecker
         PreceptBinaryExpression binary,
         IReadOnlyDictionary<string, StaticValueKind> symbols,
         out StaticValueKind kind,
-        out PreceptTypeDiagnostic? diagnostic)
+        out PreceptValidationDiagnostic? diagnostic)
     {
         kind = StaticValueKind.None;
         diagnostic = null;
@@ -697,7 +697,7 @@ internal static class PreceptTypeChecker
 
                 if (!IsExactly(leftKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41, "operator '&&' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator '&&' requires boolean operands.", 0);
                     return false;
                 }
 
@@ -707,7 +707,7 @@ internal static class PreceptTypeChecker
 
                 if (!IsExactly(rightKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41, "operator '&&' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator '&&' requires boolean operands.", 0);
                     return false;
                 }
 
@@ -722,7 +722,7 @@ internal static class PreceptTypeChecker
 
                 if (!IsExactly(leftKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41, "operator '||' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator '||' requires boolean operands.", 0);
                     return false;
                 }
 
@@ -732,7 +732,7 @@ internal static class PreceptTypeChecker
 
                 if (!IsExactly(rightKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41, "operator '||' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator '||' requires boolean operands.", 0);
                     return false;
                 }
 
@@ -761,7 +761,7 @@ internal static class PreceptTypeChecker
                     return true;
                 }
 
-                diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41, "operator '+' requires number+number or string+string.", 0);
+                diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator '+' requires number+number or string+string.", 0);
                 return false;
             }
 
@@ -780,7 +780,7 @@ internal static class PreceptTypeChecker
 
                 if (!IsExactly(leftKind, StaticValueKind.Number) || !IsExactly(rightKind, StaticValueKind.Number))
                 {
-                    diagnostic = new PreceptTypeDiagnostic(
+                    diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C41,
                         $"operator '{binary.Operator}' requires numeric operands.",
                         0);
@@ -808,14 +808,14 @@ internal static class PreceptTypeChecker
                 // null literal compared to a non-nullable operand is always wrong
                 if (leftIsNull && !HasFlag(rightEqKind, StaticValueKind.Null))
                 {
-                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41,
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41,
                         $"operator '{binary.Operator}' cannot compare non-nullable {FormatKinds(rightEqKind)} with null.", 0);
                     return false;
                 }
 
                 if (rightIsNull && !HasFlag(leftEqKind, StaticValueKind.Null))
                 {
-                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41,
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41,
                         $"operator '{binary.Operator}' cannot compare non-nullable {FormatKinds(leftEqKind)} with null.", 0);
                     return false;
                 }
@@ -823,7 +823,7 @@ internal static class PreceptTypeChecker
                 // Cross-type equality: both sides have non-null scalar families that differ
                 if (leftEqFamily != StaticValueKind.None && rightEqFamily != StaticValueKind.None && leftEqFamily != rightEqFamily)
                 {
-                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41,
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41,
                         $"operator '{binary.Operator}' requires operands of the same type, but found {FormatKinds(leftEqKind)} and {FormatKinds(rightEqKind)}.", 0);
                     return false;
                 }
@@ -836,7 +836,7 @@ internal static class PreceptTypeChecker
             {
                 if (binary.Left is not PreceptIdentifierExpression { Member: null } collectionIdentifier)
                 {
-                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41, "'contains' requires a collection field on the left side.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "'contains' requires a collection field on the left side.", 0);
                     return false;
                 }
 
@@ -846,7 +846,7 @@ internal static class PreceptTypeChecker
                 var collectionKey = $"{collectionIdentifier.Name}.count";
                 if (!symbols.ContainsKey(collectionKey))
                 {
-                    diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C38, $"unknown identifier '{collectionIdentifier.Name}'.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C38, $"unknown identifier '{collectionIdentifier.Name}'.", 0);
                     return false;
                 }
 
@@ -865,7 +865,7 @@ internal static class PreceptTypeChecker
 
                 if (innerKind != StaticValueKind.None && !IsAssignable(rightKind, innerKind))
                 {
-                    diagnostic = new PreceptTypeDiagnostic(
+                    diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C41,
                         $"operator 'contains' requires RHS of type {FormatKinds(innerKind)} but expression produces {FormatKinds(rightKind)}.",
                         0);
@@ -877,7 +877,7 @@ internal static class PreceptTypeChecker
             }
 
             default:
-                diagnostic = new PreceptTypeDiagnostic(DiagnosticCatalog.C41, $"unsupported binary operator '{binary.Operator}'.", 0);
+                diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, $"unsupported binary operator '{binary.Operator}'.", 0);
                 return false;
         }
     }
@@ -970,7 +970,7 @@ internal static class PreceptTypeChecker
         IReadOnlyDictionary<string, StaticValueKind> symbols,
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
-        List<PreceptTypeDiagnostic> diagnostics,
+        List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         string stateContext,
         int fallbackLine,
@@ -1017,7 +1017,7 @@ internal static class PreceptTypeChecker
                     if (IsAssignable(innerKind, intoKind))
                         break;
 
-                    diagnostics.Add(new PreceptTypeDiagnostic(
+                    diagnostics.Add(new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C43,
                         $"'{mutation.Verb.ToString().ToLowerInvariant()} {mutation.TargetField} into {mutation.IntoField}': cannot assign {FormatKinds(innerKind)} to target '{mutation.IntoField}' of type {FormatKinds(intoKind)}.",
                         line,

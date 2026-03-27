@@ -1597,21 +1597,50 @@ public sealed class PreceptEngine
 
 }
 
+public sealed record PreceptDiagnostic(
+    int Line,
+    int Column,
+    string Message,
+    string? Code,
+    ConstraintSeverity Severity,
+    string? StateContext = null);
+
+public sealed record CompileFromTextResult(
+    PreceptDefinition? Model,
+    PreceptEngine? Engine,
+    IReadOnlyList<PreceptDiagnostic> Diagnostics)
+{
+    public bool HasErrors => Diagnostics.Any(static diagnostic => diagnostic.Severity == ConstraintSeverity.Error);
+}
+
 public static class PreceptCompiler
 {
-    internal static CompileResult Validate(PreceptDefinition model)
+    internal static ValidationResult Validate(PreceptDefinition model)
     {
         // SYNC:CONSTRAINT:C26
         if (model is null)
             throw new ArgumentNullException(nameof(model));
 
+        var diagnostics = new List<PreceptValidationDiagnostic>();
+
         // SYNC:CONSTRAINT:C27
         if (string.IsNullOrWhiteSpace(model.InitialState.Name))
-            throw new InvalidOperationException(DiagnosticCatalog.C27.FormatMessage());
+        {
+            diagnostics.Add(new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C27,
+                DiagnosticCatalog.C27.FormatMessage(),
+                model.SourceLine));
+        }
 
         // SYNC:CONSTRAINT:C28
-        if (!model.States.Contains(model.InitialState))
-            throw new InvalidOperationException(DiagnosticCatalog.C28.FormatMessage(("stateName", model.InitialState.Name), ("workflowName", model.Name)));
+        if (!model.States.Any(state => string.Equals(state.Name, model.InitialState.Name, StringComparison.Ordinal)))
+        {
+            diagnostics.Add(new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C28,
+                DiagnosticCatalog.C28.FormatMessage(("stateName", model.InitialState.Name), ("workflowName", model.Name)),
+                model.InitialState.SourceLine > 0 ? model.InitialState.SourceLine : model.SourceLine,
+                StateContext: model.InitialState.Name));
+        }
 
         // SYNC:CONSTRAINT:C38
         // SYNC:CONSTRAINT:C39
@@ -1622,36 +1651,61 @@ public static class PreceptCompiler
         // SYNC:CONSTRAINT:C46
         // SYNC:CONSTRAINT:C47
         var typeCheck = PreceptTypeChecker.Check(model);
-        return new CompileResult(typeCheck.Diagnostics, typeCheck.TypeContext);
+        diagnostics.AddRange(typeCheck.Diagnostics);
+
+        CollectCompileTimeDiagnostics(model, diagnostics);
+
+        if (!diagnostics.Any(diagnostic => diagnostic.Constraint.Id is "C27" or "C28"))
+            diagnostics.AddRange(PreceptAnalysis.Analyze(model).Diagnostics);
+
+        return new ValidationResult(diagnostics, typeCheck.TypeContext);
+    }
+
+    public static CompileFromTextResult CompileFromText(string text)
+    {
+        var (model, parseDiagnostics) = PreceptParser.ParseWithDiagnostics(text);
+        if (model is null || parseDiagnostics.Count > 0)
+            return new CompileFromTextResult(null, null, parseDiagnostics.Select(ToDiagnostic).ToArray());
+
+        var validation = Validate(model);
+        var diagnostics = validation.Diagnostics.Select(ToDiagnostic).ToArray();
+        if (validation.HasErrors)
+            return new CompileFromTextResult(model, null, diagnostics);
+
+        return new CompileFromTextResult(model, new PreceptEngine(model), diagnostics);
     }
 
     public static PreceptEngine Compile(PreceptDefinition model)
     {
-        ValidateConstraintsAtCompileTime(model);
-
+        var validation = Validate(model);
+        ThrowIfValidationFailed(validation);
         return new PreceptEngine(model);
     }
 
-    private static void ThrowIfValidationFailed(CompileResult validation)
+    private static PreceptDiagnostic ToDiagnostic(ParseDiagnostic diagnostic)
+        => new(diagnostic.Line, diagnostic.Column, diagnostic.Message, diagnostic.Code, ConstraintSeverity.Error);
+
+    private static PreceptDiagnostic ToDiagnostic(PreceptValidationDiagnostic diagnostic)
+        => new(diagnostic.Line, diagnostic.Column, diagnostic.Message, diagnostic.DiagnosticCode, diagnostic.Constraint.Severity, diagnostic.StateContext);
+
+    private static void ThrowIfValidationFailed(ValidationResult validation)
     {
-        if (validation.HasErrors)
-        {
-            var first = validation.Diagnostics[0];
-            var location = first.Line > 0 ? $"Line {first.Line}: " : string.Empty;
-            var stateContext = string.IsNullOrWhiteSpace(first.StateContext)
-                ? string.Empty
-                : $" [state {first.StateContext}]";
-            throw new InvalidOperationException($"{location}{first.DiagnosticCode}{stateContext}: {first.Message}");
-        }
+        if (!validation.HasErrors)
+            return;
+
+        var first = validation.Diagnostics.First(diagnostic => diagnostic.Constraint.Severity == ConstraintSeverity.Error);
+        var location = first.Line > 0 ? $"Line {first.Line}: " : string.Empty;
+        var stateContext = string.IsNullOrWhiteSpace(first.StateContext)
+            ? string.Empty
+            : $" [state {first.StateContext}]";
+        throw new InvalidOperationException($"{location}{first.DiagnosticCode}{stateContext}: {first.Message}");
     }
 
-    private static void ValidateConstraintsAtCompileTime(PreceptDefinition model)
+    private static void CollectCompileTimeDiagnostics(PreceptDefinition model, List<PreceptValidationDiagnostic> diagnostics)
     {
-        ThrowIfValidationFailed(Validate(model));
-
         // Structural checks: duplicate and subsumed state asserts
-        ValidateDuplicateStateAsserts(model);
-        ValidateSubsumedStateAsserts(model);
+        CollectDuplicateStateAssertDiagnostics(model, diagnostics);
+        CollectSubsumedStateAssertDiagnostics(model, diagnostics);
 
         var defaultData = BuildDefaultData(model);
 
@@ -1662,9 +1716,13 @@ public static class PreceptCompiler
             {
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, defaultData);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
+                {
                     // SYNC:CONSTRAINT:C29
-                    throw new InvalidOperationException(
-                        DiagnosticCatalog.C29.FormatMessage(("reason", inv.Reason)));
+                    diagnostics.Add(new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C29,
+                        DiagnosticCatalog.C29.FormatMessage(("reason", inv.Reason)),
+                        inv.SourceLine));
+                }
             }
         }
 
@@ -1681,9 +1739,14 @@ public static class PreceptCompiler
 
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(sa.Expression, defaultData);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
+                {
                     // SYNC:CONSTRAINT:C30
-                    throw new InvalidOperationException(
-                        DiagnosticCatalog.C30.FormatMessage(("reason", sa.Reason), ("stateName", initialStateName)));
+                    diagnostics.Add(new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C30,
+                        DiagnosticCatalog.C30.FormatMessage(("reason", sa.Reason), ("stateName", initialStateName)),
+                        sa.SourceLine,
+                        StateContext: sa.State));
+                }
             }
         }
 
@@ -1722,17 +1785,21 @@ public static class PreceptCompiler
 
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(ea.Expression, eventDefaults);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
+                {
                     // SYNC:CONSTRAINT:C31
-                    throw new InvalidOperationException(
-                        DiagnosticCatalog.C31.FormatMessage(("reason", ea.Reason), ("eventName", ea.EventName)));
+                    diagnostics.Add(new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C31,
+                        DiagnosticCatalog.C31.FormatMessage(("reason", ea.Reason), ("eventName", ea.EventName)),
+                        ea.SourceLine));
+                }
             }
         }
 
         // 4. Validate literal set assignments against invariants
-        ValidateLiteralSetAssignments(model, defaultData);
+        CollectLiteralSetAssignmentDiagnostics(model, defaultData, diagnostics);
     }
 
-    private static void ValidateLiteralSetAssignments(PreceptDefinition model, IReadOnlyDictionary<string, object?> defaultData)
+    private static void CollectLiteralSetAssignmentDiagnostics(PreceptDefinition model, IReadOnlyDictionary<string, object?> defaultData, List<PreceptValidationDiagnostic> diagnostics)
     {
         var invariants = model.Invariants ?? Array.Empty<PreceptInvariant>();
 
@@ -1754,43 +1821,51 @@ public static class PreceptCompiler
             {
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, ctx);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
+                {
                     // SYNC:CONSTRAINT:C32
-                    throw new InvalidOperationException(
-                        DiagnosticCatalog.C32.FormatMessage(("sourceLine", assignment.SourceLine), ("key", assignment.Key), ("expression", assignment.ExpressionText), ("reason", inv.Reason)));
+                    diagnostics.Add(new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C32,
+                        DiagnosticCatalog.C32.FormatMessage(("sourceLine", assignment.SourceLine), ("key", assignment.Key), ("expression", assignment.ExpressionText), ("reason", inv.Reason)),
+                        assignment.SourceLine));
+                }
             }
         }
 
-        // Check assignments in transition rows
         if (model.TransitionRows is { Count: > 0 })
         {
             foreach (var row in model.TransitionRows)
+            {
                 foreach (var assignment in row.SetAssignments)
                     CheckLiteralAssignment(assignment);
+            }
         }
     }
 
     // SYNC:CONSTRAINT:C44
-    private static void ValidateDuplicateStateAsserts(PreceptDefinition model)
+    private static void CollectDuplicateStateAssertDiagnostics(PreceptDefinition model, List<PreceptValidationDiagnostic> diagnostics)
     {
         if (model.StateAsserts is not { Count: > 1 })
             return;
 
-        var seen = new HashSet<(AssertAnchor, string, string)>();
+        var seen = new HashSet<(AssertAnchor Anchor, string State, string Expression)>();
         foreach (var sa in model.StateAsserts)
         {
             if (!seen.Add((sa.Anchor, sa.State, sa.ExpressionText)))
             {
                 var prep = sa.Anchor.ToString().ToLowerInvariant();
-                throw new InvalidOperationException(
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C44,
                     DiagnosticCatalog.C44.FormatMessage(
                         ("preposition", prep), ("state", sa.State),
-                        ("expression", sa.ExpressionText), ("sourceLine", sa.SourceLine)));
+                        ("expression", sa.ExpressionText), ("sourceLine", sa.SourceLine)),
+                    sa.SourceLine,
+                    StateContext: sa.State));
             }
         }
     }
 
     // SYNC:CONSTRAINT:C45
-    private static void ValidateSubsumedStateAsserts(PreceptDefinition model)
+    private static void CollectSubsumedStateAssertDiagnostics(PreceptDefinition model, List<PreceptValidationDiagnostic> diagnostics)
     {
         if (model.StateAsserts is not { Count: > 1 })
             return;
@@ -1807,13 +1882,15 @@ public static class PreceptCompiler
 
         foreach (var sa in model.StateAsserts)
         {
-            if (sa.Anchor == AssertAnchor.To &&
-                inAsserts.Contains((sa.State, sa.ExpressionText)))
+            if (sa.Anchor == AssertAnchor.To && inAsserts.Contains((sa.State, sa.ExpressionText)))
             {
-                throw new InvalidOperationException(
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C45,
                     DiagnosticCatalog.C45.FormatMessage(
                         ("state", sa.State), ("expression", sa.ExpressionText),
-                        ("sourceLine", sa.SourceLine)));
+                        ("sourceLine", sa.SourceLine)),
+                    sa.SourceLine,
+                    StateContext: sa.State));
             }
         }
     }
