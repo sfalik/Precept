@@ -2,14 +2,13 @@
 
 ## Use the MCP Tools First
 
-This project ships a Precept MCP server with 6 tools. **Use them as your primary research tools** before reading source code or making assumptions about the DSL:
+This project ships a Precept MCP server with 5 tools. **Use them as your primary research tools** before reading source code or making assumptions about the DSL:
 
 - **`precept_language`** — returns the complete DSL vocabulary (all keywords by category, operators with precedence, expression scopes, constraints, fire pipeline stages, outcome kinds). Call this first when you need to understand what the language supports.
-- **`precept_schema(path)`** — returns the full typed structure of a `.precept` file (fields with types/defaults/nullability, events with args, states, transitions with guard branches). Use this to understand any specific precept file.
-- **`precept_validate(path)`** — parse + compile with structured diagnostics. Use this instead of `dotnet build` to check a precept file.
-- **`precept_audit(path)`** — BFS reachability analysis: unreachable states, dead ends, terminal states, orphaned events. Use this to assess structural quality.
-- **`precept_inspect(path, state, data)`** — read-only fire preview from any state+data snapshot. Use this to understand runtime behavior.
-- **`precept_run(path, events)`** — step-by-step event execution. Use this to trace through a workflow.
+- **`precept_compile(text)`** — parse, type-check, analyze, and compile a precept definition. Returns the full typed structure (states, fields, events, transitions) alongside any diagnostics. Use this to understand any specific precept and to check for errors.
+- **`precept_inspect(text, currentState, data, eventArgs?)`** — read-only inspection from any state+data snapshot. Shows what each event would do and which fields are editable. Use this to understand runtime behavior.
+- **`precept_fire(text, currentState, event, data?, args?)`** — single-event execution. Use this to trace through a workflow step by step.
+- **`precept_update(text, currentState, data, fields)`** — direct field editing. Use this to test `in <State> edit` declarations and verify constraint behavior on field changes.
 
 When analyzing, designing, or debugging anything related to the Precept DSL, start with the MCP tools to get authoritative data, then read source code only for implementation details the tools don't cover.
 

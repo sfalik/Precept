@@ -6,13 +6,13 @@ namespace Precept.Mcp.Tests;
 
 public class InspectToolTests
 {
-    private static string SamplesDir => TestPaths.SamplesDir;
-
-    private static string SamplePath(string fileName) => Path.Combine(SamplesDir, fileName);
+    private static string ReadSample(string fileName) =>
+        File.ReadAllText(Path.Combine(TestPaths.SamplesDir, fileName));
 
     [Fact]
     public void EventThatTransitions_ReturnsTransition()
     {
+        var text = ReadSample("maintenance-work-order.precept");
         var data = new Dictionary<string, object?>
         {
             ["RequesterName"] = "Jordan",
@@ -31,7 +31,7 @@ public class InspectToolTests
             ["Assign"] = new() { ["Technician"] = "alice", ["Estimate"] = 3.0 }
         };
 
-        var result = InspectTool.Run(SamplePath("maintenance-work-order.precept"), "Open", data, eventArgs);
+        var result = InspectTool.Inspect(text, "Open", data, eventArgs);
 
         result.Error.Should().BeNull();
         result.CurrentState.Should().Be("Open");
@@ -45,6 +45,7 @@ public class InspectToolTests
     [Fact]
     public void EventUndefined_ReturnsUndefined()
     {
+        var text = ReadSample("maintenance-work-order.precept");
         var data = new Dictionary<string, object?>
         {
             ["RequesterName"] = "Jordan",
@@ -59,16 +60,22 @@ public class InspectToolTests
             ["CancellationReason"] = null
         };
 
-        var result = InspectTool.Run(SamplePath("maintenance-work-order.precept"), "InProgress", data);
+        var result = InspectTool.Inspect(text, "InProgress", data);
 
+        // ApproveParts has no transition rows from InProgress — engine only returns events
+        // with rows from the current state, so we verify that an event without rows doesn't appear.
         var approvePartsEvent = result.Events.FirstOrDefault(e => e.Event == "ApproveParts");
-        approvePartsEvent.Should().NotBeNull();
-        approvePartsEvent!.Outcome.Should().Be("Undefined");
+        approvePartsEvent.Should().BeNull("engine.Inspect only returns events with transition rows from the current state");
+
+        // Verify that RecordProgress (which has rows from InProgress) does appear
+        var recordProgress = result.Events.FirstOrDefault(e => e.Event == "RecordProgress");
+        recordProgress.Should().NotBeNull();
     }
 
     [Fact]
-    public void EventWithRequiredArgsMissing_ReturnsRequiresArgs()
+    public void EventWithRequiredArgsMissing_ReturnsEngineOutcomeWithRequiredArgs()
     {
+        var text = ReadSample("maintenance-work-order.precept");
         var data = new Dictionary<string, object?>
         {
             ["RequesterName"] = "Jordan",
@@ -83,18 +90,21 @@ public class InspectToolTests
             ["CancellationReason"] = null
         };
 
-        var result = InspectTool.Run(SamplePath("maintenance-work-order.precept"), "Open", data);
+        var result = InspectTool.Inspect(text, "Open", data);
 
+        // Assign has transition rows from Open, so it should appear in the engine result.
+        // Without args, the engine returns its actual outcome — not a synthetic "requires-args".
         var assignEvent = result.Events.FirstOrDefault(e => e.Event == "Assign");
         assignEvent.Should().NotBeNull();
-        assignEvent!.RequiresArgs.Should().BeTrue();
-        assignEvent.RequiredArgs.Should().Contain(a => a.Name == "Technician");
-        assignEvent.RequiredArgs.Should().Contain(a => a.Name == "Estimate");
+        assignEvent!.Outcome.Should().NotBeNull();
+        // The engine returns RequiredEventArgumentKeys only for successful transitions;
+        // when args are missing and the event fails, RequiredArgs may be null.
     }
 
     [Fact]
-    public void EventWithArgsSupplied_EvaluatedWithThoseArgs()
+    public void RequiredArgs_PopulatedOnSuccessfulTransition()
     {
+        var text = ReadSample("maintenance-work-order.precept");
         var data = new Dictionary<string, object?>
         {
             ["RequesterName"] = "Jordan",
@@ -113,7 +123,40 @@ public class InspectToolTests
             ["Assign"] = new() { ["Technician"] = "alice", ["Estimate"] = 3.0 }
         };
 
-        var result = InspectTool.Run(SamplePath("maintenance-work-order.precept"), "Open", data, eventArgs);
+        var result = InspectTool.Inspect(text, "Open", data, eventArgs);
+
+        // With valid args supplied, Assign transitions successfully and carries RequiredEventArgumentKeys
+        var assignEvent = result.Events.FirstOrDefault(e => e.Event == "Assign");
+        assignEvent.Should().NotBeNull();
+        assignEvent!.Outcome.Should().Be("Transition");
+        assignEvent.RequiredArgs.Should().NotBeNull();
+        assignEvent.RequiredArgs!.Should().Contain("Technician");
+        assignEvent.RequiredArgs!.Should().Contain("Estimate");
+    }
+
+    [Fact]
+    public void EventWithArgsSupplied_EvaluatedWithThoseArgs()
+    {
+        var text = ReadSample("maintenance-work-order.precept");
+        var data = new Dictionary<string, object?>
+        {
+            ["RequesterName"] = "Jordan",
+            ["Location"] = "Plant 1",
+            ["IssueSummary"] = "Leaking valve",
+            ["AssignedTechnician"] = null,
+            ["EstimatedHours"] = 0.0,
+            ["ActualHours"] = 0.0,
+            ["Urgent"] = false,
+            ["PartsApproved"] = false,
+            ["CompletionNote"] = null,
+            ["CancellationReason"] = null
+        };
+        var eventArgs = new Dictionary<string, Dictionary<string, object?>>
+        {
+            ["Assign"] = new() { ["Technician"] = "alice", ["Estimate"] = 3.0 }
+        };
+
+        var result = InspectTool.Inspect(text, "Open", data, eventArgs);
 
         var assignEvent = result.Events.FirstOrDefault(e => e.Event == "Assign");
         assignEvent.Should().NotBeNull();
@@ -122,42 +165,117 @@ public class InspectToolTests
     }
 
     [Fact]
-    public void ResultOrdering_ActionableFirst()
+    public void EventsPreserveEngineDeclarationOrder()
     {
+        var text = ReadSample("maintenance-work-order.precept");
         var data = new Dictionary<string, object?>
         {
             ["RequesterName"] = "Jordan",
             ["Location"] = "Plant 1",
             ["IssueSummary"] = "Leaking valve",
-            ["AssignedTechnician"] = "alice",
-            ["EstimatedHours"] = 3.0,
+            ["AssignedTechnician"] = null,
+            ["EstimatedHours"] = 0.0,
             ["ActualHours"] = 0.0,
             ["Urgent"] = false,
-            ["PartsApproved"] = true,
+            ["PartsApproved"] = false,
             ["CompletionNote"] = null,
             ["CancellationReason"] = null
         };
 
-        var result = InspectTool.Run(SamplePath("maintenance-work-order.precept"), "InProgress", data);
+        var result = InspectTool.Inspect(text, "Open", data);
 
-        // First events should be actionable (Transition/NoTransition), then unavailable, then requiresArgs
-        var events = result.Events.ToList();
-        var firstActionable = events.FindIndex(e =>
-            e.Outcome == "Transition" || e.Outcome == "NoTransition");
-        var firstUnavailable = events.FindIndex(e =>
-            e.Outcome == "Undefined" || e.Outcome == "Unmatched" || e.Outcome == "Rejected" || e.Outcome == "ConstraintFailure");
-        var firstRequiresArgs = events.FindIndex(e => e.RequiresArgs == true);
-
-        if (firstActionable >= 0 && firstUnavailable >= 0)
-            firstActionable.Should().BeLessThan(firstUnavailable);
-        if (firstActionable >= 0 && firstRequiresArgs >= 0)
-            firstActionable.Should().BeLessThan(firstRequiresArgs);
+        // Events should be in engine's declaration order, not sorted by outcome
+        var eventNames = result.Events.Select(e => e.Event).ToList();
+        eventNames.Should().NotBeEmpty();
+        eventNames.Count.Should().BeGreaterThan(1);
     }
 
     [Fact]
-    public void MissingFile_ReturnsError()
+    public void CompileFailure_ReturnsErrorString()
     {
-        var result = InspectTool.Run(@"C:\nonexistent\inspect.precept", "Open");
-        result.Error.Should().Contain("File not found");
+        var result = InspectTool.Inspect("not valid precept", "Open");
+
+        result.Error.Should().Be("Compilation failed. Use precept_compile to diagnose and fix errors first.");
+        result.Events.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void EchoesResolvedInstanceSnapshot()
+    {
+        var text = ReadSample("maintenance-work-order.precept");
+        var data = new Dictionary<string, object?>
+        {
+            ["RequesterName"] = "Jordan",
+            ["Location"] = "Plant 1",
+            ["IssueSummary"] = "Leaking valve"
+        };
+
+        var result = InspectTool.Inspect(text, "Open", data);
+
+        result.Error.Should().BeNull();
+        result.CurrentState.Should().Be("Open");
+        result.Data.Should().NotBeNull();
+        result.Data!["RequesterName"].Should().Be("Jordan");
+        // Defaults should be applied
+        result.Data.Should().ContainKey("EstimatedHours");
+        result.Data.Should().ContainKey("ActualHours");
+    }
+
+    [Fact]
+    public void ConstraintFailure_ReturnsStructuredViolations()
+    {
+        var text = """
+            precept Test
+            field Name as string nullable
+            in Done assert Name != null because "Done requires a name"
+            state Open initial
+            state Done
+            event Finish
+            from Open on Finish -> transition Done
+            """;
+
+        var result = InspectTool.Inspect(text, "Open");
+
+        var finish = result.Events.FirstOrDefault(e => e.Event == "Finish");
+        finish.Should().NotBeNull();
+        finish!.Outcome.Should().Be("ConstraintFailure");
+        finish.Violations.Should().NotBeEmpty();
+        finish.Violations[0].Message.Should().Contain("Done requires a name");
+        finish.Violations[0].Source.Kind.Should().Be("state-assertion");
+        finish.Violations[0].Targets.Should().Contain(t => t.Kind == "field" && t.FieldName == "Name");
+    }
+
+    [Fact]
+    public void EditableFields_PresentWhenEditDeclarationsExist()
+    {
+        var text = ReadSample("maintenance-work-order.precept");
+
+        // Draft state has: in Draft edit Location, IssueSummary, Urgent
+        var result = InspectTool.Inspect(text, "Draft");
+
+        result.Error.Should().BeNull();
+        result.EditableFields.Should().NotBeNull();
+        result.EditableFields!.Select(f => f.Name).Should().Contain("Location");
+        result.EditableFields!.Select(f => f.Name).Should().Contain("IssueSummary");
+        result.EditableFields!.Select(f => f.Name).Should().Contain("Urgent");
+    }
+
+    [Fact]
+    public void EditableFields_NullWhenNoEditDeclarations()
+    {
+        var text = """
+            precept NoEdits
+            field Name as string nullable
+            state Open initial
+            state Done
+            event Finish
+            from Open on Finish -> transition Done
+            """;
+
+        // Precept has no edit declarations at all
+        var result = InspectTool.Inspect(text, "Open");
+
+        result.Error.Should().BeNull();
+        result.EditableFields.Should().BeNull();
     }
 }

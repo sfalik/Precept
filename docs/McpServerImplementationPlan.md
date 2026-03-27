@@ -4,7 +4,7 @@ Date: 2025-03-05
 Spec: `docs/McpServerDesign.md`
 Prerequisite: Language redesign complete (`docs/PreceptLanguageImplementationPlan.md` — all 9 phases)
 
-> **Status (2026-03-27):** Phases 0–6 are implemented — the original 6-tool surface (validate, schema, audit, run, language, inspect) is live and tested. The MCP Redesign Phase below replaces that surface with 4 tools accepting text input and returning structured feedback. Design decisions finalized 2026-03-27. Phases 7–9 have been updated to reflect the new tool names.
+> **Status (2026-03-27):** Phases 0–6 and the MCP Redesign Phase are implemented — the 5-tool surface (language, compile, inspect, fire, update) is live and tested with text input and structured feedback. The Update Tool Phase added `precept_update`, renamed `precept_run` → `precept_fire`, fixed inspect thin-wrapper violations, and added `editableFields` to inspect output. Phases 7–9 still contain some historical `precept_run` and "4 tools" references in their completed-phase descriptions (Phases 0–6 are historical records), but all forward-looking steps and checkpoints reference the current 5-tool surface.
 
 This plan builds the MCP server as a new project in `tools/Precept.Mcp/`. Each phase adds one tool, fully tested, before moving to the next. The core `src/Precept/` infrastructure (catalogs, parser, runtime) is already in place from the language redesign — this plan only adds tool wrappers and MCP transport.
 
@@ -360,41 +360,41 @@ The following decisions were finalized during the design walkthrough (2026-03-27
 - [x] Add `ConstraintSeverity.Hint` to the severity enum — already done in Language Phase I
 - [x] Implement graph analysis (C48–C53) in `PreceptAnalysis.Analyze()` and consume the structured validation result instead of exception parsing — already done in Language Phase I
 - [x] Wire graph analysis into `CompileFromText` so warnings appear alongside type-check errors — already done in Language Phase I
-- [ ] Create `ViolationDto.cs` at `tools/Precept.Mcp/Tools/ViolationDto.cs` — shared between inspect and run
-- [ ] Implement `CompileTool.cs` with inline `DiagnosticDto` and schema DTOs — merges validate + schema + audit; returns full model + diagnostics
-- [ ] Rewrite `InspectTool.cs` — delegate to `engine.Inspect()`, echo resolved snapshot, compile failure returns error string
-- [ ] Rewrite `RunTool.cs` — single-event with state+data+event+args input, structured `ViolationDto` output, compile failure returns error string
-- [ ] Delete `ValidateTool.cs`, `SchemaTool.cs`, `AuditTool.cs`
-- [ ] Rewrite test files for the new 4-tool surface
-- [ ] Update `Program.cs` if any registration changes are needed
-- [ ] Verify language server diagnostic mapping still works (LS calls same core APIs)
+- [x] Create `ViolationDto.cs` at `tools/Precept.Mcp/Tools/ViolationDto.cs` — shared between inspect and run
+- [x] Implement `CompileTool.cs` with inline `DiagnosticDto` and schema DTOs — merges validate + schema + audit; returns full model + diagnostics
+- [x] Rewrite `InspectTool.cs` — delegate to `engine.Inspect()`, echo resolved snapshot, compile failure returns error string
+- [x] Rewrite `RunTool.cs` — single-event with state+data+event+args input, structured `ViolationDto` output, compile failure returns error string
+- [x] Delete `ValidateTool.cs`, `SchemaTool.cs`, `AuditTool.cs`
+- [x] Rewrite test files for the new 4-tool surface
+- [x] Update `Program.cs` if any registration changes are needed
+- [x] Verify language server diagnostic mapping still works (LS calls same core APIs)
 
 ### Tests
 
-- [ ] `precept_compile`: valid input → full schema + zero diagnostics
-- [ ] `precept_compile`: type errors → partial schema + error-severity diagnostics with codes
-- [ ] `precept_compile`: parse failure → diagnostics only, no schema
-- [ ] `precept_compile`: unreachable state → warning-severity diagnostic (C48)
-- [ ] `precept_compile`: orphaned event → warning-severity diagnostic (C49)
-- [ ] `precept_compile`: dead-end state → hint-severity diagnostic (C50)
-- [ ] `precept_inspect`: text input + state + data → structured event outcomes with `ViolationDto`
-- [ ] `precept_inspect`: requires-args detection → `requiredArgs` reported
-- [ ] `precept_inspect`: compile errors in text → error string, no runtime results
-- [ ] `precept_inspect`: echoes resolved instance snapshot with defaults applied
-- [ ] `precept_run`: single event execution → outcome with `ViolationDto` array
-- [ ] `precept_run`: compile errors in text → error string, no execution
-- [ ] `precept_run`: constraint failure → structured violations on the result
-- [ ] `precept_run`: echoes resolved data snapshot with defaults applied
-- [ ] `precept_language`: unchanged behavior (regression)
+- [x] `precept_compile`: valid input → full schema + zero diagnostics
+- [x] `precept_compile`: type errors → partial schema + error-severity diagnostics with codes
+- [x] `precept_compile`: parse failure → diagnostics only, no schema
+- [x] `precept_compile`: unreachable state → warning-severity diagnostic (C48)
+- [x] `precept_compile`: orphaned event → warning-severity diagnostic (C49)
+- [x] `precept_compile`: dead-end state → hint-severity diagnostic (C50)
+- [x] `precept_inspect`: text input + state + data → structured event outcomes with `ViolationDto`
+- [x] `precept_inspect`: requires-args detection → `requiredArgs` reported
+- [x] `precept_inspect`: compile errors in text → error string, no runtime results
+- [x] `precept_inspect`: echoes resolved instance snapshot with defaults applied
+- [x] `precept_fire`: single event execution → outcome with `ViolationDto` array
+- [x] `precept_fire`: compile errors in text → error string, no execution
+- [x] `precept_fire`: constraint failure → structured violations on the result
+- [x] `precept_fire`: echoes resolved data snapshot with defaults applied
+- [x] `precept_language`: unchanged behavior (regression)
 
 ### Checkpoint
 
 - `dotnet build` passes (entire solution)
-- All MCP tool tests green with new 4-tool surface
+- All MCP tool tests green with new 4-tool surface (then expanded to 5-tool in the Update Tool Phase)
 - `precept_compile` returns warnings and hints alongside errors
 - `ViolationDto` preserves full `ConstraintViolation` structure (source hierarchy + targets)
-- `precept_inspect` and `precept_run` return error string on compile failure (not diagnostics)
-- `precept_run` is single-event (no batch)
+- `precept_inspect` and `precept_fire` return error string on compile failure (not diagnostics)
+- `precept_fire` is single-event (no batch)
 - `precept_inspect` echoes resolved instance snapshot
 - No domain logic in tool files beyond DTO projection
 
@@ -424,7 +424,7 @@ Use this prompt to execute the redesign phase in a new Copilot Chat session:
 
 ## Phase 7: Agent Plugin Structure + MCP Packaging
 
-**Goal:** Create the agent plugin directory structure with MCP server binaries, so the four tools are callable by Copilot with zero manual setup after plugin installation.
+**Goal:** Create the agent plugin directory structure with MCP server binaries, so the five tools are callable by Copilot with zero manual setup after plugin installation.
 
 ### Steps
 
@@ -458,14 +458,14 @@ Use this prompt to execute the redesign phase in a new Copilot Chat session:
 - [x] Rename existing extension tasks: `extension: loop local install` → `extension: install`, `extension: loop local uninstall` → `extension: uninstall` *(already implemented)*
 - [x] Remove the `extension: watch` task (unused in the local install loop) *(already implemented)*
 - [ ] Test locally using `chat.pluginLocations` setting pointing to the plugin directory
-- [ ] Verify Copilot lists all 4 precept tools from the plugin's MCP server
+- [ ] Verify Copilot lists all 5 precept tools from the plugin's MCP server
 - [ ] Test with at least 2 sample files per tool
 
 ### Checkpoint
 
 - Plugin loads without errors when registered via `chat.pluginLocations`
-- Copilot lists 4 precept tools from the plugin's MCP server
-- `precept_compile`, `precept_inspect`, and `precept_run` produce correct results
+- Copilot lists 5 precept tools from the plugin's MCP server
+- `precept_compile`, `precept_inspect`, `precept_fire`, `precept_update` produce correct results
 - Dev tasks (`extension: install`, `extension: uninstall`, `plugin: enable`, `plugin: disable`) work correctly
 - `.vscode/mcp.json` references the moved launcher at `tools/scripts/start-precept-mcp.js`
 
@@ -502,7 +502,7 @@ Use this prompt to execute Phase 7 in a new Copilot Chat session:
     - Mermaid Diagrams section: after creating/editing a precept, include a `stateDiagram-v2` diagram of the resulting state machine; use `precept_compile` for transition data
 - [ ] Draft `skills/precept-debugging/SKILL.md` with:
     - Frontmatter: name `precept-debugging`, description with explicit trigger phrases
-    - Body: diagnosis workflow using `precept_compile` → `precept_inspect` → `precept_run`
+    - Body: diagnosis workflow using `precept_compile` → `precept_inspect` → `precept_fire`
     - Mermaid Diagrams section: when explaining structure or transition behavior, include a focused `stateDiagram-v2` showing only the relevant subset; annotate guards in brackets, mark reject branches, annotate warning/hint findings (unreachable/dead-end states)
 - [ ] Validate all files against the [Agent Skills specification](https://agentskills.io/specification):
     - `name` lowercase kebab-case, matches parent directory, max 64 chars
@@ -542,7 +542,7 @@ Use this prompt to execute Phase 8 in a new Copilot Chat session:
 ### Steps
 
 - [ ] Update `README.md`:
-  - Add MCP Server section describing the 4 tools and how to use them
+  - Add MCP Server section describing the 5 tools and how to use them
     - Add setup instructions: install the Precept agent plugin (marketplace or Git URL)
     - Document the Precept Author agent and companion skills
   - Update Current Status to include MCP server and agent plugin
@@ -564,7 +564,7 @@ Use this prompt to execute Phase 8 in a new Copilot Chat session:
 
 ### Checkpoint
 
-- README accurately describes all 4 tools
+- README accurately describes all 5 tools
 - README accurately describes agent plugin installation and Precept Author agent
 - No aspirational claims presented as implemented
 - Design doc documents plugin distribution model accurately
@@ -597,18 +597,22 @@ Use this prompt to execute Phase 9 in a new Copilot Chat session:
 | `tools/Precept.Mcp/Tools/ValidateTool.cs` | **New** → **Delete** | 1 → Redesign |
 | `tools/Precept.Mcp/Tools/SchemaTool.cs` | **New** → **Delete** | 2 → Redesign |
 | `tools/Precept.Mcp/Tools/AuditTool.cs` | **New** → **Delete** | 3 → Redesign |
-| `tools/Precept.Mcp/Tools/RunTool.cs` | **New** → **Rewrite** (text input, structured violations) | 4 → Redesign |
+| `tools/Precept.Mcp/Tools/RunTool.cs` | **New** → **Rewrite** → **Rename** to `FireTool.cs` | 4 → Redesign → Update Tool |
+| `tools/Precept.Mcp/Tools/FireTool.cs` | **Renamed** from `RunTool.cs` — `precept_fire` single-event execution | Update Tool |
+| `tools/Precept.Mcp/Tools/UpdateTool.cs` | **New** — `precept_update` direct field editing | Update Tool |
 | `tools/Precept.Mcp/Tools/LanguageTool.cs` | **New** (unchanged in redesign) | 5 |
 | `tools/Precept.Mcp/Tools/InspectTool.cs` | **New** → **Rewrite** (delegate to engine.Inspect) | 6 → Redesign |
 | `tools/Precept.Mcp/Tools/CompileTool.cs` | **New** — merges validate + schema + audit; inline DiagnosticDto + schema DTOs | Redesign |
-| `tools/Precept.Mcp/Tools/ViolationDto.cs` | **New** — shared violation DTO (inspect + run) | Redesign |
+| `tools/Precept.Mcp/Tools/ViolationDto.cs` | **New** — shared violation DTO (inspect, fire, and update) | Redesign |
 | `src/Precept/Dsl/PreceptAnalysis.cs` | **New** — graph analysis (C48–C53) | Redesign (Language Phase I) |
 | `src/Precept/Dsl/PreceptCompiler.cs` | **Edit** — add `CompileFromText(text)` | Redesign (Language Phase I) |
 | `test/Precept.Mcp.Tests/Precept.Mcp.Tests.csproj` | **New** | 0 |
 | `test/Precept.Mcp.Tests/ValidateToolTests.cs` | **New** → **Delete** | 1 → Redesign |
 | `test/Precept.Mcp.Tests/SchemaToolTests.cs` | **New** → **Delete** | 2 → Redesign |
 | `test/Precept.Mcp.Tests/AuditToolTests.cs` | **New** → **Delete** | 3 → Redesign |
-| `test/Precept.Mcp.Tests/RunToolTests.cs` | **New** → **Rewrite** | 4 → Redesign |
+| `test/Precept.Mcp.Tests/RunToolTests.cs` | **New** → **Rewrite** → **Rename** to `FireToolTests.cs` | 4 → Redesign → Update Tool |
+| `test/Precept.Mcp.Tests/FireToolTests.cs` | **Renamed** from `RunToolTests.cs` | Update Tool |
+| `test/Precept.Mcp.Tests/UpdateToolTests.cs` | **New** | Update Tool |
 | `test/Precept.Mcp.Tests/LanguageToolTests.cs` | **New** (unchanged in redesign) | 5 |
 | `test/Precept.Mcp.Tests/InspectToolTests.cs` | **New** → **Rewrite** | 6 → Redesign |
 | `test/Precept.Mcp.Tests/CompileToolTests.cs` | **New** | Redesign |
@@ -648,14 +652,16 @@ Phase 6: precept_inspect (PreceptEngine.Inspect — builds on Phase 4's runtime 
     ↓
 MCP Redesign: 6→4 tools (requires Language Phase I for structured validation + C48–C53 diagnostics)
     ↓
-Phase 7: Agent plugin structure + MCP packaging (4 tools)
+Update Tool Phase: precept_update + precept_fire rename + inspect thin-wrapper fixes (requires MCP Redesign)
+    ↓
+Phase 7: Agent plugin structure + MCP packaging (5 tools)
     ↓
 Phase 8: Agent and skill content (can be drafted in parallel with Redesign)
     ↓
 Phase 9: Documentation + distribution
 ```
 
-Phases 0–6 are complete — the original 6-tool surface is implemented and tested. The MCP Redesign Phase depends on Language Phase I (graph analysis warnings) from `PreceptLanguageImplementationPlan.md`. Phase 7 requires the redesigned MCP tools. Phase 8 (agent/skill markdown) can be drafted in parallel with the Redesign Phase but testing requires the redesigned tools. Phase 9 depends on both 7 and 8.
+Phases 0–6, the MCP Redesign Phase, and the Update Tool Phase are complete — the 5-tool surface (language, compile, inspect, fire, update) is implemented and tested. Phase 7 requires the 5-tool surface. Phase 8 (agent/skill markdown) can be drafted in parallel but testing requires the redesigned tools. Phase 9 depends on both 7 and 8.
 
 ## Estimated Scope
 
@@ -668,7 +674,8 @@ Phases 0–6 are complete — the original 6-tool surface is implemented and tes
 | 4. `precept_run` | ~100 | Low (thin wrapper over engine) | ✅ Done |
 | 5. `precept_language` | ~200 | Low (reflection + static data) | ✅ Done |
 | 6. `precept_inspect` | ~130 | Low-Medium (arg detection logic) | ✅ Done |
-| MCP Redesign | ~350 | Medium (core API + DTO + rewrite 4 tools + tests) | Not started |
+| MCP Redesign | ~350 | Medium (core API + DTO + rewrite 4 tools + tests) | ✅ Done |
+| Update Tool Phase | ~180 | Low-Medium (rename + refactor + new tool + shared DTOs) | ✅ Done |
 | 7. Agent plugin structure | ~80 | Low-Medium (launcher move + toggle script) | Not started |
 | 8. Agent and skill content | ~300 | Medium (prompt engineering) | Not started |
 | 9. Documentation + distribution | ~180 | Low | Not started |

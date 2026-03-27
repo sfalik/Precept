@@ -5,24 +5,23 @@ using Precept;
 namespace Precept.Mcp.Tools;
 
 [McpServerToolType]
-public static class SchemaTool
+public static class CompileTool
 {
-    [McpServerTool(Name = "precept_schema")]
-    [Description("Return the full structure of a precept as typed JSON — states, fields, events with their args, and the transition table.")]
-    public static SchemaResult Run(
-        [Description("Path to the .precept file")] string path)
+    [McpServerTool(Name = "precept_compile")]
+    [Description("Parse, type-check, analyze, and compile a precept definition. Returns the full typed structure alongside any diagnostics.")]
+    public static CompileResult Run(
+        [Description("The precept definition text")] string text)
     {
-        if (!File.Exists(path))
-            return SchemaResult.WithError($"File not found: {path}");
+        var result = PreceptCompiler.CompileFromText(text);
+        var model = result.Model;
 
-        var text = File.ReadAllText(path);
-        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(text);
+        var diagnostics = result.Diagnostics
+            .Select(d => new DiagnosticDto(d.Line, d.Column, d.Message, d.Code,
+                d.Severity.ToString().ToLowerInvariant()))
+            .ToList();
 
-        if (model is null || diagnostics.Count > 0)
-        {
-            return SchemaResult.WithError(
-                string.Join("; ", diagnostics.Select(d => d.Message)));
-        }
+        if (model is null)
+            return CompileResult.DiagnosticsOnly(diagnostics);
 
         var states = model.States
             .Select(s => new StateDto(s.Name, GetStateRules(model, s.Name)))
@@ -46,10 +45,21 @@ public static class SchemaTool
             .Select(g => new TransitionDto(
                 g.Key.FromState,
                 g.Key.EventName,
-                g.Select(SummarizeBranch).ToList()))
+                g.Select(MapBranch).ToList()))
             .ToList();
 
-        return new SchemaResult(model.Name, model.InitialState.Name, states, fields, collectionFields, events, transitions, null);
+        return new CompileResult(
+            !result.HasErrors,
+            model.Name,
+            model.InitialState.Name,
+            model.States.Count,
+            model.Events.Count,
+            states,
+            fields,
+            collectionFields,
+            events,
+            transitions,
+            diagnostics);
     }
 
     private static List<string> GetStateRules(PreceptDefinition model, string stateName)
@@ -64,46 +74,48 @@ public static class SchemaTool
     private static object? FormatDefault(PreceptField f)
     {
         if (f.HasDefaultValue) return f.DefaultValue;
-        if (f.IsNullable) return null;
         return null;
     }
 
-    private static string SummarizeBranch(PreceptTransitionRow row)
+    private static BranchDto MapBranch(PreceptTransitionRow row)
     {
-        var guard = row.WhenText is not null ? $"if {row.WhenText}" : "else";
-        var outcome = row.Outcome switch
+        var (outcome, target, reason) = row.Outcome switch
         {
-            StateTransition t => $"transition {t.TargetState}",
-            Rejection r => r.Reason is not null ? $"reject \"{r.Reason}\"" : "reject",
-            NoTransition => "no transition",
-            _ => "unknown"
+            StateTransition t => ("transition", (string?)t.TargetState, (string?)null),
+            Rejection r => ("reject", (string?)null, r.Reason),
+            NoTransition => ("no-transition", (string?)null, (string?)null),
+            _ => ("unknown", (string?)null, (string?)null)
         };
 
-        // For unguarded rows, just show the outcome
-        if (row.WhenText is null)
-            return $"→ {outcome}";
-
-        return $"{guard} → {outcome}";
+        return new BranchDto(row.WhenText, outcome, target, reason);
     }
 }
 
-public sealed record SchemaResult(
+// ── Compile result DTOs (inline — sole consumer) ──────────────
+
+public sealed record CompileResult(
+    bool Valid,
     string? Name,
     string? InitialState,
+    int StateCount,
+    int EventCount,
     IReadOnlyList<StateDto>? States,
     IReadOnlyList<FieldDto>? Fields,
     IReadOnlyList<CollectionFieldDto>? CollectionFields,
     IReadOnlyList<EventDto>? Events,
     IReadOnlyList<TransitionDto>? Transitions,
-    string? Error)
+    IReadOnlyList<DiagnosticDto> Diagnostics)
 {
-    public static SchemaResult WithError(string message) =>
-        new(null, null, null, null, null, null, null, message);
+    public static CompileResult DiagnosticsOnly(IReadOnlyList<DiagnosticDto> diagnostics) =>
+        new(false, null, null, 0, 0, null, null, null, null, null, diagnostics);
 }
+
+public sealed record DiagnosticDto(int Line, int Column, string Message, string? Code, string Severity);
 
 public sealed record StateDto(string Name, IReadOnlyList<string> Rules);
 public sealed record FieldDto(string Name, string Type, bool Nullable, object? Default);
 public sealed record CollectionFieldDto(string Name, string Kind, string InnerType);
 public sealed record EventDto(string Name, IReadOnlyList<EventArgDto> Args);
 public sealed record EventArgDto(string Name, string Type, bool Nullable, bool Required);
-public sealed record TransitionDto(string From, string On, IReadOnlyList<string> Branches);
+public sealed record TransitionDto(string From, string On, IReadOnlyList<BranchDto> Branches);
+public sealed record BranchDto(string? Guard, string Outcome, string? Target, string? Reason);

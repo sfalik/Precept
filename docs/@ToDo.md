@@ -5,10 +5,10 @@
 The workstreams below have cross-plan dependencies. Execute in this order:
 
 ```
-CV 0-3 → Language D-H → CV 4-7 → Language I → MCP Redesign → MCP 7-9
+CV 0-3 → Language D-H → CV 4-7 → Language I → MCP Redesign → Update Tool → MCP 7-9
 ```
 
-**Rationale:** Rename phases (CV 0-3) establish final naming so all subsequent code uses the settled names. Language checker expansion (D-H) then registers new diagnostics on `DiagnosticCatalog` (renamed in CV Phase 2). The structured violation model (CV 4-7) introduces `ConstraintViolation` and the `Rejected` / `ConstraintFailure` split. Language Phase I adds graph analysis warnings (C48–C53) and cleans up compile validation so the MCP redesign can consume one structured diagnostic pipeline. The MCP Redesign Phase consolidates 6 tools into 4 with text input and structured output. MCP plugin, agent, and skills (MCP 7-9) go last because they reference the redesigned tool surface.
+**Rationale:** Rename phases (CV 0-3) establish final naming so all subsequent code uses the settled names. Language checker expansion (D-H) then registers new diagnostics on `DiagnosticCatalog` (renamed in CV Phase 2). The structured violation model (CV 4-7) introduces `ConstraintViolation` and the `Rejected` / `ConstraintFailure` split. Language Phase I adds graph analysis warnings (C48–C53) and cleans up compile validation so the MCP redesign can consume one structured diagnostic pipeline. The MCP Redesign Phase consolidates 6 tools into 4 with text input and structured output. The Update Tool Phase adds `precept_update` (the 5th tool), renames `precept_run` to `precept_fire`, fixes inspect thin-wrapper violations, and adds `editableFields` to inspect output. MCP plugin, agent, and skills (MCP 7-9) go last because they reference the full 5-tool surface.
 
 ---
 
@@ -39,10 +39,14 @@ CV 0-3 → Language D-H → CV 4-7 → Language I → MCP Redesign → MCP 7-9
 - [x] [Phase I](PreceptLanguageImplementationPlan.md#Phase-I-Graph-Analysis-Warning-Diagnostics): remove coverage warning C51, renumber graph diagnostics to C48–C53, eliminate throw-based compile validation, implement `PreceptAnalysis.Analyze()` (BFS reachability, orphaned events, dead-end detection, reject-only pairs, event-never-succeeds, empty precepts), add `ConstraintSeverity.Hint`, wire graph analysis into `Validate()`, add `CompileFromText(text)` composed pipeline, and confirm language server/MCP consumers use the structured result.
 - Verification: full solution build plus `Precept.Tests`, `Precept.LanguageServer.Tests`, and `Precept.Mcp.Tests` pass; remaining output is limited to pre-existing nullable warnings.
 
-## Group 4b: MCP Redesign (6→4 Tools)
+## Group 4b: MCP Redesign (6→4 Tools) ✅
 
-- Implement the [MCP Redesign Phase](McpServerImplementationPlan.md#MCP-Redesign-Phase-64-Tools-with-Text-Input): replace validate+schema+audit with `precept_compile`, rewrite `precept_inspect` to delegate to `engine.Inspect()`, update `precept_run` for text input and structured `ViolationDto`, create shared DTOs (`DiagnosticDto`, `ViolationDto`), delete old tool files, rewrite tests.
-- Executor note: use the [Redesign implementation prompt](McpServerImplementationPlan.md#Redesign-implementation-prompt) in the linked phase section as the canonical change guide; keep this todo entry as scope/order only.
+- [x] Implement the [MCP Redesign Phase](McpServerImplementationPlan.md#MCP-Redesign-Phase-64-Tools-with-Text-Input): replace validate+schema+audit with `precept_compile`, rewrite `precept_inspect` to delegate to `engine.Inspect()`, update `precept_run` for text input and structured `ViolationDto`, create shared DTOs (`DiagnosticDto`, `ViolationDto`), delete old tool files, rewrite tests.
+
+## Group 4b-update: Update Tool + Fire Rename + Inspect Fixes ✅
+
+- [x] Implement the [Update Tool Phase](McpServerImplementationPlan.md#Update-Tool-Phase-precept_update--precept_fire-Rename--Inspect-Thin-Wrapper-Fixes): rename `precept_run` → `precept_fire` (matching `engine.Fire()`), fix inspect thin-wrapper violations (remove pre-check block, remove synthetic `"requires-args"` outcome, remove event sorting, simplify `requiredArgs` to `IReadOnlyList<string>`), add `precept_update` tool wrapping `engine.Update()`, add `editableFields` to `precept_inspect` output, write tests.
+- Verification: full solution build plus `Precept.Tests` (544), `Precept.LanguageServer.Tests` (74), and `Precept.Mcp.Tests` (48) pass; 666 total tests.
 
 ## Group 4c: Copilot Plugin, Agent, and Skills (MCP Phases 7-9)
 

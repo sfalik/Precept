@@ -198,7 +198,7 @@ Precept isn't just a library; it's an authoring experience. The accompanying VS 
 - **Context-Aware IntelliSense:** Completions respect DSL scope and the current grammar step, so declarations suggest the next required keywords and types, invariants and state asserts suggest data fields, event asserts suggest the active event's arguments, and guarded rows hand off to `->` once the guard is complete.
 - **Hover + Go to Definition:** Hover a field, state, event, event arg, collection accessor, or DSL keyword to see its meaning and syntax form, then jump to declarations directly from references.
 - **Document Outline:** The editor exposes a structured symbol tree for the precept, including fields, states, events, and event arguments.
-- **Shared Type Diagnostics:** Expression typing, null-flow narrowing, collection mutation checks, and `from any` state-aware analysis now come from the core compiler, so the language server and MCP validation surface the same `PRECEPT038`–`PRECEPT047` errors. Equality requires same-family operands (`string == string` ✓, `string == number` ✗); non-nullable `== null` comparisons are rejected at compile time; `when` guards and `invariant`/`assert` positions require boolean expressions (`PRECEPT046`); and identical guards on the same `from X on Y` pair are caught as duplicates (`PRECEPT047`). Event args in transition rows must use the dotted form (`EventName.ArgName`); bare arg names are only valid in `on Event assert` positions. The MCP `precept_validate` result includes all diagnostic codes structurally.
+- **Shared Type Diagnostics:** Expression typing, null-flow narrowing, collection mutation checks, and `from any` state-aware analysis now come from the core compiler, so the language server and MCP validation surface the same `PRECEPT038`–`PRECEPT047` errors. Equality requires same-family operands (`string == string` ✓, `string == number` ✗); non-nullable `== null` comparisons are rejected at compile time; `when` guards and `invariant`/`assert` positions require boolean expressions (`PRECEPT046`); and identical guards on the same `from X on Y` pair are caught as duplicates (`PRECEPT047`). Event args in transition rows must use the dotted form (`EventName.ArgName`); bare arg names are only valid in `on Event assert` positions. The MCP `precept_compile` result includes all diagnostic codes structurally.
 - **Structural Diagnostics:** Real-time diagnostics now surface unreachable states, dead-end states, orphaned events, and reject-only state/event pairs that likely model unsupported events as explicit rejections.
 - **Quick Fixes:** Reject-only state/event pair warnings offer a quick fix to remove the rows and restore `Undefined` semantics for unsupported events, and orphaned event warnings offer a quick fix to remove the unused event declaration and its event asserts.
 - **Interactive Inspector:** Fire events and edit data against a live, mock instance in VS Code. The preview behaves like Markdown preview by default: one right-side preview follows the active `.precept` editor, and you can lock it to the current file with **Toggle Preview Locking**. Field edits use explicit **Edit** mode with **Save/Cancel**; validation runs live via inspect while typing, and field-level, event-arg, and event-level errors render inline beneath the controls they belong to. Values are committed only when **Save** is clicked.
@@ -217,16 +217,15 @@ Precept includes an MCP (Model Context Protocol) server that exposes DSL parsing
 
 | Tool | Purpose |
 |------|---------|
-| `precept_validate` | Parse and compile a `.precept` file, including shared type diagnostics `PRECEPT038`–`PRECEPT047`; validation returns all diagnostics with structured codes |
-| `precept_schema` | Return the full typed structure — states, fields, events, transitions |
-| `precept_audit` | Graph analysis — reachability, dead ends, terminal states, orphaned events |
-| `precept_run` | Execute a step-by-step event scenario, return outcomes |
 | `precept_language` | Full DSL reference — vocabulary, constructs, constraints, pipeline |
-| `precept_inspect` | From a state+data snapshot, preview what every event would do |
+| `precept_compile` | Parse, type-check, analyze, and compile a precept definition; returns structure and diagnostics |
+| `precept_inspect` | From a state+data snapshot, preview what every event would do and which fields are editable |
+| `precept_fire` | Fire a single event, return the execution outcome |
+| `precept_update` | Apply a direct field edit and return constraint violations |
 
 ### Agent Plugin
 
-The MCP server, a custom **Precept Author** agent, and two companion skills (`precept-authoring`, `precept-debugging`) are distributed as a Copilot agent plugin — separate from the VS Code extension. Install the plugin from the marketplace or directly from the Git repository, and all six tools, the agent, and the skills are available in any workspace.
+The MCP server, a custom **Precept Author** agent, and two companion skills (`precept-authoring`, `precept-debugging`) are distributed as a Copilot agent plugin — separate from the VS Code extension. Install the plugin from the marketplace or directly from the Git repository, and all five tools, the agent, and the skills are available in any workspace.
 
 The VS Code extension continues to provide all editor features (language server, syntax highlighting, preview panel, commands). It does not carry MCP server binaries or Copilot customization content.
 
@@ -248,7 +247,7 @@ Precept fixes this by treating the lifecycle of an entity as an executable contr
 Precept is readable by humans and writable by hand — but it is *designed* to work exceptionally well with AI. Every syntax and semantics decision produces properties that AI agents can exploit:
 
 - **Deterministic semantics.** The same precept + the same data = the same outcome, every time. An AI can reason about behavior without worrying about hidden state, timing, or side effects.
-- **Structured tool APIs.** The MCP server exposes six tools (`precept_validate`, `precept_schema`, `precept_audit`, `precept_run`, `precept_inspect`, `precept_language`) that return typed JSON — not prose. An AI can validate its own work, inspect runtime behavior, and iterate without human intervention.
+- **Structured tool APIs.** The MCP server exposes five tools (`precept_language`, `precept_compile`, `precept_inspect`, `precept_fire`, `precept_update`) that return typed JSON — not prose. An AI can validate its own work, inspect runtime behavior, and iterate without human intervention.
 - **Language reference as data.** `precept_language` returns the complete DSL vocabulary, construct forms, semantic constraints, expression scopes, and fire pipeline as structured JSON. The AI doesn't need training data or examples to know what the language supports — it can query the authoritative specification at tool-call time.
 - **Safe preview before commit.** `Inspect` and `precept_inspect` let an AI explore "what happens if I fire this event?" from any state without mutating anything. This makes trial-and-error exploration safe and cheap.
 - **Closed validation loop.** An AI can write a precept, validate it, audit its structure, run scenarios against it, and fix issues — all through tool calls, without ever needing a terminal, a build step, or human feedback.

@@ -1,6 +1,6 @@
 # Precept MCP Server Design
 
-**Status:** Original 6-tool surface implemented (2026-03-06); packaging and Copilot workflow design updated (2026-03-22); redesigned to 4 tools with text input and structured feedback (2026-03-26); design decisions finalized (2026-03-27)
+**Status:** Original 6-tool surface implemented (2026-03-06); packaging and Copilot workflow design updated (2026-03-22); redesigned to 4 tools with text input and structured feedback (2026-03-26); design decisions finalized (2026-03-27); expanded to 5 tools with `precept_update` + `precept_fire` rename (2026-03-27)
 
 ## Purpose
 
@@ -22,7 +22,8 @@ tools/Precept.Mcp/
         LanguageTool.cs
         CompileTool.cs
         InspectTool.cs
-        RunTool.cs
+        FireTool.cs
+        UpdateTool.cs
         ViolationDto.cs
         JsonConvert.cs
     Precept.Mcp.csproj
@@ -45,17 +46,18 @@ Transport: **stdio** (default for local MCP servers launched by VS Code).
 
 ## Tools
 
-> **Redesign status (2026-03-27):** The original 6-tool surface (validate, schema, audit, run, language, inspect) was implemented on 2026-03-06. The redesign below reduces to 4 tools, switches from file paths to text input, adds structured feedback, and enforces the thin-wrapper principle. Implementation is pending — see `McpServerImplementationPlan.md` for phases.
+> **Redesign status (2026-03-27):** The original 6-tool surface (validate, schema, audit, run, language, inspect) was implemented on 2026-03-06. The redesign to 5 tools is now implemented — `precept_compile` (merging validate+schema+audit), `precept_inspect` (delegating to engine.Inspect), `precept_fire` (single-event execution, named to match `engine.Fire()`), `precept_update` (direct field editing), and `precept_language` (unchanged). All tools accept inline text input and return structured feedback.
 
 ### Tool Philosophy
 
 Each tool owns exactly one concern. There is no overlap in what the tools report, and their failure modes reinforce the intended workflow:
 
 - **`precept_compile`** is the sole source of structured diagnostics (parse errors, type errors, graph warnings). It answers: *"Is this definition correct and well-structured?"*
-- **`precept_inspect`** is a read-only possibility map. It answers: *"From this state and data, what can happen for each event?"*
-- **`precept_run`** is single-event execution. It answers: *"What actually happens when I fire this event from this state and data?"*
+- **`precept_inspect`** is a read-only possibility map. It answers: *"From this state and data, what can happen for each event, and which fields are editable?"*
+- **`precept_fire`** is single-event execution. It answers: *"What actually happens when I fire this event from this state and data?"*
+- **`precept_update`** is direct field editing. It answers: *"Can I change these fields from this state, and what constraints fire?"*
 
-Inspect and run compile internally (stateless), but treat compilation as a pass/fail gate — not a diagnostic surface. On compile failure they return a short error directing Copilot to use `precept_compile`. Only `precept_compile` returns structured diagnostics. This gives Copilot a clear signal chain: compile → fix → inspect/run.
+Inspect and run compile internally (stateless), but treat compilation as a pass/fail gate — not a diagnostic surface. On compile failure they return a short error directing Copilot to use `precept_compile`. Only `precept_compile` returns structured diagnostics. This gives Copilot a clear signal chain: compile → fix → inspect/fire/update.
 
 ### Tool Tiers
 
@@ -63,7 +65,7 @@ Inspect and run compile internally (stateless), but treat compilation as a pass/
 |---|---|---|---|
 | Language | `precept_language` | *(none)* | No |
 | Definition | `precept_compile` | `text` | No (parse + type-check + graph analysis) |
-| Runtime | `precept_inspect`, `precept_run` | `text` + state + data | Yes |
+| Runtime | `precept_inspect`, `precept_fire`, `precept_update` | `text` + state + data | Yes |
 
 ### 1. `precept_language`
 
@@ -160,7 +162,7 @@ Unlike the other tools, this tool takes no input — it describes the language i
 
 ### 3. `precept_inspect`
 
-**Purpose:** From a given state and data snapshot, evaluate all declared events and report what each would do — without mutating anything. Lets Copilot explore the precept interactively ("what can happen from here?") instead of guessing event sequences for `precept_run`.
+**Purpose:** From a given state and data snapshot, evaluate all declared events and report what each would do — without mutating anything. Lets Copilot explore the precept interactively ("what can happen from here?") instead of guessing event sequences for `precept_fire`.
 
 **Input:**
 ```json
@@ -180,7 +182,7 @@ Unlike the other tools, this tool takes no input — it describes the language i
 }
 ```
 
-The `eventArgs` field is optional. When provided, the specified args are used for the named events during evaluation. Events not listed in `eventArgs` whose required args are missing report `requiresArgs: true`.
+The `eventArgs` field is optional. When provided, the specified args are used for the named events during evaluation — the tool re-inspects those events individually with the supplied args. Events not listed in `eventArgs` are inspected without args, and the engine reports the actual outcome (which may be `MissingRequiredArguments` if args are needed).
 
 **Output:**
 ```json
@@ -190,16 +192,14 @@ The `eventArgs` field is optional. When provided, the specified args are used fo
   "events": [
     {
       "event": "Block",
-      "status": "evaluated",
       "outcome": "Transition",
       "resultState": "Blocked",
-      "resultData": { "Assignee": "alice", "Priority": 3, "BlockReason": "Waiting on infra", "Resolution": null },
       "violations": []
     },
     {
       "event": "SubmitReview",
-      "status": "evaluated",
       "outcome": "ConstraintFailure",
+      "resultState": null,
       "violations": [
         {
           "message": "Cannot leave InProgress without completion note",
@@ -218,36 +218,40 @@ The `eventArgs` field is optional. When provided, the specified args are used fo
       ]
     },
     {
-      "event": "Approve",
-      "status": "evaluated",
-      "outcome": "Undefined",
-      "violations": []
-    },
-    {
       "event": "Escalate",
-      "status": "requires-args",
-      "requiredArgs": [{ "name": "Level", "type": "number" }]
+      "outcome": "MissingRequiredArguments",
+      "resultState": null,
+      "violations": [],
+      "requiredArgs": ["Level"]
     }
+  ],
+  "editableFields": [
+    { "name": "Priority", "type": "number", "nullable": false, "currentValue": 3 },
+    { "name": "BlockReason", "type": "string", "nullable": true, "currentValue": null }
   ],
   "error": null
 }
 ```
 
-The response echoes the resolved instance snapshot (`currentState` + `data` with defaults applied), so Copilot can see what defaults were filled in and confirm the starting point matches intent.
+The response echoes the resolved instance snapshot (`currentState` + `data` with defaults applied), so Copilot can see what defaults were filled in and confirm the starting point matches intent. Events appear in declaration order (no sorting). The `editableFields` array lists fields that have `in <State> edit` declarations for the current state.
 
-Events are sorted: actionable (Transition/NoTransition) first, then unavailable (Undefined/Unmatched/Rejected/ConstraintFailure), then requires-args.
+Each event reports:
+- `outcome` — the engine's actual `TransitionOutcome` string (e.g. `Transition`, `NoTransition`, `ConstraintFailure`, `Rejected`, `MissingRequiredArguments`, `Undefined`, `Unmatched`)
+- `resultState` — the target state on success, `null` otherwise
+- `violations` — structured `ViolationDto` array (empty unless `ConstraintFailure`)
+- `requiredArgs` — list of required argument names (present only when the engine populates `RequiredEventArgumentKeys`)
 
-**Implementation:** Calls `PreceptCompiler.CompileFromText(text)`, then `engine.Inspect(instance)`. The core `InspectionResult` already contains structured `EventInspectionResult` records with typed `Violations` — the MCP tool projects them into the output DTOs. No reimplementation of the inspection loop.
+**Implementation:** Calls `PreceptCompiler.CompileFromText(text)`, then `engine.Inspect(instance)` for the full state-level inspection (declaration order preserved). When `eventArgs` are supplied, re-inspects those specific events individually with `engine.Inspect(instance, eventName, args)`. Projects `EditableFields` from the core `InspectionResult`. No reimplementation of the inspection loop.
 
 **On compile failure:** Returns a short error: `"Compilation failed. Use precept_compile to diagnose and fix errors first."` — no diagnostics, no runtime results. Only `precept_compile` surfaces structured diagnostics.
 
 ---
 
-### 4. `precept_run`
+### 4. `precept_fire`
 
-**Purpose:** Fire a single event against a precept from a given state and data snapshot. Returns the execution outcome — the new state, updated data, and any constraint violations. Lets Copilot verify that a specific action actually works at runtime.
+**Purpose:** Fire a single event against a precept from a given state and data snapshot. Returns the execution outcome — the new state, updated data, and any constraint violations. Lets Copilot verify that a specific action actually works at runtime. Named to match the core API (`engine.Fire()`).
 
-Unlike `precept_inspect` (which previews all events read-only), `precept_run` executes one event and returns its concrete result. Copilot chains sequential calls to trace multi-step scenarios, feeding each result's state+data into the next call.
+Unlike `precept_inspect` (which previews all events read-only), `precept_fire` executes one event and returns its concrete result. Copilot chains sequential calls to trace multi-step scenarios, feeding each result’s state+data into the next call.
 
 **Input:**
 ```json
@@ -316,6 +320,71 @@ The response echoes the resolved data snapshot (with defaults applied), matching
 
 ---
 
+### 5. `precept_update`
+
+**Purpose:** Apply a direct field edit to a precept instance from a given state and data snapshot. Returns the update outcome — whether the edit succeeded, was rejected (uneditable field, constraint failure, invalid input), and the resulting data. Lets Copilot test `in <State> edit` declarations without firing events.
+
+**Input:**
+```json
+{
+  "text": "precept BugTracker\n...",
+  "currentState": "InProgress",
+  "data": {
+    "Assignee": "alice",
+    "Priority": 3,
+    "BlockReason": null,
+    "Resolution": null
+  },
+  "fields": {
+    "Priority": 1
+  }
+}
+```
+
+The `fields` object contains the field names and new values to apply. At least one field must be provided.
+
+**Output (success):**
+```json
+{
+  "outcome": "Updated",
+  "data": { "Assignee": "alice", "Priority": 1, "BlockReason": null, "Resolution": null },
+  "violations": [],
+  "error": null
+}
+```
+
+**Output (uneditable field):**
+```json
+{
+  "outcome": "UneditableField",
+  "data": { "Assignee": "alice", "Priority": 3, "BlockReason": null, "Resolution": null },
+  "violations": [],
+  "error": null
+}
+```
+
+**Output (constraint failure):**
+```json
+{
+  "outcome": "ConstraintFailure",
+  "data": { "Assignee": "alice", "Priority": 3, "BlockReason": null, "Resolution": null },
+  "violations": [
+    {
+      "message": "Priority must be between 1 and 5",
+      "source": { "kind": "invariant", "expressionText": "Priority >= 1 and Priority <= 5", "reason": "Priority must be between 1 and 5", "sourceLine": 8 },
+      "targets": [{ "kind": "field", "fieldName": "Priority" }]
+    }
+  ],
+  "error": null
+}
+```
+
+**Implementation:** Calls `PreceptCompiler.CompileFromText(text)`, creates an instance at the given state+data, then calls `engine.Update(instance, patch => { foreach field: patch.Set(key, value) })`. Projects `UpdateResult.Violations` as `ViolationDto` arrays.
+
+**On compile failure:** Returns a short error: `"Compilation failed. Use precept_compile to diagnose and fix errors first."` — no update results. Only `precept_compile` surfaces structured diagnostics.
+
+---
+
 ### DTOs
 
 Tools use two DTO types for structured feedback — diagnostics (compile-time) and violations (runtime). These are thin projections of core types — no domain logic.
@@ -328,7 +397,7 @@ Tools use two DTO types for structured feedback — diagnostics (compile-time) a
 
 Fields: `line` (1-based), `column` (0-based, optional), `message`, `code` (optional — present for all registered constraints), `severity` (`"error"`, `"warning"`, or `"hint"`).
 
-**`ViolationDto`** (shared `Tools/ViolationDto.cs` — used by both inspect and run) — runtime constraint violations:
+**`ViolationDto`** (shared `Tools/ViolationDto.cs` — used by inspect, fire, and update) — runtime constraint violations:
 
 ```json
 {
@@ -360,10 +429,11 @@ This preserves the full structured violation model from core without information
 |---|---|---|
 | `precept_compile` | `IReadOnlyList<DiagnosticDto>` | n/a |
 | `precept_inspect` | Short error string (gate) | `IReadOnlyList<ViolationDto>` per event |
-| `precept_run` | Short error string (gate) | `IReadOnlyList<ViolationDto>` |
+| `precept_fire` | Short error string (gate) | `IReadOnlyList<ViolationDto>` |
+| `precept_update` | Short error string (gate) | `IReadOnlyList<ViolationDto>` |
 | `precept_language` | n/a | n/a |
 
-Only `precept_compile` surfaces structured diagnostics. Inspect and run treat compilation as a pass/fail gate — on failure they return `"Compilation failed. Use precept_compile to diagnose and fix errors first."` with no runtime results. This prevents diagnostic duplication and gives Copilot a clear signal about which tool to call.
+Only `precept_compile` surfaces structured diagnostics. Inspect, fire, and update treat compilation as a pass/fail gate — on failure they return `"Compilation failed. Use precept_compile to diagnose and fix errors first."` with no runtime results. This prevents diagnostic duplication and gives Copilot a clear signal about which tool to call.
 
 ---
 
@@ -565,7 +635,7 @@ Two skills provide targeted capabilities accessible as slash commands and via au
 
 **`precept-debugging`** — standardizes diagnosis and behavior tracing:
 - Diagnose correctness and review structural quality with `precept_compile` (errors + warnings/hints)
-- Explore runtime behavior with `precept_inspect` and `precept_run`
+- Explore runtime behavior with `precept_inspect` and `precept_fire`
 - When explaining structure or transition behavior, include a focused Mermaid `stateDiagram-v2` diagram showing only the relevant states and transitions
 
 Both skills include a "Mermaid Diagrams" section that teaches the model how to generate full or partial state diagrams from `precept_compile` output data. Diagrams are rendered natively by VS Code Chat — no separate tool is needed. The extension's interactive preview panel (ELK + custom SVG) remains independent; the skill-generated Mermaid diagrams serve a different purpose (conversation-embedded, focused, partial).
