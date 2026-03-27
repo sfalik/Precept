@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using FluentAssertions;
 using Precept;
@@ -320,6 +321,21 @@ public class CatalogDriftTests
 
     private sealed record TriggerInput(string Dsl, string ExpectedFragment, Action? DirectAction = null);
 
+    private static void InvokeResolveTransition(PreceptEngine engine, string currentState, string eventName)
+    {
+        var method = typeof(PreceptEngine).GetMethod("ResolveTransition", BindingFlags.Instance | BindingFlags.NonPublic);
+        method.Should().NotBeNull("ResolveTransition should remain available for runtime constraint coverage");
+
+        try
+        {
+            method!.Invoke(engine, [currentState, eventName, new Dictionary<string, object?>()]);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            throw ex.InnerException;
+        }
+    }
+
     // Minimal valid wrapper — many violations need a precept + state context
     private const string H = "precept Test\n";
     private const string S = "state A initial\n";
@@ -516,14 +532,14 @@ public class CatalogDriftTests
         ["C36"] = new("_unused_", "Current state is required", DirectAction: () =>
         {
             var engine = PreceptCompiler.Compile(PreceptParser.Parse(H + S));
-            engine.Inspect("", "SomeEvent");
+            InvokeResolveTransition(engine, "", "SomeEvent");
         }),
 
         // C37: Inspect with empty event name
         ["C37"] = new("_unused_", "Event name is required", DirectAction: () =>
         {
             var engine = PreceptCompiler.Compile(PreceptParser.Parse(H + S));
-            engine.Inspect("A", "");
+            InvokeResolveTransition(engine, "A", "");
         }),
 
         // C38: Unknown identifier in expression

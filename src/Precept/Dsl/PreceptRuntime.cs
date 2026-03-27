@@ -279,34 +279,6 @@ public sealed class PreceptEngine
     }
 
     public EventInspectionResult Inspect(
-        string currentState,
-        string eventName,
-        IReadOnlyDictionary<string, object?>? eventArguments = null)
-    {
-        var evaluationData = BuildDirectEvaluationData(eventName, eventArguments);
-
-        // Check event asserts first
-        var eventAssertViolations = EvaluateEventAssertions(eventName, evaluationData);
-        if (eventAssertViolations.Count > 0)
-            return EventInspectionResult.Rejected(currentState, eventName, eventAssertViolations);
-
-        var resolution = ResolveTransition(currentState, eventName, evaluationData);
-
-        return resolution.Kind switch
-        {
-            TransitionResolutionKind.Transition => EventInspectionResult.Transitioned(
-                currentState,
-                eventName,
-                ((StateTransition)resolution.MatchedRow!.Outcome).TargetState,
-                GetRequiredEventArgumentKeys(eventName)),
-            TransitionResolutionKind.Unmatched => EventInspectionResult.Unmatched(currentState, eventName),
-            TransitionResolutionKind.NoTransition => EventInspectionResult.NoTransition(currentState, eventName),
-            TransitionResolutionKind.Undefined => EventInspectionResult.Undefined(currentState, eventName, resolution.NotDefinedReason!),
-            _ => EventInspectionResult.Rejected(currentState, eventName, resolution.Violations)
-        };
-    }
-
-    public EventInspectionResult Inspect(
         PreceptInstance instance,
         string eventName,
         IReadOnlyDictionary<string, object?>? eventArguments = null)

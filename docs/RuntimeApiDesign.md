@@ -93,14 +93,9 @@ public EventInspectionResult Inspect(
     PreceptInstance instance,
     string eventName,
     IReadOnlyDictionary<string, object?>? eventArguments = null)
-
-public EventInspectionResult Inspect(
-    string currentState,
-    string eventName,
-    IReadOnlyDictionary<string, object?>? eventArguments = null)
 ```
 
-Non-mutating evaluation of a single event. Returns `EventInspectionResult`. The `PreceptInstance` overload also runs a compatibility check before evaluating; the `string currentState` overload skips that check and is used internally by the aggregate `Inspect`.
+Non-mutating evaluation of a single event. Returns `EventInspectionResult`.
 
 **Semantics:**
 - Verifies schema compatibility via `CheckCompatibility` before evaluating. On failure, returns `Undefined`.
