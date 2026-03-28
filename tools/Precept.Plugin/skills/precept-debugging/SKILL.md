@@ -13,6 +13,10 @@ description: >-
 
 Follow these steps when diagnosing problems in a `.precept` file.
 
+Before guessing about DSL syntax, operators, or runtime semantics, call `precept_language`. It is the authoritative source for language behavior.
+
+When proposing a fix, match local `.precept` conventions when samples or nearby definitions already exist.
+
 ## Step 1: Compile First
 
 Call `precept_compile` with the full precept text. This is always the first step — it catches syntax errors, type errors, and structural issues before you look at runtime behavior.
@@ -34,6 +38,8 @@ If the user reports a specific problem, locate the relevant transitions in this 
 
 ## Step 3: Inspect from the Problem State
 
+Use `precept_inspect` only after `precept_compile` succeeds.
+
 Call `precept_inspect` with the precept text, the state where the problem occurs, and the current data snapshot. The response shows:
 - Which events are available from this state
 - What each event would do (transition target, field changes, or rejection)
@@ -42,6 +48,8 @@ Call `precept_inspect` with the precept text, the state where the problem occurs
 This tells you what the runtime *would* do without actually executing anything.
 
 ## Step 4: Trace with Fire
+
+Use `precept_fire` only after `precept_inspect` succeeds and the problem involves a specific event that still needs tracing. If inspect already answers the question, stop there.
 
 If the problem involves a specific event, call `precept_fire` with the precept text, current state, event name, data, and event arguments. The response shows the full execution pipeline:
 1. Event assertion evaluation
@@ -55,7 +63,7 @@ Compare the actual outcome against what the user expected. The mismatch reveals 
 
 ## Step 5: Test Field Edits
 
-If the problem involves field editing or constraint violations during data entry, call `precept_update` with the precept text, current state, data, and the fields being changed. This tests the `in <State> edit` declarations and any associated constraints.
+If the problem involves field editing or constraint violations during data entry, call `precept_update` with the precept text, current state, data, and the fields being changed. This tests the `in <State> edit` declarations and any associated constraints. Do not run `precept_update` speculatively when the issue is clearly about transition behavior rather than editable fields.
 
 ## Common Diagnostic Patterns
 
@@ -91,7 +99,7 @@ An `on <Event> assert ...` fails before any transition logic runs. The event arg
 
 ## Step 6: State Diagram for Diagnosis
 
-When explaining structure or transition behavior, generate a focused Mermaid `stateDiagram-v2` showing only the relevant subset. Annotate the diagram:
+When explaining structure or transition behavior, you may generate a focused Mermaid `stateDiagram-v2` showing only the relevant subset. A diagram is optional; use it when it would make the explanation clearer. Annotate the diagram:
 
 - Guards in brackets: `Event [guard condition]`
 - Reject branches as self-transitions: `State --> State : Event [reject]`
@@ -100,6 +108,8 @@ When explaining structure or transition behavior, generate a focused Mermaid `st
 If `precept_compile` reported warnings, annotate them:
 - Unreachable states: add a note `note right of StateName : UNREACHABLE`
 - Dead-end states: add a note `note right of StateName : DEAD END`
+
+When you present a user-facing diagram in chat, prefer the Mermaid render tool over pasting raw Mermaid source. If you also need to show the source, label it clearly as source text and do not imply that the chat itself is rendering it.
 
 Example showing a guard ordering bug:
 

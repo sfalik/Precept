@@ -1,0 +1,82 @@
+precept LibraryBookCheckout
+
+# A library checkout workflow from loan creation through return, shelving, and loss resolution.
+# This sample emphasizes due-date guards, renewal limits, and overdue fine accumulation.
+
+field BookTitle as string nullable
+field BorrowerId as string nullable
+field CurrentDay as number default 0
+field CheckoutDay as number default 0
+field DueDay as number default 0
+field RenewalCount as number default 0
+field FineAmount as number default 0
+field ConditionNote as string nullable
+field LostReported as boolean default false
+
+invariant CurrentDay >= 0 because "The day counter cannot be negative"
+invariant CheckoutDay >= 0 because "The checkout day cannot be negative"
+invariant DueDay >= 0 because "The due day cannot be negative"
+invariant RenewalCount >= 0 because "Renewal counts cannot be negative"
+invariant FineAmount >= 0 because "Fines cannot be negative"
+
+state Available initial
+state CheckedOut
+state Overdue
+state Returned
+state Lost
+state orphan
+
+# Staff can correct due-date handling while a loan is active.
+in CheckedOut edit DueDay
+in Overdue edit DueDay, FineAmount
+
+in Available assert BorrowerId == null because "Available books cannot still be assigned to a borrower"
+in CheckedOut assert BorrowerId != null because "Checked-out books must record a borrower"
+in Overdue assert BorrowerId != null because "Overdue books must still record a borrower"
+in Overdue assert CurrentDay > DueDay because "Overdue books must be past their due day"
+in Returned assert BorrowerId == null because "Returned books must clear the borrower"
+in Lost assert LostReported because "Lost books must be marked as reported lost"
+in Lost assert BorrowerId != null because "Lost books must still record the last borrower"
+
+event Checkout with Title as string, PatronId as string, LoanDays as number default 14
+on Checkout assert Title != "" because "A book title is required"
+on Checkout assert PatronId != "" because "A patron id is required"
+on Checkout assert LoanDays > 0 because "Loan days must be positive"
+
+event Renew with ExtraDays as number default 7
+on Renew assert ExtraDays > 0 because "Renewal days must be positive"
+
+event AdvanceDay with DayNumber as number
+on AdvanceDay assert DayNumber >= 0 because "The day counter cannot be negative"
+
+event ReturnBook with Condition as string nullable default null
+on ReturnBook assert Condition == null || Condition != "" because "A supplied condition note cannot be blank"
+
+event ReportLost with Note as string nullable default null
+on ReportLost assert Note == null || Note != "" because "A supplied loss note cannot be blank"
+
+event Shelve
+
+event ResolveLoss
+
+from Available on Checkout -> set BookTitle = Checkout.Title -> set BorrowerId = Checkout.PatronId -> set CheckoutDay = CurrentDay -> set DueDay = CurrentDay + Checkout.LoanDays -> set RenewalCount = 0 -> set FineAmount = 0 -> set ConditionNote = null -> set LostReported = false -> transition CheckedOut
+
+from CheckedOut on Renew when RenewalCount < 2 && !LostReported && CurrentDay <= DueDay -> set DueDay = DueDay + Renew.ExtraDays -> set RenewalCount = RenewalCount + 1 -> no transition
+from CheckedOut on Renew -> reject "Only active loans with remaining renewals can be renewed"
+
+from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay && AdvanceDay.DayNumber <= DueDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
+from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> set FineAmount = AdvanceDay.DayNumber - DueDay -> transition Overdue
+from CheckedOut on AdvanceDay -> reject "The day counter must move forward"
+
+from Overdue on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> set FineAmount = AdvanceDay.DayNumber - DueDay -> no transition
+from Overdue on AdvanceDay -> reject "The day counter must move forward"
+
+from CheckedOut on ReturnBook -> set BorrowerId = null -> set ConditionNote = ReturnBook.Condition -> transition Returned
+from Overdue on ReturnBook -> set BorrowerId = null -> set ConditionNote = ReturnBook.Condition -> transition Returned
+
+from CheckedOut on ReportLost -> set LostReported = true -> set ConditionNote = ReportLost.Note -> transition Lost
+from Overdue on ReportLost -> set LostReported = true -> set ConditionNote = ReportLost.Note -> transition Lost
+
+from Returned on Shelve -> set CheckoutDay = 0 -> set DueDay = 0 -> set RenewalCount = 0 -> set FineAmount = 0 -> set ConditionNote = null -> transition Available
+
+from Lost on ResolveLoss -> set BorrowerId = null -> set CheckoutDay = 0 -> set DueDay = 0 -> set RenewalCount = 0 -> set FineAmount = 0 -> set ConditionNote = null -> set LostReported = false -> transition Available

@@ -493,17 +493,17 @@ Use this prompt to execute Phase 7 in a new Copilot Chat session:
 
 - [x] Draft `agents/precept-author.agent.md` with:
     - YAML frontmatter: name, description, tools restricted to `read`, `edit`, `search`, `fetch`, and all `precept/*` MCP tools
-    - Body: lightweight persona and core principles — `precept_language` as DSL authority, compile after every edit, match local `.precept` conventions when present, fall back to `precept_language` when no local files exist
-    - The agent body is intentionally thin: it owns persona and tool restrictions; detailed workflows live in the companion skills (auto-discovered by VS Code based on the user's request)
+    - Body: lightweight persona, skill-routing hints, and a small set of cross-cutting guardrails
+    - The agent body is intentionally thin: it owns persona, routing, and tool restrictions; detailed workflows live in the companion skills (auto-discovered by VS Code based on the user's request)
 - [x] Draft `skills/precept-authoring/SKILL.md` with:
     - Frontmatter: name `precept-authoring`, description with explicit trigger phrases
-    - Body: step-by-step creation/editing workflow using MCP tools in prescribed order
+    - Body: step-by-step creation/editing workflow using MCP tools in prescribed, gated order
     - Repo-agnostic: no assumption that `samples/` exists; prefer local `.precept` files for convention matching, fall back to `precept_language`
-    - Mermaid Diagrams section: after creating/editing a precept, include a `stateDiagram-v2` diagram of the resulting state machine; use `precept_compile` for transition data
+    - Mermaid guidance: optionally include a `stateDiagram-v2` diagram when it helps the user understand the resulting state machine; use `precept_compile` for transition data
 - [x] Draft `skills/precept-debugging/SKILL.md` with:
     - Frontmatter: name `precept-debugging`, description with explicit trigger phrases
-    - Body: diagnosis workflow using `precept_compile` → `precept_inspect` → `precept_fire`
-    - Mermaid Diagrams section: when explaining structure or transition behavior, include a focused `stateDiagram-v2` showing only the relevant subset; annotate guards in brackets, mark reject branches, annotate warning/hint findings (unreachable/dead-end states)
+    - Body: diagnosis workflow using gated `precept_compile` → `precept_inspect` → `precept_fire` when each later step is still needed
+    - Mermaid guidance: optionally include a focused `stateDiagram-v2` showing only the relevant subset; annotate guards in brackets, mark reject branches, annotate warning/hint findings (unreachable/dead-end states)
 - [x] Validate all files against the [Agent Skills specification](https://agentskills.io/specification):
     - `name` lowercase kebab-case, matches parent directory, max 64 chars
     - `description` max 1024 chars, specific and trigger-oriented

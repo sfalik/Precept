@@ -79,6 +79,13 @@ Repeat until the definition compiles cleanly.
 
 ## Step 6: Verify Behavior
 
+Verification is sequential, not unconditional:
+
+1. Use `precept_inspect` only after `precept_compile` succeeds.
+2. If `precept_inspect` fails because the definition is invalid or the chosen snapshot is inconsistent, fix that problem before continuing.
+3. Use `precept_fire` only after `precept_inspect` succeeds and identifies a concrete event worth tracing.
+4. Do not run `precept_fire` just because it is the next step in the workflow; run it only when it adds new behavioral evidence beyond compile or inspect.
+
 Use `precept_inspect` with a state and data snapshot to confirm which events are available and what each would do. Use `precept_fire` to trace individual transitions and verify field mutations and guard evaluation.
 
 ## Step 7: State Diagram
@@ -90,6 +97,11 @@ After the precept compiles successfully, generate a Mermaid `stateDiagram-v2` di
 - If a transition has a guard, append it in brackets: `Event [guard]`.
 - Mark the initial state with `[*] --> StateName`.
 - If there are reject outcomes, add a note: `StateName --> StateName : Event [reject]`.
+- A Mermaid diagram is optional. Use it when it would help the user understand all or part of the precept, or when the user explicitly asks for a diagram.
+- When you do present a user-facing diagram in chat, prefer the Mermaid render tool over pasting raw Mermaid source.
+- Do not also paste the Mermaid source in the same response unless the user explicitly asks for the source or asks to place it in a file.
+- If Mermaid source is shown, label it clearly as source text and do not imply that the chat itself is rendering it.
+- If a guard-heavy label fails to render cleanly, simplify the label text for the diagram and explain that the exact guard remains in the precept source.
 
 Example:
 

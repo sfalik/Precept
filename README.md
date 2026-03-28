@@ -21,7 +21,7 @@
    ```bash
    code --install-extension AuthorName.precept-vscode
    ```
-3. **Install the Copilot agent plugin** *(optional — requires `chat.plugins.enabled`)*: In VS Code, run `Chat: Install Plugin From Source` and provide the plugin repo URL. This adds the MCP tools, Precept Author agent, and companion skills to Copilot.
+3. **Install the Copilot agent plugin** *(optional — requires `chat.plugins.enabled`)*: In VS Code, run `Chat: Install Plugin From Source` and provide the plugin repo URL. This adds the Precept MCP tools plus optional Copilot customizations: the Precept Author agent and two companion skills.
 
 ---
 
@@ -229,6 +229,14 @@ Precept includes an MCP (Model Context Protocol) server that exposes DSL parsing
 
 The MCP server, a custom **Precept Author** agent, and two companion skills (`precept-authoring`, `precept-debugging`) are distributed as a Copilot agent plugin — separate from the VS Code extension. Install the plugin from the marketplace or directly from the Git repository, and all five tools, the agent, and the skills are available in any workspace.
 
+The plugin has three layers:
+
+- **MCP tools** — the core semantic integration (`precept_language`, `precept_compile`, `precept_inspect`, `precept_fire`, `precept_update`). Once the plugin is installed, Copilot can use these tools without requiring you to switch agents.
+- **Skills** — task-specific workflows for authoring and debugging. These are the primary way to inject Precept-specific procedure into a normal chat session.
+- **Agent** — the optional **Precept Author** specialist from the agents picker. Use it when you want the whole conversation to stay in a Precept-focused mode.
+
+Do not assume Copilot will always auto-delegate to the custom agent. In practice, the tools and skills are the more reliable integration surface for ordinary chats, while the agent is the explicit specialist entry point.
+
 The VS Code extension continues to provide all editor features (language server, syntax highlighting, preview panel, commands). It does not carry MCP server binaries or Copilot customization content.
 
 ---
@@ -327,7 +335,7 @@ The plugin provides the Precept Author agent, companion skills, and MCP server t
 
 1. Edit files in `tools/Precept.Plugin/agents/` or `tools/Precept.Plugin/skills/`.
 2. Run `Developer: Reload Window`.
-3. The agent appears in the Chat agents picker; skills appear in the `/` slash command menu.
+3. The agent appears in the Chat agents picker; skills appear in the `/` slash command menu. The MCP tools are also available to Copilot once the plugin is loaded, even when you stay in the default agent.
 
 **MCP server C# code:**
 
@@ -339,7 +347,7 @@ The plugin provides the Precept Author agent, companion skills, and MCP server t
 
 1. Run task: `plugin: enable` (one time — stays enabled across reloads).
 2. Run `Developer: Reload Window`.
-3. Verify: the Precept Author agent appears in Chat, the 5 precept tools appear in the tools list.
+3. Verify: the Precept Author agent appears in Chat, the two skills appear in slash-command discovery, and the 5 precept tools appear in the tools list.
 
 To stop loading the plugin, run task: `plugin: disable`, then reload.
 

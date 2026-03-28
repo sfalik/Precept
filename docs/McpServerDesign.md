@@ -617,29 +617,29 @@ The running process never locks the build output directory. Old runtime copies a
 The plugin ships a custom agent (`precept-author.agent.md`) that establishes a lightweight persona with strict tool restrictions. The agent:
 
 - Restricts tools to `read`, `edit`, `search`, `fetch`, and all `precept/*` MCP tools (no terminal, no destructive operations)
-- Treats `precept_language` as the authoritative DSL reference — never generate syntax from memory or training data
-- Establishes core principles: compile after every edit, match local `.precept` conventions when present, fall back to `precept_language` when no local files exist
-- Is invocable from the agents dropdown and as a subagent from default Agent mode
+- Defines the specialist role, routes to the relevant companion skill, and keeps a small set of cross-cutting guardrails
+- Is available from the agents dropdown; some hosts may also support subagent invocation, but the plugin design should not rely on implicit delegation
 
-The agent body is intentionally thin — it owns the **persona and tool restrictions**. Detailed workflows live in the companion skills, which VS Code auto-discovers and loads based on the user's request. This separation keeps the agent focused on identity ("what am I allowed to do") while skills handle procedure ("how do I do it").
+The agent body is intentionally thin — it owns the **persona, routing, and tool restrictions**. Detailed workflows live in the companion skills, which VS Code auto-discovers and loads based on the user's request. This separation keeps the agent focused on identity and boundaries ("what am I doing, and when should I hand off to a skill?") while skills handle procedure ("how do I do it?").
 
 ### Companion Skills
 
-Two skills provide targeted capabilities accessible as slash commands and via automatic model invocation:
+Two skills provide targeted capabilities accessible as slash commands and via automatic model invocation. These skills are the primary procedural layer of the plugin:
 
 **`precept-authoring`** — standardizes the creation and editing workflow:
 - If the workspace already contains `.precept` files, read one representative file first to match local conventions
 - If no `.precept` files exist, rely on `precept_language` plus task requirements
 - Call `precept_compile` to validate and inspect the structure of any file being edited
-- After creating or editing a precept, include a Mermaid `stateDiagram-v2` diagram showing the resulting state machine to confirm the design with the user
+- Use `precept_inspect` and `precept_fire` in gated sequence only when they add evidence beyond compile output
+- Optionally include a Mermaid `stateDiagram-v2` diagram when it helps the user understand the resulting state machine; do not require a diagram for every authoring task
 - The skill must be repo-agnostic — it cannot assume `samples/` exists
 
 **`precept-debugging`** — standardizes diagnosis and behavior tracing:
 - Diagnose correctness and review structural quality with `precept_compile` (errors + warnings/hints)
-- Explore runtime behavior with `precept_inspect` and `precept_fire`
-- When explaining structure or transition behavior, include a focused Mermaid `stateDiagram-v2` diagram showing only the relevant states and transitions
+- Explore runtime behavior with `precept_inspect` and `precept_fire` only when the prior step succeeded and runtime tracing is still needed
+- Optionally include a focused Mermaid `stateDiagram-v2` diagram when it clarifies structure or transition behavior
 
-Both skills include a "Mermaid Diagrams" section that teaches the model how to generate full or partial state diagrams from `precept_compile` output data. Diagrams are rendered natively by VS Code Chat — no separate tool is needed. The extension's interactive preview panel (ELK + custom SVG) remains independent; the skill-generated Mermaid diagrams serve a different purpose (conversation-embedded, focused, partial).
+Both skills include Mermaid guidance for generating full or partial state diagrams from `precept_compile` output data. Diagrams are optional aids, not mandatory output. When the host supports Mermaid rendering, the skill can present a rendered diagram in chat; otherwise the instructions must distinguish clearly between a rendered artifact and raw Mermaid source text. The extension's interactive preview panel (ELK + custom SVG) remains independent; skill-generated Mermaid diagrams serve a different purpose (conversation-embedded, focused, partial).
 
 Both skills follow the [Agent Skills specification](https://agentskills.io/specification):
 - `name` must be lowercase kebab-case, match the parent directory name, max 64 chars
