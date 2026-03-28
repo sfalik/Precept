@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The .precept file as a syntax-colored code minimap.
+    Each horizontal band is a line of code. The PATTERN of colors
+    is the anatomy of a Precept definition:
+      - Blue bar:    `precept EntityName` declaration
+      - Teal bars:   state/event declarations
+      - Amber bars:  from...on...-> transition rules
+      - Bright bar:  the key governing operator (->)
+      - Absent gap:  the structurally absent path
+
+    At 32px: a stack of colored horizontal bands reads as "code structure."
+    At 512px: the syntax-color pattern is recognizable as Precept DSL.
+  -->
+
+  <rect width="512" height="512" fill="#141820"/>
+
+  <!-- Margin: bars start at x=80, varying widths -->
+
+  <!-- precept EntityName declaration (keyword blue, full-width) -->
+  <rect x="80" y="76"  width="352" height="22" rx="3" fill="#569CD6"/>
+
+  <!-- blank line (gap between sections) -->
+  <!-- (no rect, just spacing) -->
+
+  <!-- state declarations (teal, medium length) -->
+  <rect x="80" y="126" width="260" height="20" rx="3" fill="#4EC9B0"/>
+  <rect x="80" y="156" width="228" height="20" rx="3" fill="#4EC9B0"/>
+  <rect x="80" y="186" width="244" height="20" rx="3" fill="#4EC9B0"/>
+
+  <!-- event declarations (softer blue-green) -->
+  <rect x="80" y="234" width="240" height="20" rx="3" fill="#4A9FD8"/>
+  <rect x="80" y="264" width="208" height="20" rx="3" fill="#4A9FD8"/>
+
+  <!-- transition rules (amber/gold bars) -->
+  <rect x="80" y="312" width="352" height="20" rx="3" fill="#C8A060"/>
+  <rect x="80" y="342" width="320" height="20" rx="3" fill="#C8A060"/>
+
+  <!-- KEY GOVERNING RULE — bright accent green, the -> operator rule -->
+  <rect x="80" y="372" width="352" height="24" rx="3" fill="#1FFF7A"/>
+
+  <!-- another transition rule -->
+  <rect x="80" y="406" width="296" height="20" rx="3" fill="#C8A060"/>
+
+  <!-- absent / structurally impossible path — very dim, shorter, no valid destination -->
+  <rect x="80" y="436" width="160" height="20" rx="3" fill="#2A3A50"/>
+</svg>

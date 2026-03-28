@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The governed contract as solid material with one arrow-shaped void.
+    The material cannot be crossed except through the precisely carved
+    path — the only valid direction through the definition.
+
+    The arrow is not drawn; it is CUT. The form of permission
+    is an absence in the contract, not a mark on top of it.
+    Prevention is the material. The valid path is the void.
+  -->
+
+  <rect width="512" height="512" fill="#060810"/>
+
+  <!-- The solid governing material (cerulean blue) -->
+  <rect x="64" y="160" width="384" height="192" rx="6" fill="#1060D8"/>
+
+  <!-- Arrow void: shaft (background color cuts through the material) -->
+  <rect x="96" y="228" width="230" height="56" fill="#060810"/>
+
+  <!-- Arrow void: arrowhead triangle pointing right -->
+  <polygon points="326,192 326,320 416,256" fill="#060810"/>
+</svg>

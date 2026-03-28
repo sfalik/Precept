@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    RADICAL DEPARTURE — Wax seal aesthetic.
+
+    An official seal pressed once into governing material.
+    The definition is the seal itself: applied at compile time,
+    impossible to undo, permanently authoritative.
+
+    The -> operator at center is the seal's mark — the one
+    thing it certifies. The radial ring suggests the circumference
+    of the governed domain. The eight tick marks are the rule
+    endpoints: positions where the seal's authority terminates
+    and no transition exists beyond them.
+
+    Dark, authoritative, final. The opposite of live UI.
+    This is the compiled artifact, pressed and set.
+  -->
+
+  <rect width="512" height="512" fill="#08080E"/>
+
+  <defs>
+    <filter id="press-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+    <filter id="emboss-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Outer seal circle — the full circumference of the governed domain -->
+  <circle cx="256" cy="256" r="220" fill="#8C1018"/>
+
+  <!-- Inner darker field — the sealed interior -->
+  <circle cx="256" cy="256" r="196" fill="#6A0C14"/>
+
+  <!-- Rim band for depth -->
+  <circle cx="256" cy="256" r="220" fill="none" stroke="#C02030" stroke-width="6"/>
+  <circle cx="256" cy="256" r="196" fill="none" stroke="#4A0808" stroke-width="4"/>
+
+  <!-- Eight radial tick marks at compass positions — the rule endpoints -->
+  <!-- 0° (right) -->
+  <line x1="212" y1="256" x2="190" y2="256" stroke="#E83040" stroke-width="5" stroke-linecap="round"/>
+  <!-- 45° -->
+  <line x1="219" y1="219" x2="203" y2="203" stroke="#E83040" stroke-width="5" stroke-linecap="round"/>
+  <!-- 90° (top) -->
+  <line x1="256" y1="212" x2="256" y2="190" stroke="#E83040" stroke-width="5" stroke-linecap="round"/>
+  <!-- 135° -->
+  <line x1="293" y1="219" x2="309" y2="203" stroke="#E83040" stroke-width="5" stroke-linecap="round"/>
+  <!-- 180° (left) -->
+  <line x1="300" y1="256" x2="322" y2="256" stroke="#E83040" stroke-width="5" stroke-linecap="round"/>
+  <!-- 225° -->
+  <line x1="293" y1="293" x2="309" y2="309" stroke="#E83040" stroke-width="5" stroke-linecap="round"/>
+  <!-- 270° (bottom) -->
+  <line x1="256" y1="300" x2="256" y2="322" stroke="#E83040" stroke-width="5" stroke-linecap="round"/>
+  <!-- 315° -->
+  <line x1="219" y1="293" x2="203" y2="309" stroke="#E83040" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- The -> operator: the seal's governing mark, impressed at center -->
+  <text
+    x="256" y="280"
+    font-family="'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace"
+    font-size="148"
+    font-weight="700"
+    fill="#F0D0C8"
+    text-anchor="middle"
+    dominant-baseline="central"
+    font-feature-settings="'calt' 1, 'liga' 1"
+    filter="url(#emboss-glow)"
+  >-&gt;</text>
+</svg>

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    RADICAL DEPARTURE — Light background, maximum typographic contrast.
+
+    A designer with completely different instincts from the existing set.
+    No dark background. No glow. No thin lines. No code aesthetic.
+
+    A Japanese hanko / master craftsman's mark aesthetic:
+    The P letterform stamped in pure ink-black on warm white.
+    The notch cut through the bowl at exactly the governed height
+    is the structural rule — precisely positioned, immovable.
+
+    The P stands for "precept" — the binding rule. The cut IS the rule:
+    it bisects the bowl at the exact line of the contract, and nothing
+    above or below that cut belongs to the same governed zone.
+
+    Bold. Austere. Completely different from every other candidate.
+  -->
+
+  <!-- Warm white ground -->
+  <rect width="512" height="512" fill="#F5F0E8"/>
+
+  <!--
+    Heavy geometric P constructed from pure rectangles.
+    The letterform is architectural — built from slabs, not drawn.
+
+    Stem: x=120-204, y=88-424 (width 84, height 336)
+    Top crossbar: x=120-368, y=88-172 (width 248, height 84)
+    Mid crossbar: x=120-368, y=256-340 (width 248, height 84)
+    Right column (bowl right wall): x=284-368, y=172-256 (width 84, height 84)
+
+    This creates a P where:
+      - The counter (interior of the bowl) is the rectangle 204,172 - 284,256
+      - The overall P body is made entirely of rectangular slabs
+  -->
+
+  <!-- Stem -->
+  <rect x="120" y="88"  width="84" height="336" fill="#141010"/>
+
+  <!-- Top crossbar -->
+  <rect x="120" y="88"  width="248" height="84"  fill="#141010"/>
+
+  <!-- Mid crossbar (forms the bowl floor) -->
+  <rect x="120" y="256" width="248" height="84"  fill="#141010"/>
+
+  <!-- Right wall of bowl -->
+  <rect x="284" y="172" width="84"  height="84"  fill="#141010"/>
+
+  <!--
+    The structural cut: a thin precise gap across the full stem width,
+    at the mid-height of the counter (y=214).
+    This is the rule inscribed into the letter — the precept itself.
+    It cuts through the right wall of the bowl, making the bisection visible.
+  -->
+  <rect x="120" y="210" width="248" height="12"  fill="#F5F0E8"/>
+</svg>

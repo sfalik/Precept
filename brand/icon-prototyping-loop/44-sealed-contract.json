@@ -1,0 +1,21 @@
+{
+  "filename": "44-sealed-contract.svg",
+  "title": "An official wax seal pressed once into the governing material. The definition is the seal itself: applied at compile time, impossible to undo, permanently authoritative. The `->` operator at center is what the seal certifies — every valid transition in the governed domain. The radial tick marks are the rule endpoints: positions where authority terminates and nothing beyond them can be structurally reached.",
+  "conceptualBridge": "The pressed seal means Precept's definition is irrevocably final because compile-time verification applies the governing mark once — after which the contract cannot be altered and every transition it certifies is permanently structurally valid.",
+  "status": "exploring",
+  "decision": "Kept at threshold (4.0): the wax-seal aesthetic is a genuinely new direction and the crimson palette is unused in the active set; the 8 tick marks hurt visual economy — next iteration should simplify to just the seal circle + `->` center mark.",
+  "tags": ["radical-departure", "wax-seal", "authority", "crimson", "circular", "code-aesthetic"],
+  "palette": ["#08080E", "#8C1018", "#6A0C14", "#F0D0C8"],
+  "averageScore": 4.0,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 3.5,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 3.5,
+    "monochromeTest": 4,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

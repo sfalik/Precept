@@ -1168,7 +1168,7 @@
       const manualReview = normalizeManualReview(candidate.filename);
       const baseScore = typeof candidate.averageScore === 'number' ? candidate.averageScore : null;
       let effectiveScore = baseScore;
-      let effectiveStatus = manualReview.status || candidate.status;
+      let effectiveStatus = manualReview.status || 'exploring';
       let manualBadge = null;
 
       if (manualReview.weight > 0) {

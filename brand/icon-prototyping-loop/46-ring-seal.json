@@ -1,0 +1,21 @@
+{
+  "filename": "46-ring-seal.svg",
+  "title": "A simplified authority seal: a thin ring boundary and the `->` operator at center. The ring is the complete jurisdictional boundary of the governed domain; the operator is what the seal certifies. Unlike 44-sealed-contract, there is no decorative complexity — just the boundary and the certified law.",
+  "conceptualBridge": "The ring seal means Precept's definition is the complete governing boundary because the circle marks where jurisdiction begins and ends, and the `->` at center is what the contract certifies: every declared transition is structurally valid within it.",
+  "status": "exploring",
+  "decision": "Kept at threshold (4.0): the circular boundary adds a jurisdictional dimension to the `->` operator, but the thin outline ring reduces structural weight; if promoted, would compete with 39-arrow-code as the code-aesthetic representative — only one can stay unless both justify the slot.",
+  "tags": ["seal", "ring", "code-aesthetic", "crimson", "circular", "simplified"],
+  "palette": ["#08080E", "#C02030"],
+  "averageScore": 4.0,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 5,
+    "monochromeTest": 4,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

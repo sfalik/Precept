@@ -1,5 +1,5 @@
 Brand narrative research — how developer tools and libraries tell their story.
-
+please re-read teh 
 Purpose:
 - Study how libraries and tools frame their origin, purpose, and problem narrative.
 - Calibrate to library scale: a README opening paragraph is a brand narrative.

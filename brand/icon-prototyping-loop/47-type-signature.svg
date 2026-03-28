@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The type signature of a Precept transition: {S → S}
+    In type theory, a function type A → B is the most compact
+    expression of a governed transformation. Precept's fire operation
+    is exactly this: a typed function from (state × data) to state.
+
+    The curly braces mark the scope: the definition boundary.
+    Inside: the governing arrow.
+
+    The form reads as code (curly brace scope + arrow) and
+    as mathematics (function type) simultaneously.
+
+    Two chars: { }. One operator: →.
+    Three elements, maximum conceptual density.
+  -->
+
+  <rect width="512" height="512" fill="#0A0C14"/>
+
+  <defs>
+    <filter id="type-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!--
+    Left curly brace { in dim color
+    Right curly brace } in dim color
+    Arrow → in bright accent
+    Laid out as: { → }
+  -->
+
+  <!-- Left brace - dim -->
+  <text
+    x="80" y="298"
+    font-family="'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace"
+    font-size="260"
+    font-weight="700"
+    fill="#3A5C80"
+    text-anchor="start"
+    dominant-baseline="central"
+  >{</text>
+
+  <!-- Right brace - dim -->
+  <text
+    x="432" y="298"
+    font-family="'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace"
+    font-size="260"
+    font-weight="700"
+    fill="#3A5C80"
+    text-anchor="end"
+    dominant-baseline="central"
+  >}</text>
+
+  <!-- Governing arrow → in bright accent -->
+  <text
+    x="256" y="298"
+    font-family="'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace"
+    font-size="200"
+    font-weight="700"
+    fill="#1FFF7A"
+    text-anchor="middle"
+    dominant-baseline="central"
+    filter="url(#type-glow)"
+  >&#x2192;</text>
+</svg>

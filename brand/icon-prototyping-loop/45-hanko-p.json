@@ -1,0 +1,21 @@
+{
+  "filename": "45-hanko-p.svg",
+  "title": "A Japanese hanko / master craftsman's stamp aesthetic — the P letterform pressed in pure ink-black on warm white. The P stands for the product name; the precise cut across the bowl is the structural rule: bisecting the interior at the exact height of the contract. Precept's rules are inscribed into the definition at compile time; this mark captures that permanent inscription. No dark background. No glow. Maximum typographic contrast.",
+  "conceptualBridge": "The ink-stamped P with rule cut means Precept's governing law is inscribed into the product's identity because the letterform cannot exist structurally without the cut that defines its interior boundary.",
+  "status": "exploring",
+  "decision": "Kept: 4.25 avg — the white-background hanko aesthetic is a genuine radical departure; the P letterform family is already well represented (04, 06, 09) so this stays exploring unless the aesthetic alone earns distinction over the existing P variants.",
+  "tags": ["radical-departure", "hanko", "letterform", "white-background", "monochrome", "typographic"],
+  "palette": ["#F5F0E8", "#141010"],
+  "averageScore": 4.25,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 4,
+    "visualEconomy": 4.5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

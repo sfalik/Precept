@@ -1,0 +1,21 @@
+{
+  "filename": "43-void-arrow.svg",
+  "title": "The governed contract as solid material with one arrow-shaped void. Precept's transition rules do not draw the valid path on top of the world — they carve it out of the definition itself. The material is the contract; the arrow void is the one permitted direction. Every other point in the solid block is structurally impassable.",
+  "conceptualBridge": "The arrow void means Precept's valid transition is structurally carved into the contract because the permitted path is not a mark applied to the world but an absence in the governing material — the only opening the definition provides.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: 4.44 avg — the void-in-solid arrow is a more specific conceptual treatment than 34-transition-arrow (solid arrow); the carved-void metaphor embodies 'only the declared path exists' rather than just showing the arrow as a mark. Perfect monochrome and visual economy scores.",
+  "tags": ["void-arrow", "negative-space", "solid-block", "cerulean", "structural-path"],
+  "palette": ["#060810", "#1060D8"],
+  "averageScore": 4.44,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4.5,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 4,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

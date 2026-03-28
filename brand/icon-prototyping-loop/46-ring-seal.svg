@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    A simplified authority seal: one circle, one mark at center.
+    No radial decoration. No layering. Just the boundary and the certified content.
+
+    The thin outer ring is the jurisdictional boundary — the complete perimeter
+    of the governed domain. Inside: the -> operator in the seal color,
+    proving that this definition governs all transitions of this type.
+
+    The simplification versus 44-sealed-contract tests whether the
+    circle-boundary + center-mark form works with maximum visual economy.
+  -->
+
+  <rect width="512" height="512" fill="#08080E"/>
+
+  <defs>
+    <filter id="seal-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Outer boundary ring — the jurisdictional limit -->
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#C02030" stroke-width="12"/>
+
+  <!-- Governing operator: the certified mark -->
+  <text
+    x="256" y="286"
+    font-family="'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace"
+    font-size="220"
+    font-weight="700"
+    fill="#C02030"
+    text-anchor="middle"
+    dominant-baseline="central"
+    font-feature-settings="'calt' 1, 'liga' 1"
+    filter="url(#seal-glow)"
+  >-&gt;</text>
+</svg>

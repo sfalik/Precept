@@ -1,0 +1,21 @@
+{
+  "filename": "42-code-minimap.svg",
+  "title": "The .precept file rendered as a syntax-colored code minimap. Each horizontal band is a line of code; the pattern of colors is the anatomy of a Precept definition: blue for declarations, teal for states, amber for transition rules, bright green for the governing operator. The absent final line is the structurally impossible path — too short to reach a destination.",
+  "conceptualBridge": "The syntax bands mean Precept's contract is a complete structured file because the color pattern encodes the exact anatomy of a .precept definition — declarations, states, events, rules, and the absent impossible path — all visible at once.",
+  "status": "exploring",
+  "decision": "Kept: code minimap is a genuinely new visual family (4.06 avg), passes threshold; monochrome test is the weak point — consider a version with stronger structural differentiation that works without color.",
+  "tags": ["code-aesthetic", "minimap", "syntax-bands", "file-structure", "multi-color"],
+  "palette": ["#141820", "#569CD6", "#4EC9B0", "#4A9FD8", "#C8A060", "#1FFF7A", "#2A3A50"],
+  "averageScore": 4.06,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 4,
+    "visualEconomy": 4,
+    "monochromeTest": 3.5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}
