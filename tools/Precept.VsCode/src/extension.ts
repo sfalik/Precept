@@ -25,6 +25,7 @@ let languageServerStatusItem: vscode.StatusBarItem | undefined;
 let currentLanguageServerLaunchInfo: LanguageServerLaunchInfo | undefined;
 
 const languageServerDllName = "Precept.LanguageServer.dll";
+const bundledServerRelativePath = path.join("server", languageServerDllName);
 const devLanguageServerRootRelativePath = path.join("temp", "dev-language-server");
 const devLanguageServerBuildDllRelativePath = path.join(
   devLanguageServerRootRelativePath,
@@ -35,13 +36,14 @@ const devLanguageServerBuildDllRelativePath = path.join(
 );
 const devLanguageServerRuntimeRelativePath = path.join(devLanguageServerRootRelativePath, "runtime");
 
-type LanguageServerLaunchMode = "dev-build-shadow-copy";
+type LanguageServerLaunchMode = "dev-build-shadow-copy" | "bundled";
 
 interface LanguageServerLaunchInfo {
   mode: LanguageServerLaunchMode;
   command: string;
   args: string[];
   cwd: string;
+  projectPath?: string;
   buildDllPath?: string;
   runtimeDllPath?: string;
 }
@@ -131,23 +133,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
   context.subscriptions.push(showLanguageServerModeDisposable);
 
-  const projectPath = resolveLanguageServerProjectPath(context, outputChannel);
+  const launchInfo = resolveLanguageServerLaunchInfo(context, outputChannel);
 
-  if (!projectPath) {
-    updateLanguageServerStatusItem("error", "project not found");
-    outputChannel.appendLine("Language server project not found.");
+  if (!launchInfo) {
+    updateLanguageServerStatusItem("error", "server not found");
+    outputChannel.appendLine("Language server not found. Checked dev build and bundled server paths.");
     void vscode.window.showErrorMessage(
-      "Precept: could not locate tools/Precept.LanguageServer/Precept.LanguageServer.csproj from the current workspace."
+      "Precept: could not locate the language server. See the Precept output channel for details."
     );
     outputChannel.show(true);
     return;
   }
 
-  const projectDirectory = path.dirname(projectPath);
-  const serverWorkingDirectory = path.resolve(projectDirectory, "..", "..");
-
-  outputChannel.appendLine(`Language server project: ${projectPath}`);
-  outputChannel.appendLine(`Language server cwd: ${serverWorkingDirectory}`);
+  const serverWorkingDirectory = launchInfo.cwd;
 
   const clientOptions: LanguageClientOptions = {
     outputChannel,
@@ -164,7 +162,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   };
 
   try {
-    await ensureLanguageClientStarted(projectPath, serverWorkingDirectory, clientOptions, outputChannel);
+    await startLanguageClient(launchInfo, clientOptions, outputChannel);
   } catch (error) {
     updateLanguageServerStatusItem("error", "startup failed");
     outputChannel.appendLine(`Language client failed to start: ${String(error)}`);
@@ -173,24 +171,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     return;
   }
 
-  const devLanguageServerWatcher = createDevLanguageServerWatcher(
-    serverWorkingDirectory,
-    () => {
-      scheduleLanguageClientRestart(projectPath, serverWorkingDirectory, clientOptions, outputChannel);
-    },
-    outputChannel
-  );
-  context.subscriptions.push(devLanguageServerWatcher);
-  context.subscriptions.push(
-    new vscode.Disposable(() => {
-      if (!languageServerRestartTimer) {
-        return;
-      }
+  if (launchInfo.mode === "dev-build-shadow-copy") {
+    const devLanguageServerWatcher = createDevLanguageServerWatcher(
+      serverWorkingDirectory,
+      () => {
+        scheduleLanguageClientRestart(launchInfo, clientOptions, outputChannel);
+      },
+      outputChannel
+    );
+    context.subscriptions.push(devLanguageServerWatcher);
+    context.subscriptions.push(
+      new vscode.Disposable(() => {
+        if (!languageServerRestartTimer) {
+          return;
+        }
 
-      clearTimeout(languageServerRestartTimer);
-      languageServerRestartTimer = undefined;
-    })
-  );
+        clearTimeout(languageServerRestartTimer);
+        languageServerRestartTimer = undefined;
+      })
+    );
+  }
 
   const changeSubscription = vscode.workspace.onDidChangeTextDocument((event) => {
     if (!currentPreviewPanel || !currentPreviewDocumentUri) {
@@ -300,39 +300,50 @@ function resolveLanguageServerProjectPath(context: vscode.ExtensionContext, outp
   return candidates.find((candidate) => fs.existsSync(candidate));
 }
 
-async function ensureLanguageClientStarted(
-  projectPath: string,
-  serverWorkingDirectory: string,
-  clientOptions: LanguageClientOptions,
+function resolveLanguageServerLaunchInfo(
+  context: vscode.ExtensionContext,
   output: vscode.OutputChannel
-): Promise<void> {
-  if (client) {
-    return;
+): LanguageServerLaunchInfo | undefined {
+  // Dev mode: try to find the .csproj and build from source (shadow-copy with hot restart).
+  const projectPath = resolveLanguageServerProjectPath(context, output);
+  if (projectPath) {
+    const projectDirectory = path.dirname(projectPath);
+    const serverWorkingDirectory = path.resolve(projectDirectory, "..", "..");
+    output.appendLine(`Language server project: ${projectPath}`);
+    output.appendLine(`Language server cwd: ${serverWorkingDirectory}`);
+    try {
+      return resolveDevLaunchConfiguration(projectPath, serverWorkingDirectory, output);
+    } catch (error) {
+      output.appendLine(`Dev launch configuration failed: ${String(error)}`);
+      output.appendLine("Falling back to bundled server.");
+    }
   }
 
-  if (clientStartPromise) {
-    await clientStartPromise;
-    return;
+  // Bundled mode: look for a pre-built DLL shipped inside the extension.
+  const bundledDllPath = path.join(context.extensionPath, bundledServerRelativePath);
+  if (fs.existsSync(bundledDllPath)) {
+    output.appendLine(`Language server launch mode: bundled`);
+    output.appendLine(`Language server DLL: ${bundledDllPath}`);
+    return {
+      mode: "bundled",
+      command: "dotnet",
+      args: [bundledDllPath],
+      cwd: context.extensionPath
+    };
   }
 
-  clientStartPromise = startLanguageClient(projectPath, serverWorkingDirectory, clientOptions, output);
-  try {
-    await clientStartPromise;
-  } finally {
-    clientStartPromise = undefined;
-  }
+  output.appendLine(`Bundled server not found at ${bundledDllPath}`);
+  return undefined;
 }
 
 async function startLanguageClient(
-  projectPath: string,
-  serverWorkingDirectory: string,
+  launchInfo: LanguageServerLaunchInfo,
   clientOptions: LanguageClientOptions,
   output: vscode.OutputChannel
 ): Promise<void> {
-  const launchConfiguration = resolveLanguageServerLaunchConfiguration(projectPath, serverWorkingDirectory, output);
-  currentLanguageServerLaunchInfo = launchConfiguration;
+  currentLanguageServerLaunchInfo = launchInfo;
   updateLanguageServerStatusItem("starting");
-  const serverOptions = createServerOptions(launchConfiguration);
+  const serverOptions = createServerOptions(launchInfo);
   const nextClient = new LanguageClient(
     "preceptLanguageServer",
     "Precept Language Server",
@@ -397,8 +408,7 @@ function createDevLanguageServerWatcher(
 }
 
 function scheduleLanguageClientRestart(
-  projectPath: string,
-  serverWorkingDirectory: string,
+  launchInfo: LanguageServerLaunchInfo,
   clientOptions: LanguageClientOptions,
   output: vscode.OutputChannel
 ): void {
@@ -408,13 +418,12 @@ function scheduleLanguageClientRestart(
 
   languageServerRestartTimer = setTimeout(() => {
     languageServerRestartTimer = undefined;
-    void restartLanguageClient(projectPath, serverWorkingDirectory, clientOptions, output);
+    void restartLanguageClient(launchInfo, clientOptions, output);
   }, 500);
 }
 
 async function restartLanguageClient(
-  projectPath: string,
-  serverWorkingDirectory: string,
+  launchInfo: LanguageServerLaunchInfo,
   clientOptions: LanguageClientOptions,
   output: vscode.OutputChannel
 ): Promise<void> {
@@ -438,9 +447,15 @@ async function restartLanguageClient(
         await currentClient.stop();
       }
 
-      clientStartPromise = startLanguageClient(projectPath, serverWorkingDirectory, clientOptions, output);
+      const freshLaunchInfo = resolveDevLaunchConfiguration(
+        launchInfo.projectPath!,
+        launchInfo.cwd,
+        output
+      );
+
+      const startPromise = startLanguageClient(freshLaunchInfo, clientOptions, output);
       try {
-        await clientStartPromise;
+        await startPromise;
       } finally {
         clientStartPromise = undefined;
       }
@@ -498,6 +513,8 @@ function getLanguageServerLaunchModeLabel(mode: LanguageServerLaunchMode | undef
   switch (mode) {
     case "dev-build-shadow-copy":
       return "Dev";
+    case "bundled":
+      return "Ready";
     default:
       return "?";
   }
@@ -540,7 +557,7 @@ function showLanguageServerMode(output: vscode.OutputChannel): void {
   });
 }
 
-function resolveLanguageServerLaunchConfiguration(
+function resolveDevLaunchConfiguration(
   projectPath: string,
   serverWorkingDirectory: string,
   output: vscode.OutputChannel
@@ -563,6 +580,7 @@ function resolveLanguageServerLaunchConfiguration(
       command: "dotnet",
       args: [runtimeDllPath],
       cwd: serverWorkingDirectory,
+      projectPath,
       buildDllPath: devBuildDllPath,
       runtimeDllPath
     };

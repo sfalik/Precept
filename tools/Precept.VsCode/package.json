@@ -107,9 +107,10 @@
     "watch": "tsc -watch -p ./",
     "dev:watch": "tsc -watch -p ./ --preserveWatchOutput",
     "package:local": "npm run compile && npx @vscode/vsce package --allow-missing-repository",
+    "package:marketplace": "npm run compile && dotnet publish ../../tools/Precept.LanguageServer/Precept.LanguageServer.csproj -c Release -o ./server --no-self-contained && npx @vscode/vsce package --allow-missing-repository",
     "loop:local": "powershell -ExecutionPolicy Bypass -File ./scripts/install-local.ps1",
     "loop:local:uninstall": "powershell -ExecutionPolicy Bypass -File ./scripts/uninstall-local.ps1",
-    "vscode:prepublish": "npm run compile"
+    "vscode:prepublish": "npm run compile && dotnet publish ../../tools/Precept.LanguageServer/Precept.LanguageServer.csproj -c Release -o ./server --no-self-contained"
   },
   "dependencies": {
     "elkjs": "^0.11.0",

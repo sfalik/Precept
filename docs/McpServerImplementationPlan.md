@@ -552,7 +552,10 @@ Use this prompt to execute Phase 8 in a new Copilot Chat session:
 - [ ] Verify `docs/CatalogInfrastructureDesign.md` cross-references are still accurate
 - [x] Remove `registerMcpServerDefinitionProvider()` from VS Code extension (MCP now lives in plugin)
 - [x] Remove `mcpServerDefinitionProviders` contribution from `tools/Precept.VsCode/package.json`
-- [ ] Update distribution `.mcp.json` to use `dotnet tool run precept-mcp` (CI rewrites the dev launcher form)
+- [x] Update distribution `.mcp.json` to use `dotnet tool run precept-mcp` (created `.mcp.dist.json`; CI copies to `.mcp.json` at publish time)
+- [x] Configure `Precept.Mcp.csproj` as a .NET tool (`PackAsTool`, `ToolCommandName: precept-mcp`)
+- [x] Add bundled language server mode to VS Code extension (`server/` directory, framework-dependent)
+- [x] Add `package:marketplace` script for building marketplace VSIX with bundled language server
 - [ ] Publish plugin to a distribution channel (Git repo for direct install, and/or submit to `awesome-copilot`)
 - [ ] Verify MCP sync rule in `.github/copilot-instructions.md` is still accurate (already exists with correct post-rename names; do not overwrite with stale `Dsl*` prefixes)
 

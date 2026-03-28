@@ -607,10 +607,16 @@ The running process never locks the build output directory. Old runtime copies a
 
 | Concern | Development (this repo) | Distribution (end users) |
 |---|---|---|
-| MCP server launch | Launcher script (build + shadow copy) | `dotnet tool run precept-mcp` |
+| Language server | Dev build + shadow copy (auto-restart on `Ctrl+Shift+B`) | Bundled in VSIX under `server/` (framework-dependent) |
+| MCP server launch | Launcher script (build + shadow copy) | `dotnet tool run precept-mcp` (`.mcp.dist.json`) |
 | Plugin registration | `chat.pluginLocations` → `./tools/Precept.Plugin` | Marketplace install or Git URL |
 | Extension registration | `extension: install` task | VS Code Marketplace |
 | Plugin toggle | `plugin: enable` / `plugin: disable` tasks | Extensions panel |
+| .NET prerequisite | .NET SDK (builds from source) | .NET runtime (runs pre-built binaries) |
+
+**Extension packaging for marketplace:** Run `npm run package:marketplace` in `tools/Precept.VsCode/`. This publishes the language server into `server/` (framework-dependent, no self-contained runtime) and packages the VSIX. The `vscode:prepublish` hook runs the same `dotnet publish` step automatically.
+
+**Plugin packaging for distribution:** At publish time, copy `.mcp.dist.json` to `.mcp.json` in the published plugin. The launcher script (`tools/scripts/start-precept-mcp.js`) is not included in the published plugin.
 
 ### Precept Author Agent
 

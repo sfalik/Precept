@@ -286,6 +286,36 @@ Precept acknowledges that entirely different ceremonies apply to different types
 
 Both paths are safely watched by the exact same invariant engine. Direct editing isn't a hack; it is a first-class feature protected by the same ironclad invariants.
 
+## Installation
+
+The Precept tooling ships as two independent artifacts:
+
+| Artifact | What it provides | Install method |
+|---|---|---|
+| **VS Code Extension** | Language server (diagnostics, completions, semantic tokens), syntax highlighting, preview panel, commands | VS Code Marketplace or local VSIX |
+| **Copilot Agent Plugin** | MCP tools (`precept_compile`, `precept_inspect`, `precept_fire`, `precept_update`, `precept_language`), Precept Author agent, authoring and debugging skills | Plugin marketplace or Git install |
+
+### Prerequisites
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download) (required for both the language server and MCP tools)
+
+### Extension
+
+Install the **Precept** extension from the VS Code Marketplace. The extension bundles the language server — no additional setup needed beyond the .NET runtime.
+
+### Copilot Agent Plugin
+
+1. Install the MCP server as a .NET tool:
+   ```
+   dotnet tool install -g Precept.Mcp
+   ```
+2. Install the plugin via `Chat: Install Plugin From Source` or from the plugin marketplace.
+3. Enable the plugins preview in your user settings:
+   ```json
+   { "chat.plugins.enabled": true }
+   ```
+4. Reload the window. The Precept Author agent, skills, and MCP tools appear in the Chat panel.
+
 ## Local Development Loop (Contributors)
 
 This repo produces two VS Code artifacts: the **extension** (editor features) and the **agent plugin** (Copilot features). Both are developed locally from `tools/` and follow the same edit → build → reload cycle.

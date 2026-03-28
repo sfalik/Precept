@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <!-- Background -->
+  <rect width="128" height="128" rx="16" fill="#1e1e1e"/>
+
+  <!-- Left state circle (initial/active) -->
+  <circle cx="36" cy="64" r="22" fill="#24262b" stroke="#1FFF7A" stroke-width="3"/>
+  <!-- Initial state dot -->
+  <circle cx="36" cy="64" r="6" fill="#1FFF7A"/>
+
+  <!-- Arrow connecting states -->
+  <line x1="58" y1="64" x2="68" y2="64" stroke="#1FFF7A" stroke-width="3"/>
+  <polygon points="76,64 68,58 68,70" fill="#1FFF7A"/>
+
+  <!-- Right state circle -->
+  <circle cx="92" cy="64" r="22" fill="#24262b" stroke="#6D7F9B" stroke-width="3"/>
+</svg>

@@ -1,5 +1,7 @@
 ---
+name: Precept Author
 description: Author, validate, and debug Precept DSL definitions
+icon: ./precept-author-icon.svg
 tools:
   - read
   - edit

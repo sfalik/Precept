@@ -24,7 +24,6 @@ state CheckedOut
 state Overdue
 state Returned
 state Lost
-state orphan
 
 # Staff can correct due-date handling while a loan is active.
 in CheckedOut edit DueDay

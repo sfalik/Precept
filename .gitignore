@@ -28,4 +28,5 @@ tools/Precept.VsCode/out/
 tools/Precept.VsCode/*.vsix
 tools/Precept.VsCode/.vscode-test/
 tools/Precept.VsCode/mcp-server/
+tools/Precept.VsCode/server/
 

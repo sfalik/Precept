@@ -5,6 +5,13 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <!-- .NET tool packaging -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>precept-mcp</ToolCommandName>
+    <PackageId>Precept.Mcp</PackageId>
+    <Description>Precept DSL MCP server — provides compile, inspect, fire, update, and language tools for AI assistants.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
