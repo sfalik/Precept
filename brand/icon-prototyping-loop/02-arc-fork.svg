@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" fill="#191C22"/>
+
+  <!-- Source node (gray pill, left-center) -->
+  <rect x="56" y="214" width="120" height="54" rx="27" stroke="#3F4F6B" stroke-width="5"/>
+
+  <!-- Destination node (green pill, right-center) -->
+  <rect x="336" y="214" width="120" height="54" rx="27" stroke="#1FFF7A" stroke-width="5"/>
+
+  <!-- Green governed arc: curves above from source top to dest top -->
+  <path d="M116 214C116 98 396 98 396 214" stroke="#1FFF7A" stroke-width="6" stroke-linecap="round"/>
+  <!-- arrowhead entering dest from above -->
+  <path d="M389 206 L396 218 L403 206" fill="#1FFF7A"/>
+
+  <!-- Red dashed: exits source bottom, curves down to blocked state -->
+  <path d="M116 268C116 360 256 378 256 378" stroke="#FF3D67" stroke-width="5" stroke-dasharray="11 9" stroke-linecap="round"/>
+
+  <!-- Blocked state (red pill, bottom center) -->
+  <rect x="196" y="352" width="120" height="52" rx="26" stroke="#FF3D67" stroke-width="5"/>
+</svg>

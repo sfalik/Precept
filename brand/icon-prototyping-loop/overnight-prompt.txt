@@ -1,0 +1,68 @@
+Work only in this folder.
+
+Before changing anything, read these files:
+- Read sandbox-guardrails.md
+- Read precept-philosophy.md
+- Read candidate-evaluation-rubric.md
+- Read icon-reference-research.md
+- Read icon-aesthetic-references.md
+- Read icon-basis-workflow.precept
+- Read the existing SVGs and index.html
+
+Goal:
+Iteratively improve the Precept icon overnight.
+
+Constraints:
+- Stay entirely inside this folder.
+- Obey sandbox-guardrails.md strictly.
+- Generate SVG candidates.
+- Regenerate index.html by editing it directly immediately after every SVG save, rename, or delete.
+- Do not batch index updates.
+- Treat the index as a live progress board that must reflect every loop iteration.
+- Do not use shell in this run.
+- Do not create new .cmd, .bat, .ps1, .exe, .com, .vbs, .js, or .ts helper files as a workaround for execution.
+- Keep a curated set of the 50 best unique candidates in this folder.
+- Unique means materially different composition, not tiny variations.
+- Remove or ignore weak near-duplicates.
+- Score every serious candidate against candidate-evaluation-rubric.md before promoting it.
+- Do not keep a candidate in the curated top 50 unless it clears the rubric threshold.
+- Prefer 12 excellent candidates over 50 mediocre ones while exploring; only fill the full 50 if they truly clear the bar.
+- Avoid re-reading unchanged reference files every cycle unless needed for a real decision.
+
+Visual guidance:
+- Read precept-philosophy.md first. It explains what the product actually does and what the icon should evoke.
+- Read icon-reference-research.md and icon-aesthetic-references.md carefully. They show how the best software icons work: each one embodies a core product PROMISE as a visual form. Docker's whale carries containers because the product carries containers. Vault's door shape IS a vault. Stripe's rails ARE governed flow. Temporal's loop IS durability. Study the "conceptual bridge" for each entry.
+- YOUR FIRST TASK for every concept is to name the conceptual bridge. In one sentence, state: "This shape means [specific Precept idea] because [reason]." If you can't write that sentence, the concept isn't ready — pick a different idea. The bridge must connect to something real about the product: rules that hold, full inspectability, impossible invalid states, one-file complete contracts, prevention not detection, compile-time checking.
+- The icon does not need to look like a graph, flowchart, state chart, pipeline, or process map. Those are literal depictions of the product's internals. The icon should evoke what it feels like to use it, not diagram what it does.
+- Explore widely: abstract marks, symbolic forms, architectural motifs, structural metaphors, geometric constructions, negative-space plays, letterforms, seals, emblems, or anything else that communicates the core ideas.
+- Favor creative work that produces a strong, ownable mark.
+- Dark background preferred.
+- You are free to use any color palette. Do not default to green-and-red unless the concept genuinely calls for it. Many strong icons use a single accent color, monochrome, or an unexpected palette.
+- Avoid generic corporate symbols and repeated compositions that look like existing candidates.
+
+Process:
+
+CRITICAL RULE — WRITE IMMEDIATELY: You get ONE sentence to name a concept. Then you MUST write the SVG file. No sketching in prose, no exploring alternatives in text, no "I'm considering…" paragraphs. The cycle is: one-sentence idea → create SVG file → score it → update index. If you have written more than two sentences without saving a file, you are wasting context. Stop and write.
+
+Generation loop:
+1. Name the conceptual bridge in ONE sentence: "This shape means [Precept idea] because [reason]." Then immediately write the SVG. Do not elaborate, refine, or second-guess before writing.
+2. Write the SVG file immediately.
+3. Score it against the rubric.
+4. Update index.html with the new card and score.
+5. Decide: reject (remove the card), iterate on this file to improve it, or promote and move on.
+6. If you choose to iterate, you may refine the same file up to 3 times. After that, move on to a completely new concept.
+7. After every 3 new concepts, do a RADICAL DEPARTURE. This is mandatory, not optional. Imagine you are a completely different designer who has never seen the existing candidates. You have a different aesthetic sensibility, different influences, different instincts. You would never draw thin outlines with small circles. You might use heavy fills, bold letterforms, negative space, solid geometry, a single dominant shape, a textured surface, a contained emblem, or something no one in the folder has tried. The result should be so visually different that someone looking at the gallery would say "that one was clearly made by someone else." If your radical departure still looks like it belongs with the existing set, it is not radical enough — try again.
+
+Do not plan batches of SVGs. Do not second-guess a concept before writing it — write it, then decide. Bad SVGs are cheap; unwritten plans are worthless.
+
+Additional rules:
+- If a candidate is promising but not yet promotion-worthy, iterate on that specific file instead of starting a new one.
+- Keep the curated set diverse — favor materially different compositions over tiny variants.
+- Ensure the explored set spans multiple visual families instead of overconcentrating on one motif.
+- Favor quality over volume.
+- Use stable sequential filenames with numeric prefixes so the live index ordering stays meaningful.
+- Keep index.html sorted by descending average score (highest score first). Cards with — (unscored) go at the end. Preserve the existing card layout, auto-refresh behavior, and header metadata style.
+- Each card in index.html must include a score line: <div class="score">Avg: <span class="avg">X.X</span></div> where X.X is the average rubric score (1 decimal place). Use — if not yet scored.
+- Each card's <article class="card"> element must have a title attribute containing 1–2 sentences explaining the conceptual connection to Precept — why this visual form represents the product's ideas (rules that hold, inspectability, prevention, structural contracts). Do not describe what the SVG looks like; explain what it means.
+- When you score or rescore a candidate, update its score in index.html immediately.
+- At the end, summarize the strongest candidates and why they survived the rubric.

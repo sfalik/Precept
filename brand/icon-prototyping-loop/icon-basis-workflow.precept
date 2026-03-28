@@ -1,0 +1,23 @@
+precept IconBasisWorkflow
+
+field BlockedPathEnabled as boolean default false
+field LoopCount as number default 0
+
+state Predecessor initial
+state Current
+state NextOpen
+state LowerLoop
+state Blocked
+
+event AdvanceToCurrent
+event AdvanceToNextOpen
+event TryBlocked
+event DropToLowerLoop
+event ReturnToCurrent
+
+from Predecessor on AdvanceToCurrent -> transition Current
+from Current on AdvanceToNextOpen -> transition NextOpen
+from Current on TryBlocked when BlockedPathEnabled -> transition Blocked
+from Current on TryBlocked -> reject "Blocked path unavailable"
+from Current on DropToLowerLoop -> transition LowerLoop
+from LowerLoop on ReturnToCurrent -> set LoopCount = LoopCount + 1 -> transition Current
