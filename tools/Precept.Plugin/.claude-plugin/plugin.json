@@ -1,0 +1,13 @@
+{
+  "name": "precept",
+  "description": "Precept DSL authoring, validation, and debugging tools for GitHub Copilot.",
+  "version": "1.0.0",
+  "author": { "name": "Precept" },
+  "license": "MIT",
+  "keywords": ["precept", "dsl", "state-machine", "workflow", "domain-integrity"],
+  "agents": ["./agents"],
+  "skills": [
+    "./skills/precept-authoring",
+    "./skills/precept-debugging"
+  ]
+}

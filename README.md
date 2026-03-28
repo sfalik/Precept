@@ -140,18 +140,20 @@ if (editResult.IsSuccess)
 
 ## 📚 Sample Catalog
 
-The `samples/` directory now contains 18 fully commented workflows ordered from simple to complex. The first six are teaching-first samples, the middle six broaden feature usage, and the last six combine richer branching with more realistic review and operational rules.
+The `samples/` directory now contains 20 fully commented workflows ordered from simple to complex. Early samples are teaching-first, middle samples broaden feature usage, and later samples combine richer branching with more realistic review and operational rules.
 
 | Sample | Complexity | Learning focus |
 |--------|------------|----------------|
 | `event-registration.precept` | Simple | Scalar fields, payment flow, direct edits |
 | `library-hold-request.precept` | Simple | Queue promotion, stack history, entry and exit actions |
+| `trafficlight.precept` | Simple | Classic state progression, guard priority, `from any` |
 | `restaurant-waitlist.precept` | Simple | Queue routing, `peek`, `from any` |
 | `parcel-locker-pickup.precept` | Simple | Timed guards, reminder log stack, `clear` |
 | `building-access-badge-request.precept` | Simple | `set<number>`, `add`, `remove`, `contains`, `.min`, `.max` |
 | `refund-request.precept` | Simple | Approval flow, nullable notes, guarded rejection |
 | `maintenance-work-order.precept` | Medium | Urgency rules, from-state assertions, progress updates |
 | `clinic-appointment-scheduling.precept` | Medium | Event-arg validation with `%`, scheduling edits |
+| `library-book-checkout.precept` | Medium | Due-date guards, renewal limits, overdue fines |
 | `travel-reimbursement.precept` | Medium | Arithmetic policy checks with `*` and `/` |
 | `subscription-cancellation-retention.precept` | Medium | Retention offers, in-place review updates |
 | `vehicle-service-appointment.precept` | Medium | Service recommendation set, to-state assertions |
@@ -184,9 +186,9 @@ The catalog is designed so the overall set exercises the full current language s
 | Queue collections with `enqueue`, `dequeue`, `peek` | `library-hold-request.precept`, `restaurant-waitlist.precept`, `it-helpdesk-ticket.precept`, `utility-outage-report.precept` |
 | Stack collections with `push`, `pop`, `peek`, `clear` | `parcel-locker-pickup.precept`, `library-hold-request.precept`, `warranty-repair-request.precept` |
 | Collection accessors `.count`, `.min`, `.max`, `.peek` | `building-access-badge-request.precept`, `restaurant-waitlist.precept`, `it-helpdesk-ticket.precept`, `parcel-locker-pickup.precept` |
-| `from any on` rows | `restaurant-waitlist.precept`, `it-helpdesk-ticket.precept`, `utility-outage-report.precept` |
+| `from any on` rows | `trafficlight.precept`, `restaurant-waitlist.precept`, `it-helpdesk-ticket.precept`, `utility-outage-report.precept` |
 | Arithmetic operators `+`, `-`, `*`, `/`, `%` | `maintenance-work-order.precept`, `parcel-locker-pickup.precept`, `travel-reimbursement.precept`, `clinic-appointment-scheduling.precept` |
-| Logical operators `&&`, `||`, `!` | `maintenance-work-order.precept`, `insurance-claim.precept`, `loan-application.precept` |
+| Logical operators `&&`, `||`, `!` | `maintenance-work-order.precept`, `library-book-checkout.precept`, `insurance-claim.precept`, `loan-application.precept` |
 
 If you want to learn the language progressively, read the samples in the order listed above. If you want to see a specific feature in context, start with the matrix and jump straight to a representative file.
 
@@ -337,7 +339,7 @@ The plugin provides the Precept Author agent, companion skills, and MCP server t
 
 1. Run task: `plugin: enable` (one time — stays enabled across reloads).
 2. Run `Developer: Reload Window`.
-3. Verify: the Precept Author agent appears in Chat, the 6 precept tools appear in the tools list.
+3. Verify: the Precept Author agent appears in Chat, the 5 precept tools appear in the tools list.
 
 To stop loading the plugin, run task: `plugin: disable`, then reload.
 

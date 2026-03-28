@@ -83,12 +83,7 @@
         "when": "editorLangId == precept"
       }
     ],
-    "mcpServerDefinitionProviders": [
-      {
-        "id": "precept.mcpServer",
-        "label": "Precept"
-      }
-    ],
+
     "configuration": {
       "title": "Precept Preview",
       "properties": {
@@ -111,9 +106,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "dev:watch": "tsc -watch -p ./ --preserveWatchOutput",
-    "publish:mcp": "dotnet publish ../../tools/Precept.Mcp/Precept.Mcp.csproj -c Release --self-contained -o mcp-server/win-x64 -r win-x64 && dotnet publish ../../tools/Precept.Mcp/Precept.Mcp.csproj -c Release --self-contained -o mcp-server/linux-x64 -r linux-x64 && dotnet publish ../../tools/Precept.Mcp/Precept.Mcp.csproj -c Release --self-contained -o mcp-server/osx-arm64 -r osx-arm64",
     "package:local": "npm run compile && npx @vscode/vsce package --allow-missing-repository",
-    "package:dist": "npm run publish:mcp && npm run package:local",
     "loop:local": "powershell -ExecutionPolicy Bypass -File ./scripts/install-local.ps1",
     "loop:local:uninstall": "powershell -ExecutionPolicy Bypass -File ./scripts/uninstall-local.ps1",
     "vscode:prepublish": "npm run compile"

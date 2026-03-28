@@ -232,7 +232,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
   context.subscriptions.push(activeEditorSubscription);
 
-  registerMcpServerProvider(context);
 }
 
 export async function deactivate(): Promise<void> {
@@ -1150,62 +1149,4 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-function registerMcpServerProvider(context: vscode.ExtensionContext): void {
-  if (typeof vscode.lm?.registerMcpServerDefinitionProvider !== "function") {
-    return;
-  }
-
-  const provider = vscode.lm.registerMcpServerDefinitionProvider(
-    "precept.mcpServer",
-    {
-      provideMcpServerDefinitions: async () => {
-        const serverPath = resolveBundledMcpServerPath(context);
-        if (!serverPath) {
-          return [];
-        }
-
-        return [
-          new vscode.McpStdioServerDefinition(
-            "Precept",
-            serverPath,
-            [],
-            {},
-            context.extension.packageJSON.version
-          )
-        ];
-      }
-    }
-  );
-
-  context.subscriptions.push(provider);
-}
-
-function resolveBundledMcpServerPath(context: vscode.ExtensionContext): string | undefined {
-  const rid = getPlatformRid();
-  if (!rid) {
-    return undefined;
-  }
-
-  const executable = process.platform === "win32" ? "Precept.Mcp.exe" : "Precept.Mcp";
-  const serverPath = path.join(context.extensionPath, "mcp-server", rid, executable);
-
-  if (fs.existsSync(serverPath)) {
-    return serverPath;
-  }
-
-  return undefined;
-}
-
-function getPlatformRid(): string | undefined {
-  const platform = process.platform;
-  const arch = process.arch;
-
-  if (platform === "win32" && arch === "x64") { return "win-x64"; }
-  if (platform === "linux" && arch === "x64") { return "linux-x64"; }
-  if (platform === "darwin" && arch === "arm64") { return "osx-arm64"; }
-  if (platform === "darwin" && arch === "x64") { return "osx-x64"; }
-
-  return undefined;
 }

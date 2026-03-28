@@ -3,7 +3,7 @@ const path = require("path");
 
 const workspaceRoot = path.resolve(__dirname, "..", "..");
 const settingsPath = path.join(workspaceRoot, ".vscode", "settings.json");
-const pluginKey = "./tools/Precept.Plugin";
+const pluginKey = path.join(workspaceRoot, "tools", "Precept.Plugin").replace(/\\/g, "/");
 
 const flag = process.argv[2];
 if (flag !== "--enable" && flag !== "--disable") {

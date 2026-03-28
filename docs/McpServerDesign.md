@@ -461,7 +461,8 @@ The VS Code extension continues to provide all editor features: language server 
 
 ```
 tools/Precept.Plugin/
-├── plugin.json                    # Plugin metadata and configuration
+├── .claude-plugin/
+│   └── plugin.json                # Plugin metadata (Claude format)
 ├── agents/
 │   └── precept-author.agent.md    # Precept Author custom agent
 ├── skills/
@@ -473,7 +474,9 @@ tools/Precept.Plugin/
 └── README.md
 ```
 
-### plugin.json
+The plugin uses the **Claude format** (`.claude-plugin/plugin.json`) because `${CLAUDE_PLUGIN_ROOT}` expansion in `.mcp.json` only works with this format. The GitHub format (`.github/plugin/plugin.json`) does not expand `${CLAUDE_PLUGIN_ROOT}` or `${PLUGIN_ROOT}` as of VS Code 1.114.0-insider.
+
+### .claude-plugin/plugin.json
 
 ```json
 {
@@ -481,7 +484,6 @@ tools/Precept.Plugin/
   "description": "Precept DSL authoring, validation, and debugging tools for GitHub Copilot.",
   "version": "1.0.0",
   "author": { "name": "Precept" },
-  "repository": "https://github.com/<org>/precept-plugin",
   "license": "MIT",
   "keywords": ["precept", "dsl", "state-machine", "workflow", "domain-integrity"],
   "agents": ["./agents"],

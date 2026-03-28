@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { spawn, spawnSync } = require("child_process");
 
-const workspaceRoot = path.resolve(__dirname, "..", "..", "..");
+const workspaceRoot = path.resolve(__dirname, "..", "..");
 const projectPath = path.join(workspaceRoot, "tools", "Precept.Mcp", "Precept.Mcp.csproj");
 const buildRoot = path.join(workspaceRoot, "temp", "dev-mcp");
 const buildBinRoot = path.join(buildRoot, "bin");

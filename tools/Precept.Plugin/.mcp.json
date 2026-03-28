@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "precept": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/../scripts/start-precept-mcp.js"]
+    }
+  }
+}
