@@ -1,0 +1,21 @@
+{
+  "filename": "32-dual-chevron.svg",
+  "title": "Two massive triangles facing each other across a precise gap. The gap is not empty space — it is the contract. Precept's definition is the exact width of that governing aperture: only what fits through is structurally valid. The triangles are immovable walls; the passage between them is determined by the geometry of the definition, not by a runtime guard. Prevention is not a check — it is the shape.",
+  "conceptualBridge": "The opposing triangles mean Precept's definition is the governing aperture because only configurations that fit through the exact gap are structurally valid — the triangles make every other possibility physically absent.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: strongest radical departure this round — new visual family, new jade-green palette, exceptional visual economy and monochrome scores, distinct silhouette unlike any other candidate in the set.",
+  "tags": ["radical-departure", "opposing-triangles", "jade-green", "gap-aperture", "bold-fill"],
+  "palette": ["#060B08", "#00B838"],
+  "averageScore": 4.44,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 3.5,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

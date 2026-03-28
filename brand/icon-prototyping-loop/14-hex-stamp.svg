@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    A master die (hexagonal face, like a coin die or precision stamp)
+    with a Greek cross struck/embossed into its face.
+    Every instance is struck from the same die — the definition is the master.
+    The cross mark represents the four governed operations: Create, Fire, Inspect, Update.
+    Bronze/copper palette: ancient authority, crafted permanence.
+  -->
+
+  <defs>
+    <linearGradient id="hg" x1="256" y1="46" x2="256" y2="466" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8C5018"/>
+      <stop offset="60%" stop-color="#612C0E"/>
+      <stop offset="100%" stop-color="#3A1A06"/>
+    </linearGradient>
+    <linearGradient id="cross-g" x1="166" y1="166" x2="346" y2="346" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#D68A34"/>
+      <stop offset="100%" stop-color="#B06C1E"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="#07090C"/>
+
+  <!--
+    Regular hexagon, pointy-top, R=210, center (256,256).
+    Vertices: top=(256,46), then clockwise at 60° steps.
+  -->
+  <polygon points="256,46 438,151 438,361 256,466 74,361 74,151"
+           fill="url(#hg)"/>
+
+  <!-- Subtle bevel highlight at top edge -->
+  <path d="M256,52 L432,154" stroke="#C07830" stroke-width="2" stroke-opacity="0.35"/>
+  <path d="M256,52 L80,154" stroke="#C07830" stroke-width="2" stroke-opacity="0.35"/>
+
+  <!--
+    Greek cross (embossed/raised — lighter than hex face), center (256,256).
+    Arm half-length=90, arm half-width=34.
+    Path: M(256-34,256-90) H(256+34) V(256-34) H(256+90) V(256+34) H(256+34) V(256+90) H(256-34) V(256+34) H(256-90) V(256-34) H(256-34) Z
+  -->
+  <path d="M222 166 H290 V222 H346 V290 H290 V346 H222 V290 H166 V222 H222 Z"
+        fill="url(#cross-g)"/>
+
+  <!-- Subtle inset shadow at cross edges (depth) -->
+  <path d="M222 166 H290 V222 H346 V290 H290 V346 H222 V290 H166 V222 H222 Z"
+        fill="none" stroke="#3A1A06" stroke-width="2" stroke-opacity="0.5"/>
+</svg>

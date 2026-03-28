@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    The -> operator: the single most used symbol in every .precept file.
+
+    Every valid transition is declared as a ->. There are no other
+    valid paths — only the ones explicitly written as an arrow.
+    If you did not write a ->, the path does not exist.
+    The arrow IS the contract's permission system.
+
+    At compile time, every -> is verified: guards are type-checked,
+    targets are confirmed reachable, constraints are evaluated.
+    A -> that cannot be completed is a compile error — it is removed
+    from possibility before any instance ever runs.
+
+    This is the governing operator made into a mark.
+  -->
+
+  <rect width="512" height="512" fill="#060810"/>
+
+  <!--
+    Bold solid arrow pointing right — the -> in geometric form.
+    Shaft: y=232 to y=280 (48px tall). Arrowhead: 228px tall.
+    The form is deliberately aggressive — this is not a suggestion,
+    it is a structural declaration.
+  -->
+  <polygon
+    points="70,232 270,232 270,142 442,256 270,370 270,280 70,280"
+    fill="#E05000"
+  />
+</svg>

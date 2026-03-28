@@ -1,0 +1,21 @@
+{
+  "filename": "26-stepped-states.svg",
+  "title": "A stepped pyramid of five governed tiers. Each tier is a structurally distinct state; no tier can be reached without passing through every governed step below it. The definition is the geometry: the shape of the steps IS the allowed transition sequence. Invalid transitions — skipping levels, jumping backward — are not prevented at runtime; they are absent from the structure itself.",
+  "conceptualBridge": "The stepped pyramid means Precept's states are governed tiers because the definition makes each level structurally inaccessible except from its immediate neighbor, and the form itself encodes the only allowed transition sequence.",
+  "status": "shortlisted",
+  "decision": "Shortlisted for a structural metaphor that embodies governed state progression without depicting a state diagram, and a distinctive stepped silhouette new to the set.",
+  "tags": ["architectural", "ziggurat", "stepped", "state-hierarchy", "blue"],
+  "palette": ["#080A0E", "#1A3864", "#2A5498", "#3A6AB8"],
+  "averageScore": 4.1875,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 4.5,
+    "monochromeTest": 5,
+    "colorAndContrast": 3.5,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

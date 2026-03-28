@@ -1,0 +1,14 @@
+{
+  "filename": "01-gated-decision.svg",
+  "title": "A gated decision node where a governed path passes (green) and a blocked path is rejected (red dashed) attempts to embody Precept's prevention guarantee. The connection to structural impossibility is present but overly literal — it depicts the mechanism rather than the feeling of governed certainty.",
+  "conceptualBridge": "The gated decision means prevention because one branch is allowed and another is explicitly blocked, but it still reads as a workflow diagram.",
+  "status": "rejected",
+  "decision": "Removed from active set: user manually rejected (weight=0, review status=rejected), and avg 2.5 is well below the 4.0 threshold.",
+  "tags": ["diagrammatic", "gate", "workflow", "literal"],
+  "palette": ["#191C22", "#3F4F6B", "#061510", "#1FFF7A", "#FF3D67"],
+  "averageScore": 2.5,
+  "rubricScores": null,
+  "scoreDetailStatus": "average-only",
+  "needsRescore": true,
+  "metadataOrigin": "backfilled"
+}

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    In mathematics, an "invariant" is a property that does not change
+    under any transformation. Precept's rules are invariants: no event,
+    no data value, no code path can make the definition untrue.
+
+    The circle is the governed domain — complete, self-contained.
+    The horizontal rule bisects it exactly: this is the invariant, the precept.
+    It holds at the same position regardless of what exists inside the circle.
+    The rule extends slightly beyond the circle edges to make clear it is
+    not contained by the domain — the rule transcends any particular instance.
+
+    Two colors: the circle in cool deep blue (the domain), the rule in
+    warm bright white (the invariant that governs it).
+  -->
+
+  <rect width="512" height="512" fill="#080B12"/>
+
+  <!-- The governed domain — complete, closed circle -->
+  <circle cx="256" cy="256" r="200"
+          fill="none" stroke="#2A5FAA" stroke-width="7"/>
+
+  <!-- The invariant rule — extends beyond the domain, always present -->
+  <line x1="38" y1="256" x2="474" y2="256"
+        stroke="#E8E3D6" stroke-width="10" stroke-linecap="round"/>
+
+  <!--
+    The two intersection points — where the rule meets the domain boundary.
+    These are the governed entry/exit points: the rule enters the domain
+    and exits it, but it is never created or destroyed by the domain.
+  -->
+  <circle cx="56" cy="256" r="8" fill="#E8E3D6"/>
+  <circle cx="456" cy="256" r="8" fill="#E8E3D6"/>
+
+  <!--
+    A subtle fill on the circle to suggest the governed interior.
+  -->
+  <circle cx="256" cy="256" r="200"
+          fill="#2A5FAA" fill-opacity="0.08"/>
+</svg>

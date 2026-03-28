@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    ITERATION: The governed sector is now visually explicit.
+    The compass arms and arc define a precise sector — the valid domain.
+    Everything outside that sector is absent. The teal fill shows you exactly
+    where the definition permits existence. The pivot is the definition itself.
+    Nothing outside the governed arc can be drawn here.
+  -->
+
+  <defs>
+    <radialGradient id="sector-fill" cx="256" cy="128" r="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00B4A0" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#00B4A0" stop-opacity="0.04"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="#080D10"/>
+
+  <!--
+    The governed sector — the valid domain.
+    Path: from pivot, to left tip, along arc to right tip, back to pivot.
+    M 256,128 L 134,378 A 278,278 0 0 1 378,378 Z
+  -->
+  <path d="M256 128 L134 378 A278 278 0 0 1 378 378 Z"
+        fill="url(#sector-fill)"/>
+
+  <!-- Governing arc: the outer boundary of the valid domain -->
+  <path d="M134 378 A278 278 0 0 1 378 378"
+        stroke="#00B4A0" stroke-width="8" fill="none" stroke-linecap="round"/>
+
+  <!-- Left arm -->
+  <line x1="256" y1="128" x2="134" y2="378"
+        stroke="#00B4A0" stroke-width="11" stroke-linecap="round"/>
+
+  <!-- Right arm -->
+  <line x1="256" y1="128" x2="378" y2="378"
+        stroke="#00B4A0" stroke-width="11" stroke-linecap="round"/>
+
+  <!-- Hinge marks (compass set at the governed angle) -->
+  <circle cx="207" cy="228" r="9" fill="#080D10" stroke="#00B4A0" stroke-width="3.5"/>
+  <circle cx="305" cy="228" r="9" fill="#080D10" stroke="#00B4A0" stroke-width="3.5"/>
+
+  <!-- Pivot (the definition anchor) -->
+  <circle cx="256" cy="128" r="24" fill="#00B4A0"/>
+  <circle cx="256" cy="128" r="11" fill="#080D10"/>
+
+  <!-- Tip points (the governed endpoints) -->
+  <circle cx="134" cy="378" r="7" fill="#00B4A0"/>
+  <circle cx="378" cy="378" r="7" fill="#00B4A0"/>
+</svg>

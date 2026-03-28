@@ -1,0 +1,21 @@
+{
+  "filename": "23-closed-proof.svg",
+  "title": "A closed angular loop — a single trace that returns to its starting point — represents the compile-time proof. Precept's compiler walks every path, checks every constraint, and closes the proof before any instance can run. The angular circuit shape is both mathematically complete (it closes) and structurally sound (no exits unaccounted).",
+  "conceptualBridge": "The closed circuit means Precept's compiler certifies completeness because the definition must form a closed proof — all paths traced, no exits unaccounted, the loop sealed before runtime begins.",
+  "status": "rejected",
+  "decision": "Removed: avg 3.56 below threshold; circuit-trace silhouette has legibility issues at small size and visual economy is insufficient.",
+  "tags": ["mathematical", "circuit", "closed-loop", "cream", "proof"],
+  "palette": ["#080B0E", "#D8D4CC"],
+  "averageScore": 3.5625,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 3,
+    "legibilityAtSmallSize": 3,
+    "distinctSilhouette": 4,
+    "visualEconomy": 3,
+    "monochromeTest": 4,
+    "colorAndContrast": 3.5,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

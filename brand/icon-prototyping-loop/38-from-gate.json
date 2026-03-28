@@ -1,0 +1,21 @@
+{
+  "filename": "38-from-gate.svg",
+  "title": "Every Precept transition requires two things simultaneously: you must be `from` the right state AND `on` the right event. Neither alone opens the path. The block is the current state — bounded, total, opaque. The notch in its face is the event interface — the one precisely specified opening. The arrow exits only through the notch. Anything that doesn't match the state-and-event pair hits solid material.",
+  "conceptualBridge": "The notched block with departing arrow means Precept's `from…on…->` triple is a structural gate because the event interface is carved precisely into the state boundary — only the matching event shape can open the path and release the transition.",
+  "status": "exploring",
+  "decision": "Kept exploring: the notched-block form directly encodes the `from…on…->` governing triple with a 4.06 avg; legibility at small size is the main risk — a future iteration could simplify the notch or increase its scale.",
+  "tags": ["language-derived", "from-on-gate", "notched-block", "forest-green", "gated-transition"],
+  "palette": ["#060810", "#1A7040"],
+  "averageScore": 4.06,
+  "rubricScores": {
+    "conceptualBridge": 4.5,
+    "structuralSoundness": 4.5,
+    "legibilityAtSmallSize": 3.5,
+    "distinctSilhouette": 4,
+    "visualEconomy": 3.5,
+    "monochromeTest": 4,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

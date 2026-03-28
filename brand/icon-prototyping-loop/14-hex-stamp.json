@@ -1,0 +1,21 @@
+{
+  "filename": "14-hex-stamp.svg",
+  "title": "A master die (hexagonal, like a coin die) with a Greek cross struck into its face. Every instance of the entity is struck from the same die — the definition is the master. The cross represents the four governed operations: CreateInstance, Fire, Inspect, Update.",
+  "conceptualBridge": "The struck die means every Precept instance is structurally identical because all are struck from the same immutable definition, just as coins from a die bear identical marks.",
+  "status": "rejected",
+  "decision": "Removed: user manually rejected (weight=0, review status=rejected, note: 'the cross looks too medical'); avg 3.8 also below the 4.0 threshold.",
+  "tags": ["geometric", "hexagonal", "die", "bronze", "cross"],
+  "palette": ["#07090C", "#8C5018", "#612C0E", "#C07828"],
+  "averageScore": 3.8,
+  "rubricScores": {
+    "conceptualBridge": 3,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 4,
+    "visualEconomy": 4,
+    "monochromeTest": 4,
+    "colorAndContrast": 3.5,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

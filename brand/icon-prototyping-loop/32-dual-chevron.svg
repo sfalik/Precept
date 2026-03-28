@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    RADICAL DEPARTURE.
+
+    Two massive filled triangles facing each other across a precise gap.
+    Left-pointing. Right-pointing. Facing.
+
+    The gap between them is not empty — it is the contract.
+    The exact width of the governed aperture is the definition.
+    Only what fits through the gap is structurally valid.
+    Everything outside the triangles does not exist.
+    Everything inside the triangles is material, structural, immovable.
+
+    The form says: there is exactly one valid passage, and its exact
+    shape is determined by the definition. Not by a guard at runtime.
+    By the geometry.
+
+    Vivid jade: a color of precision, clarity, and structural
+    confidence — nothing else in this gallery uses it.
+
+    One concept. Two shapes. Total visual weight.
+  -->
+
+  <rect width="512" height="512" fill="#060B08"/>
+
+  <!-- Left-pointing triangle: massive, solid, immovable -->
+  <polygon points="76,256 206,70 206,442" fill="#00B838"/>
+
+  <!-- Right-pointing triangle: the mirror constraint -->
+  <polygon points="436,256 306,70 306,442" fill="#00B838"/>
+</svg>

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The `when` keyword rendered as it appears in a Precept file.
+
+    `when` is the guard: the conditional that makes some paths
+    exist only under specific circumstances. Without `when`,
+    a path is always available. With `when`, the path exists
+    only when the condition is structurally true.
+
+      from Current on TryBlocked when BlockedPathEnabled -> transition Blocked
+
+    The `when` clause is the governed conditional — not a runtime
+    if-statement, but a structural part of the transition declaration
+    that the compiler evaluates and type-checks before any instance runs.
+
+    Keyword purple: the color VS Code uses for control-flow keywords.
+    The icon is the word developers write when they say
+    "this path only exists when this is true."
+  -->
+
+  <rect width="512" height="512" fill="#1A1A1A"/>
+
+  <defs>
+    <filter id="terminal-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <text
+    x="256" y="268"
+    font-family="'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', 'Courier New', monospace"
+    font-size="168"
+    font-weight="700"
+    fill="#C586C0"
+    text-anchor="middle"
+    dominant-baseline="central"
+    filter="url(#terminal-glow)"
+  >when</text>
+</svg>

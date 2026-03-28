@@ -1,0 +1,21 @@
+{
+  "filename": "40-when-code.svg",
+  "title": "The `when` keyword rendered as it appears in a Precept file — monospace font, keyword purple, terminal dark background. `when` is the guard: the conditional that makes some transition paths exist only when a specific structural condition is true.",
+  "conceptualBridge": "The `when` code token means Precept's guards are structural declarations because the keyword appears in the transition rule itself — `when condition` makes a path exist only when the contract permits it.",
+  "status": "rejected",
+  "decision": "Rejected: legibility hard fail at 32px (score 2.5) — four characters at icon scale compress to an illegible word blur. The `->` operator (39) is the stronger code-aesthetic representative; keyword variants need a different approach to work at small sizes.",
+  "tags": ["language-derived", "code-aesthetic", "monospace", "terminal", "keyword", "guard"],
+  "palette": ["#1A1A1A", "#C586C0"],
+  "averageScore": 3.9,
+  "rubricScores": {
+    "conceptualBridge": 4.5,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 2.5,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 5,
+    "monochromeTest": 3,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

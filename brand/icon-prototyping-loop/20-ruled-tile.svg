@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    RADICAL DEPARTURE — No arches, no letters, no thin outlines.
+    Bold fills. Strong geometry. Unexpected palette.
+
+    A solid gold tile with a dark ruled void cut entirely through it.
+    The gold field is the definition: complete, bounded, immovable.
+    The ruled void is the precept itself: it runs from edge to edge,
+    cannot be filled in, and defines the only governed passage.
+
+    The rule does not sit on the surface of the material.
+    It IS the material — the governing divide is structural, not applied.
+    You cannot close a gap that runs through the entire form.
+  -->
+
+  <defs>
+    <linearGradient id="tile-g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D89A10"/>
+      <stop offset="100%" stop-color="#9A6A08"/>
+    </linearGradient>
+    <linearGradient id="tile-edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F0C040"/>
+      <stop offset="100%" stop-color="#7A5008"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="#060C0A"/>
+
+  <!-- Outer tile (slight bevel/edge color) -->
+  <rect x="66" y="66" width="380" height="380" rx="18" fill="url(#tile-edge)"/>
+
+  <!-- Main gold tile face -->
+  <rect x="72" y="72" width="368" height="368" rx="14" fill="url(#tile-g)"/>
+
+  <!--
+    The ruled void — the precept cut through the tile.
+    64px tall, spanning the full width of the tile (x=72 to x=440).
+    Centered at y=256: from y=224 to y=288.
+    This is not a decoration. It is the governed boundary.
+  -->
+  <rect x="72" y="224" width="368" height="64" fill="#060C0A"/>
+
+  <!--
+    Subtle inner rim on the tile (authority mark detail)
+  -->
+  <rect x="80" y="80" width="352" height="352" rx="10" fill="none"
+        stroke="#C08A0C" stroke-width="2" stroke-opacity="0.4"/>
+</svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    A solid circle with a centered square void.
+
+    The circle is the complete, bounded Precept contract — closed,
+    exact, total. You cannot step outside it because it has no outside.
+
+    The square void is the inspection port — always open, always lit,
+    structurally built in. Precept's Inspect operation is exactly this:
+    at any state, at any time, you can look inside and see every
+    possible outcome. The inspection window cannot be closed because
+    it is a structural absence in the material, not a feature you can
+    toggle.
+
+    The tension between the curved boundary (organic totality) and the
+    squared void (precise, exact access) makes the mark: governed on
+    the outside, perfectly transparent on the inside.
+  -->
+
+  <rect width="512" height="512" fill="#060C14"/>
+
+  <!-- The governed circular domain — complete, total, closed -->
+  <circle cx="256" cy="256" r="210" fill="#1E4EBE"/>
+
+  <!-- The inspection port — structurally open, always exact -->
+  <rect x="176" y="176" width="160" height="160" fill="#060C14"/>
+</svg>

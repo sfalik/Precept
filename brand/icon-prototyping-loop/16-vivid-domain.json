@@ -1,0 +1,21 @@
+{
+  "filename": "16-vivid-domain.svg",
+  "title": "The vivid solid disc is the complete Precept governed domain — bounded, closed, total. The ruled inspection slot bisecting it is not a flaw but a structural feature: at any state, at any time, nothing inside is hidden. Prevention and inspectability are both built into the form.",
+  "conceptualBridge": "The vivid domain circle means Precept is both a closed domain and a fully transparent one because the disc bounds every valid state while the inspection slot makes the interior always visible.",
+  "status": "rejected",
+  "decision": "Removed: avg 3.9 below threshold; monochrome test score 2 and weak conceptual bridge mean it cannot clear the rubric bar.",
+  "tags": ["radical-departure", "circle", "vivid", "inspection-slot", "bold-fill"],
+  "palette": ["#08090D", "#E05C0E"],
+  "averageScore": 3.9,
+  "rubricScores": {
+    "conceptualBridge": 3,
+    "structuralSoundness": 3,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 5,
+    "monochromeTest": 2,
+    "colorAndContrast": 5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

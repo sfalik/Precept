@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    RADICAL DEPARTURE — A bold Pi gate: architectural, monumental, unexpected.
+    The horizontal bar is the governing rule — immovable, structural, permanent.
+    The two pillars hold it in place. The governed opening below the bar is the
+    only valid passage: to pass through Precept's definition, you must pass
+    under its rule. There is no way over, around, or through the material.
+    Three solid rectangles. No thin lines. No decoration. Maximum weight.
+    Vivid purple: the color of authority and law since antiquity.
+  -->
+
+  <rect width="512" height="512" fill="#060810"/>
+
+  <!-- The governing crossbar — the permanent rule -->
+  <rect x="60"  y="148" width="392" height="58" fill="#7C35DC"/>
+
+  <!-- Left structural pillar -->
+  <rect x="60"  y="206" width="68"  height="258" fill="#7C35DC"/>
+
+  <!-- Right structural pillar -->
+  <rect x="384" y="206" width="68"  height="258" fill="#7C35DC"/>
+</svg>

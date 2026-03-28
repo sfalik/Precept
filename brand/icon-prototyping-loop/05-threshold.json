@@ -1,0 +1,14 @@
+{
+  "filename": "05-threshold.svg",
+  "title": "Two architectural slabs separated by a single precise aperture show that invalid paths are structurally absent — the material has no other opening, so nothing can pass except through the one governed threshold. The bright centerline is the rule itself.",
+  "conceptualBridge": "The threshold means governed access because the contract contains exactly one allowed opening and no accidental alternatives.",
+  "status": "rejected",
+  "decision": "Removed: avg 3.5 below the 4.0 threshold and fully superseded by stronger structural-opening candidates in the set.",
+  "tags": ["architectural", "threshold", "aperture", "governed-access"],
+  "palette": ["#0D1018", "#162244", "#1E3260"],
+  "averageScore": 3.5,
+  "rubricScores": null,
+  "scoreDetailStatus": "average-only",
+  "needsRescore": true,
+  "metadataOrigin": "backfilled"
+}

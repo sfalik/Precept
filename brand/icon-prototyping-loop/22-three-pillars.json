@@ -1,0 +1,21 @@
+{
+  "filename": "22-three-pillars.svg",
+  "title": "Three equal standing pillars — the three unbreakable guarantees of Precept (prevention, inspectability, determinism) — resting on a single foundation. The .precept definition is the foundation; the three properties it makes structurally certain are the pillars. Remove any one and the structure fails. All three are essential.",
+  "conceptualBridge": "The three pillars mean Precept's guarantees are structural uprights because prevention, inspectability, and determinism are not runtime policies but load-bearing columns in the definition's architecture.",
+  "status": "rejected",
+  "decision": "Removed: avg 3.625 below threshold; pillar/column motif is superseded by stronger architectural candidates.",
+  "tags": ["architectural", "pillars", "gold", "three-guarantees", "classical"],
+  "palette": ["#09090E", "#C88008", "#D4900A", "#8A5A06"],
+  "averageScore": 3.625,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 3,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 3.5,
+    "monochromeTest": 4,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 3.5
+  },
+  "needsRescore": false
+}

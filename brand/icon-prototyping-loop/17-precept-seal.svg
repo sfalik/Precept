@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    A circular authority seal — differentiated from the square amber field (06)
+    by its coin shape, crimson palette, and concentric ring detail.
+
+    The disc is the complete, bounded Precept contract.
+    The P as negative space is the always-inspectable interior:
+    you can always look through the governed domain and see what's inside.
+    The ring details give it the weight of official authority — like a hallmark
+    that can only be applied by the issuing body (the compiler).
+  -->
+
+  <defs>
+    <radialGradient id="seal-face" cx="42%" cy="38%" r="60%">
+      <stop offset="0%" stop-color="#A82020"/>
+      <stop offset="100%" stop-color="#580C0C"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="#08090D"/>
+
+  <!-- Outer rim (coin edge) -->
+  <circle cx="256" cy="256" r="222" fill="#3C0808"/>
+
+  <!-- Main seal face -->
+  <circle cx="256" cy="256" r="208" fill="url(#seal-face)"/>
+
+  <!-- Inner precision ring (authority detail) -->
+  <circle cx="256" cy="256" r="190" fill="none" stroke="#7A1616" stroke-width="2.5"/>
+
+  <!--
+    P as negative space — pressed into the seal face.
+    Bowl: center (232, 216), outer radius=64 → top y=152, bottom y=280 (semicircle)
+    Counter: center (232, 216), inner radius=38 → top y=178, bottom y=254
+    Stem: x=172-232, y=152-360
+  -->
+
+  <!-- P body (stem + bowl) — dark void in the crimson seal -->
+  <path d="M172 152 H232 A64 64 0 0 1 232 280 H172 Z" fill="#08090D"/>
+  <rect x="172" y="280" width="60" height="80" fill="#08090D"/>
+
+  <!-- P counter (refill with seal color — the bowl wall) -->
+  <path d="M232 178 A38 38 0 0 1 232 254 Z" fill="#981A1A"/>
+
+  <!-- Fine highlight at top of seal (bevel) -->
+  <path d="M136 118 A156 156 0 0 1 376 118"
+        stroke="#C83030" stroke-width="2" fill="none" stroke-opacity="0.4"/>
+</svg>

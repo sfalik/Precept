@@ -1,0 +1,21 @@
+{
+  "filename": "19-invariant.svg",
+  "title": "In mathematics, an invariant is a property that does not change under any transformation. Precept's rules are invariants: no event, no data value, no code path can make the definition untrue. The circle is the governed domain; the bisecting horizontal rule is the invariant — it holds at the same position regardless of what exists inside.",
+  "conceptualBridge": "The invariant line means Precept's rules hold unconditionally because the bisecting rule maintains its exact position regardless of any state change within the governed domain.",
+  "status": "rejected",
+  "decision": "Removed: avg 3.9 below threshold; circle+bisecting line is a generic silhouette that doesn't reach the distinctiveness bar.",
+  "tags": ["mathematical", "circle", "invariant", "bisection", "blue-white"],
+  "palette": ["#080B12", "#2A5FAA", "#E8E3D6"],
+  "averageScore": 3.9,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 4.5,
+    "monochromeTest": 4,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

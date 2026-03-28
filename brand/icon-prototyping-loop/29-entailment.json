@@ -1,0 +1,22 @@
+{
+  "filename": "29-entailment.svg",
+  "title": "The ⊢ symbol is the formal mark of logical derivation: 'A ⊢ B' means the definition proves the outcome. Precept's .precept file is exactly this — the complete definition from which every valid state configuration is structurally derived. Invalid states are not refused; they cannot be derived, so they do not exist.",
+  "conceptualBridge": "The entailment mark means Precept's definition derives all valid states because the symbol ⊢ literally means 'proves' — the contract is the source and every valid configuration follows from it with logical necessity.",
+  "status": "exploring",
+  "decision": "Kept: the ⊢ symbol is a new visual family (logical/symbolic) with a genuine mathematical connection to Precept's derivation guarantee; passes threshold at 4.19 avg.",
+  "tags": ["mathematical", "logical", "entailment", "cream", "minimal"],
+  "palette": ["#060810", "#E8E0D4"],
+  "averageScore": 4.19,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 3.5,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}
+

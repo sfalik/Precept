@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The -> operator rendered as it appears in a Precept file:
+    monospace font, syntax-highlighted, terminal background.
+
+    In Fira Code / Cascadia Code, -> renders as a ligature arrow.
+    Without ligatures, it's the two-character sequence every
+    Precept developer writes hundreds of times.
+
+    Either way: this is the governing operator of the language.
+    The icon IS the code. The code IS the icon.
+  -->
+
+  <rect width="512" height="512" fill="#1A1A1A"/>
+
+  <defs>
+    <filter id="terminal-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <text
+    x="256" y="268"
+    font-family="'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', 'Courier New', monospace"
+    font-size="268"
+    font-weight="700"
+    fill="#DCDCAA"
+    text-anchor="middle"
+    dominant-baseline="central"
+    font-feature-settings="'calt' 1, 'liga' 1"
+    filter="url(#terminal-glow)"
+  >-&gt;</text>
+</svg>

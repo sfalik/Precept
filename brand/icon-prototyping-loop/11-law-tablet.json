@@ -1,0 +1,14 @@
+{
+  "filename": "11-law-tablet.svg",
+  "title": "The pointed-arch tablet is the universal mark of inscribed law. The .precept file IS this tablet: self-contained, complete, and immutable. The three bright rules on its face are the precepts themselves — not scattered logic, not runtime guards, but laws carved into the definition that hold forever.",
+  "conceptualBridge": "The law tablet means a Precept definition is a self-contained contract because its rules are inscribed once and then hold structurally.",
+  "status": "rejected",
+  "decision": "Removed: user manually rejected (weight=0, review status=rejected, note: 'looks rude, doesn't really say anything to me about precept'). Law-tablet direction is temporarily closed.",
+  "tags": ["architectural", "tablet", "inscribed-law", "monochrome-strong"],
+  "palette": ["#0D1018", "#0F1E3A", "#162E58", "#3D8FFF"],
+  "averageScore": 4.5,
+  "rubricScores": null,
+  "scoreDetailStatus": "average-only",
+  "needsRescore": true,
+  "metadataOrigin": "backfilled"
+}

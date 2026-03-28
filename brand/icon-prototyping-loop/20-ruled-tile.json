@@ -1,0 +1,21 @@
+{
+  "filename": "20-ruled-tile.svg",
+  "title": "A solid gold tile with a dark ruled void cut entirely through it, edge to edge. The gold field is the definition: complete, bounded, immovable. The ruled void is the precept itself — it cannot be filled because it runs the full depth of the material. You cannot undo a rule that is structural.",
+  "conceptualBridge": "The ruled tile means Precept's law is carved into a fixed medium because the governing void cuts through the entire definition, making the rule impossible to close or override.",
+  "status": "shortlisted",
+  "decision": "Shortlisted as a radical departure that passes the rubric threshold; bold gold palette and carved-rule metaphor are completely new to the set.",
+  "tags": ["radical-departure", "bold-fill", "gold", "carved-rule", "tile"],
+  "palette": ["#060C0A", "#D89A10", "#9A6A08"],
+  "averageScore": 4.3,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 5,
+    "monochromeTest": 3,
+    "colorAndContrast": 5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

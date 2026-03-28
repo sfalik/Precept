@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    RADICAL DEPARTURE — Bold fills, vivid color, extreme simplicity.
+    No lines, no thin strokes, no architectural arches.
+
+    The vivid disc IS the complete Precept domain.
+    The ruled slot bisecting it IS the inspection guarantee:
+    at any state, at any time, you can look inside and see every possible outcome.
+    The slot is not a flaw in the domain — it is a structural feature of it.
+
+    Nothing inside a Precept domain is hidden.
+    The inspection window is as much a part of the definition as the boundary.
+  -->
+
+  <rect width="512" height="512" fill="#08090D"/>
+
+  <!-- The complete governed domain -->
+  <circle cx="256" cy="256" r="218" fill="#E05C0E"/>
+
+  <!--
+    The inspection slot — not a wound in the form but a designed feature.
+    Exact width of circle diameter: 256-218=38 to 256+218=474, so x=38 to x=474.
+    Height: 34px centered at y=256 (y=239 to y=273).
+  -->
+  <rect x="38" y="239" width="436" height="34" fill="#08090D"/>
+
+  <!--
+    The slot reveals a faint inner glow — what's inside is always lit.
+  -->
+  <rect x="38" y="239" width="436" height="34" fill="#FF7A30" fill-opacity="0.12"/>
+</svg>

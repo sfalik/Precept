@@ -1,0 +1,14 @@
+{
+  "filename": "02-arc-fork.svg",
+  "title": "A source node forking into a governed arc (green) and a structurally absent path (red dashed) shows that some routes cannot exist — echoing Precept's promise that invalid states are impossible, not merely caught. Thin lines and color-dependent meaning limit its impact as a compact mark.",
+  "conceptualBridge": "The arc fork means some paths cannot exist, but the composition still explains the product as a flowchart instead of a symbol.",
+  "status": "rejected",
+  "decision": "Removed from active set: avg 2.4 is well below the 4.0 threshold, and diagrammatic language fails the conceptual-bridge criterion.",
+  "tags": ["diagrammatic", "fork", "workflow", "literal"],
+  "palette": ["#191C22", "#3F4F6B", "#1FFF7A", "#FF3D67"],
+  "averageScore": 2.4,
+  "rubricScores": null,
+  "scoreDetailStatus": "average-only",
+  "needsRescore": true,
+  "metadataOrigin": "backfilled"
+}

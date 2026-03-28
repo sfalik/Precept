@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    The plumb bob: the oldest precision instrument.
+    It finds the one structurally true vertical by geometry and gravity alone —
+    no algorithm, no runtime check, no human judgment.
+    Precept finds the one valid state the same way: by the structure of the definition.
+    Same definition + same data = same result. Always. No variation.
+  -->
+
+  <defs>
+    <radialGradient id="bob-g" cx="40%" cy="38%" r="55%">
+      <stop offset="0%" stop-color="#E4E0D6"/>
+      <stop offset="100%" stop-color="#A8A49A"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="#080A0E"/>
+
+  <!-- Ceiling anchor point -->
+  <circle cx="256" cy="60" r="10" fill="#C4C0B4"/>
+
+  <!-- The cord — taut, perfectly vertical, no deviation possible -->
+  <line x1="256" y1="60" x2="256" y2="262"
+        stroke="#C4C0B4" stroke-width="5" stroke-linecap="round"/>
+
+  <!--
+    Plumb bob body — the weight that finds true vertical.
+    Shape: teardrop, wide at y=330, tapering to a sharp point at y=452.
+    Constructed as: from attachment at y=262, curving outward to widest
+    point at y=330, then angling down to sharp point at y=452.
+  -->
+  <path d="M256 262
+           C 292 262, 320 290, 320 330
+           L 256 452
+           L 192 330
+           C 192 290, 220 262, 256 262 Z"
+        fill="url(#bob-g)"/>
+
+  <!-- Subtle sheen line on the body (precision machined surface) -->
+  <line x1="270" y1="278" x2="290" y2="354"
+        stroke="#FFFFFF" stroke-width="2" stroke-opacity="0.18" stroke-linecap="round"/>
+
+  <!-- Attachment ring at top of bob -->
+  <circle cx="256" cy="270" r="14" fill="#B0ACA4" stroke="#D0CCC4" stroke-width="2"/>
+  <circle cx="256" cy="270" r="6" fill="#080A0E"/>
+</svg>

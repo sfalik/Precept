@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    The builder's square (set square / try square) — the tool that tests
+    whether an angle is exactly 90°. Nothing approximate passes a square test.
+    Precept's compiler is the set square: the definition is the standard,
+    and any state that does not fit it precisely is impossible, not just flagged.
+
+    The corner mark (the small square inside the angle) is the traditional
+    notation for "this is exactly 90°" — the mathematical symbol for
+    structural exactness.
+  -->
+
+  <rect width="512" height="512" fill="#080A0E"/>
+
+  <!-- Vertical arm of the set square -->
+  <rect x="162" y="72" width="32" height="310" rx="4" fill="#DEDAD4"/>
+
+  <!-- Horizontal arm of the set square -->
+  <rect x="162" y="350" width="298" height="32" rx="4" fill="#DEDAD4"/>
+
+  <!--
+    Exactness mark — the traditional 90° corner indicator.
+    A small open square inside the angle, set precisely in the inner corner.
+  -->
+  <rect x="194" y="318" width="32" height="32" fill="none"
+        stroke="#DEDAD4" stroke-width="3"/>
+
+  <!--
+    Measurement tick marks along the horizontal arm — the governed scale.
+    Three ticks at equal intervals: at x=278, 358, 438.
+    Each tick is 10px tall, centered on the arm's y midpoint (366).
+  -->
+  <line x1="278" y1="343" x2="278" y2="389" stroke="#DEDAD4" stroke-width="3" stroke-opacity="0.6"/>
+  <line x1="358" y1="343" x2="358" y2="389" stroke="#DEDAD4" stroke-width="3" stroke-opacity="0.6"/>
+  <line x1="438" y1="343" x2="438" y2="389" stroke="#DEDAD4" stroke-width="3" stroke-opacity="0.6"/>
+
+  <!-- Matching tick marks along the vertical arm -->
+  <line x1="155" y1="268" x2="201" y2="268" stroke="#DEDAD4" stroke-width="3" stroke-opacity="0.6"/>
+  <line x1="155" y1="188" x2="201" y2="188" stroke="#DEDAD4" stroke-width="3" stroke-opacity="0.6"/>
+  <line x1="155" y1="108" x2="201" y2="108" stroke="#DEDAD4" stroke-width="3" stroke-opacity="0.6"/>
+</svg>

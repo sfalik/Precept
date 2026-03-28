@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    A tall solid form (portrait orientation) with a precise horizontal void
+    cut entirely through it — the void is the precept itself.
+    The void doesn't sit on the surface. It runs through the full width of the form.
+    You cannot undo it. The rule is not a marking on the body; it IS the body's structure.
+
+    Above the rule: the governed valid space. Below the rule: the bounded foundation.
+    Between them: the precept — a structural gap that is also the only governed path.
+    Unlike 20-ruled-tile (square, gold, dark void):
+    this is portrait, deep blue, and the void is centered in the tall form,
+    suggesting the rule holds in both directions simultaneously.
+  -->
+
+  <defs>
+    <linearGradient id="form-g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1A3A8A"/>
+      <stop offset="100%" stop-color="#0E2468"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="#08090E"/>
+
+  <!-- The solid governed form — tall, complete, bounded -->
+  <rect x="128" y="56" width="256" height="400" rx="12"
+        fill="url(#form-g)"/>
+
+  <!--
+    The ruled void — the precept that cuts through the entire body.
+    44px tall, exactly the full width of the form.
+    Centered vertically at y=256: from y=234 to y=278.
+  -->
+  <rect x="128" y="234" width="256" height="44" fill="#08090E"/>
+
+  <!-- Subtle inner frame on the form (definition boundary detail) -->
+  <rect x="134" y="62" width="244" height="388" rx="9"
+        fill="none" stroke="#2A50B8" stroke-width="2" stroke-opacity="0.4"/>
+
+  <!-- Edge highlights: top brighter, bottom darker -->
+  <path d="M140 56 H372 A12 12 0 0 1 384 68 V76 A12 12 0 0 0 372 64 H140 A12 12 0 0 0 128 76 V68 A12 12 0 0 1 140 56 Z"
+        fill="#FFFFFF" fill-opacity="0.06"/>
+</svg>

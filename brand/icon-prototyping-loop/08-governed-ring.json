@@ -1,0 +1,14 @@
+{
+  "filename": "08-governed-ring.svg",
+  "title": "A solid ring represents the complete, self-contained Precept definition; three precisely cut channels at 120° are the only structural paths through it — CreateInstance, Fire, Inspect. Invalid states have no opening, so they cannot exist.",
+  "conceptualBridge": "The governed ring means valid operations are structural openings because anything not cut into the contract simply has no path.",
+  "status": "shortlisted",
+  "decision": "Shortlisted for clearly encoding governed entry points inside a single self-contained form.",
+  "tags": ["circular", "ring", "governed-paths", "operations"],
+  "palette": ["#0D1018", "#192A4A", "#213658", "#3D8FFF"],
+  "averageScore": 4.1,
+  "rubricScores": null,
+  "scoreDetailStatus": "average-only",
+  "needsRescore": true,
+  "metadataOrigin": "backfilled"
+}

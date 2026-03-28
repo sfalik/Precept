@@ -7,9 +7,12 @@ Scope
 
 Allowed work
 - Create and edit SVG candidates in this folder.
-- Edit index.html directly in this folder to keep the live gallery current.
+- Create and edit {stem}.json files — one per SVG candidate (loop-owned metadata).
+- Read {stem}.review.json files as user-provided review input. Never write to them.
 - Read local reference files in this folder.
 - Prune weak candidates only if they are inside this folder and clearly inferior duplicates.
+  When removing a candidate: delete the SVG, delete {stem}.json.
+  Never delete {stem}.review.json — those are user-owned.
 
 Forbidden actions
 - Do not use git.
@@ -25,10 +28,15 @@ Operational rules
 - Prefer local file reasoning over shell exploration.
 - Do not use shell in this run.
 - Do not create replacement wrapper scripts or temporary command files to regain shell access.
+- Each candidate's data lives in {stem}.json — create or rewrite this file for every candidate change.
+- User review data lives in {stem}.review.json — read these for direction, never overwrite them.
+- Never append raw HTML fragments to index.html.
+- Never write planning text, scoring commentary, or transcript output into any *.json file.
+- Newly created SVG candidates must have a matching {stem}.json created immediately, in exploring status, even before scoring is finished.
 - If a task would require leaving this folder or using the network, stop and skip that action.
 - If unsure whether something is inside scope, treat it as out of scope.
 
 Quality rules
 - Stay focused on icon exploration, curation, and comparison.
-- Keep the candidate set diverse and avoid churn outside the promoted set.
+- Keep the candidate set diverse and avoid churn outside the shortlisted set.
 - Favor safe in-folder iteration over broad experimentation.

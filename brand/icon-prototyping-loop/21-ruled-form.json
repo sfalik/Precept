@@ -1,0 +1,21 @@
+{
+  "filename": "21-ruled-form.svg",
+  "title": "A tall blue form with a precise void running through its center — the same compositional idea as 20-ruled-tile (solid material, dark void at center) rendered in portrait format with a different palette. The conceptual idea is identical: the void as the structural rule.",
+  "conceptualBridge": "The ruled void means Precept's law is structural because the governing gap runs the full depth of the governed form, but this composition is materially identical to 20-ruled-tile.",
+  "status": "rejected",
+  "decision": "Rejected as a near-duplicate of 20-ruled-tile: the same void-through-solid composition in different proportions and palette does not constitute a materially distinct candidate.",
+  "tags": ["near-duplicate", "ruled-void", "blue", "portrait"],
+  "palette": ["#08090E", "#1A3A8A", "#0E2468"],
+  "averageScore": 3.25,
+  "rubricScores": {
+    "conceptualBridge": 3,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 2.5,
+    "visualEconomy": 4,
+    "monochromeTest": 4,
+    "colorAndContrast": 3,
+    "uniquenessInFolder": 2
+  },
+  "needsRescore": false
+}

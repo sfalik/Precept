@@ -1,0 +1,21 @@
+{
+  "filename": "39-arrow-code.svg",
+  "title": "The `->` operator as it appears in a Precept file — monospace font, syntax-highlighted, terminal dark background. In Fira Code or Cascadia Code, `->` renders as a ligature arrow. This is the governing transition operator: every valid path in a definition is a `->`. The icon is literally the code. It speaks directly to the developer audience in their own visual language.",
+  "conceptualBridge": "The `->` code token means Precept's transitions are written as this exact operator because every valid path in a definition is declared with `->` — the icon is the language's governing symbol rendered in its native context.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: the only candidate where the icon IS the language — `->` is completely specific to Precept's governing operator, the terminal aesthetic is new to the set, and two bold monospace chars remain legible at 32px. Fira Code ligature renders it as a single arrow glyph.",
+  "tags": ["language-derived", "code-aesthetic", "monospace", "terminal", "operator"],
+  "palette": ["#1A1A1A", "#DCDCAA"],
+  "averageScore": 4.5,
+  "rubricScores": {
+    "conceptualBridge": 5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 3.5,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 5,
+    "monochromeTest": 4,
+    "colorAndContrast": 5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

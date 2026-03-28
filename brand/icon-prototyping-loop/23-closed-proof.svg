@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    A complete circuit — a single closed-loop trace, like a proof.
+    In logic and mathematics, a proof is a closed chain of reasoning:
+    every step follows from the previous, and the last step closes the loop.
+    Precept's definition is a closed proof: the compiler walks every path
+    from every state, verifies all transitions, checks all constraints,
+    and confirms the whole system is sound before any instance can be created.
+
+    The form: a bold angular closed-loop path that looks like a circuit trace
+    but reads as an abstract mark — complete, closed, no breaks.
+    Heavy stroke weight. Warm white on near-black. Nothing escapes the loop.
+  -->
+
+  <rect width="512" height="512" fill="#080B0E"/>
+
+  <!--
+    The closed-loop proof mark.
+    An angular, contained path that forms a closed circuit.
+    Path traced: starting from top-center, going clockwise in
+    an angular rectangular loop with one distinctive notch/corner
+    that makes it un-ignorable and visually distinct.
+
+    The key shape: a thick angular path that forms a compact closed figure,
+    like a stylized circuit board trace viewed from above.
+    Not a circle, not a rectangle — angular corners, bold weight.
+  -->
+  <path d="
+    M256 92
+    L380 92
+    L380 196
+    L330 196
+    L330 256
+    L380 256
+    L380 420
+    L132 420
+    L132 316
+    L182 316
+    L182 256
+    L132 256
+    L132 92
+    Z
+  "
+  fill="none"
+  stroke="#D8D4CC"
+  stroke-width="18"
+  stroke-linejoin="round"
+  stroke-linecap="square"/>
+
+  <!--
+    Central definition mark — the enclosed region that the loop protects.
+    A small precise circle showing "the governed center."
+  -->
+  <circle cx="256" cy="316" r="28" fill="#D8D4CC" fill-opacity="0.12"
+          stroke="#D8D4CC" stroke-width="4"/>
+  <circle cx="256" cy="316" r="10" fill="#D8D4CC"/>
+</svg>

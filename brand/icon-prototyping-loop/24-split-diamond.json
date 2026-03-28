@@ -1,0 +1,21 @@
+{
+  "filename": "24-split-diamond.svg",
+  "title": "A vivid magenta diamond split by a precise horizontal rule. The diamond is the complete governed domain — total, bounded, exact. The void between the two halves is the law: not a decoration, not a warning, but the one structural fact that makes each half distinct from the other. Without the rule, the diamond would be solid and ungoverned. With the rule, the definition makes the two halves structurally irreducible.",
+  "conceptualBridge": "The split diamond means Precept's governing rule creates structural distinction because the definition is the precise void that permanently divides the governed domain into structurally separate halves with no valid connection between them except through the contract.",
+  "status": "shortlisted",
+  "decision": "Shortlisted for exceptional distinct silhouette, vivid magenta palette new to the set, and bold visual economy that passes the rubric threshold.",
+  "tags": ["radical-departure", "diamond", "magenta", "split-void", "bold-fill"],
+  "palette": ["#080910", "#E41888"],
+  "averageScore": 4.375,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 5,
+    "visualEconomy": 4.5,
+    "monochromeTest": 3.5,
+    "colorAndContrast": 5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

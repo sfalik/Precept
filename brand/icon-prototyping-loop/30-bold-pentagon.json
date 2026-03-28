@@ -1,0 +1,21 @@
+{
+  "filename": "30-bold-pentagon.svg",
+  "title": "A solid regular pentagon — a complete, exactly-bounded polygon where each side is a governing rule.",
+  "conceptualBridge": "The pentagon means Precept's contract is a structurally closed form because each side is a governing rule and the enclosed space is the exact, total valid domain.",
+  "status": "rejected",
+  "decision": "Hard fail on conceptual bridge (score 2.5 < 3): no specific reason the form means Precept over any other bounded-domain tool — the polygon shape is too generic to carry the necessary meaning.",
+  "tags": ["geometric", "pentagon", "burgundy", "closed-form"],
+  "palette": ["#06080E", "#8A1820"],
+  "averageScore": 3.81,
+  "rubricScores": {
+    "conceptualBridge": 2.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 5,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 3.5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

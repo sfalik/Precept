@@ -1,0 +1,21 @@
+{
+  "filename": "33-cartouche.svg",
+  "title": "The cartouche is the oldest known symbol of sealed sovereign authority — in ancient practice, a cartouche enclosed a ruling name: to be within it was to be under that jurisdiction. Here, the oval is Precept's definition: the sealed governing boundary around the domain. The bold horizontal rule inside is the precept itself — the one governing line that holds within the contract and cannot be overridden from outside.",
+  "conceptualBridge": "The cartouche means Precept's definition is a sealed governing authority because the oval enclosure is the jurisdictional boundary and the horizontal rule inside is the precept that holds structurally within it.",
+  "status": "exploring",
+  "decision": "Kept: heraldic oval-seal family is new to the set, conceptual bridge is historically grounded and specific; at threshold (4.0) — worth refining the distinct silhouette before promoting.",
+  "tags": ["heraldic", "cartouche", "oval-seal", "brass", "authority"],
+  "palette": ["#07080C", "#B88A30"],
+  "averageScore": 4.0,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 3.5,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 4,
+    "monochromeTest": 4,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

@@ -1,0 +1,21 @@
+{
+  "filename": "37-reject-wall.svg",
+  "title": "A shaft stopped dead against a terminal block. The `reject` keyword in Precept declares a path that exists in the definition but leads to a structural dead end rather than a transition. The shaft is visible — the path is real and named. But the terminal block is the definition's architectural wall: the path reaches it and stops permanently. Prevention is not a runtime guard — it is a structural endpoint written into the contract.",
+  "conceptualBridge": "The reject wall means Precept's `reject` declaration is a structural terminal because the path exists in the definition but ends at a governed wall rather than a transition — the rejection is architectural, not a runtime check.",
+  "status": "exploring",
+  "decision": "Kept exploring: the shaft-and-wall form is directly language-derived and scores 4.31 avg; the vivid red palette is new to the active set — worth iterating on the silhouette to make it more distinct.",
+  "tags": ["language-derived", "reject", "terminal", "vivid-red", "wall"],
+  "palette": ["#060810", "#C81820"],
+  "averageScore": 4.31,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

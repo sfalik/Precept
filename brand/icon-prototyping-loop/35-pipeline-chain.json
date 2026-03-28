@@ -1,0 +1,21 @@
+{
+  "filename": "35-pipeline-chain.svg",
+  "title": "The `->->` pipeline is how Precept chains multiple governed operations in a single transition rule: `set field -> transition state` happens atomically — one rule, two steps, no gap where something could go wrong. The two chevrons represent this chained governance: the first arrow binds the action, the second executes the state change, and together they form one unbreakable structural unit.",
+  "conceptualBridge": "The double chevron means Precept's pipeline operator chains operations into one atomic governed step because `->->` in the definition binds multiple actions into a single structural declaration that either completes fully or is rejected entirely.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: strong visual economy and legibility; the `>>` form is distinctive as a primary mark and the cyan palette is new to the set — conceptual bridge is solid for anyone familiar with the language.",
+  "tags": ["language-derived", "pipeline", "double-chevron", "cyan", "chained-operations"],
+  "palette": ["#060810", "#00B8D0"],
+  "averageScore": 4.44,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 5,
+    "distinctSilhouette": 4,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

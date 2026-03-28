@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    The logical entailment mark ⊢ — in formal logic, "A ⊢ B" means
+    "A proves B" or "B can be derived from A." Precept's definition ⊢
+    every valid state configuration: the contract derives all valid
+    outcomes structurally. Invalid states are not guarded against —
+    they cannot be derived from the definition, so they are absent.
+
+    The vertical bar is the definition standing upright — permanent,
+    self-supporting, the source. The horizontal bar is the domain of
+    derived valid states — everything that follows necessarily from
+    the contract. The form says: from this, exactly this follows.
+  -->
+
+  <rect width="512" height="512" fill="#060810"/>
+
+  <!-- The vertical bar — the standing definition -->
+  <rect x="134" y="80" width="52" height="352" fill="#E8E0D4"/>
+
+  <!-- The horizontal bar — the governed domain that is derived -->
+  <rect x="186" y="230" width="192" height="52" fill="#E8E0D4"/>
+</svg>

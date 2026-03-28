@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    The reject declaration: a path that is explicitly named
+    and explicitly terminated.
+
+    In Precept:
+      from Current on TryBlocked -> reject "Blocked path unavailable"
+
+    This is not the absence of an arrow — it is an arrow that ends
+    at a wall. The path is declared. It exists in the definition.
+    But it leads to a structural dead end rather than a transition.
+
+    The shaft is the declared path — real, visible, in the definition.
+    The terminal block is the governed rejection — the wall that the
+    definition places at the end. The path reaches it and stops.
+    Not because a guard caught it at runtime, but because the
+    definition said: this is where it ends.
+
+    The terminal block is taller than the shaft. It has mass.
+    It is not a thin line or a signal — it is material, structural,
+    permanent. The rejection is architectural.
+  -->
+
+  <rect width="512" height="512" fill="#060810"/>
+
+  <!-- The declared path — visible in the definition -->
+  <rect x="70" y="234" width="270" height="44" fill="#C81820"/>
+
+  <!-- The terminal block — the governed rejection wall -->
+  <rect x="340" y="128" width="102" height="256" fill="#C81820"/>
+</svg>

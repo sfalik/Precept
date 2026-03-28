@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    A cartouche — the oldest known symbol of a sealed, named authority.
+    In ancient practice, a cartouche enclosed the ruling name: to be
+    within the cartouche was to be under that authority's jurisdiction.
+
+    Here, the cartouche is Precept's definition: the oval seals the
+    governed domain, and the bold horizontal rule inside it is the
+    precept itself — the single governing line that cannot be
+    overridden, re-routed, or silenced.
+
+    The outer ring is the contract boundary: closed, complete, exact.
+    The horizontal rule inside is the governing law: held firmly within
+    the contract, applied to everything it encloses.
+
+    Warm brass on near-black: the color of authority metals —
+    engraved plaques, official seals, architectural inscriptions.
+  -->
+
+  <rect width="512" height="512" fill="#07080C"/>
+
+  <!-- Outer oval frame — the sovereign boundary (thick ring) -->
+  <ellipse cx="256" cy="256" rx="220" ry="136" fill="#B88A30"/>
+
+  <!-- Inner void — the governed domain, always visible -->
+  <ellipse cx="256" cy="256" rx="178" ry="94" fill="#07080C"/>
+
+  <!-- The governing rule — the precept inscribed within the seal -->
+  <rect x="136" y="242" width="240" height="28" fill="#B88A30"/>
+</svg>

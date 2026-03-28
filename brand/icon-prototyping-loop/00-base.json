@@ -1,0 +1,14 @@
+{
+  "filename": "00-base.svg",
+  "title": "Sequential state transitions with stacked nodes attempt to show an ordered, governed set of steps. The design explores visual hierarchy between predecessor, current, and blocked states but reads as a generic workflow sketch rather than an emblem of structural certainty.",
+  "conceptualBridge": "The stacked nodes mean ordered state change, but the result reads as a generic process diagram instead of a durable product mark.",
+  "status": "exploring",
+  "decision": "Useful baseline reference but not yet a viable brand direction, kept visible for comparison and possible revisit.",
+  "tags": ["diagrammatic", "stacked-nodes", "workflow", "baseline"],
+  "palette": ["#1F1F1F", "#5C6884", "#4C5C7A", "#31E870", "#1FFF7A", "#FF3D67"],
+  "averageScore": 2.3,
+  "rubricScores": null,
+  "scoreDetailStatus": "average-only",
+  "needsRescore": true,
+  "metadataOrigin": "backfilled"
+}

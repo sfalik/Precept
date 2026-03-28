@@ -1,0 +1,21 @@
+{
+  "filename": "34-transition-arrow.svg",
+  "title": "The `->` operator is the governing mark of every valid path in a Precept definition. You write a `->` for every transition that is allowed; anything not written as an arrow structurally does not exist. The bold solid arrow is the permission system itself — not a diagram element, but the language's declaration that a path is valid.",
+  "conceptualBridge": "The `->` arrow means every valid state change is an explicitly declared path because anything in a Precept definition without an arrow simply cannot exist — the arrow is the structural permission.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: the `->` operator is the most specific and ownable language element — vivid orange palette new to the set, perfect legibility at any size, highest conceptual bridge score in the language-derived batch.",
+  "tags": ["language-derived", "arrow", "transition-operator", "orange", "bold-fill"],
+  "palette": ["#060810", "#E05000"],
+  "averageScore": 4.63,
+  "rubricScores": {
+    "conceptualBridge": 4.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 5,
+    "distinctSilhouette": 4,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

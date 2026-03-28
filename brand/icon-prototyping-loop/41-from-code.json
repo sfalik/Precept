@@ -1,0 +1,21 @@
+{
+  "filename": "41-from-code.svg",
+  "title": "The `from` keyword rendered as it appears in a Precept file — monospace font, keyword blue, terminal dark background. `from` begins every transition rule, anchoring the rule to a specific state.",
+  "conceptualBridge": "The `from` code token means Precept's transitions are anchored to specific states because every rule begins with `from [State]` — declaring that the governed behavior only applies within an exact, bounded context.",
+  "status": "rejected",
+  "decision": "Rejected: legibility hard fail at 32px (score 2.5) — four characters illegible at icon scale; `from` is also a common English word with weaker brand association than `->`. The operator is the right representative for this direction.",
+  "tags": ["language-derived", "code-aesthetic", "monospace", "terminal", "keyword", "from"],
+  "palette": ["#1A1A1A", "#569CD6"],
+  "averageScore": 3.85,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 2.5,
+    "distinctSilhouette": 3,
+    "visualEconomy": 5,
+    "monochromeTest": 3,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

@@ -1,0 +1,14 @@
+{
+  "filename": "03-keystone.svg",
+  "title": "The keystone locks an arch by geometry alone: remove it and collapse is instant, but with it in place the structure cannot fail. Precept's rules make invalid states impossible by the shape of the definition itself — not runtime guards, but structural impossibility.",
+  "conceptualBridge": "The keystone means structural impossibility because the whole system only holds when the governing rule-shape is in place.",
+  "status": "shortlisted",
+  "decision": "Shortlisted for a strong architectural metaphor that explains structural validity without diagramming workflows.",
+  "tags": ["architectural", "keystone", "structure", "law"],
+  "palette": ["#0D1018", "#141C2D", "#C8891F"],
+  "averageScore": 4.1,
+  "rubricScores": null,
+  "scoreDetailStatus": "average-only",
+  "needsRescore": true,
+  "metadataOrigin": "backfilled"
+}

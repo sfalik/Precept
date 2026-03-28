@@ -1,0 +1,14 @@
+{
+  "filename": "07-coin-notch.svg",
+  "title": "A solid disc with one precise V-notch shows that the only valid entry is structural — the material itself has no other opening, so invalid states are absent rather than refused. The notch is the one governed path; everything else is matter.",
+  "conceptualBridge": "The notched disc means one valid path because the contract is a closed body with only a single structural entry point.",
+  "status": "rejected",
+  "decision": "Removed: avg 3.5 below threshold and single-entry-point metaphor is covered more compellingly by 28-ruled-gate and 25-inspection-window.",
+  "tags": ["circular", "notch", "single-entry", "structural-path"],
+  "palette": ["#0D1018", "#1E3258", "#2C5FA8", "#4A8EFF"],
+  "averageScore": 3.5,
+  "rubricScores": null,
+  "scoreDetailStatus": "average-only",
+  "needsRescore": true,
+  "metadataOrigin": "backfilled"
+}

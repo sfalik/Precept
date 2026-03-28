@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    RADICAL DEPARTURE — Unexpected geometry, vivid palette, maximum visual weight.
+    No arches. No letters. No thin lines. Nothing familiar.
+
+    A full diamond (rotated square) split by a precise horizontal void.
+    The diamond is the complete governed domain — total, exact, bounded.
+    The void is the one precept: the definition that makes
+    one half distinct from the other, with no fuzzy boundary between them.
+
+    The void is not a rift. It is the law.
+    Without the rule, the diamond would be solid and ungoverned.
+    With the rule, each half exists in clear structural relation to the other.
+
+    Hot magenta: unexpected in developer tooling, impossible to mistake
+    for any other candidate in this gallery.
+  -->
+
+  <rect width="512" height="512" fill="#080910"/>
+
+  <!-- The complete governed domain — a solid diamond -->
+  <polygon points="256,52 460,256 256,460 52,256" fill="#E41888"/>
+
+  <!--
+    The ruled void — the one precept that defines the boundary.
+    Centered at y=256: from y=234 to y=278 (44px tall, full canvas width).
+    The void covers the entire diamond equator, cutting it precisely.
+  -->
+  <rect x="0" y="234" width="512" height="44" fill="#080910"/>
+
+  <!--
+    Edge glow on the void — the rule is not empty space but a defined gap.
+  -->
+  <line x1="52" y1="234" x2="460" y2="234"
+        stroke="#E41888" stroke-width="1.5" stroke-opacity="0.30"/>
+  <line x1="52" y1="278" x2="460" y2="278"
+        stroke="#E41888" stroke-width="1.5" stroke-opacity="0.30"/>
+</svg>

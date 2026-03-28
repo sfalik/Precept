@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    The from…on…-> governing triple.
+
+    Every transition in Precept requires two things to be true:
+      from [State]   — you must be in the right state
+      on [Event]     — the right event must have occurred
+
+    Only when both are true does the -> fire.
+    Neither alone is sufficient. The state without the event: nothing.
+    The event without the state: nothing. Both together: governed change.
+
+    The solid block is the `from` state — the bounded current context.
+    The notch on the block's right face is the `on` event — the one
+    structural opening through which the specific trigger can reach
+    the transition. The arrow departing from the notch is the `->`.
+
+    The notch is not a weakness in the block — it is the precisely
+    specified interface point. Only the right event shape fits the notch.
+    Anything else hits the solid face and has no path forward.
+  -->
+
+  <rect width="512" height="512" fill="#060810"/>
+
+  <!-- The from-state block — bounded current context -->
+  <rect x="60" y="120" width="268" height="272" fill="#1A7040"/>
+
+  <!-- The on-event notch — the precise trigger interface (void in right face) -->
+  <rect x="264" y="214" width="64" height="84" fill="#060810"/>
+
+  <!-- The -> arrow departing from the notch — the governed consequence -->
+  <polygon points="328,238 406,238 406,196 462,256 406,316 406,274 328,274"
+           fill="#1A7040"/>
+</svg>

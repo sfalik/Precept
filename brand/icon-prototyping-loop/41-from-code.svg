@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The `from` keyword: the first word of every transition rule.
+
+    Every governed path in Precept begins with `from`:
+      from Predecessor on AdvanceToCurrent -> transition Current
+      from Current on TryBlocked when BlockedPathEnabled -> ...
+
+    `from` is the declaration of context: this rule applies
+    when you are in this specific state. It is the anchor
+    that makes transitions state-dependent rather than global.
+    No `from`, no transition. No context, no rule.
+
+    Keyword blue: the color code editors use for fundamental
+    structural keywords — the words that frame what follows.
+  -->
+
+  <rect width="512" height="512" fill="#1A1A1A"/>
+
+  <defs>
+    <filter id="terminal-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <text
+    x="256" y="268"
+    font-family="'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', 'Courier New', monospace"
+    font-size="200"
+    font-weight="700"
+    fill="#569CD6"
+    text-anchor="middle"
+    dominant-baseline="central"
+    filter="url(#terminal-glow)"
+  >from</text>
+</svg>

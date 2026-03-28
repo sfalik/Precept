@@ -1,0 +1,14 @@
+{
+  "filename": "10-isometric-block.svg",
+  "title": "A dimensionally exact isometric cube: the compiled Precept definition as a material object. One block, one definition, completely self-contained. The same solid gives the same measurements from any angle — like Precept's determinism: same definition plus same data always equals the same outcome.",
+  "conceptualBridge": "The isometric block means determinism because one compiled contract stays self-consistent from every angle and yields the same result each time.",
+  "status": "shortlisted",
+  "decision": "Shortlisted for making determinism and one-definition completeness feel material and exact.",
+  "tags": ["geometric", "isometric", "solid", "determinism"],
+  "palette": ["#0C0E14", "#1A3060", "#26468C", "#3D6FCC", "#5A8AE8"],
+  "averageScore": 4.4,
+  "rubricScores": null,
+  "scoreDetailStatus": "average-only",
+  "needsRescore": true,
+  "metadataOrigin": "backfilled"
+}

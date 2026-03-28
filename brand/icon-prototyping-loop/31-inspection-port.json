@@ -1,0 +1,21 @@
+{
+  "filename": "31-inspection-port.svg",
+  "title": "A solid circle with a square void at its center. The circle is the complete, closed Precept contract — the governed domain with no outside. The square port is the Inspect operation made physical: always open, always exact, impossible to close because it is a structural absence in the material. Precept guarantees that at any state, at any time, you can look inside and see every possible outcome without executing anything. The port is not a feature — it is the architecture.",
+  "conceptualBridge": "The circle-square port means Precept is both a closed domain and a permanently transparent one because the circular boundary makes the contract total while the square void is a structurally built-in inspection window that cannot be sealed.",
+  "status": "exploring",
+  "decision": "Kept: direct and specific embodiment of the inspect operation; the circle-square combination is new to the set and passes the threshold, though the blue palette is overrepresented — consider a future iteration with a distinct color.",
+  "tags": ["inspectability", "circle", "square-void", "blue", "permanent-port"],
+  "palette": ["#060C14", "#1E4EBE"],
+  "averageScore": 4.06,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 5,
+    "monochromeTest": 4,
+    "colorAndContrast": 3.5,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

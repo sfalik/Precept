@@ -1,0 +1,21 @@
+{
+  "filename": "28-ruled-gate.svg",
+  "title": "A bold Pi gate: the permanent governing threshold that every valid path must pass under. The horizontal bar is the rule — immovable, structural, permanent. The two pillars enforce it. The governed opening below is the only valid passage; there is no path over, around, or through the material itself. Three solid shapes. No thin lines. No decoration. The architecture of law.",
+  "conceptualBridge": "The Pi gate means Precept's rules are the governing threshold because the definition is the permanent crossbar and all valid paths must pass under it — there is no structural route around it, only through it.",
+  "status": "shortlisted",
+  "decision": "Shortlisted as the session's radical departure: vivid purple palette, new Pi gate silhouette, maximum structural weight, and the highest composite score in the set.",
+  "tags": ["radical-departure", "pi-arch", "gate", "purple", "bold-fill"],
+  "palette": ["#060810", "#7C35DC"],
+  "averageScore": 4.6875,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 5,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 5,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

@@ -1,0 +1,21 @@
+{
+  "filename": "15-plumb-line.svg",
+  "title": "The plumb bob finds true vertical by gravity alone — no algorithm, no check, no human judgment. Precept finds the one valid state the same way: the structure of the definition makes any other result impossible. Same definition, same data, same outcome: as inevitable as a weight falling.",
+  "conceptualBridge": "The plumb line means Precept's outcomes are structurally inevitable because the definition, like gravity, permits only one true result from the same inputs.",
+  "status": "rejected",
+  "decision": "Removed: avg 3.9 below the 4.0 threshold; determinism metaphor is one step removed from Precept's core differentiators.",
+  "tags": ["geometric", "plumb-bob", "determinism", "cream", "precision-tool"],
+  "palette": ["#080A0E", "#C4C0B4", "#E4E0D6"],
+  "averageScore": 3.9,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 3.5,
+    "distinctSilhouette": 4,
+    "visualEconomy": 4,
+    "monochromeTest": 4,
+    "colorAndContrast": 3.5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

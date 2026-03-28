@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    RADICAL DEPARTURE.
+
+    A designer who thinks about state spaces as literal grids,
+    not abstract marks. No architecture. No letterforms. No arrows.
+
+    Four cells in a 2x2 grid. Three are filled — they are the valid
+    states enumerated by the definition. One is absent — not blocked,
+    not crossed out, not red. Just gone. The impossible state does not
+    appear in the definition, so it does not exist.
+
+    This is Precept's core promise in its most direct visual form:
+    the contract enumerates what exists.
+    What isn't enumerated isn't prevented — it is absent.
+    The empty corner is not a failure. It is a structural fact.
+
+    The three-cell mass forms a distinctive L-shaped silhouette.
+    At any size, three large squares with one missing corner
+    reads immediately as "something is exactly and deliberately absent."
+  -->
+
+  <rect width="512" height="512" fill="#060810"/>
+
+  <!-- Top-left cell — valid state -->
+  <rect x="36" y="36"  width="210" height="210" fill="#5820B8"/>
+
+  <!-- Top-right cell — valid state -->
+  <rect x="266" y="36"  width="210" height="210" fill="#5820B8"/>
+
+  <!-- Bottom-left cell — valid state -->
+  <rect x="36" y="266" width="210" height="210" fill="#5820B8"/>
+
+  <!-- Bottom-right cell — structurally absent: this state does not exist -->
+</svg>

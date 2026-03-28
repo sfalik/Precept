@@ -1,0 +1,21 @@
+{
+  "filename": "27-proof-mark.svg",
+  "title": "A bold frame containing a solid filled square — the QED tombstone that marks the end of a mathematical proof. Precept's compiler walks every path, checks every invariant, and closes the proof before any instance runs. The outer frame is the complete governing contract; the inner solid mark is the certified result. When the compiler says sound, no argument remains open.",
+  "conceptualBridge": "The proof mark means Precept's compiler certifies the complete contract because the definition must be proven structurally sound before any instance can exist, just as QED marks that every step of the proof is closed.",
+  "status": "shortlisted",
+  "decision": "Shortlisted for ruthless visual economy (two shapes only), exceptional legibility at any size, and a specific connection to Precept's compile-time verification guarantee.",
+  "tags": ["mathematical", "qed", "nested-rectangles", "proof", "cream"],
+  "palette": ["#07080C", "#E8E0D4"],
+  "averageScore": 4.375,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4.5,
+    "legibilityAtSmallSize": 5,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

@@ -1,0 +1,21 @@
+{
+  "filename": "13-compass-rule.svg",
+  "title": "The compass defines the governed radius before any line is drawn — constraint precedes action. Precept works the same way: the .precept definition sets every valid boundary before runtime begins. The pivot is the definition; the arc is the only valid circumference; the arms show where the rules reach.",
+  "conceptualBridge": "The compass means Precept defines exact limits before execution because the tool sets the governed radius before anything can be drawn outside it.",
+  "status": "exploring",
+  "decision": "Above threshold; teal palette and V-plus-arc silhouette are genuinely new to the set, but conceptual bridge is one step removed from Precept's prevention guarantee.",
+  "tags": ["geometric", "compass", "precision-tool", "teal", "boundary"],
+  "palette": ["#080D10", "#00B4A0"],
+  "averageScore": 4.1,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 4,
+    "visualEconomy": 4.5,
+    "monochromeTest": 4,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

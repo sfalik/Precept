@@ -1,0 +1,21 @@
+{
+  "filename": "25-inspection-window.svg",
+  "title": "Two dark solid blocks with a permanent glowing inspection window between them. The blocks are the governed contract — bounded, opaque, immovable. The luminous gap is Precept's Inspect operation: always available, always lit, impossible to close. You can see inside from any state, at any time, without executing anything. Prevention is the closed material; inspectability is the open light.",
+  "conceptualBridge": "The glowing slot means Precept's inspect operation is structurally permanent because the governed contract is the surrounding solid and the inspection window is a built-in structural opening that cannot be sealed.",
+  "status": "shortlisted",
+  "decision": "Shortlisted for a direct and specific embodiment of the inspect operation, distinctive blue-glow palette, and strong legibility at small sizes.",
+  "tags": ["inspectability", "glowing-slot", "two-block", "blue-glow"],
+  "palette": ["#070C14", "#0E1A38", "#1E3060", "#3A7AFF", "#FFFFFF"],
+  "averageScore": 4.25,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 4,
+    "visualEconomy": 5,
+    "monochromeTest": 4,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

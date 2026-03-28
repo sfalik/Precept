@@ -1,0 +1,21 @@
+{
+  "filename": "18-set-square.svg",
+  "title": "The builder's set square tests whether an angle is exactly 90° — nothing approximate passes. Precept's compiler is the set square: the definition sets the governed standard, and any state that does not fit precisely is structurally impossible, not flagged after the fact. The corner mark is the traditional notation for exact structural soundness.",
+  "conceptualBridge": "The set square means Precept's compile-time checking is a structural test because the definition is the precision standard against which all states are measured — approximate fits do not exist.",
+  "status": "rejected",
+  "decision": "Removed: avg 3.9 below threshold; L-shape silhouette lacks distinctiveness and the compile-time metaphor is better served by 27-proof-mark.",
+  "tags": ["geometric", "precision-tool", "right-angle", "cream", "compile-time"],
+  "palette": ["#080A0E", "#DEDAD4"],
+  "averageScore": 3.9,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 3.5,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 4,
+    "monochromeTest": 4,
+    "colorAndContrast": 3.5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

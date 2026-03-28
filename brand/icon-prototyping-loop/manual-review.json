@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 2,
+  "step": 0.1,
+  "reviews": {
+    "00-base.svg": {
+      "status": "exploring",
+      "weight": 0.7999999999999999,
+      "note": "I like this one because it resembles the preview UX"
+    },
+    "01-gated-decision.svg": {
+      "status": "rejected",
+      "weight": 0,
+      "note": "don't like the circle in the middle"
+    },
+    "11-law-tablet.svg": {
+      "status": "rejected",
+      "weight": 0,
+      "note": "looks rude, doesn't really say anything to me about 'precept'"
+    },
+    "14-hex-stamp.svg": {
+      "status": "rejected",
+      "weight": 0,
+      "note": "the cross looks too 'medical'"
+    },
+    "02-arc-fork.svg": {
+      "status": "exploring",
+      "weight": 0.5,
+      "note": "i don't mind this one, similar to 00."
+    }
+  }
+}

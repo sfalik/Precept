@@ -16,9 +16,8 @@ Constraints:
 - Stay entirely inside this folder.
 - Obey sandbox-guardrails.md strictly.
 - Generate SVG candidates.
-- Regenerate index.html by editing it directly immediately after every SVG save, rename, or delete.
-- Do not batch index updates.
-- Treat the index as a live progress board that must reflect every loop iteration.
+- Each candidate's data lives in its own file: {stem}.json (loop-owned).
+- User review data lives in {stem}.review.json — never write to these files.
 - Do not use shell in this run.
 - Do not create new .cmd, .bat, .ps1, .exe, .com, .vbs, .js, or .ts helper files as a workaround for execution.
 - Keep a curated set of the 50 best unique candidates in this folder.
@@ -42,18 +41,56 @@ Visual guidance:
 
 Process:
 
-CRITICAL RULE — WRITE IMMEDIATELY: You get ONE sentence to name a concept. Then you MUST write the SVG file. No sketching in prose, no exploring alternatives in text, no "I'm considering…" paragraphs. The cycle is: one-sentence idea → create SVG file → score it → update index. If you have written more than two sentences without saving a file, you are wasting context. Stop and write.
+OUTPUT DISCIPLINE:
+- Keep visible narration extremely short.
+- Do not dump geometry calculations, option lists, self-critique, or long score justifications before files are written.
+- Prefer file edits over explanatory prose whenever a choice has already been made.
+- If the next useful action is obvious, do the edit instead of describing the edit.
+- The dashboard is for progress visibility; your text output is not the deliverable.
+
+CRITICAL RULE — WRITE IMMEDIATELY: You get ONE sentence to name a concept. Then you MUST write the SVG file. No sketching in prose, no exploring alternatives in text, no "I'm considering…" paragraphs. The cycle is: one-sentence idea → create SVG file → score it → update {stem}.json. If you have written more than two sentences without saving a file, you are wasting context. Stop and write.
+
+CRITICAL RULE — REGISTER IMMEDIATELY: The moment an SVG file is created, create {stem}.json immediately, even if scoring is not finished yet. Unscored candidates must have averageScore = null so the dashboard can show them.
+Every newly created candidate starts in status = exploring on first registration.
+That initial exploring entry is expected to be visible in the dashboard before any rubric pass is complete.
 
 Generation loop:
 1. Name the conceptual bridge in ONE sentence: "This shape means [Precept idea] because [reason]." Then immediately write the SVG. Do not elaborate, refine, or second-guess before writing.
 2. Write the SVG file immediately.
-3. Score it against the rubric.
-4. Update index.html with the new card and score.
-5. Decide: reject (remove the card), iterate on this file to improve it, or promote and move on.
-6. If you choose to iterate, you may refine the same file up to 3 times. After that, move on to a completely new concept.
-7. After every 3 new concepts, do a RADICAL DEPARTURE. This is mandatory, not optional. Imagine you are a completely different designer who has never seen the existing candidates. You have a different aesthetic sensibility, different influences, different instincts. You would never draw thin outlines with small circles. You might use heavy fills, bold letterforms, negative space, solid geometry, a single dominant shape, a textured surface, a contained emblem, or something no one in the folder has tried. The result should be so visually different that someone looking at the gallery would say "that one was clearly made by someone else." If your radical departure still looks like it belongs with the existing set, it is not radical enough — try again.
+3. Immediately create {stem}.json (replacing {stem} with the numeric-prefixed filename without extension). Use this schema:
+	{
+	  "filename": "{stem}.svg",
+	  "title": "...",
+	  "conceptualBridge": "...",
+	  "status": "exploring",
+	  "decision": "...",
+	  "tags": [...],
+	  "palette": [...],
+	  "averageScore": null,
+	  "rubricScores": null,
+	  "needsRescore": true
+	}
+	Never leave a newly created SVG without a matching {stem}.json.
+	Never write to {stem}.review.json — those are user-owned.
+4. Score it against the rubric.
+5. Rewrite {stem}.json with the finished score and refined metadata, then set its status based on the result.
+	Candidates may remain exploring, move to shortlisted, or move to rejected after scoring.
+	It is correct for the dashboard to show the candidate first as exploring with Avg: — and only later show its scored outcome.
+	If the score fails the bar, set status to rejected.
+	If the score clears the bar but still needs more work, keep it exploring.
+	If the score clearly survives comparison, set status to shortlisted.
+6. Decide: reject, iterate on this file to improve it, or promote and move on.
+7. If you choose to iterate, you may refine the same file up to 3 times. After that, move on to a completely new concept.
+8. After every 3 new concepts, do a RADICAL DEPARTURE. This is mandatory, not optional. Imagine you are a completely different designer who has never seen the existing candidates. You have a different aesthetic sensibility, different influences, different instincts. You would never draw thin outlines with small circles. You might use heavy fills, bold letterforms, negative space, solid geometry, a single dominant shape, a textured surface, a contained emblem, or something no one in the folder has tried. The result should be so visually different that someone looking at the gallery would say "that one was clearly made by someone else." If your radical departure still looks like it belongs with the existing set, it is not radical enough — try again.
+
+When removing a candidate:
+- Delete the SVG file.
+- Delete {stem}.json.
+- Do NOT delete {stem}.review.json if it exists — those are user-owned.
 
 Do not plan batches of SVGs. Do not second-guess a concept before writing it — write it, then decide. Bad SVGs are cheap; unwritten plans are worthless.
+If you catch yourself narrating geometry, debating alternatives, or writing long scoring notes before the SVG exists and is registered, stop and perform the next file edit immediately.
+If you find yourself writing more than 5 lines of prose in a row, stop and perform the next missing file edit.
 
 Additional rules:
 - If a candidate is promising but not yet promotion-worthy, iterate on that specific file instead of starting a new one.
@@ -61,8 +98,21 @@ Additional rules:
 - Ensure the explored set spans multiple visual families instead of overconcentrating on one motif.
 - Favor quality over volume.
 - Use stable sequential filenames with numeric prefixes so the live index ordering stays meaningful.
-- Keep index.html sorted by descending average score (highest score first). Cards with — (unscored) go at the end. Preserve the existing card layout, auto-refresh behavior, and header metadata style.
-- Each card in index.html must include a score line: <div class="score">Avg: <span class="avg">X.X</span></div> where X.X is the average rubric score (1 decimal place). Use — if not yet scored.
-- Each card's <article class="card"> element must have a title attribute containing 1–2 sentences explaining the conceptual connection to Precept — why this visual form represents the product's ideas (rules that hold, inspectability, prevention, structural contracts). Do not describe what the SVG looks like; explain what it means.
-- When you score or rescore a candidate, update its score in index.html immediately.
+- Do not edit {stem}.review.json files — they are user-owned.
+- Each {stem}.json must include filename, title, conceptualBridge, status, decision, tags, palette, and averageScore. Use null if not yet scored.
+- For a newly written but unscored SVG, it is acceptable and preferred to use provisional metadata; refine that same file after scoring.
+- Use status values from this set only: exploring, shortlisted, rejected.
+- Newly created candidates must begin as exploring before any promote-or-reject decision is made.
+- conceptualBridge must be one sentence in the form of a direct meaning statement, not a visual description.
+- decision must be one concise sentence stating why the candidate was kept, shortlisted, or set aside.
+- tags must be a short array of compositional or semantic labels that help keep the set diverse.
+- palette must be a compact array of the key hex colors actually used in the SVG.
+- Each candidate title must contain 1–2 sentences explaining the conceptual connection to Precept — why this visual form represents the product's ideas (rules that hold, inspectability, prevention, structural contracts). Do not describe what the SVG looks like; explain what it means.
+- If you have full rubric scores, include rubricScores as an object keyed by rubric criterion. If you only have an average, set rubricScores to null and mark needsRescore = true.
+- The dashboard seeing a new unscored candidate quickly is more important than perfect metadata on the first write. First write fast, then refine.
+- Before starting a new concept or iteration, glob *.json (excluding *.review.json) to get a picture of what exists, and spot-check a few {stem}.review.json files to understand the user's current direction.
+- review.json entries use a signed weight plus optional manual status override: positive boosts, negative reduces, and 0.0 means no manual adjustment.
+- Manual review status overrides use only: exploring, shortlisted, rejected.
+- If a candidate is manually marked shortlisted, treat it as a protected reference anchor.
+- If a candidate is manually marked rejected, treat that direction as temporarily closed.
 - At the end, summarize the strongest candidates and why they survived the rubric.

@@ -1,0 +1,21 @@
+{
+  "filename": "36-absent-cell.svg",
+  "title": "Three filled cells and one deliberately absent corner. The filled cells are the valid states explicitly enumerated in the Precept definition. The empty corner is the impossible state — not blocked, not flagged, not crossed out. It simply does not appear in the contract, so it does not exist. Precept's prevention guarantee is not a runtime check but a structural absence: if you didn't write it, it isn't there.",
+  "conceptualBridge": "The absent cell means Precept makes invalid states structurally absent because the definition only enumerates what exists — the missing corner is not prevented at runtime, it is simply never declared, making the impossible state invisible by design.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: highest-scoring candidate this round (4.75 avg) — the absent corner is the most direct possible image of structural impossibility, the L-shaped silhouette is completely new to the set, and the concept requires no explanation once seen.",
+  "tags": ["radical-departure", "grid", "absent-state", "deep-violet", "state-space"],
+  "palette": ["#060810", "#5820B8"],
+  "averageScore": 4.75,
+  "rubricScores": {
+    "conceptualBridge": 4.5,
+    "structuralSoundness": 4.5,
+    "legibilityAtSmallSize": 5,
+    "distinctSilhouette": 5,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

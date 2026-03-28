@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    The -> -> pipeline: chained operations in one governed rule.
+
+    In Precept, a single transition line can chain operations:
+      set LoopCount = LoopCount + 1 -> transition Current
+
+    Both happen atomically. The first -> binds the set; the second ->
+    executes the state change. They are not two separate events — they
+    are one declaration, one atomic step, one governed unit.
+
+    Two bold chevrons pointing right represent this chaining.
+    The gap between them is the intermediate step — the governed
+    junction between one operation completing and the next beginning.
+    The two chevrons together say: this definition sequences multiple
+    governed actions as a single structural unit.
+  -->
+
+  <rect width="512" height="512" fill="#060810"/>
+
+  <!-- First chevron — the set operation completing -->
+  <polygon points="80,110 80,402 228,256" fill="#00B8D0"/>
+
+  <!-- Second chevron — the transition executing -->
+  <polygon points="284,110 284,402 432,256" fill="#00B8D0"/>
+</svg>

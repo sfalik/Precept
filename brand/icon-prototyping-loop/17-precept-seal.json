@@ -1,0 +1,21 @@
+{
+  "filename": "17-precept-seal.svg",
+  "title": "A circular authority seal — like a hallmark on precious metal — pressed once by the compiler and impossible to undo. The disc is the complete, bounded contract. The P as negative space shows the inspectable interior: nothing inside the governed domain is hidden from inspection.",
+  "conceptualBridge": "The authority seal means Precept's contract is irrevocable because the definition is pressed once and the seal's structure itself prevents any deviation.",
+  "status": "rejected",
+  "decision": "Removed: avg 3.7 below threshold and concept overlaps significantly with stronger 06-negative-p.",
+  "tags": ["circular", "seal", "authority", "crimson", "negative-space"],
+  "palette": ["#08090D", "#A82020", "#580C0C"],
+  "averageScore": 3.7,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 3.5,
+    "monochromeTest": 3.5,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 3.5
+  },
+  "needsRescore": false
+}

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    A solid regular pentagon — a complete, structurally closed form.
+    Each of its five sides is a governing rule; the enclosed space is
+    the valid domain. Nothing can exist outside the bounded shape —
+    not because something checks, but because the boundary is the law.
+
+    The pentagon is one of the most ancient symbols of completeness
+    and structural soundness (the Pythagoreans used it as their mark).
+    Unlike a circle (infinite, uncountable), the pentagon says: exactly
+    these rules, exactly this extent, exactly this domain.
+
+    Deep burgundy: the color of authority documents, legal seals,
+    and formal decrees — unexpected in developer tooling.
+  -->
+
+  <rect width="512" height="512" fill="#06080E"/>
+
+  <!--
+    Regular pentagon, pointing up, center (256,256), radius 210.
+    Vertices computed at angles 90°, 18°, -54°, -126°, 162°
+    (positive y points down in SVG, so sin terms are negated):
+      top:         (256, 46)
+      upper-right: (456, 191)
+      lower-right: (379, 426)
+      lower-left:  (133, 426)
+      upper-left:  (56, 191)
+  -->
+  <polygon
+    points="256,46 456,191 379,426 133,426 56,191"
+    fill="#8A1820"
+  />
+</svg>
