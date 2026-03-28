@@ -290,6 +290,15 @@ Both paths are safely watched by the exact same invariant engine. Direct editing
 
 This repo produces two VS Code artifacts: the **extension** (editor features) and the **agent plugin** (Copilot features). Both are developed locally from `tools/` and follow the same edit → build → reload cycle.
 
+### Quick reference
+
+| What you changed | What to do | Window reload? |
+|---|---|---|
+| C# language server or runtime (`src/Precept/`, `tools/Precept.LanguageServer/`) | `Ctrl+Shift+B` | No — hot restart |
+| TypeScript extension, webview HTML, preview panel, syntax grammar (`tools/Precept.VsCode/`) | Task `extension: install`, then `Developer: Reload Window` | Yes |
+| Agent or skill markdown (`tools/Precept.Plugin/agents/`, `skills/`) | `Developer: Reload Window` | Yes |
+| MCP server C# (`tools/Precept.Mcp/`) | `Developer: Reload Window`, then invoke any MCP tool | Yes |
+
 ### Prerequisites
 
 Enable the agent plugins preview in your user settings:
@@ -312,15 +321,15 @@ All dev tasks are in `.vscode/tasks.json`, runnable via **Tasks: Run Task** (`Ct
 
 ### Extension changes
 
-The extension provides the language server, syntax highlighting, preview panel, and commands.
+The extension provides the language server, syntax highlighting, preview panel, and commands. The `extension: install` task auto-detects VS Code Stable vs Insiders and installs into the correct profile.
 
-**C# language-server or runtime code:**
+**C# language-server or runtime code** (`src/Precept/`, `tools/Precept.LanguageServer/`):
 
 1. Run `Build Task` / `Ctrl+Shift+B`.
 2. The default `build` task compiles into `temp/dev-language-server` with `--artifacts-path`.
-3. The installed extension detects the new DLL, creates a fresh shadow copy under `temp/dev-language-server/runtime`, and restarts the language client automatically.
+3. The installed extension detects the new DLL, creates a fresh shadow copy under `temp/dev-language-server/runtime`, and restarts the language client automatically — no window reload needed.
 
-**TypeScript extension-host or webview code:**
+**TypeScript, webview, preview, or syntax grammar** (`tools/Precept.VsCode/src/`, `webview/`, `syntaxes/`):
 
 1. Run task: `extension: install`.
 2. Run `Developer: Reload Window`.
@@ -340,8 +349,8 @@ The plugin provides the Precept Author agent, companion skills, and MCP server t
 **MCP server C# code:**
 
 1. Edit source in `tools/Precept.Mcp/`.
-2. Run `Developer: Reload Window`, then trigger any MCP-backed action.
-3. The plugin's launcher rebuilds `tools/Precept.Mcp` into `temp/dev-mcp`, creates a fresh shadow copy under `temp/dev-mcp/runtime`, and starts the new runtime on demand.
+2. Run `Developer: Reload Window`, then invoke any MCP tool (e.g. `precept_compile`).
+3. The plugin's launcher rebuilds `tools/Precept.Mcp` into `temp/dev-mcp`, creates a fresh shadow copy under `temp/dev-mcp/runtime`, and starts the new runtime on demand. The rebuild happens lazily on the next tool invocation after reload.
 
 **First-time setup:**
 

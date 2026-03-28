@@ -581,13 +581,13 @@ All dev tasks are in `.vscode/tasks.json`, runnable via **Tasks: Run Task**:
 
 **Extension changes** (language server, syntax, preview, commands):
 
-1. For C# changes: run `Build Task` / `Ctrl+Shift+B`. The extension detects the new DLL, shadow-copies it, and restarts automatically.
-2. For TypeScript/webview changes: run task `extension: install`, then `Developer: Reload Window`.
+1. For C# changes (`src/Precept/`, `tools/Precept.LanguageServer/`): run `Build Task` / `Ctrl+Shift+B`. The extension detects the new DLL, shadow-copies it, and restarts automatically — no window reload needed.
+2. For TypeScript, webview, preview, or syntax grammar changes (`tools/Precept.VsCode/`): run task `extension: install`, then `Developer: Reload Window`. The install task auto-detects VS Code Stable vs Insiders.
 
 **Plugin changes** (agent, skills, MCP tools):
 
 1. For agent/skill markdown: edit in `tools/Precept.Plugin/`, then `Developer: Reload Window`.
-2. For MCP server C#: edit in `tools/Precept.Mcp/`, then `Developer: Reload Window` and trigger any MCP action. The launcher rebuilds and shadow-copies on demand.
+2. For MCP server C#: edit in `tools/Precept.Mcp/`, then `Developer: Reload Window` and invoke any MCP tool. The launcher rebuilds and shadow-copies lazily on the next tool invocation after reload.
 3. First-time setup: run task `plugin: enable` (one time), then `Developer: Reload Window`.
 
 The toggle script (`tools/scripts/toggle-plugin.js`) updates `chat.pluginLocations` in `.vscode/settings.json`. To stop loading the plugin, run task `plugin: disable` and reload.
