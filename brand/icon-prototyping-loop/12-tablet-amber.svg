@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <radialGradient id="aglow" cx="50%" cy="35%" r="45%">
+      <stop offset="0%" stop-color="#C8891F" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#C8891F" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="#0A0C10"/>
+
+  <!-- Warm glow at the arch crown -->
+  <ellipse cx="256" cy="186" rx="130" ry="85" fill="url(#aglow)"/>
+
+  <!--
+    Amber law tablet variant.
+    The warm gold rules on near-black stone suggest ancient immutable law —
+    not a digital tool but a carved authority. The .precept definition
+    is this tablet: what is inscribed cannot be in error; what is not
+    inscribed does not exist.
+  -->
+  <path d="M168 196 A88 88 0 0 1 344 196 L344 460 L168 460 Z"
+        fill="#111824"/>
+
+  <!-- Stone face highlight (left arch edge) -->
+  <path d="M168 196 A88 88 0 0 1 344 196"
+        stroke="#1A2E48" stroke-width="2.5" fill="none"/>
+
+  <!-- Three inscribed precepts — warm amber authority marks -->
+  <line x1="196" y1="268" x2="316" y2="268"
+        stroke="#C8891F" stroke-width="8" stroke-linecap="round"/>
+  <line x1="196" y1="332" x2="316" y2="332"
+        stroke="#C8891F" stroke-width="8" stroke-linecap="round"/>
+  <line x1="196" y1="396" x2="316" y2="396"
+        stroke="#C8891F" stroke-width="8" stroke-linecap="round"/>
+</svg>

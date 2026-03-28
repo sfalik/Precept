@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    A heavy bold P where the bowl's counter is a perfect square, not the
+    typical D-curve. The round outer bowl = organic complexity of a business
+    domain. The square counter = the compile-time exactness Precept imposes.
+    Precision lives inside the governed space. This also differentiates
+    sharply from Prefect's standard rounded P mark.
+  -->
+
+  <rect width="512" height="512" fill="#0C0F14"/>
+
+  <!-- P body: stem + full bowl including counter area -->
+  <path d="M173 106
+           L243 106
+           A96 96 0 0 1 243 298
+           L243 406
+           L173 406
+           Z"
+        fill="#EDE7DC"/>
+
+  <!--
+    Square counter: 82×82, left edge against the stem at x=249,
+    centered vertically at y=202 (bowl center).
+    The square imposes right-angle precision inside the curved governed space.
+  -->
+  <rect x="249" y="161" width="82" height="82" fill="#0C0F14"/>
+
+  <!--
+    Thin accent line at the bowl bottom where the square meets the stem curve —
+    the "rule" boundary.
+  -->
+  <line x1="173" y1="298" x2="243" y2="298" stroke="#0C0F14" stroke-width="5"/>
+</svg>

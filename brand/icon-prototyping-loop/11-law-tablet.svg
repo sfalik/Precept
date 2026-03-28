@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <radialGradient id="tglow" cx="50%" cy="38%" r="42%">
+      <stop offset="0%" stop-color="#3D8FFF" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#3D8FFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="#0D1018"/>
+
+  <!-- Subtle radiance above the tablet -->
+  <ellipse cx="256" cy="196" rx="140" ry="90" fill="url(#tglow)"/>
+
+  <!--
+    The classic pointed-arch (Roman) tablet form — the universal mark of
+    an inscribed law. The .precept file IS this tablet: self-contained,
+    complete, immutable. Three rules inscribed on its face correspond to
+    the three operations that flow from the definition: Create, Fire, Inspect.
+
+    Tablet: arch top centered at (256, 196), radius 88.
+    Body: x=168-344 (176px wide), y=196 to y=460.
+  -->
+  <path d="M168 196 A88 88 0 0 1 344 196 L344 460 L168 460 Z"
+        fill="#0F1E3A"/>
+
+  <!-- Left edge highlight (suggests carved stone depth) -->
+  <line x1="168" y1="460" x2="168" y2="196" stroke="#162E58" stroke-width="3"/>
+
+  <!-- Three inscribed rules — the precepts carved into the definition -->
+  <line x1="196" y1="268" x2="316" y2="268"
+        stroke="#3D8FFF" stroke-width="7" stroke-linecap="round"/>
+  <line x1="196" y1="332" x2="316" y2="332"
+        stroke="#3D8FFF" stroke-width="7" stroke-linecap="round"/>
+  <line x1="196" y1="396" x2="316" y2="396"
+        stroke="#3D8FFF" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- Faint inner arch line (the boundary of the governed space) -->
+  <path d="M184 196 A72 72 0 0 1 328 196"
+        stroke="#162E58" stroke-width="2.5" fill="none"/>
+</svg>

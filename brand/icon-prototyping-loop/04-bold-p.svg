@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" fill="#0C0F14"/>
+
+  <!--
+    Very heavy bold capital P. The letter P = Precept = a binding rule.
+    Stem: x=173-243, y=106-406 (70px wide, 300px tall).
+    Bowl: radius 96, center (243, 202), arcs right from y=106 to y=298.
+    Counter (negative space in bowl): radius 52, same center.
+
+    The extreme weight (stem=70px, bowl wall=44px) gives the letter
+    monumental authority — carved from material, not drawn on screen.
+  -->
+
+  <!-- P body: stem + filled bowl (including counter area) -->
+  <path d="M173 106 L243 106 A96 96 0 0 1 243 298 L243 406 L173 406 Z" fill="#EDE7DC"/>
+
+  <!-- Counter: D-shaped negative space, background color, removes bowl interior -->
+  <path d="M243 150 A52 52 0 0 1 243 254 Z" fill="#0C0F14"/>
+
+  <!--
+    Single horizontal rule across the stem at the bowl-attachment line (y=298).
+    This small groove echoes "a rule inscribed" — the P is not just a letter,
+    it carries a carved precept.
+  -->
+  <line x1="173" y1="298" x2="243" y2="298" stroke="#0C0F14" stroke-width="6"/>
+</svg>

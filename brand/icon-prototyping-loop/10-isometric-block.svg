@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    RADICAL DEPARTURE #2 — isometric solid block.
+
+    A dimensionally exact isometric cube: a compiled Precept definition
+    as a material object. Three visible faces = three inspectable surfaces.
+    One block, one definition, completely self-contained. Same definition +
+    same data = same outcome, always — like measuring a solid block: it
+    doesn't change depending on who holds the ruler.
+
+    No letterforms. No cutouts. No flat geometry. Pure dimensional form.
+    Someone looking at the gallery would say: "that one is from a different era."
+  -->
+
+  <rect width="512" height="512" fill="#0C0E14"/>
+
+  <!--
+    Cube with face size F=130 in isometric.
+    Horizontal edge: 2D-width=112.6, 2D-height=65.
+    Vertical edge: height=130 in 2D.
+
+    Top face center: (256, 220)
+    Top:   (256, 155)
+    Right: (369, 220)
+    Bottom:(256, 285)
+    Left:  (143, 220)
+
+    Left face:  (143,220)-(256,285)-(256,415)-(143,350)
+    Right face: (256,285)-(369,220)-(369,350)-(256,415)
+  -->
+
+  <!-- Right face — darkest (shadow side) -->
+  <path d="M256 285 L369 220 L369 350 L256 415 Z" fill="#1A3060"/>
+
+  <!-- Left face — medium (light-side shadow) -->
+  <path d="M143 220 L256 285 L256 415 L143 350 Z" fill="#26468C"/>
+
+  <!-- Top face — brightest (the open, inspectable surface) -->
+  <path d="M256 155 L369 220 L256 285 L143 220 Z" fill="#3D6FCC"/>
+
+  <!--
+    Subtle edge highlights — precision reads at any scale.
+    The top edges define the exact boundary of what is and is not inside the block.
+  -->
+  <line x1="256" y1="155" x2="369" y2="220" stroke="#5A8AE8" stroke-width="1.5"/>
+  <line x1="256" y1="155" x2="143" y2="220" stroke="#5A8AE8" stroke-width="1.5"/>
+  <line x1="256" y1="285" x2="256" y2="415" stroke="#2A4878" stroke-width="1.5"/>
+</svg>

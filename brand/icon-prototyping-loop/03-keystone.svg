@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="42%" r="45%">
+      <stop offset="0%" stop-color="#C8891F" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#C8891F" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="#0D1018"/>
+
+  <!-- Background glow behind keystone -->
+  <ellipse cx="256" cy="220" rx="160" ry="118" fill="url(#glow)"/>
+
+  <!-- Left flanking arch voussoir (muted, suggests the arch being held) -->
+  <path d="M184 148 L82 388 L148 388 L228 168 Z" fill="#141C2D"/>
+
+  <!-- Right flanking arch voussoir -->
+  <path d="M328 148 L284 168 L364 388 L430 388 Z" fill="#141C2D"/>
+
+  <!-- Keystone — bold amber trapezoid, wider at top, locking the arch -->
+  <path d="M184 148 L328 148 L294 306 L218 306 Z" fill="#C8891F"/>
+
+  <!-- Inscribed rules — three horizontal lines carved into the keystone face -->
+  <!-- At y=198: left edge ≈198, right edge ≈314 -->
+  <line x1="199" y1="198" x2="313" y2="198" stroke="#0D1018" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- At y=236: left edge ≈208, right edge ≈304 -->
+  <line x1="208" y1="236" x2="304" y2="236" stroke="#0D1018" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- At y=274: left edge ≈217, right edge ≈295 -->
+  <line x1="217" y1="274" x2="295" y2="274" stroke="#0D1018" stroke-width="4.5" stroke-linecap="round"/>
+</svg>

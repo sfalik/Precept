@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <!-- Soft horizontal glow through the aperture -->
+    <linearGradient id="slotglow" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%"   stop-color="#3F8EFF" stop-opacity="0"/>
+      <stop offset="30%"  stop-color="#3F8EFF" stop-opacity="0.9"/>
+      <stop offset="50%"  stop-color="#6AADFF" stop-opacity="1"/>
+      <stop offset="70%"  stop-color="#3F8EFF" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#3F8EFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="#0D1018"/>
+
+  <!--
+    Two heavy architectural slabs separated by a single 56px aperture.
+    Above and below the slot: structurally closed territory (impossible paths).
+    The slot is the only valid passage — not forbidden elsewhere, but absent.
+    The bright centerline IS the rule: precise, unambiguous, always visible.
+  -->
+
+  <!-- Top slab -->
+  <rect x="80" y="84" width="352" height="148" rx="6" fill="#162244"/>
+
+  <!-- Bottom slab — taller, more weight below the threshold -->
+  <rect x="80" y="288" width="352" height="140" rx="6" fill="#162244"/>
+
+  <!-- Aperture centerline: the precise rule that defines what passes -->
+  <line x1="80" y1="256" x2="432" y2="256"
+        stroke="url(#slotglow)" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Thin edge highlights on slab faces (depth, precision) -->
+  <line x1="80"  y1="232" x2="432" y2="232" stroke="#1E3260" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="80"  y1="288" x2="432" y2="288" stroke="#1E3260" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

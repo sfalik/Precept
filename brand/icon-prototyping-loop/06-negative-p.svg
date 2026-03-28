@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    RADICAL DEPARTURE — brand/identity aesthetic, not UI-native.
+
+    A solid amber square with the letter P cut out as pure negative space.
+    The P does not exist — it IS the inspectable interior of the governed domain.
+    The solid material surrounding it is the unbreakable contract: present,
+    immovable, defined. What's inside is always visible by design.
+
+    No nodes. No arcs. No outlines. One form, one cut, one idea.
+  -->
+
+  <rect width="512" height="512" fill="#0D1018"/>
+
+  <!-- The solid amber field — the governed domain, the unbreakable precept -->
+  <rect x="72" y="72" width="368" height="368" rx="18" fill="#C8891F"/>
+
+  <!--
+    P cut from the field as negative space.
+    Stem: x=148-228 (80px wide). Bowl: radius 108, center (228,208), y=100 to y=316.
+    Counter: radius 62 — D-shaped.
+
+    At this scale (368px field) the P fills ~60% of the field,
+    creating a strong emblem read.
+  -->
+
+  <!-- P stem + bowl (filled background color = cuts P from amber field) -->
+  <path d="M148 100
+           L228 100
+           A108 108 0 0 1 228 316
+           L228 440
+           L148 440
+           Z"
+        fill="#0D1018"/>
+
+  <!-- Counter: D-shaped interior of bowl, refilled amber to create the bowl wall -->
+  <path d="M228 148 A62 62 0 0 1 228 272 Z"
+        fill="#C8891F"/>
+</svg>
