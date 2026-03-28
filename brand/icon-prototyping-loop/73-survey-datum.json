@@ -1,0 +1,21 @@
+{
+  "filename": "73-survey-datum.svg",
+  "title": "A surveyor's benchmark datum mark: a gold equilateral triangle inscribed on a dark stone tablet, with a small circle at the centroid — the exact fixed point. Precept's compiled definition is the datum: an immovable reference from which all runtime behavior is calculated. If the datum moves, all measurements become invalid; if the definition holds, every outcome is predictable.",
+  "conceptualBridge": "The survey datum means Precept's definition is the immovable reference because every runtime measurement is derived from the fixed coordinates the contract declares.",
+  "status": "shortlisted",
+  "decision": "Shortlisted after iteration: avg 4.38, no hard fails — v2 simplified to bold triangle outline + datum circle; the gold-on-dark survey benchmark is the only candidate from this visual tradition; strong uniqueness and clear legibility at 32px.",
+  "tags": ["datum", "survey", "architectural", "gold", "triangle", "precision"],
+  "palette": ["#0A0C10", "#C8A84A"],
+  "averageScore": 4.38,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 4.5,
+    "monochromeTest": 4.5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

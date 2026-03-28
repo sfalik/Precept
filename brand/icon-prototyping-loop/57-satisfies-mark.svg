@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The ⊨ (satisfies / models) symbol as heavy geometric slabs.
+
+    ⊨ means "satisfies" or "models": the definition ⊨ all constraints.
+    In model theory: M ⊨ φ means "model M satisfies formula φ."
+    In Precept: the .precept definition ⊨ every stated constraint —
+    guaranteed at compile time before any instance can run.
+
+    The ⊢ (proves) in 51-proves-mark asserts logical derivation.
+    The ⊨ (satisfies) asserts satisfaction: the definition is a
+    model in which every constraint holds.
+
+    Constructed from four slabs:
+      - Vertical bar: the definition (the model)
+      - Upper horizontal arm: constraint 1 satisfied
+      - Lower horizontal arm: constraint 2 satisfied
+      - Center gap between arms: the structural separation
+
+    The arms are equidistant from center — the definition satisfies
+    all constraints symmetrically, not in some privileged order.
+
+    Deep forest green — new to the active set.
+  -->
+
+  <rect width="512" height="512" fill="#060C08"/>
+
+  <!-- Vertical bar (the model/definition) -->
+  <rect x="108" y="100" width="72" height="312" rx="6" fill="#1A8828"/>
+
+  <!-- Upper horizontal arm: first constraint satisfied -->
+  <rect x="180" y="100" width="224" height="64" rx="6" fill="#1A8828"/>
+
+  <!-- Lower horizontal arm: second constraint satisfied -->
+  <rect x="180" y="348" width="224" height="64" rx="6" fill="#1A8828"/>
+</svg>

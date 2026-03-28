@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    Closed interval notation [ — ]: the mathematical form for a bounded,
+    inclusive range. Two facing bracket-slabs with a tight interior space.
+    In Precept, every value in every field exists within declared bounds;
+    no field can hold a value outside the contract. The brackets are the
+    structural walls — solid, right-angled, immovable. The space between
+    them is the entire valid universe of that field.
+
+    This is a sibling to 65-denotation (⟦⟧ double-brackets) but uses
+    single square brackets and a shorter, tighter composition — more
+    like type annotation syntax than semantic denotation brackets.
+  -->
+
+  <rect width="512" height="512" fill="#0C0810"/>
+
+  <!-- Left bracket [ -->
+  <!-- Vertical bar -->
+  <rect x="108" y="140" width="38" height="232" rx="3" fill="#8040E8"/>
+  <!-- Top arm -->
+  <rect x="108" y="140" width="86" height="34" rx="3" fill="#8040E8"/>
+  <!-- Bottom arm -->
+  <rect x="108" y="338" width="86" height="34" rx="3" fill="#8040E8"/>
+
+  <!-- Right bracket ] -->
+  <!-- Vertical bar -->
+  <rect x="366" y="140" width="38" height="232" rx="3" fill="#8040E8"/>
+  <!-- Top arm -->
+  <rect x="318" y="140" width="86" height="34" rx="3" fill="#8040E8"/>
+  <!-- Bottom arm -->
+  <rect x="318" y="338" width="86" height="34" rx="3" fill="#8040E8"/>
+
+  <!-- Interior accent: a single bright horizontal rule at vertical center —
+       the "value" that lives inside the bounded range -->
+  <rect x="214" y="243" width="84" height="26" rx="4" fill="#B080FF"/>
+</svg>

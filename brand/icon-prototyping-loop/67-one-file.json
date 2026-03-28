@@ -1,0 +1,21 @@
+{
+  "filename": "67-one-file.svg",
+  "title": "One file. All rules. A compact vertical rectangle — the .precept file — with horizontal lines organized into five sections representing the five structural parts of a Precept definition: the precept header, state declarations, event declarations, transition rules, and constraint rules. The single file shape embodies Precept's core guarantee: everything that governs the entity lives in one place, not scattered across services and codebases.",
+  "conceptualBridge": "The one-file emblem means Precept's governing contract is complete and self-contained because the .precept file contains every state, event, transition, and constraint in one place — the icon IS that file, with every rule visible inside it.",
+  "status": "rejected",
+  "decision": "Rejected: 3.69 avg below threshold — too many elements (17 bars + border + fold); visual economy score 3 and monochrome score 3 indicate the design depends too heavily on color differentiation and density. The one-file concept is valid but needs a simpler execution — perhaps just the file shape with 3 bold bars (not 17 fine lines) and a bright highlight.",
+  "tags": ["document", "one-file", "contract", "multi-color", "file-icon", "complete"],
+  "palette": ["#080A10", "#141820", "#D4A020", "#4A7AC0", "#4A9CB0", "#C89840", "#1FFF7A", "#A050A0"],
+  "averageScore": 3.69,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 3.5,
+    "distinctSilhouette": 4,
+    "visualEconomy": 3,
+    "monochromeTest": 3,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

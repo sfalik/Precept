@@ -1,0 +1,21 @@
+{
+  "filename": "83-on-header.svg",
+  "title": "A document card with a vivid event-header band at the top and a ruled governed-scope body below. The `on EventName` header governs everything beneath it — nothing in the body fires unless the declared event was received. The header IS the gate; the body is the governed scope. This roots the icon in the actual editing experience of a .precept file.",
+  "conceptualBridge": "The on-header means Precept's contract is an event-governed scope because the bright header band is the declaration gate — the body below exists only because that event was declared above it.",
+  "status": "rejected",
+  "decision": "Rejected: avg 3.81 below threshold — the card-with-colored-header pattern is colonized by Trello, Jira, and every Kanban tool; body content lines disappear at 32px leaving just a plain colored-header card; no clear distinction from generic task-management icons.",
+  "tags": ["event-header", "on-clause", "card", "purple", "governed-scope", "code"],
+  "palette": ["#080810", "#10142A", "#5028CC", "#A090FF", "#7060D8", "#1E2844"],
+  "averageScore": 3.81,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 3.5,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 3.5,
+    "monochromeTest": 3.5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

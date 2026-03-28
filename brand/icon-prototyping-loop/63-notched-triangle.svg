@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    A solid triangle with one notch: the governed opening.
+
+    The triangle is an architectural form — the most stable geometric
+    structure. The notch at one vertex is the only declared entry point.
+    Nothing else penetrates the triangle. No other interface exists.
+
+    This is Precept's state in its most compressed form: a solid,
+    stable form with exactly one structural interface — the event
+    that triggers the transition. Everything else is material.
+
+    The notch is arrow-shaped — it accepts exactly the governing operator.
+    Not a round hole (accepts anything) but an arrow-shaped void
+    (accepts only the declared transition operator).
+
+    Warm amber on dark. Different from existing triangle/chevron forms
+    (32-dual-chevron uses two opposing triangles; this is a single solid triangle).
+  -->
+
+  <rect width="512" height="512" fill="#060A0C"/>
+
+  <!-- Solid triangle: the governed state -->
+  <!-- Points: top-center (256,68), bottom-left (44,444), bottom-right (468,444) -->
+  <polygon points="256,68 44,444 468,444" fill="#C88018"/>
+
+  <!-- Arrow-notch at the bottom-right vertex -->
+  <!-- The notch cuts the right side of the triangle to create the governed opening -->
+  <!-- The notch is at the rightmost point (468,444) area -->
+  <!-- Notch void: a right-pointing arrow shape at the bottom-right corner -->
+  <polygon points="468,444 380,384 380,504 468,444" fill="#060A0C"/>
+  <rect x="308" y="396" width="72" height="48" fill="#060A0C"/>
+</svg>

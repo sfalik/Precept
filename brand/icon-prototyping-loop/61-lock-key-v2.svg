@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The lock-key composition, v2 — bolder proportions.
+
+    The state block fills the left 55% of the frame.
+    The arrow key is positioned touching the block's right edge.
+    The void and key are exactly the same shape — no ambiguity.
+
+    The key FITS the lock precisely.
+    Together they ARE the transition: from-state + operator = outcome.
+  -->
+
+  <rect width="512" height="512" fill="#060810"/>
+
+  <!-- The state block — solid deep violet, left side -->
+  <rect x="36" y="120" width="268" height="272" rx="8" fill="#4A20A0"/>
+
+  <!-- Arrow void (background color) — the state's event interface -->
+  <!-- Arrow tip reaches to x=304 — the block edge -->
+  <rect x="66" y="220" width="170" height="72" fill="#060810"/>
+  <polygon points="236,188 236,324 304,256" fill="#060810"/>
+
+  <!-- The governing arrow key — same shape, bright, positioned to the right -->
+  <!-- Shaft slightly narrower than void for visual separation -->
+  <rect x="312" y="224" width="106" height="64" rx="4" fill="#8850E0"/>
+  <polygon points="418,196 418,316 472,256" fill="#8850E0"/>
+</svg>

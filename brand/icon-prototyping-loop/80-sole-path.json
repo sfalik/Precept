@@ -1,0 +1,21 @@
+{
+  "filename": "80-sole-path.svg",
+  "title": "A bright channel cut through a solid dark block — the one structural opening that the contract declared. There is no other way through; the solid material around the slot is the closed contract boundary. Precept's event declarations are exactly this: not gates that check, but the only structural openings that exist.",
+  "conceptualBridge": "The sole declared path means Precept's contract is the only route because the opening exists because it was carved by the declaration — everything undeclared is solid material with no opening.",
+  "status": "exploring",
+  "decision": "Exploring: avg 4.19 — bright horizontal slot through solid block is highly legible and architecturally specific; conceptually related to 43-void-arrow (carved opening family) but simpler and more abstract; uniqueness score lowered because the void-in-solid family already has 3 candidates; worth keeping for visual economy.",
+  "tags": ["path", "slot", "void", "teal", "governed-opening"],
+  "palette": ["#080C10", "#142030", "#20C0A0"],
+  "averageScore": 4.19,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4.5,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 5,
+    "monochromeTest": 4,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 3.5
+  },
+  "needsRescore": false
+}

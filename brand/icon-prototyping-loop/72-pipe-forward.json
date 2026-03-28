@@ -1,0 +1,21 @@
+{
+  "filename": "72-pipe-forward.svg",
+  "title": "The pipe-forward operator `|>` made architectural. Every Precept event declaration pipes the current state through the contract's declared rules to produce a validated next state — the pipe bar is the gate that holds, the chevron is the governed direction of output.",
+  "conceptualBridge": "The pipe-forward means Precept's governed composition because every event binding IS a pipe: state enters through the rule bar, the contract applies, and the transition fires in exactly one declared direction.",
+  "status": "exploring",
+  "decision": "Exploring: avg 4.25 — copper pipe-forward operator is a distinct visual family from 52-slab-arrow; conceptual bridge is slightly weaker (|> is from functional languages; -> is direct Precept syntax), but the color family and form are fresh additions to the set.",
+  "tags": ["operator", "pipe-forward", "functional", "copper", "chevron"],
+  "palette": ["#0D0906", "#C87840"],
+  "averageScore": 4.25,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 4,
+    "visualEconomy": 4.5,
+    "monochromeTest": 4.5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

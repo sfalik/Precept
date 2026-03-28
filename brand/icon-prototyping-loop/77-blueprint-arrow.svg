@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    RADICAL DEPARTURE — Engineering Blueprint.
+
+    Blueprint paper: before any building is constructed, the blueprint
+    establishes the exact specification. Nothing is improvised; the plan
+    IS the authority. Workers don't write the rules as they build —
+    the rules were already drawn, verified, and frozen in the document.
+
+    Precept works the same way: the .precept file is the blueprint.
+    At compile time the spec is verified. At runtime the spec is law.
+    This aesthetic is from a completely different design tradition:
+    technical drawings, drafting boards, engineering precision.
+
+    Bold white -> on blueprint blue. No dark background. No slab constructions.
+    Dimension lines and centermarks in the style of engineering drawings.
+  -->
+
+  <!-- Blueprint blue background -->
+  <rect width="512" height="512" fill="#0038A0"/>
+
+  <!-- Fine grid lines (blueprint ruling) -->
+  <!-- Horizontal grid lines, 32px spacing -->
+  <line x1="0" y1="64" x2="512" y2="64" stroke="#0044B8" stroke-width="1"/>
+  <line x1="0" y1="128" x2="512" y2="128" stroke="#0044B8" stroke-width="1"/>
+  <line x1="0" y1="192" x2="512" y2="192" stroke="#0044B8" stroke-width="1"/>
+  <line x1="0" y1="256" x2="512" y2="256" stroke="#0044B8" stroke-width="1"/>
+  <line x1="0" y1="320" x2="512" y2="320" stroke="#0044B8" stroke-width="1"/>
+  <line x1="0" y1="384" x2="512" y2="384" stroke="#0044B8" stroke-width="1"/>
+  <line x1="0" y1="448" x2="512" y2="448" stroke="#0044B8" stroke-width="1"/>
+  <!-- Vertical grid lines -->
+  <line x1="64" y1="0" x2="64" y2="512" stroke="#0044B8" stroke-width="1"/>
+  <line x1="128" y1="0" x2="128" y2="512" stroke="#0044B8" stroke-width="1"/>
+  <line x1="192" y1="0" x2="192" y2="512" stroke="#0044B8" stroke-width="1"/>
+  <line x1="256" y1="0" x2="256" y2="512" stroke="#0044B8" stroke-width="1"/>
+  <line x1="320" y1="0" x2="320" y2="512" stroke="#0044B8" stroke-width="1"/>
+  <line x1="384" y1="0" x2="384" y2="512" stroke="#0044B8" stroke-width="1"/>
+  <line x1="448" y1="0" x2="448" y2="512" stroke="#0044B8" stroke-width="1"/>
+
+  <!-- Centerlines (construction lines) — thin dashed -->
+  <line x1="256" y1="40" x2="256" y2="472"
+        stroke="#4488FF" stroke-width="1" stroke-dasharray="12 6"/>
+  <line x1="40" y1="256" x2="472" y2="256"
+        stroke="#4488FF" stroke-width="1" stroke-dasharray="12 6"/>
+
+  <!-- Small center mark at canvas center -->
+  <line x1="248" y1="256" x2="264" y2="256" stroke="#FFFFFF" stroke-width="1.5"/>
+  <line x1="256" y1="248" x2="256" y2="264" stroke="#FFFFFF" stroke-width="1.5"/>
+
+  <!--
+    The -> arrow as a bold technical drawing form.
+    Shaft: x=96 to x=346, y=256 (horizontal centerline)
+    Arrowhead: tip at x=420, wings at (346,216) and (346,296)
+  -->
+
+  <!-- Arrow shaft -->
+  <line x1="96" y1="256" x2="346" y2="256"
+        stroke="#FFFFFF" stroke-width="18" stroke-linecap="butt"/>
+
+  <!-- Arrowhead (bold filled triangle) -->
+  <polygon points="346,216 420,256 346,296" fill="#FFFFFF"/>
+
+  <!-- Dimension line: endpoint markers at each end of shaft -->
+  <line x1="96" y1="236" x2="96" y2="276" stroke="#FFFFFF" stroke-width="3"/>
+
+  <!-- Small endpoint dot (origin of the transition) -->
+  <circle cx="96" cy="256" r="8" fill="#FFFFFF"/>
+</svg>

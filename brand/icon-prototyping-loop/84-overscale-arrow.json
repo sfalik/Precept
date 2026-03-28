@@ -1,0 +1,21 @@
+{
+  "filename": "84-overscale-arrow.svg",
+  "title": "The governing `->` operator at monumental scale: the shaft bleeds off both canvas edges; the arrowhead wings rise and fall to the canvas boundary with the tip invisible beyond the right margin. The rule is larger than the view — you are inside the declaration. Precept's transitions are not small annotations; they are the structural law the entire domain operates within.",
+  "conceptualBridge": "The oversized arrow means Precept's transition rule is the fundamental operating principle because the operator exists at such architectural scale that the governed domain lives inside it — not alongside it.",
+  "status": "exploring",
+  "decision": "Exploring: avg 4.19, no hard fails — monumental scale inversion is a genuinely novel concept (you are inside the rule); crimson palette is fresh; the arrowhead-without-tip is unusual; main weakness is the concept requires explanation to decode, and the composition without a visible tip may read as 'abstract red shapes' rather than an arrow at 32px.",
+  "tags": ["overscale", "monumental", "arrow", "crimson", "full-bleed", "radical-departure"],
+  "palette": ["#0A0608", "#C42030"],
+  "averageScore": 4.19,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 3.5,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 4.5,
+    "monochromeTest": 4.5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

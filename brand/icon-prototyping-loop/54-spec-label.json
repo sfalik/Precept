@@ -1,0 +1,21 @@
+{
+  "filename": "54-spec-label.svg",
+  "title": "A technical specification label: black header bar, white body, engineering measurement marks. The `.precept` file IS a specification — it declares the exact structure of an entity the way a technical datasheet declares the tolerances of a manufactured part. The `->` operator in the central accent box is the key specification: the governed transformation that every instance must conform to.",
+  "conceptualBridge": "The specification label means Precept's definition is a technical contract because the .precept file specifies exactly what an entity can do the same way a part datasheet specifies exactly what a component can withstand — both are enforced before any instance is produced.",
+  "status": "rejected",
+  "decision": "Rejected: 3.69 avg below threshold; legibility hard fail (2.5) — the spec label depends on text that is completely unreadable at 32px. The concept of 'Precept as technical specification' is worth revisiting with a more abstract/geometric execution that doesn't require text labels.",
+  "tags": ["radical-departure", "specification", "industrial", "white-background", "engineering", "datasheet"],
+  "palette": ["#F0EDE8", "#1A1818", "#888880"],
+  "averageScore": 3.69,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 2.5,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 2.5,
+    "monochromeTest": 3.5,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

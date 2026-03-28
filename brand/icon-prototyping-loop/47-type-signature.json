@@ -1,0 +1,21 @@
+{
+  "filename": "47-type-signature.svg",
+  "title": "The type signature `{ → }` represents Precept's governing contract as a typed function. The curly braces are the definition scope — the boundaries within which the contract operates. The arrow inside is the governed transformation: every valid state change in Precept is a structurally typed transition. The braces are dim (the scope is structural, not flashy); the arrow is bright (the governing operator is what the definition certifies).",
+  "conceptualBridge": "The `{ → }` type signature means Precept's definition is the typed scope of all valid transitions because curly braces mark a governed code scope and the arrow inside is the function that only runs when the type system approves.",
+  "status": "exploring",
+  "decision": "Kept at threshold (4.0): the type-signature aesthetic is new and code-specific; weak structural soundness score (3.5) is the main risk — the braces don't project the governed authority the way a filled solid or geometric form does.",
+  "tags": ["code-aesthetic", "type-signature", "curly-braces", "arrow", "accent-green", "mathematical"],
+  "palette": ["#0A0C14", "#3A5C80", "#1FFF7A"],
+  "averageScore": 4.0,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 4,
+    "visualEconomy": 4.5,
+    "monochromeTest": 3.5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

@@ -1,0 +1,21 @@
+{
+  "filename": "71-square-wave.svg",
+  "title": "A square waveform with crisp 90-degree corners. Precept enforces state as discrete positions — the stable plateaus are valid states; the instantaneous vertical edges are governed transitions; there is no analog slope or intermediate position, because the contract makes them structurally impossible.",
+  "conceptualBridge": "The square wave means Precept enforces discrete state transitions because the step function's right-angle corners are architecturally impossible to blur — no gradient between states exists.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: avg 4.5, no hard fails — the step-function waveform is the only candidate in this visual family; the crisp right-angle transitions are a precise analog of Precept's discrete state enforcement; maximum uniqueness score.",
+  "tags": ["waveform", "step-function", "discrete", "teal", "signal"],
+  "palette": ["#071210", "#1ED8A0"],
+  "averageScore": 4.5,
+  "rubricScores": {
+    "conceptualBridge": 4.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 4.5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

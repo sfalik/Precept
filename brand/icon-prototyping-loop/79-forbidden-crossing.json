@@ -1,0 +1,21 @@
+{
+  "filename": "79-forbidden-crossing.svg",
+  "title": "A muted arrow crossed out by a bold crimson X. The arrow is what was attempted; the X is what the contract made impossible. Invalid states don't fail at runtime in Precept — they are forbidden at definition time by the structural absence of a declared transition. The X is not an error message; it IS the prevention.",
+  "conceptualBridge": "The forbidden crossing means Precept's prevention because the X is not a runtime error indicator but a structural declaration that this transition was never made possible — and therefore can never occur.",
+  "status": "rejected",
+  "decision": "Rejected: avg 3.94 below threshold — the X-over-arrow silhouette is heavily colonized by delete/close/error icons in UI design; the muted arrow disappears in monochrome leaving just a generic X; the 'prevention' concept is sound but this form doesn't communicate 'structural prevention' vs. 'runtime error'.",
+  "tags": ["forbidden", "prevention", "crossed-arrow", "crimson", "absence"],
+  "palette": ["#0F080A", "#2A1820", "#C82030"],
+  "averageScore": 3.94,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 3,
+    "visualEconomy": 4.5,
+    "monochromeTest": 3.5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

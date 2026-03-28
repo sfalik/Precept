@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    Two states. One precise gap between them.
+
+    The gap is the precept — the governing rule that makes
+    simultaneous existence in both states structurally impossible.
+    The squares cannot overlap. There is no in-between.
+    You are in one state or the other, never both, never neither.
+
+    Precept's compile-time verification ensures this holds:
+    the definition makes transitioning directly from one to both
+    structurally absent — no event leads to a compound state,
+    because compound states are not declared.
+
+    Two equals squares. One exact void. Zero ambiguity.
+  -->
+
+  <rect width="512" height="512" fill="#060810"/>
+
+  <!-- Left state: solid vivid rose -->
+  <rect x="56" y="148" width="188" height="216" rx="8" fill="#D01870"/>
+
+  <!-- Right state: solid vivid rose (same color — they are symmetric) -->
+  <rect x="268" y="148" width="188" height="216" rx="8" fill="#D01870"/>
+
+  <!--
+    The gap between them: x=244 to x=268 = 24px gap
+    The gap is the precept. It is not filled. It is not marked.
+    It simply cannot be crossed.
+  -->
+</svg>

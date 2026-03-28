@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    A simplified precision dial — three valid positions, one needle.
+
+    Three heavy tick marks at the only positions that exist in the definition.
+    The needle points to exactly one: the current state.
+    Nothing else. No subdivisions. No intermediate positions.
+
+    In Precept, there are exactly as many valid states as the definition declares.
+    Between them: structural absence. Not "empty" — structurally not there.
+    The dial shows this: three marks, the rest of the circumference is void.
+  -->
+
+  <rect width="512" height="512" fill="#0C0E12"/>
+
+  <!-- Outer ring: the complete governed domain -->
+  <circle cx="256" cy="256" r="200" fill="none" stroke="#3A4A60" stroke-width="4"/>
+
+  <!-- Three valid state tick marks — bold, at 120° intervals -->
+  <!-- 0° (12 o'clock): top -->
+  <line x1="256" y1="56" x2="256" y2="104" stroke="#E8E0D0" stroke-width="14" stroke-linecap="round"/>
+  <!-- 120° (4 o'clock position): bottom-right -->
+  <!-- x = 256 + 200*sin(120°) = 256 + 173 = 429, y = 256 - 200*cos(120°) = 256 + 100 = 356 -->
+  <!-- endpoint moved inward by 48px: 256 + 125*sin(120°) = 256+108 = 364, y = 256+62 = 318 -->
+  <line x1="429" y1="356" x2="381" y2="308" stroke="#E8E0D0" stroke-width="14" stroke-linecap="round"/>
+  <!-- 240° (8 o'clock position): bottom-left -->
+  <line x1="83"  y1="356" x2="131" y2="308" stroke="#E8E0D0" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- Center pivot -->
+  <circle cx="256" cy="256" r="16" fill="#E8E0D0"/>
+  <circle cx="256" cy="256" r="8"  fill="#0C0E12"/>
+
+  <!-- Needle pointing to 120° position (current state: second declared state) -->
+  <!-- Direction: 120° from 12-o'clock. x = sin(120°) ≈ 0.866, y = -cos(120°) = 0.5 -->
+  <!-- tip: 256 + 155*0.866 = 390, 256 + 155*0.5 = 334 -->
+  <line x1="256" y1="256" x2="388" y2="332" stroke="#1FFF7A" stroke-width="12" stroke-linecap="round"/>
+  <!-- Counterbalance -->
+  <line x1="256" y1="256" x2="208" y2="228" stroke="#1FFF7A" stroke-width="5" stroke-linecap="round"/>
+</svg>

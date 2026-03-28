@@ -1,0 +1,21 @@
+{
+  "filename": "48-boundary-stone.svg",
+  "title": "An ancient boundary stone with one deeply carved groove. Precept's governing rules are like marks inscribed in stone: applied once at compile time, impossible to erase or fill at runtime. The groove is the precept — the single structural rule that holds permanently in the material. The stone fragment is not neat or digital; it is material, permanent, and physically prior to any execution.",
+  "conceptualBridge": "The incised stone means Precept's rules are permanently carved into the definition because compile-time verification is the act of inscription — the rule is in the material before any runtime exists, and no execution can alter it.",
+  "status": "rejected",
+  "decision": "Rejected: 3.75 avg below threshold; legibility hard fail (3 < 3 minimum) — the irregular stone shard and carved groove are not readable at 32px, and the visual economy is too low. The concept is valid but this execution does not pass.",
+  "tags": ["radical-departure", "lithic", "boundary-stone", "earthy", "textural", "carved-rule"],
+  "palette": ["#0D0C10", "#524E48", "#4A4640", "#1A1818"],
+  "averageScore": 3.75,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 3,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 3,
+    "monochromeTest": 4,
+    "colorAndContrast": 3.5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

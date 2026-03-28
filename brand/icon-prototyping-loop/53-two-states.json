@@ -1,0 +1,21 @@
+{
+  "filename": "53-two-states.svg",
+  "title": "Two identical solid states with a precise governed gap between them. The gap is the precept — the structural rule that makes simultaneous existence in both states impossible. You are in one state or the other, never both, never neither, and the boundary between them is the contract, not a runtime check. Precept's definition declares exactly which states exist; the space between declared states cannot be occupied.",
+  "conceptualBridge": "The two-state gap means Precept's definition makes compound states structurally absent because the only valid configurations are the declared states — the gap between them is the contract's governing silence, not a barrier but a structural void.",
+  "status": "exploring",
+  "decision": "Kept: 4.19 avg — passes threshold; the gap-as-governance concept is valid but the two-rectangle silhouette is too easily mistaken for a pause button or split panel. A future iteration should add a directional element or asymmetry to make the governance reading clear.",
+  "tags": ["two-states", "gap", "structural-void", "vivid-rose", "state-boundary"],
+  "palette": ["#060810", "#D01870"],
+  "averageScore": 4.19,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 5,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 5,
+    "monochromeTest": 4.5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

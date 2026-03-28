@@ -1,0 +1,21 @@
+{
+  "filename": "68-ruled-file.svg",
+  "title": "A minimal file shape with a single governing rule at its center. The file is the .precept artifact — the one source of all rules. The bright band is the precept: the single governing declaration that makes the entity's behavior structurally certain. Everything else (states, events, field definitions) exists to support that rule. One file, one dominant rule.",
+  "conceptualBridge": "The ruled file means Precept's definition is the one source of all governing behavior because the .precept file contains the rule — every constraint, every transition, every valid state — in one bounded place.",
+  "status": "exploring",
+  "decision": "Kept at threshold (4.0): the minimal file form is legible and economical; structural soundness (3 = minimum) is the key weakness — a file icon projects 'document' not 'prevention.' Useful as an alternative direction but won't beat the stronger structural candidates in the set.",
+  "tags": ["document", "file-icon", "one-file", "green-rule", "minimal", "contract"],
+  "palette": ["#080A10", "#141C2C", "#1FFF7A", "#2A3A50"],
+  "averageScore": 4.0,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 3,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 4,
+    "visualEconomy": 5,
+    "monochromeTest": 4,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

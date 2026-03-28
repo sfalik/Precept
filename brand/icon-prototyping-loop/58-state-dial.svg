@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    RADICAL DEPARTURE — Precision instrument dial.
+
+    A completely different designer with instrument-maker influences.
+    No code. No math symbols. No geometric primitives.
+
+    A precision measurement dial — like a compass bearing or micrometer.
+    The valid states are marked positions on the dial.
+    The needle points to exactly one of them.
+    Every other position does not exist on this instrument.
+
+    This is determinism: the same inputs always produce the same reading.
+    This is completeness: only declared positions exist on the dial.
+    This is inspection: you can always read the current value exactly.
+
+    Minimal. Instrument-precise. Nothing like any existing candidate.
+  -->
+
+  <rect width="512" height="512" fill="#0C0E12"/>
+
+  <!-- Outer dial ring -->
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#2A3448" stroke-width="3"/>
+  <circle cx="256" cy="256" r="200" fill="#141820"/>
+
+  <!-- Tick marks at valid state positions (5 positions) -->
+  <!-- Position 0°: 12 o'clock (rightmost valid state) -->
+  <line x1="256" y1="56"  x2="256" y2="88"  stroke="#E8E0D0" stroke-width="8"  stroke-linecap="round"/>
+  <!-- Position 72°: (1 o'clock position) -->
+  <line x1="447" y1="118" x2="429" y2="147" stroke="#E8E0D0" stroke-width="8"  stroke-linecap="round"/>
+  <!-- Position 144° -->
+  <line x1="378" y1="436" x2="361" y2="408" stroke="#E8E0D0" stroke-width="8"  stroke-linecap="round"/>
+  <!-- Position 216° -->
+  <line x1="134" y1="436" x2="151" y2="408" stroke="#E8E0D0" stroke-width="8"  stroke-linecap="round"/>
+  <!-- Position 288° -->
+  <line x1="65"  y1="118" x2="83"  y2="147" stroke="#E8E0D0" stroke-width="8"  stroke-linecap="round"/>
+
+  <!-- Fine tick marks between valid positions (subdivisions — the transitions between states) -->
+  <!-- At 36° increments between each 72° valid mark — dim -->
+  <line x1="368" y1="67"  x2="358" y2="85"  stroke="#3A4A60" stroke-width="3" stroke-linecap="round"/>
+  <line x1="452" y1="220" x2="432" y2="224" stroke="#3A4A60" stroke-width="3" stroke-linecap="round"/>
+  <line x1="432" y1="360" x2="415" y2="346" stroke="#3A4A60" stroke-width="3" stroke-linecap="round"/>
+  <line x1="256" y1="456" x2="256" y2="436" stroke="#3A4A60" stroke-width="3" stroke-linecap="round"/>
+  <line x1="80"  y1="360" x2="97"  y2="346" stroke="#3A4A60" stroke-width="3" stroke-linecap="round"/>
+  <line x1="60"  y1="220" x2="80"  y2="224" stroke="#3A4A60" stroke-width="3" stroke-linecap="round"/>
+  <line x1="144" y1="67"  x2="154" y2="85"  stroke="#3A4A60" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Center pivot -->
+  <circle cx="256" cy="256" r="12" fill="#E8E0D0"/>
+
+  <!-- Needle pointing to 72° position (current state) — bright accent -->
+  <!-- 72° from 12 o'clock = top-right; x = 256 + 160*sin(72°), y = 256 - 160*cos(72°) -->
+  <!-- sin(72°) ≈ 0.951, cos(72°) ≈ 0.309 -->
+  <!-- tip: x = 256 + 152 = 408, y = 256 - 47 = 209 -->
+  <line x1="256" y1="256" x2="420" y2="206" stroke="#1FFF7A" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- Counterbalance tail of needle -->
+  <line x1="256" y1="256" x2="196" y2="276" stroke="#1FFF7A" stroke-width="4" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    RADICAL DEPARTURE — Extended-stem P monogram.
+
+    A P letterform where the stem extends beyond the letter bounds —
+    above and below — creating a form like a currency symbol ($ or ¥)
+    but using the P.
+
+    The extension says: "the rule that this letter represents doesn't stop
+    at the edges of the letter. The principle extends beyond any single
+    instance." The P names the product; the pole it rides on is the precept.
+
+    Vivid coral background (completely new to the set).
+    Geometric P construction.
+    Extended stem: the rule that exceeds the letterform.
+  -->
+
+  <!-- Vivid coral background -->
+  <rect width="512" height="512" fill="#E83820"/>
+
+  <!-- Black field that will be cut by the P shape -->
+  <!-- We create the P as coral cutouts from a black overlay -->
+  <!-- This technique: black rect + coral P shapes -->
+
+  <rect width="512" height="512" fill="#141010"/>
+
+  <!-- Full-height extended stem: the governing rule runs top to bottom -->
+  <rect x="164" y="28"  width="76" height="456" fill="#E83820"/>
+
+  <!-- Top cap of bowl (P crossbar top) -->
+  <rect x="164" y="108" width="160" height="68"  fill="#E83820"/>
+
+  <!-- Bottom cap of bowl (P crossbar mid) -->
+  <rect x="164" y="244" width="160" height="68"  fill="#E83820"/>
+
+  <!-- Right wall of bowl (connecting top and mid caps) -->
+  <rect x="268" y="176" width="56"  height="68"  fill="#E83820"/>
+
+  <!-- Counter: restore black inside the P bowl -->
+  <rect x="240" y="176" width="28"  height="68"  fill="#141010"/>
+</svg>

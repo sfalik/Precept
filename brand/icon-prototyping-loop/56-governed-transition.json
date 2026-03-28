@@ -1,0 +1,21 @@
+{
+  "filename": "56-governed-transition.svg",
+  "title": "A source state, a governing arrow, and a destination state — the complete atomic unit of Precept's fire operation. The smaller source block is where the entity came from; the bright green arrow in the gap is the governing `->` operator; the larger destination block is where the entity arrives. In Precept, this triple is the only valid way to change state: no implicit transitions, no shortcuts, only declared paths.",
+  "conceptualBridge": "The state-arrow-state triple means Precept's transition is a governed permission because the arrow in the gap is literally the `->` declaration in the definition — without it, no path connects the two states.",
+  "status": "exploring",
+  "decision": "Kept: 4.13 avg — the state-arrow-state triple successfully addresses the 53-two-states ambiguity; the arrow in the gap makes the governing permission explicit. Worth refining the proportions or simplifying further to boost the silhouette score.",
+  "tags": ["two-states", "governed-transition", "arrow-gap", "blue-green", "asymmetric"],
+  "palette": ["#060810", "#3050A0", "#1E60D4", "#1FFF7A"],
+  "averageScore": 4.13,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 4,
+    "visualEconomy": 4.5,
+    "monochromeTest": 4,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

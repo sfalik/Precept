@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    RADICAL DEPARTURE — Technical specification / datasheet aesthetic.
+
+    A completely different designer with engineering/industrial influences.
+    No dark background. No glowing code. No geometric icon vocabulary.
+
+    An engineering specification label: black header bar, white body,
+    measurement marks, part identifier in a bracketed box.
+
+    The `.precept` file IS a specification: it declares the exact
+    structure of an entity the way a technical datasheet declares
+    the exact tolerances of a manufactured part. The definition
+    ships with the code the same way a spec ships with a part.
+
+    The -> operator appears as the part's key specification:
+    the governed transformation that every instance must conform to.
+  -->
+
+  <!-- White engineering ground -->
+  <rect width="512" height="512" fill="#F0EDE8"/>
+
+  <!-- Black header band — the spec identifier bar -->
+  <rect x="40" y="44" width="432" height="64" rx="0" fill="#1A1818"/>
+
+  <!-- Header text: PRECEPT SPEC (engineering label style) -->
+  <text
+    x="256" y="90"
+    font-family="'Courier New', 'Consolas', monospace"
+    font-size="32"
+    font-weight="700"
+    fill="#F0EDE8"
+    text-anchor="middle"
+    dominant-baseline="central"
+    letter-spacing="4"
+  >PRECEPT SPECIFICATION</text>
+
+  <!-- Left rule line (engineering drawing style) -->
+  <line x1="40" y1="108" x2="40" y2="468" stroke="#1A1818" stroke-width="3"/>
+  <!-- Right rule line -->
+  <line x1="472" y1="108" x2="472" y2="468" stroke="#1A1818" stroke-width="3"/>
+  <!-- Bottom rule line -->
+  <line x1="40" y1="468" x2="472" y2="468" stroke="#1A1818" stroke-width="3"/>
+
+  <!-- Internal section dividers (horizontal rules in the spec body) -->
+  <line x1="40" y1="192" x2="472" y2="192" stroke="#AAAAAA" stroke-width="1"/>
+  <line x1="40" y1="336" x2="472" y2="336" stroke="#AAAAAA" stroke-width="1"/>
+
+  <!-- Section labels (engineering field labels) -->
+  <text x="56" y="160" font-family="'Courier New', Consolas, monospace" font-size="22"
+    fill="#888880" font-weight="400" letter-spacing="1">TRANSITION OPERATOR</text>
+
+  <!-- The -> in a prominent accent box: the key specification -->
+  <rect x="140" y="214" width="232" height="100" rx="4" fill="#1A1818"/>
+  <text
+    x="256" y="268"
+    font-family="'Cascadia Code', 'Fira Code', 'Courier New', monospace"
+    font-size="80"
+    font-weight="700"
+    fill="#F0EDE8"
+    text-anchor="middle"
+    dominant-baseline="central"
+    font-feature-settings="'calt' 1, 'liga' 1"
+  >-&gt;</text>
+
+  <!-- Lower section: compile-time label -->
+  <text x="56" y="370" font-family="'Courier New', Consolas, monospace" font-size="22"
+    fill="#888880" font-weight="400" letter-spacing="1">ENFORCED AT COMPILE TIME</text>
+
+  <!-- Measurement ticks on the left margin (engineering drawing style) -->
+  <line x1="40" y1="192" x2="52" y2="192" stroke="#1A1818" stroke-width="2"/>
+  <line x1="40" y1="264" x2="52" y2="264" stroke="#1A1818" stroke-width="2"/>
+  <line x1="40" y1="336" x2="52" y2="336" stroke="#1A1818" stroke-width="2"/>
+</svg>

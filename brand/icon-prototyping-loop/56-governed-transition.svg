@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    State before → State after.
+    The transition operator bridges the governed gap between two states.
+
+    The smaller left block is the source state — where we came from.
+    The larger right block is the destination state — where we arrive.
+    The bright arrow in the gap is the governing `->` operator.
+
+    In Precept: the only way to change from one state to another is
+    through an explicitly declared `->` transition. No implicit changes.
+    No shortcuts. The arrow in the gap IS the contract's permission.
+
+    The asymmetry (smaller source, larger destination) suggests
+    arrival — the entity has grown into the destination state.
+  -->
+
+  <rect width="512" height="512" fill="#060810"/>
+
+  <!-- Source state: smaller, dim (where we were) -->
+  <rect x="40" y="188" width="136" height="136" rx="6" fill="#3050A0"/>
+
+  <!-- Governing -> in the gap: bright permission -->
+  <polygon points="210,232 210,280 270,256" fill="#1FFF7A"/>
+  <rect x="176" y="244" width="34" height="24" fill="#1FFF7A"/>
+
+  <!-- Destination state: larger, vivid (where we arrive) -->
+  <rect x="298" y="148" width="174" height="216" rx="6" fill="#1E60D4"/>
+</svg>

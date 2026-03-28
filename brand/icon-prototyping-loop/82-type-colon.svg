@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    The type annotation operator :: (double colon).
+    In type theory and Haskell-family languages, `x :: T` means
+    "x has type T" — a compile-time declaration, not a runtime assertion.
+    Precept's entire .precept file IS a type annotation for the domain:
+    "Entity :: { field types, state types, transition types }."
+    The :: is the structural declaration. It doesn't check anything;
+    it defines what kinds of things are allowed to exist at all.
+
+    Two bold vertical slab-pairs, centered. Pure geometric — no text.
+    Hot coral on dark — a palette not yet used in the set.
+  -->
+
+  <rect width="512" height="512" fill="#0C0808"/>
+
+  <!-- Left double-dot: two bold squares, vertically aligned -->
+  <rect x="148" y="168" width="64" height="64" rx="6" fill="#E84040"/>
+  <rect x="148" y="280" width="64" height="64" rx="6" fill="#E84040"/>
+
+  <!-- Right double-dot -->
+  <rect x="300" y="168" width="64" height="64" rx="6" fill="#E84040"/>
+  <rect x="300" y="280" width="64" height="64" rx="6" fill="#E84040"/>
+</svg>

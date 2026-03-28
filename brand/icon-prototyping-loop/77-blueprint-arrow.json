@@ -1,0 +1,21 @@
+{
+  "filename": "77-blueprint-arrow.svg",
+  "title": "A precision engineering blueprint: the state-transition arrow drawn on blueprint paper with construction lines and dimension marks. Before any building is constructed, the blueprint establishes the exact specification. Precept works the same way — the .precept file is the blueprint, verified at compile time and enforced as law at runtime.",
+  "conceptualBridge": "The blueprint arrow means Precept's contract is the precision specification because a blueprint IS the authority from which everything is built — never improvised, already verified, structurally exact.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: avg 4.31, no hard fails — the blueprint engineering drawing is a radical departure in both color (blue bg) and aesthetic tradition; conceptual bridge 'blueprint IS the authority before construction' is strong and specific; unique in the folder; monochrome test slightly weak but compensated by exceptional color/contrast.",
+  "tags": ["blueprint", "technical-drawing", "arrow", "blue", "grid", "radical-departure"],
+  "palette": ["#0038A0", "#0044B8", "#4488FF", "#FFFFFF"],
+  "averageScore": 4.31,
+  "rubricScores": {
+    "conceptualBridge": 4.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 4,
+    "monochromeTest": 3.5,
+    "colorAndContrast": 5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

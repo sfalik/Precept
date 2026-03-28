@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    Natural deduction inference rule:
+
+         premise
+       ──────────  (rule name)
+        conclusion
+
+    In formal logic, a horizontal line between a premise and conclusion
+    denotes a valid inference step. The line IS the rule — cross it and
+    you have made a certified logical move. Below the line, the conclusion
+    holds with certainty.
+
+    Precept's transitions work identically: given a state + event (premise),
+    the contract's declared rule fires the transition (conclusion). The
+    horizontal rule in the middle is not a separator — it IS the inference.
+    Cross it and the state change is formally valid. Not cross it and the
+    state cannot change at all.
+
+    Form: two horizontal blocks (premise and conclusion) with a bright
+    ruled line between them. Pure geometric — no text. The top block
+    represents the current state (darker, heavier); the bottom block
+    represents the derived next state (slightly lit). The rule line is
+    the declared contract.
+  -->
+
+  <rect width="512" height="512" fill="#0C0F14"/>
+
+  <!-- Premise block: current state + event condition -->
+  <rect x="96" y="128" width="320" height="88" rx="4" fill="#1C2A40"/>
+
+  <!-- Inference rule line: WIDER, bolder — the most dominant element -->
+  <rect x="40" y="242" width="432" height="28" rx="2" fill="#E8A020"/>
+
+  <!-- Conclusion block: the derived next state -->
+  <rect x="96" y="296" width="320" height="88" rx="4" fill="#243248"/>
+</svg>

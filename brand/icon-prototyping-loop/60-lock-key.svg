@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The lock that only accepts the governing operator.
+
+    A solid square block (the state boundary) with an arrow-shaped void
+    (the event interface). The `->` arrow key fits exactly.
+    Nothing else opens this state. No other shape, no other operator.
+
+    This combines 43-void-arrow (arrow void in solid) with a visual
+    separation between "the locked state" and "the unlocking operator."
+
+    Left side: the state block with arrow void — the LOCKED position.
+    Right side: the `->` slab arrow — the KEY that opens it.
+
+    The two forms are shown separated, about to align.
+    Together they produce the valid transition.
+  -->
+
+  <rect width="512" height="512" fill="#060810"/>
+
+  <!-- LEFT SIDE: The state boundary (locked) -->
+  <!-- Solid block with arrow-shaped void -->
+  <rect x="36" y="152" width="212" height="208" rx="6" fill="#5028A8"/>
+
+  <!-- Arrow void in the state block (background color) -->
+  <rect x="60" y="228" width="124" height="56" fill="#060810"/>
+  <polygon points="184,204 184,308 248,256" fill="#060810"/>
+
+  <!-- RIGHT SIDE: The governing -> operator (the key) -->
+  <!-- Slab arrow in matching purple — slightly offset right, ready to fit -->
+  <rect x="272" y="228" width="120" height="56" rx="4" fill="#7040CC"/>
+  <polygon points="392,204 392,308 460,256" fill="#7040CC"/>
+</svg>

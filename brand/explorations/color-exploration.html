@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Precept Brand Color Exploration</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0a; color: #e5e5e5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; padding: 40px; }
+  h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; color: #fff; }
+  .subtitle { color: #888; font-size: 15px; margin-bottom: 48px; }
+  .palette-row { display: flex; gap: 32px; margin-bottom: 56px; flex-wrap: wrap; }
+  .palette-card { width: 320px; background: #141414; border: 1px solid #222; border-radius: 12px; overflow: hidden; }
+  .palette-card h2 { font-size: 16px; font-weight: 600; padding: 20px 20px 4px; }
+  .palette-card .hex { font-size: 13px; color: #888; padding: 0 20px 16px; font-family: ui-monospace, monospace; }
+  .swatch-bar { height: 64px; }
+  .swatch-gradient { height: 32px; display: flex; }
+  .swatch-gradient div { flex: 1; }
+  .context-block { padding: 16px 20px; }
+  .context-block h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 10px; }
+
+  /* Fake NuGet badge */
+  .badge { display: inline-flex; border-radius: 4px; font-size: 12px; font-weight: 600; overflow: hidden; margin-right: 8px; margin-bottom: 6px; }
+  .badge .label { padding: 3px 7px; background: #333; color: #ccc; }
+  .badge .value { padding: 3px 7px; color: #fff; }
+
+  /* Icon mock */
+  .icon-mock { width: 64px; height: 64px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 700; color: #0a0a0a; margin: 8px 0; }
+  .icon-mock-sm { width: 32px; height: 32px; border-radius: 6px; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; color: #0a0a0a; margin-right: 8px; vertical-align: middle; }
+
+  /* Syntax block */
+  .syntax { font-family: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace; font-size: 12px; line-height: 1.7; background: #0d0d0d; border-radius: 6px; padding: 12px 14px; margin: 8px 0; white-space: pre; overflow-x: auto; }
+  .kw { font-weight: 600; } /* keyword color set per palette */
+  .str { color: #ce9178; }
+  .num { color: #b5cea8; }
+  .id { color: #9cdcfe; }
+  .st { color: #dcdcaa; }
+  .op { color: #d4d4d4; }
+  .cmt { color: #6a9955; }
+
+  /* State diagram mock */
+  .diagram { margin: 8px 0; }
+  .diagram svg { width: 100%; }
+
+  .section-label { font-size: 20px; font-weight: 600; margin-bottom: 20px; color: #fff; }
+  .compare-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 40px; }
+  .compare-item { text-align: center; }
+  .compare-item .name { font-size: 12px; color: #888; margin-top: 6px; }
+
+  .note { color: #666; font-size: 13px; font-style: italic; padding: 0 20px 16px; }
+</style>
+</head>
+<body>
+
+<h1>Precept — Brand Color Exploration</h1>
+<p class="subtitle">Each option shown in context: swatch, NuGet badge, icon mock, syntax highlighting keyword color, and state diagram accent.</p>
+
+<!-- ========== OPTION A: DEEP TEAL ========== -->
+<div class="palette-row">
+<div class="palette-card">
+  <div class="swatch-bar" style="background: #0d9488;"></div>
+  <div class="swatch-gradient">
+    <div style="background: #042f2e;"></div>
+    <div style="background: #115e59;"></div>
+    <div style="background: #0d9488;"></div>
+    <div style="background: #14b8a6;"></div>
+    <div style="background: #5eead4;"></div>
+  </div>
+  <h2>A: Deep Teal</h2>
+  <div class="hex">#0D9488 &nbsp; rgb(13, 148, 136)</div>
+  <div class="context-block">
+    <h3>NuGet Badge</h3>
+    <div class="badge"><span class="label">nuget</span><span class="value" style="background: #0d9488;">v1.0.0</span></div>
+    <div class="badge"><span class="label">downloads</span><span class="value" style="background: #0d9488;">42k</span></div>
+  </div>
+  <div class="context-block">
+    <h3>Icon Mock (64px / 32px)</h3>
+    <div style="display:flex; align-items:center; gap:16px;">
+      <div class="icon-mock" style="background: #0d9488;">P</div>
+      <div class="icon-mock-sm" style="background: #0d9488;">P</div>
+      <span style="font-size:13px;color:#888;">on dark bg</span>
+    </div>
+  </div>
+  <div class="context-block">
+    <h3>Syntax Highlighting</h3>
+    <div class="syntax"><span class="kw" style="color:#14b8a6;">precept</span> <span class="st">LoanApplication</span>
+
+<span class="kw" style="color:#14b8a6;">field</span> <span class="id">Amount</span> <span class="kw" style="color:#14b8a6;">as</span> <span class="id">number</span> <span class="kw" style="color:#14b8a6;">default</span> <span class="num">0</span>
+<span class="kw" style="color:#14b8a6;">state</span> <span class="st">Draft</span> <span class="kw" style="color:#14b8a6;">initial</span>
+
+<span class="kw" style="color:#14b8a6;">from</span> <span class="st">Draft</span> <span class="kw" style="color:#14b8a6;">on</span> <span class="st">Submit</span>
+  <span class="op">-></span> <span class="kw" style="color:#14b8a6;">transition</span> <span class="st">Review</span></div>
+  </div>
+  <div class="context-block">
+    <h3>State Diagram Accent</h3>
+    <svg width="280" height="80" viewBox="0 0 280 80">
+      <rect x="8" y="24" width="80" height="32" rx="16" fill="none" stroke="#0d9488" stroke-width="2"/>
+      <text x="48" y="44" text-anchor="middle" fill="#e5e5e5" font-size="12" font-family="system-ui">Draft</text>
+      <line x1="88" y1="40" x2="168" y2="40" stroke="#0d9488" stroke-width="2" marker-end="url(#arrowA)"/>
+      <text x="128" y="32" text-anchor="middle" fill="#5eead4" font-size="10" font-family="monospace">Submit</text>
+      <rect x="168" y="24" width="100" height="32" rx="16" fill="none" stroke="#0d9488" stroke-width="2"/>
+      <text x="218" y="44" text-anchor="middle" fill="#e5e5e5" font-size="12" font-family="system-ui">Review</text>
+      <defs><marker id="arrowA" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0d9488"/></marker></defs>
+    </svg>
+  </div>
+  <p class="note">Cool precision. Between trust (blue) and validity (green). Underused in .NET.</p>
+</div>
+
+<!-- ========== OPTION B: AMBER / WARM GOLD ========== -->
+<div class="palette-card">
+  <div class="swatch-bar" style="background: #d97706;"></div>
+  <div class="swatch-gradient">
+    <div style="background: #451a03;"></div>
+    <div style="background: #92400e;"></div>
+    <div style="background: #d97706;"></div>
+    <div style="background: #f59e0b;"></div>
+    <div style="background: #fbbf24;"></div>
+  </div>
+  <h2>B: Amber / Warm Gold</h2>
+  <div class="hex">#D97706 &nbsp; rgb(217, 119, 6)</div>
+  <div class="context-block">
+    <h3>NuGet Badge</h3>
+    <div class="badge"><span class="label">nuget</span><span class="value" style="background: #d97706;">v1.0.0</span></div>
+    <div class="badge"><span class="label">downloads</span><span class="value" style="background: #d97706;">42k</span></div>
+  </div>
+  <div class="context-block">
+    <h3>Icon Mock (64px / 32px)</h3>
+    <div style="display:flex; align-items:center; gap:16px;">
+      <div class="icon-mock" style="background: #d97706;">P</div>
+      <div class="icon-mock-sm" style="background: #d97706;">P</div>
+      <span style="font-size:13px;color:#888;">on dark bg</span>
+    </div>
+  </div>
+  <div class="context-block">
+    <h3>Syntax Highlighting</h3>
+    <div class="syntax"><span class="kw" style="color:#f59e0b;">precept</span> <span class="st">LoanApplication</span>
+
+<span class="kw" style="color:#f59e0b;">field</span> <span class="id">Amount</span> <span class="kw" style="color:#f59e0b;">as</span> <span class="id">number</span> <span class="kw" style="color:#f59e0b;">default</span> <span class="num">0</span>
+<span class="kw" style="color:#f59e0b;">state</span> <span class="st">Draft</span> <span class="kw" style="color:#f59e0b;">initial</span>
+
+<span class="kw" style="color:#f59e0b;">from</span> <span class="st">Draft</span> <span class="kw" style="color:#f59e0b;">on</span> <span class="st">Submit</span>
+  <span class="op">-></span> <span class="kw" style="color:#f59e0b;">transition</span> <span class="st">Review</span></div>
+  </div>
+  <div class="context-block">
+    <h3>State Diagram Accent</h3>
+    <svg width="280" height="80" viewBox="0 0 280 80">
+      <rect x="8" y="24" width="80" height="32" rx="16" fill="none" stroke="#d97706" stroke-width="2"/>
+      <text x="48" y="44" text-anchor="middle" fill="#e5e5e5" font-size="12" font-family="system-ui">Draft</text>
+      <line x1="88" y1="40" x2="168" y2="40" stroke="#d97706" stroke-width="2" marker-end="url(#arrowB)"/>
+      <text x="128" y="32" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="monospace">Submit</text>
+      <rect x="168" y="24" width="100" height="32" rx="16" fill="none" stroke="#d97706" stroke-width="2"/>
+      <text x="218" y="44" text-anchor="middle" fill="#e5e5e5" font-size="12" font-family="system-ui">Review</text>
+      <defs><marker id="arrowB" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker></defs>
+    </svg>
+  </div>
+  <p class="note">Authority and permanence. "Inscribed law" feeling. Stands out against .NET purple.</p>
+</div>
+
+<!-- ========== OPTION C: DEEP INDIGO ========== -->
+<div class="palette-card">
+  <div class="swatch-bar" style="background: #4338ca;"></div>
+  <div class="swatch-gradient">
+    <div style="background: #1e1b4b;"></div>
+    <div style="background: #3730a3;"></div>
+    <div style="background: #4338ca;"></div>
+    <div style="background: #6366f1;"></div>
+    <div style="background: #a5b4fc;"></div>
+  </div>
+  <h2>C: Deep Indigo</h2>
+  <div class="hex">#4338CA &nbsp; rgb(67, 56, 202)</div>
+  <div class="context-block">
+    <h3>NuGet Badge</h3>
+    <div class="badge"><span class="label">nuget</span><span class="value" style="background: #4338ca;">v1.0.0</span></div>
+    <div class="badge"><span class="label">downloads</span><span class="value" style="background: #4338ca;">42k</span></div>
+  </div>
+  <div class="context-block">
+    <h3>Icon Mock (64px / 32px)</h3>
+    <div style="display:flex; align-items:center; gap:16px;">
+      <div class="icon-mock" style="background: #4338ca;">P</div>
+      <div class="icon-mock-sm" style="background: #4338ca;">P</div>
+      <span style="font-size:13px;color:#888;">on dark bg</span>
+    </div>
+  </div>
+  <div class="context-block">
+    <h3>Syntax Highlighting</h3>
+    <div class="syntax"><span class="kw" style="color:#818cf8;">precept</span> <span class="st">LoanApplication</span>
+
+<span class="kw" style="color:#818cf8;">field</span> <span class="id">Amount</span> <span class="kw" style="color:#818cf8;">as</span> <span class="id">number</span> <span class="kw" style="color:#818cf8;">default</span> <span class="num">0</span>
+<span class="kw" style="color:#818cf8;">state</span> <span class="st">Draft</span> <span class="kw" style="color:#818cf8;">initial</span>
+
+<span class="kw" style="color:#818cf8;">from</span> <span class="st">Draft</span> <span class="kw" style="color:#818cf8;">on</span> <span class="st">Submit</span>
+  <span class="op">-></span> <span class="kw" style="color:#818cf8;">transition</span> <span class="st">Review</span></div>
+  </div>
+  <div class="context-block">
+    <h3>State Diagram Accent</h3>
+    <svg width="280" height="80" viewBox="0 0 280 80">
+      <rect x="8" y="24" width="80" height="32" rx="16" fill="none" stroke="#4338ca" stroke-width="2"/>
+      <text x="48" y="44" text-anchor="middle" fill="#e5e5e5" font-size="12" font-family="system-ui">Draft</text>
+      <line x1="88" y1="40" x2="168" y2="40" stroke="#4338ca" stroke-width="2" marker-end="url(#arrowC)"/>
+      <text x="128" y="32" text-anchor="middle" fill="#a5b4fc" font-size="10" font-family="monospace">Submit</text>
+      <rect x="168" y="24" width="100" height="32" rx="16" fill="none" stroke="#4338ca" stroke-width="2"/>
+      <text x="218" y="44" text-anchor="middle" fill="#e5e5e5" font-size="12" font-family="system-ui">Review</text>
+      <defs><marker id="arrowC" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4338ca"/></marker></defs>
+    </svg>
+  </div>
+  <p class="note">Depth and authority. Stripe's "blurple" approach. Risk: close to .NET's own purple.</p>
+</div>
+</div>
+
+<!-- ========== ROW 2: MONOCHROME + STEEL + BONUS ========== -->
+<div class="palette-row">
+<div class="palette-card">
+  <div class="swatch-bar" style="background: linear-gradient(90deg, #fff 0%, #a3a3a3 50%, #262626 100%);"></div>
+  <div class="swatch-gradient">
+    <div style="background: #0a0a0a;"></div>
+    <div style="background: #262626;"></div>
+    <div style="background: #525252;"></div>
+    <div style="background: #a3a3a3;"></div>
+    <div style="background: #e5e5e5;"></div>
+  </div>
+  <h2>D: Monochrome</h2>
+  <div class="hex">No accent color — black, white, grays only</div>
+  <div class="context-block">
+    <h3>NuGet Badge</h3>
+    <div class="badge"><span class="label">nuget</span><span class="value" style="background: #525252;">v1.0.0</span></div>
+    <div class="badge"><span class="label">downloads</span><span class="value" style="background: #525252;">42k</span></div>
+  </div>
+  <div class="context-block">
+    <h3>Icon Mock (64px / 32px)</h3>
+    <div style="display:flex; align-items:center; gap:16px;">
+      <div class="icon-mock" style="background: #e5e5e5;">P</div>
+      <div class="icon-mock-sm" style="background: #e5e5e5;">P</div>
+      <span style="font-size:13px;color:#888;">on dark bg</span>
+    </div>
+  </div>
+  <div class="context-block">
+    <h3>Syntax Highlighting</h3>
+    <div class="syntax"><span class="kw" style="color:#e5e5e5; font-weight:700;">precept</span> <span class="st">LoanApplication</span>
+
+<span class="kw" style="color:#e5e5e5; font-weight:700;">field</span> <span class="id">Amount</span> <span class="kw" style="color:#e5e5e5; font-weight:700;">as</span> <span class="id">number</span> <span class="kw" style="color:#e5e5e5; font-weight:700;">default</span> <span class="num">0</span>
+<span class="kw" style="color:#e5e5e5; font-weight:700;">state</span> <span class="st">Draft</span> <span class="kw" style="color:#e5e5e5; font-weight:700;">initial</span>
+
+<span class="kw" style="color:#e5e5e5; font-weight:700;">from</span> <span class="st">Draft</span> <span class="kw" style="color:#e5e5e5; font-weight:700;">on</span> <span class="st">Submit</span>
+  <span class="op">-></span> <span class="kw" style="color:#e5e5e5; font-weight:700;">transition</span> <span class="st">Review</span></div>
+  </div>
+  <div class="context-block">
+    <h3>State Diagram Accent</h3>
+    <svg width="280" height="80" viewBox="0 0 280 80">
+      <rect x="8" y="24" width="80" height="32" rx="16" fill="none" stroke="#a3a3a3" stroke-width="2"/>
+      <text x="48" y="44" text-anchor="middle" fill="#e5e5e5" font-size="12" font-family="system-ui">Draft</text>
+      <line x1="88" y1="40" x2="168" y2="40" stroke="#a3a3a3" stroke-width="2" marker-end="url(#arrowD)"/>
+      <text x="128" y="32" text-anchor="middle" fill="#d4d4d4" font-size="10" font-family="monospace">Submit</text>
+      <rect x="168" y="24" width="100" height="32" rx="16" fill="none" stroke="#a3a3a3" stroke-width="2"/>
+      <text x="218" y="44" text-anchor="middle" fill="#e5e5e5" font-size="12" font-family="system-ui">Review</text>
+      <defs><marker id="arrowD" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#a3a3a3"/></marker></defs>
+    </svg>
+  </div>
+  <p class="note">Next.js approach. Extreme confidence. Needs a very strong icon to compensate.</p>
+</div>
+
+<div class="palette-card">
+  <div class="swatch-bar" style="background: #475569;"></div>
+  <div class="swatch-gradient">
+    <div style="background: #0f172a;"></div>
+    <div style="background: #1e293b;"></div>
+    <div style="background: #475569;"></div>
+    <div style="background: #94a3b8;"></div>
+    <div style="background: #cbd5e1;"></div>
+  </div>
+  <h2>E: Slate / Steel</h2>
+  <div class="hex">#475569 &nbsp; rgb(71, 85, 105)</div>
+  <div class="context-block">
+    <h3>NuGet Badge</h3>
+    <div class="badge"><span class="label">nuget</span><span class="value" style="background: #475569;">v1.0.0</span></div>
+    <div class="badge"><span class="label">downloads</span><span class="value" style="background: #475569;">42k</span></div>
+  </div>
+  <div class="context-block">
+    <h3>Icon Mock (64px / 32px)</h3>
+    <div style="display:flex; align-items:center; gap:16px;">
+      <div class="icon-mock" style="background: #64748b;">P</div>
+      <div class="icon-mock-sm" style="background: #64748b;">P</div>
+      <span style="font-size:13px;color:#888;">on dark bg</span>
+    </div>
+  </div>
+  <div class="context-block">
+    <h3>Syntax Highlighting</h3>
+    <div class="syntax"><span class="kw" style="color:#94a3b8;">precept</span> <span class="st">LoanApplication</span>
+
+<span class="kw" style="color:#94a3b8;">field</span> <span class="id">Amount</span> <span class="kw" style="color:#94a3b8;">as</span> <span class="id">number</span> <span class="kw" style="color:#94a3b8;">default</span> <span class="num">0</span>
+<span class="kw" style="color:#94a3b8;">state</span> <span class="st">Draft</span> <span class="kw" style="color:#94a3b8;">initial</span>
+
+<span class="kw" style="color:#94a3b8;">from</span> <span class="st">Draft</span> <span class="kw" style="color:#94a3b8;">on</span> <span class="st">Submit</span>
+  <span class="op">-></span> <span class="kw" style="color:#94a3b8;">transition</span> <span class="st">Review</span></div>
+  </div>
+  <div class="context-block">
+    <h3>State Diagram Accent</h3>
+    <svg width="280" height="80" viewBox="0 0 280 80">
+      <rect x="8" y="24" width="80" height="32" rx="16" fill="none" stroke="#475569" stroke-width="2"/>
+      <text x="48" y="44" text-anchor="middle" fill="#e5e5e5" font-size="12" font-family="system-ui">Draft</text>
+      <line x1="88" y1="40" x2="168" y2="40" stroke="#475569" stroke-width="2" marker-end="url(#arrowE)"/>
+      <text x="128" y="32" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="monospace">Submit</text>
+      <rect x="168" y="24" width="100" height="32" rx="16" fill="none" stroke="#475569" stroke-width="2"/>
+      <text x="218" y="44" text-anchor="middle" fill="#e5e5e5" font-size="12" font-family="system-ui">Review</text>
+      <defs><marker id="arrowE" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker></defs>
+    </svg>
+  </div>
+  <p class="note">Structural material. Steel, brushed metal. Permanent but low-saturation.</p>
+</div>
+
+<!-- ========== BONUS: AMBER + SLATE COMBO ========== -->
+<div class="palette-card">
+  <div class="swatch-bar" style="background: linear-gradient(90deg, #d97706, #475569);"></div>
+  <div class="swatch-gradient">
+    <div style="background: #1e293b;"></div>
+    <div style="background: #475569;"></div>
+    <div style="background: #d97706;"></div>
+    <div style="background: #f59e0b;"></div>
+    <div style="background: #fbbf24;"></div>
+  </div>
+  <h2>F: Amber on Slate (combo)</h2>
+  <div class="hex">Accent #D97706 on structural #475569</div>
+  <div class="context-block">
+    <h3>NuGet Badge</h3>
+    <div class="badge"><span class="label" style="background:#475569;">nuget</span><span class="value" style="background: #d97706;">v1.0.0</span></div>
+    <div class="badge"><span class="label" style="background:#475569;">downloads</span><span class="value" style="background: #d97706;">42k</span></div>
+  </div>
+  <div class="context-block">
+    <h3>Icon Mock (64px / 32px)</h3>
+    <div style="display:flex; align-items:center; gap:16px;">
+      <div class="icon-mock" style="background: #1e293b; border: 2px solid #475569; position: relative;">
+        <span style="color: #f59e0b; font-size: 32px; font-weight: 700;">P</span>
+      </div>
+      <div class="icon-mock-sm" style="background: #1e293b; border: 2px solid #475569;">
+        <span style="color: #f59e0b; font-size: 16px; font-weight: 700;">P</span>
+      </div>
+      <span style="font-size:13px;color:#888;">amber on slate</span>
+    </div>
+  </div>
+  <div class="context-block">
+    <h3>Syntax Highlighting</h3>
+    <div class="syntax"><span class="kw" style="color:#f59e0b;">precept</span> <span class="st">LoanApplication</span>
+
+<span class="kw" style="color:#94a3b8;">field</span> <span class="id">Amount</span> <span class="kw" style="color:#94a3b8;">as</span> <span class="id">number</span> <span class="kw" style="color:#94a3b8;">default</span> <span class="num">0</span>
+<span class="kw" style="color:#94a3b8;">state</span> <span class="st">Draft</span> <span class="kw" style="color:#94a3b8;">initial</span>
+
+<span class="kw" style="color:#94a3b8;">from</span> <span class="st">Draft</span> <span class="kw" style="color:#f59e0b;">on</span> <span class="st">Submit</span>
+  <span class="op">-></span> <span class="kw" style="color:#f59e0b;">transition</span> <span class="st">Review</span></div>
+  </div>
+  <div class="context-block">
+    <h3>State Diagram Accent</h3>
+    <svg width="280" height="80" viewBox="0 0 280 80">
+      <rect x="8" y="24" width="80" height="32" rx="16" fill="none" stroke="#475569" stroke-width="2"/>
+      <text x="48" y="44" text-anchor="middle" fill="#e5e5e5" font-size="12" font-family="system-ui">Draft</text>
+      <line x1="88" y1="40" x2="168" y2="40" stroke="#d97706" stroke-width="2" marker-end="url(#arrowF)"/>
+      <text x="128" y="32" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="monospace">Submit</text>
+      <rect x="168" y="24" width="100" height="32" rx="16" fill="none" stroke="#475569" stroke-width="2"/>
+      <text x="218" y="44" text-anchor="middle" fill="#e5e5e5" font-size="12" font-family="system-ui">Review</text>
+      <defs><marker id="arrowF" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker></defs>
+    </svg>
+  </div>
+  <p class="note">Warm rules inscribed in structural material. States = steel, transitions = gold. Two-color system.</p>
+</div>
+</div>
+
+<div style="margin-top:32px; padding:24px; background:#141414; border:1px solid #222; border-radius:12px; max-width:700px;">
+  <h3 style="color:#fff; margin-bottom:12px;">How to evaluate</h3>
+  <ul style="color:#aaa; font-size:14px; line-height:1.8; padding-left:20px;">
+    <li><strong>Badge visibility</strong> — which stands out in a NuGet search results page (mostly white/light bg)?</li>
+    <li><strong>Syntax keyword color</strong> — which feels most natural as the DSL keyword color you'd see daily?</li>
+    <li><strong>State diagram</strong> — which accent makes the transition arrows most readable?</li>
+    <li><strong>Icon at 32px</strong> — which is still visible and distinctive at VS Code sidebar scale?</li>
+    <li><strong>.NET ecosystem fit</strong> — teal, amber, and indigo each break from .NET's purple in different ways.</li>
+  </ul>
+</div>
+
+</body>
+</html>

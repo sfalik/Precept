@@ -1,0 +1,21 @@
+{
+  "filename": "59-simple-dial.svg",
+  "title": "A simplified precision dial: three heavy tick marks at the only declared state positions, a bold needle pointing to the current state. The simplification from 58-state-dial eliminates all subdivisions — there are no intermediate positions because Precept only declares what exists. The void arc between tick marks is not empty space but structural absence.",
+  "conceptualBridge": "The three-tick dial means Precept's states are the only positions that exist because the definition declares exactly three — the dial has no intermediate marks because no intermediate states are declared, and the needle always reads exactly one.",
+  "status": "exploring",
+  "decision": "Kept: 4.06 avg — the simplified dial passes threshold; the instrument aesthetic is new and the three-tick + needle form is legible. The monochrome test weakness (3.5) suggests this needs either stronger monochrome differentiation between ticks and needle, or acceptance that the color is load-bearing.",
+  "tags": ["precision-dial", "instrument", "needle", "three-states", "circular", "simplified"],
+  "palette": ["#0C0E12", "#3A4A60", "#E8E0D0", "#1FFF7A"],
+  "averageScore": 4.06,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 4.5,
+    "monochromeTest": 3.5,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

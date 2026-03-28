@@ -1,0 +1,21 @@
+{
+  "filename": "58-state-dial.svg",
+  "title": "A precision instrument dial showing exactly five valid state positions with a needle pointing at one. The valid states are the only marked positions on the dial; the needle always points to exactly one — the current state. This is Precept's determinism made visual: the same definition and data always produce the same reading, and the only readings that exist are the ones declared in the contract.",
+  "conceptualBridge": "The precision dial means Precept's definition declares the only valid states because a calibrated instrument only has marked positions at values that exist — the needle can only point at declared states, and Precept structurally prevents any other reading.",
+  "status": "rejected",
+  "decision": "Rejected: 3.81 avg below threshold — the dial's thin lines and many elements fail at small scale; legibility at 32px is 3 (minimum) and visual economy score of 3 indicates over-complexity. The 'precision instrument' concept is worth revisiting with a much simpler form: just the ring + 3 bold tick marks + needle, no subdivisions.",
+  "tags": ["radical-departure", "precision-dial", "instrument", "needle", "state-positions", "circular"],
+  "palette": ["#0C0E12", "#141820", "#E8E0D0", "#1FFF7A", "#3A4A60"],
+  "averageScore": 3.81,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 3,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 3,
+    "monochromeTest": 3.5,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

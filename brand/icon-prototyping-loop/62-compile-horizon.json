@@ -1,0 +1,21 @@
+{
+  "filename": "62-compile-horizon.svg",
+  "title": "The compile-time horizon: a bright vertical bar divides definition time (left) from runtime (right). The left side shows the governing contract as colored bands — declarations in blue, transition rules in amber, the key governing rule in bright green. The right side is void except for a faint echo of the permitted rule. Precept's compiler draws this line: everything before it is the definition; everything after is only what the definition permits.",
+  "conceptualBridge": "The compile-time horizon means Precept's verification is the boundary that separates definition from execution because the compiler's check draws an impenetrable line — nothing invalid can cross it into runtime, only what the contract explicitly declares.",
+  "status": "rejected",
+  "decision": "Rejected: 3.94 avg just below threshold — the compile-horizon concept is valid but the execution is too busy (7 bands + divider + echo); monochrome test is weak (3.5). A stronger iteration would reduce to 3 bands max and make the divider bolder relative to the bands.",
+  "tags": ["compile-time", "horizon", "divider", "code-bands", "multi-color", "separation"],
+  "palette": ["#0A0C12", "#4A7AC0", "#C89840", "#1FFF7A", "#E8E0D0"],
+  "averageScore": 3.94,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 4,
+    "visualEconomy": 3.5,
+    "monochromeTest": 3.5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

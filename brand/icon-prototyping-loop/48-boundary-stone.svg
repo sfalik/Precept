@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    RADICAL DEPARTURE — Lithic aesthetic.
+    A shard of stone with a single deeply carved groove.
+
+    Ancient boundary stones bore one mark: the incised line that said
+    "this is the edge of the law." Precept's definition is this:
+    one carved rule that holds permanently in the material,
+    impossible to fill in, impossible to erase at runtime.
+
+    The stone is not a rectangle — it has irregular broken edges,
+    like a fragment of something larger and more ancient than the
+    application. The groove cuts straight across its face:
+    one precept, carved once, in force forever.
+
+    No code. No glow. No dark terminal. Just matter and incision.
+    A completely different aesthetic vocabulary.
+  -->
+
+  <!-- Slate-black ground -->
+  <rect width="512" height="512" fill="#0D0C10"/>
+
+  <defs>
+    <filter id="stone-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="4" dy="6" stdDeviation="12" flood-color="#000000" flood-opacity="0.7"/>
+    </filter>
+    <!-- Subtle stone texture via turbulence -->
+    <filter id="stone-texture" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" seed="4" result="noise"/>
+      <feColorMatrix type="saturate" values="0" in="noise" result="gray-noise"/>
+      <feComposite in="SourceGraphic" in2="gray-noise" operator="arithmetic" k1="0" k2="0.92" k3="0.08" k4="0"/>
+    </filter>
+  </defs>
+
+  <!-- Stone slab: irregular polygon — a broken fragment, not a neat rectangle -->
+  <polygon
+    points="
+      88,72
+      424,64
+      440,108
+      448,420
+      380,448
+      72,436
+      60,392
+      68,108
+    "
+    fill="#4A4640"
+    filter="url(#stone-shadow)"
+  />
+
+  <!-- Stone face: slightly lighter surface -->
+  <polygon
+    points="
+      88,72
+      424,64
+      440,108
+      448,420
+      380,448
+      72,436
+      60,392
+      68,108
+    "
+    fill="#524E48"
+  />
+
+  <!-- Carved groove: a horizontal incision across the stone face -->
+  <!-- The groove is the precept — the single governing mark in the material -->
+  <!-- Slightly irregular path for carved feel: not a perfect rect but carved -->
+  <path
+    d="M 80,238 C 120,235 200,234 256,236 S 360,238 432,236
+       L 432,262 C 392,265 300,266 256,264 S 140,263 80,266 Z"
+    fill="#1A1818"
+  />
+
+  <!-- Shadow inside the groove for depth -->
+  <path
+    d="M 80,238 C 120,235 200,234 256,236 S 360,238 432,236
+       L 432,244 C 392,242 300,241 256,242 S 140,242 80,245 Z"
+    fill="#0C0A0A"
+    opacity="0.7"
+  />
+</svg>

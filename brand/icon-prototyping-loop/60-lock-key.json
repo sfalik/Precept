@@ -1,0 +1,21 @@
+{
+  "filename": "60-lock-key.svg",
+  "title": "A state boundary with an arrow-shaped void (the lock) alongside the governing `->` operator (the key). The void's exact shape matches the key exactly. Nothing else opens this state — no other operator, no other shape, no implicit path. This is Precept's from…on…-> triple made iconic: the state has exactly one interface, the event provides the key, and the transition fires only when they align.",
+  "conceptualBridge": "The lock-key arrow means Precept's transition requires exact structural alignment because the state boundary has an arrow-shaped void that only admits the declared `->` operator — nothing else fits, and nothing else was ever declared.",
+  "status": "rejected",
+  "decision": "Superseded by 61-lock-key-v2 (avg 4.63) which uses identical concept with bolder proportions that survive 32px compression; keeping only the stronger variant preserves curated-set diversity.",
+  "tags": ["lock-key", "void-arrow", "slab-arrow", "purple", "governed-interface", "two-element"],
+  "palette": ["#060810", "#5028A8", "#7040CC"],
+  "averageScore": 4.25,
+  "rubricScores": {
+    "conceptualBridge": 4.5,
+    "structuralSoundness": 4.5,
+    "legibilityAtSmallSize": 3.5,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 4,
+    "monochromeTest": 4,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

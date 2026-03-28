@@ -1,0 +1,21 @@
+{
+  "filename": "50-precept-cursor.svg",
+  "title": "The first line of every Precept definition: `precept Entity`. This is the moment when the contract comes into existence. The `precept` keyword is in VS Code blue; the entity name is in amber; the blinking cursor is the bright accent mark that says 'this definition is actively being authored.' The icon captures the one instant before the compiler compiles — the authorship moment that begins the governing contract.",
+  "conceptualBridge": "The `precept Entity|` cursor means Precept's definition IS the product because every governed entity begins with this exact line — the icon is not the tool's UI but the act of creating a governing contract.",
+  "status": "rejected",
+  "decision": "Rejected: legibility hard fail — `precept Entity` text at 96px font renders as ~6px at 32px scale; completely unreadable. The concept of authorship/declaration is worth revisiting with a 1-2 character symbol rather than multi-word text.",
+  "tags": ["code-aesthetic", "declaration", "cursor", "authorship", "multi-color"],
+  "palette": ["#1A1A1A", "#569CD6", "#DCDCAA", "#1FFF7A"],
+  "averageScore": 2.5,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 3,
+    "legibilityAtSmallSize": 2,
+    "distinctSilhouette": 3,
+    "visualEconomy": 3,
+    "monochromeTest": 3,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

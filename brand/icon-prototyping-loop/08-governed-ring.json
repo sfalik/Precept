@@ -1,14 +1,22 @@
 {
   "filename": "08-governed-ring.svg",
-  "title": "A solid ring represents the complete, self-contained Precept definition; three precisely cut channels at 120° are the only structural paths through it — CreateInstance, Fire, Inspect. Invalid states have no opening, so they cannot exist.",
+  "title": "A solid ring (annulus) with three precisely cut channels at 120° intervals. The ring represents the complete, self-contained Precept definition; the channels are the only structural paths through it (CreateInstance, Fire, Inspect). Invalid states cannot exist because there is no structural opening for them.",
   "conceptualBridge": "The governed ring means valid operations are structural openings because anything not cut into the contract simply has no path.",
-  "status": "shortlisted",
-  "decision": "Shortlisted for clearly encoding governed entry points inside a single self-contained form.",
+  "status": "rejected",
+  "decision": "Rejected on rescore: avg 3.69 below threshold — the three-channel ring concept requires knowing Precept's three operations to decode; the ring-with-notches silhouette is used by several other developer tools (Kubernetes, etc.) and doesn't read as specifically Precept; uniqueness and conceptual bridge both score below 4.",
   "tags": ["circular", "ring", "governed-paths", "operations"],
   "palette": ["#0D1018", "#192A4A", "#213658", "#3D8FFF"],
-  "averageScore": 4.1,
-  "rubricScores": null,
-  "scoreDetailStatus": "average-only",
-  "needsRescore": true,
-  "metadataOrigin": "backfilled"
+  "averageScore": 3.69,
+  "rubricScores": {
+    "conceptualBridge": 3,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 4,
+    "monochromeTest": 3.5,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 3.5
+  },
+  "needsRescore": false,
+  "metadataOrigin": "backfilled, rescored"
 }

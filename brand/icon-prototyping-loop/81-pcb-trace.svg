@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    RADICAL DEPARTURE — PCB Trace (v2, simplified).
+
+    A copper trace on a PCB substrate: bold, minimal, without grid noise.
+    The trace routes from the origin pad (left) through a right-angle turn
+    to a termination via (right-upper) — the sole declared signal path.
+    The via circle with punched hole is the definitive PCB element:
+    the declared destination.
+  -->
+
+  <rect width="512" height="512" fill="#0A1A0A"/>
+
+  <!-- Horizontal trace segment -->
+  <rect x="72" y="235" width="258" height="28" rx="4" fill="#C87820"/>
+
+  <!-- Origin pad (SMD square pad) -->
+  <rect x="56" y="218" width="52" height="62" rx="5" fill="#C87820"/>
+
+  <!-- Right-angle elbow: diagonal up-right -->
+  <line x1="318" y1="249" x2="418" y2="164"
+        stroke="#C87820" stroke-width="28" stroke-linecap="round"/>
+
+  <!-- Arrowhead at destination: two angled arms -->
+  <line x1="372" y1="122" x2="422" y2="165"
+        stroke="#C87820" stroke-width="28" stroke-linecap="round"/>
+  <line x1="372" y1="200" x2="422" y2="165"  
+        stroke="#C87820" stroke-width="28" stroke-linecap="round"/>
+
+  <!-- Destination via: annular ring (outer fill, inner punch) -->
+  <circle cx="422" cy="165" r="26" fill="#C87820"/>
+  <circle cx="422" cy="165" r="13" fill="#0A1A0A"/>
+</svg>

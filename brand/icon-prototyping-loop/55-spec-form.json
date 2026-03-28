@@ -1,0 +1,21 @@
+{
+  "filename": "55-spec-form.svg",
+  "title": "The industrial specification form reduced to pure geometry. A white-ground composition with a black header band, framing borders, and a central box containing the `->` operator. The form IS a specification sheet: the header identifies the category, the frame bounds the governed domain, the central box is the specified operation. No text needed — the structural arrangement communicates 'this is a formal declaration.'",
+  "conceptualBridge": "The specification form means Precept's definition is a formal declaration because the framed structure with a header identifies the contract the way an engineering spec sheet identifies its subject — bounded, categorized, and centered on the one thing it specifies.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: 4.5 avg — the abstract specification form works without text; white-background industrial aesthetic is completely new to the set; the white/black contrast is maximum; at 32px the header band + central box reads as a framed formal declaration. Near the top of the set.",
+  "tags": ["radical-departure", "specification", "industrial", "white-background", "framed", "abstract"],
+  "palette": ["#F2EFE8", "#141210"],
+  "averageScore": 4.5,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 4.5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

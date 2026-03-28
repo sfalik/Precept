@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    The pipe-forward operator |> as a heavy structural form.
+    In functional languages, |> means "pipe this value through this function."
+    In Precept, every event declaration pipes the current state through the
+    contract's rules to produce a validated next state.
+    The vertical bar is the gate; the chevron is the directed output.
+    The operator is the entire logic of "from … on … transition to."
+  -->
+
+  <rect width="512" height="512" fill="#0D0906"/>
+
+  <!-- The | (pipe): tall vertical slab -->
+  <rect x="134" y="120" width="40" height="272" rx="4" fill="#C87840"/>
+
+  <!-- The > (chevron): two thick angled arms meeting at a point -->
+  <!-- Upper arm: from left (x=212, y=152) to tip (x=400, y=256) -->
+  <line x1="212" y1="152" x2="400" y2="256"
+        stroke="#C87840" stroke-width="30" stroke-linecap="round"/>
+  <!-- Lower arm: from left (x=212, y=360) to tip (x=400, y=256) -->
+  <line x1="212" y1="360" x2="400" y2="256"
+        stroke="#C87840" stroke-width="30" stroke-linecap="round"/>
+</svg>

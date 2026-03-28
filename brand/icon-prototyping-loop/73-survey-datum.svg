@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    RADICAL DEPARTURE — Survey Datum Mark (v2, simplified).
+
+    A surveyor's benchmark: an equilateral triangle with a bold dot at the
+    centroid — the immovable datum point. Precept's compiled definition IS
+    the datum: a fixed reference from which all valid runtime states are
+    derived. If the datum holds, every measurement is exact. If it moves,
+    all results become invalid.
+
+    v2: removed the stone tablet and crosshair for cleaner large/small read.
+    Bold triangle outline + filled datum circle. Gold on dark.
+  -->
+
+  <rect width="512" height="512" fill="#0A0C10"/>
+
+  <!-- Bold equilateral triangle — the inscribed benchmark form.
+       Apex: (256, 96), Base left: (68, 424), Base right: (444, 424)
+  -->
+  <polygon
+    points="256,96 444,424 68,424"
+    fill="none"
+    stroke="#C8A84A"
+    stroke-width="28"
+    stroke-linejoin="round"
+    stroke-linecap="round"/>
+
+  <!-- Centroid: y = (96 + 424 + 424)/3 = 314.7, x = 256 -->
+  <!-- Bold datum circle at centroid — the exact fixed point -->
+  <circle cx="256" cy="315" r="22" fill="#C8A84A"/>
+</svg>

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The denotation brackets ⟦ ⟧ — "the meaning of the program."
+    Constructed as pure geometric slabs (not text).
+
+    In denotational semantics, ⟦P⟧ reads as "the meaning of program P."
+    Precept's .precept file IS the meaning of the entity — the complete
+    denotation of its behavior, written once, compiled once, valid forever.
+
+    The outer bars are the walls of the meaning: the total governed scope.
+    The inner bars are the precision indicator: the exact structural boundaries
+    that make this a semantic specification, not a loose description.
+
+    The content between the inner bars is the entity's behavior —
+    visible, inspectable, exact.
+
+    Constructed from 4 slabs:
+      Left: outer bar + inner bar (forming ⟦)
+      Right: outer bar + inner bar (forming ⟧)
+    Vertically centered, horizontally symmetric.
+
+    Deep cobalt blue — new to the active set.
+  -->
+
+  <rect width="512" height="512" fill="#060810"/>
+
+  <!-- Left double-bracket ⟦: outer bar + inner bar -->
+  <!-- Outer bar (leftmost) -->
+  <rect x="96"  y="100" width="44" height="312" rx="6" fill="#2050C8"/>
+  <!-- Inner bar (slightly right, same height) -->
+  <rect x="154" y="100" width="28" height="312" rx="6" fill="#2050C8"/>
+
+  <!-- Right double-bracket ⟧: inner bar + outer bar (mirrored) -->
+  <!-- Inner bar -->
+  <rect x="330" y="100" width="28" height="312" rx="6" fill="#2050C8"/>
+  <!-- Outer bar (rightmost) -->
+  <rect x="372" y="100" width="44" height="312" rx="6" fill="#2050C8"/>
+
+  <!-- Horizontal caps connecting the double bars at top and bottom -->
+  <rect x="96"  y="100" width="86"  height="28" rx="4" fill="#2050C8"/>
+  <rect x="96"  y="384" width="86"  height="28" rx="4" fill="#2050C8"/>
+  <rect x="330" y="100" width="86"  height="28" rx="4" fill="#2050C8"/>
+  <rect x="330" y="384" width="86"  height="28" rx="4" fill="#2050C8"/>
+</svg>

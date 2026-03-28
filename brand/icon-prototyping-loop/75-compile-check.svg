@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    The compile-time check mark — not a validation indicator but an
+    architectural assertion. A heavy slab checkmark (✓) where the two
+    arms are thick geometric bars meeting at a precise angle.
+
+    Precept checks your rules at COMPILE TIME, not runtime. The tick
+    is not "this ran and succeeded" — it is "this was structurally
+    verified at definition time; the invalid state cannot be reached."
+
+    The tick IS the prevention. It doesn't confirm a result; it declares
+    that an entire class of errors has been made architecturally impossible.
+    Bold, dark, permanent. Not a UI indicator — a structural mark.
+  -->
+
+  <rect width="512" height="512" fill="#060A0E"/>
+
+  <!--
+    Tick mark as two slab rectangles:
+    Short left arm: from bottom-left up and right (the short descender)
+    Long right arm: from center down-left to upper-right (the long ascending arm)
+
+    Short arm: goes from (140, 330) to (220, 420) — angle ~42°
+    Long arm: goes from (200, 420) to (420, 130) — angle ~52°
+
+    Computed as thick rotated rectangles using polygon.
+    Short arm centerline: direction (80, 90), length≈120, stroke=36
+    Long arm centerline: direction (220, -290), length≈363, stroke=36
+  -->
+
+  <!-- Short descending arm of checkmark -->
+  <line x1="136" y1="322" x2="216" y2="416"
+        stroke="#2C8CE8" stroke-width="44" stroke-linecap="round"/>
+
+  <!-- Long ascending arm of checkmark -->
+  <line x1="204" y1="412" x2="422" y2="128"
+        stroke="#2C8CE8" stroke-width="44" stroke-linecap="round"/>
+</svg>

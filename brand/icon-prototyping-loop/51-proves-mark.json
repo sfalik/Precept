@@ -1,0 +1,21 @@
+{
+  "filename": "51-proves-mark.svg",
+  "title": "The entailment symbol ⊢ rendered as heavy geometric slabs rather than text. ⊢ means 'proves' or 'derives' — the definition on the left proves all valid configurations on the right. Precept's .precept file is the premise; every valid state is a structurally necessary consequence. The heavy slab construction gives the symbol maximum architectural weight — this is not a notation mark but a structural claim.",
+  "conceptualBridge": "The slab entailment mark means Precept's definition derives all valid states with mathematical necessity because ⊢ is the formal symbol for 'proves from' — the contract is the left side and every reachable configuration follows from it.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: 4.44 avg — the heavy slab construction gives the ⊢ symbol maximum structural authority; perfect legibility and monochrome scores; warm saffron palette is new to the active set; different enough from 29-entailment (text) to earn its own slot.",
+  "tags": ["mathematical", "entailment", "geometric-slab", "saffron", "proves"],
+  "palette": ["#080810", "#D4981C"],
+  "averageScore": 4.44,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4.5,
+    "legibilityAtSmallSize": 5,
+    "distinctSilhouette": 4,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    RADICAL DEPARTURE — Neon sign aesthetic.
+
+    A completely different designer: no geometric fills, no code aesthetic,
+    no mathematical symbols. Just a glowing neon tube.
+
+    A neon sign renders the governing operator in glowing light:
+    the -> as a neon arrow. The tubes glow — they don't fill space,
+    they trace it. The air around them is dark; only the declared
+    path is illuminated.
+
+    This is the opposite of the void-arrow (43): there, the arrow was
+    carved out of solid material. Here, the arrow is drawn in pure light
+    against darkness. Same concept — the governed transition — expressed
+    through the opposite visual language.
+
+    The glow bleeds into the surrounding dark the way a neon sign
+    bleeds into a dark room. The rule illuminates only what it governs.
+  -->
+
+  <!-- Deep dark field -->
+  <rect width="512" height="512" fill="#050608"/>
+
+  <defs>
+    <!-- Neon glow: the core light + wide bloom -->
+    <filter id="neon-bloom" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="16" result="bloom"/>
+      <feMerge>
+        <feMergeNode in="bloom"/>
+        <feMergeNode in="bloom"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="neon-core" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="core-blur"/>
+      <feMerge>
+        <feMergeNode in="core-blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Neon tube group: the -> governing operator -->
+
+  <!-- Outer glow layer (wide, dim) -->
+  <g filter="url(#neon-bloom)" opacity="0.5">
+    <!-- Dash of -> -->
+    <line x1="80" y1="256" x2="312" y2="256" stroke="#FF4080" stroke-width="12" stroke-linecap="round"/>
+    <!-- Arrowhead > of -> -->
+    <polyline points="264,188 380,256 264,324" stroke="#FF4080" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+
+  <!-- Inner core layer (narrow, bright) -->
+  <g filter="url(#neon-core)">
+    <!-- Dash of -> -->
+    <line x1="80" y1="256" x2="312" y2="256" stroke="#FFAACC" stroke-width="6" stroke-linecap="round"/>
+    <!-- Arrowhead > of -> -->
+    <polyline points="264,188 380,256 264,324" stroke="#FFAACC" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+
+  <!-- Bright core (white-ish, the hot center of the tube) -->
+  <line x1="80" y1="256" x2="312" y2="256" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity="0.9"/>
+  <polyline points="264,188 380,256 264,324" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.9"/>
+</svg>

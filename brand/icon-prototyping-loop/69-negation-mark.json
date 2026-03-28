@@ -1,0 +1,21 @@
+{
+  "filename": "69-negation-mark.svg",
+  "title": "The logical negation mark ¬ rendered as heavy geometric slabs. In formal logic, ¬P means 'P does not hold.' Precept makes this structural: invalid states are not refused at runtime — they are ¬declared. The definition structurally excludes them before any instance runs. The ¬ is not a warning sign but a logical fact: the invalid configuration is ¬possible by the structure of the governing contract.",
+  "conceptualBridge": "The negation mark means Precept makes invalid states logically absent because they are ¬declared in the definition — ¬(invalid state exists) is guaranteed by compile-time verification, not runtime detection.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: 4.63 avg — the ¬ slab construction achieves near-perfect scores on structural soundness, legibility, economy, and monochrome; the conceptual bridge (3.5) is the only weakness; the teal palette is fresh; the L-shaped two-slab form is maximally legible and distinctive.",
+  "tags": ["mathematical", "negation", "logical", "slab", "teal", "absence"],
+  "palette": ["#060C0A", "#00A890"],
+  "averageScore": 4.63,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4.5,
+    "legibilityAtSmallSize": 5,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

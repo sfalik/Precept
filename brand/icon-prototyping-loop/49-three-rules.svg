@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    Three rules. That is the entire structure of a Precept definition:
+    declarations (states/events), guards (conditions), transitions (-> outcomes).
+
+    Three horizontal bars of different weights and colors — the three
+    structural layers of the governing contract. The bottom bar is
+    the transition rule, brightest and heaviest: the -> that either
+    runs or doesn't. The middle bar is the guard condition. The top
+    bar is the declaration.
+
+    Nothing else. The contract in three strokes.
+    At 32px: three colored horizontal bands. Bold and clear.
+    At 512px: the weight hierarchy tells the structural story.
+  -->
+
+  <rect width="512" height="512" fill="#0A0D16"/>
+
+  <!-- Declaration bar — top, medium weight, blue (keyword color) -->
+  <rect x="72" y="148" width="368" height="44" rx="6" fill="#4A80C0"/>
+
+  <!-- Guard condition bar — middle, slightly lighter, amber -->
+  <rect x="72" y="234" width="296" height="44" rx="6" fill="#C8A060"/>
+
+  <!-- Transition rule bar — bottom, heaviest, brightest: the -> rule -->
+  <rect x="72" y="320" width="368" height="60" rx="6" fill="#1FFF7A"/>
+</svg>

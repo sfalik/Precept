@@ -1,0 +1,21 @@
+{
+  "filename": "61-lock-key-v2.svg",
+  "title": "The lock-key composition with bolder proportions. The state block is larger and fills more of the frame; the arrow void is wider so it reads at small scale; the governing operator key is positioned immediately adjacent to the block's right edge. Together they show that the transition happens when the operator exactly fits the state's declared interface — no other key works.",
+  "conceptualBridge": "The lock-key arrow means Precept's transition requires exact structural alignment because the state's interface is the exact shape of the governing operator — nothing else is declared, so nothing else can fit.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: 4.63 avg — the bolder proportions resolve the legibility issue from 60-lock-key; the two-piece lock-and-arrow-key composition has the highest conceptual bridge score in the set (4.5) and a perfect structural soundness score (5); the distinct silhouette is memorable and specific to Precept's state-event-transition model.",
+  "tags": ["lock-key", "void-arrow", "slab-arrow", "violet", "governed-interface", "two-element"],
+  "palette": ["#060810", "#4A20A0", "#8850E0"],
+  "averageScore": 4.63,
+  "rubricScores": {
+    "conceptualBridge": 4.5,
+    "structuralSoundness": 5,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 5,
+    "visualEconomy": 4.5,
+    "monochromeTest": 4,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

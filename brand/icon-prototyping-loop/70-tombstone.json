@@ -1,0 +1,21 @@
+{
+  "filename": "70-tombstone.svg",
+  "title": "The QED tombstone ∎ — a single filled square marking the end of proof. Precept's compiler closes the proof before runtime: the definition is verified, every invariant holds, no invalid configuration exists. ∎. The icon is that mark — one square, the proof complete. Unlike 27-proof-mark (nested rectangles with outer frame), this is just the tombstone alone: maximum simplicity, maximum certainty.",
+  "conceptualBridge": "The tombstone square means Precept's compile-time proof is complete because ∎ is the mathematical mark that ends a verified argument — the definition has been proven sound and nothing more is left to check.",
+  "status": "rejected",
+  "decision": "Rejected: distinct silhouette hard fail (2.5 < 3 minimum) — a single centered square is the most generic icon shape possible; without the outer frame of 27-proof-mark, the QED reading collapses and the form reads as any app icon or square logo. The nested-rectangle 27-proof-mark is the correct representation of this concept.",
+  "tags": ["mathematical", "qed", "tombstone", "indigo", "single-square", "proof"],
+  "palette": ["#06080E", "#4838D8"],
+  "averageScore": 4.06,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 5,
+    "distinctSilhouette": 2.5,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 3
+  },
+  "needsRescore": false
+}

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The logical negation mark ¬ as heavy geometric slabs.
+
+    In formal logic, ¬P means "P does not hold."
+    Precept makes this structural: invalid states are ¬declared.
+    Not refused at runtime. Not flagged. Simply ¬there.
+
+    The ¬ shape:
+      - A wide horizontal bar at top
+      - A descending vertical bar at the right end
+    Together they form the ¬ symbol — the mark of structural absence.
+
+    "This state is ¬possible" is not a runtime error in Precept.
+    It is a logical fact written into the definition before any
+    instance runs. The ¬ marks what the definition structurally excludes.
+
+    Constructed from two slabs. Maximum economy. Maximum weight.
+    Deep teal — unused in the active shortlisted set.
+  -->
+
+  <rect width="512" height="512" fill="#060C0A"/>
+
+  <!-- The horizontal bar of ¬ (top, wide) -->
+  <rect x="80" y="148" width="352" height="72" rx="8" fill="#00A890"/>
+
+  <!-- The descending right arm of ¬ -->
+  <rect x="360" y="220" width="72" height="200" rx="8" fill="#00A890"/>
+</svg>

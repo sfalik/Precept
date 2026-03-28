@@ -1,0 +1,21 @@
+{
+  "filename": "81-pcb-trace.svg",
+  "title": "A copper PCB trace routing a state-transition signal from origin pad through a turn to an arrowhead destination. On a printed circuit board, a trace has no stray connections — only what the designer routed goes anywhere. Precept's transition declarations work exactly this way: declare the path and it exists; don't declare it and the signal has nowhere to go.",
+  "conceptualBridge": "The PCB trace means Precept's event routing is a physically declared signal path because a circuit trace only connects what the designer declared — no undeclared route can be taken.",
+  "status": "shortlisted",
+  "decision": "Shortlisted after simplification: avg 4.38, no hard fails — v2 removes the grid leaving only the bold copper trace, origin pad, diagonal, arrowhead arms, and via ring; the via circle with punched center is the definitively PCB-specific element; copper on dark green is a unique color family in the set.",
+  "tags": ["pcb", "circuit", "trace", "copper", "green", "radical-departure", "arrow"],
+  "palette": ["#0A1A0A", "#C87820"],
+  "averageScore": 4.38,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 4.5,
+    "monochromeTest": 4,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

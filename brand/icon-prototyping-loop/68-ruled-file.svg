@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    One file. One rule. That's enough.
+
+    A minimal file shape (the .precept artifact) with a single bold
+    horizontal band at the center — the governing rule.
+
+    The file is compact, bounded, complete.
+    The rule is bright and dominant.
+    Everything else is structural context.
+
+    At 32px: a dark rectangle (file) with a bright horizontal bar inside.
+    The fold at top-right differentiates it from a plain rectangle.
+    The bar makes it clear: there is a rule inside.
+
+    This is the most minimal possible encoding of the concept:
+    one file, one governing rule, nothing else needed.
+  -->
+
+  <rect width="512" height="512" fill="#080A10"/>
+
+  <!-- File body: dark slate -->
+  <polygon points="144,60 332,60 356,84 356,452 144,452" fill="#141C2C"/>
+
+  <!-- Corner fold -->
+  <polygon points="332,60 356,84 332,84" fill="#080A10"/>
+
+  <!-- The single governing rule: bright accent band -->
+  <rect x="168" y="238" width="164" height="36" rx="4" fill="#1FFF7A"/>
+
+  <!-- File border -->
+  <polygon points="144,60 332,60 356,84 356,452 144,452" fill="none" stroke="#2A3A50" stroke-width="2"/>
+  <polyline points="332,60 332,84 356,84" fill="none" stroke="#2A3A50" stroke-width="2"/>
+</svg>

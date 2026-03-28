@@ -1,0 +1,21 @@
+{
+  "filename": "82-type-colon.svg",
+  "title": "The `::` type annotation operator as four bold slab squares. In type theory, `x :: T` means 'x has type T' — a compile-time structural declaration that something exists as exactly that kind of thing. Precept's contract IS a type annotation for the entire domain: it declares what kinds of field values, state transitions, and event signatures are structurally possible.",
+  "conceptualBridge": "The double-colon means Precept's contract is a type declaration because `::` IS the compile-time assertion of structural kind — not a runtime check, a definition of what can exist.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: avg 4.31, no hard fails — the `::` type-annotation operator as four bold squares; the two-pairs-with-gap layout differentiates from a plain 2×2 grid; vivid red on dark is a fresh palette in the set; maximum visual economy score.",
+  "tags": ["type-annotation", "colon", "colon-colon", "coral-red", "slab"],
+  "palette": ["#0C0808", "#E84040"],
+  "averageScore": 4.31,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

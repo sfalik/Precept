@@ -1,0 +1,21 @@
+{
+  "filename": "76-partition-rule.svg",
+  "title": "A square partitioned by a bright diagonal rule into two structural zones. Precept's contract carves the entire space of possible values into valid domains and structurally absent ones — there is no implicit path between them; only a declared transition can cross the boundary. The diagonal line is not a suggestion; it is the compiled rule.",
+  "conceptualBridge": "The partition rule means Precept enforces state separation because the diagonal boundary is the compiled declaration that divides the valid domain from the structurally impossible one.",
+  "status": "rejected",
+  "decision": "Rejected: avg 3.81 below threshold — the diagonal partition reads as a generic 'split' or 'before/after' motif used by many products; monochrome test weak (two zones are similar tonal values); the concept is too abstract without strong specific anchoring to Precept.",
+  "tags": ["partition", "diagonal", "boundary", "orange", "two-zone"],
+  "palette": ["#080C0F", "#131F32", "#1A2E46", "#E87C20", "#253A54"],
+  "averageScore": 3.81,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 4.5,
+    "monochromeTest": 3.5,
+    "colorAndContrast": 4,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

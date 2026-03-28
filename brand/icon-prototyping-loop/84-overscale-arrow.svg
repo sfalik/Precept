@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    RADICAL DEPARTURE — Oversized Governing Arrow.
+
+    The `->` operator scaled to the entire canvas and beyond: you can only
+    see part of the arrow because the rule is larger than any single view.
+    The shaft spans the full horizontal, bleeding off both edges.
+    The arrowhead wings rise and fall to the canvas edges, with the tip
+    beyond the right margin.
+
+    This inverts the usual icon logic: instead of a small precise mark on
+    a large field, the governing rule IS the field. You are inside the rule.
+    The entire governed domain exists within the declared transition.
+
+    The crimson/deep-red palette is unused in the set.
+    This aesthetic is from a completely different design sensibility:
+    monumental, overwhelming, architectural scale.
+  -->
+
+  <rect width="512" height="512" fill="#0A0608"/>
+
+  <!-- Shaft: full horizontal slab, bleeds left and right edges -->
+  <rect x="-8" y="216" width="528" height="80" fill="#C42030"/>
+
+  <!--
+    Arrowhead wings:
+    The tip is at x=580, y=256 (off-canvas right).
+    Upper wing: from (300, 140) to (580, 256)
+    Lower wing: from (300, 372) to (580, 256)
+    The visual on canvas: two bold diagonal red bars rising/falling
+    toward the right edge, with no visible tip.
+  -->
+  <polygon
+    points="284,88 580,256 284,424"
+    fill="#C42030"/>
+</svg>

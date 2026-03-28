@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    The Sole Declared Path: a bright horizontal channel through a dark solid
+    field — not an arrow, not a gate, but the one structural opening that
+    the contract declared. Everything that isn't this channel is solid material.
+    The path exists because the contract carved it. Nothing else was carved.
+
+    This is 43-void-arrow's sibling concept but with a horizontal slot through
+    a full-width solid block instead of an arrow-void. The slot is the declared
+    event channel; the solid field around it is the closed contract boundary.
+    There is no other way through. There are no undeclared openings.
+
+    Simple, bold, unambiguous. The bright slot IS the only permitted path.
+  -->
+
+  <rect width="512" height="512" fill="#080C10"/>
+
+  <!-- The governed domain: full-width dark solid block -->
+  <rect x="72" y="72" width="368" height="368" rx="6" fill="#142030"/>
+
+  <!-- The sole declared path: a bright horizontal slot cut through the block.
+       Extends full width, centered vertically in the block. -->
+  <rect x="72" y="230" width="368" height="52" fill="#080C10"/>
+
+  <!-- Bright accent inside the path: the rule that makes this opening valid -->
+  <rect x="72" y="240" width="368" height="32" rx="3" fill="#20C0A0"/>
+</svg>

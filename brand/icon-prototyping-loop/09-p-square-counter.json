@@ -1,14 +1,22 @@
 {
   "filename": "09-p-square-counter.svg",
-  "title": "A heavy bold P where the bowl counter is a perfect square rather than the standard D-curve. The round outer bowl represents organic business complexity; the square counter shows compile-time precision imposed inside it. The square also sharply differentiates from Prefect's standard rounded P mark.",
+  "title": "A heavy bold P where the bowl's counter is a perfect square, not the typical D-curve. The round outer bowl represents organic business complexity; the square counter shows compile-time precision imposed inside it.",
   "conceptualBridge": "The square-counter P means precision inside complexity because the contract imposes exact structure within messy domain shapes.",
-  "status": "shortlisted",
-  "decision": "Shortlisted for a strong letterform with a specific precision cue that differentiates it from generic rounded P marks.",
+  "status": "rejected",
+  "decision": "Rejected as near-duplicate: the square counter — the only differentiating detail — is invisible at 32px, making this indistinguishable from 04-bold-p; avg 4.06 would pass but curated-set diversity requires keeping only the stronger P variant.",
   "tags": ["letterform", "square-counter", "precision", "monochrome-strong"],
   "palette": ["#0C0F14", "#EDE7DC"],
-  "averageScore": 4.3,
-  "rubricScores": null,
-  "scoreDetailStatus": "average-only",
-  "needsRescore": true,
-  "metadataOrigin": "backfilled"
+  "averageScore": 4.06,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 3,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 3
+  },
+  "needsRescore": false,
+  "metadataOrigin": "backfilled, rescored"
 }

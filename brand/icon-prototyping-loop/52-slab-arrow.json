@@ -1,0 +1,21 @@
+{
+  "filename": "52-slab-arrow.svg",
+  "title": "The `->` transition operator rendered as pure geometric slabs — a thick horizontal rectangle for the dash and a bold triangle for the arrowhead. No font rendering, no glyph. This is the Precept governing operator as an architectural fact rather than a typed character. The slab construction gives it the weight of a structural claim, not a keyboard shortcut.",
+  "conceptualBridge": "The slab arrow means Precept's transition operator is a structural fact because the `->` is not typed into the definition as notation but is the definition itself — a direction made permanent in the contract.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: 4.69 avg — the slab construction of `->` achieves maximum structural authority; perfect legibility, economy, and monochrome scores; electric blue palette is fresh; differs from 34-transition-arrow (solid fill) by having the dash+head slab structure that reads as 'built from material, not drawn on it'.",
+  "tags": ["language-derived", "arrow", "geometric-slab", "electric-blue", "transition-operator"],
+  "palette": ["#06080E", "#0050E8"],
+  "averageScore": 4.69,
+  "rubricScores": {
+    "conceptualBridge": 4.5,
+    "structuralSoundness": 5,
+    "legibilityAtSmallSize": 5,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

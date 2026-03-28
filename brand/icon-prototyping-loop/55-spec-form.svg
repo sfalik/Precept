@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The industrial specification form stripped to pure geometry.
+    No text. Just the structure of a spec sheet made iconic.
+
+    Black header band: the category identifier.
+    White body: the governed space.
+    Single measurement mark on left: the rule that determines the body.
+    The -> in a centered black box: the specified operation.
+
+    At 32px: a white square with a top black band and a centered dark box.
+    The form reads as "specification" — a framed declaration.
+
+    At 512px: the structural intent is clear.
+    Completely different from everything in the set.
+  -->
+
+  <!-- Industrial white ground -->
+  <rect width="512" height="512" fill="#F2EFE8"/>
+
+  <!-- Header band (category identifier) -->
+  <rect x="40" y="48" width="432" height="56" fill="#141210"/>
+
+  <!-- Left border line (engineering form edge) -->
+  <rect x="40" y="104" width="4" height="360" fill="#141210"/>
+
+  <!-- Right border line -->
+  <rect x="468" y="104" width="4" height="360" fill="#141210"/>
+
+  <!-- Bottom border line -->
+  <rect x="40" y="460" width="432" height="4" fill="#141210"/>
+
+  <!-- Central specification box: the governed operation -->
+  <rect x="156" y="196" width="200" height="112" fill="#141210"/>
+
+  <!-- -> operator in the spec box (white text on black) -->
+  <text
+    x="256" y="256"
+    font-family="'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace"
+    font-size="88"
+    font-weight="700"
+    fill="#F2EFE8"
+    text-anchor="middle"
+    dominant-baseline="central"
+    font-feature-settings="'calt' 1, 'liga' 1"
+  >-&gt;</text>
+</svg>

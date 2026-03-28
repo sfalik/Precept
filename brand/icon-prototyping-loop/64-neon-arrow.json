@@ -1,0 +1,21 @@
+{
+  "filename": "64-neon-arrow.svg",
+  "title": "The `->` governing operator rendered as a neon tube sign. The tubes trace the arrow in hot pink light against the dark — only the declared path is illuminated. The glow bleeds outward the way a rule radiates authority: the transition operator defines what is permitted, and the light marks exactly that path. The neon aesthetic is the opposite of the void-arrow (43): there the arrow was carved from solid material; here it is drawn in pure light.",
+  "conceptualBridge": "The neon arrow means Precept's transition operator is the only illuminated path because the definition declares the `->` as the governing symbol — in the dark field of structural absence, only the declared path glows.",
+  "status": "exploring",
+  "decision": "Kept: 4.13 avg — the neon aesthetic is visually distinctive and the pink palette is completely new; structural soundness (3 = minimum) is the key risk — neon signs don't project authority the way filled slabs do. A follow-up could make the neon form feel less decorative by simplifying the glow or using a more precise geometric composition.",
+  "tags": ["radical-departure", "neon", "glowing", "arrow", "hot-pink", "tube-light"],
+  "palette": ["#050608", "#FF4080", "#FFAACC", "#FFFFFF"],
+  "averageScore": 4.13,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 3,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 4.5,
+    "monochromeTest": 3,
+    "colorAndContrast": 5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    A square waveform: three horizontal segments at distinct heights connected
+    by crisp 90-degree vertical transitions. The flat plateaus are stable states;
+    the vertical edges are the governed, instantaneous transitions between them.
+    There is no slope, no ramp, no gradient — only discrete certified steps.
+    The form is common in digital logic; here it means Precept's world of
+    impossible-intermediate states made visually exact.
+  -->
+
+  <rect width="512" height="512" fill="#071210"/>
+
+  <!--
+    Step-function waveform:
+    Segment 1: baseline (y=300), enters from left
+    Step UP to y=172 (first transition)
+    Segment 2: high plateau (y=172)
+    Step DOWN to y=340 (second transition — below baseline for visual asymmetry)
+    Segment 3: lower plateau (y=340), exits right
+
+    Stroke-width 24 + square linecap + miter join for precise corners.
+  -->
+  <polyline
+    points="68,300 180,300 180,172 332,172 332,340 444,340"
+    stroke="#1ED8A0"
+    stroke-width="24"
+    stroke-linecap="square"
+    stroke-linejoin="miter"
+    fill="none"/>
+</svg>

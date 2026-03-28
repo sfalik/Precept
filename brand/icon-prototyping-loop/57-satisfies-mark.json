@@ -1,0 +1,21 @@
+{
+  "filename": "57-satisfies-mark.svg",
+  "title": "The ⊨ (satisfies) symbol as heavy geometric slabs. ⊨ means 'satisfies' in logic: the definition satisfies all constraints. In Precept, the .precept definition must satisfy every stated constraint — verified at compile time before any instance can run. The vertical bar is the definition; the two symmetric horizontal arms are the constraints it satisfies. Unlike ⊢ (proves), ⊨ asserts that the definition is a complete model in which every governing rule holds.",
+  "conceptualBridge": "The satisfies mark means Precept's definition is a verified model because ⊨ is the formal symbol for 'this structure satisfies all stated constraints' — compile-time verification is the proof that the definition ⊨ every invariant.",
+  "status": "rejected",
+  "decision": "Rejected: near-duplicate of 51-proves-mark — same slab construction, same logical symbol family (⊢ vs ⊨), similar H-shape at 32px; the ⊢ in 51 is the stronger representative with its asymmetric arms that differentiate it from a plain H; 57's symmetric arms make it less distinctive. Uniqueness score of 3 prevents promotion.",
+  "tags": ["mathematical", "satisfies", "geometric-slab", "forest-green", "constraint-satisfaction"],
+  "palette": ["#060C08", "#1A8828"],
+  "averageScore": 4.25,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4.5,
+    "legibilityAtSmallSize": 5,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 3
+  },
+  "needsRescore": false
+}

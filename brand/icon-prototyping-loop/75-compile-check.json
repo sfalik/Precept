@@ -1,0 +1,21 @@
+{
+  "filename": "75-compile-check.svg",
+  "title": "A heavy slab checkmark — but not a validation indicator. This mark is Precept's compile-time assertion: the entire class of invalid states has been made architecturally impossible before the first line of business logic runs. The tick doesn't confirm that something succeeded; it declares that failure was structurally foreclosed.",
+  "conceptualBridge": "The compile-time check means Precept's prevention because the mark is not a runtime result but an architectural declaration that invalid states are structurally impossible at definition time.",
+  "status": "exploring",
+  "decision": "Exploring: avg 4.06, no hard fails — the compile-time reframing of the checkmark is conceptually strong, but the silhouette is heavily colonized by CI/CD tools (GitHub Actions, task managers) and doesn't help Precept establish a distinct visual identity; consider iterating to a more specific form.",
+  "tags": ["checkmark", "compile-time", "prevention", "blue", "slab"],
+  "palette": ["#060A0E", "#2C8CE8"],
+  "averageScore": 4.06,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 3,
+    "visualEconomy": 4.5,
+    "monochromeTest": 4.5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

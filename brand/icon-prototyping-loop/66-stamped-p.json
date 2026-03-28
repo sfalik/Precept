@@ -1,0 +1,21 @@
+{
+  "filename": "66-stamped-p.svg",
+  "title": "A bold P letterform where the vertical stem extends full height — above and below the letter body. The extension says the governing rule is not limited to the letter: the principle runs through everything. The coral background is new to the active set; the full-height extended stem distinguishes this from 04-bold-p (bounded stem), 06-negative-p (amber, negative space), and 09-p-square-counter (square counter).",
+  "conceptualBridge": "The extended-stem P means Precept's governing rule exceeds any single instance because the stem that supports the letterform continues beyond the P's body — the principle named in the letter is not bounded by it.",
+  "status": "exploring",
+  "decision": "Kept: 4.25 avg — the vivid coral palette and extended-stem form are genuinely new to the set; conceptual bridge at 3 (minimum) means this passes but doesn't convince — 'the rule extends beyond the letter' is too abstract; the form's distinctiveness is its strongest argument.",
+  "tags": ["radical-departure", "letterform", "extended-stem", "coral", "monogram", "P-variant"],
+  "palette": ["#E83820", "#141010"],
+  "averageScore": 4.25,
+  "rubricScores": {
+    "conceptualBridge": 3,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 4,
+    "visualEconomy": 4.5,
+    "monochromeTest": 5,
+    "colorAndContrast": 5,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false
+}

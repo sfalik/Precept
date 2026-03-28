@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The tombstone: ∎ (Halmos symbol / QED mark)
+    
+    A single filled square. The end of proof.
+
+    In mathematics, ∎ marks the end of a proof — everything before
+    it has been verified and the argument is complete.
+
+    Precept's compiler closes the proof before runtime:
+    ∎ — the definition is structurally sound.
+    ∎ — every state is reachable only through declared transitions.
+    ∎ — every invariant holds.
+    ∎ — no invalid configuration exists.
+
+    The icon is that mark. One square. The proof is complete.
+    Nothing more needs to be said.
+
+    Unlike 27-proof-mark (nested rectangles suggesting "frame + QED"),
+    this is just the QED square alone — maximum simplicity.
+
+    Deep indigo — distinct from 27's cream palette.
+  -->
+
+  <rect width="512" height="512" fill="#06080E"/>
+
+  <!-- The proof mark: a single centered square -->
+  <rect x="140" y="140" width="232" height="232" rx="8" fill="#4838D8"/>
+</svg>

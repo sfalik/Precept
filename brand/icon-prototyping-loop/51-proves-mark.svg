@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The entailment symbol ⊢ rendered as pure geometric slabs — not text.
+
+    ⊢ means "proves" or "derives": the definition on the left proves
+    all valid configurations on the right. Precept's .precept file
+    is the premise; every valid state is a consequence.
+
+    Constructed from three rectangular slabs (not a font):
+      - Vertical bar: the definition (left side)
+      - Upper horizontal: the first governing rule
+      - Lower horizontal: the second governing rule
+
+    The slabs are HEAVY — maximum structural weight. This is not
+    a decorative symbol; it is an architectural assertion.
+
+    Warm saffron color — new to the active set.
+  -->
+
+  <rect width="512" height="512" fill="#080810"/>
+
+  <!-- Vertical bar: the definition (left side of ⊢) -->
+  <rect x="120" y="104" width="72" height="304" rx="6" fill="#D4981C"/>
+
+  <!-- Upper horizontal arm: one governing consequence -->
+  <rect x="192" y="104" width="216" height="72" rx="6" fill="#D4981C"/>
+
+  <!-- Lower horizontal arm: second governing consequence -->
+  <rect x="192" y="336" width="216" height="72" rx="6" fill="#D4981C"/>
+</svg>

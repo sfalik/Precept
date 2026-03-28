@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    The Forbidden Crossing: a bold `->` arrow with a heavy X through it.
+    Not a UI "error" indicator — a structural declaration.
+    The arrow shows what was attempted; the X shows what the contract
+    made structurally impossible. Invalid states don't fail at runtime;
+    they are forbidden at definition time by the absence of a declared
+    transition. The X is not a runtime error — it is the silence of the contract.
+
+    Unlike the `->` candidates (which show what CAN happen), this shows
+    what CANNOT happen — the other half of Precept's prevention guarantee.
+    Prevention over detection: the X IS the prevention.
+  -->
+
+  <rect width="512" height="512" fill="#0F080A"/>
+
+  <!-- The arrow: what was attempted (muted, dark — it has no path) -->
+  <!-- Shaft -->
+  <rect x="88" y="238" width="244" height="36" rx="4" fill="#2A1820"/>
+  <!-- Arrowhead -->
+  <polygon points="320,196 420,256 320,316" fill="#2A1820"/>
+
+  <!-- The X: the structural prohibition — vivid crimson, bold -->
+  <line x1="148" y1="148" x2="364" y2="364"
+        stroke="#C82030" stroke-width="36" stroke-linecap="round"/>
+  <line x1="364" y1="148" x2="148" y2="364"
+        stroke="#C82030" stroke-width="36" stroke-linecap="round"/>
+</svg>

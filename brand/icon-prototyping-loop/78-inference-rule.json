@@ -1,0 +1,21 @@
+{
+  "filename": "78-inference-rule.svg",
+  "title": "A natural-deduction inference rule: two blocks (premise and conclusion) separated by a bright horizontal inference line. In formal logic, the horizontal rule IS the certified deduction step. Precept's transitions work identically — the declared contract is the inference rule that derives the next state from the current state and event, with the same logical certainty.",
+  "conceptualBridge": "The inference rule means Precept derives the next state by formal deduction because the horizontal line between premise and conclusion is the contract itself — cross it and the transition is certified; it cannot be crossed any other way.",
+  "status": "shortlisted",
+  "decision": "Shortlisted after iteration (avg 4.38): amber rule line made dominant and wide (v2); natural-deduction inference rule is a precise and specific conceptual bridge; the amber horizontal slab between two dark premise/conclusion blocks reads clearly at 32px; distinct from everything else in the set.",
+  "tags": ["inference", "logic", "premise-conclusion", "amber", "horizontal-rule"],
+  "palette": ["#0C0F14", "#1C2A40", "#E8A020", "#243248"],
+  "averageScore": 4.38,
+  "rubricScores": {
+    "conceptualBridge": 4.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 4,
+    "visualEconomy": 4.5,
+    "monochromeTest": 4,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

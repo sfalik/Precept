@@ -1,0 +1,21 @@
+{
+  "filename": "74-closed-interval.svg",
+  "title": "Square bracket notation [ ] as architectural slabs, with a single accent mark centered inside the bounded interval. Every field in a Precept definition exists within declared bounds — the bracket walls are structural, immovable, and include the endpoints; no value can escape the contract.",
+  "conceptualBridge": "The closed interval means Precept enforces bounded valid ranges because the square bracket walls are the structural constraint and the interior accent is the only value that can legitimately exist within them.",
+  "status": "rejected",
+  "decision": "Rejected: avg 3.88 below threshold — single-bracket form is too similar in silhouette and concept to 65-denotation (double-bracket slabs already in set); uniqueness and conceptual bridge both score below 4; keeping 65 as the bracket family representative.",
+  "tags": ["bracket", "interval", "bounded", "purple", "slab"],
+  "palette": ["#0C0810", "#8040E8", "#B080FF"],
+  "averageScore": 3.88,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4,
+    "distinctSilhouette": 3.5,
+    "visualEconomy": 4,
+    "monochromeTest": 4,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 3.5
+  },
+  "needsRescore": false
+}

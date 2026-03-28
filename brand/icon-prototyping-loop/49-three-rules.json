@@ -1,0 +1,21 @@
+{
+  "filename": "49-three-rules.svg",
+  "title": "Three horizontal bars represent the three structural layers of every Precept rule: the declaration (state/event), the guard condition, and the governing transition. The declaration is blue; the guard is amber; the transition is bright green and heaviest — because the `->` is what the definition ultimately certifies. One contract in three strokes.",
+  "conceptualBridge": "The three weighted bars mean Precept's definition has exactly three governing layers because every `from S on E when G -> T` rule has a declaration, a condition, and a transition — the bars are those layers, arranged in execution order.",
+  "status": "rejected",
+  "decision": "Rejected: despite passing the average threshold (4.0), the distinct silhouette score of 3 makes it fail — three horizontal bars is the generic 'hamburger menu' shape; without color it reads as nothing specific to Precept. The concept of three structural layers is valid but this form cannot carry it.",
+  "tags": ["code-aesthetic", "three-bars", "layered", "green-amber-blue", "condensed"],
+  "palette": ["#0A0D16", "#4A80C0", "#C8A060", "#1FFF7A"],
+  "averageScore": 4.0,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 3.5,
+    "legibilityAtSmallSize": 5,
+    "distinctSilhouette": 3,
+    "visualEconomy": 5,
+    "monochromeTest": 3.5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 3.5
+  },
+  "needsRescore": false
+}

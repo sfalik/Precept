@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The -> operator constructed from pure geometric slabs.
+    No font. No glyph. Just rectangles and a triangle.
+
+    The dash is a horizontal slab — a rule. The arrowhead is a
+    right-pointing triangle — a direction. Together: a governed direction.
+
+    The dash represents the constraint (you cannot pass without meeting the rule).
+    The triangle represents the outcome (if the rule is met, this is where you go).
+
+    Constructed from:
+      - One horizontal rectangle (the dash of ->)
+      - One right-pointing triangle (the > of ->)
+
+    This form has the same visual DNA as a typographic -> but rendered
+    as thick structural shapes rather than text glyphs. The slab weight
+    makes it monumental — not a keyboard character but an architectural fact.
+
+    Deep electric blue — different from every existing arrow candidate.
+  -->
+
+  <rect width="512" height="512" fill="#06080E"/>
+
+  <!-- The dash: a thick horizontal slab -->
+  <rect x="68" y="216" width="256" height="80" rx="6" fill="#0050E8"/>
+
+  <!-- The arrowhead: a right-pointing triangle -->
+  <polygon points="324,148 324,364 464,256" fill="#0050E8"/>
+</svg>

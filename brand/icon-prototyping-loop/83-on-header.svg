@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    The "on" event header: a bold horizontal banner containing a short code
+    token, with a large dark body below it. This mimics the .precept file's
+    visual structure: the `on EventName` header governs everything below it.
+    The bright header IS the declaration; the dark body is the governed scope.
+
+    At 32px: a bright band at top + dark body = clear header/body structure.
+    The code token in the header (two small rectangles = "on" abbreviated)
+    reads as a code label. This is a UI-metaphor rooted in the actual
+    Precept editing experience — like the preview UX the user liked in 00-base.
+
+    Composition: vivid electric violet header band, dark body, two small
+    white rectangles inside the header as the "on" label marks.
+  -->
+
+  <rect width="512" height="512" fill="#080810"/>
+
+  <!-- Card/file body -->
+  <rect x="88" y="88" width="336" height="336" rx="8" fill="#10142A"/>
+
+  <!-- Header band: the `on` declaration -->
+  <rect x="88" y="88" width="336" height="80" rx="8" fill="#5028CC"/>
+  <!-- Bottom corners square for the band -->
+  <rect x="88" y="140" width="336" height="28" fill="#5028CC"/>
+
+  <!-- "on" token: two abstract word-blocks inside the header -->
+  <rect x="118" y="110" width="60" height="18" rx="3" fill="#A090FF"/>
+  <rect x="192" y="110" width="92" height="18" rx="3" fill="#7060D8"/>
+
+  <!-- Body content lines: three ruled bands in the governed scope -->
+  <rect x="118" y="208" width="200" height="14" rx="2" fill="#1E2844"/>
+  <rect x="118" y="238" width="160" height="14" rx="2" fill="#1E2844"/>
+  <rect x="118" y="268" width="220" height="14" rx="2" fill="#1E2844"/>
+  <rect x="118" y="298" width="130" height="14" rx="2" fill="#1E2844"/>
+</svg>

@@ -1,0 +1,21 @@
+{
+  "filename": "63-notched-triangle.svg",
+  "title": "A solid triangle with one arrow-shaped notch at its base corner. The triangle is the most structurally stable geometric form — it cannot be deformed. The notch is the only declared event interface: an arrow-shaped void that accepts exactly the governing `->` operator and nothing else. Precept's states are exactly this: a structurally stable form with one declared entry point.",
+  "conceptualBridge": "The notched triangle means Precept's state is a structurally stable governed form because the triangle cannot be entered except through the one declared interface — the arrow notch — and the material prevents any other path.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: 4.5 avg — the solid notched triangle achieves exceptional scores on structural soundness, legibility, visual economy, and monochrome test; the amber palette is warm and authoritative; the arrow notch is the most economical possible encoding of a 'governed entry interface'; only the conceptual bridge (3.5) prevents a higher score.",
+  "tags": ["triangle", "notched", "amber", "solid-form", "state-interface"],
+  "palette": ["#060A0C", "#C88018"],
+  "averageScore": 4.5,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4.5,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 5,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4.5
+  },
+  "needsRescore": false
+}

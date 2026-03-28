@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    The Diagonal Partition: a bold square split by a bright diagonal rule
+    into two zones — the dark domain above-left and the lit domain below-right.
+    The diagonal is not a gradient, not a soft edge, not a transition — it is
+    a structural boundary declared by the contract. There is no implicit path
+    between the two zones; only a declared transition can cross it.
+
+    This evokes Precept's state partitioning: the definition carves the entire
+    space of possible values into valid regions and structurally absent ones.
+    The bright diagonal line is the rule itself — the compile-time enforced
+    border between what is permitted and what has no structural path.
+  -->
+
+  <rect width="512" height="512" fill="#080C0F"/>
+
+  <!-- Dark zone (upper-left): the governed domain -->
+  <polygon points="88,88 424,88 88,424" fill="#131F32"/>
+
+  <!-- Bright zone (lower-right): the declared transition target -->
+  <polygon points="424,88 424,424 88,424" fill="#1A2E46"/>
+
+  <!-- The partition rule: bold diagonal stroke — the declared boundary -->
+  <line x1="88" y1="424" x2="424" y2="88"
+        stroke="#E87C20" stroke-width="22"/>
+
+  <!-- Outer boundary: the contract frame -->
+  <rect x="88" y="88" width="336" height="336"
+        fill="none" stroke="#253A54" stroke-width="6"/>
+</svg>

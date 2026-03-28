@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Precept Typography Exploration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Sora:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Inconsolata:wght@400;500;600;700;800;900&family=Red+Hat+Mono:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600;700&family=Archivo:wght@400;500;600;700;800;900&family=Familjen+Grotesk:wght@400;500;600;700&family=Urbanist:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0a; color: #e5e5e5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; padding: 40px; }
+  h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; color: #fff; }
+  .subtitle { color: #888; font-size: 15px; margin-bottom: 48px; }
+
+  .option-group { margin-bottom: 64px; }
+  .option-group h2 { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 6px; }
+  .option-group .desc { font-size: 14px; color: #888; margin-bottom: 24px; max-width: 700px; }
+
+  .type-card { background: #141414; border: 1px solid #222; border-radius: 12px; padding: 28px 32px; margin-bottom: 20px; }
+  .type-card .font-label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 16px; }
+
+  /* Wordmark row */
+  .wordmark-row { display: flex; align-items: baseline; gap: 48px; flex-wrap: wrap; margin-bottom: 20px; }
+  .wordmark { color: #fff; }
+  .wordmark-sm { color: #bbb; }
+  .wordmark-xs { color: #888; }
+
+  /* Meta row */
+  .meta-row { display: flex; gap: 32px; flex-wrap: wrap; font-size: 13px; color: #666; margin-top: 12px; }
+  .meta-row .tag { background: #1e1e1e; border: 1px solid #333; border-radius: 4px; padding: 2px 8px; font-size: 11px; }
+
+  /* Pairing sample */
+  .pairing { margin-top: 20px; padding: 20px; background: #0d0d0d; border-radius: 8px; }
+  .pairing h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #555; margin-bottom: 12px; }
+  .pairing .headline { margin-bottom: 8px; color: #fff; }
+  .pairing .body-text { color: #999; font-size: 14px; line-height: 1.6; max-width: 600px; }
+
+  /* Size & weight showcase */
+  .weight-row { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 8px; }
+  .weight-sample { color: #999; font-size: 14px; }
+  .weight-sample span { display: block; color: #ccc; }
+
+  .section-divider { height: 1px; background: #222; margin: 48px 0; }
+
+  .verdict { padding: 16px 20px; background: #1a1a0d; border: 1px solid #333; border-radius: 8px; font-size: 13px; color: #b3a66a; margin-top: 12px; }
+  .verdict-cool { background: #0d1a1a; border-color: #1a3333; color: #6ab3a6; }
+  .verdict-neutral { background: #141414; border-color: #333; color: #aaa; }
+
+  .comparison-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin: 24px 0; }
+</style>
+</head>
+<body>
+
+<h1>Precept — Typography Exploration</h1>
+<p class="subtitle">Three approaches: distinctive geometric wordmark, pragmatic Inter, or no wordmark (icon only). Each shown at multiple sizes and in full context.</p>
+
+<!-- ========== APPROACH A: DISTINCTIVE WORDMARK ========== -->
+<div class="option-group">
+<h2>Approach A: Distinctive Geometric Wordmark</h2>
+<p class="desc">A custom-feeling typeface for "Precept" only. Body text / docs use a separate neutral face. This is most impactful when the logo needs to stand alone without an icon.</p>
+
+<div class="comparison-grid">
+
+<div class="type-card">
+  <div class="font-label">Space Grotesk</div>
+  <div class="wordmark-row">
+    <div class="wordmark" style="font-family:'Space Grotesk',sans-serif; font-size:48px; font-weight:700;">Precept</div>
+    <div class="wordmark-sm" style="font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:700;">Precept</div>
+    <div class="wordmark-xs" style="font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:600;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Geometric</span> <span class="tag">Compact</span> <span class="tag">Distinctive 'e'</span>
+  </div>
+  <div class="verdict">Slightly technical feeling. The flat-topped 'e' is a built-in differentiator. Compact at small sizes.</div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Outfit</div>
+  <div class="wordmark-row">
+    <div class="wordmark" style="font-family:'Outfit',sans-serif; font-size:48px; font-weight:700;">Precept</div>
+    <div class="wordmark-sm" style="font-family:'Outfit',sans-serif; font-size:24px; font-weight:700;">Precept</div>
+    <div class="wordmark-xs" style="font-family:'Outfit',sans-serif; font-size:14px; font-weight:600;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Rounded geometric</span> <span class="tag">Modern</span> <span class="tag">Friendly</span>
+  </div>
+  <div class="verdict">Warmer than Space Grotesk but still structured. Round terminals add approachability.</div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Sora</div>
+  <div class="wordmark-row">
+    <div class="wordmark" style="font-family:'Sora',sans-serif; font-size:48px; font-weight:700;">Precept</div>
+    <div class="wordmark-sm" style="font-family:'Sora',sans-serif; font-size:24px; font-weight:700;">Precept</div>
+    <div class="wordmark-xs" style="font-family:'Sora',sans-serif; font-size:14px; font-weight:600;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Neo-geometric</span> <span class="tag">Clean</span> <span class="tag">Mathematical</span>
+  </div>
+  <div class="verdict verdict-cool">Clean mathematical precision. Japanese-inspired geometry. The 'P' and 'e' have distinctive forms.</div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Plus Jakarta Sans</div>
+  <div class="wordmark-row">
+    <div class="wordmark" style="font-family:'Plus Jakarta Sans',sans-serif; font-size:48px; font-weight:800;">Precept</div>
+    <div class="wordmark-sm" style="font-family:'Plus Jakarta Sans',sans-serif; font-size:24px; font-weight:800;">Precept</div>
+    <div class="wordmark-xs" style="font-family:'Plus Jakarta Sans',sans-serif; font-size:14px; font-weight:700;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Rounded</span> <span class="tag">Substantial weight</span> <span class="tag">Product-y</span>
+  </div>
+  <div class="verdict">Heavy confidence. Product-oriented — Vercel, Linear vibes. Very readable at all sizes.</div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Manrope</div>
+  <div class="wordmark-row">
+    <div class="wordmark" style="font-family:'Manrope',sans-serif; font-size:48px; font-weight:800;">Precept</div>
+    <div class="wordmark-sm" style="font-family:'Manrope',sans-serif; font-size:24px; font-weight:800;">Precept</div>
+    <div class="wordmark-xs" style="font-family:'Manrope',sans-serif; font-size:14px; font-weight:700;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Semi-condensed</span> <span class="tag">Heavy</span> <span class="tag">Technical</span>
+  </div>
+  <div class="verdict verdict-cool">Tighter letter spacing at heavy weights. Dignified. The 'P' has a distinctive bowl.</div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">DM Sans</div>
+  <div class="wordmark-row">
+    <div class="wordmark" style="font-family:'DM Sans',sans-serif; font-size:48px; font-weight:700;">Precept</div>
+    <div class="wordmark-sm" style="font-family:'DM Sans',sans-serif; font-size:24px; font-weight:700;">Precept</div>
+    <div class="wordmark-xs" style="font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Low-contrast</span> <span class="tag">Neutral-warm</span> <span class="tag">Geometric</span>
+  </div>
+  <div class="verdict verdict-neutral">Most restrained of the distinctive options. Google's design system influence. Pairs well with everything.</div>
+</div>
+
+</div>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- ========== APPROACH B: INTER (PRAGMATIC) ========== -->
+<div class="option-group">
+<h2>Approach B: Inter Everywhere</h2>
+<p class="desc">Use Inter for both wordmark and body text. Pragmatic, developer-familiar, zero brand friction. The icon carries all visual identity.</p>
+
+<div class="type-card">
+  <div class="font-label">Inter — wordmark at multiple weights</div>
+  <div class="wordmark-row">
+    <div class="wordmark" style="font-family:'Inter',sans-serif; font-size:48px; font-weight:800;">Precept</div>
+    <div class="wordmark" style="font-family:'Inter',sans-serif; font-size:48px; font-weight:600;">Precept</div>
+    <div class="wordmark" style="font-family:'Inter',sans-serif; font-size:48px; font-weight:400;">Precept</div>
+  </div>
+  <div style="display:flex; gap:24px; margin-top:12px;">
+    <div class="wordmark-sm" style="font-family:'Inter',sans-serif; font-size:24px; font-weight:800;">Precept</div>
+    <div class="wordmark-sm" style="font-family:'Inter',sans-serif; font-size:24px; font-weight:600;">Precept</div>
+    <div class="wordmark-xs" style="font-family:'Inter',sans-serif; font-size:14px; font-weight:700;">Precept</div>
+    <div class="wordmark-xs" style="font-family:'Inter',sans-serif; font-size:14px; font-weight:400;">Precept</div>
+  </div>
+  <div class="pairing" style="font-family:'Inter',sans-serif;">
+    <h3>Full context</h3>
+    <div class="headline" style="font-size:20px; font-weight:700;">Precept — a domain integrity engine for .NET</div>
+    <div class="body-text">Define your entire state machine — states, transitions, fields, guards, constraints — in a single <code>.precept</code> file. The runtime enforces every rule at every boundary.</div>
+  </div>
+  <div class="verdict verdict-neutral">Maximum familiarity. Every developer already reads Inter. Zero personality — relies entirely on icon + color for brand distinction.</div>
+</div>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- ========== APPROACH C: NO WORDMARK ========== -->
+<div class="option-group">
+<h2>Approach C: No Wordmark (Icon Only)</h2>
+<p class="desc">The brand is carried entirely by the icon. Text is set in whatever system font the context demands. Minimal brand surface — maximum icon investment required.</p>
+
+<div class="type-card">
+  <div class="font-label">Icon carries the identity</div>
+  <div style="display:flex; align-items:center; gap:24px; margin-bottom:20px;">
+    <div style="width:64px;height:64px;background:#d97706;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:#0a0a0a;">P</div>
+    <div>
+      <div style="font-size:24px; font-weight:600; color:#fff; font-family:system-ui;">Precept</div>
+      <div style="font-size:13px; color:#666;">System font. The icon IS the brand.</div>
+    </div>
+  </div>
+  <div style="display:flex; gap:16px; align-items:center;">
+    <span style="font-family:'Segoe UI',sans-serif; font-size:14px; color:#999;">Segoe UI:</span>
+    <span style="font-family:'Segoe UI',sans-serif; font-size:14px; color:#ccc; font-weight:600;">Precept</span>
+    <span style="font-family:Arial,sans-serif; font-size:14px; color:#999; margin-left:20px;">Arial:</span>
+    <span style="font-family:Arial,sans-serif; font-size:14px; color:#ccc; font-weight:600;">Precept</span>
+    <span style="font-family:system-ui; font-size:14px; color:#999; margin-left:20px;">system-ui:</span>
+    <span style="font-family:system-ui; font-size:14px; color:#ccc; font-weight:600;">Precept</span>
+  </div>
+  <div class="verdict">Lowest maintenance. Needs a truly excellent icon. Monospace name in docs and READMEs naturally becomes the wordmark via backtick convention.</div>
+</div>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- ========== WORDMARK + CODE FONT PAIRING ========== -->
+<div class="option-group">
+<h2>Bonus: Wordmark + Code Font Pairings</h2>
+<p class="desc">Precept lives in code editors. How does the wordmark look next to the monospace code it governs?</p>
+
+<div class="comparison-grid">
+<div class="type-card">
+  <div class="font-label">Space Grotesk + JetBrains Mono</div>
+  <div style="margin-bottom:12px;">
+    <span style="font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:700; color:#fff;">Precept</span>
+    <span style="font-family:'JetBrains Mono',monospace; font-size:14px; color:#888; margin-left:12px;">precept LoanApplication</span>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#999; line-height:1.6;">
+    <span style="color:#f59e0b;">state</span> Draft <span style="color:#f59e0b;">initial</span><br>
+    <span style="color:#f59e0b;">from</span> Draft <span style="color:#f59e0b;">on</span> Submit -> <span style="color:#f59e0b;">transition</span> Review
+  </div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Sora + JetBrains Mono</div>
+  <div style="margin-bottom:12px;">
+    <span style="font-family:'Sora',sans-serif; font-size:24px; font-weight:700; color:#fff;">Precept</span>
+    <span style="font-family:'JetBrains Mono',monospace; font-size:14px; color:#888; margin-left:12px;">precept LoanApplication</span>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#999; line-height:1.6;">
+    <span style="color:#f59e0b;">state</span> Draft <span style="color:#f59e0b;">initial</span><br>
+    <span style="color:#f59e0b;">from</span> Draft <span style="color:#f59e0b;">on</span> Submit -> <span style="color:#f59e0b;">transition</span> Review
+  </div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Manrope + JetBrains Mono</div>
+  <div style="margin-bottom:12px;">
+    <span style="font-family:'Manrope',sans-serif; font-size:24px; font-weight:800; color:#fff;">Precept</span>
+    <span style="font-family:'JetBrains Mono',monospace; font-size:14px; color:#888; margin-left:12px;">precept LoanApplication</span>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#999; line-height:1.6;">
+    <span style="color:#f59e0b;">state</span> Draft <span style="color:#f59e0b;">initial</span><br>
+    <span style="color:#f59e0b;">from</span> Draft <span style="color:#f59e0b;">on</span> Submit -> <span style="color:#f59e0b;">transition</span> Review
+  </div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Plus Jakarta Sans + JetBrains Mono</div>
+  <div style="margin-bottom:12px;">
+    <span style="font-family:'Plus Jakarta Sans',sans-serif; font-size:24px; font-weight:800; color:#fff;">Precept</span>
+    <span style="font-family:'JetBrains Mono',monospace; font-size:14px; color:#888; margin-left:12px;">precept LoanApplication</span>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#999; line-height:1.6;">
+    <span style="color:#f59e0b;">state</span> Draft <span style="color:#f59e0b;">initial</span><br>
+    <span style="color:#f59e0b;">from</span> Draft <span style="color:#f59e0b;">on</span> Submit -> <span style="color:#f59e0b;">transition</span> Review
+  </div>
+</div>
+</div>
+</div>
+
+<div style="margin-top:32px; padding:24px; background:#141414; border:1px solid #222; border-radius:12px; max-width:700px;">
+  <h3 style="color:#fff; margin-bottom:12px;">How to evaluate</h3>
+  <ul style="color:#aaa; font-size:14px; line-height:1.8; padding-left:20px;">
+    <li><strong>48px</strong> — README hero area, landing page. Is there personality?</li>
+    <li><strong>24px</strong> — Section header, sidebar nav. Still distinctive?</li>
+    <li><strong>14px</strong> — NuGet listing, VS Code marketplace. Readable?</li>
+    <li><strong>Paired with code</strong> — The wordmark sits next to <code>.precept</code> code often. Does it clash or complement?</li>
+    <li><strong>Maintenance cost</strong> — Distinctive wordmark = more design surface. Inter = zero friction. Icon-only = icon must be excellent.</li>
+  </ul>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- ========== ARCHIVED: Indigo-Palette Font Explorations (from color system page) ========== -->
+<div class="option-group">
+<h2>Archived: Indigo-Palette Font Explorations</h2>
+<p class="desc">These fonts were evaluated against the indigo brand palette during color system exploration. <strong>Inconsolata was chosen.</strong> Everything below is archived for reference.</p>
+
+<h3 style="color:#fff; margin-top:24px; margin-bottom:16px;">Sans-Serif Wordmarks (Indigo Palette)</h3>
+
+<div class="comparison-grid">
+
+<div class="type-card">
+  <div class="font-label">Instrument Sans</div>
+  <div class="wordmark-row">
+    <div style="font-family:'Instrument Sans',sans-serif; font-size:48px; font-weight:700; color:#fff;">Precept</div>
+    <div style="font-family:'Instrument Sans',sans-serif; font-size:24px; font-weight:700; color:#a5b4fc;">Precept</div>
+    <div style="font-family:'Instrument Sans',sans-serif; font-size:14px; font-weight:600; color:#71717a;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Variable axis</span> <span class="tag">Sharp angles</span> <span class="tag">New (2023)</span>
+  </div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Archivo</div>
+  <div class="wordmark-row">
+    <div style="font-family:'Archivo',sans-serif; font-size:48px; font-weight:800; color:#fff;">Precept</div>
+    <div style="font-family:'Archivo',sans-serif; font-size:24px; font-weight:800; color:#a5b4fc;">Precept</div>
+    <div style="font-family:'Archivo',sans-serif; font-size:14px; font-weight:700; color:#71717a;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Grotesque revival</span> <span class="tag">Ink traps</span> <span class="tag">Strong 'P'</span>
+  </div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Familjen Grotesk</div>
+  <div class="wordmark-row">
+    <div style="font-family:'Familjen Grotesk',sans-serif; font-size:48px; font-weight:700; color:#fff;">Precept</div>
+    <div style="font-family:'Familjen Grotesk',sans-serif; font-size:24px; font-weight:700; color:#a5b4fc;">Precept</div>
+    <div style="font-family:'Familjen Grotesk',sans-serif; font-size:14px; font-weight:600; color:#71717a;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Swedish design</span> <span class="tag">Unusual proportions</span> <span class="tag">Narrow</span>
+  </div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Urbanist</div>
+  <div class="wordmark-row">
+    <div style="font-family:'Urbanist',sans-serif; font-size:48px; font-weight:700; color:#fff;">Precept</div>
+    <div style="font-family:'Urbanist',sans-serif; font-size:24px; font-weight:700; color:#a5b4fc;">Precept</div>
+    <div style="font-family:'Urbanist',sans-serif; font-size:14px; font-weight:600; color:#71717a;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Pure geometric</span> <span class="tag">Century Gothic successor</span> <span class="tag">Wide bowls</span>
+  </div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Figtree</div>
+  <div class="wordmark-row">
+    <div style="font-family:'Figtree',sans-serif; font-size:48px; font-weight:800; color:#fff;">Precept</div>
+    <div style="font-family:'Figtree',sans-serif; font-size:24px; font-weight:800; color:#a5b4fc;">Precept</div>
+    <div style="font-family:'Figtree',sans-serif; font-size:14px; font-weight:700; color:#71717a;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Friendly geometric</span> <span class="tag">GitHub-inspired</span> <span class="tag">Clear at small sizes</span>
+  </div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">JetBrains Mono (as wordmark)</div>
+  <div class="wordmark-row">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:48px; font-weight:700; color:#fff;">Precept</div>
+    <div style="font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:700; color:#a5b4fc;">Precept</div>
+    <div style="font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:#71717a;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Monospace = developer signal</span> <span class="tag">Same font as the DSL</span> <span class="tag">Zero design debt</span>
+  </div>
+</div>
+
+</div>
+
+<h3 style="color:#fff; margin-top:32px; margin-bottom:16px;">Monospace / Terminal-Style Wordmarks (Indigo Palette)</h3>
+<p class="desc" style="margin-bottom:20px;">If the code IS the brand, the wordmark should feel like code. Six monospace faces beyond JetBrains Mono — each has different character.</p>
+
+<div class="comparison-grid">
+
+<div class="type-card">
+  <div class="font-label">Fira Code</div>
+  <div class="wordmark-row">
+    <div style="font-family:'Fira Code',monospace; font-size:48px; font-weight:700; color:#fff;">Precept</div>
+    <div style="font-family:'Fira Code',monospace; font-size:24px; font-weight:700; color:#a5b4fc;">Precept</div>
+    <div style="font-family:'Fira Code',monospace; font-size:14px; font-weight:600; color:#71717a;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Ligatures</span> <span class="tag">Mozilla heritage</span> <span class="tag">Warm terminals</span>
+  </div>
+  <div style="font-family:'Fira Code',monospace; font-size:13px; color:#64748b; margin-top:12px; line-height:1.6;">
+    <span style="color:#818cf8;">from</span> <span style="color:#a5b4fc;">Draft</span> <span style="color:#818cf8;">on</span> <span style="color:#c4b5fd;">Submit</span> <span style="color:#818cf8;font-weight:700;">-></span> <span style="color:#818cf8;">transition</span> <span style="color:#94a3b8;">Review</span>
+  </div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Source Code Pro</div>
+  <div class="wordmark-row">
+    <div style="font-family:'Source Code Pro',monospace; font-size:48px; font-weight:700; color:#fff;">Precept</div>
+    <div style="font-family:'Source Code Pro',monospace; font-size:24px; font-weight:700; color:#a5b4fc;">Precept</div>
+    <div style="font-family:'Source Code Pro',monospace; font-size:14px; font-weight:600; color:#71717a;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Adobe</span> <span class="tag">VS Code default</span> <span class="tag">Extremely legible</span>
+  </div>
+  <div style="font-family:'Source Code Pro',monospace; font-size:13px; color:#64748b; margin-top:12px; line-height:1.6;">
+    <span style="color:#818cf8;">from</span> <span style="color:#a5b4fc;">Draft</span> <span style="color:#818cf8;">on</span> <span style="color:#c4b5fd;">Submit</span> <span style="color:#818cf8;font-weight:700;">-></span> <span style="color:#818cf8;">transition</span> <span style="color:#94a3b8;">Review</span>
+  </div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">IBM Plex Mono</div>
+  <div class="wordmark-row">
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:48px; font-weight:700; color:#fff;">Precept</div>
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:24px; font-weight:700; color:#a5b4fc;">Precept</div>
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:600; color:#71717a;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Corporate precision</span> <span class="tag">Slab-influenced</span> <span class="tag">Distinctive 'P'</span>
+  </div>
+  <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#64748b; margin-top:12px; line-height:1.6;">
+    <span style="color:#818cf8;">from</span> <span style="color:#a5b4fc;">Draft</span> <span style="color:#818cf8;">on</span> <span style="color:#c4b5fd;">Submit</span> <span style="color:#818cf8;font-weight:700;">-></span> <span style="color:#818cf8;">transition</span> <span style="color:#94a3b8;">Review</span>
+  </div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Space Mono</div>
+  <div class="wordmark-row">
+    <div style="font-family:'Space Mono',monospace; font-size:48px; font-weight:700; color:#fff;">Precept</div>
+    <div style="font-family:'Space Mono',monospace; font-size:24px; font-weight:700; color:#a5b4fc;">Precept</div>
+    <div style="font-family:'Space Mono',monospace; font-size:14px; font-weight:700; color:#71717a;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Colophon Foundry</span> <span class="tag">Retro-futurist</span> <span class="tag">Strong personality</span>
+  </div>
+  <div style="font-family:'Space Mono',monospace; font-size:13px; color:#64748b; margin-top:12px; line-height:1.6;">
+    <span style="color:#818cf8;">from</span> <span style="color:#a5b4fc;">Draft</span> <span style="color:#818cf8;">on</span> <span style="color:#c4b5fd;">Submit</span> <span style="color:#818cf8;font-weight:700;">-></span> <span style="color:#818cf8;">transition</span> <span style="color:#94a3b8;">Review</span>
+  </div>
+</div>
+
+<div class="type-card" style="border-color:#312e81;">
+  <div class="font-label" style="color:#818cf8;">Inconsolata ✅ CHOSEN</div>
+  <div class="wordmark-row">
+    <div style="font-family:'Inconsolata',monospace; font-size:48px; font-weight:700; color:#fff;">Precept</div>
+    <div style="font-family:'Inconsolata',monospace; font-size:24px; font-weight:700; color:#a5b4fc;">Precept</div>
+    <div style="font-family:'Inconsolata',monospace; font-size:14px; font-weight:700; color:#71717a;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Humanist mono</span> <span class="tag">Narrow</span> <span class="tag">Classic programmer font</span>
+  </div>
+  <div style="font-family:'Inconsolata',monospace; font-size:13px; color:#64748b; margin-top:12px; line-height:1.6;">
+    <span style="color:#818cf8;">from</span> <span style="color:#a5b4fc;">Draft</span> <span style="color:#818cf8;">on</span> <span style="color:#c4b5fd;">Submit</span> <span style="color:#818cf8;font-weight:700;">-></span> <span style="color:#818cf8;">transition</span> <span style="color:#94a3b8;">Review</span>
+  </div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Red Hat Mono</div>
+  <div class="wordmark-row">
+    <div style="font-family:'Red Hat Mono',monospace; font-size:48px; font-weight:700; color:#fff;">Precept</div>
+    <div style="font-family:'Red Hat Mono',monospace; font-size:24px; font-weight:700; color:#a5b4fc;">Precept</div>
+    <div style="font-family:'Red Hat Mono',monospace; font-size:14px; font-weight:600; color:#71717a;">Precept</div>
+  </div>
+  <div class="meta-row">
+    <span class="tag">Open source enterprise</span> <span class="tag">Generous spacing</span> <span class="tag">Clean curves</span>
+  </div>
+  <div style="font-family:'Red Hat Mono',monospace; font-size:13px; color:#64748b; margin-top:12px; line-height:1.6;">
+    <span style="color:#818cf8;">from</span> <span style="color:#a5b4fc;">Draft</span> <span style="color:#818cf8;">on</span> <span style="color:#c4b5fd;">Submit</span> <span style="color:#818cf8;font-weight:700;">-></span> <span style="color:#818cf8;">transition</span> <span style="color:#94a3b8;">Review</span>
+  </div>
+</div>
+
+</div>
+
+<h3 style="color:#fff; margin-top:32px; margin-bottom:16px;">Wordmark + Code Pairings (Indigo Palette)</h3>
+
+<div class="comparison-grid">
+<div class="type-card">
+  <div class="font-label">Instrument Sans + JetBrains Mono</div>
+  <div style="margin-bottom:12px; display:flex; align-items:baseline; gap:16px;">
+    <span style="font-family:'Instrument Sans',sans-serif; font-size:24px; font-weight:700; color:#fff;">Precept</span>
+    <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#818cf8;">precept LoanApplication</span>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#64748b; line-height:1.6;">
+    <span style="color:#818cf8;">state</span> <span style="color:#a5b4fc;">Draft</span> <span style="color:#818cf8;">initial</span> &nbsp; <span style="color:#818cf8;">from</span> <span style="color:#a5b4fc;">Draft</span> <span style="color:#818cf8;">on</span> <span style="color:#c4b5fd;">Submit</span> <span style="color:#818cf8;">-></span> <span style="color:#818cf8;">transition</span> <span style="color:#94a3b8;">Review</span>
+  </div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Archivo + JetBrains Mono</div>
+  <div style="margin-bottom:12px; display:flex; align-items:baseline; gap:16px;">
+    <span style="font-family:'Archivo',sans-serif; font-size:24px; font-weight:800; color:#fff;">Precept</span>
+    <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#818cf8;">precept LoanApplication</span>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#64748b; line-height:1.6;">
+    <span style="color:#818cf8;">state</span> <span style="color:#a5b4fc;">Draft</span> <span style="color:#818cf8;">initial</span> &nbsp; <span style="color:#818cf8;">from</span> <span style="color:#a5b4fc;">Draft</span> <span style="color:#818cf8;">on</span> <span style="color:#c4b5fd;">Submit</span> <span style="color:#818cf8;">-></span> <span style="color:#818cf8;">transition</span> <span style="color:#94a3b8;">Review</span>
+  </div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">JetBrains Mono (unified)</div>
+  <div style="margin-bottom:12px; display:flex; align-items:baseline; gap:16px;">
+    <span style="font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:700; color:#fff;">Precept</span>
+    <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#818cf8;">precept LoanApplication</span>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#64748b; line-height:1.6;">
+    <span style="color:#818cf8;">state</span> <span style="color:#a5b4fc;">Draft</span> <span style="color:#818cf8;">initial</span> &nbsp; <span style="color:#818cf8;">from</span> <span style="color:#a5b4fc;">Draft</span> <span style="color:#818cf8;">on</span> <span style="color:#c4b5fd;">Submit</span> <span style="color:#818cf8;">-></span> <span style="color:#818cf8;">transition</span> <span style="color:#94a3b8;">Review</span>
+  </div>
+</div>
+
+<div class="type-card">
+  <div class="font-label">Figtree + JetBrains Mono</div>
+  <div style="margin-bottom:12px; display:flex; align-items:baseline; gap:16px;">
+    <span style="font-family:'Figtree',sans-serif; font-size:24px; font-weight:800; color:#fff;">Precept</span>
+    <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#818cf8;">precept LoanApplication</span>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#64748b; line-height:1.6;">
+    <span style="color:#818cf8;">state</span> <span style="color:#a5b4fc;">Draft</span> <span style="color:#818cf8;">initial</span> &nbsp; <span style="color:#818cf8;">from</span> <span style="color:#a5b4fc;">Draft</span> <span style="color:#818cf8;">on</span> <span style="color:#c4b5fd;">Submit</span> <span style="color:#818cf8;">-></span> <span style="color:#818cf8;">transition</span> <span style="color:#94a3b8;">Review</span>
+  </div>
+</div>
+</div>
+
+</div>
+
+</body>
+</html>

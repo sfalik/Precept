@@ -1,0 +1,21 @@
+{
+  "filename": "65-denotation.svg",
+  "title": "The denotation brackets ⟦ ⟧ constructed as pure geometric slabs. In denotational semantics, ⟦P⟧ means 'the meaning of program P.' Precept's .precept file is exactly this: the complete denotation of an entity's behavior — written once, compiled once, governing every instance forever. The double-bar construction distinguishes the semantic brackets from ordinary brackets: this is a formal mathematical claim, not a code grouping.",
+  "conceptualBridge": "The denotation brackets mean Precept's definition is the complete semantic meaning of an entity because ⟦·⟧ is the formal notation for 'the denotation of a program' — the .precept file is the total specification from which all valid behaviors are derived.",
+  "status": "shortlisted",
+  "decision": "Shortlisted: 4.38 avg — the geometric slab brackets are visually distinctive and pass all rubric minimums; the symmetric double-bar construction projects precision and formality; cobalt palette is fresh; main weakness is the conceptual bridge (3.5) which requires knowledge of denotational semantics notation.",
+  "tags": ["mathematical", "denotation-brackets", "semantic", "cobalt", "geometric-slab"],
+  "palette": ["#060810", "#2050C8"],
+  "averageScore": 4.38,
+  "rubricScores": {
+    "conceptualBridge": 3.5,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 4.5,
+    "visualEconomy": 4,
+    "monochromeTest": 5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 5
+  },
+  "needsRescore": false
+}

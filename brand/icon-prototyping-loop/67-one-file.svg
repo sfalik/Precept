@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    One file. All rules.
+
+    A compact vertical rectangle — the .precept file — filled with
+    horizontal lines packed tight. Every line is a rule. Every rule
+    is in this one file. Nothing is scattered across services,
+    across layers, across codebases.
+
+    The file shape is the product's primary artifact: what you write,
+    what the compiler compiles, what governs every instance.
+
+    The lines are dense but organized — not random, not chaotic.
+    Five groups of lines, separated by thin gaps: the five sections
+    of a Precept definition (precept header, states, events, transitions, constraints).
+
+    At 32px: a tall dark rectangle with horizontal rules inside.
+    Small but unmistakable as a document full of governing text.
+
+    Gold on near-black. Classic legal-document palette.
+  -->
+
+  <rect width="512" height="512" fill="#080A10"/>
+
+  <!-- The file: a tall narrow rectangle with a slight fold on top-right corner -->
+  <polygon points="148,52 340,52 364,76 364,460 148,460" fill="#141820"/>
+
+  <!-- Corner fold indicator -->
+  <polygon points="340,52 364,76 340,76" fill="#080A10"/>
+  <polyline points="340,52 340,76 364,76" fill="none" stroke="#2A3A50" stroke-width="2"/>
+
+  <!-- Section 1: precept header (1 bold line) -->
+  <rect x="172" y="88"  width="164" height="8" rx="2" fill="#D4A020"/>
+
+  <!-- Section 2: state declarations (4 lines) -->
+  <rect x="172" y="124" width="140" height="6" rx="1" fill="#4A7AC0"/>
+  <rect x="172" y="138" width="120" height="6" rx="1" fill="#4A7AC0"/>
+  <rect x="172" y="152" width="132" height="6" rx="1" fill="#4A7AC0"/>
+  <rect x="172" y="166" width="108" height="6" rx="1" fill="#4A7AC0"/>
+
+  <!-- Section 3: event declarations (3 lines) -->
+  <rect x="172" y="200" width="144" height="6" rx="1" fill="#4A9CB0"/>
+  <rect x="172" y="214" width="128" height="6" rx="1" fill="#4A9CB0"/>
+  <rect x="172" y="228" width="136" height="6" rx="1" fill="#4A9CB0"/>
+
+  <!-- Section 4: transition rules (5 lines — the most important section) -->
+  <rect x="172" y="264" width="164" height="6" rx="1" fill="#C89840"/>
+  <rect x="172" y="278" width="148" height="6" rx="1" fill="#C89840"/>
+  <rect x="172" y="292" width="164" height="8" rx="2" fill="#1FFF7A"/>
+  <rect x="172" y="308" width="140" height="6" rx="1" fill="#C89840"/>
+  <rect x="172" y="322" width="156" height="6" rx="1" fill="#C89840"/>
+
+  <!-- Section 5: constraint rules (3 lines) -->
+  <rect x="172" y="358" width="132" height="6" rx="1" fill="#A050A0"/>
+  <rect x="172" y="372" width="144" height="6" rx="1" fill="#A050A0"/>
+  <rect x="172" y="386" width="120" height="6" rx="1" fill="#A050A0"/>
+
+  <!-- Border of the file -->
+  <polygon points="148,52 340,52 364,76 364,460 148,460" fill="none" stroke="#2A3A50" stroke-width="2"/>
+</svg>

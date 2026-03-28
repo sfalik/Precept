@@ -3,12 +3,20 @@
   "title": "The P exists only as absence — a window cut through solid amber material. The surrounding field is the unbreakable governed contract; the P-shaped void proves that inside every Precept domain, everything is always visible and inspectable by design.",
   "conceptualBridge": "The negative-space P means inspectability because the governed contract is the solid field and the interior is visible only through what the definition allows.",
   "status": "shortlisted",
-  "decision": "Shortlisted for combining ownable letterform recognition with a strong inspectability metaphor.",
+  "decision": "Kept: avg 4.31, no hard fails — negative-space letterform with specific inspectability metaphor; the inversion of positive space makes a striking, memorable icon that communicates 'everything inside is visible by design'.",
   "tags": ["letterform", "negative-space", "amber", "inspectability"],
   "palette": ["#0D1018", "#C8891F"],
-  "averageScore": 4.3,
-  "rubricScores": null,
-  "scoreDetailStatus": "average-only",
-  "needsRescore": true,
-  "metadataOrigin": "backfilled"
+  "averageScore": 4.31,
+  "rubricScores": {
+    "conceptualBridge": 4,
+    "structuralSoundness": 4,
+    "legibilityAtSmallSize": 4.5,
+    "distinctSilhouette": 4,
+    "visualEconomy": 5,
+    "monochromeTest": 4.5,
+    "colorAndContrast": 4.5,
+    "uniquenessInFolder": 4
+  },
+  "needsRescore": false,
+  "metadataOrigin": "backfilled, rescored"
 }

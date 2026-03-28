@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    The compile-time horizon: the line before which everything is defined,
+    and after which nothing invalid can exist.
+
+    Left side: the definition — horizontal rule bands represent the
+    declared states, events, and transition rules.
+    The vertical bright bar is the compile-time verification line.
+    Right side: runtime — the void. Nothing runs here that wasn't certified.
+
+    Precept's compiler draws this line. Everything left of it is the contract.
+    Everything right of it is only what the contract permits.
+    The line itself is the guarantee.
+  -->
+
+  <rect width="512" height="512" fill="#0A0C12"/>
+
+  <!-- Left side: definition structure (colored bands) -->
+  <!-- State declarations: blue -->
+  <rect x="48" y="128" width="184" height="28" rx="4" fill="#4A7AC0"/>
+  <rect x="48" y="168" width="152" height="28" rx="4" fill="#4A7AC0"/>
+  <rect x="48" y="208" width="168" height="28" rx="4" fill="#4A7AC0"/>
+
+  <!-- Transition rules: amber -->
+  <rect x="48" y="268" width="188" height="28" rx="4" fill="#C89840"/>
+  <rect x="48" y="308" width="172" height="28" rx="4" fill="#C89840"/>
+
+  <!-- Key governing rule: bright accent -->
+  <rect x="48" y="348" width="188" height="32" rx="4" fill="#1FFF7A"/>
+
+  <!-- Compile-time verification line: the bright vertical bar -->
+  <rect x="252" y="80" width="10" height="352" rx="4" fill="#E8E0D0"/>
+
+  <!-- Right side: runtime — void (nothing is here except what the definition permits) -->
+  <!-- Subtle suggestion of "what's permitted" — a single faint copy of the bright rule -->
+  <rect x="276" y="348" width="188" height="32" rx="4" fill="#1FFF7A" opacity="0.2"/>
+</svg>
