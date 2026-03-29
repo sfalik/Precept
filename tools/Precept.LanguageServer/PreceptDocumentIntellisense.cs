@@ -8,11 +8,13 @@ namespace Precept.LanguageServer;
 internal static class PreceptDocumentIntellisense
 {
     private static readonly Regex PreceptDeclRegex = new("^\\s*precept\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
-    private static readonly Regex StateDeclRegex = new("^\\s*state\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
-    private static readonly Regex EventDeclRegex = new("^\\s*event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
+    private static readonly Regex StateDeclRegex = new("^\\s*state\\s+(?<rest>.+)$", RegexOptions.Compiled);
+    private static readonly Regex EventDeclRegex = new("^\\s*event\\s+(?<rest>.+)$", RegexOptions.Compiled);
     private static readonly Regex FieldDeclRegex = new("^\\s*field\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?<type>string|number|boolean)(?:\\s|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex CollectionFieldDeclRegex = new("^\\s*field\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?<kind>set|queue|stack)\\s+of\\s+(?<type>string|number|boolean)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex EventWithArgsRegex = new("^\\s*event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+with\\s+(?<args>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex EventWithArgsRegex = new("^\\s*event\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+with\\s+(?<args>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex IdentifierPattern = new("[A-Za-z_][A-Za-z0-9_]*", RegexOptions.Compiled);
+    private static readonly HashSet<string> StateKeywords = new(StringComparer.Ordinal) { "initial" };
     private static readonly Regex TransitionRowRegex = new("^\\s*from\\s+(?<states>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)(?<rest>.*)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex StateClauseRegex = new("^\\s*(?<prep>in|to|from)\\s+(?<states>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+(?<tail>assert|edit|->)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EventAssertRegex = new("^\\s*on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)\\s+assert\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -24,9 +26,9 @@ internal static class PreceptDocumentIntellisense
         var (model, _) = PreceptParser.ParseWithDiagnostics(text);
 
         var states = model?.States.Select(static state => state.Name).ToArray()
-            ?? CollectIdentifiers(lines, StateDeclRegex);
+            ?? CollectMultiIdentifiers(lines, StateDeclRegex, StateKeywords);
         var events = model?.Events.Select(static evt => evt.Name).ToArray()
-            ?? CollectIdentifiers(lines, EventDeclRegex);
+            ?? CollectEventNames(lines);
         var fields = model?.Fields.Select(static field => field.Name).ToArray()
             ?? CollectIdentifiers(lines, FieldDeclRegex);
         var collections = model?.CollectionFields.Select(static field => field.Name).ToArray()
@@ -437,57 +439,79 @@ internal static class PreceptDocumentIntellisense
             var stateMatch = StateDeclRegex.Match(line);
             if (stateMatch.Success)
             {
-                var name = stateMatch.Groups["name"].Value;
-                var isInitial = model is not null && string.Equals(model.InitialState.Name, name, StringComparison.Ordinal);
-                var symbol = BuildSymbol(
-                    name,
-                    PreceptDeclaredSymbolKind.State,
-                    isInitial ? "initial state" : "state",
-                    lineIndex,
-                    line,
-                    "name",
-                    null,
-                    $"```precept\nstate {name}{(isInitial ? " initial" : string.Empty)}\n```\n\n{(isInitial ? "Initial" : "Declared")} state.");
-                states[name] = symbol;
-                ordered.Add(symbol);
+                var rest = stateMatch.Groups["rest"].Value;
+                var restStart = stateMatch.Groups["rest"].Index;
+                foreach (Match nameMatch in IdentifierPattern.Matches(rest))
+                {
+                    var name = nameMatch.Value;
+                    if (StateKeywords.Contains(name))
+                        continue;
+                    var isInitial = model is not null && string.Equals(model.InitialState.Name, name, StringComparison.Ordinal);
+                    var nameStart = restStart + nameMatch.Index;
+                    var symbol = new PreceptDeclaredSymbol(
+                        name,
+                        PreceptDeclaredSymbolKind.State,
+                        isInitial ? "initial state" : "state",
+                        CreateLineRange(lineIndex, line),
+                        CreateRange(lineIndex, nameStart, nameStart + name.Length),
+                        null,
+                        $"```precept\nstate {name}{(isInitial ? " initial" : string.Empty)}\n```\n\n{(isInitial ? "Initial" : "Declared")} state.");
+                    states[name] = symbol;
+                    ordered.Add(symbol);
+                }
                 continue;
             }
 
             var eventMatch = EventDeclRegex.Match(line);
             if (eventMatch.Success)
             {
-                var name = eventMatch.Groups["name"].Value;
-                eventsByName.TryGetValue(name, out var evt);
-                var symbol = BuildSymbol(
-                    name,
-                    PreceptDeclaredSymbolKind.Event,
-                    BuildEventDetail(evt),
-                    lineIndex,
-                    line,
-                    "name",
-                    null,
-                    BuildEventMarkdown(name, evt));
-                events[name] = symbol;
-                ordered.Add(symbol);
+                var rest = eventMatch.Groups["rest"].Value;
+                var restStart = eventMatch.Groups["rest"].Index;
 
-                if (evt is not null)
+                // Extract event names (stop at "with" keyword)
+                var nameMatches = IdentifierPattern.Matches(rest)
+                    .Cast<Match>()
+                    .TakeWhile(static m => !string.Equals(m.Value, "with", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                // Track where args start for arg symbol creation
+                var withIdx = rest.IndexOf(" with ", StringComparison.OrdinalIgnoreCase);
+                var argsSearchStart = withIdx >= 0 ? restStart + withIdx : line.Length;
+
+                foreach (var nameMatch in nameMatches)
                 {
-                    var searchStart = eventMatch.Groups["name"].Index + eventMatch.Groups["name"].Length;
-                    foreach (var arg in evt.Args)
-                    {
-                        var argIndex = FindArgumentIndex(line, arg.Name, searchStart);
-                        if (argIndex < 0)
-                            continue;
+                    var name = nameMatch.Value;
+                    eventsByName.TryGetValue(name, out var evt);
+                    var nameStart = restStart + nameMatch.Index;
+                    var symbol = new PreceptDeclaredSymbol(
+                        name,
+                        PreceptDeclaredSymbolKind.Event,
+                        BuildEventDetail(evt),
+                        CreateLineRange(lineIndex, line),
+                        CreateRange(lineIndex, nameStart, nameStart + name.Length),
+                        null,
+                        BuildEventMarkdown(name, evt));
+                    events[name] = symbol;
+                    ordered.Add(symbol);
 
-                        var argSymbol = new PreceptDeclaredSymbol(
-                            arg.Name,
-                            PreceptDeclaredSymbolKind.EventArg,
-                            FormatScalarType(arg.Type, arg.IsNullable),
-                            CreateLineRange(lineIndex, line),
-                            CreateRange(lineIndex, argIndex, argIndex + arg.Name.Length),
-                            name,
-                            BuildEventArgMarkdown(name, arg));
-                        eventArgs[$"{name}.{arg.Name}"] = argSymbol;
+                    if (evt is not null)
+                    {
+                        foreach (var arg in evt.Args)
+                        {
+                            var argIndex = FindArgumentIndex(line, arg.Name, argsSearchStart);
+                            if (argIndex < 0)
+                                continue;
+
+                            var argSymbol = new PreceptDeclaredSymbol(
+                                arg.Name,
+                                PreceptDeclaredSymbolKind.EventArg,
+                                FormatScalarType(arg.Type, arg.IsNullable),
+                                CreateLineRange(lineIndex, line),
+                                CreateRange(lineIndex, argIndex, argIndex + arg.Name.Length),
+                                name,
+                                BuildEventArgMarkdown(name, arg));
+                            eventArgs[$"{name}.{arg.Name}"] = argSymbol;
+                        }
                     }
                 }
             }
@@ -605,8 +629,6 @@ internal static class PreceptDocumentIntellisense
         var match = kind switch
         {
             PreceptDeclaredSymbolKind.Precept => PreceptDeclRegex.Match(line),
-            PreceptDeclaredSymbolKind.State => StateDeclRegex.Match(line),
-            PreceptDeclaredSymbolKind.Event => EventDeclRegex.Match(line),
             PreceptDeclaredSymbolKind.Field => FieldDeclRegex.Match(line),
             PreceptDeclaredSymbolKind.CollectionField => CollectionFieldDeclRegex.Match(line),
             _ => throw new InvalidOperationException($"Unsupported declaration kind '{kind}'.")
@@ -682,12 +704,15 @@ internal static class PreceptDocumentIntellisense
             if (!match.Success)
                 continue;
 
-            var eventName = match.Groups["name"].Value;
+            var names = IdentifierPattern.Matches(match.Groups["names"].Value)
+                .Select(static m => m.Value)
+                .ToArray();
             var args = Regex.Matches(match.Groups["args"].Value, "\\b(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+", RegexOptions.IgnoreCase)
                 .Select(static value => value.Groups["name"].Value)
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
-            result[eventName] = args;
+            foreach (var eventName in names)
+                result[eventName] = args;
         }
 
         return result;
@@ -777,6 +802,48 @@ internal static class PreceptDocumentIntellisense
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static value => value, StringComparer.Ordinal)
             .ToArray();
+
+    /// <summary>
+    /// Extracts all identifiers from lines matching a regex with a "rest" capture group,
+    /// filtering out keywords in the exclude set (e.g. "initial" for state declarations).
+    /// </summary>
+    private static string[] CollectMultiIdentifiers(string[] lines, Regex regex, HashSet<string> excludeKeywords)
+        => lines
+            .Select(line => regex.Match(line))
+            .Where(static match => match.Success)
+            .SelectMany(match => IdentifierPattern.Matches(match.Groups["rest"].Value)
+                .Select(static m => m.Value)
+                .Where(name => !excludeKeywords.Contains(name)))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static value => value, StringComparer.Ordinal)
+            .ToArray();
+
+    /// <summary>
+    /// Extracts event names from event declaration lines, handling multi-name declarations.
+    /// For "event A, B with ..." extracts A and B. For "event C" extracts C.
+    /// </summary>
+    private static string[] CollectEventNames(string[] lines)
+    {
+        var names = new List<string>();
+        foreach (var line in lines)
+        {
+            var withMatch = EventWithArgsRegex.Match(line);
+            if (withMatch.Success)
+            {
+                names.AddRange(IdentifierPattern.Matches(withMatch.Groups["names"].Value)
+                    .Select(static m => m.Value));
+                continue;
+            }
+            var simpleMatch = EventDeclRegex.Match(line);
+            if (simpleMatch.Success)
+            {
+                names.AddRange(IdentifierPattern.Matches(simpleMatch.Groups["rest"].Value)
+                    .Select(static m => m.Value)
+                    .TakeWhile(static name => !string.Equals(name, "with", StringComparison.OrdinalIgnoreCase)));
+            }
+        }
+        return names.Distinct(StringComparer.Ordinal).OrderBy(static v => v, StringComparer.Ordinal).ToArray();
+    }
 
     private static bool TryGetIdentifierAtPosition(string line, int character, out string identifier, out int start, out int end)
     {

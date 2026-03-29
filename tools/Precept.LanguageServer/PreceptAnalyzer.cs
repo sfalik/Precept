@@ -100,6 +100,21 @@ internal sealed class PreceptAnalyzer
         var collectionKinds = info.CollectionKinds;
         var currentEvent = FindCurrentEventName(lines, (int)position.Line);
 
+        // ── Completion suppression: "inventing a name" positions ──
+        // When the user is typing a new identifier name, suppress the default keyword list.
+        if (Regex.IsMatch(beforeCursor, @"^\s*precept\s+\S*$", RegexOptions.IgnoreCase))
+            return Array.Empty<CompletionItem>();
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+$", RegexOptions.IgnoreCase))
+            return Array.Empty<CompletionItem>();
+        if (Regex.IsMatch(beforeCursor, @"^\s*state\s+$", RegexOptions.IgnoreCase))
+            return Array.Empty<CompletionItem>();
+        if (Regex.IsMatch(beforeCursor, @"^\s*state\s+.*,\s*$", RegexOptions.IgnoreCase))
+            return Array.Empty<CompletionItem>();
+        if (Regex.IsMatch(beforeCursor, @"^\s*event\s+$", RegexOptions.IgnoreCase))
+            return Array.Empty<CompletionItem>();
+        if (Regex.IsMatch(beforeCursor, @"^\s*event\s+[A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*\s*,\s*$", RegexOptions.IgnoreCase))
+            return Array.Empty<CompletionItem>();
+
         // Collection member prefix: e.g. "Floors." → suggest .count, .min, .max, .peek
         var collectionMemberPrefixMatch = Regex.Match(beforeCursor, "(?<col>[A-Za-z_][A-Za-z0-9_]*)\\.$");
         if (collectionMemberPrefixMatch.Success)
@@ -346,9 +361,13 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, "\\bof\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return ScalarTypeItems;
 
-        // After "state <Name> ", suggest the "initial" keyword
-        if (Regex.IsMatch(beforeCursor, "^\\s*state\\s+[A-Za-z_][A-Za-z0-9_]*\\s+[^\\n]*$", RegexOptions.IgnoreCase))
-            return [InitialItem];
+        // After "state <Name>[, ...] " (trailing space after a name), suggest "initial" and ","
+        if (Regex.IsMatch(beforeCursor, @"^\s*state\s+(?:[A-Za-z_][A-Za-z0-9_]*\s*(?:initial\s*)?(?:,\s*)?)*[A-Za-z_][A-Za-z0-9_]*\s+$", RegexOptions.IgnoreCase))
+            return [InitialItem, new CompletionItem { Label = ",", Kind = CompletionItemKind.Operator, Detail = "add another state name" }];
+
+        // After "state ... initial " (trailing space after initial), suggest ","
+        if (Regex.IsMatch(beforeCursor, @"^\s*state\s+.*\binitial\s+$", RegexOptions.IgnoreCase))
+            return [new CompletionItem { Label = ",", Kind = CompletionItemKind.Operator, Detail = "add another state name" }];
 
         return DistinctAndSort(KeywordItems.Concat(GlobalSnippetItems));
     }

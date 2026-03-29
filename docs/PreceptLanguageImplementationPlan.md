@@ -362,7 +362,7 @@ Run all three test projects (`Precept.Tests`, `Precept.LanguageServer.Tests`, `P
 
 ## Planned Follow-Up: Multi-Name State & Event Declarations
 
-**Status:** Not yet implemented
+**Status:** Implemented
 **Prerequisite:** None (independent of compile-time checking expansion)
 
 ### Motivation
@@ -611,8 +611,8 @@ Update the existing `state <Name> ` completion branch (suggests `initial`) to al
 #### Step 9: Documentation Sync
 
 - [x] `PreceptLanguageDesign.md` — grammar, state declarations, event declarations (updated in this pass)
-- [ ] `README.md` — review for any syntax examples that show state/event declarations; update if needed
-- [ ] `ConstructCatalog` — `ConstructInfo` registrations updated in Steps 2–3
+- [x] `README.md` — reviewed; syntax examples use one-per-line style which remains valid
+- [x] `ConstructCatalog` — `ConstructInfo` registrations updated in Steps 2–3
 
 #### Step 10: Build & Full Test Suite
 

@@ -71,24 +71,49 @@
       "patterns": [
         {
           "name": "meta.declaration.state.precept",
-          "match": "^(\\s*)(state)(\\s+)([A-Za-z_][A-Za-z0-9_]*)(\\s+(initial))?",
+          "match": "^(\\s*)(state)(\\s+)(.*)",
           "captures": {
             "2": { "name": "keyword.control.precept" },
-            "4": { "name": "entity.name.type.state.precept" },
-            "6": { "name": "keyword.control.precept" }
+            "4": {
+              "patterns": [
+                {
+                  "name": "keyword.control.precept",
+                  "match": "\\binitial\\b"
+                },
+                {
+                  "name": "entity.name.type.state.precept",
+                  "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+                },
+                {
+                  "name": "punctuation.separator.comma.precept",
+                  "match": ","
+                }
+              ]
+            }
           }
         }
       ]
     },
     "eventWithArgsDeclaration": {
-      "comment": "event Name with Arg as type, Arg2 as type",
+      "comment": "event Name[, Name, ...] with Arg as type, Arg2 as type",
       "patterns": [
         {
           "name": "meta.declaration.event.precept",
-          "match": "^(\\s*)(event)(\\s+)([A-Za-z_][A-Za-z0-9_]*)(\\s+)(with)(\\s+)(.*)",
+          "match": "^(\\s*)(event)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(with)(\\s+)(.*)",
           "captures": {
             "2": { "name": "keyword.control.precept" },
-            "4": { "name": "entity.name.function.event.precept" },
+            "4": {
+              "patterns": [
+                {
+                  "name": "entity.name.function.event.precept",
+                  "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+                },
+                {
+                  "name": "punctuation.separator.comma.precept",
+                  "match": ","
+                }
+              ]
+            },
             "6": { "name": "keyword.other.precept" },
             "8": {
               "patterns": [
@@ -118,10 +143,21 @@
       "patterns": [
         {
           "name": "meta.declaration.event.precept",
-          "match": "^(\\s*)(event)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
+          "match": "^(\\s*)(event)(\\s+)(.*)",
           "captures": {
             "2": { "name": "keyword.control.precept" },
-            "4": { "name": "entity.name.function.event.precept" }
+            "4": {
+              "patterns": [
+                {
+                  "name": "entity.name.function.event.precept",
+                  "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+                },
+                {
+                  "name": "punctuation.separator.comma.precept",
+                  "match": ","
+                }
+              ]
+            }
           }
         }
       ]

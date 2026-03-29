@@ -607,16 +607,24 @@ public static class PreceptParser
                 "Global data constraint checked after every mutation",
                 "invariant Priority >= 1 because \"Priority must be positive\""));
 
-    // state <Name> [initial]
+    // state <Name> [initial] (, <Name> [initial])*
+    private sealed record StateNameEntry(string Name, bool IsInitial, int Line, int Column);
+
+    private static readonly TokenListParser<PreceptToken, StateNameEntry> StateNameEntryParser =
+        from name in Token.EqualTo(PreceptToken.Identifier)
+        from initial in Token.EqualTo(PreceptToken.Initial).Value(true).OptionalOrDefault(false)
+        select new StateNameEntry(name.ToText(), initial, name.Span.Position.Line, name.Span.Position.Column);
+
     private static readonly TokenListParser<PreceptToken, StatementResult> StateDecl =
         (from kw in Token.EqualTo(PreceptToken.State)
-         from name in Token.EqualTo(PreceptToken.Identifier)
-         from initial in Token.EqualTo(PreceptToken.Initial).Value(true).OptionalOrDefault(false)
-         select (StatementResult)new StateResult(new PreceptState(name.ToText(), kw.Span.Position.Line), initial))
+         from entries in StateNameEntryParser.AtLeastOnceDelimitedBy(Token.EqualTo(PreceptToken.Comma))
+         select (StatementResult)new StateResult(
+             entries.Select(e => new PreceptState(e.Name, kw.Span.Position.Line, e.Column)).ToArray(),
+             entries.Select(e => e.IsInitial).ToArray()))
         .Named("state declaration")
             .Register(new ConstructInfo(
                 "state-declaration",
-                "state <Name> [initial]",
+                "state <Name> [initial][, <Name> [initial], ...]",
                 "top-level",
                 "Declares a workflow state",
                 "state Idle initial"));
@@ -635,16 +643,18 @@ public static class PreceptParser
 
     private static readonly TokenListParser<PreceptToken, StatementResult> EventDecl =
         (from kw in Token.EqualTo(PreceptToken.Event)
-         from name in Token.EqualTo(PreceptToken.Identifier)
+         from names in Token.EqualTo(PreceptToken.Identifier)
+             .AtLeastOnceDelimitedBy(Token.EqualTo(PreceptToken.Comma))
          from args in Token.EqualTo(PreceptToken.With)
              .IgnoreThen(EventArg.AtLeastOnceDelimitedBy(Token.EqualTo(PreceptToken.Comma)))
              .OptionalOrDefault(Array.Empty<PreceptEventArg>())
-         select (StatementResult)new EventResult(new PreceptEvent(
-             name.ToText(), args.ToList(), kw.Span.Position.Line)))
+         select (StatementResult)new EventResult(
+             names.Select(n => new PreceptEvent(
+                 n.ToText(), args.ToList(), kw.Span.Position.Line, n.Span.Position.Column)).ToArray()))
         .Named("event declaration")
             .Register(new ConstructInfo(
                 "event-declaration",
-                "event <Name> [with <Arg> as <Type> [nullable] [default <Val>], ...]",
+                "event <Name>[, <Name>, ...] [with <Arg> as <Type> [nullable] [default <Val>], ...]",
                 "top-level",
                 "Declares an external trigger with optional typed arguments",
                 "event Submit with Comment as string"));
@@ -792,8 +802,8 @@ public static class PreceptParser
     private sealed record FieldResult(PreceptField Field) : StatementResult;
     private sealed record CollectionFieldResult(PreceptCollectionField Field) : StatementResult;
     private sealed record InvariantResult(PreceptInvariant Invariant) : StatementResult;
-    private sealed record StateResult(PreceptState State, bool IsInitial) : StatementResult;
-    private sealed record EventResult(PreceptEvent Event) : StatementResult;
+    private sealed record StateResult(PreceptState[] States, bool[] InitialFlags) : StatementResult;
+    private sealed record EventResult(PreceptEvent[] Events) : StatementResult;
     private sealed record StateAssertResult(AssertAnchor Prep, string[] States,
         string ExprText, PreceptExpression Expr, string Reason, int SourceLine = 0) : StatementResult;
     private sealed record EventAssertResult(EventAssertion Assert) : StatementResult;
@@ -879,24 +889,31 @@ public static class PreceptParser
                     break;
 
                 case StateResult sr:
-                    if (states.Any(s => s.Name == sr.State.Name))
-                        // SYNC:CONSTRAINT:C7
-                        throw DiagnosticCatalog.C7.ToException(("stateName", sr.State.Name));
-                    states.Add(sr.State);
-                    if (sr.IsInitial)
+                    for (int i = 0; i < sr.States.Length; i++)
                     {
-                        if (initialState is not null)
-                            // SYNC:CONSTRAINT:C8
-                            throw DiagnosticCatalog.C8.ToException(("stateName", initialState.Name));
-                        initialState = sr.State;
+                        var state = sr.States[i];
+                        if (states.Any(s => s.Name == state.Name))
+                            // SYNC:CONSTRAINT:C7
+                            throw DiagnosticCatalog.C7.ToException(("stateName", state.Name));
+                        states.Add(state);
+                        if (sr.InitialFlags[i])
+                        {
+                            if (initialState is not null)
+                                // SYNC:CONSTRAINT:C8
+                                throw DiagnosticCatalog.C8.ToException(("stateName", initialState.Name));
+                            initialState = state;
+                        }
                     }
                     break;
 
                 case EventResult er:
-                    if (events.Any(e => e.Name == er.Event.Name))
-                        // SYNC:CONSTRAINT:C9
-                        throw DiagnosticCatalog.C9.ToException(("eventName", er.Event.Name));
-                    events.Add(er.Event);
+                    foreach (var evt in er.Events)
+                    {
+                        if (events.Any(e => e.Name == evt.Name))
+                            // SYNC:CONSTRAINT:C9
+                            throw DiagnosticCatalog.C9.ToException(("eventName", evt.Name));
+                        events.Add(evt);
+                    }
                     break;
 
                 case StateAssertResult sar:

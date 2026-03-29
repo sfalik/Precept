@@ -1022,4 +1022,248 @@ public class NewSyntaxParserTests
         diagnostics.Should().NotBeEmpty();
         diagnostics[0].Message.Should().Contain("Duplicate state");
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Multi-name state declarations
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_MultiState_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            state A initial, B, C
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.States.Should().HaveCount(3);
+        model.States[0].Name.Should().Be("A");
+        model.States[1].Name.Should().Be("B");
+        model.States[2].Name.Should().Be("C");
+        model.InitialState.Name.Should().Be("A");
+    }
+
+    [Fact]
+    public void Parse_MultiState_WithInitial_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            state A, B initial, C
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.States.Should().HaveCount(3);
+        model.InitialState.Name.Should().Be("B");
+    }
+
+    [Fact]
+    public void Parse_MultiState_FirstInitial_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            state A initial, B, C
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.States.Should().HaveCount(3);
+        model.InitialState.Name.Should().Be("A");
+    }
+
+    [Fact]
+    public void Parse_MultiState_LastInitial_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            state A, B, C initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.States.Should().HaveCount(3);
+        model.InitialState.Name.Should().Be("C");
+    }
+
+    [Fact]
+    public void Parse_MultiState_DuplicateFails()
+    {
+        const string dsl = """
+            precept Test
+            state A initial, B, A
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Duplicate state*");
+    }
+
+    [Fact]
+    public void Parse_MultiState_CrossLineDuplicateFails()
+    {
+        const string dsl = """
+            precept Test
+            state A initial
+            state B, A
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Duplicate state*");
+    }
+
+    [Fact]
+    public void Parse_MultiState_TwoInitialsFails()
+    {
+        const string dsl = """
+            precept Test
+            state A initial, B initial
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*initial*");
+    }
+
+    [Fact]
+    public void Parse_MultiState_CrossLineInitialFails()
+    {
+        const string dsl = """
+            precept Test
+            state A initial
+            state B initial, C
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*initial*");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Multi-name event declarations
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_MultiEvent_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            state Idle initial
+            event Foo, Bar, Baz
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.Events.Should().HaveCount(3);
+        model.Events[0].Name.Should().Be("Foo");
+        model.Events[1].Name.Should().Be("Bar");
+        model.Events[2].Name.Should().Be("Baz");
+        model.Events[0].Args.Should().BeEmpty();
+        model.Events[1].Args.Should().BeEmpty();
+        model.Events[2].Args.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Parse_MultiEvent_WithSharedArgs_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            state Idle initial
+            event Approve, Reject with Note as string
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.Events.Should().HaveCount(2);
+        model.Events[0].Name.Should().Be("Approve");
+        model.Events[1].Name.Should().Be("Reject");
+        model.Events[0].Args.Should().HaveCount(1);
+        model.Events[0].Args[0].Name.Should().Be("Note");
+        model.Events[1].Args.Should().HaveCount(1);
+        model.Events[1].Args[0].Name.Should().Be("Note");
+    }
+
+    [Fact]
+    public void Parse_MultiEvent_DuplicateFails()
+    {
+        const string dsl = """
+            precept Test
+            state Idle initial
+            event A, B, A
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Duplicate event*");
+    }
+
+    [Fact]
+    public void Parse_MultiEvent_CrossLineDuplicateFails()
+    {
+        const string dsl = """
+            precept Test
+            state Idle initial
+            event A
+            event B, A
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Duplicate event*");
+    }
+
+    [Fact]
+    public void Parse_MixedSingleAndMulti_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            state Draft initial
+            state UnderReview, Approved, Declined
+            event Submit with Amount as number
+            event Approve, Reject with Note as string
+            event Cancel
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.States.Should().HaveCount(4);
+        model.Events.Should().HaveCount(4);
+        model.Events.Select(e => e.Name).Should().BeEquivalentTo("Submit", "Approve", "Reject", "Cancel");
+    }
+
+    [Fact]
+    public void Parse_SourceColumn_MultiState()
+    {
+        const string dsl = """
+            precept Test
+            state AlphaState initial, BetaState, GammaState
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.States.Should().HaveCount(3);
+        // All states share the same SourceLine
+        model.States[0].SourceLine.Should().Be(model.States[1].SourceLine);
+        model.States[1].SourceLine.Should().Be(model.States[2].SourceLine);
+        // Each state has a distinct SourceColumn matching its position
+        model.States[0].SourceColumn.Should().BeGreaterThan(0);
+        model.States[1].SourceColumn.Should().BeGreaterThan(model.States[0].SourceColumn);
+        model.States[2].SourceColumn.Should().BeGreaterThan(model.States[1].SourceColumn);
+    }
+
+    [Fact]
+    public void Parse_SourceColumn_MultiEvent()
+    {
+        const string dsl = """
+            precept Test
+            state Idle initial
+            event AlphaEvent, BetaEvent, GammaEvent
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.Events.Should().HaveCount(3);
+        // All events share the same SourceLine
+        model.Events[0].SourceLine.Should().Be(model.Events[1].SourceLine);
+        model.Events[1].SourceLine.Should().Be(model.Events[2].SourceLine);
+        // Each event has a distinct SourceColumn matching its position
+        model.Events[0].SourceColumn.Should().BeGreaterThan(0);
+        model.Events[1].SourceColumn.Should().BeGreaterThan(model.Events[0].SourceColumn);
+        model.Events[2].SourceColumn.Should().BeGreaterThan(model.Events[1].SourceColumn);
+    }
 }

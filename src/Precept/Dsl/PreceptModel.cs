@@ -19,12 +19,14 @@ public sealed record PreceptDefinition(
 
 public sealed record PreceptState(
     string Name,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    int SourceColumn = 0);
 
 public sealed record PreceptEvent(
     string Name,
     IReadOnlyList<PreceptEventArg> Args,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    int SourceColumn = 0);
 
 public sealed record PreceptEventArg(
     string Name,

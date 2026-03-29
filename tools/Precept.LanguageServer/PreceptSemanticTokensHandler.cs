@@ -29,6 +29,9 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
     // Comments are stripped by the tokenizer, so we scan them from raw text.
     private static readonly Regex LineCommentRegex = new("#.*$", RegexOptions.Compiled | RegexOptions.Multiline);
 
+    /// <summary>Tracks declaration context for comma-separated name lists.</summary>
+    private enum DeclContext { None, State, Event }
+
     // ── Attribute-driven semantic type map ────────────────────────────
     // Built once at startup from PreceptTokenMeta — adding a keyword to
     // the PreceptToken enum with [TokenCategory] automatically gives it
@@ -131,6 +134,7 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
         }
 
         PreceptToken? previousKind = null;
+        var declContext = DeclContext.None;
 
         foreach (var token in tokens)
         {
@@ -140,6 +144,16 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
             var line = token.Span.Position.Line - 1;
             var col = token.Span.Position.Column - 1;
             var len = token.Span.Length;
+
+            // Track declaration context for comma-separated name lists
+            if (token.Kind == PreceptToken.State)
+                declContext = DeclContext.State;
+            else if (token.Kind == PreceptToken.Event)
+                declContext = DeclContext.Event;
+            else if (token.Kind == PreceptToken.NewLine)
+                declContext = DeclContext.None;
+            else if (token.Kind == PreceptToken.With)
+                declContext = DeclContext.None;
 
             string? semanticType = null;
 
@@ -151,7 +165,7 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
             // 2b. Identifiers — classified by preceding token context
             else if (token.Kind == PreceptToken.Identifier)
             {
-                semanticType = ClassifyIdentifier(previousKind);
+                semanticType = ClassifyIdentifier(previousKind, declContext);
             }
             // 2c. String literals
             else if (token.Kind == PreceptToken.StringLiteral)
@@ -185,11 +199,13 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
     /// - After dot → "variable" (member access like Collection.count)
     /// - Otherwise → "variable" (bare identifier in expression)
     /// </summary>
-    private static string ClassifyIdentifier(PreceptToken? previousKind) => previousKind switch
+    private static string ClassifyIdentifier(PreceptToken? previousKind, DeclContext context) => previousKind switch
     {
         PreceptToken.Precept => "type",
         PreceptToken.From => "type",
         PreceptToken.Dot => "variable",
+        PreceptToken.Comma when context == DeclContext.State => "type",
+        PreceptToken.Comma when context == DeclContext.Event => "function",
         PreceptToken.Comma => "variable",
         _ when previousKind.HasValue && StateContextTokens.Contains(previousKind.Value) => "type",
         _ when previousKind.HasValue && EventContextTokens.Contains(previousKind.Value) => "function",
