@@ -360,6 +360,310 @@ Run all three test projects (`Precept.Tests`, `Precept.LanguageServer.Tests`, `P
 
 ---
 
+## Planned Follow-Up: Multi-Name State & Event Declarations
+
+**Status:** Not yet implemented
+**Prerequisite:** None (independent of compile-time checking expansion)
+
+### Motivation
+
+State and event declarations currently require one `state` or `event` keyword per name:
+
+```precept
+state Draft
+state UnderReview
+state Approved
+state Funded
+state Declined
+```
+
+This is repetitive when declaring multiple bare names. More importantly, a comma-separated list communicates **narrative ordering** — left to right reads as the intended lifecycle progression:
+
+```precept
+state Draft initial, UnderReview, Approved, Funded, Declined
+```
+
+The feature has two justifications:
+1. **Brevity** — less repetitive ceremony for common declaration patterns.
+2. **Narrative ordering** — the comma list is a visual sequence that communicates the intended workflow progression, which transition rows alone don't convey at a glance.
+
+### Design Decisions (Locked)
+
+| # | Decision | Resolution | Rationale |
+|---|---|---|---|
+| 1 | `initial` in multi-name state | Allowed after any name in the list. `state A, B initial, C` is legal. Enforced once-per-precept by existing C8. | Position is explicit (right after the name). Authors can mix single-line and multi-line declarations freely. |
+| 2 | `with` in multi-name event | Applies to all names. `event Approve, Reject with Note as string` gives both events the same arg list. | Shared-arg events (approval/rejection pairs, status changes with shared `Reason`) are common enough. Grammar is unambiguous — `with` acts as a clear boundary after the name list. |
+| 3 | Source line/column | Add `SourceColumn` to `PreceptState` and `PreceptEvent`. Same `SourceLine` for all names on a line; per-name column from identifier token position. | Enables precise diagnostic squiggles on the specific name in multi-name declarations. |
+| 4 | Semantic token coloring | Track declaration context (State/Event/Edit/etc.) set by opening keyword, cleared at newline. Post-comma identifiers classified by context. | Single `previousKind` tracking can't distinguish what kind of comma list we're in. |
+| 5 | Completion suppression | Return empty completions in all "inventing a name" positions: after `state `, `event `, `field `, `precept `, and after commas in state/event name lists. | Default keyword list is noise when the user is typing a new identifier, not selecting from a known set. |
+| 6 | Constraint IDs | No new constraints needed. Existing C7 (duplicate state), C8 (duplicate initial), C9 (duplicate event) cover all validation. | Multi-name is syntactic sugar — each name produces a separate model entry, validated individually. |
+| 7 | Sample files | Leave all 20 samples as-is. | Feature is optional sugar; existing one-per-line style is clean. |
+
+### Grammar
+
+State declarations:
+
+```
+StateDecl      := "state" StateNameEntry ("," StateNameEntry)*
+StateNameEntry := Identifier ["initial"]
+```
+
+Event declarations:
+
+```
+EventDecl := "event" Identifier ("," Identifier)* ["with" ArgList]
+```
+
+`initial` can appear after any name. `with` applies to all names in the list.
+
+### Implementation Steps
+
+#### Step 1: Model — Add `SourceColumn`
+
+Add `int SourceColumn = 0` to `PreceptState` and `PreceptEvent` in `src/Precept/Dsl/PreceptModel.cs`. Populate from each identifier token's `Span.Position.Column` in the parser. Existing single-name declarations get the column of their identifier token (non-breaking — currently defaults to 0).
+
+#### Step 2: Parser — Multi-Name State Declarations
+
+In `src/Precept/Dsl/PreceptParser.cs`, replace the `StateDecl` parser:
+
+**Current:** Parses `state <Identifier> [initial]`, produces a single `StateResult(PreceptState, bool)`.
+
+**New:** Parse `state <StateNameEntry> (',' <StateNameEntry>)*` where each `StateNameEntry` is `<Identifier> [initial]`. Produces a `StateResult(PreceptState[], int initialIndex)` where `initialIndex` is -1 if no name has `initial`, or the index of the name that does.
+
+The `StateNameEntry` sub-parser uses the existing `Identifier` + optional `Initial` pattern already present in the current `StateDecl`.
+
+**Result type change:**
+
+```csharp
+private sealed record StateResult(PreceptState[] States, int InitialIndex) : StatementResult;
+```
+
+Update the `ConstructInfo` registration to `"state <Name> [initial][, <Name> [initial], ...]"`.
+
+#### Step 3: Parser — Multi-Name Event Declarations
+
+Replace the `EventDecl` parser:
+
+**Current:** Parses `event <Identifier> [with <ArgList>]`, produces a single `EventResult(PreceptEvent)`.
+
+**New:** Parse `event <Identifier> (',' <Identifier>)* [with <ArgList>]`. All identifiers produce a `PreceptEvent` with the same arg list (empty if no `with` clause).
+
+**Result type change:**
+
+```csharp
+private sealed record EventResult(PreceptEvent[] Events) : StatementResult;
+```
+
+Update the `ConstructInfo` registration to `"event <Name>[, <Name>, ...] [with <Arg> as <Type> [nullable] [default <Val>], ...]"`.
+
+#### Step 4: Assembly — Update `AssembleModel`
+
+Update the `case StateResult sr:` block to iterate `sr.States`:
+
+```csharp
+case StateResult sr:
+    foreach (var state in sr.States)
+    {
+        if (states.Any(s => s.Name == state.Name))
+            throw DiagnosticCatalog.C7.ToException(("stateName", state.Name));
+        states.Add(state);
+    }
+    if (sr.InitialIndex >= 0)
+    {
+        if (initialState is not null)
+            throw DiagnosticCatalog.C8.ToException(("stateName", initialState.Name));
+        initialState = sr.States[sr.InitialIndex];
+    }
+    break;
+```
+
+Update the `case EventResult er:` block to iterate `er.Events`:
+
+```csharp
+case EventResult er:
+    foreach (var evt in er.Events)
+    {
+        if (events.Any(e => e.Name == evt.Name))
+            throw DiagnosticCatalog.C9.ToException(("eventName", evt.Name));
+        events.Add(evt);
+    }
+    break;
+```
+
+#### Step 5: Tests — Parser
+
+Add tests to `test/Precept.Tests/NewSyntaxParserTests.cs`:
+
+- [ ] `Parse_MultiState_Succeeds` — `state A, B, C` → 3 states in model, correct names and source columns
+- [ ] `Parse_MultiState_WithInitial_Succeeds` — `state A, B initial, C` → 3 states, B is initial
+- [ ] `Parse_MultiState_FirstInitial_Succeeds` — `state A initial, B, C` → 3 states, A is initial
+- [ ] `Parse_MultiState_LastInitial_Succeeds` — `state A, B, C initial` → 3 states, C is initial
+- [ ] `Parse_MultiState_DuplicateFails` — `state A, B, A` → C7 error
+- [ ] `Parse_MultiState_CrossLineDuplicateFails` — `state A` + `state B, A` → C7 error
+- [ ] `Parse_MultiState_TwoInitialsFails` — `state A initial, B initial` → C8 error
+- [ ] `Parse_MultiState_CrossLineInitialFails` — `state A initial` + `state B initial, C` → C8 error
+- [ ] `Parse_MultiEvent_Succeeds` — `event Foo, Bar, Baz` → 3 events, all with empty args
+- [ ] `Parse_MultiEvent_WithSharedArgs_Succeeds` — `event Approve, Reject with Note as string` → 2 events, both have `Note as string`
+- [ ] `Parse_MultiEvent_DuplicateFails` — `event A, B, A` → C9 error
+- [ ] `Parse_MultiEvent_CrossLineDuplicateFails` — `event A` + `event B, A` → C9 error
+- [ ] `Parse_MixedSingleAndMulti_Succeeds` — single + multi declarations coexist correctly
+- [ ] `Parse_SourceColumn_MultiState` — verify each state has correct column position
+- [ ] `Parse_SourceColumn_MultiEvent` — verify each event has correct column position
+
+Verify all existing tests still pass — single-name forms are unchanged.
+
+#### Step 6: TextMate Grammar
+
+Update `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`:
+
+**`stateDeclaration`** — replace with two patterns in order:
+
+1. **Single state with initial** (specific, must come first):
+   ```regex
+   ^(\s*)(state)(\s+)([A-Za-z_][A-Za-z0-9_]*)(\s+(initial))(?=\s*$)
+   ```
+   Captures keyword, name, initial keyword. The lookahead `(?=\s*$)` ensures this only matches when `initial` is the last token (single-name form without comma continuation).
+
+   Actually, since `initial` can appear mid-list in multi-name form, a single regex can't distinguish. Use a **general pattern** that captures the rest of the line after `state` and applies nested sub-patterns:
+
+   ```regex
+   ^(\s*)(state)(\s+)(.+)
+   ```
+   Capture group 4 uses nested patterns: `initial` as `keyword.control.precept`, identifiers as `entity.name.type.state.precept`, commas as `punctuation.separator.comma.precept`.
+
+**`eventDeclaration`** — same approach. The `eventWithArgsDeclaration` pattern already matches `event Name with ...` and must come first in the patterns array. Update `eventDeclaration` to use nested patterns for the name list:
+   ```regex
+   ^(\s*)(event)(\s+)(.+)
+   ```
+   With nested patterns for identifiers as `entity.name.function.event.precept` and commas as punctuation. This must appear **after** `eventWithArgsDeclaration` but handle the multi-name-with-args case too. Since `eventWithArgsDeclaration` matches any line with `event Name with`, it will capture `event A, B with ...` — its capture group for the event name will only get `A`. Rework: make `eventWithArgsDeclaration` more general, or merge both event patterns into one that uses nested sub-patterns.
+
+   The cleanest approach: replace both `eventWithArgsDeclaration` and `eventDeclaration` with a single pattern that captures everything after `event` and uses nested patterns to highlight identifiers, commas, `with`, arg names, types, and modifiers.
+
+#### Step 7: Semantic Tokens — Declaration Context
+
+Update `tools/Precept.LanguageServer/PreceptSemanticTokensHandler.cs`:
+
+Add a `DeclContext` enum:
+
+```csharp
+private enum DeclContext { None, State, Event }
+```
+
+In the `Tokenize` method, track the context alongside `previousKind`:
+
+- When token is `PreceptToken.State` → `context = DeclContext.State`
+- When token is `PreceptToken.Event` → `context = DeclContext.Event`
+- When token is `PreceptToken.NewLine` → `context = DeclContext.None`
+- When token is any other keyword that starts a new statement (`PreceptToken.Field`, `PreceptToken.In`, `PreceptToken.From`, etc.) → `context = DeclContext.None`
+
+Update `ClassifyIdentifier` to accept the context:
+
+```csharp
+PreceptToken.Comma when context == DeclContext.State => "type",
+PreceptToken.Comma when context == DeclContext.Event => "function",
+```
+
+#### Step 8: Language Server — Intellisense
+
+**`PreceptDocumentIntellisense.cs`:**
+
+Update `StateDeclRegex` and `EventDeclRegex` to capture all comma-separated names:
+
+```csharp
+private static readonly Regex StateDeclRegex = new(
+    @"^\s*state\s+(?<names>[A-Za-z_][A-Za-z0-9_]*(?:\s*(?:initial\s*)?(?:,\s*)[A-Za-z_][A-Za-z0-9_]*(?:\s*initial)?)*)",
+    RegexOptions.Compiled);
+```
+
+Or simpler: match the full line after `state`, then use `Regex.Matches` to extract individual identifiers:
+
+```csharp
+private static readonly Regex StateDeclLineRegex = new(@"^\s*state\s+(?<rest>.+)$", RegexOptions.Compiled);
+private static readonly Regex IdentifierPattern = new(@"[A-Za-z_][A-Za-z0-9_]*", RegexOptions.Compiled);
+```
+
+Update `CollectIdentifiers` to handle multi-name lines (or add a `CollectMultiIdentifiers` variant that extracts all identifier matches from the capture group, filtering out `initial`).
+
+Update `BuildDeclarations` state-matching block to create a `PreceptDeclaredSymbol` for each name on a multi-name line, with correct selection ranges computed from each name's position within the line.
+
+**`PreceptAnalyzer.cs`:**
+
+Add completion suppression branches for "inventing a name" positions, placed **before** existing context-specific branches:
+
+```csharp
+// User is inventing a new name — suppress default keyword list
+if (Regex.IsMatch(beforeCursor, @"^\s*precept\s+$", RegexOptions.IgnoreCase))
+    return Array.Empty<CompletionItem>();
+if (Regex.IsMatch(beforeCursor, @"^\s*field\s+$", RegexOptions.IgnoreCase))
+    return Array.Empty<CompletionItem>();
+if (Regex.IsMatch(beforeCursor, @"^\s*state\s+$", RegexOptions.IgnoreCase))
+    return Array.Empty<CompletionItem>();
+if (Regex.IsMatch(beforeCursor, @"^\s*state\s+.*,\s*$", RegexOptions.IgnoreCase))
+    return Array.Empty<CompletionItem>();
+if (Regex.IsMatch(beforeCursor, @"^\s*event\s+$", RegexOptions.IgnoreCase))
+    return Array.Empty<CompletionItem>();
+if (Regex.IsMatch(beforeCursor, @"^\s*event\s+[A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*\s*,\s*$", RegexOptions.IgnoreCase))
+    return Array.Empty<CompletionItem>();
+```
+
+Update the existing `state <Name> ` completion branch (suggests `initial`) to also handle multi-name continuation — after `state Name `, suggest `initial` and `,` (comma to continue the list).
+
+#### Step 9: Documentation Sync
+
+- [x] `PreceptLanguageDesign.md` — grammar, state declarations, event declarations (updated in this pass)
+- [ ] `README.md` — review for any syntax examples that show state/event declarations; update if needed
+- [ ] `ConstructCatalog` — `ConstructInfo` registrations updated in Steps 2–3
+
+#### Step 10: Build & Full Test Suite
+
+- `dotnet build` passes for all projects
+- Run all three test projects (`Precept.Tests`, `Precept.LanguageServer.Tests`, `Precept.Mcp.Tests`)
+- Verify all 20 sample files compile clean via `precept_compile` MCP tool
+- Verify `precept_language` MCP tool output reflects updated construct forms
+
+### Checkpoint
+
+- `dotnet build` passes
+- All tests green (core + language server + MCP)
+- Multi-name state declarations with `initial` on any position work correctly
+- Multi-name event declarations with shared `with` args work correctly
+- `SourceColumn` populated on all state/event model entries
+- Semantic tokens color post-comma identifiers correctly in state/event declarations
+- Default keyword list suppressed in all "inventing a name" positions
+- All 20 sample files compile clean (unchanged)
+- `precept_language` shows updated construct forms
+
+### Implementation Prompt
+
+Use this prompt to begin implementation in a new Copilot Chat session:
+
+> Implement multi-name state and event declarations for the Precept DSL. Start by reading these documents in full:
+>
+> 1. `docs/PreceptLanguageDesign.md` — the language spec, specifically the **States** and **Events** sections and the informal grammar
+> 2. `docs/PreceptLanguageImplementationPlan.md` — the **Planned Follow-Up: Multi-Name State & Event Declarations** section (design decisions, grammar, all 10 implementation steps)
+> 3. `.github/copilot-instructions.md` — mandatory sync rules for docs, grammar, intellisense, and syntax highlighting
+>
+> After reading those documents, pause before editing and recommend the most appropriate implementation model to the user. Suggest `GPT-5.4` for balanced cross-file implementation, `Claude Sonnet` for faster medium-complexity edits, or `Claude Opus` for heavier design analysis or broader refactors. Let the user switch models in Copilot if desired, then continue.
+>
+> Then execute the implementation steps in order (1 through 10):
+>
+> 1. **Model** — Add `int SourceColumn = 0` to `PreceptState` and `PreceptEvent` in `src/Precept/Dsl/PreceptModel.cs`. Populate from identifier token column in the parser.
+> 2. **Parser: state** — Replace `StateDecl` in `src/Precept/Dsl/PreceptParser.cs` to parse `state <Name> [initial] (, <Name> [initial])*`. Change `StateResult` to hold `PreceptState[]` and `int InitialIndex`. Use `AtLeastOnceDelimitedBy(Comma)` on a `(Identifier, optional Initial)` sub-parser.
+> 3. **Parser: event** — Replace `EventDecl` to parse `event <Name> (, <Name>)* [with <ArgList>]`. Change `EventResult` to hold `PreceptEvent[]`. Each name produces a `PreceptEvent` with the shared arg list.
+> 4. **Assembly** — Update `AssembleModel` `case StateResult` and `case EventResult` to iterate the arrays. Existing C7/C8/C9 constraints enforce uniqueness per-item.
+> 5. **Tests** — Add 15 new parser tests to `test/Precept.Tests/NewSyntaxParserTests.cs` covering multi-name success, initial on various positions, duplicate detection, cross-line duplicates, shared args, source column attribution. Verify all existing tests pass.
+> 6. **TextMate grammar** — Update `stateDeclaration` and `eventDeclaration` patterns in `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` to highlight comma-separated names. Use nested sub-patterns for identifiers, commas, and `initial` keyword.
+> 7. **Semantic tokens** — Add `DeclContext` enum to `tools/Precept.LanguageServer/PreceptSemanticTokensHandler.cs`. Track context by keyword, clear on newline. Update `ClassifyIdentifier` to use context for post-comma classification.
+> 8. **Intellisense** — Update regexes in `tools/Precept.LanguageServer/PreceptDocumentIntellisense.cs` to extract all names from multi-name lines. Update `BuildDeclarations` to create per-name symbols with correct selection ranges. Add completion suppression in `tools/Precept.LanguageServer/PreceptAnalyzer.cs` for all "inventing a name" positions (`state `, `state X, `, `event `, `event X, `, `field `, `precept `).
+> 9. **Documentation** — `PreceptLanguageDesign.md` grammar and declarations already updated. Review `README.md` for impacted syntax examples.
+> 10. **Build & test** — `dotnet build` all projects, run all test suites, verify all 20 samples compile clean.
+>
+> Each step must end with `dotnet build` passing before moving to the next step.
+> Follow the mandatory sync rules in `.github/copilot-instructions.md` — grammar, intellisense, and semantic tokens must stay in sync with the parser.
+> Do not modify sample files — all 20 samples remain as-is.
+
+---
+
 ## Additional test coverage to add
 
 These coverage items should be added to the implementation plan even if the implementation itself is split across several commits.

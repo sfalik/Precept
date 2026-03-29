@@ -133,7 +133,8 @@ DefaultOpt         := ("default" LiteralOrList)?
 
 Invariant          := "invariant" BoolExpr "because" StringLiteral
 
-StateDecl          := "state" Identifier InitialOpt
+StateDecl          := "state" StateNameEntry ("," StateNameEntry)*
+StateNameEntry     := Identifier InitialOpt
 InitialOpt         := ("initial")?
 
 StateAssert        := StateInAssert | StateToAssert | StateFromAssert
@@ -161,7 +162,7 @@ ClearAction        := "clear" Identifier
 EditDecl           := "in" StateTarget "edit" FieldList
 FieldList          := Identifier ("," Identifier)*
 
-EventDecl          := "event" Identifier ("with" ArgList)?
+EventDecl          := "event" Identifier ("," Identifier)* ("with" ArgList)?
 ArgList            := ArgDecl ("," ArgDecl)*
 ArgDecl            := Identifier "as" TypeRef NullableOpt DefaultOpt
 
@@ -321,13 +322,33 @@ invariant MaxAmount >= MinAmount because "MaxAmount must be >= MinAmount"
 
 ### State declarations
 
-Form:
+Forms:
 
 - `state <Name> [initial]`
+- `state <Name> [initial], <Name> [initial], ...`
+
+Multi-name declarations declare multiple states on a single line, separated by commas. Each name may optionally be followed by `initial`. The comma-separated form communicates the intended workflow progression — left to right reads as the expected lifecycle sequence.
 
 Constraints:
-- Exactly one state must be marked `initial`.
-- No duplicate state names.
+- Exactly one state across the entire precept must be marked `initial`. The `initial` keyword may appear after any name in the list.
+- No duplicate state names (within a single declaration or across declarations).
+
+Examples:
+
+```precept
+# Single-name form (unchanged)
+state Draft initial
+
+# Multi-name form — workflow progression reads left to right
+state UnderReview, Approved, Funded, Declined
+
+# initial can appear on any name in the list
+state Draft, UnderReview initial, Approved, Funded, Declined
+
+# Mixing single-name and multi-name in the same precept is valid
+state Draft initial
+state UnderReview, Approved, Funded, Declined
+```
 
 ### State asserts (Locked)
 
@@ -504,29 +525,40 @@ The runtime `Update` API, `IUpdatePatchBuilder`, validation pipeline, and inspec
 
 ### Event declarations
 
-Form:
+Forms:
 
 - `event <Name>`
 - `event <Name> with <ArgList>`
+- `event <Name>, <Name>, ...`
+- `event <Name>, <Name>, ... with <ArgList>`
 
 Where each arg is:
 
 - `<ArgName> as <Type> [nullable] [default <Literal>]`
 
+Multi-name declarations declare multiple events on a single line, separated by commas. When `with` is present on a multi-name declaration, every declared event receives the same argument list. The comma-separated form communicates the expected event ordering — left to right reads as the intended invocation sequence.
+
 Constraints:
-- No duplicate event names.
+- No duplicate event names (within a single declaration or across declarations).
 - No duplicate argument names within an event.
 
-Example:
-
-- `event SubmitOrder with items as set of string, paymentToken as string nullable`
-- `event Cancel with reason as string`
-
-Focused example:
+Examples:
 
 ```precept
+# Single-name forms (unchanged)
 event SubmitOrder with items as set of string, paymentToken as string nullable
 event Cancel with reason as string
+
+# Multi-name form — bare events, lifecycle order reads left to right
+event Submit, Review, Approve, Fund
+
+# Multi-name with shared args — both events get the same signature
+event Approve, Reject with Note as string
+
+# Mixing styles in the same precept is valid
+event Submit with Applicant as string, Amount as number
+event Approve, Reject with Note as string
+event Cancel, Archive
 ```
 
 ### Event asserts (Locked)
