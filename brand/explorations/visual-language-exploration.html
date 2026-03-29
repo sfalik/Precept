@@ -33,6 +33,7 @@
     overflow-x: auto;
     white-space: pre;
     border: 1px solid #1e1b4b;
+    min-width: 0;
   }
 
   .side-by-side { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
@@ -259,13 +260,13 @@
 <!-- Exploration 1a: Minimum viable snippet candidates -->
 <div class="card" style="margin-top:24px;">
   <div class="card-header">
-    <h3>Minimum viable snippet &mdash; seven candidates <span class="status-open">Exploring</span></h3>
+    <h3>Minimum viable snippet &mdash; eight candidates <span class="status-open">Exploring</span></h3>
     <p>Complete authentic scenarios. Universal domains everyone recognizes. Each showcases a natural subset of the language.</p>
   </div>
   <div class="card-body">
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; min-width:0;">
       <!-- A: Thermostat -->
-      <div>
+      <div style="min-width:0;">
         <div style="font-size:11px; color:#52525b; margin-bottom:6px;">A) Thermostat &mdash; 19 lines</div>
         <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">Thermostat</span>
 
@@ -287,7 +288,7 @@
 <span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Heating</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Reached</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Idle</span></div>
       </div>
       <!-- B: ParkingMeter -->
-      <div>
+      <div style="min-width:0;">
         <div style="font-size:11px; color:#52525b; margin-bottom:6px;">B) ParkingMeter &mdash; 17 lines</div>
         <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">ParkingMeter</span>
 
@@ -308,7 +309,7 @@
 <span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Check</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span></div>
       </div>
       <!-- C: Toaster -->
-      <div>
+      <div style="min-width:0;">
         <div style="font-size:11px; color:#52525b; margin-bottom:6px;">C) Toaster &mdash; 15 lines</div>
         <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">Toaster</span>
 
@@ -326,7 +327,7 @@
 <span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Toasting</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Cancel</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Idle</span></div>
       </div>
       <!-- D: Stopwatch -->
-      <div>
+      <div style="min-width:0;">
         <div style="font-size:11px; color:#52525b; margin-bottom:6px;">D) Stopwatch &mdash; 15 lines</div>
         <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">Stopwatch</span>
 
@@ -343,7 +344,7 @@
 <span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Stopped</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Reset</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Elapsed</span> <span style="color:#6366F1;">=</span> <span style="color:#64748B;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span></div>
       </div>
       <!-- E: CoffeeMachine -->
-      <div>
+      <div style="min-width:0;">
         <div style="font-size:11px; color:#52525b; margin-bottom:6px;">E) CoffeeMachine &mdash; 21 lines</div>
         <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">CoffeeMachine</span>
 
@@ -367,7 +368,7 @@
   <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span></div>
       </div>
       <!-- F: WashingMachine -->
-      <div>
+      <div style="min-width:0;">
         <div style="font-size:11px; color:#52525b; margin-bottom:6px;">F) WashingMachine &mdash; 19 lines</div>
         <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">WashingMachine</span>
 
@@ -389,7 +390,7 @@
 <span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Done</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Unload</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Load</span> <span style="color:#6366F1;">=</span> <span style="color:#64748B;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Empty</span></div>
       </div>
       <!-- G: SmartBulb -->
-      <div>
+      <div style="min-width:0;">
         <div style="font-size:11px; color:#52525b; margin-bottom:6px;">G) SmartBulb &mdash; 17 lines</div>
         <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">SmartBulb</span>
 
@@ -408,15 +409,35 @@
 <span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">On</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Dim</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Brightness</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Dim</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Level</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span>
 <span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Off</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Dim</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Brightness</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Dim</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Level</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">On</span></div>
       </div>
+      <!-- H: TrafficLight -->
+      <div style="min-width:0;">
+        <div style="font-size:11px; color:#52525b; margin-bottom:6px;">H) TrafficLight &mdash; 15 lines</div>
+        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">TrafficLight</span>
+
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">Cycles</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
+
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Red</span> <span style="color:#638EE3;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#80A5EF;">Green</span><span style="color:#6366F1;">,</span> <span style="color:#80A5EF;">Yellow</span>
+
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Advance</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Demand</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Advance</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Demand</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"No cars for you!"</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Red</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Advance</span> <span style="color:#4F46E5;font-weight:600;">when</span> <span style="color:#3AC8F8;">Advance</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Demand</span> <span style="color:#78829B;">&gt;</span> <span style="color:#64748B;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Green</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Green</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Advance</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Yellow</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Yellow</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Advance</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Cycles</span> <span style="color:#6366F1;">=</span> <span style="color:#94A3B8;">Cycles</span> <span style="color:#78829B;">+</span> <span style="color:#64748B;">1</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Red</span></div>
+      </div>
     </div>
-    <div class="note" style="margin-top:16px;">
-      <strong>A) Thermostat</strong> &mdash; 19 lines. Idle &harr; Heating. Assert (&&), no transition on re-adjust while heating, dotted access.<br>
-      <strong>B) ParkingMeter</strong> &mdash; 17 lines. Empty &harr; Active. Invariant, assert, when guard, no transition, accumulation.<br>
-      <strong>C) Toaster</strong> &mdash; 15 lines. Idle &harr; Toasting. Invariant (&&), edit declaration, Cancel event.<br>
-      <strong>D) Stopwatch</strong> &mdash; 15 lines. Stopped &harr; Running. Invariant, 3 comma events, no transition on reset while stopped.<br>
-      <strong>E) CoffeeMachine</strong> &mdash; 21 lines. Ready &harr; Brewing. When guard, reject, no transition on refill, decrement.<br>
-      <strong>F) WashingMachine</strong> &mdash; 19 lines. Empty &rarr; Loaded &rarr; Washing &rarr; Done &rarr; Empty. 4 states, comma sources, capacity invariant.<br>
-      <strong>G) SmartBulb</strong> &mdash; 17 lines. Off &harr; On. Assert (&&), no transition on dim, same event different outcomes by state.
+    <div style="font-size:12px; color:#52525b; line-height:1.8; margin-top:8px;">
+      <span style="color:#6b7280;">A) Thermostat</span> &mdash; 19 lines. Idle &harr; Heating. Assert (&&), no transition on re-adjust while heating, dotted access.<br>
+      <span style="color:#6b7280;">B) ParkingMeter</span> &mdash; 17 lines. Empty &harr; Active. Invariant, assert, when guard, no transition, accumulation.<br>
+      <span style="color:#6b7280;">C) Toaster</span> &mdash; 15 lines. Idle &harr; Toasting. Invariant (&&), edit declaration, Cancel event.<br>
+      <span style="color:#6b7280;">D) Stopwatch</span> &mdash; 15 lines. Stopped &harr; Running. Invariant, 3 comma events, no transition on reset while stopped.<br>
+      <span style="color:#6b7280;">E) CoffeeMachine</span> &mdash; 21 lines. Ready &harr; Brewing. When guard, reject, no transition on refill, decrement.<br>
+      <span style="color:#6b7280;">F) WashingMachine</span> &mdash; 19 lines. Empty &rarr; Loaded &rarr; Washing &rarr; Done &rarr; Empty. 4 states, comma sources, capacity invariant.<br>
+      <span style="color:#6b7280;">G) SmartBulb</span> &mdash; 17 lines. Off &harr; On. Assert (&&), no transition on dim, same event different outcomes by state.<br>
+      <span style="color:#6b7280;">H) TrafficLight</span> &mdash; 15 lines. Red &rarr; Green &rarr; Yellow &rarr; Red. Assert, demand guard, cycle counter.
+    </div>
     </div>
   </div>
 </div>
