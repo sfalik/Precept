@@ -664,6 +664,182 @@ Use this prompt to begin implementation in a new Copilot Chat session:
 
 ---
 
+## Planned Follow-Up: Multi-Name Field Declarations
+
+**Status:** Not yet implemented
+**Prerequisite:** Multi-Name State & Event Declarations (implemented)
+
+### Motivation
+
+Field declarations currently require one `field` keyword per name:
+
+```precept
+field MinAmount as number default 0
+field MaxAmount as number default 0
+field FirstName as string nullable
+field LastName as string nullable
+```
+
+When multiple fields share the same type, nullability, and default, a comma-separated list reduces repetition and groups related fields visually:
+
+```precept
+field MinAmount, MaxAmount as number default 0
+field FirstName, LastName as string nullable
+```
+
+The feature follows the same pattern established by multi-name state and event declarations, with one simplification: there are no per-name modifiers (unlike `initial` on states). The `as <Type>`, `nullable`, and `default <Value>` tail applies uniformly to every name in the list — matching Go/Pascal/VHDL conventions.
+
+### Design Decisions (Locked)
+
+| # | Decision | Resolution | Rationale |
+|---|---|---|---|
+| 1 | Shared tail semantics | `as <Type> [nullable] [default <Value>]` applies uniformly to all names. No per-name overrides. | Avoids C/C# ambiguity where trailing modifiers bind to the last name only. Type-after-names position makes uniform sharing unambiguous. |
+| 2 | Collection fields | `field A, B as set of string` is legal — same collection kind and inner type shared across all names. | Natural extension; no grammar ambiguity since `as` marks the boundary between names and type. |
+| 3 | Collection defaults | `field A, B as set of string default ["x", "y"]` gives both fields the same default list. | Consistent with scalar defaults. Each field gets its own independent copy of the default value at runtime. |
+| 4 | Constraint IDs | No new constraints needed. Existing C10 (duplicate field name) covers validation. | Multi-name is syntactic sugar — each name produces a separate model entry, validated individually. |
+| 5 | `SourceColumn` | Populate from each identifier token's column position, same as state/event multi-name. | Enables precise diagnostic squiggles on the specific name in multi-name declarations. |
+| 6 | Sample files | Leave all 20 samples as-is. | Feature is optional sugar; existing one-per-line style is clean. |
+
+### Grammar
+
+Scalar field declarations:
+
+```
+FieldDecl := "field" Identifier ("," Identifier)* "as" TypeRef NullableOpt DefaultOpt
+```
+
+Collection field declarations:
+
+```
+CollectionFieldDecl := "field" Identifier ("," Identifier)* "as" CollectionKind "of" ScalarType DefaultOpt
+```
+
+`as` acts as the clear boundary between the name list and the shared type/modifier tail.
+
+### Implementation Steps
+
+#### Step 1: Parser — Multi-Name Scalar Field Declarations
+
+In `src/Precept/Dsl/PreceptParser.cs`, replace the `FieldDecl` parser:
+
+**Current:** Parses `field <Identifier> as <Type> [nullable] [default <Value>]`, produces a single `FieldResult(PreceptField)`.
+
+**New:** Parse `field <Identifier> (',' <Identifier>)* as <Type> [nullable] [default <Value>]`. All identifiers produce a `PreceptField` with the same type, nullability, and default value.
+
+**Result type change:**
+
+```csharp
+private sealed record FieldResult(PreceptField[] Fields) : StatementResult;
+```
+
+Update the `ConstructInfo` registration to `"field <Name>[, <Name>, ...] as <Type> [nullable] [default <Value>]"`.
+
+#### Step 2: Parser — Multi-Name Collection Field Declarations
+
+Same change for `CollectionFieldDecl`:
+
+**Result type change:**
+
+```csharp
+private sealed record CollectionFieldResult(PreceptCollectionField[] Fields) : StatementResult;
+```
+
+Update the `ConstructInfo` registration to `"field <Name>[, <Name>, ...] as set|queue|stack of <Type> [default <ListLiteral>]"`.
+
+#### Step 3: Assembly — Update `AssembleModel`
+
+Update the `case FieldResult fr:` block to iterate `fr.Fields`, applying existing duplicate-field constraint (C10) per item.
+
+Update the `case CollectionFieldResult cfr:` block similarly.
+
+#### Step 4: Tests — Parser
+
+Add tests to `test/Precept.Tests/NewSyntaxParserTests.cs`:
+
+- [ ] `Parse_MultiField_Succeeds` — `field A, B, C as number default 0` → 3 fields, all number, all default 0
+- [ ] `Parse_MultiField_Nullable_Succeeds` — `field A, B as string nullable` → 2 fields, both string nullable, default null
+- [ ] `Parse_MultiField_DuplicateFails` — `field A, B, A as number default 0` → duplicate field error
+- [ ] `Parse_MultiField_CrossLineDuplicateFails` — `field A as number default 0` + `field B, A as number default 0` → duplicate field error
+- [ ] `Parse_MultiCollectionField_Succeeds` — `field A, B as set of string` → 2 collection fields, both set-of-string
+- [ ] `Parse_MultiCollectionField_WithDefault_Succeeds` — `field A, B as set of string default ["x"]` → 2 collection fields with shared default
+- [ ] `Parse_MixedSingleAndMultiField_Succeeds` — single + multi declarations coexist correctly
+- [ ] `Parse_SourceColumn_MultiField` — verify each field has correct column position
+
+Verify all existing tests still pass.
+
+#### Step 5: TextMate Grammar
+
+Update `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`:
+
+Update `fieldDeclaration` pattern to capture the name list before `as` and use nested sub-patterns for identifiers and commas. The `as` keyword, type, `nullable`, and `default` patterns remain unchanged.
+
+#### Step 6: Semantic Tokens
+
+Add `DeclContext.Field` to the existing `DeclContext` enum in `tools/Precept.LanguageServer/PreceptSemanticTokensHandler.cs`. Set context when `PreceptToken.Field` is seen, clear on newline or `As`. Post-comma identifiers in field declarations classify as `"variable"`.
+
+#### Step 7: Intellisense
+
+**`PreceptDocumentIntellisense.cs`:**
+
+Update `FieldDeclRegex` and `CollectionFieldDeclRegex` to capture comma-separated names. Update `BuildDeclarations` field-matching block to create per-name `PreceptDeclaredSymbol` entries with correct selection ranges.
+
+**`PreceptAnalyzer.cs`:**
+
+Update the existing `field $` completion suppression to also cover `field X, $` (post-comma position in field name lists). After `field Name `, suggest `as` and `,`.
+
+#### Step 8: Documentation Sync
+
+- [ ] `PreceptLanguageDesign.md` — grammar and field declarations (updated in this pass)
+- [ ] `README.md` — review for any field declaration examples; update if needed
+- [ ] `ConstructCatalog` — `ConstructInfo` registrations updated in Steps 1–2
+
+#### Step 9: Build & Full Test Suite
+
+- `dotnet build` passes for all projects
+- Run all three test projects (`Precept.Tests`, `Precept.LanguageServer.Tests`, `Precept.Mcp.Tests`)
+- Verify all 20 sample files compile clean via `precept_compile` MCP tool
+- Verify `precept_language` MCP tool output reflects updated construct forms
+
+### Checkpoint
+
+- `dotnet build` passes
+- All tests green (core + language server + MCP)
+- Multi-name scalar field declarations work correctly
+- Multi-name collection field declarations work correctly
+- `SourceColumn` populated on all field model entries
+- Semantic tokens color post-comma identifiers correctly in field declarations
+- Default keyword list suppressed in all field "inventing a name" positions
+- All 20 sample files compile clean (unchanged)
+- `precept_language` shows updated construct forms
+
+### Implementation Prompt
+
+Use this prompt to begin implementation in a new Copilot Chat session:
+
+> Implement multi-name field declarations for the Precept DSL. Start by reading these documents in full:
+>
+> 1. `docs/PreceptLanguageDesign.md` — the language spec, specifically the **Fields** section and the informal grammar
+> 2. `docs/PreceptLanguageImplementationPlan.md` — the **Planned Follow-Up: Multi-Name Field Declarations** section (design decisions, grammar, all 9 implementation steps)
+> 3. `.github/copilot-instructions.md` — mandatory sync rules for docs, grammar, intellisense, and syntax highlighting
+>
+> Then execute the implementation steps in order (1 through 9):
+>
+> 1. **Parser: scalar fields** — Replace `FieldDecl` in `src/Precept/Dsl/PreceptParser.cs` to parse `field <Name> (, <Name>)* as <Type> [nullable] [default <Value>]`. Change `FieldResult` to hold `PreceptField[]`. Use `Identifier.AtLeastOnceDelimitedBy(Comma)` before `as`.
+> 2. **Parser: collection fields** — Replace `CollectionFieldDecl` similarly. Change `CollectionFieldResult` to hold `PreceptCollectionField[]`.
+> 3. **Assembly** — Update `AssembleModel` `case FieldResult` and `case CollectionFieldResult` to iterate the arrays with per-item duplicate checks.
+> 4. **Tests** — Add 8 new parser tests covering multi-name success, nullable, duplicates, cross-line duplicates, collections, shared defaults, mixed single/multi, source columns.
+> 5. **TextMate grammar** — Update `fieldDeclaration` pattern in `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` to highlight comma-separated names before `as`.
+> 6. **Semantic tokens** — Add `DeclContext.Field` to the enum in `tools/Precept.LanguageServer/PreceptSemanticTokensHandler.cs`. Post-comma field identifiers classify as `"variable"`.
+> 7. **Intellisense** — Update regexes in `tools/Precept.LanguageServer/PreceptDocumentIntellisense.cs` and completions in `tools/Precept.LanguageServer/PreceptAnalyzer.cs` for multi-name field positions.
+> 8. **Documentation** — `PreceptLanguageDesign.md` grammar and field declarations already updated. Review `README.md` for impacted examples.
+> 9. **Build & test** — `dotnet build` all projects, run all test suites, verify all 20 samples compile clean.
+>
+> Each step must end with `dotnet build` passing before moving to the next step.
+> Follow the mandatory sync rules in `.github/copilot-instructions.md` — grammar, intellisense, and semantic tokens must stay in sync with the parser.
+> Do not modify sample files — all 20 samples remain as-is.
+
+---
+
 ## Additional test coverage to add
 
 These coverage items should be added to the implementation plan even if the implementation itself is split across several commits.

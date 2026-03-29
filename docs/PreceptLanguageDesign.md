@@ -127,7 +127,7 @@ Statement          := FieldDecl | Invariant | StateDecl | StateAssert | StateAct
                     | EditDecl | EventDecl | EventAssert | TransitionRow
                     | Comment | Blank
 
-FieldDecl          := "field" Identifier "as" TypeRef NullableOpt DefaultOpt
+FieldDecl          := "field" Identifier ("," Identifier)* "as" TypeRef NullableOpt DefaultOpt
 NullableOpt        := ("nullable")?
 DefaultOpt         := ("default" LiteralOrList)?
 
@@ -263,9 +263,12 @@ Constraints:
 
 ### Field declarations
 
-Form:
+Forms:
 
 - `field <Name> as <Type> [nullable] [default <Literal>]`
+- `field <Name>, <Name>, ... as <Type> [nullable] [default <Literal>]`
+
+Multi-name declarations declare multiple fields sharing the same type, nullability, and default value. The type, `nullable`, and `default` clauses apply uniformly to every name in the list.
 
 Defaults:
 - Non-nullable scalar fields must declare a `default ...`.
@@ -273,11 +276,16 @@ Defaults:
 - Collection fields default to empty when `default ...` is omitted.
 - Collection defaults may be expressed using a list literal, e.g. `default ["a", "b"]` (exact literal rules TBD).
 
+Constraints:
+- No duplicate field names (within a single declaration or across declarations).
+
 Examples:
 
 - `field Balance as number default 0`
 - `field Email as string nullable`
 - `field Tags as set of string default ["priority", "vip"]`
+- `field MinAmount, MaxAmount as number default 0`
+- `field FirstName, LastName as string nullable`
 
 Focused example:
 
@@ -285,6 +293,10 @@ Focused example:
 field Balance as number default 0
 field Email as string nullable
 field Tags as set of string default ["priority", "vip"]
+
+# Multi-name form — shared type and default
+field MinAmount, MaxAmount as number default 0
+field FirstName, LastName, MiddleName as string nullable
 ```
 
 ### Field invariants (Locked)
