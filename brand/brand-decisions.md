@@ -65,15 +65,86 @@ The "Precept color." Used for keywords in syntax highlighting, brand mark, NuGet
 
 ### Semantic palette
 
-Five colors, each with a fixed meaning across all surfaces (syntax, diagrams, diagnostics, preview panel):
+17 shades in 6 families. Background `#0c0c0f`. Every color has a fixed meaning across all surfaces (syntax, diagrams, inspector). Nothing is decorative.
 
-| Color | Hex | Role | Syntax HL | Diagram | Diagnostics |
-|-------|-----|------|-----------|---------|-------------|
-| **Indigo** | `#6366F1` / `#818CF8` / `#A5B4FC` | Brand / Structure | Keywords | Initial state node | PRECEPT codes |
-| **Emerald** | `#34D399` | Enabled / Valid | Type names | Enabled edges | Type annotations |
-| **Rose** | `#F43F5E` / `#FB7185` | Blocked / Error | Error squiggles | Blocked edges (dashed) | Error severity |
-| **Amber** | `#FBBF24` | Constraint / Warning | `because` strings | Guard annotations | Warning severity |
-| **Slate** | `#475569` / `#94A3B8` | Structural / Inactive | Operators, punctuation | Intermediate nodes, muted edges | Separators |
+**Semantic color as brand.** Most tools pick colors for aesthetics, then assign meanings later. Precept's palette is the reverse — every color exists because the compiler knows something about the code and needs a way to say it. The system is organized along two dimensions:
+
+- **Dimension 1 — what kind of thing:** States (nouns — where you are), Events (verbs — what happens), Data (variables — what you know). Each gets its own hue family so a line of code is instantly scannable without reading it.
+- **Dimension 2 — runtime evaluation:** Verdicts (enabled / blocked / warning) are reserved for runtime outcomes. They never appear in syntax highlighting, so green and red can't be confused with authoring-time colors.
+- **Rules sit at the intersection** — they aren't a category of *thing*. They produce *verdicts about* categories. Gold is the only warm hue in a cool-toned palette, so constraint syntax interrupts visually.
+- **Structure is scaffolding** — intentionally quiet. Declaration, action, and glue keywords fade behind the semantic content they frame.
+
+#### Structure · Indigo · 239–245°
+
+Scaffolding — intentionally sub-AA contrast, fades behind the content it frames. Three tiers create hierarchy: declarations define the schema, actions drive the machine, glue is connective tissue.
+
+| Shade | Hex | CR | Role | Keywords |
+|-------|-----|----|------|----------|
+| Declaration | `#4338CA` | 2.5 | Top-level declarations | precept, field, state, event, invariant |
+| Action | `#4F46E5` | 3.1 | Imperative actions | from, on, in, set, transition, edit, to, add, remove, enqueue, dequeue, push, pop, clear |
+| Glue | `#6366F1` | 4.4 | Connective tissue | as, with, when, nullable, default, no, into, of, any, ->, = |
+
+Structure is intentionally sub-AA contrast — it's scaffolding that fades behind the content it frames.
+
+#### States · Azure · 220°
+
+Nouns — where you are. Three lifecycle shades let the compiler show origin → active → final without annotation.
+
+| Shade | Hex | CR | Role |
+|-------|-----|----|------|
+| Origin | `#638EE3` | 6.1 | Initial state + `initial` keyword |
+| Active | `#80A5EF` | 7.9 | Non-initial, non-terminal states |
+| Final | `#98B7F6` | 9.7 | Terminal states |
+
+#### Events · Sky · 195°
+
+Verbs — what happens. Bright cyan gives events visual primacy on action lines, where they're the most important word.
+
+| Shade | Hex | CR | Role |
+|-------|-----|----|------|
+| Transition | `#3AC8F8` | 10.0 | Always moves state |
+| Conditional | `#7DDAFC` | 12.4 | May transition or reject |
+| Stationary | `#0FB0EB` | 7.8 | Data-only, no transition |
+
+Sky shifted from 199° to 195° to widen the gap to Azure from 21° to 25°.
+
+#### Data · Slate · 215–223°
+
+Variables — what you know. Neutral slate recedes behind the colored actors (states, events, rules), letting field names read as content rather than chrome.
+
+| Shade | Hex | CR | Role |
+|-------|-----|----|------|
+| Names | `#94A3B8` | 7.6 | Field names, arg names |
+| Types + Operators | `#78829B` | 5.1 | string, number, boolean, set, queue, stack + &&, >=, !=, ==, contains |
+| Values | `#64748B` | 4.1 | Literals, non-rule strings, arithmetic |
+
+#### Rules · Gold · 43°
+
+The only warm hue in a cool-toned palette — gold interrupts visually, signaling "this is a constraint." Bright messages outrank muted keywords: the human-readable explanation is the hero text.
+
+| Shade | Hex | CR | Role |
+|-------|-----|----|------|
+| Keywords | `#B8860B` | 6.0 | assert, because, reject |
+| Messages | `#FBBF24` | 11.7 | because/reject string content |
+
+#### Verdicts · Runtime only
+
+Never in syntax highlighting — reserved entirely for runtime outcomes. Emerald is purely "enabled" (no longer double-duty with types). Green/red/yellow can't be confused with authoring-time colors because they only appear in the inspector and diagrams.
+
+| Shade | Hex | CR | Role |
+|-------|-----|----|------|
+| Enabled | `#34D399` | 10.2 | Enabled, valid, success |
+| Blocked | `#F87171` | 7.1 | Blocked, rejected, violated |
+| Warning | `#FDE047` | 14.8 | Unmatched, warning |
+
+### Hue map
+
+```
+43° Gold — 50° Warning — 158° Emerald — 195° Sky — 215° Slate — 220° Azure — 239° Indigo
+         7°           108°            37°         20°          5°          19°
+```
+
+Minimum gap: 5° (Slate↔Azure) — separated by saturation (15-20% vs 65-78%) and lightness tier.
 
 ### Structural state coloring (compiler-driven)
 
@@ -81,11 +152,27 @@ Three structural roles the compiler determines automatically — no DSL annotati
 
 | Role | Color | Token | Rationale |
 |------|-------|-------|-----------|
-| **Initial** | Light indigo `#A5B4FC` | `preceptState.initial` | Brand color. The entry point. |
-| **Intermediate** | Slate `#94A3B8` | `preceptState.intermediate` | In-progress. Connective tissue. |
-| **Terminal** | Lilac `#C4B5FD` | `preceptState.terminal` | Neutral finality. No success/failure implication. |
+| **Origin** | Azure `#638EE3` | `preceptState.initial` | Entry point. Deepest Azure shade. |
+| **Active** | Azure `#80A5EF` | `preceptState.intermediate` | In-progress. Mid-tone Azure. |
+| **Final** | Azure `#98B7F6` | `preceptState.terminal` | Terminal. Lightest Azure shade. |
 
-Terminal states use lilac (light violet from the indigo family) deliberately — "Approved" and "Declined" are both terminal, and the compiler cannot distinguish success from failure. Lilac reads as "finished" without judgment.
+All three use the Azure 220° family at different lightness tiers. "Approved" and "Declined" get the same Final shade — the compiler can't judge success vs failure.
+
+### Event structural coloring (compiler-driven)
+
+Three structural roles the compiler determines by analyzing transition behavior:
+
+| Role | Color | Token | Determination |
+|------|-------|-------|---------------|
+| **Transition** | Sky `#3AC8F8` | `preceptEvent.transition` | Every `from` block for this event contains a `transition` action |
+| **Conditional** | Sky `#7DDAFC` | `preceptEvent.conditional` | Some `from` blocks transition, others `reject` or have `when` guards |
+| **Stationary** | Sky `#0FB0EB` | `preceptEvent.stationary` | No `from` block for this event contains a `transition` action |
+
+Parallel to state structural coloring — the compiler classifies events automatically, no DSL annotation needed.
+
+### Background
+
+`#0c0c0f` — near-black with a slight warm undertone. All contrast ratios in the palette are computed against this background.
 
 ## ✅ Typography / Wordmark
 
@@ -110,10 +197,14 @@ Code:      precept LoanApplication  (Inconsolata 400-600, normal case)
 
 **Secondary visual surface**: State diagrams from the VS Code preview panel. The diagram uses the same semantic palette as the syntax highlighting, creating a visual link between code and visualization.
 
-**Structural semantic coloring**: State names in syntax highlighting are colored by their structural role (initial/intermediate/terminal), matching their diagram node color. This is compiler-driven and automatic.
+**Structural semantic coloring**: Both state names and event names in syntax highlighting are colored by their compiler-determined structural role, matching their diagram node/edge color. This is automatic — no DSL annotation needed.
 
-**The system**: Every color means something. Nothing is decorative. Indigo = "this is Precept." Emerald = "this is allowed." Rose = "this is blocked." Amber = "this is a rule." Slate = "this is structure." The same five-color system works across syntax highlighting, state diagrams, diagnostics, and the preview panel.
+**The system**: Every color means something. Nothing is decorative. 6 families, 17 shades:
+- **Indigo** = structure (keywords, actions, glue)
+- **Azure** = states (origin, active, final)
+- **Sky** = events (transition, conditional, stationary)
+- **Slate** = data (names, types, values)
+- **Gold** = rules (assert/because/reject keywords + message strings)
+- **Emerald / Coral / Yellow** = verdicts (enabled, blocked, warning — runtime only)
 
-### Open exploration
-
-- **Event coloring**: How should event names be colored in the semantic system? Currently classified as `"function"` in the language server. Exploring whether events deserve their own semantic color or role within the palette.
+The same system works across syntax highlighting, state diagrams, diagnostics, and the inspector panel.
