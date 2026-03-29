@@ -428,4 +428,10 @@ public static class DiagnosticCatalog
         "Precept declares no events.",
         "Precept '{Name}' declares no events.",
         ConstraintSeverity.Hint);
+
+    /// <summary>Transition rows must reference declared states (both source and target).</summary>
+    public static readonly LanguageConstraint C54 = Register(
+        "C54", "parse",
+        "Transition rows must reference declared states (both source and target).",
+        "Undeclared state '{stateName}' referenced in transition row.");
 }

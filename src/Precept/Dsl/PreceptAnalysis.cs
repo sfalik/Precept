@@ -75,7 +75,9 @@ internal static class PreceptAnalysis
             while (queue.Count > 0)
             {
                 var current = queue.Dequeue();
-                foreach (var neighbor in graph[current])
+                if (!graph.TryGetValue(current, out var neighbors))
+                    continue;
+                foreach (var neighbor in neighbors)
                 {
                     if (reachable.Add(neighbor))
                         queue.Enqueue(neighbor);

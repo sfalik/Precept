@@ -752,7 +752,7 @@ For `no transition`: steps 3 and 5 are skipped (no state change). `in <State>` a
 | Identical-guard duplicate | A row has the same guard as a prior row for the same `(state, event)` | Error | C47 |
 | Non-boolean rule position | `when` guard, `invariant`, or `assert` expression does not produce a boolean | Error | C46 |
 | Missing outcome | Row has no outcome (`transition`, `no transition`, or `reject`) | Error | C10 |
-| Unknown state/event | `from` references undeclared state; `on` references undeclared event | Error | — |
+| Unknown state/event | `from` references undeclared state; `transition` references undeclared state | Error | C54 |
 | Unknown field | `set` targets undeclared field; mutation targets non-collection field | Error | — |
 | Unreachable state | State cannot be reached from the initial state by any transition path | Warning | C48 |
 | Orphaned event | Event declared but never referenced in any `from … on` transition row | Warning | C49 |

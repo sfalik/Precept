@@ -1410,4 +1410,54 @@ public class NewSyntaxParserTests
         var act = () => PreceptParser.Parse(dsl);
         act.Should().Throw<InvalidOperationException>().WithMessage("*Duplicate field*");
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Undeclared state references in transition rows (C54)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_TransitionTargetUndeclaredState_Throws()
+    {
+        const string dsl = """
+            precept Test
+            state Open initial
+            event Go
+            from Open on Go -> transition Nowhere
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Undeclared state 'Nowhere'*");
+    }
+
+    [Fact]
+    public void Parse_TransitionSourceUndeclaredState_Throws()
+    {
+        const string dsl = """
+            precept Test
+            state Open initial
+            state Closed
+            event Go
+            from Bogus on Go -> transition Closed
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Undeclared state 'Bogus'*");
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_UndeclaredTargetState_ReturnsDiagnosticAndNullModel()
+    {
+        const string dsl = """
+            precept Test
+            state Open initial
+            event Go
+            from Open on Go -> transition Nowhere
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        model.Should().BeNull();
+        diagnostics.Should().NotBeEmpty();
+        diagnostics[0].Message.Should().Contain("Undeclared state 'Nowhere'");
+    }
 }

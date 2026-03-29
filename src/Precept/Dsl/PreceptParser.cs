@@ -980,6 +980,16 @@ public static class PreceptParser
             }
         }
 
+        // SYNC:CONSTRAINT:C54 — validate transition rows reference declared states
+        var stateNames = new HashSet<string>(states.Select(s => s.Name), StringComparer.Ordinal);
+        foreach (var row in transitionRows)
+        {
+            if (!stateNames.Contains(row.FromState))
+                throw DiagnosticCatalog.C54.ToException(("stateName", row.FromState));
+            if (row.Outcome is StateTransition st && !stateNames.Contains(st.TargetState))
+                throw DiagnosticCatalog.C54.ToException(("stateName", st.TargetState));
+        }
+
         if (states.Count == 0)
             // SYNC:CONSTRAINT:C12
             throw DiagnosticCatalog.C12.ToException();

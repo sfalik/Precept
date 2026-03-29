@@ -505,6 +505,9 @@ public class CatalogDriftTests
         // C53: Empty precept
         ["C53"] = new(H + S, "declares no events"),
 
+        // C54: Undeclared state in transition row
+        ["C54"] = new(H + S + "event Go\nfrom A on Go -> transition Nowhere\n", "Undeclared state"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state
