@@ -843,8 +843,7 @@ public static class PreceptParser
 
     /// <summary>
     /// Raw file parser: captures header + statements without validation.
-    /// AssembleModel is called separately after confirming IsAtEnd, so partial
-    /// parses of old-syntax files can fall through to the legacy parser.
+    /// AssembleModel is called separately after confirming IsAtEnd.
     /// </summary>
     private static readonly TokenListParser<PreceptToken, ((string Name, int SourceLine) Header, StatementResult[] Statements)> RawFileParser =
         from header in PreceptHeader

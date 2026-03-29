@@ -11,8 +11,6 @@
     { "include": "#eventDeclaration" },
     { "include": "#fieldCollectionDeclaration" },
     { "include": "#fieldScalarDeclaration" },
-    { "include": "#legacyCollectionFieldDeclaration" },
-    { "include": "#legacyScalarFieldDeclaration" },
     { "include": "#invariantStatement" },
     { "include": "#assertStatement" },
     { "include": "#fromOnHeader" },
@@ -224,34 +222,6 @@
         }
       ]
     },
-    "legacyCollectionFieldDeclaration": {
-      "comment": "Legacy: set<number> FieldName",
-      "patterns": [
-        {
-          "name": "meta.field-declaration.collection.precept",
-          "match": "\\b(set|queue|stack)<(string|number|boolean)>\\s+([A-Za-z_][A-Za-z0-9_]*)",
-          "captures": {
-            "1": { "name": "storage.type.precept" },
-            "2": { "name": "storage.type.precept" },
-            "3": { "name": "variable.other.field.precept" }
-          }
-        }
-      ]
-    },
-    "legacyScalarFieldDeclaration": {
-      "comment": "Legacy: string? Name or number Balance = 0",
-      "patterns": [
-        {
-          "name": "meta.field-declaration.scalar.precept",
-          "match": "\\b(string|number|boolean|null)(\\?)?\\s+([A-Za-z_][A-Za-z0-9_]*)",
-          "captures": {
-            "1": { "name": "storage.type.precept" },
-            "2": { "name": "keyword.operator.precept" },
-            "3": { "name": "variable.other.field.precept" }
-          }
-        }
-      ]
-    },
     "invariantStatement": {
       "comment": "invariant Expr because \"Reason\"",
       "patterns": [
@@ -344,7 +314,7 @@
       "patterns": [
         {
           "name": "keyword.other.precept",
-          "match": "\\b(field|as|with|assert|because|nullable|default|invariant|edit|rule)\\b"
+          "match": "\\b(field|as|with|assert|because|nullable|default|invariant|edit)\\b"
         }
       ]
     },

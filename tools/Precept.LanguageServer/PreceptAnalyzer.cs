@@ -9,22 +9,17 @@ namespace Precept.LanguageServer;
 internal sealed class PreceptAnalyzer
 {
     private static readonly Regex LineErrorRegex = new("^Line\\s+(?<line>\\d+)\\s*:\\s*(?<message>.+)$", RegexOptions.Compiled);
-    private static readonly Regex StateRegex = new("^\\s*state\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
-    private static readonly Regex EventRegex = new("^\\s*event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
-    private static readonly Regex DataFieldRegex = new("^\\s*(?:string|number|boolean|null)\\??\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\s*=\\s*.+)?\\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex EventArgRegex = new("^\\s*(?:string|number|boolean|null)\\??\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\\s*=\\s*.+)?\\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex FromOnRegex = new("^\\s*from\\s+(?<from>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EventMemberPrefixRegex = new("(?<event>[A-Za-z_][A-Za-z0-9_]*)\\.$", RegexOptions.Compiled);
-    private static readonly Regex CollectionDeclRegex = new("^\\s*(?:set|queue|stack)<(?:number|string|boolean)>\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex SetAssignmentExpressionRegex = new("(?:^|->)\\s*set\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*[^\\n]*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex CollectionMutationExpressionRegex = new("(?:^|->)\\s*(?:add|remove|push|enqueue)\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)\\s+[^\\n]*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    // ── New-syntax regex patterns ──────────────────────────────────────
-    // Match `field Name[, Name, ...] as string|number|boolean` (scalar fields in new syntax)
+    // ── Regex patterns for new-syntax declarations ──────────────────────
+    // Match `field Name[, Name, ...] as string|number|boolean` (scalar fields)
     private static readonly Regex NewFieldDeclRegex = new("^\\s*field\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?:string|number|boolean)(?:\\s|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    // Match `field Name[, Name, ...] as set|queue|stack of type` (collection fields in new syntax)
+    // Match `field Name[, Name, ...] as set|queue|stack of type` (collection fields)
     private static readonly Regex NewCollectionFieldRegex = new("^\\s*field\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?:set|queue|stack)\\s+of\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    // Match `event Name[, Name, ...] with ...` (inline event args in new syntax)
+    // Match `event Name[, Name, ...] with ...` (inline event args)
     private static readonly Regex NewEventWithArgsRegex = new("^\\s*event\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+with\\s+(?<args>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
 
@@ -754,128 +749,6 @@ internal sealed class PreceptAnalyzer
         return items;
     }
 
-    private static IReadOnlyList<string> CollectTopLevelDataFields(string[] lines)
-    {
-        var fields = new HashSet<string>(StringComparer.Ordinal);
-        var inEventArgs = false;
-        var eventIndent = 0;
-
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var raw = lines[i];
-            var trimmed = raw.Trim();
-            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("#", StringComparison.Ordinal))
-                continue;
-
-            var indent = raw.Length - raw.TrimStart().Length;
-
-            if (Regex.IsMatch(trimmed, "^event\\s+[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.IgnoreCase))
-            {
-                inEventArgs = true;
-                eventIndent = indent;
-                continue;
-            }
-
-            if (inEventArgs && indent > eventIndent)
-                continue;
-
-            inEventArgs = false;
-
-            // New syntax: field Name[, Name, ...] as string|number|boolean (scalar only, not collection)
-            var newFieldMatch = NewFieldDeclRegex.Match(raw);
-            if (newFieldMatch.Success)
-            {
-                foreach (Match idMatch in Regex.Matches(newFieldMatch.Groups["names"].Value, "[A-Za-z_][A-Za-z0-9_]*"))
-                    fields.Add(idMatch.Value);
-                continue;
-            }
-
-            // Old syntax: string? Name [= value]
-            var match = DataFieldRegex.Match(raw);
-            if (match.Success)
-                fields.Add(match.Groups["name"].Value);
-        }
-
-        return fields.OrderBy(x => x, StringComparer.Ordinal).ToArray();
-    }
-
-    private static IReadOnlyDictionary<string, IReadOnlyList<string>> CollectEventArgs(string[] lines)
-    {
-        var result = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
-        var currentEvent = string.Empty;
-        var currentIndent = 0;
-        var currentArgs = new List<string>();
-        var inEvent = false;
-
-        void FlushCurrentEvent()
-        {
-            if (inEvent && !string.IsNullOrWhiteSpace(currentEvent))
-                result[currentEvent] = currentArgs.Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
-        }
-
-        for (var i = 0; i < lines.Length; i++)
-        {
-            var raw = lines[i];
-            var trimmed = raw.Trim();
-            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("#", StringComparison.Ordinal))
-                continue;
-
-            // New syntax: event Name[, Name, ...] with ArgName as type, ArgName2 as type
-            var newEventWithMatch = NewEventWithArgsRegex.Match(raw);
-            if (newEventWithMatch.Success)
-            {
-                FlushCurrentEvent();
-
-                // Parse inline args: "Count as number, Reason as string"
-                var argsText = newEventWithMatch.Groups["args"].Value;
-                var parsedArgs = new List<string>();
-                foreach (Match argMatch in Regex.Matches(argsText, "\\b(?<argName>[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+", RegexOptions.IgnoreCase))
-                    parsedArgs.Add(argMatch.Groups["argName"].Value);
-
-                // Assign to each event name in the comma-separated list
-                foreach (Match idMatch in Regex.Matches(newEventWithMatch.Groups["names"].Value, "[A-Za-z_][A-Za-z0-9_]*"))
-                {
-                    currentEvent = idMatch.Value;
-                    currentArgs = new List<string>(parsedArgs);
-                    FlushCurrentEvent();
-                }
-                inEvent = false;
-                continue;
-            }
-
-            var eventMatch = EventRegex.Match(raw);
-            if (eventMatch.Success)
-            {
-                FlushCurrentEvent();
-                currentEvent = eventMatch.Groups["name"].Value;
-                currentIndent = raw.Length - raw.TrimStart().Length;
-                currentArgs = new List<string>();
-                inEvent = true;
-                continue;
-            }
-
-            if (!inEvent)
-                continue;
-
-            var indent = raw.Length - raw.TrimStart().Length;
-            if (indent <= currentIndent)
-            {
-                FlushCurrentEvent();
-                inEvent = false;
-                currentEvent = string.Empty;
-                currentArgs = new List<string>();
-                continue;
-            }
-
-            var argMatch2 = EventArgRegex.Match(raw);
-            if (argMatch2.Success)
-                currentArgs.Add(argMatch2.Groups["name"].Value);
-        }
-
-        FlushCurrentEvent();
-        return result;
-    }
-
     private static string? FindCurrentEventName(string[] lines, int lineIndex)
     {
         var start = Math.Min(Math.Max(lineIndex, 0), lines.Length - 1);
@@ -887,32 +760,6 @@ internal sealed class PreceptAnalyzer
         }
 
         return null;
-    }
-
-    /// <summary>
-    /// Collects collection field names from both old syntax (set&lt;T&gt; Name)
-    /// and new syntax (field Name as set of T).
-    /// </summary>
-    private static IReadOnlyList<string> CollectAllCollectionFields(string text, string[] lines)
-    {
-        var names = new HashSet<string>(StringComparer.Ordinal);
-
-        // Old syntax: set<T> Name, queue<T> Name, stack<T> Name
-        foreach (var name in CollectIdentifiers(text, CollectionDeclRegex))
-            names.Add(name);
-
-        // New syntax: field Name[, Name, ...] as set|queue|stack of T
-        foreach (var line in lines)
-        {
-            var match = NewCollectionFieldRegex.Match(line);
-            if (match.Success)
-            {
-                foreach (Match idMatch in Regex.Matches(match.Groups["names"].Value, "[A-Za-z_][A-Za-z0-9_]*"))
-                    names.Add(idMatch.Value);
-            }
-        }
-
-        return names.OrderBy(x => x, StringComparer.Ordinal).ToArray();
     }
 
     private static IReadOnlyList<CompletionItem> DistinctAndSort(IEnumerable<CompletionItem> items)
@@ -1007,19 +854,6 @@ internal sealed class PreceptAnalyzer
                 return i;
         }
         return 0;
-    }
-
-    private static IReadOnlyList<string> CollectIdentifiers(string text, Regex regex)
-    {
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var line in text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
-        {
-            var match = regex.Match(line);
-            if (match.Success)
-                names.Add(match.Groups["name"].Value);
-        }
-
-        return names.OrderBy(x => x, StringComparer.Ordinal).ToArray();
     }
 
     private static Diagnostic ToDiagnostic(string message, string[] lines)
