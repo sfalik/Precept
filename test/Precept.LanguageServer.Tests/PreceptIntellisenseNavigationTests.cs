@@ -49,7 +49,7 @@ public class PreceptIntellisenseNavigationTests
         var hover = PreceptDocumentIntellisense.CreateHover(info, position);
 
         hover.Should().NotBeNull();
-        hover!.Contents.ToString().Should().Contain("field <Name> as <Type> [nullable] [default <Value>]");
+        hover!.Contents.ToString().Should().Contain("field <Name>[, <Name>, ...] as <Type> [nullable] [default <Value>]");
         hover.Contents.ToString().Should().Contain("Declares a scalar or collection data field");
     }
 

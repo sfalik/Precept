@@ -328,7 +328,8 @@ public class PreceptAnalyzerCompletionTests
         var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
 
         completions.Should().Contain("as");
-        completions.Should().HaveCount(1);
+        completions.Should().Contain(",");
+        completions.Should().HaveCount(2);
     }
 
     [Fact]

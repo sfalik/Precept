@@ -567,25 +567,28 @@ public static class PreceptParser
                 "Names the workflow",
                 "precept BugTracker"));
 
-    // field <Name> as <Type> [nullable] [default <Value>]
+    // field <Name>[, <Name>, ...] as <Type> [nullable] [default <Value>]
     private static readonly TokenListParser<PreceptToken, StatementResult> FieldDecl =
         (from kw in Token.EqualTo(PreceptToken.Field)
-         from name in Token.EqualTo(PreceptToken.Identifier)
+         from names in Token.EqualTo(PreceptToken.Identifier)
+             .AtLeastOnceDelimitedBy(Token.EqualTo(PreceptToken.Comma))
          from _ in Token.EqualTo(PreceptToken.As)
          from typeRef in TypeRef
          from nullable in Token.EqualTo(PreceptToken.Nullable).Value(true).OptionalOrDefault(false)
          from dflt in OptionalDefault
          select typeRef.IsCollection
-            ? (StatementResult)new CollectionFieldResult(new PreceptCollectionField(
-                name.ToText(), typeRef.CollectionKind!.Value, typeRef.ScalarType))
-            : new FieldResult(new PreceptField(
-                name.ToText(), typeRef.ScalarType, nullable,
-                dflt.Specified || nullable,
-                dflt.Specified ? dflt.Value : null)))
+            ? (StatementResult)new CollectionFieldResult(
+                names.Select(n => new PreceptCollectionField(
+                    n.ToText(), typeRef.CollectionKind!.Value, typeRef.ScalarType)).ToArray())
+            : new FieldResult(
+                names.Select(n => new PreceptField(
+                    n.ToText(), typeRef.ScalarType, nullable,
+                    dflt.Specified || nullable,
+                    dflt.Specified ? dflt.Value : null)).ToArray()))
         .Named("field declaration")
             .Register(new ConstructInfo(
                 "field-declaration",
-                "field <Name> as <Type> [nullable] [default <Value>]",
+                "field <Name>[, <Name>, ...] as <Type> [nullable] [default <Value>]",
                 "top-level",
                 "Declares a scalar or collection data field",
                 "field Priority as number default 3"));
@@ -799,8 +802,8 @@ public static class PreceptParser
 
     /// <summary>Base type for parsed statement results before assembly into the model.</summary>
     private abstract record StatementResult;
-    private sealed record FieldResult(PreceptField Field) : StatementResult;
-    private sealed record CollectionFieldResult(PreceptCollectionField Field) : StatementResult;
+    private sealed record FieldResult(PreceptField[] Fields) : StatementResult;
+    private sealed record CollectionFieldResult(PreceptCollectionField[] Fields) : StatementResult;
     private sealed record InvariantResult(PreceptInvariant Invariant) : StatementResult;
     private sealed record StateResult(PreceptState[] States, bool[] InitialFlags) : StatementResult;
     private sealed record EventResult(PreceptEvent[] Events) : StatementResult;
@@ -871,17 +874,23 @@ public static class PreceptParser
             switch (stmt)
             {
                 case FieldResult fr:
-                    if (fields.Any(f => f.Name == fr.Field.Name) || collectionFields.Any(f => f.Name == fr.Field.Name))
-                        // SYNC:CONSTRAINT:C6
-                        throw DiagnosticCatalog.C6.ToException(("fieldName", fr.Field.Name));
-                    fields.Add(fr.Field);
+                    foreach (var field in fr.Fields)
+                    {
+                        if (fields.Any(f => f.Name == field.Name) || collectionFields.Any(f => f.Name == field.Name))
+                            // SYNC:CONSTRAINT:C6
+                            throw DiagnosticCatalog.C6.ToException(("fieldName", field.Name));
+                        fields.Add(field);
+                    }
                     break;
 
                 case CollectionFieldResult cfr:
-                    if (fields.Any(f => f.Name == cfr.Field.Name) || collectionFields.Any(f => f.Name == cfr.Field.Name))
-                        // SYNC:CONSTRAINT:C6
-                        throw DiagnosticCatalog.C6.ToException(("fieldName", cfr.Field.Name));
-                    collectionFields.Add(cfr.Field);
+                    foreach (var collField in cfr.Fields)
+                    {
+                        if (fields.Any(f => f.Name == collField.Name) || collectionFields.Any(f => f.Name == collField.Name))
+                            // SYNC:CONSTRAINT:C6
+                            throw DiagnosticCatalog.C6.ToException(("fieldName", collField.Name));
+                        collectionFields.Add(collField);
+                    }
                     break;
 
                 case InvariantResult ir:

@@ -1266,4 +1266,148 @@ public class NewSyntaxParserTests
         model.Events[1].SourceColumn.Should().BeGreaterThan(model.Events[0].SourceColumn);
         model.Events[2].SourceColumn.Should().BeGreaterThan(model.Events[1].SourceColumn);
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Multi-name field declarations
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_MultiField_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            state Idle initial
+            field A, B, C as number default 0
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.Fields.Should().HaveCount(3);
+        model.Fields[0].Name.Should().Be("A");
+        model.Fields[1].Name.Should().Be("B");
+        model.Fields[2].Name.Should().Be("C");
+        model.Fields[0].Type.Should().Be(PreceptScalarType.Number);
+        model.Fields[1].Type.Should().Be(PreceptScalarType.Number);
+        model.Fields[2].Type.Should().Be(PreceptScalarType.Number);
+        model.Fields[0].DefaultValue.Should().Be(0m);
+        model.Fields[1].DefaultValue.Should().Be(0m);
+        model.Fields[2].DefaultValue.Should().Be(0m);
+    }
+
+    [Fact]
+    public void Parse_MultiField_Nullable_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            state Idle initial
+            field A, B as string nullable
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.Fields.Should().HaveCount(2);
+        model.Fields[0].Name.Should().Be("A");
+        model.Fields[1].Name.Should().Be("B");
+        model.Fields[0].IsNullable.Should().BeTrue();
+        model.Fields[1].IsNullable.Should().BeTrue();
+        model.Fields[0].DefaultValue.Should().BeNull();
+        model.Fields[1].DefaultValue.Should().BeNull();
+    }
+
+    [Fact]
+    public void Parse_MultiField_DuplicateFails()
+    {
+        const string dsl = """
+            precept Test
+            state Idle initial
+            field A, B, A as number default 0
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Duplicate field*");
+    }
+
+    [Fact]
+    public void Parse_MultiField_CrossLineDuplicateFails()
+    {
+        const string dsl = """
+            precept Test
+            state Idle initial
+            field A as number default 0
+            field B, A as number default 1
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Duplicate field*");
+    }
+
+    [Fact]
+    public void Parse_MultiCollectionField_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            state Idle initial
+            field A, B as set of string
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.CollectionFields.Should().HaveCount(2);
+        model.CollectionFields[0].Name.Should().Be("A");
+        model.CollectionFields[1].Name.Should().Be("B");
+        model.CollectionFields[0].CollectionKind.Should().Be(PreceptCollectionKind.Set);
+        model.CollectionFields[1].CollectionKind.Should().Be(PreceptCollectionKind.Set);
+        model.CollectionFields[0].InnerType.Should().Be(PreceptScalarType.String);
+        model.CollectionFields[1].InnerType.Should().Be(PreceptScalarType.String);
+    }
+
+    [Fact]
+    public void Parse_MultiCollectionField_WithDefault_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            state Idle initial
+            field A, B as set of string default ["x"]
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.CollectionFields.Should().HaveCount(2);
+        model.CollectionFields[0].Name.Should().Be("A");
+        model.CollectionFields[1].Name.Should().Be("B");
+    }
+
+    [Fact]
+    public void Parse_MixedSingleAndMultiField_Succeeds()
+    {
+        const string dsl = """
+            precept Test
+            state Idle initial
+            field Solo as boolean default false
+            field X, Y as number default 0
+            field Tags as set of string
+            field P, Q as queue of number
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.Fields.Should().HaveCount(3);
+        model.Fields.Select(f => f.Name).Should().BeEquivalentTo("Solo", "X", "Y");
+        model.CollectionFields.Should().HaveCount(3);
+        model.CollectionFields.Select(f => f.Name).Should().BeEquivalentTo("Tags", "P", "Q");
+    }
+
+    [Fact]
+    public void Parse_MultiField_ScalarAndCollectionDuplicateFails()
+    {
+        const string dsl = """
+            precept Test
+            state Idle initial
+            field A as number default 0
+            field B, A as set of string
+            """;
+
+        var act = () => PreceptParser.Parse(dsl);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Duplicate field*");
+    }
 }

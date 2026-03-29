@@ -20,12 +20,12 @@ internal sealed class PreceptAnalyzer
     private static readonly Regex CollectionMutationExpressionRegex = new("(?:^|->)\\s*(?:add|remove|push|enqueue)\\s+(?<field>[A-Za-z_][A-Za-z0-9_]*)\\s+[^\\n]*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     // ── New-syntax regex patterns ──────────────────────────────────────
-    // Match `field Name as string|number|boolean` (scalar fields in new syntax)
-    private static readonly Regex NewFieldDeclRegex = new("^\\s*field\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?:string|number|boolean)(?:\\s|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    // Match `field Name as set|queue|stack of type` (collection fields in new syntax)
-    private static readonly Regex NewCollectionFieldRegex = new("^\\s*field\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?:set|queue|stack)\\s+of\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    // Match `event Name with ...` (inline event args in new syntax)
-    private static readonly Regex NewEventWithArgsRegex = new("^\\s*event\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+with\\s+(?<args>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    // Match `field Name[, Name, ...] as string|number|boolean` (scalar fields in new syntax)
+    private static readonly Regex NewFieldDeclRegex = new("^\\s*field\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?:string|number|boolean)(?:\\s|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    // Match `field Name[, Name, ...] as set|queue|stack of type` (collection fields in new syntax)
+    private static readonly Regex NewCollectionFieldRegex = new("^\\s*field\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?:set|queue|stack)\\s+of\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    // Match `event Name[, Name, ...] with ...` (inline event args in new syntax)
+    private static readonly Regex NewEventWithArgsRegex = new("^\\s*event\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+with\\s+(?<args>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
 
     private readonly ConcurrentDictionary<DocumentUri, string> _documents = new();
@@ -105,6 +105,8 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, @"^\s*precept\s+\S*$", RegexOptions.IgnoreCase))
             return Array.Empty<CompletionItem>();
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+$", RegexOptions.IgnoreCase))
+            return Array.Empty<CompletionItem>();
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*\s*,\s*$", RegexOptions.IgnoreCase))
             return Array.Empty<CompletionItem>();
         if (Regex.IsMatch(beforeCursor, @"^\s*state\s+$", RegexOptions.IgnoreCase))
             return Array.Empty<CompletionItem>();
@@ -262,9 +264,9 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+\w*$", RegexOptions.IgnoreCase))
             return TypeItems;
 
-        // After "field Name " → suggest "as"
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+$", RegexOptions.IgnoreCase))
-            return [new CompletionItem { Label = "as", Kind = CompletionItemKind.Keyword }];
+        // After "field Name[, Name, ...] " → suggest "as" and ","
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+(?:[A-Za-z_]\w*\s*(?:,\s*)?)*[A-Za-z_]\w*\s+$", RegexOptions.IgnoreCase))
+            return [new CompletionItem { Label = "as", Kind = CompletionItemKind.Keyword }, new CompletionItem { Label = ",", Kind = CompletionItemKind.Operator, Detail = "add another field name" }];
 
         // ── New-syntax: invariant/assert expressions ──
         // After a completed invariant expression, suggest the required reason clause.
@@ -779,11 +781,12 @@ internal sealed class PreceptAnalyzer
 
             inEventArgs = false;
 
-            // New syntax: field Name as string|number|boolean (scalar only, not collection)
+            // New syntax: field Name[, Name, ...] as string|number|boolean (scalar only, not collection)
             var newFieldMatch = NewFieldDeclRegex.Match(raw);
             if (newFieldMatch.Success)
             {
-                fields.Add(newFieldMatch.Groups["name"].Value);
+                foreach (Match idMatch in Regex.Matches(newFieldMatch.Groups["names"].Value, "[A-Za-z_][A-Za-z0-9_]*"))
+                    fields.Add(idMatch.Value);
                 continue;
             }
 
@@ -817,21 +820,25 @@ internal sealed class PreceptAnalyzer
             if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("#", StringComparison.Ordinal))
                 continue;
 
-            // New syntax: event Name with ArgName as type, ArgName2 as type
+            // New syntax: event Name[, Name, ...] with ArgName as type, ArgName2 as type
             var newEventWithMatch = NewEventWithArgsRegex.Match(raw);
             if (newEventWithMatch.Success)
             {
                 FlushCurrentEvent();
-                currentEvent = newEventWithMatch.Groups["name"].Value;
-                currentArgs = new List<string>();
-                inEvent = true;
 
                 // Parse inline args: "Count as number, Reason as string"
                 var argsText = newEventWithMatch.Groups["args"].Value;
+                var parsedArgs = new List<string>();
                 foreach (Match argMatch in Regex.Matches(argsText, "\\b(?<argName>[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+", RegexOptions.IgnoreCase))
-                    currentArgs.Add(argMatch.Groups["argName"].Value);
+                    parsedArgs.Add(argMatch.Groups["argName"].Value);
 
-                FlushCurrentEvent();
+                // Assign to each event name in the comma-separated list
+                foreach (Match idMatch in Regex.Matches(newEventWithMatch.Groups["names"].Value, "[A-Za-z_][A-Za-z0-9_]*"))
+                {
+                    currentEvent = idMatch.Value;
+                    currentArgs = new List<string>(parsedArgs);
+                    FlushCurrentEvent();
+                }
                 inEvent = false;
                 continue;
             }
@@ -894,12 +901,15 @@ internal sealed class PreceptAnalyzer
         foreach (var name in CollectIdentifiers(text, CollectionDeclRegex))
             names.Add(name);
 
-        // New syntax: field Name as set|queue|stack of T
+        // New syntax: field Name[, Name, ...] as set|queue|stack of T
         foreach (var line in lines)
         {
             var match = NewCollectionFieldRegex.Match(line);
             if (match.Success)
-                names.Add(match.Groups["name"].Value);
+            {
+                foreach (Match idMatch in Regex.Matches(match.Groups["names"].Value, "[A-Za-z_][A-Za-z0-9_]*"))
+                    names.Add(idMatch.Value);
+            }
         }
 
         return names.OrderBy(x => x, StringComparer.Ordinal).ToArray();

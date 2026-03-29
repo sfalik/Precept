@@ -666,7 +666,7 @@ Use this prompt to begin implementation in a new Copilot Chat session:
 
 ## Planned Follow-Up: Multi-Name Field Declarations
 
-**Status:** Not yet implemented
+**Status:** Implemented
 **Prerequisite:** Multi-Name State & Event Declarations (implemented)
 
 ### Motivation
@@ -756,14 +756,14 @@ Update the `case CollectionFieldResult cfr:` block similarly.
 
 Add tests to `test/Precept.Tests/NewSyntaxParserTests.cs`:
 
-- [ ] `Parse_MultiField_Succeeds` — `field A, B, C as number default 0` → 3 fields, all number, all default 0
-- [ ] `Parse_MultiField_Nullable_Succeeds` — `field A, B as string nullable` → 2 fields, both string nullable, default null
-- [ ] `Parse_MultiField_DuplicateFails` — `field A, B, A as number default 0` → duplicate field error
-- [ ] `Parse_MultiField_CrossLineDuplicateFails` — `field A as number default 0` + `field B, A as number default 0` → duplicate field error
-- [ ] `Parse_MultiCollectionField_Succeeds` — `field A, B as set of string` → 2 collection fields, both set-of-string
-- [ ] `Parse_MultiCollectionField_WithDefault_Succeeds` — `field A, B as set of string default ["x"]` → 2 collection fields with shared default
-- [ ] `Parse_MixedSingleAndMultiField_Succeeds` — single + multi declarations coexist correctly
-- [ ] `Parse_SourceColumn_MultiField` — verify each field has correct column position
+- [x] `Parse_MultiField_Succeeds` — `field A, B, C as number default 0` → 3 fields, all number, all default 0
+- [x] `Parse_MultiField_Nullable_Succeeds` — `field A, B as string nullable` → 2 fields, both string nullable, default null
+- [x] `Parse_MultiField_DuplicateFails` — `field A, B, A as number default 0` → duplicate field error
+- [x] `Parse_MultiField_CrossLineDuplicateFails` — `field A as number default 0` + `field B, A as number default 0` → duplicate field error
+- [x] `Parse_MultiCollectionField_Succeeds` — `field A, B as set of string` → 2 collection fields, both set-of-string
+- [x] `Parse_MultiCollectionField_WithDefault_Succeeds` — `field A, B as set of string default ["x"]` → 2 collection fields with shared default
+- [x] `Parse_MixedSingleAndMultiField_Succeeds` — single + multi declarations coexist correctly
+- [x] `Parse_MultiField_ScalarAndCollectionDuplicateFails` — scalar + collection cross-duplicate detected
 
 Verify all existing tests still pass.
 
@@ -789,9 +789,9 @@ Update the existing `field $` completion suppression to also cover `field X, $` 
 
 #### Step 8: Documentation Sync
 
-- [ ] `PreceptLanguageDesign.md` — grammar and field declarations (updated in this pass)
-- [ ] `README.md` — review for any field declaration examples; update if needed
-- [ ] `ConstructCatalog` — `ConstructInfo` registrations updated in Steps 1–2
+- [x] `PreceptLanguageDesign.md` — grammar and field declarations (updated in this pass)
+- [x] `README.md` — reviewed; field examples use one-per-line style which remains valid
+- [x] `ConstructCatalog` — `ConstructInfo` registrations updated in Steps 1–2
 
 #### Step 9: Build & Full Test Suite
 
@@ -811,6 +811,14 @@ Update the existing `field $` completion suppression to also cover `field X, $` 
 - Default keyword list suppressed in all field "inventing a name" positions
 - All 20 sample files compile clean (unchanged)
 - `precept_language` shows updated construct forms
+
+### Lesson Learned: Regex Capture Group Naming
+
+When changing a regex capture group name in a declaration regex (e.g. renaming `"name"` to `"rest"` for multi-name support), **audit every consumer** — not just the obvious callers. In particular:
+
+- **Fallback-path code**: Methods like `BuildCollectionKinds`, `BuildCollectionInnerTypes`, and `BuildFieldTypeKinds` only execute when the parser returns `null` (i.e. the DSL has errors). Core parser tests won't catch breakage here because the model parses successfully.
+- **Completion tests**: These naturally trigger the fallback path because cursor-position markers create invalid syntax (e.g. `Floors.$$` → dangling dot).
+- **Convention**: Multi-name declaration regexes use a `"rest"` capture group for the name list. `CollectMultiIdentifiers` depends on this. Keep this consistent when adding new multi-name constructs.
 
 ### Implementation Prompt
 

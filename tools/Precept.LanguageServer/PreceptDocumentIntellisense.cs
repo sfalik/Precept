@@ -7,14 +7,22 @@ namespace Precept.LanguageServer;
 
 internal static class PreceptDocumentIntellisense
 {
+    // ── Regex capture group convention ──────────────────────────────────
+    // Multi-name declaration regexes (State, Event, Field, CollectionField) use a "rest" capture
+    // group for the name list portion. CollectMultiIdentifiers, BuildCollectionKinds,
+    // BuildCollectionInnerTypes, and BuildFieldTypeKinds all depend on this group name.
+    // When changing a capture group name, audit EVERY consumer — especially fallback-path
+    // code that only runs when the parser returns null (e.g. completion tests with cursor
+    // positions that create invalid syntax).
     private static readonly Regex PreceptDeclRegex = new("^\\s*precept\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex StateDeclRegex = new("^\\s*state\\s+(?<rest>.+)$", RegexOptions.Compiled);
     private static readonly Regex EventDeclRegex = new("^\\s*event\\s+(?<rest>.+)$", RegexOptions.Compiled);
-    private static readonly Regex FieldDeclRegex = new("^\\s*field\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?<type>string|number|boolean)(?:\\s|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex CollectionFieldDeclRegex = new("^\\s*field\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?<kind>set|queue|stack)\\s+of\\s+(?<type>string|number|boolean)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex FieldDeclRegex = new("^\\s*field\\s+(?<rest>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?<type>string|number|boolean)(?:\\s|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex CollectionFieldDeclRegex = new("^\\s*field\\s+(?<rest>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?<kind>set|queue|stack)\\s+of\\s+(?<type>string|number|boolean)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EventWithArgsRegex = new("^\\s*event\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+with\\s+(?<args>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex IdentifierPattern = new("[A-Za-z_][A-Za-z0-9_]*", RegexOptions.Compiled);
     private static readonly HashSet<string> StateKeywords = new(StringComparer.Ordinal) { "initial" };
+    private static readonly HashSet<string> EmptyKeywords = new(StringComparer.Ordinal);
     private static readonly Regex TransitionRowRegex = new("^\\s*from\\s+(?<states>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)(?<rest>.*)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex StateClauseRegex = new("^\\s*(?<prep>in|to|from)\\s+(?<states>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+(?<tail>assert|edit|->)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EventAssertRegex = new("^\\s*on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)\\s+assert\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -30,9 +38,9 @@ internal static class PreceptDocumentIntellisense
         var events = model?.Events.Select(static evt => evt.Name).ToArray()
             ?? CollectEventNames(lines);
         var fields = model?.Fields.Select(static field => field.Name).ToArray()
-            ?? CollectIdentifiers(lines, FieldDeclRegex);
+            ?? CollectMultiIdentifiers(lines, FieldDeclRegex, EmptyKeywords);
         var collections = model?.CollectionFields.Select(static field => field.Name).ToArray()
-            ?? CollectIdentifiers(lines, CollectionFieldDeclRegex);
+            ?? CollectMultiIdentifiers(lines, CollectionFieldDeclRegex, EmptyKeywords);
         var eventArgs = model is not null
             ? model.Events.ToDictionary(
                 static evt => evt.Name,
@@ -396,43 +404,51 @@ internal static class PreceptDocumentIntellisense
             var collectionMatch = CollectionFieldDeclRegex.Match(line);
             if (collectionMatch.Success)
             {
-                var name = collectionMatch.Groups["name"].Value;
-                var collection = collectionsByName.TryGetValue(name, out var modelCollection)
-                    ? modelCollection
-                    : new PreceptCollectionField(name, ParseCollectionKind(collectionMatch.Groups["kind"].Value), ParseScalarType(collectionMatch.Groups["type"].Value));
-                var detail = $"{collection.CollectionKind.ToString().ToLowerInvariant()} of {collection.InnerType.ToString().ToLowerInvariant()}";
-                var symbol = BuildSymbol(
-                    name,
-                    PreceptDeclaredSymbolKind.CollectionField,
-                    detail,
-                    lineIndex,
-                    line,
-                    "name",
-                    null,
-                    $"```precept\nfield {name} as {detail}\n```\n\nCollection field of type `{detail}`.");
-                collections[name] = symbol;
-                ordered.Add(symbol);
+                var namesGroup = collectionMatch.Groups["rest"];
+                foreach (Match nameMatch in IdentifierPattern.Matches(namesGroup.Value))
+                {
+                    var name = nameMatch.Value;
+                    var collection = collectionsByName.TryGetValue(name, out var modelCollection)
+                        ? modelCollection
+                        : new PreceptCollectionField(name, ParseCollectionKind(collectionMatch.Groups["kind"].Value), ParseScalarType(collectionMatch.Groups["type"].Value));
+                    var detail = $"{collection.CollectionKind.ToString().ToLowerInvariant()} of {collection.InnerType.ToString().ToLowerInvariant()}";
+                    var nameStart = namesGroup.Index + nameMatch.Index;
+                    var symbol = new PreceptDeclaredSymbol(
+                        name,
+                        PreceptDeclaredSymbolKind.CollectionField,
+                        detail,
+                        CreateLineRange(lineIndex, line),
+                        CreateRange(lineIndex, nameStart, nameStart + name.Length),
+                        null,
+                        $"```precept\nfield {name} as {detail}\n```\n\nCollection field of type `{detail}`.");
+                    collections[name] = symbol;
+                    ordered.Add(symbol);
+                }
                 continue;
             }
 
             var fieldMatch = FieldDeclRegex.Match(line);
             if (fieldMatch.Success)
             {
-                var name = fieldMatch.Groups["name"].Value;
-                var detail = fieldsByName.TryGetValue(name, out var field)
-                    ? FormatScalarFieldDetail(field)
-                    : fieldMatch.Groups["type"].Value.ToLowerInvariant();
-                var symbol = BuildSymbol(
-                    name,
-                    PreceptDeclaredSymbolKind.Field,
-                    detail,
-                    lineIndex,
-                    line,
-                    "name",
-                    null,
-                    BuildFieldMarkdown(name, fieldsByName.TryGetValue(name, out field) ? field : null));
-                fields[name] = symbol;
-                ordered.Add(symbol);
+                var namesGroup = fieldMatch.Groups["rest"];
+                foreach (Match nameMatch in IdentifierPattern.Matches(namesGroup.Value))
+                {
+                    var name = nameMatch.Value;
+                    var detail = fieldsByName.TryGetValue(name, out var field)
+                        ? FormatScalarFieldDetail(field)
+                        : fieldMatch.Groups["type"].Value.ToLowerInvariant();
+                    var nameStart = namesGroup.Index + nameMatch.Index;
+                    var symbol = new PreceptDeclaredSymbol(
+                        name,
+                        PreceptDeclaredSymbolKind.Field,
+                        detail,
+                        CreateLineRange(lineIndex, line),
+                        CreateRange(lineIndex, nameStart, nameStart + name.Length),
+                        null,
+                        BuildFieldMarkdown(name, fieldsByName.TryGetValue(name, out field) ? field : null));
+                    fields[name] = symbol;
+                    ordered.Add(symbol);
+                }
                 continue;
             }
 
@@ -629,8 +645,6 @@ internal static class PreceptDocumentIntellisense
         var match = kind switch
         {
             PreceptDeclaredSymbolKind.Precept => PreceptDeclRegex.Match(line),
-            PreceptDeclaredSymbolKind.Field => FieldDeclRegex.Match(line),
-            PreceptDeclaredSymbolKind.CollectionField => CollectionFieldDeclRegex.Match(line),
             _ => throw new InvalidOperationException($"Unsupported declaration kind '{kind}'.")
         };
 
@@ -735,7 +749,9 @@ internal static class PreceptDocumentIntellisense
             if (!match.Success)
                 continue;
 
-            kinds[match.Groups["name"].Value] = ParseCollectionKind(match.Groups["kind"].Value);
+            var kind = ParseCollectionKind(match.Groups["kind"].Value);
+            foreach (Match idMatch in IdentifierPattern.Matches(match.Groups["rest"].Value))
+                kinds[idMatch.Value] = kind;
         }
 
         return kinds;
@@ -758,7 +774,9 @@ internal static class PreceptDocumentIntellisense
             if (!match.Success)
                 continue;
 
-            types[match.Groups["name"].Value] = ParseScalarType(match.Groups["type"].Value);
+            var innerType = ParseScalarType(match.Groups["type"].Value);
+            foreach (Match idMatch in IdentifierPattern.Matches(match.Groups["rest"].Value))
+                types[idMatch.Value] = innerType;
         }
 
         return types;
@@ -788,7 +806,8 @@ internal static class PreceptDocumentIntellisense
                 PreceptScalarType.Boolean => StaticValueKind.Boolean,
                 _ => StaticValueKind.None
             };
-            kinds[match.Groups["name"].Value] = kind;
+            foreach (Match idMatch in IdentifierPattern.Matches(match.Groups["rest"].Value))
+                kinds[idMatch.Value] = kind;
         }
 
         return kinds;

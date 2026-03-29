@@ -30,7 +30,7 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
     private static readonly Regex LineCommentRegex = new("#.*$", RegexOptions.Compiled | RegexOptions.Multiline);
 
     /// <summary>Tracks declaration context for comma-separated name lists.</summary>
-    private enum DeclContext { None, State, Event }
+    private enum DeclContext { None, State, Event, Field }
 
     // ── Attribute-driven semantic type map ────────────────────────────
     // Built once at startup from PreceptTokenMeta — adding a keyword to
@@ -150,9 +150,13 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
                 declContext = DeclContext.State;
             else if (token.Kind == PreceptToken.Event)
                 declContext = DeclContext.Event;
+            else if (token.Kind == PreceptToken.Field)
+                declContext = DeclContext.Field;
             else if (token.Kind == PreceptToken.NewLine)
                 declContext = DeclContext.None;
             else if (token.Kind == PreceptToken.With)
+                declContext = DeclContext.None;
+            else if (token.Kind == PreceptToken.As)
                 declContext = DeclContext.None;
 
             string? semanticType = null;
@@ -206,6 +210,7 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
         PreceptToken.Dot => "variable",
         PreceptToken.Comma when context == DeclContext.State => "type",
         PreceptToken.Comma when context == DeclContext.Event => "function",
+        PreceptToken.Comma when context == DeclContext.Field => "variable",
         PreceptToken.Comma => "variable",
         _ when previousKind.HasValue && StateContextTokens.Contains(previousKind.Value) => "type",
         _ when previousKind.HasValue && EventContextTokens.Contains(previousKind.Value) => "function",

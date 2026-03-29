@@ -163,14 +163,25 @@
       ]
     },
     "fieldCollectionDeclaration": {
-      "comment": "field Name as set of string",
+      "comment": "field Name[, Name, ...] as set of string",
       "patterns": [
         {
           "name": "meta.field-declaration.collection.precept",
-          "match": "^(\\s*)(field)(\\s+)([A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(set|queue|stack)(\\s+)(of)(\\s+)(string|number|boolean)",
+          "match": "^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(set|queue|stack)(\\s+)(of)(\\s+)(string|number|boolean)",
           "captures": {
             "2": { "name": "keyword.other.precept" },
-            "4": { "name": "variable.other.field.precept" },
+            "4": {
+              "patterns": [
+                {
+                  "name": "variable.other.field.precept",
+                  "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+                },
+                {
+                  "name": "punctuation.separator.comma.precept",
+                  "match": ","
+                }
+              ]
+            },
             "6": { "name": "keyword.other.precept" },
             "8": { "name": "storage.type.precept" },
             "10": { "name": "keyword.control.precept" },
@@ -180,14 +191,25 @@
       ]
     },
     "fieldScalarDeclaration": {
-      "comment": "field Name as string nullable default value",
+      "comment": "field Name[, Name, ...] as string nullable default value",
       "patterns": [
         {
           "name": "meta.field-declaration.scalar.precept",
-          "match": "^(\\s*)(field)(\\s+)([A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(string|number|boolean)(.*)",
+          "match": "^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(string|number|boolean)(.*)",
           "captures": {
             "2": { "name": "keyword.other.precept" },
-            "4": { "name": "variable.other.field.precept" },
+            "4": {
+              "patterns": [
+                {
+                  "name": "variable.other.field.precept",
+                  "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+                },
+                {
+                  "name": "punctuation.separator.comma.precept",
+                  "match": ","
+                }
+              ]
+            },
             "6": { "name": "keyword.other.precept" },
             "8": { "name": "storage.type.precept" },
             "9": {
