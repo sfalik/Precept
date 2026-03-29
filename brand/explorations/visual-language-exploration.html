@@ -1,68 +1,43 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Precept Visual Language Exploration</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #0a0a0a; color: #e5e5e5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; padding: 40px; }
+  body { background: #0c0c0f; color: #e5e5e5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; padding: 40px; max-width: 1100px; margin: 0 auto; }
   h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; color: #fff; }
-  .subtitle { color: #888; font-size: 15px; margin-bottom: 48px; max-width: 800px; }
+  h2 { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+  .subtitle { color: #71717a; font-size: 15px; margin-bottom: 48px; max-width: 800px; line-height: 1.6; }
 
   .section { margin-bottom: 64px; }
-  .section h2 { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 8px; }
-  .section .desc { font-size: 14px; color: #888; margin-bottom: 24px; max-width: 700px; line-height: 1.6; }
-  .section-divider { height: 1px; background: #222; margin: 48px 0; }
+  .desc { font-size: 14px; color: #71717a; margin-bottom: 24px; max-width: 700px; line-height: 1.6; }
+  .section-divider { height: 1px; background: #27272a; margin: 48px 0; }
 
-  .card { background: #141414; border: 1px solid #222; border-radius: 12px; overflow: hidden; margin-bottom: 24px; }
+  .card { background: #141416; border: 1px solid #27272a; border-radius: 12px; overflow: hidden; margin-bottom: 24px; }
   .card-header { padding: 20px 24px 8px; }
   .card-header h3 { font-size: 15px; font-weight: 600; color: #fff; }
-  .card-header p { font-size: 13px; color: #666; margin-top: 4px; }
+  .card-header p { font-size: 13px; color: #52525b; margin-top: 4px; }
   .card-body { padding: 16px 24px 24px; }
 
-  /* ===== Syntax-as-hero block ===== */
-  .syntax-hero {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  .syntax-block {
+    font-family: 'Inconsolata', ui-monospace, monospace;
     font-size: 14px;
     line-height: 1.8;
-    background: #0d0d0d;
+    background: #0c0c0f;
     border-radius: 8px;
     padding: 24px 28px;
     overflow-x: auto;
     white-space: pre;
-    border: 1px solid #1a1a1a;
+    border: 1px solid #1e1b4b;
   }
-  /* Token colors using amber accent */
-  .kw { color: #f59e0b; font-weight: 600; }          /* keywords */
-  .kw2 { color: #d97706; }                             /* secondary keywords */
-  .st { color: #dcdcaa; }                              /* state/event/precept names */
-  .id { color: #9cdcfe; }                              /* field identifiers */
-  .tp { color: #4ec9b0; }                              /* types */
-  .num { color: #b5cea8; }                             /* numbers */
-  .str { color: #ce9178; }                             /* string literals */
-  .op { color: #d4d4d4; }                              /* operators */
-  .cmt { color: #6a9955; font-style: italic; }         /* comments */
-  .arrow { color: #f59e0b; font-weight: 700; }         /* -> transition arrow */
-  .because { color: #ce9178; }                          /* because strings */
 
-  /* ===== State diagram ===== */
-  .diagram-container {
-    background: #0d0d0d;
-    border: 1px solid #1a1a1a;
-    border-radius: 8px;
-    padding: 32px;
-    text-align: center;
-  }
-  .diagram-container svg { max-width: 100%; }
-
-  /* ===== Side by side layout ===== */
   .side-by-side { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
   @media (max-width: 900px) { .side-by-side { grid-template-columns: 1fr; } }
 
-  /* ===== README mock ===== */
   .readme-mock {
     background: #0d1117;
     border: 1px solid #30363d;
@@ -77,215 +52,471 @@
   .readme-mock .badge .label { padding: 3px 7px; background: #21262d; color: #8b949e; }
   .readme-mock .badge .value { padding: 3px 7px; color: #fff; }
 
-  /* ===== Visual identity surface grid ===== */
-  .surface-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-  .surface-item {
-    background: #0d0d0d;
-    border: 1px solid #222;
-    border-radius: 8px;
-    padding: 16px;
-    text-align: center;
-  }
-  .surface-item .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #555; margin-bottom: 8px; }
-  .surface-item .preview { min-height: 80px; display: flex; align-items: center; justify-content: center; }
-
-  .note { font-size: 13px; color: #888; border-left: 3px solid #d97706; padding-left: 12px; margin-top: 16px; line-height: 1.6; }
-  .callout { background: #1a1a0d; border: 1px solid #33300d; border-radius: 8px; padding: 16px 20px; font-size: 14px; color: #b3a66a; margin-top: 16px; line-height: 1.6; }
+  .note { font-size: 13px; color: #71717a; border-left: 3px solid #6366F1; padding-left: 12px; margin-top: 16px; line-height: 1.6; }
+  .callout { background: rgba(99,102,241,0.06); border: 1px solid #312e81; border-radius: 8px; padding: 16px 20px; font-size: 14px; color: #a1a1aa; margin-top: 16px; line-height: 1.7; }
+  .callout strong { color: #e5e5e5; }
+  .status-locked { display: inline-block; background: #166534; color: #34D399; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; vertical-align: middle; margin-left: 8px; }
+  .status-open { display: inline-block; background: #422006; color: #FBBF24; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; vertical-align: middle; margin-left: 8px; }
 </style>
 </head>
 <body>
 
-<h1>Precept — Visual Language Exploration</h1>
-<p class="subtitle">Your direction: the DSL syntax and state diagrams ARE the visual identity. The icon is one element in a broader system that includes <code>.precept</code> files, state diagrams, diagnostics, and the VS Code preview panel.</p>
+<h1>Precept &mdash; Visual Language Exploration</h1>
+<p class="subtitle">The DSL syntax and state diagrams ARE the visual identity. The icon is one element in a broader system that includes <code>.precept</code> files, state diagrams, diagnostics, and the inspector panel. Background: <code>#0c0c0f</code>. Font: Inconsolata. Palette: 17 shades, 6 families.</p>
 
-<div class="callout" style="background:#1e1b4b; border:1px solid #312e81; border-radius:8px; padding:16px 20px; font-size:14px; color:#a5b4fc; margin-bottom:48px; line-height:1.6;">
-  <strong>Status:</strong> This exploration established the core visual language decisions (DSL-as-hero, state diagrams, diagnostics panel). Those decisions are now <strong>locked</strong> in <a href="../brand-decisions.md" style="color:#c7d2fe;">brand-decisions.md</a>. Remaining open threads — semantic token-to-color mapping, AI/MCP as a third visual surface, and event/field coloring — continue in <a href="semantic-color-exploration.html" style="color:#c7d2fe;">semantic-color-exploration.html</a>.
+<div class="callout" style="margin-bottom:48px;">
+  <strong>Locked decisions applied:</strong> All examples below use the locked 17-shade semantic palette (indigo structure, azure states, sky events, slate data, gold rules, emerald/coral/yellow verdicts), Inconsolata font, <code>#0c0c0f</code> background, and compiler-driven structural coloring for both states and events. See <a href="../brand-decisions.md" style="color:#818CF8;">brand-decisions.md</a> and <a href="../brand-spec.html" style="color:#818CF8;">brand-spec.html</a> for canonical references.
 </div>
 
 <!-- ===== SECTION 1: The DSL as hero visual ===== -->
 <div class="section">
-<h2>1. The .precept file IS the hero visual</h2>
-<p class="desc">Like Prisma's .prisma schema or Tailwind's utility classes, the DSL syntax is the most frequently seen brand surface. Every keyword-anchored line creates a distinctive left-edge pattern.</p>
+<h2>1. The .precept file IS the hero visual <span class="status-locked">Locked</span></h2>
+<p class="desc">Like Prisma's .prisma schema or Tailwind's utility classes, the DSL syntax is the most frequently seen brand surface. Every keyword-anchored line creates a distinctive left-edge pattern. The code IS the hero image.</p>
 
 <div class="card">
   <div class="card-header">
-    <h3>loan-application.precept — as hero code block</h3>
-    <p>Amber keywords on dark background. The left-edge keyword rhythm is the visual signature.</p>
+    <h3>loan-application.precept</h3>
+    <p>Four sections, one specification. The data it carries, the phases it moves through, what can happen, and how it behaves. You are not writing code &mdash; you are describing how the workflow should work.</p>
   </div>
   <div class="card-body">
-    <div class="syntax-hero"><span class="kw">precept</span> <span class="st">LoanApplication</span>
+    <div class="syntax-block"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">LoanApplication</span>
 
-<span class="cmt"># Fields define the data the workflow carries.</span>
-<span class="kw">field</span> <span class="id">ApplicantName</span>    <span class="kw2">as</span> <span class="tp">string</span>  <span class="kw2">nullable</span>
-<span class="kw">field</span> <span class="id">RequestedAmount</span>  <span class="kw2">as</span> <span class="tp">number</span>  <span class="kw2">default</span> <span class="num">0</span>
-<span class="kw">field</span> <span class="id">CreditScore</span>      <span class="kw2">as</span> <span class="tp">number</span>  <span class="kw2">default</span> <span class="num">0</span>
-<span class="kw">field</span> <span class="id">DocumentsVerified</span> <span class="kw2">as</span> <span class="tp">boolean</span> <span class="kw2">default</span> <span class="num">false</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">ApplicantName</span>    <span style="color:#6366F1;">as</span> <span style="color:#78829B;">string</span>  <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">RequestedAmount</span>  <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>  <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">CreditScore</span>      <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>  <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">DocumentsVerified</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">boolean</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">false</span>
 
-<span class="cmt"># Invariants are always-true constraints.</span>
-<span class="kw">invariant</span> <span class="id">RequestedAmount</span> <span class="op">>=</span> <span class="num">0</span> <span class="kw2">because</span> <span class="because">"Requested amount cannot be negative"</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#94A3B8;">RequestedAmount</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Requested amount cannot be negative"</span>
 
-<span class="cmt"># States define the workflow phases.</span>
-<span class="kw">state</span> <span class="st">Draft</span> <span class="kw">initial</span>
-<span class="kw">state</span> <span class="st">UnderReview</span>
-<span class="kw">state</span> <span class="st">Approved</span>
-<span class="kw">state</span> <span class="st">Declined</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Draft</span> <span style="color:#638EE3;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#80A5EF;">UnderReview</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#98B7F6;">Approved</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#98B7F6;">Funded</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#98B7F6;">Declined</span>
 
-<span class="cmt"># State constraints.</span>
-<span class="kw">in</span> <span class="st">Approved</span> <span class="kw2">assert</span> <span class="id">DocumentsVerified</span> <span class="kw2">because</span> <span class="because">"Approved loans must have verified documents"</span>
+<span style="color:#4F46E5;font-weight:600;">in</span> <span style="color:#98B7F6;">Approved</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">DocumentsVerified</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approved loans must have verified documents"</span>
 
-<span class="cmt"># Events with argument constraints.</span>
-<span class="kw">event</span> <span class="st">Submit</span> <span class="kw2">with</span> <span class="id">Applicant</span> <span class="kw2">as</span> <span class="tp">string</span><span class="op">,</span> <span class="id">Amount</span> <span class="kw2">as</span> <span class="tp">number</span>
-<span class="kw">on</span> <span class="st">Submit</span> <span class="kw2">assert</span> <span class="id">Applicant</span> <span class="op">!=</span> <span class="str">""</span> <span class="kw2">because</span> <span class="because">"Applicant is required"</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Submit</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Applicant</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">string</span><span style="color:#52525b;">,</span> <span style="color:#94A3B8;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span><span style="color:#52525b;">,</span> <span style="color:#94A3B8;">Score</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Applicant</span> <span style="color:#78829B;">!=</span> <span style="color:#64748B;">""</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"An applicant name is required"</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Amount</span> <span style="color:#78829B;">&gt;</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Loan requests must be positive"</span>
 
-<span class="cmt"># Transitions: the workflow's behavior, end to end.</span>
-<span class="kw">from</span> <span class="st">Draft</span> <span class="kw">on</span> <span class="st">Submit</span>
-  <span class="arrow">-></span> <span class="kw">set</span> <span class="id">ApplicantName</span> <span class="op">=</span> <span class="st">Submit</span><span class="op">.</span><span class="id">Applicant</span>
-  <span class="arrow">-></span> <span class="kw">set</span> <span class="id">RequestedAmount</span> <span class="op">=</span> <span class="st">Submit</span><span class="op">.</span><span class="id">Amount</span>
-  <span class="arrow">-></span> <span class="kw">transition</span> <span class="st">UnderReview</span></div>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#7DDAFC;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Decline</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">string</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#0FB0EB;">VerifyDocuments</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">FundLoan</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">ApplicantName</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Applicant</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">RequestedAmount</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Amount</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">CreditScore</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Score</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">UnderReview</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#0FB0EB;">VerifyDocuments</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">DocumentsVerified</span> <span style="color:#6366F1;">=</span> <span style="color:#64748B;">true</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#6366F1;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#7DDAFC;">Approve</span>
+  <span style="color:#6366F1;">when</span> <span style="color:#94A3B8;">DocumentsVerified</span> <span style="color:#78829B;">&amp;&amp;</span> <span style="color:#94A3B8;">CreditScore</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">680</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#98B7F6;">Approved</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#7DDAFC;">Approve</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#B8860B;font-weight:600;">reject</span> <span style="color:#FBBF24;">"Approval requires verified documents and strong credit"</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Decline</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#98B7F6;">Declined</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#98B7F6;">Approved</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">FundLoan</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#98B7F6;">Funded</span></div>
   </div>
 </div>
 
 <div class="callout">
-  <strong>The visual identity move:</strong> In the README, landing page, and docs, the <code>.precept</code> code block is the hero — not a decorative illustration. The syntax highlighting palette, keyword rhythm, and arrow chains are what people remember. This is the Tailwind/Prisma approach.
+  <strong>The authoring experience is the value proposition.</strong> A precept reads top to bottom in natural sections &mdash; data, states, events, behavior &mdash; each one self-explanatory. Whether you write it by hand or an AI generates it from a conversation, the result is immediately readable. The coloring reinforces the sections: you can scan the left edge and know exactly where you are.
+</div>
+
+<div class="callout" style="margin-top:12px; background:rgba(56,189,248,0.06); border-color:#0c4a6e;">
+  <strong>What to explore:</strong>
+  <ul style="margin:8px 0 0 16px; line-height:1.8;">
+    <li>How does the hero adapt for GitHub dark/light themes? (GitHub strips inline styles from markdown code blocks.)</li>
+    <li>Minimum viable snippet &mdash; what is the shortest precept that still communicates the feel?</li>
+    <li>Comments vs no comments &mdash; current: none. The DSL reads without explanation. But do first-time readers need a nudge?</li>
+    <li>Authoring-first identity &mdash; should the README lead with "what it looks like to write one" rather than "what it does"?</li>
+    <li>AI generation as a brand moment &mdash; when an AI generates a precept from conversation, should we show that workflow? ("describe your approval process" &rarr; generates the precept)</li>
+  </ul>
+</div>
+
+<!-- Light theme comparison -->
+<div class="card" style="margin-top:24px;">
+  <div class="card-header">
+    <h3>Light theme stress test <span class="status-open">Exploring</span></h3>
+    <p>Same colors, white background. No adjustments &mdash; honest rendering.</p>
+  </div>
+  <div class="card-body">
+    <!-- Full stress test: every family on white -->
+    <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:1.8; background:#ffffff; border-radius:8px; padding:20px 24px; white-space:pre; border:1px solid #d1d5db; margin-bottom:16px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">LoanApplication</span>
+
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">ApplicantName</span>    <span style="color:#6366F1;">as</span> <span style="color:#78829B;">string</span>  <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">RequestedAmount</span>  <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>  <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">DocumentsVerified</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">boolean</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">false</span>
+
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#94A3B8;">RequestedAmount</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Requested amount cannot be negative"</span>
+
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Draft</span> <span style="color:#638EE3;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#80A5EF;">UnderReview</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#98B7F6;">Approved</span>
+
+<span style="color:#4F46E5;font-weight:600;">in</span> <span style="color:#98B7F6;">Approved</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">DocumentsVerified</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approved loans must have verified documents"</span>
+
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Submit</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Applicant</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">string</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Applicant</span> <span style="color:#78829B;">!=</span> <span style="color:#64748B;">""</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"An applicant name is required"</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#7DDAFC;">Approve</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#0FB0EB;">VerifyDocuments</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">ApplicantName</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Applicant</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">UnderReview</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#7DDAFC;">Approve</span>
+  <span style="color:#6366F1;">when</span> <span style="color:#94A3B8;">DocumentsVerified</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#98B7F6;">Approved</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#7DDAFC;">Approve</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#B8860B;font-weight:600;">reject</span> <span style="color:#FBBF24;">"Documents must be verified before approval"</span></div>
+
+    <!-- Family-by-family breakdown -->
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:16px;">
+      <!-- Structure -->
+      <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
+        <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Structure (Indigo)</div>
+        <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
+          <span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#a3a3a3;">Declaration</span><br>
+          <span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#a3a3a3;">... </span><span style="color:#4F46E5;font-weight:600;">on</span><br>
+          <span style="color:#6366F1;">as</span> <span style="color:#a3a3a3;">... </span><span style="color:#6366F1;">default</span> <span style="color:#a3a3a3;">... </span><span style="color:#6366F1;">when</span>
+        </div>
+        <div style="font-size:11px; margin-top:8px; color:#16a34a; font-weight:600;">&#10003; Excellent</div>
+      </div>
+      <!-- States -->
+      <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
+        <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">States (Azure)</div>
+        <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
+          <span style="color:#638EE3;">Draft</span> <span style="color:#a3a3a3;">origin</span><br>
+          <span style="color:#80A5EF;">UnderReview</span> <span style="color:#a3a3a3;">active</span><br>
+          <span style="color:#98B7F6;">Approved</span> <span style="color:#a3a3a3;">final</span>
+        </div>
+        <div style="font-size:11px; margin-top:8px; color:#dc2626; font-weight:600;">&#10007; Washed out</div>
+      </div>
+      <!-- Events -->
+      <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
+        <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Events (Sky)</div>
+        <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
+          <span style="color:#3AC8F8;">Submit</span> <span style="color:#a3a3a3;">transition</span><br>
+          <span style="color:#7DDAFC;">Approve</span> <span style="color:#a3a3a3;">conditional</span><br>
+          <span style="color:#0FB0EB;">Verify</span> <span style="color:#a3a3a3;">stationary</span>
+        </div>
+        <div style="font-size:11px; margin-top:8px; color:#dc2626; font-weight:600;">&#10007; Nearly invisible</div>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+      <!-- Data -->
+      <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
+        <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Data (Slate)</div>
+        <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
+          <span style="color:#94A3B8;">ApplicantName</span> <span style="color:#a3a3a3;">names</span><br>
+          <span style="color:#78829B;">string</span> <span style="color:#a3a3a3;">types+ops</span><br>
+          <span style="color:#64748B;">0</span> <span style="color:#a3a3a3;">... </span><span style="color:#64748B;">false</span> <span style="color:#a3a3a3;">values</span>
+        </div>
+        <div style="font-size:11px; margin-top:8px; color:#ca8a04; font-weight:600;">~ Names fade, types/values OK</div>
+      </div>
+      <!-- Rules -->
+      <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
+        <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Rules (Gold)</div>
+        <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
+          <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#a3a3a3;">keyword</span><br>
+          <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#a3a3a3;">... </span><span style="color:#B8860B;font-weight:600;">reject</span><br>
+          <span style="color:#FBBF24;">"message text"</span>
+        </div>
+        <div style="font-size:11px; margin-top:8px; color:#ca8a04; font-weight:600;">~ Keywords OK, messages disappear</div>
+      </div>
+      <!-- Verdicts -->
+      <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
+        <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Verdicts</div>
+        <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
+          <span style="color:#34D399;">Enabled</span> <span style="color:#a3a3a3;">#34D399</span><br>
+          <span style="color:#F87171;">Blocked</span> <span style="color:#a3a3a3;">#F87171</span><br>
+          <span style="color:#FDE047;">Warning</span> <span style="color:#a3a3a3;">#FDE047</span>
+        </div>
+        <div style="font-size:11px; margin-top:8px; color:#ca8a04; font-weight:600;">~ Enabled/Warning vanish, Blocked OK</div>
+      </div>
+    </div>
+
+    <div class="note" style="margin-top:16px;">
+      <strong>Decision:</strong> Visual language is dark-mode-first (<code>#0c0c0f</code>). The locked 17-shade palette is the dark palette. A parallel light-mode palette (17 darkened shades hitting 4.5:1 on white) will be defined as part of the full color system implementation &mdash; standard practice, same grammar, two color maps. Not needed for the brand exploration phase.
+    </div>
+  </div>
 </div>
 </div>
 
 <div class="section-divider"></div>
 
-<!-- ===== SECTION 2: State diagram as accompanying graphic ===== -->
+<!-- Exploration 1a: Minimum viable snippet candidates -->
+<div class="card" style="margin-top:24px;">
+  <div class="card-header">
+    <h3>Minimum viable snippet &mdash; three candidates <span class="status-open">Exploring</span></h3>
+    <p>Minimally complete: cycles back, ~10 lines, has data + a gold rule + transitions. Universal domain everyone understands instantly.</p>
+  </div>
+  <div class="card-body">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+      <!-- A: Thermostat -->
+      <div>
+        <div style="font-size:11px; color:#52525b; margin-bottom:6px;">A) Thermostat &mdash; 11 lines</div>
+        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">Thermostat</span>
+
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">TargetTemp</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">72</span>
+
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Idle</span> <span style="color:#638EE3;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#80A5EF;">Heating</span>
+
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">SetTarget</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Temp</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">SetTarget</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Temp</span> <span style="color:#78829B;">&gt;</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Absolute zero is not a comfort setting"</span>
+
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Reached</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Idle</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">SetTarget</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">TargetTemp</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">SetTarget</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Temp</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Heating</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Heating</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Reached</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Idle</span></div>
+      </div>
+      <!-- B: ParkingMeter -->
+      <div>
+        <div style="font-size:11px; color:#52525b; margin-bottom:6px;">B) ParkingMeter &mdash; 13 lines</div>
+        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">ParkingMeter</span>
+
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">MinutesLeft</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
+
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#94A3B8;">MinutesLeft</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Time travel not supported"</span>
+
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Empty</span> <span style="color:#638EE3;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#80A5EF;">Active</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#80A5EF;">Expired</span>
+
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">AddTime</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Minutes</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">AddTime</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Minutes</span> <span style="color:#78829B;">&gt;</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Nice try, feed the meter"</span>
+
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Expire</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Empty</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">AddTime</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">MinutesLeft</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">AddTime</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Minutes</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Active</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Expire</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Expired</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Expired</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">AddTime</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">MinutesLeft</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">AddTime</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Minutes</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Active</span></div>
+      </div>
+      <!-- C: Toaster -->
+      <div>
+        <div style="font-size:11px; color:#52525b; margin-bottom:6px;">C) Toaster &mdash; 10 lines</div>
+        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">Toaster</span>
+
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">Level</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">3</span>
+
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#94A3B8;">Level</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">1</span> <span style="color:#78829B;">&amp;&amp;</span> <span style="color:#94A3B8;">Level</span> <span style="color:#78829B;">&lt;=</span> <span style="color:#64748B;">5</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"The dial only goes to 5, trust us"</span>
+
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Idle</span> <span style="color:#638EE3;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#80A5EF;">Toasting</span>
+
+<span style="color:#6366F1;">in</span> <span style="color:#638EE3;">Idle</span> <span style="color:#4338CA;font-weight:600;">edit</span> <span style="color:#94A3B8;">Level</span>
+
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Start</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Done</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Idle</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Start</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Toasting</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Toasting</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Done</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Idle</span></div>
+      </div>
+      <!-- D: Stopwatch -->
+      <div>
+        <div style="font-size:11px; color:#52525b; margin-bottom:6px;">D) Stopwatch &mdash; 11 lines</div>
+        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">Stopwatch</span>
+
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">Elapsed</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
+
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#94A3B8;">Elapsed</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Time only moves forward"</span>
+
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Stopped</span> <span style="color:#638EE3;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#80A5EF;">Running</span>
+
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Start</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Stop</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Reset</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Stopped</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Start</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Running</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Running</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Stop</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Elapsed</span> <span style="color:#6366F1;">=</span> <span style="color:#94A3B8;">Elapsed</span> <span style="color:#78829B;">+</span> <span style="color:#64748B;">1</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Stopped</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Stopped</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Reset</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Elapsed</span> <span style="color:#6366F1;">=</span> <span style="color:#64748B;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Stopped</span></div>
+      </div>
+    </div>
+    <div class="note" style="margin-top:16px;">
+      <strong>A) Thermostat</strong> &mdash; 11 lines. Idle &harr; Heating. Data flow, event assert, explicit events.<br>
+      <strong>B) ParkingMeter</strong> &mdash; 13 lines. Empty &rarr; Active &harr; Expired. Invariant + event assert, explicit events.<br>
+      <strong>C) Toaster</strong> &mdash; Idle &harr; Toasting. Editable Level with invariant, explicit events. 10 lines. Compiled clean, invariant verified via <code>precept_update</code>.<br>
+      <strong>D) Stopwatch</strong> &mdash; 11 lines. Stopped &harr; Running. Start/Stop/Reset cycle, data increment + clear, invariant guard.
+    </div>
+  </div>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- ===== SECTION 2: State diagram ===== -->
 <div class="section">
-<h2>2. State diagrams as the accompanying graphic system</h2>
-<p class="desc">You mentioned wanting state diagrams as a visual element. Here's how the same LoanApplication looks as a state diagram — the natural companion to the DSL code.</p>
+<h2>2. State diagrams as the accompanying graphic system <span class="status-locked">Locked</span></h2>
+<p class="desc">The VS Code preview panel renders state diagrams using the same semantic palette as syntax highlighting. Code and diagram share visual language &mdash; same azure for states, same sky for events, same verdict colors for edges.</p>
 
 <div class="card">
   <div class="card-header">
-    <h3>LoanApplication — state diagram (amber accent)</h3>
-    <p>States as nodes, events as labeled edges. This comes directly from the VS Code preview panel.</p>
+    <h3>LoanApplication &mdash; state diagram</h3>
+    <p>Azure state nodes (origin/active/final shades). Sky event labels. Emerald enabled edges. Coral blocked edges. Gold rule annotations.</p>
   </div>
   <div class="card-body">
-    <div class="diagram-container">
-      <svg width="600" height="340" viewBox="0 0 600 340">
-        <!-- Background grid (subtle Vercel-inspired) -->
+    <div style="background:#0c0c0f; border-radius:8px; padding:32px; text-align:center; border:1px solid #1e1b4b;">
+      <svg width="680" height="260" viewBox="0 0 680 260">
         <defs>
-          <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
-            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#1a1a1a" stroke-width="0.5"/>
+          <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#1e1b4b" stroke-width="0.3"/>
           </pattern>
-          <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-            <path d="M0,0 L10,5 L0,10 z" fill="#d97706"/>
-          </marker>
-          <marker id="arrowGray" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-            <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
-          </marker>
+          <marker id="ae" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#34D399"/></marker>
+          <marker id="am" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#6366F1"/></marker>
+          <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#F87171"/></marker>
         </defs>
-        <rect width="600" height="340" fill="#0d0d0d" rx="8"/>
-        <rect width="600" height="340" fill="url(#grid)" rx="8"/>
+        <rect width="680" height="260" rx="8" fill="#0c0c0f"/>
+        <rect width="680" height="260" rx="8" fill="url(#grid)"/>
 
-        <!-- Draft (initial) -->
-        <rect x="40" y="140" width="100" height="40" rx="20" fill="none" stroke="#d97706" stroke-width="2.5"/>
-        <circle cx="50" cy="160" r="4" fill="#d97706"/>
-        <text x="95" y="165" text-anchor="middle" fill="#e5e5e5" font-size="14" font-family="'Space Grotesk',system-ui" font-weight="600">Draft</text>
+        <!-- Draft (origin) -->
+        <rect x="30" y="100" width="80" height="36" rx="18" fill="rgba(99,142,227,0.08)" stroke="#638EE3" stroke-width="2.5"/>
+        <circle cx="42" cy="118" r="4" fill="#638EE3"/>
+        <text x="74" y="123" text-anchor="middle" fill="#638EE3" font-size="13" font-weight="600" font-family="Inconsolata,monospace">Draft</text>
 
-        <!-- UnderReview -->
-        <rect x="230" y="140" width="140" height="40" rx="20" fill="none" stroke="#475569" stroke-width="2"/>
-        <text x="300" y="165" text-anchor="middle" fill="#e5e5e5" font-size="14" font-family="'Space Grotesk',system-ui" font-weight="600">UnderReview</text>
+        <!-- UnderReview (active) -->
+        <rect x="190" y="100" width="120" height="36" rx="18" fill="none" stroke="#80A5EF" stroke-width="2"/>
+        <text x="250" y="123" text-anchor="middle" fill="#80A5EF" font-size="12" font-weight="600" font-family="Inconsolata,monospace">UnderReview</text>
 
-        <!-- Approved -->
-        <rect x="460" y="80" width="110" height="40" rx="20" fill="none" stroke="#475569" stroke-width="2"/>
-        <text x="515" y="105" text-anchor="middle" fill="#e5e5e5" font-size="14" font-family="'Space Grotesk',system-ui" font-weight="600">Approved</text>
+        <!-- Approved (final) + assert badge -->
+        <rect x="390" y="48" width="100" height="36" rx="18" fill="none" stroke="#98B7F6" stroke-width="2"/>
+        <rect x="386" y="44" width="108" height="44" rx="20" fill="none" stroke="#98B7F6" stroke-width="1" opacity="0.3"/>
+        <text x="440" y="71" text-anchor="middle" fill="#98B7F6" font-size="12" font-weight="600" font-family="Inconsolata,monospace">Approved</text>
+        <rect x="500" y="50" width="12" height="12" rx="3" fill="#FBBF24" opacity="0.9"/>
+        <text x="506" y="59" text-anchor="middle" fill="#0c0c0f" font-size="8" font-weight="700">!</text>
+        <text x="520" y="59" fill="#FBBF24" font-size="9" font-family="Inconsolata,monospace" opacity="0.8">assert</text>
 
-        <!-- Funded -->
-        <rect x="460" y="160" width="100" height="40" rx="20" fill="none" stroke="#16a34a" stroke-width="2"/>
-        <text x="510" y="185" text-anchor="middle" fill="#e5e5e5" font-size="14" font-family="'Space Grotesk',system-ui" font-weight="600">Funded</text>
+        <!-- Funded (final) -->
+        <rect x="570" y="48" width="80" height="36" rx="18" fill="none" stroke="#98B7F6" stroke-width="2"/>
+        <rect x="566" y="44" width="88" height="44" rx="20" fill="none" stroke="#98B7F6" stroke-width="1" opacity="0.3"/>
+        <text x="610" y="71" text-anchor="middle" fill="#98B7F6" font-size="12" font-weight="600" font-family="Inconsolata,monospace">Funded</text>
 
-        <!-- Declined -->
-        <rect x="460" y="240" width="110" height="40" rx="20" fill="none" stroke="#dc2626" stroke-width="2"/>
-        <text x="515" y="265" text-anchor="middle" fill="#e5e5e5" font-size="14" font-family="'Space Grotesk',system-ui" font-weight="600">Declined</text>
+        <!-- Declined (final) -->
+        <rect x="390" y="158" width="100" height="36" rx="18" fill="none" stroke="#98B7F6" stroke-width="2"/>
+        <rect x="386" y="154" width="108" height="44" rx="20" fill="none" stroke="#98B7F6" stroke-width="1" opacity="0.3"/>
+        <text x="440" y="181" text-anchor="middle" fill="#98B7F6" font-size="12" font-weight="600" font-family="Inconsolata,monospace">Declined</text>
 
-        <!-- Draft -> UnderReview (Submit) -->
-        <line x1="140" y1="160" x2="224" y2="160" stroke="#d97706" stroke-width="2" marker-end="url(#arrow)"/>
-        <text x="182" y="150" text-anchor="middle" fill="#fbbf24" font-size="11" font-family="'JetBrains Mono',monospace">Submit</text>
+        <!-- Draft -> UnderReview (enabled) -->
+        <line x1="110" y1="118" x2="186" y2="118" stroke="#34D399" stroke-width="2" marker-end="url(#ae)"/>
+        <text x="148" y="110" text-anchor="middle" fill="#3AC8F8" font-size="10" font-family="Inconsolata,monospace" font-weight="600">Submit</text>
 
-        <!-- UnderReview -> Approved (Approve) -->
-        <line x1="370" y1="150" x2="454" y2="105" stroke="#d97706" stroke-width="2" marker-end="url(#arrow)"/>
-        <text x="420" y="118" text-anchor="middle" fill="#fbbf24" font-size="11" font-family="'JetBrains Mono',monospace">Approve</text>
+        <!-- UnderReview -> Approved -->
+        <line x1="310" y1="108" x2="386" y2="74" stroke="#6366F1" stroke-width="1.5" opacity="0.6" marker-end="url(#am)"/>
+        <text x="348" y="82" text-anchor="middle" fill="#7DDAFC" font-size="9" font-family="Inconsolata,monospace" opacity="0.7">Approve</text>
+        <text x="348" y="93" text-anchor="middle" fill="#FBBF24" font-size="8" font-family="Inconsolata,monospace" opacity="0.7">when docs &amp; credit</text>
 
-        <!-- UnderReview -> Declined (Decline) -->
-        <line x1="370" y1="170" x2="454" y2="250" stroke="#d97706" stroke-width="2" marker-end="url(#arrow)"/>
-        <text x="420" y="224" text-anchor="middle" fill="#fbbf24" font-size="11" font-family="'JetBrains Mono',monospace">Decline</text>
+        <!-- UnderReview -> Approved REJECT -->
+        <line x1="310" y1="116" x2="386" y2="72" stroke="#F87171" stroke-width="1.5" stroke-dasharray="5 3" opacity="0.5" marker-end="url(#ar)"/>
+        <text x="370" y="108" fill="#F87171" font-size="8" font-family="Inconsolata,monospace" opacity="0.6">reject</text>
 
-        <!-- Approved -> Funded (FundLoan) -->
-        <line x1="515" y1="120" x2="512" y2="154" stroke="#d97706" stroke-width="2" marker-end="url(#arrow)"/>
-        <text x="540" y="142" fill="#fbbf24" font-size="11" font-family="'JetBrains Mono',monospace">FundLoan</text>
+        <!-- UnderReview -> Declined -->
+        <line x1="310" y1="128" x2="386" y2="172" stroke="#6366F1" stroke-width="1.5" opacity="0.5" marker-end="url(#am)"/>
+        <text x="355" y="160" text-anchor="middle" fill="#3AC8F8" font-size="9" font-family="Inconsolata,monospace" opacity="0.6">Decline</text>
 
-        <!-- Self-loop: UnderReview on VerifyDocuments -->
-        <path d="M 300 140 C 300 100 340 100 340 140" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrowGray)"/>
-        <text x="330" y="92" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="'JetBrains Mono',monospace">VerifyDocuments</text>
+        <!-- Approved -> Funded -->
+        <line x1="490" y1="66" x2="566" y2="66" stroke="#6366F1" stroke-width="1.5" opacity="0.5" marker-end="url(#am)"/>
+        <text x="528" y="46" text-anchor="middle" fill="#3AC8F8" font-size="9" font-family="Inconsolata,monospace" opacity="0.6">FundLoan</text>
+
+        <!-- Self-loop: VerifyDocuments (stationary) -->
+        <path d="M 250 100 C 250 65 300 65 300 100" fill="none" stroke="#6366F1" stroke-width="1.5" opacity="0.5" marker-end="url(#am)"/>
+        <text x="285" y="58" text-anchor="middle" fill="#0FB0EB" font-size="9" font-family="Inconsolata,monospace" opacity="0.6">Verify</text>
 
         <!-- Legend -->
-        <rect x="30" y="290" width="12" height="12" rx="3" fill="none" stroke="#d97706" stroke-width="2"/>
-        <text x="50" y="300" fill="#888" font-size="11" font-family="system-ui">Initial state</text>
-        <rect x="150" y="290" width="12" height="12" rx="3" fill="none" stroke="#475569" stroke-width="2"/>
-        <text x="170" y="300" fill="#888" font-size="11" font-family="system-ui">Intermediate</text>
-        <rect x="280" y="290" width="12" height="12" rx="3" fill="none" stroke="#16a34a" stroke-width="2"/>
-        <text x="300" y="300" fill="#888" font-size="11" font-family="system-ui">Terminal (success)</text>
-        <rect x="430" y="290" width="12" height="12" rx="3" fill="none" stroke="#dc2626" stroke-width="2"/>
-        <text x="450" y="300" fill="#888" font-size="11" font-family="system-ui">Terminal (failure)</text>
+        <g transform="translate(30, 225)">
+          <circle cx="6" cy="6" r="5" fill="none" stroke="#638EE3" stroke-width="2"/>
+          <text x="18" y="10" fill="#52525b" font-size="10">Origin</text>
+          <rect x="68" y="1" width="10" height="10" rx="3" fill="none" stroke="#80A5EF" stroke-width="1.5"/>
+          <text x="84" y="10" fill="#52525b" font-size="10">Active</text>
+          <rect x="128" y="1" width="10" height="10" rx="3" fill="none" stroke="#98B7F6" stroke-width="1.5"/>
+          <text x="144" y="10" fill="#52525b" font-size="10">Final</text>
+          <line x1="184" y1="6" x2="204" y2="6" stroke="#34D399" stroke-width="2"/>
+          <text x="210" y="10" fill="#52525b" font-size="10">Enabled</text>
+          <line x1="262" y1="6" x2="282" y2="6" stroke="#F87171" stroke-width="2" stroke-dasharray="4 3"/>
+          <text x="288" y="10" fill="#52525b" font-size="10">Blocked</text>
+          <rect x="340" y="1" width="10" height="10" rx="3" fill="#FBBF24" opacity="0.9"/>
+          <text x="356" y="10" fill="#FBBF24" font-size="10">Rule</text>
+          <text x="400" y="10" fill="#3AC8F8" font-size="10" font-family="Inconsolata,monospace">Events</text>
+        </g>
       </svg>
     </div>
   </div>
 </div>
 
 <div class="callout">
-  <strong>DSL + Diagram pairing:</strong> The code defines it, the diagram visualizes it. Together they're the visual identity system — code block on the left, state diagram on the right. This pairing appears in the README, the VS Code preview panel, and eventually docs.
+  <strong>DSL + Diagram pairing:</strong> The code defines it, the diagram visualizes it. Together they are the visual identity system &mdash; code on the left, state diagram on the right. This pairing appears in the README, the VS Code preview panel, and eventually docs. Both use the same palette; the diagram is a direct projection of the code, not a separate design.
+</div>
+
+<div class="callout" style="margin-top:12px; background:rgba(56,189,248,0.06); border-color:#0c4a6e;">
+  <strong>What to explore:</strong>
+  <ul style="margin:8px 0 0 16px; line-height:1.8;">
+    <li>Node shapes &mdash; pill (current) vs rounded rect vs circle for origin? Double-border for final is clear, but is there a cleaner terminal marker?</li>
+    <li>Edge routing &mdash; straight lines vs curved? Curved might look more polished but harder to generate programmatically.</li>
+    <li>Constraint annotations &mdash; the gold "!" badge works here. Should guards appear as edge labels or separate annotations?</li>
+    <li>Self-loop rendering &mdash; the VerifyDocuments arc looks OK. Does it need a different visual when the event is stationary?</li>
+    <li>Layout algorithm &mdash; what drives node positioning? Left-to-right flow with lifecycle ordering (origin &rarr; active &rarr; final)?</li>
+  </ul>
 </div>
 </div>
 
 <div class="section-divider"></div>
 
-<!-- ===== SECTION 3: The combined system ===== -->
+<!-- ===== SECTION 3: Combined system ===== -->
 <div class="section">
 <h2>3. The combined visual identity system</h2>
-<p class="desc">Code + diagram + icon + diagnostic output. Four surfaces, one visual language.</p>
+<p class="desc">Code + diagram + diagnostics + icon. Four surfaces, one visual language, one palette.</p>
 
 <div class="side-by-side">
   <!-- Left: Code -->
   <div class="card">
     <div class="card-header">
-      <h3>Surface 1: DSL Code</h3>
+      <h3>Surface 1: DSL Code <span class="status-locked">Locked</span></h3>
       <p>The hero. Seen daily in the editor.</p>
     </div>
     <div class="card-body">
-      <div class="syntax-hero" style="font-size:12px;"><span class="kw">precept</span> <span class="st">LoanApplication</span>
+      <div class="syntax-block" style="font-size:12px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">LoanApplication</span>
 
-<span class="kw">field</span> <span class="id">Amount</span> <span class="kw2">as</span> <span class="tp">number</span> <span class="kw2">default</span> <span class="num">0</span>
-<span class="kw">state</span> <span class="st">Draft</span> <span class="kw">initial</span>
-<span class="kw">state</span> <span class="st">UnderReview</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Draft</span> <span style="color:#638EE3;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#80A5EF;">UnderReview</span>
 
-<span class="kw">from</span> <span class="st">Draft</span> <span class="kw">on</span> <span class="st">Submit</span>
-  <span class="arrow">-></span> <span class="kw">set</span> <span class="id">Amount</span> <span class="op">=</span> <span class="st">Submit</span><span class="op">.</span><span class="id">Amount</span>
-  <span class="arrow">-></span> <span class="kw">transition</span> <span class="st">UnderReview</span></div>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Amount</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Amount</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">UnderReview</span></div>
     </div>
   </div>
 
   <!-- Right: Diagram -->
   <div class="card">
     <div class="card-header">
-      <h3>Surface 2: State Diagram</h3>
-      <p>The companion. Same data, visual form.</p>
+      <h3>Surface 2: State Diagram <span class="status-locked">Locked</span></h3>
+      <p>The companion. Same palette, visual form.</p>
     </div>
     <div class="card-body">
-      <div class="diagram-container" style="padding:20px;">
-        <svg width="260" height="100" viewBox="0 0 260 100">
+      <div style="background:#0c0c0f; border-radius:8px; padding:20px; border:1px solid #1e1b4b; text-align:center;">
+        <svg width="280" height="100" viewBox="0 0 280 100">
           <defs>
-            <marker id="a2" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker>
+            <marker id="a2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#34D399"/></marker>
           </defs>
-          <rect x="10" y="30" width="80" height="36" rx="18" fill="none" stroke="#d97706" stroke-width="2"/>
-          <circle cx="20" cy="48" r="3" fill="#d97706"/>
-          <text x="55" y="53" text-anchor="middle" fill="#e5e5e5" font-size="13" font-family="system-ui" font-weight="600">Draft</text>
-          <line x1="90" y1="48" x2="155" y2="48" stroke="#d97706" stroke-width="2" marker-end="url(#a2)"/>
-          <text x="122" y="40" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="monospace">Submit</text>
-          <rect x="155" y="30" width="100" height="36" rx="18" fill="none" stroke="#475569" stroke-width="2"/>
-          <text x="205" y="53" text-anchor="middle" fill="#e5e5e5" font-size="13" font-family="system-ui" font-weight="600">Review</text>
+          <rect x="10" y="32" width="80" height="36" rx="18" fill="rgba(99,142,227,0.08)" stroke="#638EE3" stroke-width="2.5"/>
+          <circle cx="22" cy="50" r="3" fill="#638EE3"/>
+          <text x="55" y="55" text-anchor="middle" fill="#638EE3" font-size="13" font-family="Inconsolata,monospace" font-weight="600">Draft</text>
+          <line x1="90" y1="50" x2="165" y2="50" stroke="#34D399" stroke-width="2" marker-end="url(#a2)"/>
+          <text x="127" y="42" text-anchor="middle" fill="#3AC8F8" font-size="10" font-family="Inconsolata,monospace">Submit</text>
+          <rect x="165" y="32" width="105" height="36" rx="18" fill="none" stroke="#80A5EF" stroke-width="2"/>
+          <text x="217" y="55" text-anchor="middle" fill="#80A5EF" font-size="12" font-family="Inconsolata,monospace" font-weight="600">UnderReview</text>
         </svg>
       </div>
     </div>
@@ -293,88 +524,27 @@
 </div>
 
 <div style="margin-top:24px;" class="side-by-side">
-  <!-- Left: Icon -->
+  <!-- Left: Icon placeholder -->
   <div class="card">
     <div class="card-header">
-      <h3>Surface 3: Icon</h3>
+      <h3>Surface 3: Icon <span class="status-open">Exploring</span></h3>
       <p>NuGet, GitHub, VS Code sidebar.</p>
     </div>
     <div class="card-body">
       <div style="display:flex;gap:24px;align-items:center;">
-        <!-- Abstract state-machine inspired icon concept -->
-        <svg width="64" height="64" viewBox="0 0 64 64">
-          <rect width="64" height="64" rx="12" fill="#1e293b"/>
-          <circle cx="18" cy="32" r="8" fill="none" stroke="#d97706" stroke-width="2.5"/>
-          <circle cx="18" cy="32" r="3" fill="#d97706"/>
-          <line x1="26" y1="32" x2="38" y2="32" stroke="#d97706" stroke-width="2.5"/>
-          <path d="M36,28 L42,32 L36,36" fill="#d97706"/>
-          <circle cx="48" cy="32" r="8" fill="none" stroke="#475569" stroke-width="2"/>
-        </svg>
-        <svg width="32" height="32" viewBox="0 0 64 64">
-          <rect width="64" height="64" rx="12" fill="#1e293b"/>
-          <circle cx="18" cy="32" r="8" fill="none" stroke="#d97706" stroke-width="3"/>
-          <circle cx="18" cy="32" r="3" fill="#d97706"/>
-          <line x1="26" y1="32" x2="38" y2="32" stroke="#d97706" stroke-width="3"/>
-          <path d="M36,28 L42,32 L36,36" fill="#d97706"/>
-          <circle cx="48" cy="32" r="8" fill="none" stroke="#475569" stroke-width="2.5"/>
-        </svg>
+        <div style="width:64px;height:64px;border-radius:12px;background:#1e293b;border:1px dashed #4338CA;display:flex;align-items:center;justify-content:center;">
+          <span style="color:#6366F1;font-size:11px;">TBD</span>
+        </div>
+        <div style="width:32px;height:32px;border-radius:6px;background:#1e293b;border:1px dashed #4338CA;display:flex;align-items:center;justify-content:center;">
+          <span style="color:#6366F1;font-size:8px;">TBD</span>
+        </div>
         <div>
-          <div style="font-size:13px;color:#888;">Concept: abstract state + transition</div>
-          <div style="font-size:12px;color:#555;">Initial node → target node</div>
+          <div style="font-size:13px;color:#71717a;">Autonomous prototyping loop running</div>
+          <div style="font-size:12px;color:#52525b;">See <code>brand/icon-prototyping-loop/</code></div>
         </div>
       </div>
-      <div style="display:flex;gap:24px;align-items:center;margin-top:20px;">
-        <!-- Tablet/inscription concept -->
-        <svg width="64" height="64" viewBox="0 0 64 64">
-          <rect width="64" height="64" rx="12" fill="#1e293b"/>
-          <rect x="16" y="12" width="32" height="40" rx="3" fill="none" stroke="#d97706" stroke-width="2"/>
-          <line x1="22" y1="22" x2="42" y2="22" stroke="#d97706" stroke-width="1.5" opacity="0.8"/>
-          <line x1="22" y1="29" x2="38" y2="29" stroke="#475569" stroke-width="1.5" opacity="0.6"/>
-          <line x1="22" y1="36" x2="40" y2="36" stroke="#475569" stroke-width="1.5" opacity="0.6"/>
-          <line x1="22" y1="43" x2="34" y2="43" stroke="#475569" stroke-width="1.5" opacity="0.4"/>
-        </svg>
-        <svg width="32" height="32" viewBox="0 0 64 64">
-          <rect width="64" height="64" rx="12" fill="#1e293b"/>
-          <rect x="16" y="12" width="32" height="40" rx="3" fill="none" stroke="#d97706" stroke-width="2.5"/>
-          <line x1="22" y1="22" x2="42" y2="22" stroke="#d97706" stroke-width="2" opacity="0.8"/>
-          <line x1="22" y1="29" x2="38" y2="29" stroke="#475569" stroke-width="2" opacity="0.6"/>
-          <line x1="22" y1="36" x2="40" y2="36" stroke="#475569" stroke-width="2" opacity="0.6"/>
-          <line x1="22" y1="43" x2="34" y2="43" stroke="#475569" stroke-width="1.5" opacity="0.4"/>
-        </svg>
-        <div>
-          <div style="font-size:13px;color:#888;">Concept: inscribed tablet</div>
-          <div style="font-size:12px;color:#555;">Rules written in stone. Top line in amber = precept declaration.</div>
-        </div>
-      </div>
-      <div style="display:flex;gap:24px;align-items:center;margin-top:20px;">
-        <!-- Combined: tablet with state-machine accent -->
-        <svg width="64" height="64" viewBox="0 0 64 64">
-          <rect width="64" height="64" rx="12" fill="#1e293b"/>
-          <rect x="14" y="10" width="36" height="44" rx="3" fill="none" stroke="#475569" stroke-width="1.5"/>
-          <line x1="20" y1="20" x2="44" y2="20" stroke="#d97706" stroke-width="1.5"/>
-          <line x1="20" y1="27" x2="40" y2="27" stroke="#475569" stroke-width="1" opacity="0.5"/>
-          <line x1="20" y1="33" x2="42" y2="33" stroke="#475569" stroke-width="1" opacity="0.5"/>
-          <!-- Small state diagram overlay -->
-          <circle cx="24" cy="44" r="4" fill="none" stroke="#d97706" stroke-width="1.5"/>
-          <circle cx="24" cy="44" r="1.5" fill="#d97706"/>
-          <line x1="28" y1="44" x2="34" y2="44" stroke="#d97706" stroke-width="1.5"/>
-          <path d="M33,42 L36,44 L33,46" fill="#d97706"/>
-          <circle cx="40" cy="44" r="4" fill="none" stroke="#475569" stroke-width="1.5"/>
-        </svg>
-        <svg width="32" height="32" viewBox="0 0 64 64">
-          <rect width="64" height="64" rx="12" fill="#1e293b"/>
-          <rect x="14" y="10" width="36" height="44" rx="3" fill="none" stroke="#475569" stroke-width="2"/>
-          <line x1="20" y1="20" x2="44" y2="20" stroke="#d97706" stroke-width="2"/>
-          <line x1="20" y1="27" x2="40" y2="27" stroke="#475569" stroke-width="1.5" opacity="0.5"/>
-          <circle cx="24" cy="44" r="4" fill="none" stroke="#d97706" stroke-width="2"/>
-          <circle cx="24" cy="44" r="1.5" fill="#d97706"/>
-          <line x1="28" y1="44" x2="34" y2="44" stroke="#d97706" stroke-width="2"/>
-          <circle cx="40" cy="44" r="4" fill="none" stroke="#475569" stroke-width="2"/>
-        </svg>
-        <div>
-          <div style="font-size:13px;color:#888;">Concept: tablet + state diagram</div>
-          <div style="font-size:12px;color:#555;">Rules on top, state machine at bottom. Both ideas in one mark.</div>
-        </div>
+      <div class="note" style="margin-top:16px;">
+        The icon does not have to carry the entire brand. It is one element in a system where the <code>.precept</code> file format and state diagrams do the heavy lifting. Whatever icon emerges will use the locked indigo palette.
       </div>
     </div>
   </div>
@@ -382,111 +552,139 @@
   <!-- Right: Diagnostic output -->
   <div class="card">
     <div class="card-header">
-      <h3>Surface 4: Diagnostic Output</h3>
+      <h3>Surface 4: Diagnostics <span class="status-locked">Locked</span></h3>
       <p>Error messages as a brand surface.</p>
     </div>
     <div class="card-body">
-      <div style="font-family:'JetBrains Mono',monospace; font-size:12px; background:#0d0d0d; border-radius:6px; padding:16px; line-height:1.8;">
-        <div><span style="color:#d97706;">PRECEPT001</span> <span style="color:#dc2626;">error</span>: Unreachable state <span style="color:#dcdcaa;">Archived</span> — no transitions lead here</div>
-        <div><span style="color:#d97706;">PRECEPT038</span> <span style="color:#dc2626;">error</span>: Type mismatch in guard: expected <span style="color:#4ec9b0;">number</span>, got <span style="color:#4ec9b0;">string</span></div>
-        <div><span style="color:#d97706;">PRECEPT047</span> <span style="color:#f59e0b;">warning</span>: Dead-end state <span style="color:#dcdcaa;">Approved</span> — no outgoing transitions</div>
-        <div style="margin-top:12px; color:#555;">──────────────────────────────────────</div>
-        <div style="color:#888; margin-top:4px;">3 diagnostics (2 errors, 1 warning)</div>
+      <div style="font-family:'Inconsolata',monospace; font-size:12px; background:#0c0c0f; border-radius:6px; padding:16px; line-height:1.8; border:1px solid #1e1b4b;">
+        <div><span style="color:#818cf8;">PRECEPT001</span> <span style="color:#F87171;">error</span>: Unreachable state <span style="color:#80A5EF;">Archived</span> &mdash; no transitions lead here</div>
+        <div><span style="color:#818cf8;">PRECEPT038</span> <span style="color:#F87171;">error</span>: Type mismatch in guard: expected <span style="color:#78829B;">number</span>, got <span style="color:#78829B;">string</span></div>
+        <div><span style="color:#818cf8;">PRECEPT047</span> <span style="color:#FDE047;">warning</span>: Dead-end state <span style="color:#98B7F6;">Approved</span> &mdash; no outgoing transitions</div>
+        <div style="margin-top:12px; color:#27272a;">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</div>
+        <div style="color:#52525b; margin-top:4px;">3 diagnostics (<span style="color:#F87171;">2 errors</span>, <span style="color:#FDE047;">1 warning</span>)</div>
       </div>
       <div class="note" style="margin-top:16px;">
-        The <code>PRECEPT</code> prefix + amber diagnostic codes become a recognizable "signature" — like BenchmarkDotNet's result tables.
+        The <code style="color:#818cf8;">PRECEPT</code> prefix + indigo codes become a recognizable "signature" &mdash; like BenchmarkDotNet's result tables. State names in diagnostics use their structural color (azure shades).
       </div>
     </div>
   </div>
 </div>
-
 </div>
 
 <div class="section-divider"></div>
 
 <!-- ===== SECTION 4: README mock ===== -->
 <div class="section">
-<h2>4. How it comes together: README hero</h2>
-<p class="desc">The DSL code block + state diagram side by side, as the visual anchor of the README.</p>
+<h2>4. How it comes together: README hero <span class="status-open">Exploring</span></h2>
+<p class="desc">The DSL code block + state diagram side by side, as the visual anchor of the README. This is the first thing people see.</p>
 
 <div class="readme-mock">
   <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px;">
-    <svg width="40" height="40" viewBox="0 0 64 64">
-      <rect width="64" height="64" rx="12" fill="#1e293b"/>
-      <rect x="14" y="10" width="36" height="44" rx="3" fill="none" stroke="#475569" stroke-width="1.5"/>
-      <line x1="20" y1="20" x2="44" y2="20" stroke="#d97706" stroke-width="1.5"/>
-      <line x1="20" y1="27" x2="40" y2="27" stroke="#475569" stroke-width="1" opacity="0.5"/>
-      <line x1="20" y1="33" x2="42" y2="33" stroke="#475569" stroke-width="1" opacity="0.5"/>
-      <circle cx="24" cy="44" r="4" fill="none" stroke="#d97706" stroke-width="1.5"/>
-      <circle cx="24" cy="44" r="1.5" fill="#d97706"/>
-      <line x1="28" y1="44" x2="34" y2="44" stroke="#d97706" stroke-width="1.5"/>
-      <path d="M33,42 L36,44 L33,46" fill="#d97706"/>
-      <circle cx="40" cy="44" r="4" fill="none" stroke="#475569" stroke-width="1.5"/>
-    </svg>
-    <h1 style="font-family:'Space Grotesk',system-ui; font-weight:700;">Precept</h1>
+    <!-- Wordmark -->
+    <span style="font-family:'Inconsolata',monospace; font-weight:700; font-size:28px; color:#6366F1; font-variant:small-caps; letter-spacing:0.1em;">Precept</span>
   </div>
-  <p class="tagline">A domain integrity engine for .NET. One file defines every state, transition, field, guard, and constraint. The runtime enforces it all.</p>
+  <p class="tagline">A domain integrity engine for .NET &mdash; a single declarative contract that binds state, data, and business rules into an engine where invalid states are structurally impossible.</p>
   <div class="badges">
-    <div class="badge"><span class="label">nuget</span><span class="value" style="background:#d97706;">v1.0.0</span></div>
+    <div class="badge"><span class="label">nuget</span><span class="value" style="background:#6366F1;">v1.0.0</span></div>
     <div class="badge"><span class="label">license</span><span class="value" style="background:#475569;">MIT</span></div>
     <div class="badge"><span class="label">.NET</span><span class="value" style="background:#475569;">8.0+</span></div>
   </div>
 
   <!-- Hero code + diagram side by side -->
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;">
-    <div style="background:#161b22; border:1px solid #30363d; border-radius:6px; padding:16px; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.7; white-space:pre; overflow-x:auto;"><span style="color:#f59e0b;font-weight:600;">precept</span> <span style="color:#dcdcaa;">LoanApplication</span>
+    <div style="background:#0c0c0f; border:1px solid #1e1b4b; border-radius:6px; padding:16px; font-family:'Inconsolata',monospace; font-size:11px; line-height:1.7; white-space:pre; overflow-x:auto;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">LoanApplication</span>
 
-<span style="color:#f59e0b;">field</span> <span style="color:#9cdcfe;">Amount</span> <span style="color:#d97706;">as</span> <span style="color:#4ec9b0;">number</span>
-<span style="color:#f59e0b;">state</span> <span style="color:#dcdcaa;">Draft</span> <span style="color:#f59e0b;">initial</span>
-<span style="color:#f59e0b;">state</span> <span style="color:#dcdcaa;">UnderReview</span>
-<span style="color:#f59e0b;">state</span> <span style="color:#dcdcaa;">Approved</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Draft</span> <span style="color:#638EE3;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#80A5EF;">UnderReview</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#98B7F6;">Approved</span>
 
-<span style="color:#f59e0b;">from</span> <span style="color:#dcdcaa;">Draft</span> <span style="color:#f59e0b;">on</span> <span style="color:#dcdcaa;">Submit</span>
-  <span style="color:#f59e0b;">-></span> <span style="color:#f59e0b;">transition</span> <span style="color:#dcdcaa;">UnderReview</span></div>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">UnderReview</span></div>
 
-    <div style="background:#161b22; border:1px solid #30363d; border-radius:6px; padding:16px; display:flex; align-items:center; justify-content:center;">
-      <svg width="240" height="140" viewBox="0 0 240 140">
+    <div style="background:#0c0c0f; border:1px solid #1e1b4b; border-radius:6px; padding:16px; display:flex; align-items:center; justify-content:center;">
+      <svg width="260" height="120" viewBox="0 0 260 120">
         <defs>
-          <marker id="a3" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker>
+          <marker id="a3" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7" fill="#34D399"/></marker>
+          <marker id="a4" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7" fill="#6366F1"/></marker>
         </defs>
-        <rect x="20" y="55" width="60" height="28" rx="14" fill="none" stroke="#d97706" stroke-width="2"/>
-        <circle cx="28" cy="69" r="3" fill="#d97706"/>
-        <text x="54" y="73" text-anchor="middle" fill="#c9d1d9" font-size="11" font-family="system-ui" font-weight="600">Draft</text>
-        <line x1="80" y1="69" x2="115" y2="69" stroke="#d97706" stroke-width="1.5" marker-end="url(#a3)"/>
-        <text x="97" y="62" text-anchor="middle" fill="#fbbf24" font-size="9" font-family="monospace">Submit</text>
-        <rect x="115" y="55" width="70" height="28" rx="14" fill="none" stroke="#475569" stroke-width="1.5"/>
-        <text x="150" y="73" text-anchor="middle" fill="#c9d1d9" font-size="10" font-family="system-ui" font-weight="600">Review</text>
-        <line x1="185" y1="62" x2="210" y2="32" stroke="#d97706" stroke-width="1.5" marker-end="url(#a3)"/>
-        <text x="210" y="50" fill="#fbbf24" font-size="9" font-family="monospace">Approve</text>
-        <rect x="195" y="16" width="40" height="24" rx="12" fill="none" stroke="#16a34a" stroke-width="1.5"/>
-        <text x="215" y="32" text-anchor="middle" fill="#c9d1d9" font-size="10" font-family="system-ui">✓</text>
-        <line x1="185" y1="76" x2="210" y2="106" stroke="#d97706" stroke-width="1.5" marker-end="url(#a3)"/>
-        <text x="210" y="97" fill="#fbbf24" font-size="9" font-family="monospace">Decline</text>
-        <rect x="195" y="96" width="40" height="24" rx="12" fill="none" stroke="#dc2626" stroke-width="1.5"/>
-        <text x="215" y="112" text-anchor="middle" fill="#c9d1d9" font-size="10" font-family="system-ui">✗</text>
+        <rect x="10" y="45" width="60" height="28" rx="14" fill="rgba(99,142,227,0.08)" stroke="#638EE3" stroke-width="2"/>
+        <circle cx="20" cy="59" r="3" fill="#638EE3"/>
+        <text x="44" y="63" text-anchor="middle" fill="#638EE3" font-size="11" font-family="Inconsolata,monospace" font-weight="600">Draft</text>
+
+        <line x1="70" y1="59" x2="98" y2="59" stroke="#34D399" stroke-width="1.5" marker-end="url(#a3)"/>
+        <text x="84" y="51" text-anchor="middle" fill="#3AC8F8" font-size="8" font-family="Inconsolata,monospace">Submit</text>
+
+        <rect x="98" y="45" width="72" height="28" rx="14" fill="none" stroke="#80A5EF" stroke-width="1.5"/>
+        <text x="134" y="63" text-anchor="middle" fill="#80A5EF" font-size="10" font-family="Inconsolata,monospace" font-weight="600">Review</text>
+
+        <line x1="170" y1="52" x2="198" y2="32" stroke="#6366F1" stroke-width="1.5" opacity="0.6" marker-end="url(#a4)"/>
+        <text x="198" y="46" fill="#7DDAFC" font-size="8" font-family="Inconsolata,monospace">Approve</text>
+        <rect x="195" y="16" width="55" height="24" rx="12" fill="none" stroke="#98B7F6" stroke-width="1.5"/>
+        <rect x="192" y="13" width="61" height="30" rx="14" fill="none" stroke="#98B7F6" stroke-width="0.8" opacity="0.3"/>
+        <text x="222" y="32" text-anchor="middle" fill="#98B7F6" font-size="9" font-family="Inconsolata,monospace">Approved</text>
+
+        <line x1="170" y1="66" x2="198" y2="86" stroke="#6366F1" stroke-width="1.5" opacity="0.6" marker-end="url(#a4)"/>
+        <text x="198" y="82" fill="#3AC8F8" font-size="8" font-family="Inconsolata,monospace">Decline</text>
+        <rect x="195" y="78" width="55" height="24" rx="12" fill="none" stroke="#98B7F6" stroke-width="1.5"/>
+        <rect x="192" y="75" width="61" height="30" rx="14" fill="none" stroke="#98B7F6" stroke-width="0.8" opacity="0.3"/>
+        <text x="222" y="94" text-anchor="middle" fill="#98B7F6" font-size="9" font-family="Inconsolata,monospace">Declined</text>
       </svg>
     </div>
   </div>
+</div>
+
+<div class="callout" style="margin-top:16px; background:rgba(56,189,248,0.06); border-color:#0c4a6e;">
+  <strong>README exploration questions:</strong>
+  <ul style="margin:8px 0 0 16px; line-height:1.8;">
+    <li>Does the code+diagram pairing work as a single visual unit, or should the diagram go below?</li>
+    <li>NuGet badge in indigo (<span style="color:#6366F1;">#6366F1</span>) &mdash; does it read as a Precept thing or just generic purple?</li>
+    <li>Wordmark treatment: small-caps Inconsolata 700 with 0.1em spacing. Should it appear in the README header or is the plain text name enough?</li>
+    <li>GitHub dark theme background (#0d1117) vs our background (#0c0c0f) &mdash; close enough, or need the code block to specify its own background?</li>
+    <li>Social preview image (og:image) &mdash; probably the code+diagram pairing rendered as a 1280x640 PNG. What else?</li>
+  </ul>
 </div>
 </div>
 
 <div class="section-divider"></div>
 
-<!-- ===== SECTION 5: The thesis ===== -->
+<!-- ===== SECTION 5: Thesis ===== -->
 <div class="section">
-<h2>5. Visual identity thesis</h2>
+<h2>5. Visual identity thesis <span class="status-locked">Locked</span></h2>
 
 <div class="card">
   <div class="card-body" style="line-height:1.8; font-size:15px;">
-    <p style="color:#fff; font-weight:600; margin-bottom:12px;">Precept's visual identity is not an icon — it's an ecosystem of four surfaces:</p>
-    <ol style="color:#ccc; padding-left:20px; margin-bottom:20px;">
-      <li style="margin-bottom:8px;"><strong style="color:#f59e0b;">DSL syntax</strong> — keyword-anchored lines, arrow chains, the distinctive left-edge rhythm. This is the hero visual.</li>
-      <li style="margin-bottom:8px;"><strong style="color:#f59e0b;">State diagrams</strong> — nodes and labeled edges, generated directly from the precept. The companion graphic.</li>
-      <li style="margin-bottom:8px;"><strong style="color:#f59e0b;">The icon</strong> — a mark that hints at both ideas (inscribed rules + state flow). Used at small sizes everywhere.</li>
-      <li style="margin-bottom:8px;"><strong style="color:#f59e0b;">Diagnostic output</strong> — <code>PRECEPT</code>-prefixed codes with structured messages. The daily-use brand surface.</li>
+    <p style="color:#fff; font-weight:600; margin-bottom:12px;">Precept's visual identity is not an icon &mdash; it is an ecosystem of four surfaces:</p>
+    <ol style="color:#a1a1aa; padding-left:20px; margin-bottom:20px;">
+      <li style="margin-bottom:8px;"><strong style="color:#6366F1;">DSL syntax</strong> &mdash; keyword-anchored lines, arrow chains, the distinctive left-edge rhythm. Six visual voices (indigo structure, azure states, sky events, slate data, gold rules, verdict colors). This is the hero visual.</li>
+      <li style="margin-bottom:8px;"><strong style="color:#80A5EF;">State diagrams</strong> &mdash; azure nodes, sky event labels, verdict-colored edges, gold rule annotations. Generated directly from the precept. The companion graphic.</li>
+      <li style="margin-bottom:8px;"><strong style="color:#52525b;">The icon</strong> &mdash; a mark that hints at both ideas (inscribed rules + state flow). Used at small sizes everywhere. Currently exploring.</li>
+      <li style="margin-bottom:8px;"><strong style="color:#818cf8;">Diagnostic output</strong> &mdash; <code style="color:#818cf8;">PRECEPT</code>-prefixed codes with structured messages, structural state colors inline. The daily-use brand surface.</li>
     </ol>
-    <p style="color:#999;">The icon doesn't have to carry the entire brand. It's one element in a system where the <code>.precept</code> file format and state diagrams do the heavy lifting.</p>
+    <p style="color:#71717a;">The icon does not carry the brand alone. The <code>.precept</code> file format and state diagrams do the heavy lifting. The semantic color system is the connective tissue &mdash; the same 17 shades appear across all four surfaces.</p>
   </div>
+</div>
+
+<div class="callout">
+  <strong>What is decided:</strong>
+  <ul style="margin:8px 0 0 16px; line-height:1.8;">
+    <li>Primary surface = DSL syntax. Secondary = state diagrams. Tertiary = diagnostics. Icon = small mark.</li>
+    <li>Background: <code>#0c0c0f</code> everywhere. Font: Inconsolata (wordmark 700 small-caps, code 400-600).</li>
+    <li>17-shade semantic palette applied consistently across all surfaces.</li>
+    <li>Compiler-driven structural coloring for states (origin/active/final) and events (transition/conditional/stationary).</li>
+  </ul>
+</div>
+
+<div class="callout" style="margin-top:12px; background:rgba(56,189,248,0.06); border-color:#0c4a6e;">
+  <strong>Open threads to explore:</strong>
+  <ul style="margin:8px 0 0 16px; line-height:1.8;">
+    <li><strong>Inspector panel</strong> &mdash; the runtime "what can I do from here?" view. Fifth visual surface? Uses the same palette but needs its own layout language.</li>
+    <li><strong>AI/MCP as a visual surface</strong> &mdash; when an AI agent calls <code>precept_inspect</code>, the JSON output maps to the same categories. Could we render an "AI view" that uses the same palette?</li>
+    <li><strong>README hero layout</strong> &mdash; final positioning of code + diagram. Side-by-side vs stacked. Image format for og:image.</li>
+    <li><strong>Icon direction</strong> &mdash; autonomous loop running. Will incorporate locked palette colors once a form converges.</li>
+    <li><strong>Light theme</strong> &mdash; do we need one? GitHub READMEs can be viewed in light mode. How does the palette adapt?</li>
+    <li><strong>Animation</strong> &mdash; could the state diagram animate transitions? Fire an event and watch the current-state marker move? This would be compelling for landing pages.</li>
+  </ul>
 </div>
 </div>
 
