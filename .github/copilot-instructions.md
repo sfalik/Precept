@@ -1,48 +1,85 @@
 # Copilot Instructions for Precept
 
+## Architecture
+
+Precept is a domain integrity engine for .NET — a DSL runtime that binds an entity's state, data, and business rules into a single executable contract.
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| Core runtime | `src/Precept/Dsl/` | Parser → type checker → expression evaluator → runtime engine |
+| Language server | `tools/Precept.LanguageServer/` | LSP: diagnostics, completions, hover, go-to-definition, semantic tokens, preview |
+| MCP server | `tools/Precept.Mcp/` | 5 MCP tools wrapping core APIs (see below) |
+| VS Code extension | `tools/Precept.VsCode/` | Extension host: syntax highlighting, preview webview, commands |
+| Copilot plugin | `tools/Precept.Plugin/` | Agent definition + 2 skills + MCP launcher |
+| Sample files | `samples/` | 20 `.precept` files — canonical DSL usage examples |
+
+Key design docs: `docs/PreceptLanguageDesign.md` (DSL semantics), `docs/RuntimeApiDesign.md` (C# API), `docs/McpServerDesign.md` (MCP tool specs), `docs/CatalogInfrastructureDesign.md` (metadata registries). See `docs/` for the full set.
+
+## Build & Test
+
+```bash
+# Build everything
+dotnet build
+
+# Build language server only (default build task — Ctrl+Shift+B)
+dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server
+
+# Run all tests (xUnit + FluentAssertions, 666 tests across 3 projects)
+dotnet test
+
+# Run a single test project
+dotnet test test/Precept.Tests/
+dotnet test test/Precept.LanguageServer.Tests/
+dotnet test test/Precept.Mcp.Tests/
+
+# VS Code extension (from tools/Precept.VsCode/)
+npm run compile        # Build TypeScript
+npm run watch          # Watch mode
+npm run loop:local     # Package + install locally (also a VS Code task)
+```
+
+**VS Code tasks** (Run Task menu): `build`, `extension: install`, `extension: uninstall`, `plugin: enable`, `plugin: disable`.
+
+## Development Workflow
+
+- **Runtime / language server changes** → edit `src/Precept/` or `tools/Precept.LanguageServer/` → run Build task → extension auto-detects new build, no reload needed.
+- **Extension UI / grammar / TypeScript** → edit `tools/Precept.VsCode/` → run `extension: install` task → reload window.
+- **MCP server** → edit `tools/Precept.Mcp/` → reload window → rebuild happens lazily on next tool invocation.
+- **Plugin (agents/skills markdown)** → edit `tools/Precept.Plugin/` → reload window → changes appear immediately.
+
 ## Use the MCP Tools First
 
 This project ships a Precept MCP server with 5 tools. **Use them as your primary research tools** before reading source code or making assumptions about the DSL:
 
-- **`precept_language`** — returns the complete DSL vocabulary (all keywords by category, operators with precedence, expression scopes, constraints, fire pipeline stages, outcome kinds). Call this first when you need to understand what the language supports.
-- **`precept_compile(text)`** — parse, type-check, analyze, and compile a precept definition. Returns the full typed structure (states, fields, events, transitions) alongside any diagnostics. Use this to understand any specific precept and to check for errors.
-- **`precept_inspect(text, currentState, data, eventArgs?)`** — read-only inspection from any state+data snapshot. Shows what each event would do and which fields are editable. Use this to understand runtime behavior.
-- **`precept_fire(text, currentState, event, data?, args?)`** — single-event execution. Use this to trace through a workflow step by step.
-- **`precept_update(text, currentState, data, fields)`** — direct field editing. Use this to test `in <State> edit` declarations and verify constraint behavior on field changes.
+| Tool | Purpose |
+|------|---------|
+| `precept_language` | Complete DSL vocabulary (keywords, operators, scopes, constraints, pipeline stages) |
+| `precept_compile(text)` | Parse, type-check, analyze; returns typed structure + diagnostics |
+| `precept_inspect(text, currentState, data, eventArgs?)` | Read-only preview of what each event would do |
+| `precept_fire(text, currentState, event, data?, args?)` | Single-event execution for step-by-step tracing |
+| `precept_update(text, currentState, data, fields)` | Direct field editing to test `edit` declarations and constraints |
 
-When analyzing, designing, or debugging anything related to the Precept DSL, start with the MCP tools to get authoritative data, then read source code only for implementation details the tools don't cover.
+Start with MCP tools for authoritative data, then read source code only for implementation details the tools don't cover.
 
 ## DSL Sample Files (.precept)
 
-`.precept` files are DSL source files interpreted directly by the runtime — they are **not** compiled by the C# build pipeline. Never run `dotnet build` or `dotnet run` to validate a `.precept` file.
+`.precept` files are interpreted by the runtime — **not** compiled by the C# build pipeline. Never run `dotnet build` or `dotnet run` to validate a `.precept` file.
 
 To check a `.precept` file for errors:
-1. Use the `get_errors` tool on the `.precept` file path — this reads the VS Code Problems panel, which is populated by the DSL language server.
-2. Cross-check the file against the sample files in `samples/`.
+1. Use the `get_errors` tool on the `.precept` file path (reads the VS Code Problems panel, populated by the language server).
+2. Cross-check against sample files in `samples/`.
 
-Do not invoke any terminal command to validate `.precept` files.
+## Documentation Sync (Non-Negotiable)
 
-## Documentation Sync Is Mandatory
-
-When making any code, interface, test, or behavior change, keep documentation in sync in the same edit pass.
+When making any code, interface, test, or behavior change, keep documentation in sync in the same edit pass. Unless explicitly told not to, include documentation synchronization as part of every relevant code change.
 
 ### Source of Truth
 
-- `README.md` is the public project narrative and usage guide.
-- Design documents in `docs/` are canonical design decision records.
-- Legacy documentation (`README-legacy.md`, `docs/DesignNotes-legacy.md`) is archived and must not be updated.
+- `README.md` — public project narrative and usage guide. Must track real implementation: update API names, behavioral semantics, examples, and feature claims on every meaningful change. Never leave aspirational claims as if implemented.
+- `docs/` — canonical design decision records.
+- Legacy files (`README-legacy.md`, `docs/DesignNotes-legacy.md`) — archived, do not update.
 
-## README Must Track Real Implementation
-
-On every meaningful change, review `README.md` and update impacted sections, including:
-
-- API names/signatures and type names
-- Behavioral semantics (especially inspect/fire outcomes and exceptions)
-- Examples/snippets that reference changed APIs
-- Feature claims that no longer match current code
-- Sample files that are affected by changes
-
-Do not leave aspirational claims as if implemented. If behavior is planned but not implemented, mark it clearly as design-phase or pending.
+Keep updates focused and factual. If uncertain whether a claim is implemented, verify from code/tests first.
 
 ## Syntax Highlighting Grammar Sync (Non-Negotiable)
 
@@ -102,20 +139,16 @@ The MCP server tools in `tools/Precept.Mcp/Tools/` are thin wrappers around core
 - When the fire pipeline stages change, update the static `FirePipeline` array in `LanguageTool.cs`.
 - The MCP tools are **thin wrappers** — never duplicate domain logic. If a tool method exceeds ~30 lines of non-serialization code, the logic probably belongs in `src/Precept/`.
 
-## Scope Discipline
+## Test Conventions
 
-- Keep doc updates focused and factual.
-- Prefer minimal, accurate wording over broad marketing language.
-- If uncertain whether a claim is implemented, verify from code/tests first.
-
-## Design Option Responses
-
-When providing design-option responses, include concrete usage examples to illustrate the implementation and clarify the context of the options presented.
+- Framework: **xUnit** with **FluentAssertions**
+- Naming: `PascalCase` + `Tests` suffix (e.g. `PreceptParserTests.cs`, `PreceptRuntimeTests.cs`)
+- Tests typically use `[Fact]` and `[Theory]` attributes
 
 ## DSL Authoring (Non-Negotiable)
 
 Before writing or editing any `.precept` file or any DSL snippet, read at least one representative sample file from `samples/` to confirm current syntax conventions. Do not rely on memory or inference — read first, then write.
 
-## Deliverable Expectation
+## Design Option Responses
 
-Unless explicitly told not to, include documentation synchronization as part of every relevant code change.
+When providing design-option responses, include concrete usage examples to illustrate the implementation and clarify the context of the options presented.

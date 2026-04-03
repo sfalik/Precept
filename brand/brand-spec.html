@@ -174,7 +174,7 @@
 <div class="section">
 <h2>4. Color System <span class="status-chip">LOCKED</span></h2>
 
-<p>17 shades in 6 families. Background <code>#0c0c0f</code>. Every color has a fixed meaning across all surfaces. Nothing is decorative.</p>
+<p>15 shades in 6 families. Background <code>#0c0c0f</code>. Every color has a fixed meaning across all surfaces. Nothing is decorative.</p>
 
 <div class="callout">
   <strong>Semantic color as brand</strong>
@@ -183,14 +183,15 @@
     <li><strong>Dimension 1 — what kind of thing:</strong> States (nouns — where you are), Events (verbs — what happens), Data (variables — what you know). Each gets its own hue family so a line of code is instantly scannable without reading it.</li>
     <li><strong>Dimension 2 — runtime evaluation:</strong> Verdicts (enabled / blocked / warning) are reserved for runtime outcomes. They never appear in syntax highlighting, so green and red can't be confused with authoring-time colors.</li>
     <li><strong>Rules sit at the intersection</strong> — they aren't a category of <em>thing</em> (like states or events). They produce <em>verdicts about</em> categories. Gold is the only warm hue in a cool-toned palette, so constraint syntax interrupts visually: when you see gold, you know it's a rule.</li>
-    <li><strong>Structure is scaffolding</strong> — intentionally quiet. Declaration, action, and glue keywords fade behind the semantic content they frame.</li>
+    <li><strong>Structure is scaffolding</strong> — intentionally quiet, rendered in semibold. Declaration, action, and glue keywords fade behind the semantic content they frame.</li>
+    <li><strong>Typography as a second channel</strong> — semibold for structure (load-bearing scaffolding), italic for data (receding content), normal weight for the primary semantic actors (states, events, rules).</li>
   </ul>
 </div>
 
 <!-- Structure -->
 <div class="card">
-  <h3 style="color:#6366F1;">Structure · Indigo · 239–245°</h3>
-  <p style="font-size:11px; color:#52525b; margin-bottom:12px;">Scaffolding — intentionally sub-AA contrast, fades behind the content it frames. Three tiers create hierarchy: declarations define the schema, actions drive the machine, glue is connective tissue.</p>
+  <h3 style="color:#6366F1;">Structure · Indigo · 239–245° · Semibold</h3>
+  <p style="font-size:11px; color:#52525b; margin-bottom:12px;">Scaffolding — intentionally sub-AA contrast, rendered in semibold to feel load-bearing. Three tiers create hierarchy: declarations define the schema, actions drive the machine, glue is connective tissue.</p>
   <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
     <div style="display:flex; align-items:center; gap:10px;">
       <div style="width:56px; height:36px; border-radius:6px; background:#4338CA; flex-shrink:0;"></div>
@@ -209,67 +210,59 @@
 
 <!-- States -->
 <div class="card">
-  <h3 style="color:#80A5EF;">States · Azure · 220°</h3>
-  <p style="font-size:11px; color:#52525b; margin-bottom:12px;">Nouns — where you are. Three lifecycle shades let the compiler show origin → active → final without annotation.</p>
+  <h3 style="color:#A898F5;">States · Violet · 260°</h3>
+  <p style="font-size:11px; color:#52525b; margin-bottom:12px;">Nouns — where you are. Three lifecycle shades let the compiler show origin → active → final without annotation. Violet at 260° provides 21° of hue separation from indigo structure.</p>
   <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
     <div style="display:flex; align-items:center; gap:10px;">
-      <div style="width:56px; height:36px; border-radius:6px; background:#638EE3; flex-shrink:0;"></div>
-      <div><span style="color:#638EE3; font-weight:600; font-size:12px;">Origin #638EE3</span><div style="font-size:10px; color:#52525b;">CR 6.1 · initial state + <code style="color:#638EE3;">initial</code></div></div>
+      <div style="width:56px; height:36px; border-radius:6px; background:#8B7AED; flex-shrink:0;"></div>
+      <div><span style="color:#8B7AED; font-weight:600; font-size:12px;">Origin #8B7AED</span><div style="font-size:10px; color:#52525b;">CR 7.0 · initial state + <code style="color:#8B7AED;">initial</code></div></div>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
-      <div style="width:56px; height:36px; border-radius:6px; background:#80A5EF; flex-shrink:0;"></div>
-      <div><span style="color:#80A5EF; font-weight:600; font-size:12px;">Active #80A5EF</span><div style="font-size:10px; color:#52525b;">CR 7.9 · non-initial, non-terminal</div></div>
+      <div style="width:56px; height:36px; border-radius:6px; background:#A898F5; flex-shrink:0;"></div>
+      <div><span style="color:#A898F5; font-weight:600; font-size:12px;">Active #A898F5</span><div style="font-size:10px; color:#52525b;">CR 8.5 · non-initial, non-terminal</div></div>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
-      <div style="width:56px; height:36px; border-radius:6px; background:#98B7F6; flex-shrink:0;"></div>
-      <div><span style="color:#98B7F6; font-weight:600; font-size:12px;">Final #98B7F6</span><div style="font-size:10px; color:#52525b;">CR 9.7 · terminal states</div></div>
+      <div style="width:56px; height:36px; border-radius:6px; background:#C0B4F8; flex-shrink:0;"></div>
+      <div><span style="color:#C0B4F8; font-weight:600; font-size:12px;">Final #C0B4F8</span><div style="font-size:10px; color:#52525b;">CR 10.0 · terminal states</div></div>
     </div>
   </div>
 </div>
 
 <!-- Events -->
 <div class="card">
-  <h3 style="color:#3AC8F8;">Events · Sky · 195°</h3>
-  <p style="font-size:11px; color:#52525b; margin-bottom:12px;">Verbs — what happens. Bright cyan gives events visual primacy on action lines, where they're the most important word. Sky at 195° keeps 25° of hue gap to Azure states and 37° from Emerald verdicts.</p>
-  <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+  <h3 style="color:#30B8E8;">Events · Cyan · 195°</h3>
+  <p style="font-size:11px; color:#52525b; margin-bottom:12px;">Verbs — what happens. Toned cyan gives events visual primacy on action lines, where they're the most important word. Single shade — all events are the same color regardless of transition behavior.</p>
+  <div style="display:grid; grid-template-columns:1fr; gap:12px; max-width:300px;">
     <div style="display:flex; align-items:center; gap:10px;">
-      <div style="width:56px; height:36px; border-radius:6px; background:#3AC8F8; flex-shrink:0;"></div>
-      <div><span style="color:#3AC8F8; font-weight:600; font-size:12px;">Transition #3AC8F8</span><div style="font-size:10px; color:#52525b;">CR 10.0 · always moves state</div></div>
-    </div>
-    <div style="display:flex; align-items:center; gap:10px;">
-      <div style="width:56px; height:36px; border-radius:6px; background:#7DDAFC; flex-shrink:0;"></div>
-      <div><span style="color:#7DDAFC; font-weight:600; font-size:12px;">Conditional #7DDAFC</span><div style="font-size:10px; color:#52525b;">CR 12.4 · may transition or reject</div></div>
-    </div>
-    <div style="display:flex; align-items:center; gap:10px;">
-      <div style="width:56px; height:36px; border-radius:6px; background:#0FB0EB; flex-shrink:0;"></div>
-      <div><span style="color:#0FB0EB; font-weight:600; font-size:12px;">Stationary #0FB0EB</span><div style="font-size:10px; color:#52525b;">CR 7.8 · data-only, no transition</div></div>
+      <div style="width:56px; height:36px; border-radius:6px; background:#30B8E8; flex-shrink:0;"></div>
+      <div><span style="color:#30B8E8; font-weight:600; font-size:12px;">All events #30B8E8</span><div style="font-size:10px; color:#52525b;">CR 9.5 · event names in all contexts</div></div>
     </div>
   </div>
 </div>
 
 <!-- Data -->
 <div class="card">
-  <h3 style="color:#94A3B8;">Data · Slate · 215–223°</h3>
-  <p style="font-size:11px; color:#52525b; margin-bottom:12px;">Variables — what you know. Neutral slate recedes behind the colored actors (states, events, rules), letting field names read as content rather than chrome.</p>
+  <h3 style="color:#B0BEC5;">Data · Bright Slate · 215° · Italic</h3>
+  <p style="font-size:11px; color:#52525b; margin-bottom:12px;">Variables — what you know. Bright slate in italic recedes behind the colored actors (states, events, rules) while remaining comfortably readable. Italic creates a distinct register even though the hue is close to structure.</p>
   <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
     <div style="display:flex; align-items:center; gap:10px;">
-      <div style="width:56px; height:36px; border-radius:6px; background:#94A3B8; flex-shrink:0;"></div>
-      <div><span style="color:#94A3B8; font-weight:600; font-size:12px;">Names #94A3B8</span><div style="font-size:10px; color:#52525b;">CR 7.6 · field names, arg names</div></div>
+      <div style="width:56px; height:36px; border-radius:6px; background:#B0BEC5; flex-shrink:0;"></div>
+      <div><span style="color:#B0BEC5; font-weight:600; font-size:12px; font-style:italic;">Names #B0BEC5</span><div style="font-size:10px; color:#52525b;">CR 8.0 · field names, arg names</div></div>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
-      <div style="width:56px; height:36px; border-radius:6px; background:#78829B; flex-shrink:0;"></div>
-      <div><span style="color:#78829B; font-weight:600; font-size:12px;">Types + Operators #78829B</span><div style="font-size:10px; color:#52525b;">CR 5.1 · string, number, boolean + &&, >=, !=, ==, contains</div></div>
+      <div style="width:56px; height:36px; border-radius:6px; background:#9AA8B5; flex-shrink:0;"></div>
+      <div><span style="color:#9AA8B5; font-weight:600; font-size:12px; font-style:italic;">Types + Operators #9AA8B5</span><div style="font-size:10px; color:#52525b;">CR 6.5 · string, number, boolean + &&, >=, !=, ==, contains</div></div>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
-      <div style="width:56px; height:36px; border-radius:6px; background:#64748B; flex-shrink:0;"></div>
-      <div><span style="color:#64748B; font-weight:600; font-size:12px;">Values #64748B</span><div style="font-size:10px; color:#52525b;">CR 4.1 · literals, non-rule strings, arithmetic</div></div>
+      <div style="width:56px; height:36px; border-radius:6px; background:#84929F; flex-shrink:0;"></div>
+      <div><span style="color:#84929F; font-weight:600; font-size:12px; font-style:italic;">Values #84929F</span><div style="font-size:10px; color:#52525b;">CR 5.5 · literals, non-rule strings, arithmetic</div></div>
     </div>
   </div>
 </div>
 
 <!-- Rules -->
 <div class="card">
-  <h3 style="color:#FBBF24;">Rules · Gold · 43°</h3>
+  <h3 style="color:#FBBF24;">Rules · Gold · 45°</h3>
   <p style="font-size:11px; color:#52525b; margin-bottom:12px;">The only warm hue in a cool-toned palette — gold interrupts visually, signaling "this is a constraint." Bright messages outrank muted keywords: the human-readable explanation is the hero text.</p>
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
     <div style="display:flex; align-items:center; gap:10px;">
@@ -307,8 +300,9 @@
 <div class="callout">
   <strong>Hue map (°):</strong>
   <div style="font-family:'Inconsolata',monospace; font-size:11px; margin-top:6px; color:#a1a1aa;">
-    43° Gold —<span style="color:#52525b;">7°</span>— 50° Warning —<span style="color:#52525b;">108°</span>— 158° Emerald —<span style="color:#52525b;">37°</span>— 195° Sky —<span style="color:#52525b;">20°</span>— 215° Slate —<span style="color:#52525b;">5°</span>— 220° Azure —<span style="color:#52525b;">19°</span>— 239° Indigo
+    45° Gold —<span style="color:#52525b;">150°</span>— 195° Cyan —<span style="color:#52525b;">20°</span>— 215° Slate —<span style="color:#52525b;">24°</span>— 239° Indigo —<span style="color:#52525b;">21°</span>— 260° Violet
   </div>
+  <div style="font-size:10px; color:#52525b; margin-top:4px;">Within the cool cluster (195°–260°), families separate via hue + saturation + typography (italic data vs semibold structure vs normal states/events).</div>
 </div>
 
 <div class="card">
@@ -316,57 +310,62 @@
   <p style="margin-bottom:12px;">Three structural roles determined automatically by the compiler — no DSL annotation needed:</p>
 
   <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px;">
-    <div style="background:#1a2744; border-radius:8px; padding:14px; text-align:center;">
-      <div style="width:36px; height:36px; border-radius:50%; border:3px solid #638EE3; margin:0 auto 6px; display:flex; align-items:center; justify-content:center;">
-        <span style="color:#638EE3; font-size:10px;">●</span>
+    <div style="background:#1a1528; border-radius:8px; padding:14px; text-align:center;">
+      <div style="width:36px; height:36px; border-radius:50%; border:3px solid #4338CA; margin:0 auto 6px; display:flex; align-items:center; justify-content:center;">
+        <span style="color:#8B7AED; font-size:10px;">●</span>
       </div>
-      <div style="color:#638EE3; font-weight:700; font-size:13px;">Origin</div>
-      <div style="color:#64748b; font-size:10px;">#638EE3 · Initial state</div>
+      <div style="color:#8B7AED; font-weight:700; font-size:13px;">Origin</div>
+      <div style="color:#64748b; font-size:10px;">#8B7AED · Initial state</div>
     </div>
-    <div style="background:#1e293b; border-radius:8px; padding:14px; text-align:center;">
-      <div style="width:36px; height:36px; border-radius:6px; border:2px solid #80A5EF; margin:0 auto 6px;"></div>
-      <div style="color:#80A5EF; font-weight:700; font-size:13px;">Active</div>
-      <div style="color:#64748b; font-size:10px;">#80A5EF · Non-terminal</div>
+    <div style="background:#1a1528; border-radius:8px; padding:14px; text-align:center;">
+      <div style="width:36px; height:36px; border-radius:6px; border:2px solid #4F46E5; margin:0 auto 6px;"></div>
+      <div style="color:#A898F5; font-weight:700; font-size:13px;">Active</div>
+      <div style="color:#64748b; font-size:10px;">#A898F5 · Non-terminal</div>
     </div>
-    <div style="background:#1a2744; border-radius:8px; padding:14px; text-align:center;">
-      <div style="width:36px; height:36px; border-radius:6px; border:3px double #98B7F6; margin:0 auto 6px;"></div>
-      <div style="color:#98B7F6; font-weight:700; font-size:13px;">Final</div>
-      <div style="color:#64748b; font-size:10px;">#98B7F6 · Terminal</div>
+    <div style="background:#1a1528; border-radius:8px; padding:14px; text-align:center;">
+      <div style="width:36px; height:36px; border-radius:6px; border:3px double #6366F1; margin:0 auto 6px;"></div>
+      <div style="color:#C0B4F8; font-weight:700; font-size:13px;">Final</div>
+      <div style="color:#64748b; font-size:10px;">#C0B4F8 · Terminal</div>
     </div>
   </div>
 
-  <p style="margin-top:12px; font-size:12px;">All three use the Azure 220° family at different lightness tiers. "Approved" and "Declined" get the same Final shade — the compiler can't judge success vs failure.</p>
+  <p style="margin-top:12px; font-size:12px;">Node borders use indigo (structure colors). State name text uses violet shades. "Approved" and "Declined" get the same Final shade — the compiler can't judge success vs failure.</p>
 </div>
 
 <div class="card">
-  <h3>Structural event coloring (compiler-driven)</h3>
-  <p style="margin-bottom:12px;">Three structural roles determined by analyzing transition behavior — no DSL annotation needed:</p>
+  <h3>State diagram coloring</h3>
+  <p style="margin-bottom:12px;">State diagrams use the same semantic palette, reinforcing the code ↔ diagram visual link:</p>
 
-  <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px;">
-    <div style="background:#0c1a2a; border-radius:8px; padding:14px; text-align:center;">
-      <div style="width:36px; height:36px; border-radius:50%; border:3px solid #3AC8F8; margin:0 auto 6px; display:flex; align-items:center; justify-content:center;">
-        <span style="color:#3AC8F8; font-size:14px;">→</span>
+  <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px;">
+    <div style="background:#0c0c0f; border-radius:8px; padding:14px; text-align:center;">
+      <div style="width:36px; height:36px; border-radius:6px; border:2px solid #4F46E5; margin:0 auto 6px; display:flex; align-items:center; justify-content:center;">
+        <span style="color:#A898F5; font-size:10px; font-family:Inconsolata,monospace;">State</span>
       </div>
-      <div style="color:#3AC8F8; font-weight:700; font-size:13px;">Transition</div>
-      <div style="color:#64748b; font-size:10px;">#3AC8F8 · Always moves state</div>
+      <div style="color:#4F46E5; font-weight:700; font-size:12px;">Node Borders</div>
+      <div style="color:#64748b; font-size:10px;">Indigo · structure</div>
     </div>
-    <div style="background:#0c1a2a; border-radius:8px; padding:14px; text-align:center;">
-      <div style="width:36px; height:36px; border-radius:6px; border:2px dashed #7DDAFC; margin:0 auto 6px; display:flex; align-items:center; justify-content:center;">
-        <span style="color:#7DDAFC; font-size:14px;">?</span>
+    <div style="background:#0c0c0f; border-radius:8px; padding:14px; text-align:center;">
+      <div style="width:36px; height:12px; margin:12px auto 18px; display:flex; align-items:center; justify-content:center;">
+        <span style="color:#A898F5; font-size:11px; font-family:Inconsolata,monospace; font-weight:600;">Draft</span>
       </div>
-      <div style="color:#7DDAFC; font-weight:700; font-size:13px;">Conditional</div>
-      <div style="color:#64748b; font-size:10px;">#7DDAFC · May transition or reject</div>
+      <div style="color:#A898F5; font-weight:700; font-size:12px;">State Names</div>
+      <div style="color:#64748b; font-size:10px;">Violet · by tier</div>
     </div>
-    <div style="background:#0c1a2a; border-radius:8px; padding:14px; text-align:center;">
-      <div style="width:36px; height:36px; border-radius:6px; border:2px solid #0FB0EB; margin:0 auto 6px; display:flex; align-items:center; justify-content:center;">
-        <span style="color:#0FB0EB; font-size:14px;">●</span>
+    <div style="background:#0c0c0f; border-radius:8px; padding:14px; text-align:center;">
+      <div style="width:36px; height:36px; margin:0 auto 6px; display:flex; align-items:center; justify-content:center;">
+        <span style="color:#B8860B; font-size:18px;">→</span>
       </div>
-      <div style="color:#0FB0EB; font-weight:700; font-size:13px;">Stationary</div>
-      <div style="color:#64748b; font-size:10px;">#0FB0EB · Data-only, no transition</div>
+      <div style="color:#B8860B; font-weight:700; font-size:12px;">Arrows</div>
+      <div style="color:#64748b; font-size:10px;">Gold · rules of motion</div>
+    </div>
+    <div style="background:#0c0c0f; border-radius:8px; padding:14px; text-align:center;">
+      <div style="width:36px; height:12px; margin:12px auto 18px; display:flex; align-items:center; justify-content:center;">
+        <span style="color:#30B8E8; font-size:10px; font-family:Inconsolata,monospace;">Submit</span>
+      </div>
+      <div style="color:#30B8E8; font-weight:700; font-size:12px;">Event Labels</div>
+      <div style="color:#64748b; font-size:10px;">Cyan · same as syntax</div>
     </div>
   </div>
-
-  <p style="margin-top:12px; font-size:12px;">All three use the Sky 195° family. Classification is automatic: Transition = every <code>from</code> block contains <code>transition</code>; Conditional = some paths transition, others reject; Stationary = no <code>from</code> block transitions.</p>
 </div>
 </div>
 
@@ -465,30 +464,30 @@
   <h3>Primary surface — DSL syntax as hero</h3>
   <p style="margin-bottom:12px;">The <code>.precept</code> file format IS the brand. The code is the hero image.</p>
 
-  <div class="syntax-block"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">LoanApplication</span>
+  <div class="syntax-block"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
 
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">ApplicantName</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">string</span> <span style="color:#6366F1;">nullable</span>
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">RequestedAmount</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ApplicantName</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
 
-<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#94A3B8;">RequestedAmount</span> <span style="color:#78829B;">>=</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Amount cannot be negative"</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span> <span style="color:#9AA8B5;font-style:italic;">>=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Amount cannot be negative"</span>
 
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Draft</span> <span style="color:#638EE3;">initial</span>
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#80A5EF;">UnderReview</span>
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#98B7F6;">Approved</span>
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#98B7F6;">Declined</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#8B7AED;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#A898F5;">UnderReview</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#C0B4F8;">Approved</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#C0B4F8;">Declined</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Submit</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Applicant</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">string</span>
-<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Applicant</span> <span style="color:#78829B;">!=</span> <span style="color:#64748B;">""</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Name required"</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Submit</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Applicant</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">string</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Submit</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Applicant</span> <span style="color:#9AA8B5;font-style:italic;">!=</span> <span style="color:#84929F;font-style:italic;">""</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Name required"</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span>
-  <span style="color:#6366F1;font-weight:700;">-></span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">ApplicantName</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Applicant</span>
-  <span style="color:#6366F1;font-weight:700;">-></span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">UnderReview</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Submit</span>
+  <span style="color:#6366F1;font-weight:700;">-></span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">ApplicantName</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Applicant</span>
+  <span style="color:#6366F1;font-weight:700;">-></span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">UnderReview</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#7DDAFC;">Approve</span>
-  <span style="color:#6366F1;font-weight:700;">-></span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#98B7F6;">Approved</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;font-weight:700;">-></span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#C0B4F8;">Approved</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Decline</span>
-  <span style="color:#6366F1;font-weight:700;">-></span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#98B7F6;">Declined</span></div>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Decline</span>
+  <span style="color:#6366F1;font-weight:700;">-></span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#C0B4F8;">Declined</span></div>
 </div>
 
 <div class="card">
@@ -498,50 +497,49 @@
   <svg width="100%" height="140" viewBox="0 0 520 140" style="margin:8px 0;">
     <rect width="520" height="140" fill="#0c0c0f" rx="8"/>
 
-    <!-- Draft (origin) -->
-    <circle cx="60" cy="70" r="26" fill="none" stroke="#638EE3" stroke-width="2.5"/>
-    <text x="60" y="74" text-anchor="middle" fill="#638EE3" font-size="11" font-family="Inconsolata,monospace" font-weight="600">Draft</text>
+    <!-- Draft (origin) — indigo border, violet text -->
+    <circle cx="60" cy="70" r="26" fill="none" stroke="#4338CA" stroke-width="2.5"/>
+    <text x="60" y="74" text-anchor="middle" fill="#8B7AED" font-size="11" font-family="Inconsolata,monospace" font-weight="600">Draft</text>
 
-    <!-- UnderReview (active) -->
-    <rect x="170" y="46" width="90" height="48" rx="6" fill="none" stroke="#80A5EF" stroke-width="1.5"/>
-    <text x="215" y="74" text-anchor="middle" fill="#80A5EF" font-size="10" font-family="Inconsolata,monospace">UnderReview</text>
+    <!-- UnderReview (active) — indigo border, violet text -->
+    <rect x="170" y="46" width="90" height="48" rx="6" fill="none" stroke="#4F46E5" stroke-width="1.5"/>
+    <text x="215" y="74" text-anchor="middle" fill="#A898F5" font-size="10" font-family="Inconsolata,monospace">UnderReview</text>
 
-    <!-- Approved (final) -->
-    <rect x="350" y="20" width="80" height="38" rx="6" fill="none" stroke="#98B7F6" stroke-width="2"/>
-    <rect x="346" y="16" width="88" height="46" rx="8" fill="none" stroke="#98B7F6" stroke-width="1" opacity="0.3"/>
-    <text x="390" y="43" text-anchor="middle" fill="#98B7F6" font-size="10" font-family="Inconsolata,monospace">Approved</text>
+    <!-- Approved (final) — indigo border, violet text -->
+    <rect x="350" y="20" width="80" height="38" rx="6" fill="none" stroke="#6366F1" stroke-width="2"/>
+    <rect x="346" y="16" width="88" height="46" rx="8" fill="none" stroke="#6366F1" stroke-width="1" opacity="0.3"/>
+    <text x="390" y="43" text-anchor="middle" fill="#C0B4F8" font-size="10" font-family="Inconsolata,monospace">Approved</text>
 
-    <!-- Declined (final) -->
-    <rect x="350" y="82" width="80" height="38" rx="6" fill="none" stroke="#98B7F6" stroke-width="2"/>
-    <rect x="346" y="78" width="88" height="46" rx="8" fill="none" stroke="#98B7F6" stroke-width="1" opacity="0.3"/>
-    <text x="390" y="105" text-anchor="middle" fill="#98B7F6" font-size="10" font-family="Inconsolata,monospace">Declined</text>
+    <!-- Declined (final) — indigo border, violet text -->
+    <rect x="350" y="82" width="80" height="38" rx="6" fill="none" stroke="#6366F1" stroke-width="2"/>
+    <rect x="346" y="78" width="88" height="46" rx="8" fill="none" stroke="#6366F1" stroke-width="1" opacity="0.3"/>
+    <text x="390" y="105" text-anchor="middle" fill="#C0B4F8" font-size="10" font-family="Inconsolata,monospace">Declined</text>
 
-    <!-- Edges -->
+    <!-- Edges — gold arrows, cyan event labels -->
     <defs>
-      <marker id="aG" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#34d399"/></marker>
-      <marker id="aS" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#80A5EF"/></marker>
+      <marker id="aGold" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#B8860B"/></marker>
     </defs>
-    <line x1="86" y1="70" x2="166" y2="70" stroke="#34d399" stroke-width="1.5" marker-end="url(#aG)"/>
-    <text x="126" y="62" text-anchor="middle" fill="#3AC8F8" font-size="9" font-family="Inconsolata,monospace">Submit</text>
+    <line x1="86" y1="70" x2="166" y2="70" stroke="#B8860B" stroke-width="1.5" marker-end="url(#aGold)"/>
+    <text x="126" y="62" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Inconsolata,monospace">Submit</text>
 
-    <line x1="260" y1="56" x2="346" y2="40" stroke="#80A5EF" stroke-width="1.5" opacity="0.5" marker-end="url(#aS)"/>
-    <text x="303" y="40" text-anchor="middle" fill="#7DDAFC" font-size="9" font-family="Inconsolata,monospace">Approve</text>
+    <line x1="260" y1="56" x2="346" y2="40" stroke="#B8860B" stroke-width="1.5" opacity="0.6" marker-end="url(#aGold)"/>
+    <text x="303" y="40" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Inconsolata,monospace">Approve</text>
 
-    <line x1="260" y1="82" x2="346" y2="100" stroke="#80A5EF" stroke-width="1.5" opacity="0.5" marker-end="url(#aS)"/>
-    <text x="303" y="100" text-anchor="middle" fill="#3AC8F8" font-size="9" font-family="Inconsolata,monospace">Decline</text>
+    <line x1="260" y1="82" x2="346" y2="100" stroke="#B8860B" stroke-width="1.5" opacity="0.6" marker-end="url(#aGold)"/>
+    <text x="303" y="100" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Inconsolata,monospace">Decline</text>
 
     <!-- Legend -->
     <g transform="translate(20, 128)">
-      <circle cx="6" cy="0" r="4" fill="none" stroke="#638EE3" stroke-width="2"/>
+      <circle cx="6" cy="0" r="4" fill="none" stroke="#4338CA" stroke-width="2"/>
       <text x="14" y="4" fill="#52525b" font-size="8" font-family="Inconsolata,monospace">Origin</text>
-      <rect x="60" y="-4" width="8" height="8" rx="2" fill="none" stroke="#80A5EF" stroke-width="1.5"/>
+      <rect x="60" y="-4" width="8" height="8" rx="2" fill="none" stroke="#4F46E5" stroke-width="1.5"/>
       <text x="72" y="4" fill="#52525b" font-size="8" font-family="Inconsolata,monospace">Active</text>
-      <rect x="130" y="-4" width="8" height="8" rx="2" fill="none" stroke="#98B7F6" stroke-width="1.5"/>
+      <rect x="130" y="-4" width="8" height="8" rx="2" fill="none" stroke="#6366F1" stroke-width="1.5"/>
       <text x="142" y="4" fill="#52525b" font-size="8" font-family="Inconsolata,monospace">Final</text>
-      <line x1="250" y1="0" x2="264" y2="0" stroke="#34d399" stroke-width="1.5"/>
-      <text x="268" y="4" fill="#52525b" font-size="8" font-family="Inconsolata,monospace">Enabled</text>
-      <line x1="320" y1="0" x2="334" y2="0" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3 2"/>
-      <text x="338" y="4" fill="#52525b" font-size="8" font-family="Inconsolata,monospace">Blocked</text>
+      <line x1="250" y1="0" x2="264" y2="0" stroke="#B8860B" stroke-width="1.5"/>
+      <text x="268" y="4" fill="#52525b" font-size="8" font-family="Inconsolata,monospace">Transition</text>
+      <line x1="340" y1="0" x2="354" y2="0" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3 2"/>
+      <text x="358" y="4" fill="#52525b" font-size="8" font-family="Inconsolata,monospace">Blocked</text>
     </g>
   </svg>
 </div>
@@ -562,21 +560,19 @@
   <p style="margin-bottom:12px;">Both state and event names are colored by structural role. The compiler determines roles automatically — no annotation needed.</p>
   <table>
     <tr><th>Category</th><th>Role</th><th>Color</th><th>Determination</th></tr>
-    <tr><td rowspan="3" style="color:#80A5EF;">States</td><td>Origin</td><td><span style="color:#638EE3;">#638EE3</span></td><td>Marked <code>initial</code></td></tr>
-    <tr><td>Active</td><td><span style="color:#80A5EF;">#80A5EF</span></td><td>Non-initial, non-terminal</td></tr>
-    <tr><td>Final</td><td><span style="color:#98B7F6;">#98B7F6</span></td><td>Terminal (no outgoing transitions)</td></tr>
-    <tr><td rowspan="3" style="color:#3AC8F8;">Events</td><td>Transition</td><td><span style="color:#3AC8F8;">#3AC8F8</span></td><td>Every <code>from</code> block contains <code>transition</code></td></tr>
-    <tr><td>Conditional</td><td><span style="color:#7DDAFC;">#7DDAFC</span></td><td>Some paths transition, others <code>reject</code></td></tr>
-    <tr><td>Stationary</td><td><span style="color:#0FB0EB;">#0FB0EB</span></td><td>No <code>from</code> block contains <code>transition</code></td></tr>
+    <tr><td rowspan="3" style="color:#A898F5;">States</td><td>Origin</td><td><span style="color:#8B7AED;">#8B7AED</span></td><td>Marked <code>initial</code></td></tr>
+    <tr><td>Active</td><td><span style="color:#A898F5;">#A898F5</span></td><td>Non-initial, non-terminal</td></tr>
+    <tr><td>Final</td><td><span style="color:#C0B4F8;">#C0B4F8</span></td><td>Terminal (no outgoing transitions)</td></tr>
+    <tr><td style="color:#30B8E8;">Events</td><td>All</td><td><span style="color:#30B8E8;">#30B8E8</span></td><td>Single shade for all events</td></tr>
   </table>
 </div>
 
 <div class="callout">
-  <strong>The principle:</strong> Every color means something. Nothing is decorative. 6 families, 17 shades:
-  <strong style="color:#6366F1;">Indigo</strong> = structure ·
-  <strong style="color:#80A5EF;">Azure</strong> = states ·
-  <strong style="color:#3AC8F8;">Sky</strong> = events ·
-  <strong style="color:#94A3B8;">Slate</strong> = data ·
+  <strong>The principle:</strong> Every color means something. Nothing is decorative. 6 families, 15 shades:
+  <strong style="color:#6366F1;">Indigo</strong> = structure (semibold) ·
+  <strong style="color:#A898F5;">Violet</strong> = states ·
+  <strong style="color:#30B8E8;">Cyan</strong> = events ·
+  <strong style="color:#B0BEC5;">Slate</strong> = data (italic) ·
   <strong style="color:#FBBF24;">Gold</strong> = rules ·
   <strong style="color:#34D399;">Emerald</strong>/<strong style="color:#F87171;">Coral</strong>/<strong style="color:#FDE047;">Yellow</strong> = verdicts (runtime)
 </div>
@@ -602,7 +598,7 @@
     <tr>
       <td style="color:#e5e5e5;">Event coloring</td>
       <td><span style="color:#34D399;">Locked</span></td>
-      <td>Sky 195° family with 3 structural roles (transition/conditional/stationary). Compiler-driven.</td>
+      <td>Cyan 195° single shade (#30B8E8). All events same color.</td>
     </tr>
     <tr>
       <td style="color:#e5e5e5;">Icon / brand mark</td>

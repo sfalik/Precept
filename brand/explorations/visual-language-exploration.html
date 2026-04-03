@@ -63,10 +63,10 @@
 <body>
 
 <h1>Precept &mdash; Visual Language Exploration</h1>
-<p class="subtitle">The DSL syntax and state diagrams ARE the visual identity. The icon is one element in a broader system that includes <code>.precept</code> files, state diagrams, diagnostics, and the inspector panel. Background: <code>#0c0c0f</code>. Font: Inconsolata. Palette: 17 shades, 6 families.</p>
+<p class="subtitle">The DSL syntax and state diagrams ARE the visual identity. The icon is one element in a broader system that includes <code>.precept</code> files, state diagrams, diagnostics, and the inspector panel. Background: <code>#0c0c0f</code>. Font: Inconsolata. Palette: 15 shades, 6 families.</p>
 
 <div class="callout" style="margin-bottom:48px;">
-  <strong>Locked decisions applied:</strong> All examples below use the locked 17-shade semantic palette (indigo structure, azure states, sky events, slate data, gold rules, emerald/coral/yellow verdicts), Inconsolata font, <code>#0c0c0f</code> background, and compiler-driven structural coloring for both states and events. See <a href="../brand-decisions.md" style="color:#818CF8;">brand-decisions.md</a> and <a href="../brand-spec.html" style="color:#818CF8;">brand-spec.html</a> for canonical references.
+  <strong>Locked decisions applied:</strong> All examples below use the locked 15-shade semantic palette (indigo structure semibold, violet states, cyan events, bright slate data italic, gold rules, emerald/coral/yellow verdicts), Inconsolata font, <code>#0c0c0f</code> background, and compiler-driven structural coloring for states. See <a href="../brand-decisions.md" style="color:#818CF8;">brand-decisions.md</a> and <a href="../brand-spec.html" style="color:#818CF8;">brand-spec.html</a> for canonical references.
 </div>
 
 <!-- ===== SECTION 1: The DSL as hero visual ===== -->
@@ -80,53 +80,53 @@
     <p>Four sections, one specification. The data it carries, the phases it moves through, what can happen, and how it behaves. You are not writing code &mdash; you are describing how the workflow should work.</p>
   </div>
   <div class="card-body">
-    <div class="syntax-block"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">LoanApplication</span>
+    <div class="syntax-block"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
 
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">ApplicantName</span>    <span style="color:#6366F1;">as</span> <span style="color:#78829B;">string</span>  <span style="color:#6366F1;">nullable</span>
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">RequestedAmount</span>  <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>  <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">CreditScore</span>      <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>  <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">DocumentsVerified</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">boolean</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">false</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ApplicantName</span>    <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">string</span>  <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span>  <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>  <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">CreditScore</span>      <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>  <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">DocumentsVerified</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">boolean</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">false</span>
 
-<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#94A3B8;">RequestedAmount</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Requested amount cannot be negative"</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Requested amount cannot be negative"</span>
 
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Draft</span> <span style="color:#638EE3;">initial</span>
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#80A5EF;">UnderReview</span>
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#98B7F6;">Approved</span>
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#98B7F6;">Funded</span>
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#98B7F6;">Declined</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#8B7AED;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#A898F5;">UnderReview</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#C0B4F8;">Approved</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#C0B4F8;">Funded</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#C0B4F8;">Declined</span>
 
-<span style="color:#4F46E5;font-weight:600;">in</span> <span style="color:#98B7F6;">Approved</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">DocumentsVerified</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approved loans must have verified documents"</span>
+<span style="color:#4F46E5;font-weight:600;">in</span> <span style="color:#C0B4F8;">Approved</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">DocumentsVerified</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approved loans must have verified documents"</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Submit</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Applicant</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">string</span><span style="color:#52525b;">,</span> <span style="color:#94A3B8;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span><span style="color:#52525b;">,</span> <span style="color:#94A3B8;">Score</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>
-<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Applicant</span> <span style="color:#78829B;">!=</span> <span style="color:#64748B;">""</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"An applicant name is required"</span>
-<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Amount</span> <span style="color:#78829B;">&gt;</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Loan requests must be positive"</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Submit</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Applicant</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">string</span><span style="color:#52525b;">,</span> <span style="color:#B0BEC5;font-style:italic;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span><span style="color:#52525b;">,</span> <span style="color:#B0BEC5;font-style:italic;">Score</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Submit</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Applicant</span> <span style="color:#9AA8B5;font-style:italic;">!=</span> <span style="color:#84929F;font-style:italic;">""</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"An applicant name is required"</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Submit</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Amount</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Loan requests must be positive"</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#7DDAFC;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Decline</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">string</span>
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#0FB0EB;">VerifyDocuments</span>
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">FundLoan</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Decline</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">string</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">VerifyDocuments</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">FundLoan</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">ApplicantName</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Applicant</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">RequestedAmount</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Amount</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">CreditScore</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Score</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">UnderReview</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Submit</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">ApplicantName</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Applicant</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Amount</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">CreditScore</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Score</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">UnderReview</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#0FB0EB;">VerifyDocuments</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">DocumentsVerified</span> <span style="color:#6366F1;">=</span> <span style="color:#64748B;">true</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">VerifyDocuments</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">DocumentsVerified</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;font-style:italic;">true</span>
   <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#6366F1;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#7DDAFC;">Approve</span>
-  <span style="color:#6366F1;">when</span> <span style="color:#94A3B8;">DocumentsVerified</span> <span style="color:#78829B;">&amp;&amp;</span> <span style="color:#94A3B8;">CreditScore</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">680</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#98B7F6;">Approved</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#7DDAFC;">Approve</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;">when</span> <span style="color:#B0BEC5;font-style:italic;">DocumentsVerified</span> <span style="color:#9AA8B5;font-style:italic;">&amp;&amp;</span> <span style="color:#B0BEC5;font-style:italic;">CreditScore</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">680</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#C0B4F8;">Approved</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
   <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#B8860B;font-weight:600;">reject</span> <span style="color:#FBBF24;">"Approval requires verified documents and strong credit"</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Decline</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#98B7F6;">Declined</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Decline</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#C0B4F8;">Declined</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#98B7F6;">Approved</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">FundLoan</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#98B7F6;">Funded</span></div>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#C0B4F8;">Approved</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">FundLoan</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#C0B4F8;">Funded</span></div>
   </div>
 </div>
 
@@ -153,33 +153,33 @@
   </div>
   <div class="card-body">
     <!-- Full stress test: every family on white -->
-    <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:1.8; background:#ffffff; border-radius:8px; padding:20px 24px; white-space:pre; border:1px solid #d1d5db; margin-bottom:16px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">LoanApplication</span>
+    <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:1.8; background:#ffffff; border-radius:8px; padding:20px 24px; white-space:pre; border:1px solid #d1d5db; margin-bottom:16px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
 
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">ApplicantName</span>    <span style="color:#6366F1;">as</span> <span style="color:#78829B;">string</span>  <span style="color:#6366F1;">nullable</span>
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">RequestedAmount</span>  <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>  <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">DocumentsVerified</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">boolean</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">false</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ApplicantName</span>    <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">string</span>  <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span>  <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>  <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">DocumentsVerified</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">boolean</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">false</span>
 
-<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#94A3B8;">RequestedAmount</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Requested amount cannot be negative"</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Requested amount cannot be negative"</span>
 
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Draft</span> <span style="color:#638EE3;">initial</span>
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#80A5EF;">UnderReview</span>
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#98B7F6;">Approved</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#8B7AED;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#A898F5;">UnderReview</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#C0B4F8;">Approved</span>
 
-<span style="color:#4F46E5;font-weight:600;">in</span> <span style="color:#98B7F6;">Approved</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">DocumentsVerified</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approved loans must have verified documents"</span>
+<span style="color:#4F46E5;font-weight:600;">in</span> <span style="color:#C0B4F8;">Approved</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">DocumentsVerified</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approved loans must have verified documents"</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Submit</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Applicant</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">string</span>
-<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Applicant</span> <span style="color:#78829B;">!=</span> <span style="color:#64748B;">""</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"An applicant name is required"</span>
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#7DDAFC;">Approve</span>
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#0FB0EB;">VerifyDocuments</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Submit</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Applicant</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">string</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Submit</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Applicant</span> <span style="color:#9AA8B5;font-style:italic;">!=</span> <span style="color:#84929F;font-style:italic;">""</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"An applicant name is required"</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Approve</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">VerifyDocuments</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">ApplicantName</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Applicant</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">UnderReview</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Submit</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">ApplicantName</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Applicant</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">UnderReview</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#7DDAFC;">Approve</span>
-  <span style="color:#6366F1;">when</span> <span style="color:#94A3B8;">DocumentsVerified</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#98B7F6;">Approved</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#7DDAFC;">Approve</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;">when</span> <span style="color:#B0BEC5;font-style:italic;">DocumentsVerified</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#C0B4F8;">Approved</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
   <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#B8860B;font-weight:600;">reject</span> <span style="color:#FBBF24;">"Documents must be verified before approval"</span></div>
 
     <!-- Family-by-family breakdown -->
@@ -196,21 +196,21 @@
       </div>
       <!-- States -->
       <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
-        <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">States (Azure)</div>
+        <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">States (Violet)</div>
         <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
-          <span style="color:#638EE3;">Draft</span> <span style="color:#a3a3a3;">origin</span><br>
-          <span style="color:#80A5EF;">UnderReview</span> <span style="color:#a3a3a3;">active</span><br>
-          <span style="color:#98B7F6;">Approved</span> <span style="color:#a3a3a3;">final</span>
+          <span style="color:#8B7AED;">Draft</span> <span style="color:#a3a3a3;">origin</span><br>
+          <span style="color:#A898F5;">UnderReview</span> <span style="color:#a3a3a3;">active</span><br>
+          <span style="color:#C0B4F8;">Approved</span> <span style="color:#a3a3a3;">final</span>
         </div>
         <div style="font-size:11px; margin-top:8px; color:#dc2626; font-weight:600;">&#10007; Washed out</div>
       </div>
       <!-- Events -->
       <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
-        <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Events (Sky)</div>
+        <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Events (Cyan)</div>
         <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
-          <span style="color:#3AC8F8;">Submit</span> <span style="color:#a3a3a3;">transition</span><br>
-          <span style="color:#7DDAFC;">Approve</span> <span style="color:#a3a3a3;">conditional</span><br>
-          <span style="color:#0FB0EB;">Verify</span> <span style="color:#a3a3a3;">stationary</span>
+          <span style="color:#30B8E8;">Submit</span> <span style="color:#a3a3a3;">transition</span><br>
+          <span style="color:#30B8E8;">Approve</span> <span style="color:#a3a3a3;">conditional</span><br>
+          <span style="color:#30B8E8;">Verify</span> <span style="color:#a3a3a3;">stationary</span>
         </div>
         <div style="font-size:11px; margin-top:8px; color:#dc2626; font-weight:600;">&#10007; Nearly invisible</div>
       </div>
@@ -218,11 +218,11 @@
     <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
       <!-- Data -->
       <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
-        <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Data (Slate)</div>
+        <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Data (Bright Slate)</div>
         <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
-          <span style="color:#94A3B8;">ApplicantName</span> <span style="color:#a3a3a3;">names</span><br>
-          <span style="color:#78829B;">string</span> <span style="color:#a3a3a3;">types+ops</span><br>
-          <span style="color:#64748B;">0</span> <span style="color:#a3a3a3;">... </span><span style="color:#64748B;">false</span> <span style="color:#a3a3a3;">values</span>
+          <span style="color:#B0BEC5;font-style:italic;">ApplicantName</span> <span style="color:#a3a3a3;">names</span><br>
+          <span style="color:#9AA8B5;font-style:italic;">string</span> <span style="color:#a3a3a3;">types+ops</span><br>
+          <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#a3a3a3;">... </span><span style="color:#84929F;font-style:italic;">false</span> <span style="color:#a3a3a3;">values</span>
         </div>
         <div style="font-size:11px; margin-top:8px; color:#ca8a04; font-weight:600;">~ Names fade, types/values OK</div>
       </div>
@@ -249,7 +249,7 @@
     </div>
 
     <div class="note" style="margin-top:16px;">
-      <strong>Decision:</strong> Visual language is dark-mode-first (<code>#0c0c0f</code>). The locked 17-shade palette is the dark palette. A parallel light-mode palette (17 darkened shades hitting 4.5:1 on white) will be defined as part of the full color system implementation &mdash; standard practice, same grammar, two color maps. Not needed for the brand exploration phase.
+      <strong>Decision:</strong> Visual language is dark-mode-first (<code>#0c0c0f</code>). The locked 15-shade palette is the dark palette. A parallel light-mode palette (15 darkened shades hitting 4.5:1 on white) will be defined as part of the full color system implementation &mdash; standard practice, same grammar, two color maps. Not needed for the brand exploration phase.
     </div>
   </div>
 </div>
@@ -268,164 +268,164 @@
       <!-- A: Thermostat -->
       <div style="min-width:0;">
         <div style="font-size:11px; color:#52525b; margin-bottom:6px;">A) Thermostat &mdash; 19 lines</div>
-        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">Thermostat</span>
+        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">Thermostat</span>
 
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">Target</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">68</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">Target</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">68</span>
 
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Idle</span> <span style="color:#638EE3;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#80A5EF;">Heating</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Idle</span> <span style="color:#8B7AED;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Heating</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Adjust</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Temp</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>
-<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Adjust</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Temp</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">50</span> <span style="color:#78829B;">&amp;&amp;</span> <span style="color:#94A3B8;">Temp</span> <span style="color:#78829B;">&lt;=</span> <span style="color:#64748B;">90</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Comfort has limits"</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Adjust</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Temp</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Adjust</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Temp</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">50</span> <span style="color:#9AA8B5;font-style:italic;">&amp;&amp;</span> <span style="color:#B0BEC5;font-style:italic;">Temp</span> <span style="color:#9AA8B5;font-style:italic;">&lt;=</span> <span style="color:#84929F;font-style:italic;">90</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Comfort has limits"</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Reached</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Reached</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Idle</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Adjust</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Target</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Adjust</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Temp</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Heating</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Heating</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Adjust</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Target</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Adjust</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Temp</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Idle</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Adjust</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">Target</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Adjust</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Temp</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Heating</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Heating</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Adjust</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">Target</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Adjust</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Temp</span>
   <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Heating</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Reached</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Idle</span></div>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Heating</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Reached</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Idle</span></div>
       </div>
       <!-- B: ParkingMeter -->
       <div style="min-width:0;">
         <div style="font-size:11px; color:#52525b; margin-bottom:6px;">B) ParkingMeter &mdash; 17 lines</div>
-        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">ParkingMeter</span>
+        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">ParkingMeter</span>
 
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">TimeLeft</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
-<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#94A3B8;">TimeLeft</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"The meter lacks a reverse gear"</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"The meter lacks a reverse gear"</span>
 
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Empty</span> <span style="color:#638EE3;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#80A5EF;">Active</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Empty</span> <span style="color:#8B7AED;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Active</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Feed</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Minutes</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>
-<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Feed</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Minutes</span> <span style="color:#78829B;">&gt;</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Coins go in, not out"</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Feed</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Minutes</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Feed</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Minutes</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Coins go in, not out"</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Check</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Check</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Empty</span><span style="color:#6366F1;">,</span> <span style="color:#80A5EF;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Feed</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">TimeLeft</span> <span style="color:#6366F1;">=</span> <span style="color:#94A3B8;">TimeLeft</span> <span style="color:#78829B;">+</span> <span style="color:#3AC8F8;">Feed</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Minutes</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Active</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Check</span> <span style="color:#4F46E5;font-weight:600;">when</span> <span style="color:#94A3B8;">TimeLeft</span> <span style="color:#78829B;">==</span> <span style="color:#64748B;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Empty</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Check</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span></div>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Empty</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Feed</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">+</span> <span style="color:#30B8E8;">Feed</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Minutes</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Active</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Check</span> <span style="color:#4F46E5;font-weight:600;">when</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">==</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Empty</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Check</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span></div>
       </div>
       <!-- C: Toaster -->
       <div style="min-width:0;">
         <div style="font-size:11px; color:#52525b; margin-bottom:6px;">C) Toaster &mdash; 15 lines</div>
-        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">Toaster</span>
+        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">Toaster</span>
 
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">Level</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">3</span>
-<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#94A3B8;">Level</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">1</span> <span style="color:#78829B;">&amp;&amp;</span> <span style="color:#94A3B8;">Level</span> <span style="color:#78829B;">&lt;=</span> <span style="color:#64748B;">5</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"The dial only goes to 5"</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">Level</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">3</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">Level</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">1</span> <span style="color:#9AA8B5;font-style:italic;">&amp;&amp;</span> <span style="color:#B0BEC5;font-style:italic;">Level</span> <span style="color:#9AA8B5;font-style:italic;">&lt;=</span> <span style="color:#84929F;font-style:italic;">5</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"The dial only goes to 5"</span>
 
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Idle</span> <span style="color:#638EE3;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#80A5EF;">Toasting</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Idle</span> <span style="color:#8B7AED;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Toasting</span>
 
-<span style="color:#6366F1;">in</span> <span style="color:#638EE3;">Idle</span> <span style="color:#4338CA;font-weight:600;">edit</span> <span style="color:#94A3B8;">Level</span>
+<span style="color:#6366F1;">in</span> <span style="color:#8B7AED;">Idle</span> <span style="color:#4338CA;font-weight:600;">edit</span> <span style="color:#B0BEC5;font-style:italic;">Level</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Start</span><span style="color:#6366F1;">,</span> <span style="color:#3AC8F8;">Done</span><span style="color:#6366F1;">,</span> <span style="color:#3AC8F8;">Cancel</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Start</span><span style="color:#6366F1;">,</span> <span style="color:#30B8E8;">Done</span><span style="color:#6366F1;">,</span> <span style="color:#30B8E8;">Cancel</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Idle</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Start</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Toasting</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Toasting</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Done</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Idle</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Toasting</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Cancel</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Idle</span></div>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Idle</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Start</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Toasting</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Toasting</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Done</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Idle</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Toasting</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Cancel</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Idle</span></div>
       </div>
       <!-- D: Stopwatch -->
       <div style="min-width:0;">
         <div style="font-size:11px; color:#52525b; margin-bottom:6px;">D) Stopwatch &mdash; 15 lines</div>
-        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">Stopwatch</span>
+        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">Stopwatch</span>
 
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">Elapsed</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
-<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#94A3B8;">Elapsed</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Time moves forward"</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">Elapsed</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">Elapsed</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Time moves forward"</span>
 
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Stopped</span> <span style="color:#638EE3;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#80A5EF;">Running</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Stopped</span> <span style="color:#8B7AED;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Running</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Start</span><span style="color:#6366F1;">,</span> <span style="color:#3AC8F8;">Stop</span><span style="color:#6366F1;">,</span> <span style="color:#3AC8F8;">Reset</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Start</span><span style="color:#6366F1;">,</span> <span style="color:#30B8E8;">Stop</span><span style="color:#6366F1;">,</span> <span style="color:#30B8E8;">Reset</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Stopped</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Start</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Running</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Running</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Stop</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Elapsed</span> <span style="color:#6366F1;">=</span> <span style="color:#94A3B8;">Elapsed</span> <span style="color:#78829B;">+</span> <span style="color:#64748B;">1</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Stopped</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Running</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Reset</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Elapsed</span> <span style="color:#6366F1;">=</span> <span style="color:#64748B;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Stopped</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Stopped</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Reset</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Elapsed</span> <span style="color:#6366F1;">=</span> <span style="color:#64748B;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span></div>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Stopped</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Start</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Running</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Running</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Stop</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">Elapsed</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">Elapsed</span> <span style="color:#9AA8B5;font-style:italic;">+</span> <span style="color:#84929F;font-style:italic;">1</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Stopped</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Running</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Reset</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">Elapsed</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Stopped</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Stopped</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Reset</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">Elapsed</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span></div>
       </div>
       <!-- E: CoffeeMachine -->
       <div style="min-width:0;">
         <div style="font-size:11px; color:#52525b; margin-bottom:6px;">E) CoffeeMachine &mdash; 21 lines</div>
-        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">CoffeeMachine</span>
+        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">CoffeeMachine</span>
 
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">Cups</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">10</span>
-<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#94A3B8;">Cups</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"We can't un-brew coffee"</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">Cups</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">10</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">Cups</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"We can't un-brew coffee"</span>
 
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Ready</span> <span style="color:#638EE3;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#80A5EF;">Brewing</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Ready</span> <span style="color:#8B7AED;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Brewing</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Brew</span><span style="color:#6366F1;">,</span> <span style="color:#3AC8F8;">Done</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Brew</span><span style="color:#6366F1;">,</span> <span style="color:#30B8E8;">Done</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Refill</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>
-<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Refill</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Amount</span> <span style="color:#78829B;">&gt;</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Air isn't coffee"</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Refill</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Refill</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Amount</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Air isn't coffee"</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Ready</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Brew</span> <span style="color:#B8860B;font-weight:600;">when</span> <span style="color:#94A3B8;">Cups</span> <span style="color:#78829B;">&gt;</span> <span style="color:#64748B;">0</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Cups</span> <span style="color:#6366F1;">=</span> <span style="color:#94A3B8;">Cups</span> <span style="color:#78829B;">-</span> <span style="color:#64748B;">1</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Brewing</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Ready</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Brew</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">reject</span> <span style="color:#FBBF24;">"Out of coffee"</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Brewing</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Done</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Ready</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Ready</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Refill</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Cups</span> <span style="color:#6366F1;">=</span> <span style="color:#94A3B8;">Cups</span> <span style="color:#78829B;">+</span> <span style="color:#3AC8F8;">Refill</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Amount</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Ready</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Brew</span> <span style="color:#B8860B;font-weight:600;">when</span> <span style="color:#B0BEC5;font-style:italic;">Cups</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">Cups</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">Cups</span> <span style="color:#9AA8B5;font-style:italic;">-</span> <span style="color:#84929F;font-style:italic;">1</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Brewing</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Ready</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Brew</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">reject</span> <span style="color:#FBBF24;">"Out of coffee"</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Brewing</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Done</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Ready</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Ready</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Refill</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">Cups</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">Cups</span> <span style="color:#9AA8B5;font-style:italic;">+</span> <span style="color:#30B8E8;">Refill</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Amount</span>
   <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span></div>
       </div>
       <!-- F: WashingMachine -->
       <div style="min-width:0;">
         <div style="font-size:11px; color:#52525b; margin-bottom:6px;">F) WashingMachine &mdash; 19 lines</div>
-        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">WashingMachine</span>
+        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">WashingMachine</span>
 
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">Load</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
-<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#94A3B8;">Load</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">0</span> <span style="color:#78829B;">&amp;&amp;</span> <span style="color:#94A3B8;">Load</span> <span style="color:#78829B;">&lt;=</span> <span style="color:#64748B;">8</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"It's a washer, not a TARDIS"</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">Load</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">Load</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#9AA8B5;font-style:italic;">&amp;&amp;</span> <span style="color:#B0BEC5;font-style:italic;">Load</span> <span style="color:#9AA8B5;font-style:italic;">&lt;=</span> <span style="color:#84929F;font-style:italic;">8</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"It's a washer, not a TARDIS"</span>
 
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Empty</span> <span style="color:#638EE3;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#80A5EF;">Loaded</span><span style="color:#6366F1;">,</span> <span style="color:#80A5EF;">Washing</span><span style="color:#6366F1;">,</span> <span style="color:#80A5EF;">Done</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Empty</span> <span style="color:#8B7AED;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Loaded</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Washing</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Done</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Add</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Pounds</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>
-<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Add</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Pounds</span> <span style="color:#78829B;">&gt;</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Invisible laundry doesn't count"</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Add</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Pounds</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Add</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Pounds</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Invisible laundry doesn't count"</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Start</span><span style="color:#6366F1;">,</span> <span style="color:#3AC8F8;">Finish</span><span style="color:#6366F1;">,</span> <span style="color:#3AC8F8;">Unload</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Start</span><span style="color:#6366F1;">,</span> <span style="color:#30B8E8;">Finish</span><span style="color:#6366F1;">,</span> <span style="color:#30B8E8;">Unload</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Empty</span><span style="color:#6366F1;">,</span> <span style="color:#80A5EF;">Loaded</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Add</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Load</span> <span style="color:#6366F1;">=</span> <span style="color:#94A3B8;">Load</span> <span style="color:#78829B;">+</span> <span style="color:#3AC8F8;">Add</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Pounds</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Loaded</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Loaded</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Start</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Washing</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Washing</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Finish</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Done</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Done</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Unload</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Load</span> <span style="color:#6366F1;">=</span> <span style="color:#64748B;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Empty</span></div>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Empty</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Loaded</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Add</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">Load</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">Load</span> <span style="color:#9AA8B5;font-style:italic;">+</span> <span style="color:#30B8E8;">Add</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Pounds</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Loaded</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Loaded</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Start</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Washing</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Washing</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Finish</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Done</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Done</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Unload</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">Load</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Empty</span></div>
       </div>
       <!-- G: SmartBulb -->
       <div style="min-width:0;">
         <div style="font-size:11px; color:#52525b; margin-bottom:6px;">G) SmartBulb &mdash; 17 lines</div>
-        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">SmartBulb</span>
+        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">SmartBulb</span>
 
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">Brightness</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">50</span>
-<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#94A3B8;">Brightness</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">0</span> <span style="color:#78829B;">&amp;&amp;</span> <span style="color:#94A3B8;">Brightness</span> <span style="color:#78829B;">&lt;=</span> <span style="color:#64748B;">100</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Not everything goes to eleven"</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">Brightness</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">50</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">Brightness</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#9AA8B5;font-style:italic;">&amp;&amp;</span> <span style="color:#B0BEC5;font-style:italic;">Brightness</span> <span style="color:#9AA8B5;font-style:italic;">&lt;=</span> <span style="color:#84929F;font-style:italic;">100</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Not everything goes to eleven"</span>
 
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Off</span> <span style="color:#638EE3;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#80A5EF;">On</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Off</span> <span style="color:#8B7AED;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">On</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Toggle</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Toggle</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Dim</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Level</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>
-<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Dim</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Level</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">0</span> <span style="color:#78829B;">&amp;&amp;</span> <span style="color:#94A3B8;">Level</span> <span style="color:#78829B;">&lt;=</span> <span style="color:#64748B;">100</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Stay in range"</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Dim</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Level</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Dim</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Level</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#9AA8B5;font-style:italic;">&amp;&amp;</span> <span style="color:#B0BEC5;font-style:italic;">Level</span> <span style="color:#9AA8B5;font-style:italic;">&lt;=</span> <span style="color:#84929F;font-style:italic;">100</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Stay in range"</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Off</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Toggle</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">On</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">On</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Toggle</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Off</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">On</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Dim</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Brightness</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Dim</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Level</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Off</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Dim</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Brightness</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Dim</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Level</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">On</span></div>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Off</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Toggle</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">On</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">On</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Toggle</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Off</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">On</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Dim</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">Brightness</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Dim</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Level</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Off</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Dim</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">Brightness</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Dim</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Level</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">On</span></div>
       </div>
       <!-- H: TrafficLight -->
       <div style="min-width:0;">
         <div style="font-size:11px; color:#52525b; margin-bottom:6px;">H) TrafficLight &mdash; 15 lines</div>
-        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">TrafficLight</span>
+        <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">TrafficLight</span>
 
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">Cycles</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">Cycles</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
 
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Red</span> <span style="color:#638EE3;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#80A5EF;">Green</span><span style="color:#6366F1;">,</span> <span style="color:#80A5EF;">Yellow</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Red</span> <span style="color:#8B7AED;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Green</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Yellow</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#3AC8F8;">Advance</span> <span style="color:#6366F1;">with</span> <span style="color:#94A3B8;">Demand</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>
-<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Advance</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#94A3B8;">Demand</span> <span style="color:#78829B;">&gt;=</span> <span style="color:#64748B;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"No cars for you!"</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Demand</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Demand</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"No cars for you!"</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Red</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Advance</span> <span style="color:#4F46E5;font-weight:600;">when</span> <span style="color:#3AC8F8;">Advance</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Demand</span> <span style="color:#78829B;">&gt;</span> <span style="color:#64748B;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Green</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Green</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Advance</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">Yellow</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#80A5EF;">Yellow</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Advance</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Cycles</span> <span style="color:#6366F1;">=</span> <span style="color:#94A3B8;">Cycles</span> <span style="color:#78829B;">+</span> <span style="color:#64748B;">1</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#638EE3;">Red</span></div>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Red</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#4F46E5;font-weight:600;">when</span> <span style="color:#30B8E8;">Advance</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Demand</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Green</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Green</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Yellow</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Yellow</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">Cycles</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">Cycles</span> <span style="color:#9AA8B5;font-style:italic;">+</span> <span style="color:#84929F;font-style:italic;">1</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Red</span></div>
       </div>
     </div>
     <div style="font-size:12px; color:#52525b; line-height:1.8; margin-top:8px;">
@@ -440,19 +440,78 @@
     </div>
     </div>
   </div>
+
+  <!-- Shortlisted hero snippets -->
+  <div class="card" style="margin-top:24px;">
+    <div class="card-header">
+      <h3>Shortlisted &mdash; tightened hero candidates <span class="status-open">Exploring</span></h3>
+      <p>Two candidates at 15 lines each &mdash; the target for a README hero block. Both compile clean and show 10 DSL features each.</p>
+    </div>
+    <div class="card-body">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; min-width:0;">
+        <!-- ParkingMeter (tightened) -->
+        <div style="min-width:0;">
+          <div style="font-size:11px; color:#52525b; margin-bottom:6px;">B&#x2032;) ParkingMeter &mdash; 15 lines</div>
+          <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">ParkingMeter</span>
+
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"The meter lacks a reverse gear"</span>
+
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Empty</span> <span style="color:#8B7AED;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Active</span>
+
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Feed</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Minutes</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Feed</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Minutes</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Coins go in, not out"</span>
+
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Check</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Empty</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Feed</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">+</span> <span style="color:#30B8E8;">Feed</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Minutes</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Active</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Check</span> <span style="color:#4F46E5;font-weight:600;">when</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">==</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Empty</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Check</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span></div>
+          <div style="font-size:11px; color:#52525b; margin-top:8px; line-height:1.6;">
+            <strong style="color:#6b7280;">10 features:</strong> precept, field+default, invariant+because, state+initial, event with, assert+because, comma sources, when guard, set+dotted access, no transition.
+          </div>
+        </div>
+        <!-- TrafficLight (reworked) -->
+        <div style="min-width:0;">
+          <div style="font-size:11px; color:#52525b; margin-bottom:6px;">H&#x2032;) TrafficLight &mdash; 15 lines</div>
+          <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">TrafficLight</span>
+
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">Cycles</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">Cycles</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"History doesn't rewind"</span>
+
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Red</span> <span style="color:#8B7AED;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Green</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Yellow</span>
+
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Demand</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#30B8E8;">Advance</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Demand</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Negative cars aren't a thing"</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Red</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#4F46E5;font-weight:600;">when</span> <span style="color:#30B8E8;">Advance</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Demand</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Green</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Red</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Green</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Yellow</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Yellow</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">Cycles</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">Cycles</span> <span style="color:#9AA8B5;font-style:italic;">+</span> <span style="color:#84929F;font-style:italic;">1</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Red</span></div>
+          <div style="font-size:11px; color:#52525b; margin-top:8px; line-height:1.6;">
+            <strong style="color:#6b7280;">10 features:</strong> precept, field+default, invariant+because, state+initial (3 states, cyclic), event with, assert+dotted access+because, when guard, no transition, set+expression, cyclic transitions.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="section-divider"></div>
 
 <!-- ===== SECTION 2: State diagram ===== -->
 <div class="section">
-<h2>2. State diagrams as the accompanying graphic system <span class="status-locked">Locked</span></h2>
-<p class="desc">The VS Code preview panel renders state diagrams using the same semantic palette as syntax highlighting. Code and diagram share visual language &mdash; same azure for states, same sky for events, same verdict colors for edges.</p>
+<h2>2. State diagrams as the accompanying graphic system <span class="status-open">Exploring</span></h2>
+<p class="desc">The VS Code preview panel renders state diagrams using the same semantic palette as syntax highlighting. Code and diagram share visual language &mdash; same violet for states, same cyan for events, same verdict colors for edges.</p>
 
 <div class="card">
   <div class="card-header">
     <h3>LoanApplication &mdash; state diagram</h3>
-    <p>Azure state nodes (origin/active/final shades). Sky event labels. Emerald enabled edges. Coral blocked edges. Gold rule annotations.</p>
+    <p>Indigo-bordered nodes with violet state names (origin/active/final shades). Cyan event labels. Gold transition arrows. Coral blocked edges.</p>
   </div>
   <div class="card-body">
     <div style="background:#0c0c0f; border-radius:8px; padding:32px; text-align:center; border:1px solid #1e1b4b;">
@@ -469,39 +528,39 @@
         <rect width="680" height="260" rx="8" fill="url(#grid)"/>
 
         <!-- Draft (origin) -->
-        <rect x="30" y="100" width="80" height="36" rx="18" fill="rgba(99,142,227,0.08)" stroke="#638EE3" stroke-width="2.5"/>
-        <circle cx="42" cy="118" r="4" fill="#638EE3"/>
-        <text x="74" y="123" text-anchor="middle" fill="#638EE3" font-size="13" font-weight="600" font-family="Inconsolata,monospace">Draft</text>
+        <rect x="30" y="100" width="80" height="36" rx="18" fill="rgba(139,122,237,0.08)" stroke="#8B7AED" stroke-width="2.5"/>
+        <circle cx="42" cy="118" r="4" fill="#8B7AED"/>
+        <text x="74" y="123" text-anchor="middle" fill="#8B7AED" font-size="13" font-weight="600" font-family="Inconsolata,monospace">Draft</text>
 
         <!-- UnderReview (active) -->
-        <rect x="190" y="100" width="120" height="36" rx="18" fill="none" stroke="#80A5EF" stroke-width="2"/>
-        <text x="250" y="123" text-anchor="middle" fill="#80A5EF" font-size="12" font-weight="600" font-family="Inconsolata,monospace">UnderReview</text>
+        <rect x="190" y="100" width="120" height="36" rx="18" fill="none" stroke="#A898F5" stroke-width="2"/>
+        <text x="250" y="123" text-anchor="middle" fill="#A898F5" font-size="12" font-weight="600" font-family="Inconsolata,monospace">UnderReview</text>
 
         <!-- Approved (final) + assert badge -->
-        <rect x="390" y="48" width="100" height="36" rx="18" fill="none" stroke="#98B7F6" stroke-width="2"/>
-        <rect x="386" y="44" width="108" height="44" rx="20" fill="none" stroke="#98B7F6" stroke-width="1" opacity="0.3"/>
-        <text x="440" y="71" text-anchor="middle" fill="#98B7F6" font-size="12" font-weight="600" font-family="Inconsolata,monospace">Approved</text>
+        <rect x="390" y="48" width="100" height="36" rx="18" fill="none" stroke="#C0B4F8" stroke-width="2"/>
+        <rect x="386" y="44" width="108" height="44" rx="20" fill="none" stroke="#C0B4F8" stroke-width="1" opacity="0.3"/>
+        <text x="440" y="71" text-anchor="middle" fill="#C0B4F8" font-size="12" font-weight="600" font-family="Inconsolata,monospace">Approved</text>
         <rect x="500" y="50" width="12" height="12" rx="3" fill="#FBBF24" opacity="0.9"/>
         <text x="506" y="59" text-anchor="middle" fill="#0c0c0f" font-size="8" font-weight="700">!</text>
         <text x="520" y="59" fill="#FBBF24" font-size="9" font-family="Inconsolata,monospace" opacity="0.8">assert</text>
 
         <!-- Funded (final) -->
-        <rect x="570" y="48" width="80" height="36" rx="18" fill="none" stroke="#98B7F6" stroke-width="2"/>
-        <rect x="566" y="44" width="88" height="44" rx="20" fill="none" stroke="#98B7F6" stroke-width="1" opacity="0.3"/>
-        <text x="610" y="71" text-anchor="middle" fill="#98B7F6" font-size="12" font-weight="600" font-family="Inconsolata,monospace">Funded</text>
+        <rect x="570" y="48" width="80" height="36" rx="18" fill="none" stroke="#C0B4F8" stroke-width="2"/>
+        <rect x="566" y="44" width="88" height="44" rx="20" fill="none" stroke="#C0B4F8" stroke-width="1" opacity="0.3"/>
+        <text x="610" y="71" text-anchor="middle" fill="#C0B4F8" font-size="12" font-weight="600" font-family="Inconsolata,monospace">Funded</text>
 
         <!-- Declined (final) -->
-        <rect x="390" y="158" width="100" height="36" rx="18" fill="none" stroke="#98B7F6" stroke-width="2"/>
-        <rect x="386" y="154" width="108" height="44" rx="20" fill="none" stroke="#98B7F6" stroke-width="1" opacity="0.3"/>
-        <text x="440" y="181" text-anchor="middle" fill="#98B7F6" font-size="12" font-weight="600" font-family="Inconsolata,monospace">Declined</text>
+        <rect x="390" y="158" width="100" height="36" rx="18" fill="none" stroke="#C0B4F8" stroke-width="2"/>
+        <rect x="386" y="154" width="108" height="44" rx="20" fill="none" stroke="#C0B4F8" stroke-width="1" opacity="0.3"/>
+        <text x="440" y="181" text-anchor="middle" fill="#C0B4F8" font-size="12" font-weight="600" font-family="Inconsolata,monospace">Declined</text>
 
         <!-- Draft -> UnderReview (enabled) -->
         <line x1="110" y1="118" x2="186" y2="118" stroke="#34D399" stroke-width="2" marker-end="url(#ae)"/>
-        <text x="148" y="110" text-anchor="middle" fill="#3AC8F8" font-size="10" font-family="Inconsolata,monospace" font-weight="600">Submit</text>
+        <text x="148" y="110" text-anchor="middle" fill="#30B8E8" font-size="10" font-family="Inconsolata,monospace" font-weight="600">Submit</text>
 
         <!-- UnderReview -> Approved -->
         <line x1="310" y1="108" x2="386" y2="74" stroke="#6366F1" stroke-width="1.5" opacity="0.6" marker-end="url(#am)"/>
-        <text x="348" y="82" text-anchor="middle" fill="#7DDAFC" font-size="9" font-family="Inconsolata,monospace" opacity="0.7">Approve</text>
+        <text x="348" y="82" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Inconsolata,monospace" opacity="0.7">Approve</text>
         <text x="348" y="93" text-anchor="middle" fill="#FBBF24" font-size="8" font-family="Inconsolata,monospace" opacity="0.7">when docs &amp; credit</text>
 
         <!-- UnderReview -> Approved REJECT -->
@@ -510,23 +569,23 @@
 
         <!-- UnderReview -> Declined -->
         <line x1="310" y1="128" x2="386" y2="172" stroke="#6366F1" stroke-width="1.5" opacity="0.5" marker-end="url(#am)"/>
-        <text x="355" y="160" text-anchor="middle" fill="#3AC8F8" font-size="9" font-family="Inconsolata,monospace" opacity="0.6">Decline</text>
+        <text x="355" y="160" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Inconsolata,monospace" opacity="0.6">Decline</text>
 
         <!-- Approved -> Funded -->
         <line x1="490" y1="66" x2="566" y2="66" stroke="#6366F1" stroke-width="1.5" opacity="0.5" marker-end="url(#am)"/>
-        <text x="528" y="46" text-anchor="middle" fill="#3AC8F8" font-size="9" font-family="Inconsolata,monospace" opacity="0.6">FundLoan</text>
+        <text x="528" y="46" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Inconsolata,monospace" opacity="0.6">FundLoan</text>
 
         <!-- Self-loop: VerifyDocuments (stationary) -->
         <path d="M 250 100 C 250 65 300 65 300 100" fill="none" stroke="#6366F1" stroke-width="1.5" opacity="0.5" marker-end="url(#am)"/>
-        <text x="285" y="58" text-anchor="middle" fill="#0FB0EB" font-size="9" font-family="Inconsolata,monospace" opacity="0.6">Verify</text>
+        <text x="285" y="58" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Inconsolata,monospace" opacity="0.6">Verify</text>
 
         <!-- Legend -->
         <g transform="translate(30, 225)">
-          <circle cx="6" cy="6" r="5" fill="none" stroke="#638EE3" stroke-width="2"/>
+          <circle cx="6" cy="6" r="5" fill="none" stroke="#8B7AED" stroke-width="2"/>
           <text x="18" y="10" fill="#52525b" font-size="10">Origin</text>
-          <rect x="68" y="1" width="10" height="10" rx="3" fill="none" stroke="#80A5EF" stroke-width="1.5"/>
+          <rect x="68" y="1" width="10" height="10" rx="3" fill="none" stroke="#A898F5" stroke-width="1.5"/>
           <text x="84" y="10" fill="#52525b" font-size="10">Active</text>
-          <rect x="128" y="1" width="10" height="10" rx="3" fill="none" stroke="#98B7F6" stroke-width="1.5"/>
+          <rect x="128" y="1" width="10" height="10" rx="3" fill="none" stroke="#C0B4F8" stroke-width="1.5"/>
           <text x="144" y="10" fill="#52525b" font-size="10">Final</text>
           <line x1="184" y1="6" x2="204" y2="6" stroke="#34D399" stroke-width="2"/>
           <text x="210" y="10" fill="#52525b" font-size="10">Enabled</text>
@@ -534,7 +593,7 @@
           <text x="288" y="10" fill="#52525b" font-size="10">Blocked</text>
           <rect x="340" y="1" width="10" height="10" rx="3" fill="#FBBF24" opacity="0.9"/>
           <text x="356" y="10" fill="#FBBF24" font-size="10">Rule</text>
-          <text x="400" y="10" fill="#3AC8F8" font-size="10" font-family="Inconsolata,monospace">Events</text>
+          <text x="400" y="10" fill="#30B8E8" font-size="10" font-family="Inconsolata,monospace">Events</text>
         </g>
       </svg>
     </div>
@@ -542,7 +601,7 @@
 </div>
 
 <div class="callout">
-  <strong>DSL + Diagram pairing:</strong> The code defines it, the diagram visualizes it. Together they are the visual identity system &mdash; code on the left, state diagram on the right. This pairing appears in the README, the VS Code preview panel, and eventually docs. Both use the same palette; the diagram is a direct projection of the code, not a separate design.
+  <strong>DSL + Diagram pairing:</strong> The code defines it, the diagram visualizes it. Together they are the visual identity system &mdash; code on the left, state diagram on the right. This pairing appears in the README, the VS Code preview panel, and eventually docs. Both use the same palette; the diagram is a direct projection of the code, not a separate design. Node borders are indigo (structure), state name text is violet, arrows are gold, event labels are cyan.
 </div>
 
 <div class="callout" style="margin-top:12px; background:rgba(56,189,248,0.06); border-color:#0c4a6e;">
@@ -572,15 +631,15 @@
       <p>The hero. Seen daily in the editor.</p>
     </div>
     <div class="card-body">
-      <div class="syntax-block" style="font-size:12px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">LoanApplication</span>
+      <div class="syntax-block" style="font-size:12px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
 
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#64748B;">0</span>
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Draft</span> <span style="color:#638EE3;">initial</span>
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#80A5EF;">UnderReview</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#8B7AED;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#A898F5;">UnderReview</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#94A3B8;">Amount</span> <span style="color:#6366F1;">=</span> <span style="color:#3AC8F8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#94A3B8;">Amount</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">UnderReview</span></div>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Submit</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">Amount</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Amount</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">UnderReview</span></div>
     </div>
   </div>
 
@@ -596,13 +655,13 @@
           <defs>
             <marker id="a2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#34D399"/></marker>
           </defs>
-          <rect x="10" y="32" width="80" height="36" rx="18" fill="rgba(99,142,227,0.08)" stroke="#638EE3" stroke-width="2.5"/>
-          <circle cx="22" cy="50" r="3" fill="#638EE3"/>
-          <text x="55" y="55" text-anchor="middle" fill="#638EE3" font-size="13" font-family="Inconsolata,monospace" font-weight="600">Draft</text>
+          <rect x="10" y="32" width="80" height="36" rx="18" fill="rgba(139,122,237,0.08)" stroke="#8B7AED" stroke-width="2.5"/>
+          <circle cx="22" cy="50" r="3" fill="#8B7AED"/>
+          <text x="55" y="55" text-anchor="middle" fill="#8B7AED" font-size="13" font-family="Inconsolata,monospace" font-weight="600">Draft</text>
           <line x1="90" y1="50" x2="165" y2="50" stroke="#34D399" stroke-width="2" marker-end="url(#a2)"/>
-          <text x="127" y="42" text-anchor="middle" fill="#3AC8F8" font-size="10" font-family="Inconsolata,monospace">Submit</text>
-          <rect x="165" y="32" width="105" height="36" rx="18" fill="none" stroke="#80A5EF" stroke-width="2"/>
-          <text x="217" y="55" text-anchor="middle" fill="#80A5EF" font-size="12" font-family="Inconsolata,monospace" font-weight="600">UnderReview</text>
+          <text x="127" y="42" text-anchor="middle" fill="#30B8E8" font-size="10" font-family="Inconsolata,monospace">Submit</text>
+          <rect x="165" y="32" width="105" height="36" rx="18" fill="none" stroke="#A898F5" stroke-width="2"/>
+          <text x="217" y="55" text-anchor="middle" fill="#A898F5" font-size="12" font-family="Inconsolata,monospace" font-weight="600">UnderReview</text>
         </svg>
       </div>
     </div>
@@ -643,14 +702,14 @@
     </div>
     <div class="card-body">
       <div style="font-family:'Inconsolata',monospace; font-size:12px; background:#0c0c0f; border-radius:6px; padding:16px; line-height:1.8; border:1px solid #1e1b4b;">
-        <div><span style="color:#818cf8;">PRECEPT001</span> <span style="color:#F87171;">error</span>: Unreachable state <span style="color:#80A5EF;">Archived</span> &mdash; no transitions lead here</div>
-        <div><span style="color:#818cf8;">PRECEPT038</span> <span style="color:#F87171;">error</span>: Type mismatch in guard: expected <span style="color:#78829B;">number</span>, got <span style="color:#78829B;">string</span></div>
-        <div><span style="color:#818cf8;">PRECEPT047</span> <span style="color:#FDE047;">warning</span>: Dead-end state <span style="color:#98B7F6;">Approved</span> &mdash; no outgoing transitions</div>
+        <div><span style="color:#818cf8;">PRECEPT001</span> <span style="color:#F87171;">error</span>: Unreachable state <span style="color:#A898F5;">Archived</span> &mdash; no transitions lead here</div>
+        <div><span style="color:#818cf8;">PRECEPT038</span> <span style="color:#F87171;">error</span>: Type mismatch in guard: expected <span style="color:#9AA8B5;font-style:italic;">number</span>, got <span style="color:#9AA8B5;font-style:italic;">string</span></div>
+        <div><span style="color:#818cf8;">PRECEPT047</span> <span style="color:#FDE047;">warning</span>: Dead-end state <span style="color:#C0B4F8;">Approved</span> &mdash; no outgoing transitions</div>
         <div style="margin-top:12px; color:#27272a;">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</div>
         <div style="color:#52525b; margin-top:4px;">3 diagnostics (<span style="color:#F87171;">2 errors</span>, <span style="color:#FDE047;">1 warning</span>)</div>
       </div>
       <div class="note" style="margin-top:16px;">
-        The <code style="color:#818cf8;">PRECEPT</code> prefix + indigo codes become a recognizable "signature" &mdash; like BenchmarkDotNet's result tables. State names in diagnostics use their structural color (azure shades).
+        The <code style="color:#818cf8;">PRECEPT</code> prefix + indigo codes become a recognizable "signature" &mdash; like BenchmarkDotNet's result tables. State names in diagnostics use their structural color (violet shades).
       </div>
     </div>
   </div>
@@ -678,15 +737,15 @@
 
   <!-- Hero code + diagram side by side -->
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;">
-    <div style="background:#0c0c0f; border:1px solid #1e1b4b; border-radius:6px; padding:16px; font-family:'Inconsolata',monospace; font-size:11px; line-height:1.7; white-space:pre; overflow-x:auto;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#94A3B8;">LoanApplication</span>
+    <div style="background:#0c0c0f; border:1px solid #1e1b4b; border-radius:6px; padding:16px; font-family:'Inconsolata',monospace; font-size:11px; line-height:1.7; white-space:pre; overflow-x:auto;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
 
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#94A3B8;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#78829B;">number</span>
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#638EE3;">Draft</span> <span style="color:#638EE3;">initial</span>
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#80A5EF;">UnderReview</span>
-<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#98B7F6;">Approved</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#8B7AED;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#A898F5;">UnderReview</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#C0B4F8;">Approved</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#638EE3;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#3AC8F8;">Submit</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#80A5EF;">UnderReview</span></div>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Submit</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">UnderReview</span></div>
 
     <div style="background:#0c0c0f; border:1px solid #1e1b4b; border-radius:6px; padding:16px; display:flex; align-items:center; justify-content:center;">
       <svg width="260" height="120" viewBox="0 0 260 120">
@@ -694,27 +753,27 @@
           <marker id="a3" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7" fill="#34D399"/></marker>
           <marker id="a4" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7" fill="#6366F1"/></marker>
         </defs>
-        <rect x="10" y="45" width="60" height="28" rx="14" fill="rgba(99,142,227,0.08)" stroke="#638EE3" stroke-width="2"/>
-        <circle cx="20" cy="59" r="3" fill="#638EE3"/>
-        <text x="44" y="63" text-anchor="middle" fill="#638EE3" font-size="11" font-family="Inconsolata,monospace" font-weight="600">Draft</text>
+        <rect x="10" y="45" width="60" height="28" rx="14" fill="rgba(139,122,237,0.08)" stroke="#8B7AED" stroke-width="2"/>
+        <circle cx="20" cy="59" r="3" fill="#8B7AED"/>
+        <text x="44" y="63" text-anchor="middle" fill="#8B7AED" font-size="11" font-family="Inconsolata,monospace" font-weight="600">Draft</text>
 
         <line x1="70" y1="59" x2="98" y2="59" stroke="#34D399" stroke-width="1.5" marker-end="url(#a3)"/>
-        <text x="84" y="51" text-anchor="middle" fill="#3AC8F8" font-size="8" font-family="Inconsolata,monospace">Submit</text>
+        <text x="84" y="51" text-anchor="middle" fill="#30B8E8" font-size="8" font-family="Inconsolata,monospace">Submit</text>
 
-        <rect x="98" y="45" width="72" height="28" rx="14" fill="none" stroke="#80A5EF" stroke-width="1.5"/>
-        <text x="134" y="63" text-anchor="middle" fill="#80A5EF" font-size="10" font-family="Inconsolata,monospace" font-weight="600">Review</text>
+        <rect x="98" y="45" width="72" height="28" rx="14" fill="none" stroke="#A898F5" stroke-width="1.5"/>
+        <text x="134" y="63" text-anchor="middle" fill="#A898F5" font-size="10" font-family="Inconsolata,monospace" font-weight="600">Review</text>
 
         <line x1="170" y1="52" x2="198" y2="32" stroke="#6366F1" stroke-width="1.5" opacity="0.6" marker-end="url(#a4)"/>
-        <text x="198" y="46" fill="#7DDAFC" font-size="8" font-family="Inconsolata,monospace">Approve</text>
-        <rect x="195" y="16" width="55" height="24" rx="12" fill="none" stroke="#98B7F6" stroke-width="1.5"/>
-        <rect x="192" y="13" width="61" height="30" rx="14" fill="none" stroke="#98B7F6" stroke-width="0.8" opacity="0.3"/>
-        <text x="222" y="32" text-anchor="middle" fill="#98B7F6" font-size="9" font-family="Inconsolata,monospace">Approved</text>
+        <text x="198" y="46" fill="#30B8E8" font-size="8" font-family="Inconsolata,monospace">Approve</text>
+        <rect x="195" y="16" width="55" height="24" rx="12" fill="none" stroke="#C0B4F8" stroke-width="1.5"/>
+        <rect x="192" y="13" width="61" height="30" rx="14" fill="none" stroke="#C0B4F8" stroke-width="0.8" opacity="0.3"/>
+        <text x="222" y="32" text-anchor="middle" fill="#C0B4F8" font-size="9" font-family="Inconsolata,monospace">Approved</text>
 
         <line x1="170" y1="66" x2="198" y2="86" stroke="#6366F1" stroke-width="1.5" opacity="0.6" marker-end="url(#a4)"/>
-        <text x="198" y="82" fill="#3AC8F8" font-size="8" font-family="Inconsolata,monospace">Decline</text>
-        <rect x="195" y="78" width="55" height="24" rx="12" fill="none" stroke="#98B7F6" stroke-width="1.5"/>
-        <rect x="192" y="75" width="61" height="30" rx="14" fill="none" stroke="#98B7F6" stroke-width="0.8" opacity="0.3"/>
-        <text x="222" y="94" text-anchor="middle" fill="#98B7F6" font-size="9" font-family="Inconsolata,monospace">Declined</text>
+        <text x="198" y="82" fill="#30B8E8" font-size="8" font-family="Inconsolata,monospace">Decline</text>
+        <rect x="195" y="78" width="55" height="24" rx="12" fill="none" stroke="#C0B4F8" stroke-width="1.5"/>
+        <rect x="192" y="75" width="61" height="30" rx="14" fill="none" stroke="#C0B4F8" stroke-width="0.8" opacity="0.3"/>
+        <text x="222" y="94" text-anchor="middle" fill="#C0B4F8" font-size="9" font-family="Inconsolata,monospace">Declined</text>
       </svg>
     </div>
   </div>
@@ -742,12 +801,12 @@
   <div class="card-body" style="line-height:1.8; font-size:15px;">
     <p style="color:#fff; font-weight:600; margin-bottom:12px;">Precept's visual identity is not an icon &mdash; it is an ecosystem of four surfaces:</p>
     <ol style="color:#a1a1aa; padding-left:20px; margin-bottom:20px;">
-      <li style="margin-bottom:8px;"><strong style="color:#6366F1;">DSL syntax</strong> &mdash; keyword-anchored lines, arrow chains, the distinctive left-edge rhythm. Six visual voices (indigo structure, azure states, sky events, slate data, gold rules, verdict colors). This is the hero visual.</li>
-      <li style="margin-bottom:8px;"><strong style="color:#80A5EF;">State diagrams</strong> &mdash; azure nodes, sky event labels, verdict-colored edges, gold rule annotations. Generated directly from the precept. The companion graphic.</li>
+      <li style="margin-bottom:8px;"><strong style="color:#6366F1;">DSL syntax</strong> &mdash; keyword-anchored lines, arrow chains, the distinctive left-edge rhythm. Six visual voices (indigo structure, violet states, cyan events, bright slate data, gold rules, verdict colors). This is the hero visual.</li>
+      <li style="margin-bottom:8px;"><strong style="color:#A898F5;">State diagrams</strong> &mdash; indigo-bordered nodes, violet state names, cyan event labels, gold transition arrows. Generated directly from the precept. The companion graphic.</li>
       <li style="margin-bottom:8px;"><strong style="color:#52525b;">The icon</strong> &mdash; a mark that hints at both ideas (inscribed rules + state flow). Used at small sizes everywhere. Currently exploring.</li>
       <li style="margin-bottom:8px;"><strong style="color:#818cf8;">Diagnostic output</strong> &mdash; <code style="color:#818cf8;">PRECEPT</code>-prefixed codes with structured messages, structural state colors inline. The daily-use brand surface.</li>
     </ol>
-    <p style="color:#71717a;">The icon does not carry the brand alone. The <code>.precept</code> file format and state diagrams do the heavy lifting. The semantic color system is the connective tissue &mdash; the same 17 shades appear across all four surfaces.</p>
+    <p style="color:#71717a;">The icon does not carry the brand alone. The <code>.precept</code> file format and state diagrams do the heavy lifting. The semantic color system is the connective tissue &mdash; the same 15 shades appear across all four surfaces.</p>
   </div>
 </div>
 
@@ -756,8 +815,8 @@
   <ul style="margin:8px 0 0 16px; line-height:1.8;">
     <li>Primary surface = DSL syntax. Secondary = state diagrams. Tertiary = diagnostics. Icon = small mark.</li>
     <li>Background: <code>#0c0c0f</code> everywhere. Font: Inconsolata (wordmark 700 small-caps, code 400-600).</li>
-    <li>17-shade semantic palette applied consistently across all surfaces.</li>
-    <li>Compiler-driven structural coloring for states (origin/active/final) and events (transition/conditional/stationary).</li>
+    <li>15-shade semantic palette applied consistently across all surfaces.</li>
+    <li>Compiler-driven structural coloring for states (origin/active/final).</li>
   </ul>
 </div>
 

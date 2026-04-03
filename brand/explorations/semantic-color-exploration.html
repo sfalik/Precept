@@ -70,6 +70,18 @@
 <body>
 
 <h1>Precept — Semantic Color System Exploration</h1>
+<div style="background:#14532d; border:2px solid #34D399; border-radius:8px; padding:16px 20px; margin-bottom:24px;">
+  <strong style="color:#34D399; font-size:14px;">SUPERSEDED — Palette Locked</strong>
+  <p style="color:#86efac; font-size:13px; margin-top:6px; line-height:1.6;">This exploration was the starting point for the semantic color system. The final converged palette is locked in <a href="../brand-spec.html" style="color:#fff;">brand-spec.html</a> §4 Color System and <a href="../brand-decisions.md" style="color:#fff;">brand-decisions.md</a>. Key changes from this exploration:</p>
+  <ul style="color:#86efac; font-size:12px; margin:6px 0 0 16px; line-height:1.8;">
+    <li><strong>States:</strong> Indigo/Slate/Lilac tiers → <strong>Violet 260°</strong> (#8B7AED / #A898F5 / #C0B4F8)</li>
+    <li><strong>Events:</strong> Lilac/Gold/Sky candidates → <strong>Cyan 195°</strong> single shade (#30B8E8)</li>
+    <li><strong>Data:</strong> Emerald types + light-blue vars → <strong>Bright Slate 215°</strong> italic (#B0BEC5 / #9AA8B5 / #84929F)</li>
+    <li><strong>Structure:</strong> Single indigo → <strong>3-tier Indigo</strong> semibold (#4338CA / #4F46E5 / #6366F1)</li>
+    <li><strong>Rules:</strong> Amber <code>because</code> → <strong>Gold 45°</strong> (#B8860B keywords + #FBBF24 messages)</li>
+    <li><strong>Typography:</strong> Added semibold for structure, italic for data</li>
+  </ul>
+</div>
 <p class="subtitle">Every color means something. Indigo anchors the brand, then semantic roles drive the rest: emerald for enabled transitions, rose for blocked paths, amber for constraints, slate for structural chrome, and lilac for terminal states. A palette built on meaning, not decoration.</p>
 
 <!-- ===================================================================== -->
@@ -1221,7 +1233,7 @@
           </td>
           <td style="padding:10px 12px;"><span style="color:#818cf8;">&#9632;</span> <span style="color:#94a3b8; font-family:'Inconsolata',monospace; font-size:11px;">#818CF8</span></td>
           <td style="padding:10px 12px; color:#94a3b8;">Indigo — structural flow</td>
-          <td style="padding:10px 12px; color:#34d399;">&#10003; Locked</td>
+          <td style="padding:10px 12px; color:#52525b;">—</td>
         </tr>
         <tr style="border-bottom:1px solid #1e1b4b;">
           <td style="padding:10px 12px; color:#6366f1; font-weight:600;">Declaration Keywords</td>
@@ -1230,7 +1242,7 @@
           </td>
           <td style="padding:10px 12px;"><span style="color:#6366f1;">&#9632;</span> <span style="color:#94a3b8; font-family:'Inconsolata',monospace; font-size:11px;">#818CF8</span></td>
           <td style="padding:10px 12px; color:#94a3b8;">Indigo — defining things</td>
-          <td style="padding:10px 12px; color:#34d399;">&#10003; Locked</td>
+          <td style="padding:10px 12px; color:#52525b;">—</td>
         </tr>
         <tr style="border-bottom:1px solid #1e1b4b;">
           <td style="padding:10px 12px; color:#818cf8; font-weight:600;">Action Keywords</td>
@@ -1239,7 +1251,7 @@
           </td>
           <td style="padding:10px 12px;"><span style="color:#818cf8;">&#9632;</span> <span style="color:#94a3b8; font-family:'Inconsolata',monospace; font-size:11px;">#818CF8</span></td>
           <td style="padding:10px 12px; color:#94a3b8;">Indigo — mutations</td>
-          <td style="padding:10px 12px; color:#34d399;">&#10003; Locked</td>
+          <td style="padding:10px 12px; color:#52525b;">—</td>
         </tr>
         <tr style="border-bottom:1px solid #1e1b4b;">
           <td style="padding:10px 12px; color:#818cf8; font-weight:600;">Outcome Keywords</td>
@@ -1248,7 +1260,7 @@
           </td>
           <td style="padding:10px 12px;"><span style="color:#818cf8;">&#9632;</span> <span style="color:#94a3b8; font-family:'Inconsolata',monospace; font-size:11px;">#818CF8</span></td>
           <td style="padding:10px 12px; color:#94a3b8;">Indigo — what happens</td>
-          <td style="padding:10px 12px; color:#34d399;">&#10003; Locked</td>
+          <td style="padding:10px 12px; color:#52525b;">—</td>
         </tr>
 
         <!-- TYPES -->
@@ -1259,7 +1271,7 @@
           </td>
           <td style="padding:10px 12px;"><span style="color:#34d399;">&#9632;</span> <span style="color:#94a3b8; font-family:'Inconsolata',monospace; font-size:11px;">#34D399</span></td>
           <td style="padding:10px 12px; color:#94a3b8;">Emerald — data shape</td>
-          <td style="padding:10px 12px; color:#34d399;">&#10003; Locked</td>
+          <td style="padding:10px 12px; color:#52525b;">—</td>
         </tr>
 
         <!-- LITERALS -->
@@ -1270,7 +1282,7 @@
           </td>
           <td style="padding:10px 12px;"><span style="color:#b5cea8;">&#9632;</span> <span style="color:#94a3b8; font-family:'Inconsolata',monospace; font-size:11px;">#B5CEA8</span></td>
           <td style="padding:10px 12px; color:#94a3b8;">Muted green — literal values</td>
-          <td style="padding:10px 12px; color:#34d399;">&#10003; Locked</td>
+          <td style="padding:10px 12px; color:#52525b;">—</td>
         </tr>
         <tr style="border-bottom:1px solid #27272a;">
           <td style="padding:10px 12px; color:#b5cea8; font-weight:600;">Number Literals</td>
@@ -1279,7 +1291,7 @@
           </td>
           <td style="padding:10px 12px;"><span style="color:#b5cea8;">&#9632;</span> <span style="color:#94a3b8; font-family:'Inconsolata',monospace; font-size:11px;">#B5CEA8</span></td>
           <td style="padding:10px 12px; color:#94a3b8;">Muted green — numeric values</td>
-          <td style="padding:10px 12px; color:#34d399;">&#10003; Locked</td>
+          <td style="padding:10px 12px; color:#52525b;">—</td>
         </tr>
         <tr style="border-bottom:1px solid #422006;">
           <td style="padding:10px 12px; color:#fbbf24; font-weight:600;">String Literals</td>
@@ -1288,7 +1300,7 @@
           </td>
           <td style="padding:10px 12px;"><span style="color:#fbbf24;">&#9632;</span> <span style="color:#94a3b8; font-family:'Inconsolata',monospace; font-size:11px;">#FBBF24</span></td>
           <td style="padding:10px 12px; color:#94a3b8;">Amber — constraint messages &amp; reject reasons</td>
-          <td style="padding:10px 12px; color:#34d399;">&#10003; Locked</td>
+          <td style="padding:10px 12px; color:#52525b;">—</td>
         </tr>
 
         <!-- OPERATORS -->
@@ -1299,7 +1311,7 @@
           </td>
           <td style="padding:10px 12px;"><span style="color:#d4d4d4;">&#9632;</span> <span style="color:#94a3b8; font-family:'Inconsolata',monospace; font-size:11px;">#D4D4D4</span></td>
           <td style="padding:10px 12px; color:#94a3b8;">Neutral gray — logic &amp; math</td>
-          <td style="padding:10px 12px; color:#34d399;">&#10003; Locked</td>
+          <td style="padding:10px 12px; color:#52525b;">—</td>
         </tr>
         <tr style="border-bottom:1px solid #1e1b4b;">
           <td style="padding:10px 12px; color:#818cf8; font-weight:600;">Arrow Operator</td>
@@ -1308,7 +1320,7 @@
           </td>
           <td style="padding:10px 12px;"><span style="color:#818cf8;">&#9632;</span> <span style="color:#94a3b8; font-family:'Inconsolata',monospace; font-size:11px;">#818CF8 bold</span></td>
           <td style="padding:10px 12px; color:#94a3b8;">Indigo bold — pipeline</td>
-          <td style="padding:10px 12px; color:#34d399;">&#10003; Locked</td>
+          <td style="padding:10px 12px; color:#52525b;">—</td>
         </tr>
 
         <!-- IDENTIFIERS — the open questions -->
@@ -1375,7 +1387,7 @@
           </td>
           <td style="padding:10px 12px;"><span style="color:#6a9955;">&#9632;</span> <span style="color:#94a3b8; font-family:'Inconsolata',monospace; font-size:11px;">#6A9955</span></td>
           <td style="padding:10px 12px; color:#94a3b8;">Green — standard convention</td>
-          <td style="padding:10px 12px; color:#34d399;">&#10003; Locked</td>
+          <td style="padding:10px 12px; color:#52525b;">—</td>
         </tr>
       </tbody>
     </table>
