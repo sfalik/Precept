@@ -63,16 +63,16 @@
 <body>
 
 <h1>Precept &mdash; Visual Language Exploration</h1>
-<p class="subtitle">The DSL syntax and state diagrams ARE the visual identity. The icon is one element in a broader system that includes <code>.precept</code> files, state diagrams, diagnostics, and the inspector panel. Background: <code>#0c0c0f</code>. Font: Inconsolata. Palette: 15 shades, 6 families.</p>
+<p class="subtitle">The DSL syntax and state diagrams ARE the visual identity. The icon is one element in a broader system that includes <code>.precept</code> files, state diagrams, diagnostics, and the inspector panel. Background: <code>#0c0c0f</code>. Font: Inconsolata. This page now renders editor-adjacent examples with the locked semantic system: indigo for structure, one violet for all states, cyan for events, slate for data, and gold only for human-readable rule messages.</p>
 
 <div class="callout" style="margin-bottom:48px;">
-  <strong>Locked decisions applied:</strong> All examples below use the locked 15-shade semantic palette (indigo structure semibold, violet states, cyan events, bright slate data italic, gold rules, emerald/coral/yellow verdicts), Inconsolata font, <code>#0c0c0f</code> background, and compiler-driven structural coloring for states. See <a href="../brand-decisions.md" style="color:#818CF8;">brand-decisions.md</a> and <a href="../brand-spec.html" style="color:#818CF8;">brand-spec.html</a> for canonical references.
+  <strong>Locked decisions applied:</strong> Syntax and diagram examples on this page are aligned to the locked semantic model: one hue per category, typography for constraint pressure, and no lifecycle-tier state colors in code. Exploration here is now about composition, layout, and supporting surfaces rather than alternate syntax semantics. See <a href="../brand-decisions.md" style="color:#818CF8;">brand-decisions.md</a> and <a href="../brand-spec.html" style="color:#818CF8;">brand-spec.html</a> for canonical references.
 </div>
 
 <!-- ===== SECTION 1: The DSL as hero visual ===== -->
 <div class="section">
 <h2>1. The .precept file IS the hero visual <span class="status-locked">Locked</span></h2>
-<p class="desc">Like Prisma's .prisma schema or Tailwind's utility classes, the DSL syntax is the most frequently seen brand surface. Every keyword-anchored line creates a distinctive left-edge pattern. The code IS the hero image.</p>
+<p class="desc">Like Prisma's .prisma schema or Tailwind's utility classes, the DSL syntax is the most frequently seen brand surface. Every keyword-anchored line creates a distinctive left-edge pattern. In the locked system, color means category, not lifecycle: the code IS the hero image.</p>
 
 <div class="card">
   <div class="card-header">
@@ -153,7 +153,7 @@
   </div>
   <div class="card-body">
     <!-- Full stress test: every family on white -->
-    <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:1.8; background:#ffffff; border-radius:8px; padding:20px 24px; white-space:pre; border:1px solid #d1d5db; margin-bottom:16px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
+    <div data-semantic-preview="true" style="font-family:'Inconsolata',monospace; font-size:13px; line-height:1.8; background:#ffffff; border-radius:8px; padding:20px 24px; white-space:pre; border:1px solid #d1d5db; margin-bottom:16px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
 
 <span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ApplicantName</span>    <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">string</span>  <span style="color:#6366F1;">nullable</span>
 <span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span>  <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>  <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
@@ -189,7 +189,7 @@
         <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Structure (Indigo)</div>
         <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
           <span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#a3a3a3;">Declaration</span><br>
-          <span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#a3a3a3;">... </span><span style="color:#4F46E5;font-weight:600;">on</span><br>
+          <span style="color:#4338CA;font-weight:600;">from</span> <span style="color:#a3a3a3;">... </span><span style="color:#4338CA;font-weight:600;">on</span><br>
           <span style="color:#6366F1;">as</span> <span style="color:#a3a3a3;">... </span><span style="color:#6366F1;">default</span> <span style="color:#a3a3a3;">... </span><span style="color:#6366F1;">when</span>
         </div>
         <div style="font-size:11px; margin-top:8px; color:#16a34a; font-weight:600;">&#10003; Excellent</div>
@@ -198,17 +198,17 @@
       <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
         <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">States (Violet)</div>
         <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
-          <span style="color:#8B7AED;">Draft</span> <span style="color:#a3a3a3;">origin</span><br>
-          <span style="color:#A898F5;">UnderReview</span> <span style="color:#a3a3a3;">active</span><br>
-          <span style="color:#C0B4F8;">Approved</span> <span style="color:#a3a3a3;">final</span>
+          <span style="color:#A898F5;">Draft</span> <span style="color:#a3a3a3;">unconstrained</span><br>
+          <span style="color:#A898F5;">UnderReview</span> <span style="color:#a3a3a3;">same hue</span><br>
+          <span style="color:#A898F5;font-style:italic;">Approved</span> <span style="color:#a3a3a3;">constrained</span>
         </div>
-        <div style="font-size:11px; margin-top:8px; color:#dc2626; font-weight:600;">&#10007; Washed out</div>
+        <div style="font-size:11px; margin-top:8px; color:#16a34a; font-weight:600;">&#10003; One category, one hue</div>
       </div>
       <!-- Events -->
       <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
         <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Events (Cyan)</div>
         <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
-          <span style="color:#30B8E8;">Submit</span> <span style="color:#a3a3a3;">transition</span><br>
+          <span style="color:#30B8E8;font-style:italic;">Submit</span> <span style="color:#a3a3a3;">constrained</span><br>
           <span style="color:#30B8E8;">Approve</span> <span style="color:#a3a3a3;">conditional</span><br>
           <span style="color:#30B8E8;">Verify</span> <span style="color:#a3a3a3;">stationary</span>
         </div>
@@ -228,13 +228,13 @@
       </div>
       <!-- Rules -->
       <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
-        <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Rules (Gold)</div>
+        <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Rules (Messages Only)</div>
         <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
-          <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#a3a3a3;">keyword</span><br>
-          <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#a3a3a3;">... </span><span style="color:#B8860B;font-weight:600;">reject</span><br>
+          <span style="color:#6366F1;">because</span> <span style="color:#a3a3a3;">grammar</span><br>
+          <span style="color:#4338CA;font-weight:600;">assert</span> <span style="color:#a3a3a3;">... </span><span style="color:#4338CA;font-weight:600;">reject</span><br>
           <span style="color:#FBBF24;">"message text"</span>
         </div>
-        <div style="font-size:11px; margin-top:8px; color:#ca8a04; font-weight:600;">~ Keywords OK, messages disappear</div>
+        <div style="font-size:11px; margin-top:8px; color:#16a34a; font-weight:600;">&#10003; Gold reserved for payloads</div>
       </div>
       <!-- Verdicts -->
       <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
@@ -249,7 +249,7 @@
     </div>
 
     <div class="note" style="margin-top:16px;">
-      <strong>Decision:</strong> Visual language is dark-mode-first (<code>#0c0c0f</code>). The locked 15-shade palette is the dark palette. A parallel light-mode palette (15 darkened shades hitting 4.5:1 on white) will be defined as part of the full color system implementation &mdash; standard practice, same grammar, two color maps. Not needed for the brand exploration phase.
+      <strong>Decision:</strong> Visual language is dark-mode-first (<code>#0c0c0f</code>). Syntax highlighting v1 is a dark-mode-only 8-shade implementation, so this light rendering is a stress test rather than a second locked palette.
     </div>
   </div>
 </div>
@@ -506,12 +506,12 @@
 <!-- ===== SECTION 2: State diagram ===== -->
 <div class="section">
 <h2>2. State diagrams as the accompanying graphic system <span class="status-open">Exploring</span></h2>
-<p class="desc">The VS Code preview panel renders state diagrams using the same semantic palette as syntax highlighting. Code and diagram share visual language &mdash; same violet for states, same cyan for events, same verdict colors for edges.</p>
+<p class="desc">This section is exploring layout, annotation density, and diagram composition while staying inside the locked semantic color model. Shape carries origin/final structure; color still carries category.</p>
 
 <div class="card">
   <div class="card-header">
     <h3>LoanApplication &mdash; state diagram</h3>
-    <p>Indigo-bordered nodes with violet state names (origin/active/final shades). Cyan event labels. Gold transition arrows. Coral blocked edges.</p>
+    <p>Exploration: node shapes, edge routing, verdict overlays, and constraint annotations. The palette itself stays locked: indigo structure, one violet state hue, cyan event labels, and verdict colors only for runtime outcomes.</p>
   </div>
   <div class="card-body">
     <div style="background:#0c0c0f; border-radius:8px; padding:32px; text-align:center; border:1px solid #1e1b4b;">
@@ -528,31 +528,31 @@
         <rect width="680" height="260" rx="8" fill="url(#grid)"/>
 
         <!-- Draft (origin) -->
-        <rect x="30" y="100" width="80" height="36" rx="18" fill="rgba(139,122,237,0.08)" stroke="#8B7AED" stroke-width="2.5"/>
-        <circle cx="42" cy="118" r="4" fill="#8B7AED"/>
-        <text x="74" y="123" text-anchor="middle" fill="#8B7AED" font-size="13" font-weight="600" font-family="Inconsolata,monospace">Draft</text>
+        <rect x="30" y="100" width="80" height="36" rx="18" fill="none" stroke="#4338CA" stroke-width="2.5"/>
+        <circle cx="42" cy="118" r="4" fill="#4338CA"/>
+        <text x="74" y="123" text-anchor="middle" fill="#A898F5" font-size="13" font-weight="600" font-family="Inconsolata,monospace">Draft</text>
 
-        <!-- UnderReview (active) -->
-        <rect x="190" y="100" width="120" height="36" rx="18" fill="none" stroke="#A898F5" stroke-width="2"/>
+        <!-- UnderReview -->
+        <rect x="190" y="100" width="120" height="36" rx="18" fill="none" stroke="#4338CA" stroke-width="2"/>
         <text x="250" y="123" text-anchor="middle" fill="#A898F5" font-size="12" font-weight="600" font-family="Inconsolata,monospace">UnderReview</text>
 
         <!-- Approved (final) + assert badge -->
-        <rect x="390" y="48" width="100" height="36" rx="18" fill="none" stroke="#C0B4F8" stroke-width="2"/>
-        <rect x="386" y="44" width="108" height="44" rx="20" fill="none" stroke="#C0B4F8" stroke-width="1" opacity="0.3"/>
-        <text x="440" y="71" text-anchor="middle" fill="#C0B4F8" font-size="12" font-weight="600" font-family="Inconsolata,monospace">Approved</text>
+        <rect x="390" y="48" width="100" height="36" rx="18" fill="none" stroke="#4338CA" stroke-width="2"/>
+        <rect x="386" y="44" width="108" height="44" rx="20" fill="none" stroke="#4338CA" stroke-width="1" opacity="0.3"/>
+        <text x="440" y="71" text-anchor="middle" fill="#A898F5" font-size="12" font-weight="600" font-family="Inconsolata,monospace">Approved</text>
         <rect x="500" y="50" width="12" height="12" rx="3" fill="#FBBF24" opacity="0.9"/>
         <text x="506" y="59" text-anchor="middle" fill="#0c0c0f" font-size="8" font-weight="700">!</text>
         <text x="520" y="59" fill="#FBBF24" font-size="9" font-family="Inconsolata,monospace" opacity="0.8">assert</text>
 
         <!-- Funded (final) -->
-        <rect x="570" y="48" width="80" height="36" rx="18" fill="none" stroke="#C0B4F8" stroke-width="2"/>
-        <rect x="566" y="44" width="88" height="44" rx="20" fill="none" stroke="#C0B4F8" stroke-width="1" opacity="0.3"/>
-        <text x="610" y="71" text-anchor="middle" fill="#C0B4F8" font-size="12" font-weight="600" font-family="Inconsolata,monospace">Funded</text>
+        <rect x="570" y="48" width="80" height="36" rx="18" fill="none" stroke="#4338CA" stroke-width="2"/>
+        <rect x="566" y="44" width="88" height="44" rx="20" fill="none" stroke="#4338CA" stroke-width="1" opacity="0.3"/>
+        <text x="610" y="71" text-anchor="middle" fill="#A898F5" font-size="12" font-weight="600" font-family="Inconsolata,monospace">Funded</text>
 
         <!-- Declined (final) -->
-        <rect x="390" y="158" width="100" height="36" rx="18" fill="none" stroke="#C0B4F8" stroke-width="2"/>
-        <rect x="386" y="154" width="108" height="44" rx="20" fill="none" stroke="#C0B4F8" stroke-width="1" opacity="0.3"/>
-        <text x="440" y="181" text-anchor="middle" fill="#C0B4F8" font-size="12" font-weight="600" font-family="Inconsolata,monospace">Declined</text>
+        <rect x="390" y="158" width="100" height="36" rx="18" fill="none" stroke="#4338CA" stroke-width="2"/>
+        <rect x="386" y="154" width="108" height="44" rx="20" fill="none" stroke="#4338CA" stroke-width="1" opacity="0.3"/>
+        <text x="440" y="181" text-anchor="middle" fill="#A898F5" font-size="12" font-weight="600" font-family="Inconsolata,monospace">Declined</text>
 
         <!-- Draft -> UnderReview (enabled) -->
         <line x1="110" y1="118" x2="186" y2="118" stroke="#34D399" stroke-width="2" marker-end="url(#ae)"/>
@@ -581,19 +581,20 @@
 
         <!-- Legend -->
         <g transform="translate(30, 225)">
-          <circle cx="6" cy="6" r="5" fill="none" stroke="#8B7AED" stroke-width="2"/>
-          <text x="18" y="10" fill="#52525b" font-size="10">Origin</text>
-          <rect x="68" y="1" width="10" height="10" rx="3" fill="none" stroke="#A898F5" stroke-width="1.5"/>
-          <text x="84" y="10" fill="#52525b" font-size="10">Active</text>
-          <rect x="128" y="1" width="10" height="10" rx="3" fill="none" stroke="#C0B4F8" stroke-width="1.5"/>
-          <text x="144" y="10" fill="#52525b" font-size="10">Final</text>
-          <line x1="184" y1="6" x2="204" y2="6" stroke="#34D399" stroke-width="2"/>
-          <text x="210" y="10" fill="#52525b" font-size="10">Enabled</text>
-          <line x1="262" y1="6" x2="282" y2="6" stroke="#F87171" stroke-width="2" stroke-dasharray="4 3"/>
-          <text x="288" y="10" fill="#52525b" font-size="10">Blocked</text>
-          <rect x="340" y="1" width="10" height="10" rx="3" fill="#FBBF24" opacity="0.9"/>
-          <text x="356" y="10" fill="#FBBF24" font-size="10">Rule</text>
-          <text x="400" y="10" fill="#30B8E8" font-size="10" font-family="Inconsolata,monospace">Events</text>
+          <circle cx="6" cy="6" r="5" fill="none" stroke="#4338CA" stroke-width="2"/>
+          <text x="18" y="10" fill="#52525b" font-size="10">Origin marker</text>
+          <rect x="88" y="1" width="10" height="10" rx="3" fill="none" stroke="#4338CA" stroke-width="1.5"/>
+          <text x="104" y="10" fill="#52525b" font-size="10">Standard node</text>
+          <rect x="176" y="1" width="10" height="10" rx="3" fill="none" stroke="#4338CA" stroke-width="1.5"/>
+          <rect x="173" y="-2" width="16" height="16" rx="5" fill="none" stroke="#4338CA" stroke-width="1" opacity="0.35"/>
+          <text x="198" y="10" fill="#52525b" font-size="10">Final shape</text>
+          <line x1="282" y1="6" x2="302" y2="6" stroke="#34D399" stroke-width="2"/>
+          <text x="308" y="10" fill="#52525b" font-size="10">Enabled</text>
+          <line x1="360" y1="6" x2="380" y2="6" stroke="#F87171" stroke-width="2" stroke-dasharray="4 3"/>
+          <text x="386" y="10" fill="#52525b" font-size="10">Blocked</text>
+          <rect x="438" y="1" width="10" height="10" rx="3" fill="#FBBF24" opacity="0.9"/>
+          <text x="454" y="10" fill="#FBBF24" font-size="10">Constraint</text>
+          <text x="516" y="10" fill="#30B8E8" font-size="10" font-family="Inconsolata,monospace">Events</text>
         </g>
       </svg>
     </div>
@@ -601,7 +602,7 @@
 </div>
 
 <div class="callout">
-  <strong>DSL + Diagram pairing:</strong> The code defines it, the diagram visualizes it. Together they are the visual identity system &mdash; code on the left, state diagram on the right. This pairing appears in the README, the VS Code preview panel, and eventually docs. Both use the same palette; the diagram is a direct projection of the code, not a separate design. Node borders are indigo (structure), state name text is violet, arrows are gold, event labels are cyan.
+  <strong>DSL + Diagram pairing:</strong> The code defines it, the diagram visualizes it. Together they are the visual identity system &mdash; code on the left, state diagram on the right. This pairing appears in the README, the VS Code preview panel, and eventually docs. The palette here is locked; the exploration is about how much structural annotation the diagram should carry.
 </div>
 
 <div class="callout" style="margin-top:12px; background:rgba(56,189,248,0.06); border-color:#0c4a6e;">
@@ -611,7 +612,7 @@
     <li>Edge routing &mdash; straight lines vs curved? Curved might look more polished but harder to generate programmatically.</li>
     <li>Constraint annotations &mdash; the gold "!" badge works here. Should guards appear as edge labels or separate annotations?</li>
     <li>Self-loop rendering &mdash; the VerifyDocuments arc looks OK. Does it need a different visual when the event is stationary?</li>
-    <li>Layout algorithm &mdash; what drives node positioning? Left-to-right flow with lifecycle ordering (origin &rarr; active &rarr; final)?</li>
+    <li>Layout algorithm &mdash; what drives node positioning? Left-to-right flow with structural ordering (origin &rarr; intermediate &rarr; terminal)?</li>
   </ul>
 </div>
 </div>
@@ -647,7 +648,7 @@
   <div class="card">
     <div class="card-header">
       <h3>Surface 2: State Diagram <span class="status-locked">Locked</span></h3>
-      <p>The companion. Same palette, visual form.</p>
+      <p>The companion. Locked semantic palette, different spatial grammar.</p>
     </div>
     <div class="card-body">
       <div style="background:#0c0c0f; border-radius:8px; padding:20px; border:1px solid #1e1b4b; text-align:center;">
@@ -655,12 +656,12 @@
           <defs>
             <marker id="a2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#34D399"/></marker>
           </defs>
-          <rect x="10" y="32" width="80" height="36" rx="18" fill="rgba(139,122,237,0.08)" stroke="#8B7AED" stroke-width="2.5"/>
-          <circle cx="22" cy="50" r="3" fill="#8B7AED"/>
-          <text x="55" y="55" text-anchor="middle" fill="#8B7AED" font-size="13" font-family="Inconsolata,monospace" font-weight="600">Draft</text>
+          <rect x="10" y="32" width="80" height="36" rx="18" fill="none" stroke="#4338CA" stroke-width="2.5"/>
+          <circle cx="22" cy="50" r="3" fill="#4338CA"/>
+          <text x="55" y="55" text-anchor="middle" fill="#A898F5" font-size="13" font-family="Inconsolata,monospace" font-weight="600">Draft</text>
           <line x1="90" y1="50" x2="165" y2="50" stroke="#34D399" stroke-width="2" marker-end="url(#a2)"/>
           <text x="127" y="42" text-anchor="middle" fill="#30B8E8" font-size="10" font-family="Inconsolata,monospace">Submit</text>
-          <rect x="165" y="32" width="105" height="36" rx="18" fill="none" stroke="#A898F5" stroke-width="2"/>
+          <rect x="165" y="32" width="105" height="36" rx="18" fill="none" stroke="#4338CA" stroke-width="2"/>
           <text x="217" y="55" text-anchor="middle" fill="#A898F5" font-size="12" font-family="Inconsolata,monospace" font-weight="600">UnderReview</text>
         </svg>
       </div>
@@ -704,12 +705,12 @@
       <div style="font-family:'Inconsolata',monospace; font-size:12px; background:#0c0c0f; border-radius:6px; padding:16px; line-height:1.8; border:1px solid #1e1b4b;">
         <div><span style="color:#818cf8;">PRECEPT001</span> <span style="color:#F87171;">error</span>: Unreachable state <span style="color:#A898F5;">Archived</span> &mdash; no transitions lead here</div>
         <div><span style="color:#818cf8;">PRECEPT038</span> <span style="color:#F87171;">error</span>: Type mismatch in guard: expected <span style="color:#9AA8B5;font-style:italic;">number</span>, got <span style="color:#9AA8B5;font-style:italic;">string</span></div>
-        <div><span style="color:#818cf8;">PRECEPT047</span> <span style="color:#FDE047;">warning</span>: Dead-end state <span style="color:#C0B4F8;">Approved</span> &mdash; no outgoing transitions</div>
+        <div><span style="color:#818cf8;">PRECEPT047</span> <span style="color:#FDE047;">warning</span>: Dead-end state <span style="color:#A898F5;">Approved</span> &mdash; no outgoing transitions</div>
         <div style="margin-top:12px; color:#27272a;">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</div>
         <div style="color:#52525b; margin-top:4px;">3 diagnostics (<span style="color:#F87171;">2 errors</span>, <span style="color:#FDE047;">1 warning</span>)</div>
       </div>
       <div class="note" style="margin-top:16px;">
-        The <code style="color:#818cf8;">PRECEPT</code> prefix + indigo codes become a recognizable "signature" &mdash; like BenchmarkDotNet's result tables. State names in diagnostics use their structural color (violet shades).
+        The <code style="color:#818cf8;">PRECEPT</code> prefix + indigo codes become a recognizable "signature" &mdash; like BenchmarkDotNet's result tables. State names in diagnostics use the locked single-violet state color.
       </div>
     </div>
   </div>
@@ -737,7 +738,7 @@
 
   <!-- Hero code + diagram side by side -->
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;">
-    <div style="background:#0c0c0f; border:1px solid #1e1b4b; border-radius:6px; padding:16px; font-family:'Inconsolata',monospace; font-size:11px; line-height:1.7; white-space:pre; overflow-x:auto;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
+    <div data-semantic-preview="true" style="background:#0c0c0f; border:1px solid #1e1b4b; border-radius:6px; padding:16px; font-family:'Inconsolata',monospace; font-size:11px; line-height:1.7; white-space:pre; overflow-x:auto;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
 
 <span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
 <span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#8B7AED;">initial</span>
@@ -753,27 +754,27 @@
           <marker id="a3" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7" fill="#34D399"/></marker>
           <marker id="a4" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7" fill="#6366F1"/></marker>
         </defs>
-        <rect x="10" y="45" width="60" height="28" rx="14" fill="rgba(139,122,237,0.08)" stroke="#8B7AED" stroke-width="2"/>
-        <circle cx="20" cy="59" r="3" fill="#8B7AED"/>
-        <text x="44" y="63" text-anchor="middle" fill="#8B7AED" font-size="11" font-family="Inconsolata,monospace" font-weight="600">Draft</text>
+        <rect x="10" y="45" width="60" height="28" rx="14" fill="none" stroke="#4338CA" stroke-width="2"/>
+        <circle cx="20" cy="59" r="3" fill="#4338CA"/>
+        <text x="44" y="63" text-anchor="middle" fill="#A898F5" font-size="11" font-family="Inconsolata,monospace" font-weight="600">Draft</text>
 
         <line x1="70" y1="59" x2="98" y2="59" stroke="#34D399" stroke-width="1.5" marker-end="url(#a3)"/>
         <text x="84" y="51" text-anchor="middle" fill="#30B8E8" font-size="8" font-family="Inconsolata,monospace">Submit</text>
 
-        <rect x="98" y="45" width="72" height="28" rx="14" fill="none" stroke="#A898F5" stroke-width="1.5"/>
+        <rect x="98" y="45" width="72" height="28" rx="14" fill="none" stroke="#4338CA" stroke-width="1.5"/>
         <text x="134" y="63" text-anchor="middle" fill="#A898F5" font-size="10" font-family="Inconsolata,monospace" font-weight="600">Review</text>
 
         <line x1="170" y1="52" x2="198" y2="32" stroke="#6366F1" stroke-width="1.5" opacity="0.6" marker-end="url(#a4)"/>
         <text x="198" y="46" fill="#30B8E8" font-size="8" font-family="Inconsolata,monospace">Approve</text>
-        <rect x="195" y="16" width="55" height="24" rx="12" fill="none" stroke="#C0B4F8" stroke-width="1.5"/>
-        <rect x="192" y="13" width="61" height="30" rx="14" fill="none" stroke="#C0B4F8" stroke-width="0.8" opacity="0.3"/>
-        <text x="222" y="32" text-anchor="middle" fill="#C0B4F8" font-size="9" font-family="Inconsolata,monospace">Approved</text>
+        <rect x="195" y="16" width="55" height="24" rx="12" fill="none" stroke="#4338CA" stroke-width="1.5"/>
+        <rect x="192" y="13" width="61" height="30" rx="14" fill="none" stroke="#4338CA" stroke-width="0.8" opacity="0.3"/>
+        <text x="222" y="32" text-anchor="middle" fill="#A898F5" font-size="9" font-family="Inconsolata,monospace">Approved</text>
 
         <line x1="170" y1="66" x2="198" y2="86" stroke="#6366F1" stroke-width="1.5" opacity="0.6" marker-end="url(#a4)"/>
         <text x="198" y="82" fill="#30B8E8" font-size="8" font-family="Inconsolata,monospace">Decline</text>
-        <rect x="195" y="78" width="55" height="24" rx="12" fill="none" stroke="#C0B4F8" stroke-width="1.5"/>
-        <rect x="192" y="75" width="61" height="30" rx="14" fill="none" stroke="#C0B4F8" stroke-width="0.8" opacity="0.3"/>
-        <text x="222" y="94" text-anchor="middle" fill="#C0B4F8" font-size="9" font-family="Inconsolata,monospace">Declined</text>
+        <rect x="195" y="78" width="55" height="24" rx="12" fill="none" stroke="#4338CA" stroke-width="1.5"/>
+        <rect x="192" y="75" width="61" height="30" rx="14" fill="none" stroke="#4338CA" stroke-width="0.8" opacity="0.3"/>
+        <text x="222" y="94" text-anchor="middle" fill="#A898F5" font-size="9" font-family="Inconsolata,monospace">Declined</text>
       </svg>
     </div>
   </div>
@@ -801,12 +802,12 @@
   <div class="card-body" style="line-height:1.8; font-size:15px;">
     <p style="color:#fff; font-weight:600; margin-bottom:12px;">Precept's visual identity is not an icon &mdash; it is an ecosystem of four surfaces:</p>
     <ol style="color:#a1a1aa; padding-left:20px; margin-bottom:20px;">
-      <li style="margin-bottom:8px;"><strong style="color:#6366F1;">DSL syntax</strong> &mdash; keyword-anchored lines, arrow chains, the distinctive left-edge rhythm. Six visual voices (indigo structure, violet states, cyan events, bright slate data, gold rules, verdict colors). This is the hero visual.</li>
-      <li style="margin-bottom:8px;"><strong style="color:#A898F5;">State diagrams</strong> &mdash; indigo-bordered nodes, violet state names, cyan event labels, gold transition arrows. Generated directly from the precept. The companion graphic.</li>
+      <li style="margin-bottom:8px;"><strong style="color:#6366F1;">DSL syntax</strong> &mdash; keyword-anchored lines, arrow chains, the distinctive left-edge rhythm. The shipped editor uses the locked 8-shade syntax system. This is the hero visual.</li>
+      <li style="margin-bottom:8px;"><strong style="color:#A898F5;">State diagrams</strong> &mdash; generated directly from the precept. They use the same locked hue families, with shape rather than tint carrying origin/final structure.</li>
       <li style="margin-bottom:8px;"><strong style="color:#52525b;">The icon</strong> &mdash; a mark that hints at both ideas (inscribed rules + state flow). Used at small sizes everywhere. Currently exploring.</li>
-      <li style="margin-bottom:8px;"><strong style="color:#818cf8;">Diagnostic output</strong> &mdash; <code style="color:#818cf8;">PRECEPT</code>-prefixed codes with structured messages, structural state colors inline. The daily-use brand surface.</li>
+      <li style="margin-bottom:8px;"><strong style="color:#818cf8;">Diagnostic output</strong> &mdash; <code style="color:#818cf8;">PRECEPT</code>-prefixed codes with structured messages and the same locked category colors inline. The daily-use brand surface.</li>
     </ol>
-    <p style="color:#71717a;">The icon does not carry the brand alone. The <code>.precept</code> file format and state diagrams do the heavy lifting. The semantic color system is the connective tissue &mdash; the same 15 shades appear across all four surfaces.</p>
+    <p style="color:#71717a;">The icon does not carry the brand alone. The <code>.precept</code> file format and state diagrams do the heavy lifting. The semantic color system is the connective tissue: one locked authoring-time meaning per hue family, with verdict colors reserved for runtime outcomes.</p>
   </div>
 </div>
 
@@ -815,8 +816,8 @@
   <ul style="margin:8px 0 0 16px; line-height:1.8;">
     <li>Primary surface = DSL syntax. Secondary = state diagrams. Tertiary = diagnostics. Icon = small mark.</li>
     <li>Background: <code>#0c0c0f</code> everywhere. Font: Inconsolata (wordmark 700 small-caps, code 400-600).</li>
-    <li>15-shade semantic palette applied consistently across all surfaces.</li>
-    <li>Compiler-driven structural coloring for states (origin/active/final).</li>
+    <li>Editor-adjacent surfaces on this page use the locked 8-shade dark-mode semantic system.</li>
+    <li>State diagrams use the same locked hue families; origin and final status are expressed through shape, not alternate state tints.</li>
   </ul>
 </div>
 
@@ -832,6 +833,98 @@
   </ul>
 </div>
 </div>
+
+<script>
+  (function () {
+    var semanticKeywords = new Set(['precept', 'field', 'state', 'event', 'invariant', 'from', 'on', 'in', 'to', 'set', 'transition', 'edit', 'assert', 'reject', 'when', 'no']);
+    var grammarKeywords = new Set(['as', 'with', 'default', 'nullable', 'any', 'of', 'into', 'because']);
+    var typeKeywords = new Set(['string', 'number', 'boolean', 'set', 'queue', 'stack']);
+    var operatorPattern = /^(->|=|==|!=|>=|<=|>|<|\+|-|&&|,|\.)$/;
+    var literalPattern = /^(true|false|null|".*"|\d+)$/;
+
+    function collectConstrainedNames(blockText) {
+      var constrainedStates = new Set();
+      var constrainedEvents = new Set();
+      var stateRegex = /\b(?:in|to|from)\s+([A-Za-z_][A-Za-z0-9_]*)\s+assert\b/g;
+      var eventRegex = /\bon\s+([A-Za-z_][A-Za-z0-9_]*)\s+assert\b/g;
+      var match;
+
+      while ((match = stateRegex.exec(blockText)) !== null) {
+        constrainedStates.add(match[1]);
+      }
+
+      while ((match = eventRegex.exec(blockText)) !== null) {
+        constrainedEvents.add(match[1]);
+      }
+
+      return {
+        constrainedStates: constrainedStates,
+        constrainedEvents: constrainedEvents
+      };
+    }
+
+    function normalizeSpan(span, constrainedNames) {
+      var text = span.textContent.trim();
+      if (!text) {
+        return;
+      }
+
+      if (semanticKeywords.has(text)) {
+        span.style.color = '#4338CA';
+        span.style.fontWeight = '600';
+        if (text !== 'no') {
+          span.style.fontStyle = 'normal';
+        }
+        return;
+      }
+
+      if (grammarKeywords.has(text)) {
+        span.style.color = '#6366F1';
+        span.style.fontWeight = '400';
+        span.style.fontStyle = 'normal';
+        return;
+      }
+
+      if (typeKeywords.has(text)) {
+        span.style.color = '#9AA8B5';
+        span.style.fontStyle = 'normal';
+        span.style.fontWeight = '400';
+        return;
+      }
+
+      if (operatorPattern.test(text)) {
+        span.style.color = '#6366F1';
+        span.style.fontStyle = 'normal';
+        span.style.fontWeight = text === '->' ? '700' : '400';
+        return;
+      }
+
+      if (literalPattern.test(text) && span.style.color.toLowerCase() !== 'rgb(251, 191, 36)') {
+        span.style.color = '#84929F';
+        span.style.fontStyle = 'normal';
+        span.style.fontWeight = '400';
+        return;
+      }
+
+      var styleText = (span.getAttribute('style') || '').toLowerCase();
+      if (styleText.indexOf('#8b7aed') >= 0 || styleText.indexOf('#c0b4f8') >= 0) {
+        span.style.color = '#A898F5';
+        span.style.fontStyle = constrainedNames.constrainedStates.has(text) ? 'italic' : 'normal';
+      }
+
+      if (styleText.indexOf('#30b8e8') >= 0) {
+        span.style.fontStyle = constrainedNames.constrainedEvents.has(text) ? 'italic' : 'normal';
+      }
+    }
+
+    document.querySelectorAll('.syntax-block, [data-semantic-preview="true"]').forEach(function (block) {
+      var constrainedNames = collectConstrainedNames(block.textContent);
+      block.querySelectorAll('span').forEach(function (span) {
+        normalizeSpan(span, constrainedNames);
+      });
+    });
+  })();
+</script>
 
 </body>
 </html>

@@ -56,17 +56,14 @@
 <div style="background:#14532d; border:2px solid #34D399; border-radius:10px; padding:20px 24px; margin-bottom:32px;">
   <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
     <span style="background:#34D399; color:#0c0c0f; font-size:11px; font-weight:800; padding:3px 10px; border-radius:10px; letter-spacing:0.5px;">LOCKED</span>
-    <strong style="color:#34D399; font-size:16px;">Converged Palette — Bright Slate (D1)</strong>
+    <strong style="color:#34D399; font-size:16px;">Locked Conclusion — 15-Shade Brand Language + 8-Shade Syntax v1</strong>
   </div>
-  <p style="color:#86efac; font-size:13px; line-height:1.7; margin-bottom:12px;">This exploration is complete. The final locked palette is: <strong>Violet states</strong> (V3, §14), <strong>toned Cyan events</strong> (#30B8E8), <strong>Bright Slate italic data</strong> (D1, §16), <strong>3-tier Indigo semibold structure</strong>, <strong>Gold rules</strong>. Pale yellow data (§21) was explored and rejected.</p>
+  <p style="color:#86efac; font-size:13px; line-height:1.7; margin-bottom:12px;">This file now records two layers of the final direction. The broader brand language still uses the full 15-shade system across diagrams, diagnostics, and supporting visuals. Editor syntax highlighting v1 is narrower: a dark-mode-only 8-shade adaptation with two indigo structure shades, one violet state hue, one cyan event hue, three slate data shades, and gold reserved for rule message strings. The appended concluding section at the end is the canonical syntax-v1 result; the earlier sections remain as archived alternatives.</p>
   <div style="display:flex; gap:6px; flex-wrap:wrap;">
-    <span style="display:inline-block; width:28px; height:16px; border-radius:3px; background:#4338CA;" title="Declaration"></span>
-    <span style="display:inline-block; width:28px; height:16px; border-radius:3px; background:#4F46E5;" title="Action"></span>
-    <span style="display:inline-block; width:28px; height:16px; border-radius:3px; background:#6366F1;" title="Glue"></span>
+    <span style="display:inline-block; width:28px; height:16px; border-radius:3px; background:#4338CA;" title="Structure semantic"></span>
+    <span style="display:inline-block; width:28px; height:16px; border-radius:3px; background:#6366F1;" title="Structure grammar"></span>
     <span style="display:inline-block; width:4px;"></span>
-    <span style="display:inline-block; width:28px; height:16px; border-radius:3px; background:#8B7AED;" title="Origin"></span>
-    <span style="display:inline-block; width:28px; height:16px; border-radius:3px; background:#A898F5;" title="Active"></span>
-    <span style="display:inline-block; width:28px; height:16px; border-radius:3px; background:#C0B4F8;" title="Final"></span>
+    <span style="display:inline-block; width:28px; height:16px; border-radius:3px; background:#A898F5;" title="States"></span>
     <span style="display:inline-block; width:4px;"></span>
     <span style="display:inline-block; width:28px; height:16px; border-radius:3px; background:#30B8E8;" title="Events"></span>
     <span style="display:inline-block; width:4px;"></span>
@@ -74,7 +71,6 @@
     <span style="display:inline-block; width:28px; height:16px; border-radius:3px; background:#9AA8B5;" title="Types"></span>
     <span style="display:inline-block; width:28px; height:16px; border-radius:3px; background:#84929F;" title="Values"></span>
     <span style="display:inline-block; width:4px;"></span>
-    <span style="display:inline-block; width:28px; height:16px; border-radius:3px; background:#B8860B;" title="Rule keywords"></span>
     <span style="display:inline-block; width:28px; height:16px; border-radius:3px; background:#FBBF24;" title="Messages"></span>
   </div>
   <p style="color:#64748b; font-size:11px; margin-top:8px;">Canonical spec: <a href="../brand-spec.html" style="color:#86efac;">brand-spec.html</a> §4 · <a href="../brand-decisions.md" style="color:#86efac;">brand-decisions.md</a></p>
@@ -3082,6 +3078,326 @@
 </div>
 
 </div>
+</div>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- ===================================================================== -->
+<!-- NEW: 8-SHADE ITALIC-CONSTRAINED MODEL                                  -->
+<!-- ===================================================================== -->
+<div class="section">
+<h2>22. Locked Syntax v1 Conclusion — 8-Shade Model</h2>
+
+<div class="card">
+  <p style="color:#fff; font-size:15px; font-weight:600; margin-bottom:12px;">One color per category. Italic means constrained.</p>
+  <p style="margin-bottom:8px; color:#71717a;">This concluding section supersedes the earlier syntax-color directions in this file. The earlier comparisons remain valuable as archaeology, but this is the final editor-highlighting outcome.</p>
+  <p>Each DSL category gets one color. Typography carries the constraint signal: <strong>italic = has assert rules</strong> (states, events) or <strong>appears in an invariant</strong> (fields). 7 of 8 shades map directly to standard editor conventions. The italic-constrained signal is the one Precept-specific innovation.</p>
+  <p style="margin-top:8px;">Rule keywords (<code>assert</code>, <code>reject</code>, <code>when</code>, <code>no</code>) join Structure · Semantic in bold indigo. Types and values return as separate Data shades. Only <code>because</code>/<code>reject</code> message strings stay gold.</p>
+</div>
+
+<div class="callout">
+  <strong>The 8-shade palette:</strong>
+  <table style="margin-top:8px;">
+    <tr><th>#</th><th>Family</th><th>Shade</th><th>Hex</th><th>Typography</th><th>Role</th></tr>
+    <tr><td>1</td><td>Structure</td><td><span class="swatch" style="background:#4338CA;"></span>Semantic</td><td><code>#4338CA</code></td><td>bold</td><td>Keywords that drive behavior</td></tr>
+    <tr><td>2</td><td>Structure</td><td><span class="swatch" style="background:#6366F1;"></span>Grammar</td><td><code>#6366F1</code></td><td>normal</td><td>Modifiers, operators, punctuation</td></tr>
+    <tr><td>3</td><td>States</td><td><span class="swatch" style="background:#A898F5;"></span></td><td><code>#A898F5</code></td><td>normal / <em>italic if constrained</em></td><td>State names (<em>italic</em> = has <code>in/to/from X assert</code>)</td></tr>
+    <tr><td>4</td><td>Events</td><td><span class="swatch" style="background:#30B8E8;"></span></td><td><code>#30B8E8</code></td><td>normal / <em>italic if constrained</em></td><td>Event names (<em>italic</em> = has <code>on X assert</code>)</td></tr>
+    <tr><td>5</td><td>Data</td><td><span class="swatch" style="background:#B0BEC5;"></span>Names</td><td><code>#B0BEC5</code></td><td>normal / <em>italic if guarded</em></td><td>Field/arg names (<em>italic</em> = in <code>invariant</code>)</td></tr>
+    <tr><td>6</td><td>Data</td><td><span class="swatch" style="background:#9AA8B5;"></span>Types</td><td><code>#9AA8B5</code></td><td>normal</td><td><code>string</code>, <code>number</code>, <code>boolean</code>, collection types</td></tr>
+    <tr><td>7</td><td>Data</td><td><span class="swatch" style="background:#84929F;"></span>Values</td><td><code>#84929F</code></td><td>normal</td><td><code>true</code>, <code>false</code>, <code>null</code>, number/string literals</td></tr>
+    <tr><td>8</td><td>Rules</td><td><span class="swatch" style="background:#FBBF24;"></span>Messages</td><td><code>#FBBF24</code></td><td>normal</td><td>String content in <code>because</code>/<code>reject</code></td></tr>
+  </table>
+</div>
+
+<!-- ===== LOAN APPLICATION: BEFORE/AFTER ===== -->
+<h3>LoanApplication — Before (earlier full-palette syntax treatment) vs After (locked 8-shade syntax v1)</h3>
+<p style="margin-bottom:16px; color:#71717a; font-size:12px;">
+  Constraints: <strong>Approved</strong> has <code>in Approved assert</code> → constrained state.
+  <strong>Submit</strong> has <code>on Submit assert</code> → constrained event.
+  <strong>RequestedAmount</strong> in <code>invariant</code> → guarded field.
+  All others unconstrained/unguarded.
+</p>
+
+<div class="side-by-side">
+  <div style="min-width:0;">
+    <div class="label-current">Earlier full-palette syntax treatment</div>
+    <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
+
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ApplicantName</span>    <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">string</span>  <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span>  <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>  <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">CreditScore</span>      <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>  <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">DocumentsVerified</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">boolean</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">false</span>
+
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Requested amount cannot be negative"</span>
+
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#8B7AED;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#A898F5;">UnderReview</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#C0B4F8;">Approved</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#C0B4F8;">Funded</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#C0B4F8;">Declined</span>
+
+<span style="color:#4F46E5;font-weight:600;">in</span> <span style="color:#C0B4F8;">Approved</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">DocumentsVerified</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approved loans must have verified documents"</span>
+
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Submit</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Applicant</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">string</span><span style="color:#52525b;">,</span> <span style="color:#B0BEC5;font-style:italic;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span><span style="color:#52525b;">,</span> <span style="color:#B0BEC5;font-style:italic;">Score</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Submit</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Applicant</span> <span style="color:#9AA8B5;font-style:italic;">!=</span> <span style="color:#84929F;font-style:italic;">""</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"An applicant name is required"</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Submit</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Amount</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Loan requests must be positive"</span>
+
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Decline</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">string</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">VerifyDocuments</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">FundLoan</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Submit</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">ApplicantName</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Applicant</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Amount</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">CreditScore</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Submit</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Score</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">UnderReview</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;">when</span> <span style="color:#B0BEC5;font-style:italic;">DocumentsVerified</span> <span style="color:#9AA8B5;font-style:italic;">&amp;&amp;</span> <span style="color:#B0BEC5;font-style:italic;">CreditScore</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">680</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#C0B4F8;">Approved</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#B8860B;font-weight:600;">reject</span> <span style="color:#FBBF24;">"Approval requires verified documents and strong credit"</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Decline</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#C0B4F8;">Declined</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#C0B4F8;">Approved</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">FundLoan</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#C0B4F8;">Funded</span></div>
+  </div>
+
+  <div style="min-width:0;">
+    <div class="label-alt">Locked 8-shade syntax v1</div>
+    <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:700;">precept</span> <span style="color:#B0BEC5;">LoanApplication</span>
+
+<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;">ApplicantName</span>    <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span>  <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span>  <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span>  <span style="color:#6366F1;">default</span> <span style="color:#84929F;">0</span>
+<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;">CreditScore</span>      <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span>  <span style="color:#6366F1;">default</span> <span style="color:#84929F;">0</span>
+<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;">DocumentsVerified</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">boolean</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;">false</span>
+
+<span style="color:#4338CA;font-weight:700;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span> <span style="color:#6366F1;">&gt;=</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Requested amount cannot be negative"</span>
+
+<span style="color:#4338CA;font-weight:700;">state</span> <span style="color:#A898F5;">Draft</span> <span style="color:#6366F1;">initial</span>
+<span style="color:#4338CA;font-weight:700;">state</span> <span style="color:#A898F5;">UnderReview</span>
+<span style="color:#4338CA;font-weight:700;">state</span> <span style="color:#A898F5;font-style:italic;">Approved</span>
+<span style="color:#4338CA;font-weight:700;">state</span> <span style="color:#A898F5;">Funded</span>
+<span style="color:#4338CA;font-weight:700;">state</span> <span style="color:#A898F5;">Declined</span>
+
+<span style="color:#4338CA;font-weight:700;">in</span> <span style="color:#A898F5;font-style:italic;">Approved</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">DocumentsVerified</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Approved loans must have verified documents"</span>
+
+<span style="color:#4338CA;font-weight:700;">event</span> <span style="color:#30B8E8;font-style:italic;">Submit</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Applicant</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span><span style="color:#6366F1;">,</span> <span style="color:#B0BEC5;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span><span style="color:#6366F1;">,</span> <span style="color:#B0BEC5;">Score</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span>
+<span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">Submit</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">Applicant</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">""</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"An applicant name is required"</span>
+<span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">Submit</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">Amount</span> <span style="color:#6366F1;">&gt;</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Loan requests must be positive"</span>
+
+<span style="color:#4338CA;font-weight:700;">event</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span>
+<span style="color:#4338CA;font-weight:700;">event</span> <span style="color:#30B8E8;">Decline</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span>
+<span style="color:#4338CA;font-weight:700;">event</span> <span style="color:#30B8E8;">VerifyDocuments</span>
+<span style="color:#4338CA;font-weight:700;">event</span> <span style="color:#30B8E8;">FundLoan</span>
+
+<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;">Draft</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">Submit</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;">ApplicantName</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;font-style:italic;">Submit</span><span style="color:#6366F1;">.</span><span style="color:#B0BEC5;">Applicant</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;font-style:italic;">Submit</span><span style="color:#6366F1;">.</span><span style="color:#B0BEC5;">Amount</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;">CreditScore</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;font-style:italic;">Submit</span><span style="color:#6366F1;">.</span><span style="color:#B0BEC5;">Score</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">transition</span> <span style="color:#A898F5;">UnderReview</span>
+
+<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#4338CA;font-weight:700;">when</span> <span style="color:#B0BEC5;">DocumentsVerified</span> <span style="color:#6366F1;">&amp;&amp;</span> <span style="color:#B0BEC5;">CreditScore</span> <span style="color:#6366F1;">&gt;=</span> <span style="color:#84929F;">680</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">transition</span> <span style="color:#A898F5;font-style:italic;">Approved</span>
+<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">reject</span> <span style="color:#FBBF24;">"Approval requires verified documents and strong credit"</span>
+
+<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;">Decline</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">transition</span> <span style="color:#A898F5;">Declined</span>
+
+<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;font-style:italic;">Approved</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;">FundLoan</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">transition</span> <span style="color:#A898F5;">Funded</span></div>
+  </div>
+</div>
+
+<div class="note">
+  <strong>What changes:</strong>
+  <ul style="margin:4px 0 0 12px; line-height:1.8;">
+    <li><span style="color:#A898F5;font-style:italic;">Approved</span> is italic (constrained — has <code>in Approved assert</code>). Other states are <span style="color:#A898F5;">normal violet</span> — same color, no italic.</li>
+    <li><span style="color:#30B8E8;font-style:italic;">Submit</span> is italic (constrained — has <code>on Submit assert</code>). Other events are <span style="color:#30B8E8;">normal cyan</span>.</li>
+    <li><span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span> is italic (guarded — appears in <code>invariant</code>). Other field names are <span style="color:#B0BEC5;">normal slate</span>.</li>
+    <li><code style="color:#4338CA;font-weight:700;">assert</code>, <code style="color:#4338CA;font-weight:700;">reject</code>, <code style="color:#4338CA;font-weight:700;">when</code> are bold indigo (structure semantic), not gold.</li>
+    <li><span style="color:#9AA8B5;">string</span>, <span style="color:#9AA8B5;">number</span> are muted slate (data types). <span style="color:#84929F;">0</span>, <span style="color:#84929F;">false</span>, <span style="color:#84929F;">680</span> are dim slate (data values).</li>
+    <li>Only <span style="color:#FBBF24;">message strings</span> stay gold — the human-readable explanation is still the hero text.</li>
+  </ul>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- ===== PARKINGMETER: BEFORE/AFTER ===== -->
+<h3>ParkingMeter — Before (earlier full-palette syntax treatment) vs After (locked 8-shade syntax v1)</h3>
+<p style="margin-bottom:16px; color:#71717a; font-size:12px;">
+  Constraints: No states have asserts → all unconstrained.
+  <strong>Feed</strong> has <code>on Feed assert</code> → constrained event. <strong>Check</strong> → unconstrained.
+  <strong>TimeLeft</strong> in <code>invariant</code> → guarded field.
+</p>
+
+<div class="side-by-side">
+  <div style="min-width:0;">
+    <div class="label-current">Earlier full-palette syntax treatment</div>
+    <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">ParkingMeter</span>
+
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"The meter lacks a reverse gear"</span>
+
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Empty</span> <span style="color:#8B7AED;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Active</span>
+
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Feed</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Minutes</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Feed</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Minutes</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Coins go in, not out"</span>
+
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Check</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Empty</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Feed</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">+</span> <span style="color:#30B8E8;">Feed</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Minutes</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Active</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Check</span> <span style="color:#4F46E5;font-weight:600;">when</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">==</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Empty</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Check</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span></div>
+  </div>
+
+  <div style="min-width:0;">
+    <div class="label-alt">Locked 8-shade syntax v1</div>
+    <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:700;">precept</span> <span style="color:#B0BEC5;">ParkingMeter</span>
+
+<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;">0</span>
+<span style="color:#4338CA;font-weight:700;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#6366F1;">&gt;=</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"The meter lacks a reverse gear"</span>
+
+<span style="color:#4338CA;font-weight:700;">state</span> <span style="color:#A898F5;">Empty</span> <span style="color:#6366F1;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Active</span>
+
+<span style="color:#4338CA;font-weight:700;">event</span> <span style="color:#30B8E8;font-style:italic;">Feed</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Minutes</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span>
+<span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">Feed</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">Minutes</span> <span style="color:#6366F1;">&gt;</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Coins go in, not out"</span>
+
+<span style="color:#4338CA;font-weight:700;">event</span> <span style="color:#30B8E8;">Check</span>
+
+<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;">Empty</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Active</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">Feed</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#6366F1;">+</span> <span style="color:#30B8E8;font-style:italic;">Feed</span><span style="color:#6366F1;">.</span><span style="color:#B0BEC5;">Minutes</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">transition</span> <span style="color:#A898F5;">Active</span>
+<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;">Active</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;">Check</span> <span style="color:#4338CA;font-weight:700;">when</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#6366F1;">==</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">transition</span> <span style="color:#A898F5;">Empty</span>
+<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;">Active</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;">Check</span> <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">no</span> <span style="color:#4338CA;font-weight:700;">transition</span></div>
+  </div>
+</div>
+
+<div class="note">
+  <strong>What jumps out:</strong>
+  <ul style="margin:4px 0 0 12px; line-height:1.8;">
+    <li><span style="color:#30B8E8;font-style:italic;">Feed</span> (italic cyan) vs <span style="color:#30B8E8;">Check</span> (normal cyan) — italic signals "this event has validation rules."</li>
+    <li><span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> (italic) stands out from <span style="color:#B0BEC5;">Minutes</span> (normal) — the invariant-watched field is visually distinct.</li>
+    <li>Both states are the same <span style="color:#A898F5;">normal violet</span> — neither has asserts, so no fake distinction.</li>
+    <li><span style="color:#9AA8B5;">number</span>, <span style="color:#84929F;">0</span> use dedicated Data shades — types muted, values dim — blending into the background frame.</li>
+  </ul>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- ===== LIBRARY BOOK CHECKOUT: RICH CONSTRAINTS ===== -->
+<h3>LibraryBookCheckout — Rich constraint example</h3>
+<p style="margin-bottom:16px; color:#71717a; font-size:12px;">
+  This sample has heavy constraint usage. Constrained states: <strong>Available, CheckedOut, Overdue, Returned, Lost</strong> (all have <code>in X assert</code>).
+  Constrained events: <strong>Checkout, Renew, AdvanceDay, ReturnBook, ReportLost</strong> (all have <code>on X assert</code>).
+  Unconstrained: <strong>Shelve, ResolveLoss</strong> (no asserts).
+  Guarded fields: <strong>CurrentDay, CheckoutDay, DueDay, RenewalCount, FineAmount</strong> (in invariants).
+  Unguarded: <strong>BookTitle, BorrowerId, ConditionNote, LostReported</strong>.
+</p>
+
+<div class="syntax-block" style="font-size:12px; padding:20px 24px;"><span style="color:#4338CA;font-weight:700;">precept</span> <span style="color:#B0BEC5;">LibraryBookCheckout</span>
+
+<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;">BookTitle</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;">BorrowerId</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;font-style:italic;">CurrentDay</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;">0</span>
+<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;font-style:italic;">CheckoutDay</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;">0</span>
+<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;font-style:italic;">DueDay</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;">0</span>
+<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;font-style:italic;">RenewalCount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;">0</span>
+<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;font-style:italic;">FineAmount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;">0</span>
+<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;">ConditionNote</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;">LostReported</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">boolean</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;">false</span>
+
+<span style="color:#4338CA;font-weight:700;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">CurrentDay</span> <span style="color:#6366F1;">&gt;=</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"The day counter cannot be negative"</span>
+<span style="color:#4338CA;font-weight:700;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">CheckoutDay</span> <span style="color:#6366F1;">&gt;=</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"The checkout day cannot be negative"</span>
+<span style="color:#4338CA;font-weight:700;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">DueDay</span> <span style="color:#6366F1;">&gt;=</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"The due day cannot be negative"</span>
+<span style="color:#4338CA;font-weight:700;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">RenewalCount</span> <span style="color:#6366F1;">&gt;=</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Renewal counts cannot be negative"</span>
+<span style="color:#4338CA;font-weight:700;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">FineAmount</span> <span style="color:#6366F1;">&gt;=</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Fines cannot be negative"</span>
+
+<span style="color:#4338CA;font-weight:700;">state</span> <span style="color:#A898F5;font-style:italic;">Available</span> <span style="color:#6366F1;">initial</span>
+<span style="color:#4338CA;font-weight:700;">state</span> <span style="color:#A898F5;font-style:italic;">CheckedOut</span>
+<span style="color:#4338CA;font-weight:700;">state</span> <span style="color:#A898F5;font-style:italic;">Overdue</span>
+<span style="color:#4338CA;font-weight:700;">state</span> <span style="color:#A898F5;font-style:italic;">Returned</span>
+<span style="color:#4338CA;font-weight:700;">state</span> <span style="color:#A898F5;font-style:italic;">Lost</span>
+
+<span style="color:#4338CA;font-weight:700;">in</span> <span style="color:#A898F5;font-style:italic;">Available</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">BorrowerId</span> <span style="color:#6366F1;">==</span> <span style="color:#84929F;">null</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Available books cannot still be assigned to a borrower"</span>
+<span style="color:#4338CA;font-weight:700;">in</span> <span style="color:#A898F5;font-style:italic;">CheckedOut</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">BorrowerId</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">null</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Checked-out books must record a borrower"</span>
+<span style="color:#4338CA;font-weight:700;">in</span> <span style="color:#A898F5;font-style:italic;">Overdue</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">BorrowerId</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">null</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Overdue books must still record a borrower"</span>
+<span style="color:#4338CA;font-weight:700;">in</span> <span style="color:#A898F5;font-style:italic;">Overdue</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;font-style:italic;">CurrentDay</span> <span style="color:#6366F1;">&gt;</span> <span style="color:#B0BEC5;font-style:italic;">DueDay</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Overdue books must be past their due day"</span>
+<span style="color:#4338CA;font-weight:700;">in</span> <span style="color:#A898F5;font-style:italic;">Returned</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">BorrowerId</span> <span style="color:#6366F1;">==</span> <span style="color:#84929F;">null</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Returned books must clear the borrower"</span>
+<span style="color:#4338CA;font-weight:700;">in</span> <span style="color:#A898F5;font-style:italic;">Lost</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">LostReported</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Lost books must be marked as reported lost"</span>
+<span style="color:#4338CA;font-weight:700;">in</span> <span style="color:#A898F5;font-style:italic;">Lost</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">BorrowerId</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">null</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Lost books must still record the last borrower"</span>
+
+<span style="color:#4338CA;font-weight:700;">in</span> <span style="color:#A898F5;font-style:italic;">CheckedOut</span> <span style="color:#4338CA;font-weight:700;">edit</span> <span style="color:#B0BEC5;font-style:italic;">DueDay</span>
+<span style="color:#4338CA;font-weight:700;">in</span> <span style="color:#A898F5;font-style:italic;">Overdue</span> <span style="color:#4338CA;font-weight:700;">edit</span> <span style="color:#B0BEC5;font-style:italic;">DueDay</span><span style="color:#6366F1;">,</span> <span style="color:#B0BEC5;font-style:italic;">FineAmount</span>
+
+<span style="color:#4338CA;font-weight:700;">event</span> <span style="color:#30B8E8;font-style:italic;">Checkout</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Title</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span><span style="color:#6366F1;">,</span> <span style="color:#B0BEC5;">PatronId</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span><span style="color:#6366F1;">,</span> <span style="color:#B0BEC5;">LoanDays</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;">14</span>
+<span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">Checkout</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">Title</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">""</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"A book title is required"</span>
+<span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">Checkout</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">PatronId</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">""</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"A patron id is required"</span>
+<span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">Checkout</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">LoanDays</span> <span style="color:#6366F1;">&gt;</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Loan days must be positive"</span>
+
+<span style="color:#4338CA;font-weight:700;">event</span> <span style="color:#30B8E8;font-style:italic;">Renew</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">ExtraDays</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;">7</span>
+<span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">Renew</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">ExtraDays</span> <span style="color:#6366F1;">&gt;</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Renewal days must be positive"</span>
+
+<span style="color:#4338CA;font-weight:700;">event</span> <span style="color:#30B8E8;font-style:italic;">AdvanceDay</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">DayNumber</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span>
+<span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">AdvanceDay</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">DayNumber</span> <span style="color:#6366F1;">&gt;=</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"The day counter cannot be negative"</span>
+
+<span style="color:#4338CA;font-weight:700;">event</span> <span style="color:#30B8E8;font-style:italic;">ReturnBook</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Condition</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;">null</span>
+<span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">ReturnBook</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">Condition</span> <span style="color:#6366F1;">==</span> <span style="color:#84929F;">null</span> <span style="color:#6366F1;">||</span> <span style="color:#B0BEC5;">Condition</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">""</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"A supplied condition note cannot be blank"</span>
+
+<span style="color:#4338CA;font-weight:700;">event</span> <span style="color:#30B8E8;font-style:italic;">ReportLost</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;">null</span>
+<span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">ReportLost</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">==</span> <span style="color:#84929F;">null</span> <span style="color:#6366F1;">||</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">""</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"A supplied loss note cannot be blank"</span>
+
+<span style="color:#4338CA;font-weight:700;">event</span> <span style="color:#30B8E8;">Shelve</span>
+<span style="color:#4338CA;font-weight:700;">event</span> <span style="color:#30B8E8;">ResolveLoss</span>
+
+<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;font-style:italic;">Available</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">Checkout</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;">BookTitle</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;font-style:italic;">Checkout</span><span style="color:#6366F1;">.</span><span style="color:#B0BEC5;">Title</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;">BorrowerId</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;font-style:italic;">Checkout</span><span style="color:#6366F1;">.</span><span style="color:#B0BEC5;">PatronId</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;font-style:italic;">CheckoutDay</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">CurrentDay</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;font-style:italic;">DueDay</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">CurrentDay</span> <span style="color:#6366F1;">+</span> <span style="color:#30B8E8;font-style:italic;">Checkout</span><span style="color:#6366F1;">.</span><span style="color:#B0BEC5;">LoanDays</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;font-style:italic;">RenewalCount</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;">0</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;font-style:italic;">FineAmount</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;">0</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;">ConditionNote</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;">null</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;">LostReported</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;">false</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">transition</span> <span style="color:#A898F5;font-style:italic;">CheckedOut</span>
+
+<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;font-style:italic;">CheckedOut</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">Renew</span>
+  <span style="color:#4338CA;font-weight:700;">when</span> <span style="color:#B0BEC5;font-style:italic;">RenewalCount</span> <span style="color:#6366F1;">&lt;</span> <span style="color:#84929F;">2</span> <span style="color:#6366F1;">&amp;&amp;</span> <span style="color:#6366F1;">!</span><span style="color:#B0BEC5;">LostReported</span> <span style="color:#6366F1;">&amp;&amp;</span> <span style="color:#B0BEC5;font-style:italic;">CurrentDay</span> <span style="color:#6366F1;">&lt;=</span> <span style="color:#B0BEC5;font-style:italic;">DueDay</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;font-style:italic;">DueDay</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">DueDay</span> <span style="color:#6366F1;">+</span> <span style="color:#30B8E8;font-style:italic;">Renew</span><span style="color:#6366F1;">.</span><span style="color:#B0BEC5;">ExtraDays</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;font-style:italic;">RenewalCount</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">RenewalCount</span> <span style="color:#6366F1;">+</span> <span style="color:#84929F;">1</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">no</span> <span style="color:#4338CA;font-weight:700;">transition</span>
+<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;font-style:italic;">CheckedOut</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">Renew</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">reject</span> <span style="color:#FBBF24;">"Only active loans with remaining renewals can be renewed"</span>
+
+<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;font-style:italic;">Returned</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;">Shelve</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;font-style:italic;">CheckoutDay</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;font-style:italic;">DueDay</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;">0</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;font-style:italic;">RenewalCount</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;font-style:italic;">FineAmount</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;">0</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;">ConditionNote</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;">null</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">transition</span> <span style="color:#A898F5;font-style:italic;">Available</span>
+
+<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;font-style:italic;">Lost</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;">ResolveLoss</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;">BorrowerId</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;">null</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;">LostReported</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;">false</span>
+  <span style="color:#6366F1;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">transition</span> <span style="color:#A898F5;font-style:italic;">Available</span></div>
+
+<div class="note">
+  <strong>Rich constraint visibility:</strong> In a heavily constrained precept, italic carries the load:
+  <ul style="margin:4px 0 0 12px; line-height:1.8;">
+    <li>All 5 states are <span style="color:#A898F5;font-style:italic;">italic violet</span> — every state has entry requirements. A reader immediately knows "every state transition is guarded."</li>
+    <li><span style="color:#30B8E8;">Shelve</span> and <span style="color:#30B8E8;">ResolveLoss</span> are normal cyan — the two "easy" events with no argument validation. They visually pop as the simple exit paths.</li>
+    <li>In the pipeline <code>set <span style="color:#B0BEC5;font-style:italic;">DueDay</span> = <span style="color:#B0BEC5;font-style:italic;">CurrentDay</span> + <span style="color:#30B8E8;font-style:italic;">Checkout</span>.<span style="color:#B0BEC5;">LoanDays</span></code> — guarded fields (<span style="color:#B0BEC5;font-style:italic;">DueDay</span>, <span style="color:#B0BEC5;font-style:italic;">CurrentDay</span>) are italic while unguarded arg <span style="color:#B0BEC5;">LoanDays</span> is normal. You can see which values are watched by invariants.</li>
+  </ul>
+</div>
+
 </div>
 </div>
 
