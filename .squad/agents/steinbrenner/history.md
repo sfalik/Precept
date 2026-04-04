@@ -1,3 +1,11 @@
+## 2026-04-04T20:28:43Z — Orchestration: Elaine Palette Mapping Polish
+
+Elaine completed beautification and unification of palette mapping visual treatments in \rand\brand-spec.html\ §2.1 (Syntax Editor) and §2.2 (State Diagram). Created \.spm-*\ CSS component system (~70 lines) to match polished §1.4 color system design. All locked semantic colors, mappings, and tokens preserved. System is general-purpose and applicable to future surface sections (Inspector, Docs, CLI).
+
+**Decisions merged to decisions.md:** 35 inbox items (palette structure, color roles, semantic reframes, surfaces, README reviews, corrections, final verdicts)
+
+**Status:** Complete. Ready for integration.
+
 # Project Context
 
 - **Owner:** shane
@@ -119,3 +127,4 @@
 - **Unique positioning opportunity:** Lead with **tooling story** (MCP, VS Code extension, live preview, AI-native design) as primary differentiator. Other comparable tools bury tooling — Precept can invert this: "tooling-first, DSL-second."
 - **Minimum viable quickstart:** 1-command install → 10-line domain example → 3-line C# usage OR CLI validation. Must be domain-relevant (Order/Subscription), not "Hello World."
 - **Decision inbox filed:** Scope/priority recommendation for README revamp from product perspective.
+

@@ -1,3 +1,11 @@
+## 2026-04-04T20:28:43Z — Orchestration: Elaine Palette Mapping Polish
+
+Elaine completed beautification and unification of palette mapping visual treatments in \rand\brand-spec.html\ §2.1 (Syntax Editor) and §2.2 (State Diagram). Created \.spm-*\ CSS component system (~70 lines) to match polished §1.4 color system design. All locked semantic colors, mappings, and tokens preserved. System is general-purpose and applicable to future surface sections (Inspector, Docs, CLI).
+
+**Decisions merged to decisions.md:** 35 inbox items (palette structure, color roles, semantic reframes, surfaces, README reviews, corrections, final verdicts)
+
+**Status:** Complete. Ready for integration.
+
 # Project Context
 
 - **Owner:** shane
@@ -285,3 +293,16 @@ Reviewed §1.4 Color System, §1.4.1 Color Usage, and §2.1 Syntax Editor at Sha
 
 ✓ Decision filed to decisions.md (merged 2026-04-04)
 ⏳ Awaiting Shane sign-off for implementation
+
+### 2026-04-07 — README Restructure Proposal Architectural Review
+
+Reviewed Peterman's `brand/references/readme-restructure-proposal.md` against all three research inputs (Peterman, Steinbrenner, Elaine) and the current README. Filed review to `brand/references/readme-restructure-review-frank.md` and decision to `.squad/decisions/inbox/frank-readme-proposal-review.md`.
+
+**Key findings:**
+- **Structure approved:** Prove → trial → differentiate → reference is the correct narrative architecture for category-creation.
+- **CTA hierarchy correct:** VS Code extension (primary) → NuGet (secondary) → Copilot plugin (tertiary) eliminates decision paralysis.
+- **Hero split sound:** Separating DSL (18-20 lines) from C# (5 lines) maps to the two distinct artifacts.
+- **Four required changes filed:** (1) Wrong C# API call chain in hero spec, (2) inconsistent Getting Started step 3 title, (3) "Language Server and Preview" is an implementation label not a user-facing heading, (4) "without human intervention" overstates current AI capability.
+
+**Learning:** Brand/copy proposals that reference runtime API surfaces must be verified against the actual public contracts. The C# hero spec had the wrong method call sequence — this would have propagated into the final README if not caught at review. Always cross-check `docs/RuntimeApiDesign.md` when non-technical proposals specify API usage examples.
+

@@ -1,13 +1,10 @@
-brand: restructure brand-spec around visual surfaces
+Scribe: Merge inbox decisions and update team history (2026-04-04T20:28:43Z)
 
-- Reorganize brand-spec.html: Brand Identity → Visual Surfaces → Research & Explorations
-- Add Elaine's visual surfaces draft (5 surfaces: syntax editor, state diagram, inspector, docs site, CLI)
-- Add inspector panel design review (brand color drift identified — fix pending)
-- Add brand-spec structure research (13 systems studied, surface-first validated)
-- Update design gate: Elaine → Peterman → Frank → Shane for all technical surfaces
-- Charter updates: Peterman (design review participation), Elaine (brand compliance gate)
-
-Deferred: CLI color audit, public docs site surface
-Pending: Inspector panel color fix (Kramer), visual surfaces integration into brand-spec
+- Write orchestration log: Elaine palette mapping polish completion
+- Write session log: Palette mapping beautification and unification
+- Merge 35 inbox decision files to decisions.md
+- Delete inbox files after merge
+- Update agent history files: elaine, frank, george, j-peterman, kramer, ralph, steinbrenner, uncle-leo
+- No archival needed (all inbox entries are current, from 2026-04-04)
 
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

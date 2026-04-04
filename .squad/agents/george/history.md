@@ -1,3 +1,11 @@
+## 2026-04-04T20:28:43Z — Orchestration: Elaine Palette Mapping Polish
+
+Elaine completed beautification and unification of palette mapping visual treatments in \rand\brand-spec.html\ §2.1 (Syntax Editor) and §2.2 (State Diagram). Created \.spm-*\ CSS component system (~70 lines) to match polished §1.4 color system design. All locked semantic colors, mappings, and tokens preserved. System is general-purpose and applicable to future surface sections (Inspector, Docs, CLI).
+
+**Decisions merged to decisions.md:** 35 inbox items (palette structure, color roles, semantic reframes, surfaces, README reviews, corrections, final verdicts)
+
+**Status:** Complete. Ready for integration.
+
 # Project Context
 
 - **Owner:** shane
@@ -176,3 +184,28 @@ Implemented Frank's protocol fix from his architecture review of Elaine's visual
 **Documentation:** Preview protocol is not formally documented in a single design doc. Protocol types in `PreceptPreviewProtocol.cs` serve as implementation documentation. `EditableFieldsDesign.md` and `RulesDesign.md` reference the protocol in context of future work but don't document the full structure.
 
 **Design gate compliance:** Shane approved Frank's review plan. This is a one-field additive protocol change with no DSL semantics, parser, type checker, or runtime execution changes — within charter bounds for non-design-gated work. Fix exactly matches Frank's architectural specification in `.squad/decisions/inbox/frank-surfaces-review.md` § Surface 2 blocker resolution.
+
+### README Restructure Proposal Review (2026-04-06)
+
+Reviewed `brand/references/readme-restructure-proposal.md` for runtime/DSL/API accuracy. Full review at `brand/references/readme-restructure-review-george.md`. Decision filed to `.squad/decisions/inbox/george-readme-proposal-review.md`.
+
+**Verdict:** CONDITIONALLY APPROVED — 3 required changes.
+
+**Key findings:**
+
+1. **`RestoreInstance` is fabricated.** The proposal's C# block spec includes "(or `RestoreInstance`)" as an alternative API name. `RestoreInstance` does not exist on `PreceptEngine` or anywhere in the public API. The correct restore-from-database pattern is the second overload of `CreateInstance(string state, IDictionary<string, object?> data)`. Frank's RC-1 addendum mistakenly validated this name. Required: remove `RestoreInstance` from the spec and correct Frank's fix guidance.
+
+2. **Getting Started drops the .NET SDK prerequisite.** The language server is a .NET 10 process. Without the SDK, installing the extension gives silent failure — no diagnostics, no completions. The current README has a Prerequisites section; the proposal drops it entirely. Required: restore a .NET SDK prerequisite note.
+
+3. **"Replacing three separate libraries" overclaims substitutability.** Precept adopts a new execution model, not a drop-in library swap. "Replacing" implies a piecemeal migration path that doesn't exist. Required: soften to "eliminating fragmentation" or similar.
+
+**Confirmed accurate claims in the proposal:**
+- Live state diagram (drawDiagram() is fully implemented in inspector-preview.html, ~700 lines)
+- "Italic signals constraint pressure" (confirmed via `.constrained.precept` scopes in package.json)
+- 5 MCP tools, 2 skills (confirmed from source)
+- PreceptParser.Parse / PreceptCompiler.Compile / engine.CreateInstance / engine.Fire API names (all real)
+- "Full inspectability — preview without mutation" (Inspect runs full 6-stage pipeline simulation with no commit)
+- Compile-time checking bullets (unreachable states, dead ends, type mismatches, null-safety — all real C26–C54 diagnostics)
+
+**Pattern noted:** Fabricated API names in README copy are a credibility risk. The `RestoreInstance` issue shows that architecture reviewers who haven't read the runtime source will validate invented names if they're plausible-sounding. Runtime review is a required gate before any README copy brief is issued.
+

@@ -1,3 +1,11 @@
+## 2026-04-04T20:28:43Z — Orchestration: Elaine Palette Mapping Polish
+
+Elaine completed beautification and unification of palette mapping visual treatments in \rand\brand-spec.html\ §2.1 (Syntax Editor) and §2.2 (State Diagram). Created \.spm-*\ CSS component system (~70 lines) to match polished §1.4 color system design. All locked semantic colors, mappings, and tokens preserved. System is general-purpose and applicable to future surface sections (Inspector, Docs, CLI).
+
+**Decisions merged to decisions.md:** 35 inbox items (palette structure, color roles, semantic reframes, surfaces, README reviews, corrections, final verdicts)
+
+**Status:** Complete. Ready for integration.
+
 # Project Context
 
 - **Owner:** shane
@@ -13,7 +21,33 @@
 
 ## Learnings
 
-### 2026-04-06 — Brand-spec § 1.4 palette structure review
+### 2026-04-07 — Brand-spec color information architecture implemented
+
+**Task:** Implement the approved restructure: §1.4 identity-only, §1.4.1 narrowed to cross-surface contract, syntax token cards moved to §2.1, diagram color mapping added to §2.2.
+
+**What was done:**
+- Rewrote §1.4 intro to clarify the two-layer system (brand palette here, syntax palette in §2.1)
+- Removed 7 syntax token cards and constraint signaling table from §1.4 — moved entire block to §2.1
+- Added "Semantic family reference" table to §1.4 — 6 rows, identity-level only (hue/hex/meaning/surfaces)
+- Updated hue map in §1.4 with forward reference to §2.1
+- Renamed §1.4.1 from "Color Usage" to "Cross-Surface Color Application"
+- Fixed the `brand-light` discrepancy in §1.4.1 Color Roles: removed incorrect "state names in diagrams and syntax" claim (state names use Violet `#A898F5`, not brand-light `#818CF8`)
+- Restructured §2.1: split into two cards (Purpose/Color application + Live example/Constraint signaling/Diagnostics), with 7 syntax cards + hue map between them
+- Added "Diagram color mapping" subsection to §2.2 with static elements table, runtime verdict overlay table, and semantic signals callout
+- Fixed SVG legend `#f43f5e` → `#FB7185` (brand palette source of truth)
+- Documented open decision (current state indicator) clearly rather than inventing a value
+
+**Files affected:** `brand/brand-spec.html` only.
+
+**Key learning — restructure vs. rewrite:** The three reviewers (Frank, Elaine, Peterman) had independently reached near-identical conclusions about the structural problems. When all three analyses converge, the implementation is mechanical: move blocks, update forward references, fix the discrepancies named in the reviews. No new decisions required — just execution.
+
+**Key learning — open decisions in specs:** When implementation is uncertain (current state indicator, two viable options), the right move is to document the decision space explicitly in the spec rather than pick one. The spec becomes the decision surface, not the decider. This keeps it honest.
+
+**Key learning — discrepancy repair during restructure:** The brand-light/violet discrepancy was an existing error that only became visible during the restructure. The restructure pass is the right time to fix these — the doc is already open, the reviewer has context, and the fix is small.
+
+---
+
+
 
 **Task:** Assess whether the second palette (per-category syntax cards) in § 1.4 belongs in § 2.1, and whether § 1.4.1 overlaps with / creates redundancy against that second palette or the main palette card.
 
@@ -332,6 +366,7 @@ Precept's wit is not performance—it's earned from specificity. The tool knows 
 - Card structure follows color-exploration.html palette-card format, adapted with inline styles to match .card class typography in brand-spec.
 - Card contents:
   1. **Swatch bar** — 48px solid block at #6366F1, full-width bleed
+
   2. **Gradient ramp** — 8 equal segments from #1e1b4b (ground) → #312e81 → #3730a3 → #4338ca → #6366f1 → #818cf8 → #a5b4fc → #c7d2fe (pale)
   3. **Title**: "Indigo · 239°" in #6366F1; subtitle describes the 8-shade system
   4. **Color role table** — grid layout: swatch dot · hex · role name · usage description; Semantic/Grammar rows colored for legibility
@@ -467,3 +502,19 @@ Elaine's `brand/visual-surfaces-draft.html` — full UX specifications for five 
 - Hero sample selection finalized (Subscription Billing at 18 DSL statements is research-validated length)
 
 **Next:** Draft new README.md using Hybrid model, 18-line hero, AI-first section.
+
+### 2026-04-04 — Final brand-spec palette cleanup pass
+
+**Task:** Run the final cleanup on `brand/brand-spec.html` after the IA restructure without redesigning the spec.
+
+**What was done:**
+- Replaced the remaining legacy verdict hex references so later sections now consistently use Blocked `#FB7185` and Warning `#FCD34D`
+- Cleaned stale verdict examples in Syntax Editor diagnostics, Inspector Panel, and CLI / Terminal copy so prose and mockups now match the locked verdict palette
+- Normalized two related palette drifts tied to the same review thread: background `#09090B` → locked `#0c0c0f`, and gold `#F59E0B` → locked `#FBBF24`
+- Updated generic verdict wording in the CLI section from red/yellow shorthand to the locked emerald/rose/amber language
+- Left the open current-state-indicator callout in §2.2 untouched except for preserving its Shane-sign-off status
+
+**Files affected:** `brand/brand-spec.html`
+
+**Remaining blocker:** The only unresolved brand-spec item in this lane is still Shane’s sign-off on the current state indicator treatment in §2.2. The cleanup pass closes palette drift; it does not resolve that open decision.
+

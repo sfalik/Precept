@@ -1,3 +1,11 @@
+## 2026-04-04T20:28:43Z — Orchestration: Elaine Palette Mapping Polish
+
+Elaine completed beautification and unification of palette mapping visual treatments in \rand\brand-spec.html\ §2.1 (Syntax Editor) and §2.2 (State Diagram). Created \.spm-*\ CSS component system (~70 lines) to match polished §1.4 color system design. All locked semantic colors, mappings, and tokens preserved. System is general-purpose and applicable to future surface sections (Inspector, Docs, CLI).
+
+**Decisions merged to decisions.md:** 35 inbox items (palette structure, color roles, semantic reframes, surfaces, README reviews, corrections, final verdicts)
+
+**Status:** Complete. Ready for integration.
+
 # Project Context
 
 - **Owner:** shane
@@ -285,3 +293,4 @@ Conducted internal DSL verbosity analysis across all 21 sample files, producing 
 3. **Non-Negative Numeric Invariant Boilerplate** — `invariant X >= 0` repeated per numeric field. Present in 19/21 samples. Proposal: field-level `min 0` annotation.
 
 **Strategic finding:** The 6–8 gate and DSL Coverage floor are in structural tension. Satisfying both requires language features (named guards, ternary, string.length) identified in companion research.
+

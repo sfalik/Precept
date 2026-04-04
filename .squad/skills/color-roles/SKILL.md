@@ -9,13 +9,13 @@ Quick reference for the locked 8+3 color system and how each color maps to produ
 | Hex | Role | Use |
 |-----|------|-----|
 | `#6366F1` | brand | Wordmark, primary CTA, badges, diagram borders, grammar keywords |
-| `#818CF8` | brand-light | Hover states, secondary highlights, state names, header accents |
+| `#818CF8` | brand-light | Hover states, secondary highlights, header accents |
 | `#C7D2FE` | brand-muted | Feature card backgrounds, table header tints, callout text |
 | `#E5E5E5` | text | Body copy, README prose, headings, button labels |
 | `#A1A1AA` | text-secondary | Captions, metadata, table cells, secondary badges |
 | `#71717A` | text-muted | Placeholders, disabled labels, timestamps, tertiary text |
 | `#27272A` | border | Card outlines, table borders, section separators, inactive states |
-| `#09090B` | bg | Page background, surface ground plane |
+| `#0c0c0f` | bg | Page background, surface ground plane |
 
 ### Semantic +3
 | Hex | Role | Use |
@@ -27,7 +27,7 @@ Quick reference for the locked 8+3 color system and how each color maps to produ
 ### Syntax Accent
 | Hex | Role | Use |
 |-----|------|-----|
-| `#F59E0B` | gold | Rule messages in `because`/`reject` — **syntax only, never UI** |
+| `#FBBF24` | gold | Rule messages in `because`/`reject` — **syntax only, never UI** |
 
 ## README Color Mapping
 - **Primary badge:** shields.io `color=6366F1`
@@ -42,6 +42,8 @@ Quick reference for the locked 8+3 color system and how each color maps to produ
 3. Error rose is product UI only. Not README, not marketing.
 4. Need a secondary accent? Use brand-light `#818CF8`.
 5. Need a subtle background tint? Use brand-muted `#C7D2FE`.
+6. State names are Violet `#A898F5`, not brand-light.
+7. When auditing drift, trust the locked palette card first and sweep later surface sections for stale literal hexes.
 
 ## Source of Truth
 `brand/brand-spec.html` §1.4 (palette card) and §1.4.1 (color usage roles).

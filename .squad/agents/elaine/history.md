@@ -1,3 +1,11 @@
+## 2026-04-04T20:28:43Z — Orchestration: Elaine Palette Mapping Polish
+
+Elaine completed beautification and unification of palette mapping visual treatments in \rand\brand-spec.html\ §2.1 (Syntax Editor) and §2.2 (State Diagram). Created \.spm-*\ CSS component system (~70 lines) to match polished §1.4 color system design. All locked semantic colors, mappings, and tokens preserved. System is general-purpose and applicable to future surface sections (Inspector, Docs, CLI).
+
+**Decisions merged to decisions.md:** 35 inbox items (palette structure, color roles, semantic reframes, surfaces, README reviews, corrections, final verdicts)
+
+**Status:** Complete. Ready for integration.
+
 # Elaine — History
 
 ## Hire Date
@@ -768,3 +776,152 @@ No remaining open items from reviewer feedback.
 
 ✓ Decision filed to decisions.md (merged 2026-04-04)
 ⏳ Awaiting Shane resolution on three flagged UX decisions
+
+---
+
+## Session 5 — Brand-Spec Restructure Follow-Up Feedback (2025-07-16)
+
+### What I Did
+
+**Consolidated follow-up feedback for Peterman's brand-spec restructure.** Shane asked me to hold the broader brand-spec feedback explicitly — the full color information architecture cleanup, not just the diagram or palette pieces individually. I read all four review documents (two from me, two from Frank), cross-referenced against decisions.md, and produced two deliverables:
+
+1. **Follow-up feedback note** (`brand/references/brand-spec-followup-feedback-elaine.md`) — a structured review checklist covering section architecture, duplication removal, diagram mapping preservation, open diagram decisions, hex discrepancies, risk points, and my post-restructure review criteria.
+
+2. **Decisions inbox filing** (`.squad/decisions/inbox/elaine-brandspec-followup-feedback.md`) — team-relevant recommendations: review gate sequence after Peterman delivers, three blocking diagram decisions for Shane, hex discrepancy resolution timing, and gold restriction consolidation.
+
+### Key Deliverables
+
+| File | Purpose |
+|------|---------|
+| `brand/references/brand-spec-followup-feedback-elaine.md` | Structured review checklist for Peterman's restructure — section scope, duplication points, diagram mapping, hex fixes, risk assessment |
+| `.squad/decisions/inbox/elaine-brandspec-followup-feedback.md` | Team decision record: review gate, blocking decisions, hex resolution timing |
+
+### Learnings
+
+**Consolidation notes are review criteria, not design.** When multiple review documents converge on the same recommendation, the follow-up deliverable should be a checklist of what to verify — not a fifth restatement of the recommendation. The value is in making the review pass mechanical and complete, not in re-arguing the case.
+
+**Open decisions compound when they block different people.** The three diagram decisions (current state indicator, muted edge, guard text) are each small in isolation, but together they block both Peterman (can't write the section without values) and Kramer (can't align CSS to spec). Flagging the compound dependency to Shane matters more than the individual choices.
+
+---
+
+## Session 6 — Brand-Spec Final Review Verdict (2025-07-16)
+
+### What I Did
+
+**Final review of brand-spec.html against my consolidated follow-up checklist.** Verified every item from the 7-section checklist in `brand-spec-followup-feedback-elaine.md` against the current file state after Peterman's restructure and drift-normalization pass.
+
+**Verdict: APPROVED.** All known feedback from four source reviews has been addressed. Filed decision to `.squad/decisions/inbox/elaine-brand-spec-final-verdict.md`.
+
+### Verified
+
+- §1.4 slimmed to brand palette + semantic family reference table + forward references. No syntax family cards.
+- §1.4.1 renamed to "Cross-Surface Color Application," brand-light row corrected (no longer claims state names use #818CF8).
+- §2.1 absorbed all 6 family cards, hue map, and constraint signaling table. Self-contained for implementers.
+- §2.2 has dedicated "Diagram color mapping" h3 (11-row static elements table) and "Runtime verdict overlay" h3 (7-row interactive table), plus semantic signals section.
+- All 3 hex discrepancies resolved: error locked to #FB7185, warning to #FCD34D, success to #34D399. No trace of off-system colors.
+- SVG legend blocked line corrected from #f43f5e to #FB7185.
+- Cross-references from §2.2–§2.5 to §1.4 all resolve correctly.
+- 2 of 3 open diagram decisions resolved (muted edge = #71717A, guard annotation = #B0BEC5). Only current state indicator remains open, correctly flagged for Shane.
+
+### Key Deliverables
+
+| File | Purpose |
+|------|---------|
+| `.squad/decisions/inbox/elaine-brand-spec-final-verdict.md` | APPROVED verdict with full checklist results |
+
+### Learnings
+
+**A good restructure resolves problems upstream.** Half the issues I was tracking (constraint signaling duplication, "8" count ambiguity, brand-light misattribution) didn't need individual fixes — they resolved naturally when the content moved to the right section. The restructure IS the fix. Individual patches before the restructure would have been wasted work.
+
+**Acceptable duplication depends on abstraction level.** Gold's restriction now appears in 5 places, which sounds worse than the original 4. But the old 4 were all within §1.4's 300 lines at the same abstraction level. The new 5 are spread across identity (§1.4), cross-surface application (§1.4.1), and implementation (§2.1) — each serving a different reader at a different zoom level. Same fact, different contexts, different utility. Duplication is only a problem when it creates ambiguity about which instance is authoritative.
+
+---
+
+## Session 7 — Semantic Family Reference Table Styling (2025-07-16)
+
+### What I Did
+
+**Restyled the §1.4 semantic family reference table as a cohesive palette card.** Shane requested a visual polish pass — keep all content, make it beautiful as a palette.
+
+**Design approach:**
+- Converted basic HTML table to a structured palette card with `sf-palette` scoped styles
+- Added indigo gradient header matching the brand identity
+- Split into two visual groups: **Core Semantic Families** (5 colors) and **Signal Colors** (3 colors)
+- Each color row uses a gradient swatch with subtle shadow, grid-based info layout
+- Color names use their own hue for instant recognition
+- Hex codes in monospace pill badges
+- Surface listings use interpunct separators (·) for cleaner scanability
+- Responsive collapse for narrow viewports
+
+**Key styling decisions:**
+- Swatch size: 56×40px with 8px radius and subtle inner highlight — substantial but not dominating
+- Row separation: subtle border-top (rgba) between rows, stronger indigo border between groups
+- Info grid: Name | Hex | Meaning | Surfaces in consistent columns
+- Background: `#0c0c0f` body matches existing brand-spec dark theme
+
+### Learnings
+
+**Palette tables are not data tables.** A palette reference is about recognition and meaning, not data comparison. Grid layout with generous swatches works better than dense table rows because each color deserves visual breathing room. The gradient swatches add depth without introducing new colors — they use darker shades of the same hue.
+
+**CSS scoping via `.sf-` prefix avoids style bleeding.** The brand-spec already has `.card`, `.swatch`, and table styles. Using a dedicated prefix (`sf-palette`, `sf-row`, etc.) keeps the semantic family styling contained without risk of side effects elsewhere in the document.
+
+---
+
+## Session — Palette Mapping Visual Unification (2026-04-04)
+
+### What I Did
+
+**Unified the palette mapping visual treatment in §2.1 and §2.2 to match the polished §1.4 design language.**
+
+The sections had drifted into separate visual treatments:
+- §1.4 used the polished `.sf-palette` card system with gradient swatches, clean info grids, and grouped rows
+- §2.1 used scattered `.card` elements with inline styles — functional but inconsistent
+- §2.2 used raw HTML tables with inline swatch spans — utilitarian but visually flat
+
+**Created a new `.spm-*` (Surface Palette Mapping) CSS system** that echoes the §1.4 visual language while being appropriate for surface-specific element mappings. Key components:
+
+- `.spm-surface` — Container card with dark background and indigo border accents
+- `.spm-header` — Color-tinted section headers with gradient backgrounds matching each family
+- `.spm-row` / `.spm-grid` — Grid-based layout for swatches and info
+- `.spm-swatch` — Gradient swatches with subtle shadows matching §1.4 treatment
+- `.spm-title` / `.spm-hex` / `.spm-weight` / `.spm-tokens` — Consistent info typography
+- `.spm-table-section` / `.spm-table` — Polished table treatment for diagram mappings
+- `.spm-shapes` / `.spm-shape-tile` — Unified shape legend tiles for diagram lifecycle
+
+**§2.1 Syntax Editor updates:**
+- Consolidated 7 separate `.card` elements into one unified `.spm-surface` container
+- Each color family (Structure, States, Events, Data, Rules) gets a tinted header
+- Core tokens grouped as "Core Semantic Tokens" with shared header
+- Comments section grouped as "Support Tokens"
+- Verdict colors grouped as "Reserved · Verdict Colors" with muted background
+
+**§2.2 State Diagram updates:**
+- Shape legend tiles now use `.spm-shape-tile` — consistent sizing and visual treatment
+- Static elements table wrapped in `.spm-table-section` with header containing colored dot
+- Runtime verdict table uses same treatment for visual consistency
+- Mini-swatches inline with color names for quick scanning
+
+### Design Principles Applied
+
+1. **Echoed §1.4, didn't copy it.** The surface palette mappings serve a different purpose (element-to-color reference) than the semantic family reference (system overview). Same visual language, adapted to the content.
+
+2. **Color-coded section headers.** Each family (Indigo, Violet, Cyan, Slate, Gold) gets a subtle gradient tint in its header — instant recognition of which family you're in.
+
+3. **Grouped semantic relationships.** Core tokens, Support tokens, and Reserved verdict colors are now visually separated, making the 5+3 system structure obvious.
+
+4. **Table refinement, not table replacement.** §2.2's tables are appropriate for element-to-color mappings — they're reference material, not galleries. I upgraded them visually (mini-swatches, scoped sections, consistent column widths) rather than converting to a grid layout.
+
+### Key Files Modified
+
+| File | Changes |
+|------|---------|
+| `brand/brand-spec.html` | Added `.spm-*` CSS system (~70 lines), restructured §2.1 palette cards, restructured §2.2 shape tiles and tables |
+
+### Learnings
+
+**Surface mappings need sectioned headers.** When documenting how a surface applies the semantic palette, grouping by family with color-coded headers creates immediate visual anchors. A flat list of 12 token types is harder to scan than 5 family groups.
+
+**Tables can be beautiful.** The §2.2 diagram mapping tables contain detailed technical information that works best in tabular form. The upgrade (section headers, mini-swatches, refined spacing) preserved the table's utility while bringing it into visual alignment with the rest of the document.
+
+**Component reuse across surfaces.** The `.spm-*` system is intentionally general enough to apply to future surface sections (Inspector, Docs, CLI) if they need detailed element-to-color mappings.
+
