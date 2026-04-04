@@ -8,7 +8,8 @@
 <style>
   :root { --brand-mono: 'Cascadia Cove', 'Cascadia Code', Consolas, monospace; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #0c0c0f; color: #e5e5e5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; padding: 40px; max-width: 1100px; margin: 0 auto; }
+  body { background: #0c0c0f; color: #e5e5e5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; padding: 40px; width: 100%; }
+  @media (max-width: 900px) { body { padding: 24px; } }
   h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; color: #fff; }
   h2 { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 8px; }
   .subtitle { color: #71717a; font-size: 15px; margin-bottom: 48px; max-width: 800px; line-height: 1.6; }
@@ -312,12 +313,12 @@
         <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">ParkingMeter</span>
 
 <span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
-<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"The meter lacks a reverse gear"</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Negative time is a mathematical luxury we cannot afford."</span>
 
 <span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Empty</span> <span style="color:#8B7AED;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Active</span>
 
 <span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Feed</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Minutes</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
-<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Feed</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Minutes</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Coins go in, not out"</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Feed</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Minutes</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"You must intend to park for at least a moment."</span>
 
 <span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Check</span>
 
@@ -464,7 +465,7 @@
   <div class="card" style="margin-top:24px;">
     <div class="card-header">
       <h3>Shortlisted &mdash; tightened hero candidates <span class="status-open">Exploring</span></h3>
-      <p>Two candidates at 15 lines each &mdash; the target for a README hero block. Both compile clean and show 10 DSL features each.</p>
+      <p>Two candidates at 15 lines each &mdash; the target for a README hero block. Both compile clean and show 10 DSL features each, but they emphasize different strengths.</p>
     </div>
     <div class="card-body">
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; min-width:0;">
@@ -474,20 +475,20 @@
           <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">ParkingMeter</span>
 
 <span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
-<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"The meter lacks a reverse gear"</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Negative time is a mathematical luxury we cannot afford."</span>
 
 <span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Empty</span> <span style="color:#8B7AED;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Active</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Feed</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Minutes</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
-<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Feed</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Minutes</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Coins go in, not out"</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">AddTime</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Minutes</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">AddTime</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">Minutes</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"You must intend to park for at least a moment."</span>
 
-<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Check</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Inspect</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Empty</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Feed</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">+</span> <span style="color:#30B8E8;">Feed</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Minutes</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Empty</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">AddTime</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">+</span> <span style="color:#30B8E8;">AddTime</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Minutes</span>
   <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Active</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Check</span> <span style="color:#4F46E5;font-weight:600;">when</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">==</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Empty</span>
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Check</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span></div>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Inspect</span> <span style="color:#4F46E5;font-weight:600;">when</span> <span style="color:#B0BEC5;font-style:italic;">TimeLeft</span> <span style="color:#9AA8B5;font-style:italic;">==</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Empty</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Active</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Inspect</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span></div>
           <div style="font-size:11px; color:#52525b; margin-top:8px; line-height:1.6;">
             <strong style="color:#6b7280;">10 features:</strong> precept, field+default, invariant+because, state+initial, event with, assert+because, comma sources, when guard, set+dotted access, no transition.
           </div>
@@ -497,24 +498,29 @@
           <div style="font-size:11px; color:#52525b; margin-bottom:6px;">H&#x2032;) TrafficLight &mdash; 15 lines</div>
           <div class="syntax-block" style="font-size:12px; padding:16px 20px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">TrafficLight</span>
 
-<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">Cycles</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
-<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">Cycles</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"History doesn't rewind"</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">QueuedCars</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
+<span style="color:#4338CA;font-weight:600;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">QueuedCars</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"The queue cannot owe the city cars"</span>
 
 <span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Red</span> <span style="color:#8B7AED;">initial</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Green</span><span style="color:#6366F1;">,</span> <span style="color:#A898F5;">Yellow</span>
 
 <span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;font-style:italic;">Demand</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
-<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#30B8E8;">Advance</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Demand</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Negative cars aren't a thing"</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#30B8E8;">Advance</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Demand</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Negative traffic would raise new questions"</span>
 
-<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Red</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#4F46E5;font-weight:600;">when</span> <span style="color:#30B8E8;">Advance</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Demand</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Green</span>
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Red</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#4F46E5;font-weight:600;">when</span> <span style="color:#30B8E8;">Advance</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Demand</span> <span style="color:#9AA8B5;font-style:italic;">&gt;</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">QueuedCars</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">QueuedCars</span> <span style="color:#9AA8B5;font-style:italic;">+</span> <span style="color:#30B8E8;">Advance</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;font-style:italic;">Demand</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Green</span>
 <span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Red</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">no</span> <span style="color:#4F46E5;font-weight:600;">transition</span>
 <span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Green</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span> <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Yellow</span>
 <span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#A898F5;">Yellow</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Advance</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">Cycles</span> <span style="color:#6366F1;">=</span> <span style="color:#B0BEC5;font-style:italic;">Cycles</span> <span style="color:#9AA8B5;font-style:italic;">+</span> <span style="color:#84929F;font-style:italic;">1</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">QueuedCars</span> <span style="color:#6366F1;">=</span> <span style="color:#84929F;font-style:italic;">0</span>
   <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#8B7AED;">Red</span></div>
           <div style="font-size:11px; color:#52525b; margin-top:8px; line-height:1.6;">
             <strong style="color:#6b7280;">10 features:</strong> precept, field+default, invariant+because, state+initial (3 states, cyclic), event with, assert+dotted access+because, when guard, no transition, set+expression, cyclic transitions.
           </div>
         </div>
+      </div>
+      <div class="note" style="margin-top:16px; border-color:#1e1b4b; background:rgba(67,56,202,0.08);">
+        <strong>ParkingMeter:</strong> denser contract sample. It gets to invariant, asserted event input, comma sources, guarded transition, accumulation, dotted access, and <span style="font-family:var(--brand-mono);">no transition</span> in just two states.<br><br>
+        <strong>TrafficLight:</strong> cleaner cyclic-state sample. It is faster to parse at a glance and makes the state-machine loop immediately obvious, but some of its surface area reads more like a teaching demo than a workflow contract.<br><br>
+        <strong>Decision still open:</strong> choose <span style="color:#B0BEC5; font-style:italic;">ParkingMeter</span> if the hero should foreground expressive business-rule density; choose <span style="color:#B0BEC5; font-style:italic;">TrafficLight</span> if the hero should foreground instant legibility and cyclic motion.
       </div>
     </div>
   </div>
@@ -799,6 +805,51 @@
   </div>
 </div>
 
+<div class="card" style="margin-top:24px;">
+  <div class="card-header">
+    <h3>README Hero A/B &mdash; comment-free vs one editorial note <span class="status-open">Exploring</span></h3>
+    <p>The palette question is solved. This is now a composition question: does a single comment help the first read, or does it dilute the austerity?</p>
+  </div>
+  <div class="card-body">
+    <div class="side-by-side">
+      <div>
+        <div style="font-size:11px; color:#52525b; margin-bottom:6px;">A) Comment-free hero</div>
+        <div data-semantic-preview="true" style="background:#0c0c0f; border:1px solid #1e1b4b; border-radius:6px; padding:16px; font-family:var(--brand-mono); font-size:11px; line-height:1.7; white-space:pre; overflow-x:auto;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
+
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#8B7AED;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#A898F5;">UnderReview</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#C0B4F8;">Approved</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Submit</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">UnderReview</span></div>
+        <div class="note" style="margin-top:12px;">
+          <strong>Read:</strong> hardest-edged option. It looks like product, not tutorial. The first impression is structural confidence.
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px; color:#52525b; margin-bottom:6px;">B) One-comment hero</div>
+        <div data-semantic-preview="true" style="background:#0c0c0f; border:1px solid #1e1b4b; border-radius:6px; padding:16px; font-family:var(--brand-mono); font-size:11px; line-height:1.7; white-space:pre; overflow-x:auto;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
+
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
+<span style="color:#9096A6;font-style:italic;"># Approval only after review</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#8B7AED;">initial</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#A898F5;">UnderReview</span>
+<span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#C0B4F8;">Approved</span>
+
+<span style="color:#4F46E5;font-weight:600;">from</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Submit</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">UnderReview</span></div>
+        <div class="note" style="margin-top:12px;">
+          <strong>Read:</strong> more welcoming on first contact, but it shifts the block one step toward explanation instead of declaration.
+        </div>
+      </div>
+    </div>
+    <div class="callout" style="margin-top:16px; background:rgba(22,101,52,0.12); border-color:#166534;">
+      <strong>Current recommendation:</strong> Keep the README hero comment-free. Use the one-comment variant for docs, landing-page storytelling, or onboarding surfaces where a teaching cue is worth the extra noise.
+    </div>
+  </div>
+</div>
+
 <div class="callout" style="margin-top:16px; background:rgba(56,189,248,0.06); border-color:#0c4a6e;">
   <strong>README exploration questions:</strong>
   <ul style="margin:8px 0 0 16px; line-height:1.8;">
@@ -807,6 +858,7 @@
     <li>Wordmark treatment: small-caps Cascadia Cove 700 with 0.1em spacing. Should it appear in the README header or is the plain text name enough?</li>
     <li>GitHub dark theme background (#0d1117) vs our background (#0c0c0f) &mdash; close enough, or need the code block to specify its own background?</li>
     <li>Social preview image (og:image) &mdash; probably the code+diagram pairing rendered as a 1280x640 PNG. What else?</li>
+    <li>Comment usage is now a placement choice, not a styling question: README hero = no comment, onboarding/doc surfaces = maybe one.</li>
   </ul>
 </div>
 </div>
