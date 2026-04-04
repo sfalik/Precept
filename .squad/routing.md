@@ -9,7 +9,7 @@ How to decide who handles what.
 | Architecture, design decisions, cross-cutting concerns | Frank | API surface changes, breaking changes, architectural proposals |
 | DSL engine: parser, type checker, evaluator, compiler, runtime | George | Tokenizer bugs, type inference, state machine logic, constraint evaluation |
 | VS Code extension, language server, LSP, TypeScript, TextMate grammar | Kramer | Completions, hover, semantic tokens, syntax highlighting, preview webview |
-| MCP server, Copilot plugin, AI integration, agent/skills content | Elaine | MCP tool DTOs, plugin prompts, skill files, AI-native features |
+| MCP server, Copilot plugin, AI integration, agent/skills content | Newman | MCP tool DTOs, plugin prompts, skill files, AI-native features |
 | Testing, xUnit, edge cases, quality gates, regression | Soup Nazi | Test coverage, failing tests, edge case identification, test strategy |
 | Code review, PR review, code quality, standards enforcement | Uncle Leo | PR reviews, code smells, style violations, quality audits |
 | README, docs, brand, marketplace listings, DevRel | J. Peterman | README updates, brand copy, NuGet/VS Code/Claude marketplace content |

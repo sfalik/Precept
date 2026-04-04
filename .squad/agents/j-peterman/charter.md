@@ -39,8 +39,8 @@
 
 ## Model
 
-- **Preferred:** `claude-haiku-4.5`
-- **Rationale:** Docs and writing — not code. Cost-first.
+- **Preferred:** `claude-sonnet-4.5`
+- **Rationale:** Brand copy and docs quality matters — sonnet for better writing.
 
 ## Collaboration
 

@@ -15,7 +15,7 @@
 | Frank | Lead/Architect | `.squad/agents/frank/charter.md` | 🟢 Active |
 | George | Runtime Dev | `.squad/agents/george/charter.md` | 🟢 Active |
 | Kramer | Tooling Dev | `.squad/agents/kramer/charter.md` | 🟢 Active |
-| Elaine | MCP/AI Dev | `.squad/agents/elaine/charter.md` | 🟢 Active |
+| Newman | MCP/AI Dev | `.squad/agents/newman/charter.md` | 🟢 Active |
 | Soup Nazi | Tester | `.squad/agents/soup-nazi/charter.md` | 🟢 Active |
 | Uncle Leo | Code Reviewer | `.squad/agents/uncle-leo/charter.md` | 🟢 Active |
 | J. Peterman | Brand/DevRel | `.squad/agents/j-peterman/charter.md` | 🟢 Active |
