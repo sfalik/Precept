@@ -327,7 +327,7 @@ Build and run all tests. Add new tests for constrained vs unconstrained tokens.
 
 ## Phase 6: Extension Color Lock
 
-**Goal:** Bind hex values and font styles to the custom semantic token types in `package.json`. After this phase + extension install, the 8-shade palette is visible (including italic for constrained tokens).
+**Goal:** Declare the custom semantic token types/modifiers and map them to Precept-specific fallback scopes in `package.json`. After this phase + extension install, the semantic layer has a stable scope-map path even without a bundled theme.
 
 ### Steps
 
@@ -354,35 +354,34 @@ Build and run all tests. Add new tests for constrained vs unconstrained tokens.
 ]
 ```
 
-- [ ] Add `configurationDefaults` with `editor.semanticTokenColorCustomizations`:
+- [ ] Add `semanticTokenScopes` so each custom semantic token resolves to a Precept-owned fallback scope:
 
 ```jsonc
-"configurationDefaults": {
-  "editor.semanticTokenColorCustomizations": {
-    "[*]": {
-      "rules": {
-        "preceptKeywordSemantic": { "foreground": "#4338CA", "bold": true },
-        "preceptKeywordGrammar":  { "foreground": "#6366F1" },
-        "preceptState":           { "foreground": "#A898F5" },
-        "preceptEvent":           { "foreground": "#30B8E8" },
-        "preceptFieldName":       { "foreground": "#B0BEC5" },
-        "preceptType":            { "foreground": "#9AA8B5" },
-        "preceptValue":           { "foreground": "#84929F" },
-        "preceptMessage":         { "foreground": "#FBBF24" },
-        "preceptState:preceptConstrained":     { "italic": true },
-        "preceptEvent:preceptConstrained":     { "italic": true },
-        "preceptFieldName:preceptConstrained": { "italic": true }
-      }
+"semanticTokenScopes": [
+  {
+    "language": "precept",
+    "scopes": {
+      "preceptKeywordSemantic": ["keyword.other.semantic.precept"],
+      "preceptKeywordGrammar": ["keyword.other.grammar.precept"],
+      "preceptState": ["entity.name.type.state.precept"],
+      "preceptState.preceptConstrained": ["entity.name.type.state.constrained.precept"],
+      "preceptEvent": ["entity.name.function.event.precept"],
+      "preceptEvent.preceptConstrained": ["entity.name.function.event.constrained.precept"],
+      "preceptFieldName": ["variable.other.field.precept"],
+      "preceptFieldName.preceptConstrained": ["variable.other.field.constrained.precept"],
+      "preceptType": ["storage.type.precept"],
+      "preceptValue": ["constant.other.value.precept"],
+      "preceptMessage": ["entity.name.precept.message.precept", "string.quoted.double.message.precept"]
     }
   }
-}
+]
 ```
 
 ### Affected files
 
 | File | Changes |
 |------|---------|
-| `tools/Precept.VsCode/package.json` | Add `semanticTokenTypes`, `semanticTokenModifiers`, `configurationDefaults` |
+| `tools/Precept.VsCode/package.json` | Add `semanticTokenTypes`, `semanticTokenModifiers`, `semanticTokenScopes` |
 
 ### Checkpoint
 
@@ -405,7 +404,7 @@ tools/Precept.VsCode/package.json:
 
 1. "semanticTokenTypes" — 8 custom type declarations
 2. "semanticTokenModifiers" — 1 modifier (preceptConstrained)
-3. "configurationDefaults" with "editor.semanticTokenColorCustomizations"
+3. "semanticTokenScopes" for custom semantic-token-to-scope fallback mapping
    mapping each type to its hex + font style
 
 Use the exact hex values and font styles from the plan.
@@ -418,7 +417,7 @@ Build (npm run compile). Run extension: install task. Verify colors.
 
 ## Phase 7: TextMate Fallback Colors
 
-**Goal:** Lock fallback colors for the 1–2 second cold-start window before semantic tokens load.
+**Goal:** Lock fallback colors for the 1–2 second cold-start window before semantic tokens load, and for the semantic-token scope-map fallback path when no theme provides semantic token colors.
 
 ### Steps
 
@@ -452,7 +451,7 @@ Build (npm run compile). Run extension: install task. Verify colors.
 }
 ```
 
-**Note:** Strings default to slate (`#84929F`) — message strings flash slate→gold briefly when semantic tokens correct them. This keeps non-message strings correct during fallback. All keywords default to Semantic bold — grammar keywords flash bold→normal briefly when corrected.
+**Note:** Strings default to slate (`#84929F`) in generic fallback. Dedicated message-string and precept-name scopes are colored gold immediately, so the highest-signal Rules · Messages cases do not depend on semantic theming.
 
 ### Affected files
 

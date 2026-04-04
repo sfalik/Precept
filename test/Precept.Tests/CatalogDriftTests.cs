@@ -171,6 +171,7 @@ public class CatalogDriftTests
             // Keyword, operator, and punctuation tokens must have [TokenSymbol]
             var needsSymbol = category.Value is
                 TokenCategory.Control or TokenCategory.Declaration or
+                TokenCategory.Grammar or
                 TokenCategory.Action or TokenCategory.Outcome or
                 TokenCategory.Type or TokenCategory.Literal or
                 TokenCategory.Operator or TokenCategory.Punctuation;

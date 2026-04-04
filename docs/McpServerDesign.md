@@ -77,6 +77,20 @@ Unlike the other tools, this tool takes no input — it describes the language i
 
 **Output:** Full language reference JSON (vocabulary, constructs, constraints, expressionScopes, firePipeline, outcomeKinds). See the `precept_language` output format section below — unchanged from the original design.
 
+The `vocabulary` object contains the following keyword lists, each reflecting `PreceptToken` metadata:
+
+| Property | `TokenCategory` | Keywords |
+|---|---|---|
+| `ControlKeywords` | `Control` | `state`, `in`, `to`, `from`, `on`, `when` |
+| `DeclarationKeywords` | `Declaration` | `precept`, `field`, `invariant`, `event`, `assert`, `edit` |
+| `GrammarKeywords` | `Grammar` | `as`, `with`, `nullable`, `default`, `because`, `any`, `of`, `into`, `initial` |
+| `ActionKeywords` | `Action` | `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear` |
+| `OutcomeKeywords` | `Outcome` | `transition`, `no`, `reject` |
+| `TypeKeywords` | `Type` | `set`, `string`, `number`, `boolean`, `queue`, `stack` |
+| `LiteralKeywords` | `Literal` | `true`, `false`, `null` |
+
+`GrammarKeywords` contains connective and modifier keywords that serve a structural grammar role — they join, qualify, or introduce parts of declarations — rather than performing computation or control flow.
+
 **Implementation:** Serializes `ConstructCatalog.Constructs` + `DiagnosticCatalog.Diagnostics` + reflected `PreceptToken` vocabulary. No MCP-specific data — everything comes from core infrastructure.
 
 ---

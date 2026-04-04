@@ -6,7 +6,11 @@ namespace Precept.LanguageServer;
 
 internal sealed class PreceptDefinitionHandler : IDefinitionHandler
 {
-    private static readonly TextDocumentSelector Selector = TextDocumentSelector.ForPattern("**/*.precept");
+    private static readonly TextDocumentSelector Selector = new(new TextDocumentFilter
+    {
+        Pattern = "**/*.precept",
+        Language = "precept"
+    });
 
     public Task<LocationOrLocationLinks?> Handle(DefinitionParams request, CancellationToken cancellationToken)
     {

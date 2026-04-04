@@ -12,7 +12,11 @@ internal sealed class PreceptTextDocumentSyncHandler : TextDocumentSyncHandlerBa
 {
     internal static readonly PreceptAnalyzer SharedAnalyzer = new();
 
-    private static readonly TextDocumentSelector Selector = TextDocumentSelector.ForPattern("**/*.precept");
+    private static readonly TextDocumentSelector Selector = new(new TextDocumentFilter
+    {
+        Pattern = "**/*.precept",
+        Language = "precept"
+    });
 
     private readonly ILanguageServerFacade _router;
 

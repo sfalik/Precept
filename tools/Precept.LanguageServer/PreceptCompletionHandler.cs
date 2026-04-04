@@ -8,7 +8,11 @@ namespace Precept.LanguageServer;
 
 internal sealed class PreceptCompletionHandler : CompletionHandlerBase
 {
-    private static readonly TextDocumentSelector Selector = TextDocumentSelector.ForPattern("**/*.precept");
+    private static readonly TextDocumentSelector Selector = new(new TextDocumentFilter
+    {
+        Pattern = "**/*.precept",
+        Language = "precept"
+    });
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken cancellationToken)
     {

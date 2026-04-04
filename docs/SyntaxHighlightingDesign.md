@@ -2,7 +2,7 @@
 
 Date: 2026-04-03
 
-Status: **Design locked.** The 8-shade semantic palette is frozen. Implementation has not started.
+Status: **Design locked.** The 8-shade semantic palette is frozen. Implementation now uses custom semantic token types plus `semanticTokenScopes`, with color lock carried by Precept-specific TextMate fallback scopes.
 
 > Brand source of truth: `brand/brand-decisions.md § Semantic palette` and `brand/brand-spec.html § Color System`.
 
@@ -99,7 +99,7 @@ Identifier classification (context-aware via `ClassifyIdentifier()`):
 
 **File:** `tools/Precept.VsCode/package.json`
 
-Currently: `"semanticHighlighting": true` is set, but **no custom colors are defined**. Colors come entirely from the user's active theme.
+Currently: `"semanticHighlighting": true` is set, custom semantic token types/modifiers are declared, and `semanticTokenScopes` maps those semantic tokens into Precept-specific TextMate scopes. The locked palette is applied through Precept-owned TextMate scope rules in `configurationDefaults.editor.tokenColorCustomizations`.
 
 ## Design: Mapping the 8-Shade Palette to the Pipeline
 
@@ -113,7 +113,7 @@ The current pipeline classifies tokens into generic LSP semantic types (`keyword
 
 **TextMate grammar as the fallback.** TextMate scopes provide coloring before the language server loads. The scopes already have enough granularity for a reasonable approximation of the 8-shade system.
 
-**`package.json` `semanticTokenColors` as the color lock.** This is where hex values and font styles are bound to semantic token types. This gives us fixed colors regardless of the user's theme.
+**`semanticTokenScopes` + Precept-owned TextMate scopes as the color lock.** The language server still emits custom semantic token types, but when no theme provides semantic token color rules, VS Code intentionally falls back through the semantic token scope map. By mapping custom semantic tokens to Precept-specific TextMate scopes, then binding those scopes in `editor.tokenColorCustomizations`, the extension gets stable colors without bundling a dedicated theme.
 
 ### Required Changes
 
@@ -143,32 +143,33 @@ TokenModifiers = new Container<SemanticTokenModifier>(
 )
 ```
 
-Then in `package.json`, map each custom type to its hex + style:
+Then in `package.json`, declare each custom type and map it to Precept-specific fallback scopes:
 
 ```jsonc
-"configurationDefaults": {
-  "editor.semanticTokenColorCustomizations": {
-    "[*]": {
-      "rules": {
-        "preceptKeywordSemantic": { "foreground": "#4338CA", "bold": true },
-        "preceptKeywordGrammar":  { "foreground": "#6366F1" },
-        "preceptState":           { "foreground": "#A898F5" },
-        "preceptEvent":           { "foreground": "#30B8E8" },
-        "preceptFieldName":       { "foreground": "#B0BEC5" },
-        "preceptType":            { "foreground": "#9AA8B5" },
-        "preceptValue":           { "foreground": "#84929F" },
-        "preceptMessage":         { "foreground": "#FBBF24" },
-        "preceptState:preceptConstrained":     { "foreground": "#A898F5", "italic": true },
-        "preceptEvent:preceptConstrained":     { "foreground": "#30B8E8", "italic": true },
-        "preceptFieldName:preceptConstrained": { "foreground": "#B0BEC5", "italic": true }
-      }
+"semanticTokenScopes": [
+  {
+    "language": "precept",
+    "scopes": {
+      "preceptKeywordSemantic": ["keyword.other.semantic.precept"],
+      "preceptKeywordGrammar": ["keyword.other.grammar.precept"],
+      "preceptState": ["entity.name.type.state.precept"],
+      "preceptState.preceptConstrained": ["entity.name.type.state.constrained.precept"],
+      "preceptEvent": ["entity.name.function.event.precept"],
+      "preceptEvent.preceptConstrained": ["entity.name.function.event.constrained.precept"],
+      "preceptFieldName": ["variable.other.field.precept"],
+      "preceptFieldName.preceptConstrained": ["variable.other.field.constrained.precept"],
+      "preceptType": ["storage.type.precept"],
+      "preceptValue": ["constant.other.value.precept"],
+      "preceptMessage": ["entity.name.precept.message.precept", "string.quoted.double.message.precept"]
     }
   }
-}
+]
 ```
 
-**Pros:** Clean, explicit mapping. Each shade has its own token type. No ambiguity.
-**Cons:** Custom types are non-standard. Theme authors can't override them with familiar selectors. Requires `semanticTokenTypes` contribution in `package.json` to declare them.
+The actual hex values are then bound to those scopes in `editor.tokenColorCustomizations`.
+
+**Pros:** Keeps custom semantic token types, avoids bundling a theme, and matches how VS Code's semantic token scope-map fallback is designed to work.
+**Cons:** The scope inspector typically shows the mapped TextMate scope and a standard token kind such as `String` or `Other`, not the custom semantic token id directly.
 
 **Option 2 — Standard types with custom modifiers.** Keep standard LSP types but add Precept-specific modifiers to disambiguate:
 
@@ -261,11 +262,11 @@ This is new capability. The handler must determine which states, events, and fie
 
 **Implementation approach:** Before the per-token loop, extract constraint sets from the analyzer's `PreceptDefinition` for the document, building three `HashSet<string>` collections: `constrainedStates`, `constrainedEvents`, `guardedFields`. Then during token emission, when an identifier is classified as `preceptState`/`preceptEvent`/`preceptFieldName`, check membership and add the modifier. If the parse is incomplete or failed, skip italic entirely (fail open).
 
-#### E. Extension `package.json` — `semanticTokenColors` and Type Declarations
+#### E. Extension `package.json` — Type Declarations, `semanticTokenScopes`, and Fallback Scope Rules
 
 **✅ Decided.** Mechanical — follows directly from A and B. Comments are TextMate-only (tokenizer strips them), so comment color is handled entirely in the TextMate fallback (section F).
 
-Add the custom semantic token type contributions and color mappings:
+Add the custom semantic token type contributions, semantic-token-to-scope mappings, and Precept-owned fallback scope rules:
 
 ```jsonc
 "contributes": {
@@ -282,22 +283,42 @@ Add the custom semantic token type contributions and color mappings:
   "semanticTokenModifiers": [
     { "id": "preceptConstrained", "description": "Token is under constraint/invariant pressure" }
   ],
+  "semanticTokenScopes": [
+    {
+      "language": "precept",
+      "scopes": {
+        "preceptKeywordSemantic": ["keyword.other.semantic.precept"],
+        "preceptKeywordGrammar": ["keyword.other.grammar.precept"],
+        "preceptState": ["entity.name.type.state.precept"],
+        "preceptState.preceptConstrained": ["entity.name.type.state.constrained.precept"],
+        "preceptEvent": ["entity.name.function.event.precept"],
+        "preceptEvent.preceptConstrained": ["entity.name.function.event.constrained.precept"],
+        "preceptFieldName": ["variable.other.field.precept"],
+        "preceptFieldName.preceptConstrained": ["variable.other.field.constrained.precept"],
+        "preceptType": ["storage.type.precept"],
+        "preceptValue": ["constant.other.value.precept"],
+        "preceptMessage": ["entity.name.precept.message.precept", "string.quoted.double.message.precept"]
+      }
+    }
+  ],
   "configurationDefaults": {
-    "editor.semanticTokenColorCustomizations": {
+    "[precept]": { "editor.semanticHighlighting.enabled": true },
+    "editor.tokenColorCustomizations": {
       "[*]": {
-        "rules": {
-          "preceptKeywordSemantic": { "foreground": "#4338CA", "bold": true },
-          "preceptKeywordGrammar":  { "foreground": "#6366F1" },
-          "preceptState":           { "foreground": "#A898F5" },
-          "preceptEvent":           { "foreground": "#30B8E8" },
-          "preceptFieldName":       { "foreground": "#B0BEC5" },
-          "preceptType":            { "foreground": "#9AA8B5" },
-          "preceptValue":           { "foreground": "#84929F" },
-          "preceptMessage":         { "foreground": "#FBBF24" },
-          "preceptState:preceptConstrained":     { "italic": true },
-          "preceptEvent:preceptConstrained":     { "italic": true },
-          "preceptFieldName:preceptConstrained": { "italic": true }
-        }
+        "textMateRules": [
+          { "scope": "keyword.other.semantic.precept",              "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
+          { "scope": "keyword.other.grammar.precept",               "settings": { "foreground": "#6366F1" } },
+          { "scope": "entity.name.type.state.precept",              "settings": { "foreground": "#A898F5" } },
+          { "scope": "entity.name.type.state.constrained.precept",  "settings": { "foreground": "#A898F5", "fontStyle": "italic" } },
+          { "scope": "entity.name.function.event.precept",          "settings": { "foreground": "#30B8E8" } },
+          { "scope": "entity.name.function.event.constrained.precept", "settings": { "foreground": "#30B8E8", "fontStyle": "italic" } },
+          { "scope": "variable.other.field.precept",                "settings": { "foreground": "#B0BEC5" } },
+          { "scope": "variable.other.field.constrained.precept",    "settings": { "foreground": "#B0BEC5", "fontStyle": "italic" } },
+          { "scope": "storage.type.precept",                        "settings": { "foreground": "#9AA8B5" } },
+          { "scope": "constant.other.value.precept",                "settings": { "foreground": "#84929F" } },
+          { "scope": "entity.name.precept.message.precept",         "settings": { "foreground": "#FBBF24" } },
+          { "scope": "string.quoted.double.message.precept",        "settings": { "foreground": "#FBBF24" } }
+        ]
       }
     }
   }
@@ -306,7 +327,7 @@ Add the custom semantic token type contributions and color mappings:
 
 #### F. TextMate Grammar — Fallback Color Anchoring
 
-**✅ Decided.** Strings default to slate (Data · Values) in TextMate fallback. Message strings flash slate→gold briefly when semantic tokens load. This keeps non-message strings (more common in default values) correct immediately.
+**✅ Decided.** Strings default to slate (Data · Values) in generic fallback, but dedicated message-string scopes (`string.quoted.double.message.precept`) and the dedicated precept-name scope (`entity.name.precept.message.precept`) are colored gold immediately. This keeps the two most important Rules · Messages cases correct even when VS Code is rendering through the semantic-token scope map fallback.
 
 The TextMate grammar already assigns specific scopes. To lock fallback colors before the language server loads, add `tokenColorCustomizations` in `configurationDefaults`:
 
@@ -356,7 +377,7 @@ See `docs/SyntaxHighlightingImplementationPlan.md` for the phased execution plan
 
 ### R1: `configurationDefaults` scope precedence — ✅ Accepted
 
-`editor.semanticTokenColorCustomizations` in `configurationDefaults` sets defaults that the user can override in their `settings.json`. This is the correct behavior for most extensions. However, the brand spec says "no user-facing palette overrides." True enforcement would require injecting colors at the decoration level (via `createTextEditorDecorationType`), which is significantly more complex. **Decision:** Accept `configurationDefaults` — users who override are power users making a deliberate choice.
+The extension does not bundle a theme. Instead, it relies on `semanticTokenScopes` and Precept-owned TextMate scopes. This is the intended VS Code fallback path when no theme-provided `semanticTokenColors` rule matches a custom semantic token. **Decision:** Accept the scope-map fallback as the non-theme implementation path.
 
 ### R2: Theme interaction — ✅ Accepted
 

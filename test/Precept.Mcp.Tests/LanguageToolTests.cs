@@ -15,6 +15,7 @@ public class LanguageToolTests
         result.Vocabulary.ControlKeywords.Should().NotBeEmpty();
         result.Vocabulary.ActionKeywords.Should().NotBeEmpty();
         result.Vocabulary.DeclarationKeywords.Should().NotBeEmpty();
+        result.Vocabulary.GrammarKeywords.Should().NotBeEmpty();
         result.Vocabulary.TypeKeywords.Should().NotBeEmpty();
         result.Vocabulary.LiteralKeywords.Should().NotBeEmpty();
         result.Vocabulary.Operators.Should().NotBeEmpty();
@@ -30,6 +31,7 @@ public class LanguageToolTests
         {
             [TokenCategory.Control] = result.Vocabulary.ControlKeywords,
             [TokenCategory.Declaration] = result.Vocabulary.DeclarationKeywords,
+            [TokenCategory.Grammar] = result.Vocabulary.GrammarKeywords,
             [TokenCategory.Action] = result.Vocabulary.ActionKeywords,
             [TokenCategory.Outcome] = result.Vocabulary.OutcomeKeywords,
             [TokenCategory.Type] = result.Vocabulary.TypeKeywords,

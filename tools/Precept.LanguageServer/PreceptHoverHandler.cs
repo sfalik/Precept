@@ -6,7 +6,11 @@ namespace Precept.LanguageServer;
 
 internal sealed class PreceptHoverHandler : IHoverHandler
 {
-    private static readonly TextDocumentSelector Selector = TextDocumentSelector.ForPattern("**/*.precept");
+    private static readonly TextDocumentSelector Selector = new(new TextDocumentFilter
+    {
+        Pattern = "**/*.precept",
+        Language = "precept"
+    });
 
     public Task<Hover?> Handle(HoverParams request, CancellationToken cancellationToken)
     {

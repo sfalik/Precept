@@ -4,6 +4,7 @@
   "scopeName": "source.precept",
   "patterns": [
     { "include": "#comment" },
+    { "include": "#messageStrings" },
     { "include": "#strings" },
     { "include": "#machineDeclaration" },
     { "include": "#stateDeclaration" },
@@ -52,6 +53,26 @@
         }
       ]
     },
+    "messageStrings": {
+      "patterns": [
+        {
+          "name": "meta.message.because.precept",
+          "match": "\\b(because)(\\s+)(\"(?:\\\\.|[^\"\\\\])*\")",
+          "captures": {
+            "1": { "name": "keyword.other.precept" },
+            "3": { "name": "string.quoted.double.message.precept" }
+          }
+        },
+        {
+          "name": "meta.message.reject.precept",
+          "match": "\\b(reject)(\\s+)(\"(?:\\\\.|[^\"\\\\])*\")",
+          "captures": {
+            "1": { "name": "keyword.other.precept" },
+            "3": { "name": "string.quoted.double.message.precept" }
+          }
+        }
+      ]
+    },
 
     "machineDeclaration": {
       "patterns": [
@@ -60,7 +81,7 @@
           "match": "^(\\s*)(precept)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "2": { "name": "keyword.control.precept" },
-            "4": { "name": "entity.name.type.precept" }
+            "4": { "name": "entity.name.precept.message.precept" }
           }
         }
       ]

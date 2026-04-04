@@ -9,7 +9,13 @@ namespace Precept.LanguageServer;
 
 internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
 {
-    private static readonly TextDocumentSelector Selector = TextDocumentSelector.ForPattern("**/*.precept");
+    internal readonly record struct ClassifiedSemanticToken(string Text, string Type, string? Modifier);
+
+    private static readonly TextDocumentSelector Selector = new(new TextDocumentFilter
+    {
+        Pattern = "**/*.precept",
+        Language = "precept"
+    });
 
     private static readonly SemanticTokensLegend Legend = new()
     {
@@ -21,9 +27,19 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
             "number",
             "string",
             "operator",
-            "comment"
+            "comment",
+            "preceptKeywordSemantic",
+            "preceptKeywordGrammar",
+            "preceptState",
+            "preceptEvent",
+            "preceptFieldName",
+            "preceptType",
+            "preceptValue",
+            "preceptMessage"
         ),
-        TokenModifiers = new Container<SemanticTokenModifier>()
+        TokenModifiers = new Container<SemanticTokenModifier>(
+            "preceptConstrained"
+        )
     };
 
     // Comments are stripped by the tokenizer, so we scan them from raw text.
@@ -77,14 +93,15 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
             var category = PreceptTokenMeta.GetCategory(member);
             var semanticType = category switch
             {
-                TokenCategory.Control => "keyword",
-                TokenCategory.Declaration => "keyword",
-                TokenCategory.Action => "keyword",
-                TokenCategory.Outcome => "keyword",
-                TokenCategory.Type => "type",
-                TokenCategory.Literal => "keyword",  // true/false/null
-                TokenCategory.Operator => "operator",
-                TokenCategory.Punctuation => member == PreceptToken.Arrow ? "operator" : null,
+                TokenCategory.Control => "preceptKeywordSemantic",
+                TokenCategory.Declaration => "preceptKeywordSemantic",
+                TokenCategory.Action => "preceptKeywordSemantic",
+                TokenCategory.Outcome => "preceptKeywordSemantic",
+                TokenCategory.Grammar => "preceptKeywordGrammar",
+                TokenCategory.Type => "preceptType",
+                TokenCategory.Literal => "preceptValue",
+                TokenCategory.Operator => "preceptKeywordGrammar",
+                TokenCategory.Punctuation => member == PreceptToken.Arrow ? "preceptKeywordGrammar" : null,
                 _ => null
             };
             if (semanticType != null)
@@ -133,19 +150,50 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
             return Task.CompletedTask;
         }
 
+        foreach (var (token, semanticType, modifier) in ClassifyTokens(tokens, text))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var line = token.Span.Position.Line - 1;
+            var col = token.Span.Position.Column - 1;
+            var len = token.Span.Length;
+
+            if (semanticType != null)
+                Push(builder, line, col, len, semanticType, modifier);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    internal static IReadOnlyList<ClassifiedSemanticToken> GetClassifiedTokens(string text)
+    {
+        TokenList<PreceptToken> tokens;
+        try
+        {
+            tokens = PreceptTokenizerBuilder.Instance.Tokenize(text);
+        }
+        catch
+        {
+            return [];
+        }
+
+        return ClassifyTokens(tokens, text)
+            .Where(x => x.SemanticType != null)
+            .Select(x => new ClassifiedSemanticToken(x.Token.ToStringValue(), x.SemanticType!, x.Modifier))
+            .ToList();
+    }
+
+    private static IEnumerable<(Token<PreceptToken> Token, string? SemanticType, string? Modifier)> ClassifyTokens(
+        TokenList<PreceptToken> tokens,
+        string text)
+    {
+        var (constrainedStates, constrainedEvents, guardedFields) = BuildConstraintSets(text);
+
         PreceptToken? previousKind = null;
         var declContext = DeclContext.None;
 
         foreach (var token in tokens)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            // Superpower positions are 1-based; LSP is 0-based
-            var line = token.Span.Position.Line - 1;
-            var col = token.Span.Position.Column - 1;
-            var len = token.Span.Length;
-
-            // Track declaration context for comma-separated name lists
             if (token.Kind == PreceptToken.State)
                 declContext = DeclContext.State;
             else if (token.Kind == PreceptToken.Event)
@@ -160,63 +208,130 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
                 declContext = DeclContext.None;
 
             string? semanticType = null;
+            string? modifier = null;
 
-            // 2a. Fixed-category tokens (keywords, operators, types)
             if (SemanticTypeMap.TryGetValue(token.Kind, out var mapped))
             {
                 semanticType = mapped;
             }
-            // 2b. Identifiers — classified by preceding token context
             else if (token.Kind == PreceptToken.Identifier)
             {
                 semanticType = ClassifyIdentifier(previousKind, declContext);
+                if (semanticType != null)
+                {
+                    var tokenText = token.ToStringValue();
+                    if ((semanticType == "preceptState" && constrainedStates.Contains(tokenText)) ||
+                        (semanticType == "preceptEvent" && constrainedEvents.Contains(tokenText)) ||
+                        (semanticType == "preceptFieldName" && guardedFields.Contains(tokenText)))
+                    {
+                        modifier = "preceptConstrained";
+                    }
+                }
             }
-            // 2c. String literals
             else if (token.Kind == PreceptToken.StringLiteral)
             {
-                semanticType = "string";
+                semanticType = previousKind is PreceptToken.Because or PreceptToken.Reject
+                    ? "preceptMessage"
+                    : "preceptValue";
             }
-            // 2d. Number literals
             else if (token.Kind == PreceptToken.NumberLiteral)
             {
-                semanticType = "number";
+                semanticType = "preceptValue";
             }
 
-            if (semanticType != null)
-                Push(builder, line, col, len, semanticType);
+            yield return (token, semanticType, modifier);
 
-            // Track previous non-trivial token for context
             if (token.Kind != PreceptToken.NewLine)
                 previousKind = token.Kind;
         }
+    }
 
-        return Task.CompletedTask;
+    /// <summary>
+    /// Parses the document text and extracts constraint sets for italic modifier emission.
+    /// Fails open — returns empty sets if the parse is incomplete or fails.
+    /// </summary>
+    internal static (HashSet<string> States, HashSet<string> Events, HashSet<string> Fields) BuildConstraintSets(string text)
+    {
+        try
+        {
+            var (definition, parseDiags) = PreceptParser.ParseWithDiagnostics(text);
+            if (definition is null || parseDiags.Count > 0)
+                return ([], [], []);
+            return ExtractConstraintSets(definition);
+        }
+        catch
+        {
+            return ([], [], []);
+        }
+    }
+
+    /// <summary>
+    /// Extracts the three constraint sets from a fully parsed <see cref="PreceptDefinition"/>.
+    /// </summary>
+    internal static (HashSet<string> States, HashSet<string> Events, HashSet<string> Fields) ExtractConstraintSets(PreceptDefinition definition)
+    {
+        var states = new HashSet<string>(StringComparer.Ordinal);
+        var events = new HashSet<string>(StringComparer.Ordinal);
+        var fields = new HashSet<string>(StringComparer.Ordinal);
+
+        if (definition.StateAsserts != null)
+            foreach (var sa in definition.StateAsserts)
+                states.Add(sa.State);
+
+        if (definition.EventAsserts != null)
+            foreach (var ea in definition.EventAsserts)
+                events.Add(ea.EventName);
+
+        if (definition.Invariants != null)
+            foreach (var inv in definition.Invariants)
+                CollectFieldNames(inv.Expression, fields);
+
+        return (states, events, fields);
+    }
+
+    private static void CollectFieldNames(PreceptExpression expr, HashSet<string> fields)
+    {
+        switch (expr)
+        {
+            case PreceptIdentifierExpression { Member: null } id:
+                fields.Add(id.Name);
+                break;
+            case PreceptBinaryExpression bin:
+                CollectFieldNames(bin.Left, fields);
+                CollectFieldNames(bin.Right, fields);
+                break;
+            case PreceptUnaryExpression unary:
+                CollectFieldNames(unary.Operand, fields);
+                break;
+            case PreceptParenthesizedExpression paren:
+                CollectFieldNames(paren.Inner, fields);
+                break;
+        }
     }
 
     /// <summary>
     /// Classifies an identifier token based on the preceding token:
-    /// - After state/transition/in/to → "type" (state name)
-    /// - After event/on → "function" (event name)
-    /// - After field/set/add/remove/.../into → "variable" (field name)
-    /// - After precept → "type" (precept name)
-    /// - After from → "type" (state name; covers "from State on Event")
-    /// - After dot → "variable" (member access like Collection.count)
-    /// - Otherwise → "variable" (bare identifier in expression)
+    /// - After precept → "preceptMessage" (gold — the contract name)
+    /// - After state/from/transition/in/to → "preceptState"
+    /// - After event/on → "preceptEvent"
+    /// - After field/set/add/remove/.../into → "preceptFieldName"
+    /// - After dot → "preceptFieldName" (member access like Collection.count)
+    /// - Otherwise → "preceptFieldName" (bare identifier in expression)
     /// </summary>
     private static string ClassifyIdentifier(PreceptToken? previousKind, DeclContext context) => previousKind switch
     {
-        PreceptToken.Precept => "type",
-        PreceptToken.From => "type",
-        PreceptToken.Dot => "variable",
-        PreceptToken.Comma when context == DeclContext.State => "type",
-        PreceptToken.Comma when context == DeclContext.Event => "function",
-        PreceptToken.Comma when context == DeclContext.Field => "variable",
-        PreceptToken.Comma => "variable",
-        _ when previousKind.HasValue && StateContextTokens.Contains(previousKind.Value) => "type",
-        _ when previousKind.HasValue && EventContextTokens.Contains(previousKind.Value) => "function",
-        _ when previousKind.HasValue && FieldContextTokens.Contains(previousKind.Value) => "variable",
-        PreceptToken.Edit => "variable",
-        _ => "variable" // default: bare identifier in expression position
+        PreceptToken.Precept => "preceptMessage",
+        PreceptToken.From => "preceptState",
+        PreceptToken.Dot => "preceptFieldName",
+        PreceptToken.Comma when context == DeclContext.State => "preceptState",
+        PreceptToken.Comma when context == DeclContext.Event => "preceptEvent",
+        PreceptToken.Comma when context == DeclContext.Field => "preceptFieldName",
+        PreceptToken.Comma => "preceptFieldName",
+        _ when previousKind.HasValue && StateContextTokens.Contains(previousKind.Value) => "preceptState",
+        _ when previousKind.HasValue && EventContextTokens.Contains(previousKind.Value) => "preceptEvent",
+        _ when previousKind.HasValue && FieldContextTokens.Contains(previousKind.Value) => "preceptFieldName",
+        PreceptToken.Edit => "preceptFieldName",
+        _ => "preceptFieldName" // default: bare identifier in expression position
     };
 
     /// <summary>Converts a character offset in the full text to (line, column), both 0-based.</summary>
@@ -240,9 +355,9 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
         return (line, col);
     }
 
-    private static void Push(SemanticTokensBuilder builder, int line, int character, int length, string tokenType)
+    private static void Push(SemanticTokensBuilder builder, int line, int character, int length, string tokenType, string? modifier = null)
     {
         if (length <= 0) return;
-        builder.Push(line, character, length, tokenType, Array.Empty<string>());
+        builder.Push(line, character, length, tokenType, modifier != null ? [modifier] : Array.Empty<string>());
     }
 }

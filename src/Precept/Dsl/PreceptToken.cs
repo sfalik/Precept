@@ -13,6 +13,7 @@ public enum TokenCategory
     Declaration,
     Action,
     Outcome,
+    Grammar,
     Type,
     Literal,
     Operator,
@@ -66,17 +67,17 @@ public enum PreceptToken
     [TokenSymbol("field")]
     Field,
 
-    [TokenCategory(TokenCategory.Declaration)]
+    [TokenCategory(TokenCategory.Grammar)]
     [TokenDescription("Type annotation separator")]
     [TokenSymbol("as")]
     As,
 
-    [TokenCategory(TokenCategory.Declaration)]
+    [TokenCategory(TokenCategory.Grammar)]
     [TokenDescription("Marks a field as nullable")]
     [TokenSymbol("nullable")]
     Nullable,
 
-    [TokenCategory(TokenCategory.Declaration)]
+    [TokenCategory(TokenCategory.Grammar)]
     [TokenDescription("Specifies a default value")]
     [TokenSymbol("default")]
     Default,
@@ -86,7 +87,7 @@ public enum PreceptToken
     [TokenSymbol("invariant")]
     Invariant,
 
-    [TokenCategory(TokenCategory.Declaration)]
+    [TokenCategory(TokenCategory.Grammar)]
     [TokenDescription("Reason sentinel for constraints")]
     [TokenSymbol("because")]
     Because,
@@ -96,7 +97,7 @@ public enum PreceptToken
     [TokenSymbol("state")]
     State,
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Grammar)]
     [TokenDescription("Marks the initial state")]
     [TokenSymbol("initial")]
     Initial,
@@ -106,7 +107,7 @@ public enum PreceptToken
     [TokenSymbol("event")]
     Event,
 
-    [TokenCategory(TokenCategory.Declaration)]
+    [TokenCategory(TokenCategory.Grammar)]
     [TokenDescription("Introduces event arguments")]
     [TokenSymbol("with")]
     With,
@@ -148,12 +149,12 @@ public enum PreceptToken
     [TokenSymbol("when")]
     When,
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Grammar)]
     [TokenDescription("Wildcard for all declared states")]
     [TokenSymbol("any")]
     Any,
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Grammar)]
     [TokenDescription("Collection inner-type separator")]
     [TokenSymbol("of")]
     Of,
@@ -201,7 +202,7 @@ public enum PreceptToken
     [TokenSymbol("clear")]
     Clear,
 
-    [TokenCategory(TokenCategory.Action)]
+    [TokenCategory(TokenCategory.Grammar)]
     [TokenDescription("Captures dequeue/pop result into a field")]
     [TokenSymbol("into")]
     Into,

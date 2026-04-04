@@ -28,6 +28,7 @@ public static class LanguageTool
         var controlKeywords = new List<string>();
         var actionKeywords = new List<string>();
         var declarationKeywords = new List<string>();
+        var grammarKeywords = new List<string>();
         var outcomeKeywords = new List<string>();
         var typeKeywords = new List<string>();
         var literalKeywords = new List<string>();
@@ -57,6 +58,9 @@ public static class LanguageTool
                     case TokenCategory.Outcome when symbol is not null:
                         outcomeKeywords.Add(symbol);
                         break;
+                    case TokenCategory.Grammar when symbol is not null:
+                        grammarKeywords.Add(symbol);
+                        break;
                     case TokenCategory.Type when symbol is not null:
                         typeKeywords.Add(symbol);
                         break;
@@ -75,6 +79,7 @@ public static class LanguageTool
                     controlKeywords,
                     actionKeywords,
                     declarationKeywords,
+                    grammarKeywords,
                     outcomeKeywords,
                     typeKeywords,
                     literalKeywords,
@@ -144,6 +149,7 @@ public sealed record VocabularyDto(
     IReadOnlyList<string> ControlKeywords,
     IReadOnlyList<string> ActionKeywords,
     IReadOnlyList<string> DeclarationKeywords,
+    IReadOnlyList<string> GrammarKeywords,
     IReadOnlyList<string> OutcomeKeywords,
     IReadOnlyList<string> TypeKeywords,
     IReadOnlyList<string> LiteralKeywords,

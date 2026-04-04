@@ -8,7 +8,11 @@ namespace Precept.LanguageServer;
 
 internal sealed class PreceptCodeActionHandler : ICodeActionHandler
 {
-    private static readonly TextDocumentSelector Selector = TextDocumentSelector.ForPattern("**/*.precept");
+    private static readonly TextDocumentSelector Selector = new(new TextDocumentFilter
+    {
+        Pattern = "**/*.precept",
+        Language = "precept"
+    });
 
     public Task<CommandOrCodeActionContainer?> Handle(CodeActionParams request, CancellationToken cancellationToken)
     {
