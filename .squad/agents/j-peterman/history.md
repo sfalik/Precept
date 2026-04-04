@@ -21,6 +21,28 @@ Elaine completed beautification and unification of palette mapping visual treatm
 
 ## Learnings
 
+### 2026-04-08 — README copy polish pass completed
+
+**Task:** Focused post-design copy pass on live README. Preserve Elaine's structural improvements. Tighten prose only for clarity, cadence, and brand voice. Do not reopen structure. Do not introduce new hero domain. Keep current mark and temporary sample.
+
+**What was done:**
+- Line 8: Rewrote hook to integrate "unbreakable precepts" mechanism phrase into the main positioning sentence. "By treating business constraints as unbreakable precepts" now connects the brand name to the core mechanism in one breath, making the name feel earned. This preserves the key phrase flagged in design review while tightening prose.
+- Line 79: Simplified AI-Native Tooling lead-in. Removed parenthetical "(5 tools)" and "a language server that" construction. Result: leaner sentence that still names all three components. Removed "gives" to make it parallel structure ("MCP server… GitHub Copilot plugin… and language server give…").
+- Line 81: Simplified Unified Domain Integrity opener. Changed "Precept co-locates them: constraints live next to the state they govern" to "Precept unifies them into one definition" — same meaning, 9 fewer words, clearer antecedent (co-locates/unifies/integrates all mean roughly the same thing; unify is most direct).
+- Line 84: Changed "complete rules" to "all rules" — matches the verb "together" better grammatically, preserves meaning, tighter phrasing.
+- Line 85: Simplified full inspectability bullet. "preview any action's outcome without mutation" → "preview any action's outcome without executing it". More precise: we're not mutating data via preview, we're avoiding actual execution. The word "mutation" can be misread as data structure mutation.
+- Line 88: Simplified Live Editor Experience. Removed "Context-aware" (implicit in "Completions") and removed vague "a live state diagram preview" → "in VS Code" (concrete location, serves navigation and AI reader).
+
+**Approach:** Tightened for cadence (removed parentheses, reduced word count), preserved all factual claims and locked positioning language, kept brand voice (authoritative, matter-of-fact, no hedging).
+
+**Files affected:** `README.md` only. Structure, examples, links, and conceptual content untouched.
+
+**Key decision:** The "unbreakable precepts" phrase was kept because it does distinct work — it connects brand name to mechanism in one moment, making the name feel earned rather than invented. Rather than cutting it (as earlier drafts considered), integrated it as a participial phrase in the main positioning sentence.
+
+**Key learning — prose tightening discipline:** When tightening copy post-design, the move is not to remove or reorganize — it is to make every word earn its place. Parentheticals that restate what's already clear (5 tools), qualifiers that don't add info (a language server that), vague nouns (mutation when you mean execution) are the first targets. The structural work (Elaine's design) is finished; now it's rhythm and precision.
+
+---
+
 ### 2026-04-07 — Signal color family names applied consistently
 
 **Task:** Determine whether the three signal colors had proper family names beyond plain green/yellow/red, and if so, update all occurrences to use those names.

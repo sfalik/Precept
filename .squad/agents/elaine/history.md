@@ -1,3 +1,27 @@
+## 2026-04-07 — README Form/Shape Pass Applied
+
+### What I Did
+
+Applied form/shape improvements to README.md per task brief:
+
+1. **Title block** — Removed emoji from H1, shortened badge labels, cleaned definition blockquote
+2. **Quick Example** — Shortened C# variable names for compactness; kept vertical layout (side-by-side tables break code blocks on GitHub)
+3. **Getting Started** — Collapsed verbose prereq callout to one bold line; tightened step prose
+4. **What Makes Precept Different** — Collapsed three H3s into bold inline headers; preserved the bullet list for Unified Domain Integrity
+5. **Learn More** — Changed bullet list to table format for better alignment
+6. **Contributing** — Collapsed build details into two commands; trimmed quick-reference table
+
+### Learnings
+
+- **Side-by-side layouts don't work for code blocks in GitHub markdown.** HTML tables technically render, but code fence blocks inside `<td>` cells don't highlight reliably. The vertical layout is safer and still scannable.
+- **Bold inline headers with em-dash lead-ins can replace H3s when the content is one sentence.** This reduces heading noise without losing structure.
+- **Tables beat bullet lists for resource links.** The two-column alignment (resource + description) is easier to scan than a long list of dashed phrases.
+- **Prerequisite callouts can be over-prominent.** A bold one-liner does the job without a full blockquote.
+
+**Decision written to:** `.squad/decisions/inbox/elaine-readme-shape-pass.md`
+
+---
+
 ## 2026-04-07 — README Rewrite: Direct Contribution Role Defined
 
 ### What I Did
