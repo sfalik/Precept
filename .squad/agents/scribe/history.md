@@ -1,7 +1,7 @@
 ## 2026-04-04T23:02:57Z - Hero snippet pass recorded
 
 - Logged J. Peterman's canonical hero-snippet pass in orchestration and session logs.
-- Merged decision inbox into decisions.md (27 appended, 0 deduplicated/skipped) and cleared processed inbox files.
+- Merged decision inbox into decisions.md (27 appended, 1 deduplicated/skipped) and cleared processed inbox files.
 - Propagated the hero-snippet source-of-truth update to Elaine and Steinbrenner.
 - Summarized oversized agent histories into compact Core Context sections.
 
@@ -39,3 +39,4 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 ## Recent Updates
 
 - Team initialized on 2026-04-04 with the full eight-agent Seinfeld cast across project domains.
+
