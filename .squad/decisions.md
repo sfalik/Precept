@@ -471,6 +471,42 @@ The hero has ONE job: make a .NET developer read it and think "this is a real bu
 Structural budget at 15 lines (±1):
 ```
 1  precept Name
+
+---
+
+## Hero Domain Selection: Subscription Billing
+
+**Date:** 2026-05-01  
+**Author:** J. Peterman  
+**Status:** Decided
+
+### Decision
+
+The rank-1 domain chosen as the new hero in `brand/explorations/visual-language-exploration.html` is **Subscription Billing**.
+
+### Rationale
+
+Subscription Billing scored 29/30 in the hero deliberation (tied with SaaS Trial and Coffee Order), winning the tiebreak on Precept Differentiation (5/5). It was selected as rank #1 for:
+
+- **Universal recognition**: The SaaS trial → active → cancelled lifecycle is immediately understood by any developer, regardless of stack or industry.
+- **Quintessential structural impossibility**: `reject "Cancelled subscriptions cannot be reactivated"` is the clearest possible expression of the product thesis — "invalid states are structurally impossible."
+- **Multi-line hero format**: The `from Trial on Activate when PlanName == null` block reads like a product spec, teaching five DSL concepts in four lines.
+- **Full DSL coverage** (5/5): invariant, when guard, reject, dotted set, transition, no transition, 3 states, typed event, event assert — all present.
+
+### HTML Changes Made
+
+1. **Hero card**: Replaced loan-application.precept with subscription.precept (rank #1, score 29/30).
+2. **Rubric section**: New section inserted after hero, showing the 6-criterion scoring table with max scores and descriptions.
+3. **30-Candidate Gallery**: All 30 deliberation candidates displayed in rank order, each with badge (gold/silver/bronze), score breakdown, DSL snippet (inline-styled), and reasoning sentence.
+4. **Final Ranking Table**: Compact table showing all 30 candidates with per-criterion scores and notes.
+
+### Candidates Tied at 29/30
+
+| Rank | Domain | Why ranked below |
+|------|--------|-----------------|
+| 1 | Subscription Billing | Winner — strongest differentiation |
+| 2 | SaaS Trial | Slightly lower narrative immediacy |
+| 3 | Coffee Order | Lower Diff score (4 vs 5) |
 2  (blank)
 3  field … default
 4  invariant … because
