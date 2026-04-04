@@ -39,7 +39,7 @@ The name "Precept" carries narrative weight — it means "a strict rule of actio
 
 Tone coordinates (NN/g dimensions):
 - Formal ↔ Casual: Slightly casual. Contractions fine. Occasional explanatory asides.
-- Serious ↔ Funny: Serious. No jokes.
+- Serious ↔ Funny: Serious, but occasional jokes.  
 - Respectful ↔ Irreverent: Respectful.
 - Matter-of-fact ↔ Enthusiastic: Matter-of-fact with clarifying asides.
 

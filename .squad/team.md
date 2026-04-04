@@ -20,6 +20,7 @@
 | Uncle Leo | Code Reviewer | `.squad/agents/uncle-leo/charter.md` | 🟢 Active |
 | J. Peterman | Brand/DevRel | `.squad/agents/j-peterman/charter.md` | 🟢 Active |
 | Steinbrenner | PM | `.squad/agents/steinbrenner/charter.md` | 🟢 Active |
+| Elaine | UX Designer | `.squad/agents/elaine/charter.md` | 🟢 Active |
 | Scribe | Session Logger | `.squad/agents/scribe/charter.md` | 🟢 Active |
 | Ralph | Work Monitor | — | 🔄 Monitor |
 

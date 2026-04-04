@@ -1,0 +1,265 @@
+<!-- ===================================================================== -->
+<!-- VISUAL SURFACES (Draft for review and integration into brand-spec.html) -->
+<!-- ===================================================================== -->
+
+<div class="section">
+<h2>10. Visual Surfaces <span class="status-chip">DRAFT</span></h2>
+
+<p>Precept appears on five primary visual surfaces — each serves a distinct user need, but all share the same semantic color vocabulary and typography principles from the locked system. This section describes how the brand system translates into each surface.</p>
+
+<!-- SURFACE 1: SYNTAX EDITOR -->
+<div class="card">
+<h3>Surface 1: Syntax Editor</h3>
+
+<p><strong>Purpose:</strong> The `.precept` text file in VS Code where developers author domain contracts. Syntax highlighting, semantic tokens, hover cards, diagnostic underlines, and inline constraint indicators.</p>
+
+<p><strong>Primary visual concerns:</strong></p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li>Scannability at glance — a developer skims down the file and immediately recognizes structural parts (declarations vs. rules vs. data)</li>
+  <li>Constraint visibility — states and events under rule pressure must be visually distinguished without slowing read</li>
+  <li>Diagnostic clarity — error underlines and inline messages must interrupt attention without overwhelming</li>
+  <li>Monospace legibility — code rendering in small size, dark background; every hue and weight choice is functional, never decorative</li>
+</ul>
+
+<p><strong>Color application:</strong> Use the complete 8-shade authoring palette (§4) exactly as locked. Syntax highlighting tokens map to the semantic system:</p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li><strong>Indigo shades</strong> (#4338CA semantic, #6366F1 grammar) for structure keywords and grammar — establishes the control backbone of the file</li>
+  <li><strong>Violet</strong> (#A898F5) for state names; italic if constrained by `assert`</li>
+  <li><strong>Cyan</strong> (#30B8E8) for event names; italic if constrained by `assert`</li>
+  <li><strong>Slate shades</strong> (#B0BEC5 names, #9AA8B5 types, #84929F values) for data — three depths separate at a glance</li>
+  <li><strong>Gold</strong> (#FBBF24) for message strings in `because` and `reject` — the human explanation earns the warm interrupt</li>
+  <li><strong>Comments</strong> (#9096A6, italic) — intentionally muted, outside the semantic palette</li>
+  <li><strong>No runtime verdicts in syntax highlighting.</strong> Green/red/yellow are reserved for runtime outcomes only; they never appear in the editor, so authoring-time color cannot be confused with runtime verdict</li>
+</ul>
+
+<p><strong>Typography application:</strong> Cascadia Cove monospace, standard rendering sizes (13–14px in VS Code). Typography is the second signal channel alongside color:</p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li><strong>Bold:</strong> Structure semantic keywords — `precept`, `field`, `state`, `event`, `invariant`, etc. Weight signals "this word drives behavior"</li>
+  <li><strong>Italic:</strong> Constrained states, constrained events, and invariant-guarded field names. Italic says "this token is under rule pressure"</li>
+  <li><strong>Normal weight:</strong> Structure grammar, unconstrained actors, data types, values, and rule message text</li>
+</ul>
+
+<p><strong>Accessibility notes:</strong></p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li>Color contrast: All syntax colors meet WCAG AA (4.5:1) against the background (#0c0c0f). Verified in brand-decisions.md color table (CR column)</li>
+  <li>Italic as non-primary signal: Italic marks constraint pressure as a supplement to color, not the primary indicator. A developer with red/green color blindness can still distinguish constrained tokens by their italic rendering</li>
+</ul>
+
+<!-- SHANE REVIEW: Verify that italic + color together serve color-blind developers adequately. Consider a user test with deuteranopia/protanopia viewers. -->
+
+<p><strong>AI-first note:</strong> The syntax editor is the first thing an AI agent reads when learning a Precept file. Structured coloring means the agent can parse hue and weight as metadata channels: indigo = control, violet/cyan = actors, slate = data, gold = human text. Semantic tokens enable AI tools like Claude's symbol inspection to understand token kinds without re-parsing. The editor is not just for humans — syntax highlighting is a machine-readable format.</p>
+
+</div>
+
+<!-- SURFACE 2: STATE DIAGRAM -->
+<div class="card">
+<h3>Surface 2: State Diagram</h3>
+
+<p><strong>Purpose:</strong> The visual graph rendered in the VS Code preview webview, showing states as nodes and transitions as labeled edges. Developers use the diagram to verify logic, understand event flow, and catch impossible paths. AI agents use diagrams to reason about reachability and state coverage.</p>
+
+<p><strong>Primary visual concerns:</strong></p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li>Visual hierarchy of state roles — initial, intermediate, and terminal states must be instantly distinguishable by shape and color</li>
+  <li>Event labeling — transition arrows must clearly show which event fires the edge, and conditional transitions need guards/assertions visible</li>
+  <li>Layout legibility — node spacing, edge routing, and label placement must prevent visual tangles even with 10+ states</li>
+  <li>Runtime outcome visualization — during inspection, nodes may highlight to show enabled/blocked state transitions</li>
+</ul>
+
+<p><strong>Color application:</strong> State diagram coloring uses the same hue families as syntax highlighting but applies them differently — color and shape together encode state role (§8 / §9 of this spec):</p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li><strong>State nodes:</strong> Use the structural indigo family (#A5B4FC initial, #94A3B8 intermediate, #C4B5FD terminal). Lifecycle role is shown by shape, not lifecycle tint. One state hue keeps the diagram clean</li>
+  <li><strong>State names (text):</strong> Violet (#A898F5) — matches syntax highlighting, so readers recognize the name immediately</li>
+  <li><strong>Transition arrows:</strong> Indigo (#6366F1) — flow belongs to the structure grammar family</li>
+  <li><strong>Event labels on edges:</strong> Cyan (#30B8E8) — matches syntax highlighting event hue; label color identifies the event type without re-reading</li>
+  <li><strong>Event sub-shading:</strong> If diagram rendering includes event subtype (transition/conditional/stationary), use the cyan sub-shades (#38BDF8, #7DD3FC, #0EA5E9 respectively, per §9)</li>
+  <li><strong>Runtime verdict overlays:</strong> When showing live state during inspection, use the verdict colors: Enabled (#34D399), Blocked (#F87171), Warning (#FDE047). These are strictly runtime, never authoring-time</li>
+</ul>
+
+<div class="callout">
+  <strong>Why no lifecycle tints in diagrams:</strong> The compiler cannot know whether a terminal state is "good" (Approved) or "bad" (Rejected). Using green for some terminals and red for others would require manual annotation and create false confidence. Lilac works for all terminals because it signals finality, not valence. Verdict colors stay runtime-only.
+</div>
+
+<p><strong>Typography application:</strong> Cascadia Cove, normal weight for all labels (bold and italic not used in diagrams):</p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li><strong>State names:</strong> 12–13px, centered on node, violet text. Legible even at small zoom</li>
+  <li><strong>Event labels:</strong> 11–12px, positioned above or below edge, cyan text. Label placement must avoid edge occlusion</li>
+  <li><strong>Guard/assertion markers:</strong> If conditional transitions show their guards, use 10–11px gold (#FBBF24) text, positioned on or near the edge</li>
+</ul>
+
+<p><strong>Accessibility notes:</strong></p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li>Color + shape redundancy: State roles use both color AND shape (circle, rounded rect, double-border). A color-blind viewer still recognizes initial vs. terminal by shape alone</li>
+  <li>Edge clarity: Transition arrows must have sufficient stroke weight (2–2.5px) and contrast (#6366F1 arrow on dark background). Event labels must be readable at typical extension webview zoom levels</li>
+</ul>
+
+<!-- PETERMAN REVIEW: Verify that state node colors (#A5B4FC, #94A3B8, #C4B5FD) are applied consistently with the locked system. These appear in brand-spec.html §8 but should be confirmed as the canonical indigo-family progression. -->
+
+<p><strong>AI-first note:</strong> Diagrams are not just for human visual intuition — they are structured graph data that AI agents parse to understand state reachability. Clear label positioning and consistent edge coloring mean an AI tool can extract "which events can fire from State X?" without ambiguity. The diagram layout itself is machine-readable: node positions, edge directions, and labeled transitions form a knowledge graph that supports AI reasoning about coverage, cycles, and dead states.</p>
+
+</div>
+
+<!-- SURFACE 3: INSPECTOR PANEL -->
+<div class="card">
+<h3>Surface 3: Inspector Panel</h3>
+
+<p><strong>Purpose:</strong> The data/field inspector in the preview webview, showing live instance state during event firing. Developers inspect field values, constraint violations, and the effect of transitions. The panel is where data becomes concrete — where abstract rules meet runtime reality.</p>
+
+<p><strong>Primary visual concerns:</strong></p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li>Field visibility and hierarchy — which fields are set, which are null/default, which are guarded by invariants</li>
+  <li>Constraint feedback — if a field violates an invariant, the violation must be obvious without requiring text parsing</li>
+  <li>Event argument preview — when firing an event, the panel shows what arguments are available and their values</li>
+  <li>State transition clarity — before and after state, with visual indication of which fields changed</li>
+</ul>
+
+<p><strong>Color application:</strong> Inspector uses the data and verdict color systems:</p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li><strong>Field names:</strong> Slate (#B0BEC5), normal or italic if guarded by invariant. Same as syntax highlighting so the reader recognizes the field</li>
+  <li><strong>Field types:</strong> Slate (#9AA8B5). Type info is secondary to the name and value</li>
+  <li><strong>Field values:</strong> Slate (#84929F) for normal values, or verdict colors if a constraint is violated</li>
+  <li><strong>Current state label:</strong> Violet (#A898F5) — matches syntax highlighting and diagram state naming</li>
+  <li><strong>Constraint violation indicators:</strong> Blocked (#F87171) for invariant violations, Warning (#FDE047) for unmatched guards. Verdict colors signal runtime constraint feedback</li>
+  <li><strong>Enabled indicators:</strong> Enabled (#34D399) for valid state, successful transitions, or non-violated fields</li>
+  <li><strong>Read-only field indicators:</strong> Dusk indigo (#9096A6) or a neutral shade for fields that cannot be modified directly (computed, state-derived)</li>
+</ul>
+
+<p><strong>Typography application:</strong> Cascadia Cove monospace, 12–13px for field names and values:</p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li><strong>Field name:</strong> Normal weight, 12px, left-aligned. Field names that are invariant-guarded can be italic</li>
+  <li><strong>Field value:</strong> 12px, monospace to match code appearance. Wider line-height (1.6–1.8) for readability in a tabular layout</li>
+  <li><strong>Constraint message:</strong> 11px, gold (#FBBF24) text below the violated field. Message text is the human explanation, so it earns color emphasis and smaller size to distinguish from data values</li>
+</ul>
+
+<p><strong>Accessibility notes:</strong></p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li>Color + icon redundancy: Constraint violations use both color (Blocked red) and an icon (✗ or warning symbol). A color-blind developer still sees the symbol</li>
+  <li>Table structure: If inspector data is rendered as a table (field name | type | value), use proper `<th>` headers and `<tr>/<td>` semantics so screen readers announce the structure</li>
+</ul>
+
+<!-- SHANE REVIEW: Confirm that Inspector UI is already built or planned. If planned, this description should drive the implementation. If already built, verify the current colors/layout match these principles. -->
+
+<p><strong>AI-first note:</strong> The inspector panel is JSON-serializable state data. An AI agent reading the inspector output needs to understand: current state, current field values, which constraints are violated, and what the next transition would do. Structured layout with consistent field ordering and color-coded constraint feedback means the agent can parse violations without string matching on error text. The inspector is both a human debugging tool and an API contract for AI tools.</p>
+
+</div>
+
+<!-- SURFACE 4: DOCS SITE -->
+<div class="card">
+<h3>Surface 4: Docs Site</h3>
+
+<p><strong>Purpose:</strong> The documentation website (future surface) where developers learn Precept concepts, read language design docs, explore sample files, and navigate API reference. The docs site is where brand positioning comes to life — it must teach the "why" alongside the "how."</p>
+
+<p><strong>Primary visual concerns:</strong></p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li>Hierarchy and scanability — tutorials, reference, samples, and theory must be visually stratified so a developer finds what they need instantly</li>
+  <li>Code sample rendering — `.precept` files embedded in docs must use the same syntax highlighting colors as the editor, so readers feel continuity</li>
+  <li>Conceptual callouts — "this is a precept" (small caps), "this is a pattern" (styled differently from narrative prose)</li>
+  <li>Responsive layout — docs must work on desktop (code examples side-by-side with prose) and mobile (stacked layout)</li>
+</ul>
+
+<p><strong>Color application:</strong> Docs site maintains the dark-mode semantic palette but may introduce additional neutral/gray shades for navigation, backgrounds, and UI chrome:</p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li><strong>Code blocks embedded in prose:</strong> Use the full syntax highlighting palette — indigo for structure, violet for states, cyan for events, slate for data, gold for messages. Readers see the same colors as in their editor</li>
+  <li><strong>Brand color accents:</strong> Navigation, headings, and link highlights use deep indigo (#6366F1). This keeps the brand color family visible throughout the site without overwhelming</li>
+  <li><strong>Callout boxes:</strong> Locked brand decisions, conceptual definitions, and "Precept principle" statements may use subtle indigo background (current practice in brand-spec.html callout style)</li>
+  <li><strong>Verdict colors in diagrams and reference tables:</strong> If diagrams are embedded in docs, use the same color system as the preview webview (§2)</li>
+  <li><strong>Neutral grays for structure:</strong> Navigation backgrounds, borders, table headers, and dividers use the muted palette (#27272a, #18181b, #0c0c0f) to avoid competition with semantic colors</li>
+</ul>
+
+<!-- PETERMAN REVIEW: This section describes the future docs site. Confirm whether docs site branding is your responsibility (i.e., should this description be in brand-spec.html as a locked decision) or whether it's aspirational. If locked, add specific hex values and component guidelines to brand-spec.html. If aspirational, keep it in this draft for future design work. -->
+
+<p><strong>Typography application:</strong> Cascadia Cove for code, primary brand font for headings and UI:</p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li><strong>Page headings (H1):</strong> Cascadia Cove 700, small caps, 0.1em letter-spacing — same wordmark treatment as README and brand-spec</li>
+  <li><strong>Section headings (H2, H3):</strong> Cascadia Cove 600–700, normal case. Hierarchy through size and weight, not typeface</li>
+  <li><strong>Prose:</strong> System font stack or Cascadia Cove 400, 14–16px line-height 1.6–1.8. Readable for long-form content</li>
+  <li><strong>Code samples:</strong> Cascadia Cove 400, 12–13px with 1.8 line-height. Syntax highlighting colors applied</li>
+</ul>
+
+<p><strong>Accessibility notes:</strong></p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li>Heading hierarchy: H1 → H2 → H3, no skips. Screen readers rely on hierarchy to navigate long docs</li>
+  <li>Code sample alt text or captions: Embedded `.precept` samples should have a descriptive caption or nearby prose explaining the concept they demonstrate</li>
+</ul>
+
+<p><strong>AI-first note:</strong> The docs site is where AI agents gather context before writing Precept. Claude agents reading the tutorial section learn syntax and patterns. Reference docs with clear structure (headings, code blocks in `<pre>`, definition lists) are easier for agents to parse. Embedded `.precept` samples double as training data — the agent can read a sample and a caption and learn a pattern. Docs site design matters as much for AI comprehension as human comprehension.</p>
+
+</div>
+
+<!-- SURFACE 5: CLI / TERMINAL -->
+<div class="card">
+<h3>Surface 5: CLI / Terminal</h3>
+
+<p><strong>Purpose:</strong> Command-line output, build logs, diagnostic messages, and error reporting. Developers see this surface when running `dotnet build`, invoking the language server, or checking `precept` command-line tools. This is where the brand system meets terminal constraints.</p>
+
+<p><strong>Primary visual concerns:</strong></p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li>Error signal clarity — a developer must instantly see "this is an error" without reading prose</li>
+  <li>Terminal color support — many terminals support 256-color or true color; output must be legible in both dark and light terminal themes</li>
+  <li>Structured output — diagnostic messages, file paths, line numbers, and error text must separate visually even in monospace</li>
+  <li>No ambiguity with success/failure — the verdict colors (green/red/yellow) must be reserved for actual success/failure signals, not decorative accents</li>
+</ul>
+
+<p><strong>Color application:</strong> CLI output uses verdict colors strategically and sparingly:</p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li><strong>Success messages:</strong> Enabled (#34D399) — "Build succeeded" or "✓ All checks passed"</li>
+  <li><strong>Error messages:</strong> Blocked (#F87171) — "Error: Invalid syntax at line 12" or "✗ Constraint violated"</li>
+  <li><strong>Warnings:</strong> Warning (#FDE047) — "Warning: Event 'Activate' has no guard; all paths succeed"</li>
+  <li><strong>Neutral output (file paths, context info):</strong> Default terminal color (no color applied). The terminal's default foreground color is most readable across theme variations</li>
+  <li><strong>Emphasis (bold text):</strong> File names, identifiers, and code elements can use bold or `backtick quoting` to stand out. Avoid color for emphasis on the CLI</li>
+  <li><strong>No structural indigo on CLI.</strong> Deep indigo (#6366F1) does not render well on light terminal themes and may be illegible. Reserved for UI only</li>
+</ul>
+
+<p><strong>Typography application:</strong> Monospace rendering, standard terminal fonts:</p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li><strong>Error/warning headers:</strong> Bold + verdict color, e.g., `✗ ERROR:` (bold red) followed by the message</li>
+  <li><strong>File path and line number:</strong> Normal weight, default color, e.g., `file.precept:12:5:` (no color formatting)</li>
+  <li><strong>Diagnostic message:</strong> Normal weight, default color. If a message quotes code, use backticks: `\`FieldName\`` or double-quotes: `"message text"`</li>
+  <li><strong>Suggestion or hint:</strong> Dim/muted color if the terminal supports it; otherwise, normal color with a `→` prefix</li>
+</ul>
+
+<p><strong>Accessibility notes:</strong></p>
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li>Color + symbol redundancy: Errors use both color (red) and a symbol (✗). Warnings use both color (yellow) and a symbol (⚠ or ⚡). A developer with red/green color blindness still sees the symbol</li>
+  <li>Light terminal compatibility: Verdict colors (#34D399, #F87171, #FDE047) are calibrated for dark backgrounds. For light terminals, either detect theme and swap to darker shades, or remove color and rely on symbols only</li>
+</ul>
+
+<!-- SHANE REVIEW: Verify whether the CLI tools (dotnet build, language server, precept CLI) already apply colors. If so, audit the current colors and adjust to match these principles. -->
+
+<p><strong>AI-first note:</strong> CLI output is often captured by AI tools and parsed as structured data. JSON output (e.g., `--json` flag) is machine-readable; human-readable error messages should be parseable too. Consistent error formatting (error symbol + colon + error code + message) means an AI agent can regex-parse failures. Color codes in terminal output can be captured or stripped by tools, so color should never be the only signal — symbol and text structure matter more.</p>
+
+</div>
+
+</div>
+
+<!-- ===================================================================== -->
+<!-- SUMMARY AND OUTSTANDING QUESTIONS -->
+<!-- ===================================================================== -->
+
+<div class="card">
+
+<h3>Integration Notes</h3>
+
+<p>These five surfaces form the complete visual ecosystem for Precept:</p>
+
+<ol style="margin-left: 16px; color: #a1a1aa;">
+  <li><strong>Syntax Editor:</strong> Where rules are written. Color encodes structural meaning; typography signals constraint pressure. The gateway into Precept.</li>
+  <li><strong>State Diagram:</strong> Where logic is visualized. Color + shape encode state roles; labels show events. The cognitive map developers build in their head.</li>
+  <li><strong>Inspector Panel:</strong> Where data is debugged. Verdict colors show constraint violations; data colors show field types and values. The moment theory meets reality.</li>
+  <li><strong>Docs Site:</strong> Where concepts are learned. Embeds the same color system as the editor so syntax examples feel familiar. The destination for "how do I...?" questions.</li>
+  <li><strong>CLI / Terminal:</strong> Where builds are reported. Verdict colors + symbols report success/failure; neutral colors for context. The automation surface.</li>
+</ol>
+
+<p>All five surfaces speak the same semantic language: indigo = structure, violet = states, cyan = events, slate = data, gold = messages, plus verdict colors for runtime outcomes. A developer who learns the color system in one surface instantly understands it in the others.</p>
+
+<p style="margin-top: 16px;"><strong>Outstanding questions for review:</strong></p>
+
+<ul style="margin-left: 16px; color: #a1a1aa;">
+  <li>Docs Site: Is the documentation website a locked responsibility for Peterman, or is it a future design project? This draft assumes future, but if it's being designed now, these principles should be moved to brand-spec.html §10 as locked decisions.</li>
+  <li>Inspector Panel: If the panel is already built in the VS Code extension, should this description be compared against the actual implementation and adjusted?</li>
+  <li>CLI Colors: Are the CLI tools (dotnet build, language server diagnostics, precept CLI) already applying colors? If so, an audit against these principles may uncover inconsistencies.</li>
+  <li>Light Theme: The entire system is designed dark-mode-first. If a light theme is planned for any surface, color values may need adjustment. Verdict colors (#34D399, #F87171, #FDE047) are calibrated for dark backgrounds.</li>
+  <li>Accessibility Testing: These notes include contrast ratios and redundancy (color + shape, color + symbol) but have not been validated with color-blind users or screen reader tests.</li>
+</ul>
+
+</div>
+

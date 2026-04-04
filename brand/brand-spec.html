@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Precept Brand Specification — Locked Decisions</title>
+<title>Precept Brand Specification — Surfaces & Identity</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>
@@ -71,13 +71,23 @@
 <!-- HEADER                                                                 -->
 <!-- ===================================================================== -->
 <h1>Precept</h1>
-<p class="subtitle">Brand Specification — Locked Decisions &nbsp;·&nbsp; Last updated: 2026-04-03</p>
+<p class="subtitle">Brand Specification — Surfaces & Identity &nbsp;·&nbsp; Last updated: 2026-04-03</p>
+
+<!-- STRUCTURE
+     1. Brand Identity
+     2. Visual Surfaces
+     3. Research & Explorations
+-->
 
 <!-- ===================================================================== -->
-<!-- 1. POSITIONING                                                         -->
+<!-- SECTION 1: BRAND IDENTITY                                             -->
 <!-- ===================================================================== -->
 <div class="section">
-<h2>1. Positioning <span class="status-chip">LOCKED</span></h2>
+<h2 style="font-size: 24px; margin-bottom: 24px; color: #6366F1;">1. Brand Identity</h2>
+
+<!-- 1.1 Positioning & Narrative -->
+<div class="section">
+<h2>1.1 Positioning &amp; Narrative <span class="status-chip">LOCKED</span></h2>
 
 <div class="card">
   <h3>Primary frame</h3>
@@ -93,17 +103,9 @@
     "Precept is a domain integrity engine for .NET — a single declarative contract that binds state, data, and business rules into an engine where invalid states are structurally impossible."
   </div>
 </div>
-</div>
-
-<div class="section-divider"></div>
-
-<!-- ===================================================================== -->
-<!-- 2. NARRATIVE                                                           -->
-<!-- ===================================================================== -->
-<div class="section">
-<h2>2. Narrative Archetype <span class="status-chip">LOCKED</span></h2>
 
 <div class="card">
+  <h3>Narrative archetype</h3>
   <p style="color:#fff; font-size:15px; font-weight:600; margin-bottom:8px;">Category Creator: "This is a new kind of thing."</p>
   <p>Like Temporal's "durable execution" or Tailwind's "utility-first CSS." Requires category education but earns the strongest position.</p>
 
@@ -123,11 +125,9 @@
 
 <div class="section-divider"></div>
 
-<!-- ===================================================================== -->
-<!-- 3. VOICE                                                               -->
-<!-- ===================================================================== -->
+<!-- 1.2 Voice & Tone -->
 <div class="section">
-<h2>3. Voice &amp; Tone <span class="status-chip">LOCKED</span></h2>
+<h2>1.2 Voice &amp; Tone <span class="status-chip">LOCKED</span></h2>
 
 <div class="card">
   <p style="color:#fff; font-size:15px; font-weight:600; margin-bottom:12px;">Authoritative with warmth.</p>
@@ -170,11 +170,126 @@
 
 <div class="section-divider"></div>
 
-<!-- ===================================================================== -->
-<!-- 4. COLOR SYSTEM                                                        -->
-<!-- ===================================================================== -->
+<!-- 1.3 Wordmark & Mark -->
 <div class="section">
-<h2>4. Color System <span class="status-chip">LOCKED</span></h2>
+<h2>1.3 Wordmark &amp; Brand Mark <span class="status-chip">LOCKED</span></h2>
+
+<div class="card">
+  <h3>Brand font</h3>
+  <p style="color:#fff; font-weight:600; margin:4px 0;">Cascadia Cove</p>
+  <p>Monospace from the Cascadia family, used with Cascadia Code fallback. Editor-native, crisp, and suited to both wordmark and code.</p>
+
+  <h3>Wordmark</h3>
+  <div style="margin:12px 0 20px;">
+    <div style="font-family:var(--brand-mono); font-size:48px; font-weight:700; font-variant:small-caps; letter-spacing:0.1em; color:#fff;">Precept</div>
+    <div style="font-size:11px; color:#52525b; margin-top:4px;">Cascadia Cove 700 · font-variant: small-caps · letter-spacing: 0.1em</div>
+  </div>
+
+  <p style="font-size:12px; color:#71717a; margin-top:-6px;">Source note: some archived snippets elsewhere in the brand folder still carry literal Inconsolata declarations, but active brand surfaces normalize to the shared Cascadia Cove <code>--brand-mono</code> stack.</p>
+
+  <h3>Weight range</h3>
+  <div style="display:flex; flex-direction:column; gap:8px; margin:8px 0;">
+    <div style="display:flex; align-items:baseline; gap:20px;">
+      <span style="font-size:32px; font-weight:400; color:#fff;">Precept</span>
+      <span style="color:#52525b; font-size:11px;">400 Regular — body text, inline references</span>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:20px;">
+      <span style="font-size:32px; font-weight:600; color:#fff;">Precept</span>
+      <span style="color:#52525b; font-size:11px;">600 SemiBold — code blocks, emphasis</span>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:20px;">
+      <span style="font-size:32px; font-weight:700; color:#fff;">Precept</span>
+      <span style="color:#52525b; font-size:11px;">700 Bold — wordmark, headings</span>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:20px;">
+      <span style="font-size:32px; font-weight:900; color:#fff;">Precept</span>
+      <span style="color:#52525b; font-size:11px;">900 Black — hero display (optional)</span>
+    </div>
+  </div>
+
+  <h3>Wordmark in context</h3>
+  <div style="background:#0c0c0f; border-radius:8px; padding:24px; border:1px solid #1e1b4b; margin:8px 0;">
+    <div class="lockup">
+      <svg width="40" height="40" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="12" fill="#1e1b4b"/>
+        <rect x="14" y="10" width="36" height="44" rx="3" fill="none" stroke="#475569" stroke-width="1.5"/>
+        <line x1="20" y1="20" x2="44" y2="20" stroke="#818cf8" stroke-width="1.5"/>
+        <line x1="20" y1="27" x2="40" y2="27" stroke="#475569" stroke-width="1" opacity="0.5"/>
+        <line x1="20" y1="33" x2="42" y2="33" stroke="#475569" stroke-width="1" opacity="0.5"/>
+        <circle cx="24" cy="44" r="4" fill="none" stroke="#6366f1" stroke-width="1.5"/>
+        <circle cx="24" cy="44" r="1.5" fill="#6366f1"/>
+        <line x1="28" y1="44" x2="34" y2="44" stroke="#34d399" stroke-width="1.5"/>
+        <path d="M33,42 L36,44 L33,46" fill="#34d399"/>
+        <circle cx="40" cy="44" r="4" fill="none" stroke="#475569" stroke-width="1.5"/>
+      </svg>
+      <div>
+        <div style="font-size:24px; font-weight:700; font-variant:small-caps; letter-spacing:0.1em; color:#fff;">Precept</div>
+        <div style="font-size:12px; color:#71717a; margin-top:2px;">A domain integrity engine for .NET</div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:18px; font-weight:700; font-variant:small-caps; letter-spacing:0.1em; color:#fff;">Precept</span>
+      <span class="badge"><span class="label">nuget</span><span class="value" style="background:#4338ca;">v1.0.0</span></span>
+      <span class="badge"><span class="label">.NET</span><span class="value" style="background:#334155;">8.0+</span></span>
+      <span class="badge"><span class="label">license</span><span class="value" style="background:#334155;">MIT</span></span>
+    </div>
+  </div>
+
+  <h3>Code font</h3>
+  <p>Same typeface family. The code grows out of the wordmark.</p>
+  <div style="display:flex; gap:32px; align-items:baseline; margin:8px 0;">
+    <div>
+      <div style="font-size:20px; font-weight:700; font-variant:small-caps; letter-spacing:0.1em; color:#fff;">Precept</div>
+      <div style="font-size:10px; color:#52525b;">Wordmark: 700, small-caps, 0.1em</div>
+    </div>
+    <div>
+      <div style="font-size:13px; font-weight:400; color:#818cf8;">precept LoanApplication</div>
+      <div style="font-size:10px; color:#52525b;">Code: 400, normal case</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Brand mark form</h3>
+  <p style="margin-bottom:16px;">Filled indigo circle → emerald arrow → open slate circle. On a dark indigo ground.</p>
+
+  <div style="display:flex; gap:32px; align-items:center; flex-wrap:wrap;">
+    <!-- Full mark -->
+    <div style="text-align:center;">
+      <svg width="80" height="80" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="12" fill="#1e1b4b"/>
+        <circle cx="18" cy="32" r="8" fill="none" stroke="#6366f1" stroke-width="2.5"/>
+        <circle cx="18" cy="32" r="3" fill="#6366f1"/>
+        <line x1="26" y1="32" x2="38" y2="32" stroke="#34d399" stroke-width="2.5"/>
+        <path d="M36,28 L42,32 L36,36" fill="#34d399"/>
+        <circle cx="48" cy="32" r="8" fill="none" stroke="#475569" stroke-width="2"/>
+      </svg>
+      <div style="font-size:11px; color:#52525b; margin-top:4px;">Full mark</div>
+    </div>
+
+    <!-- Color key -->
+    <div style="font-size:12px; line-height:2.2;">
+      <div><span class="swatch" style="background:#6366F1;"></span><span style="color:#6366F1; font-weight:600;">Indigo #6366F1</span> — origin state (brand color)</div>
+      <div><span class="swatch" style="background:#34D399;"></span><span style="color:#34D399; font-weight:600;">Emerald #34D399</span> — transition arrow (enabled)</div>
+      <div><span class="swatch" style="background:#475569;"></span><span style="color:#94A3B8; font-weight:600;">Slate #475569</span> — destination state (chrome)</div>
+      <div><span class="swatch" style="background:#1E1B4B;"></span><span style="color:#71717a; font-weight:600;">Ground #1E1B4B</span> — dark indigo surface</div>
+    </div>
+  </div>
+
+  <p style="margin-top:16px;">The mark encodes the atomic unit of Precept — one origin state (indigo circle, filled, active), one enabled transition (emerald arrow), one destination (slate circle, open, waiting). Every precept, no matter how complex, is built from this repeated form.</p>
+
+  <div class="callout" style="margin-top:16px;">
+    <strong>Note:</strong> The icon prototyping loop in <code>brand/icon-prototyping-loop/</code> continues to explore icon variations. This section locks the <em>conceptual form</em> and <em>color mapping</em> of the brand mark. Final icon rendering (corner radii, stroke weights, optical sizing) may refine through the prototyping loop without changing the locked form.
+  </div>
+</div>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- 1.4 Color System -->
+<div class="section">
+<h2>1.4 Color System <span class="status-chip">LOCKED</span></h2>
 
 <p>8 authoring-time shades in 5 families, plus 3 runtime verdict colors. Comments sit outside that semantic palette as an editorial lane. Background <code>#0c0c0f</code>. Every color has a fixed meaning. Nothing is decorative.</p>
 
@@ -318,140 +433,36 @@
     <tr><td>Data names</td><td><span style="color:#B0BEC5;">#B0BEC5</span></td><td><span style="color:#B0BEC5; font-style:italic;">#B0BEC5 italic</span></td><td>Referenced by an <code>invariant</code></td></tr>
   </table>
 </div>
-
-<div class="card">
-  <h3>State diagram coloring</h3>
-  <p style="margin-bottom:12px;">State diagrams use the same hue families, but shape — not lifecycle tint — carries origin/final structure.</p>
-
-  <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px;">
-    <div style="background:#0c0c0f; border-radius:8px; padding:14px; text-align:center;">
-      <div style="width:36px; height:36px; border-radius:6px; border:2px solid #4338CA; margin:0 auto 6px; display:flex; align-items:center; justify-content:center;">
-        <span style="color:#A898F5; font-size:10px; font-family:var(--brand-mono);">State</span>
-      </div>
-      <div style="color:#4338CA; font-weight:700; font-size:12px;">Node Borders</div>
-      <div style="color:#64748b; font-size:10px;">Indigo · structure</div>
-    </div>
-    <div style="background:#0c0c0f; border-radius:8px; padding:14px; text-align:center;">
-      <div style="width:36px; height:12px; margin:12px auto 18px; display:flex; align-items:center; justify-content:center;">
-        <span style="color:#A898F5; font-size:11px; font-family:var(--brand-mono); font-weight:600;">Draft</span>
-      </div>
-      <div style="color:#A898F5; font-weight:700; font-size:12px;">State Names</div>
-      <div style="color:#64748b; font-size:10px;">One violet hue</div>
-    </div>
-    <div style="background:#0c0c0f; border-radius:8px; padding:14px; text-align:center;">
-      <div style="width:36px; height:36px; margin:0 auto 6px; display:flex; align-items:center; justify-content:center;">
-        <span style="color:#6366F1; font-size:18px;">→</span>
-      </div>
-      <div style="color:#6366F1; font-weight:700; font-size:12px;">Arrows</div>
-      <div style="color:#64748b; font-size:10px;">Indigo grammar · flow</div>
-    </div>
-    <div style="background:#0c0c0f; border-radius:8px; padding:14px; text-align:center;">
-      <div style="width:36px; height:12px; margin:12px auto 18px; display:flex; align-items:center; justify-content:center;">
-        <span style="color:#30B8E8; font-size:10px; font-family:var(--brand-mono);">Submit</span>
-      </div>
-      <div style="color:#30B8E8; font-weight:700; font-size:12px;">Event Labels</div>
-      <div style="color:#64748b; font-size:10px;">Cyan · same as syntax</div>
-    </div>
-  </div>
 </div>
+
+<div class="section-divider"></div>
+
+<!-- 1.5 Typography -->
+<div class="section">
+<h2>1.5 Typography <span class="status-chip">LOCKED</span></h2>
+<!-- Typography content already in section 1.3 Wordmark. This is a placeholder for potential future expansion. -->
+</div>
+
 </div>
 
 <div class="section-divider"></div>
 
 <!-- ===================================================================== -->
-<!-- 5. TYPOGRAPHY                                                          -->
+<!-- SECTION 2: VISUAL SURFACES                                            -->
 <!-- ===================================================================== -->
 <div class="section">
-<h2>5. Typography <span class="status-chip">LOCKED</span></h2>
+<h2 style="font-size: 24px; margin-bottom: 24px; color: #6366F1;">2. Visual Surfaces</h2>
 
-<div class="card">
-  <h3>Brand font</h3>
-  <p style="color:#fff; font-weight:600; margin:4px 0;">Cascadia Cove</p>
-  <p>Monospace from the Cascadia family, used with Cascadia Code fallback. Editor-native, crisp, and suited to both wordmark and code.</p>
-
-  <h3>Wordmark</h3>
-  <div style="margin:12px 0 20px;">
-    <div style="font-family:var(--brand-mono); font-size:48px; font-weight:700; font-variant:small-caps; letter-spacing:0.1em; color:#fff;">Precept</div>
-    <div style="font-size:11px; color:#52525b; margin-top:4px;">Cascadia Cove 700 · font-variant: small-caps · letter-spacing: 0.1em</div>
-  </div>
-
-  <p style="font-size:12px; color:#71717a; margin-top:-6px;">Source note: some archived snippets elsewhere in the brand folder still carry literal Inconsolata declarations, but active brand surfaces normalize to the shared Cascadia Cove <code>--brand-mono</code> stack.</p>
-
-  <h3>Weight range</h3>
-  <div style="display:flex; flex-direction:column; gap:8px; margin:8px 0;">
-    <div style="display:flex; align-items:baseline; gap:20px;">
-      <span style="font-size:32px; font-weight:400; color:#fff;">Precept</span>
-      <span style="color:#52525b; font-size:11px;">400 Regular — body text, inline references</span>
-    </div>
-    <div style="display:flex; align-items:baseline; gap:20px;">
-      <span style="font-size:32px; font-weight:600; color:#fff;">Precept</span>
-      <span style="color:#52525b; font-size:11px;">600 SemiBold — code blocks, emphasis</span>
-    </div>
-    <div style="display:flex; align-items:baseline; gap:20px;">
-      <span style="font-size:32px; font-weight:700; color:#fff;">Precept</span>
-      <span style="color:#52525b; font-size:11px;">700 Bold — wordmark, headings</span>
-    </div>
-    <div style="display:flex; align-items:baseline; gap:20px;">
-      <span style="font-size:32px; font-weight:900; color:#fff;">Precept</span>
-      <span style="color:#52525b; font-size:11px;">900 Black — hero display (optional)</span>
-    </div>
-  </div>
-
-  <h3>Wordmark in context</h3>
-  <div style="background:#0c0c0f; border-radius:8px; padding:24px; border:1px solid #1e1b4b; margin:8px 0;">
-    <div class="lockup">
-      <svg width="40" height="40" viewBox="0 0 64 64">
-        <rect width="64" height="64" rx="12" fill="#1e1b4b"/>
-        <rect x="14" y="10" width="36" height="44" rx="3" fill="none" stroke="#475569" stroke-width="1.5"/>
-        <line x1="20" y1="20" x2="44" y2="20" stroke="#818cf8" stroke-width="1.5"/>
-        <line x1="20" y1="27" x2="40" y2="27" stroke="#475569" stroke-width="1" opacity="0.5"/>
-        <line x1="20" y1="33" x2="42" y2="33" stroke="#475569" stroke-width="1" opacity="0.5"/>
-        <circle cx="24" cy="44" r="4" fill="none" stroke="#6366f1" stroke-width="1.5"/>
-        <circle cx="24" cy="44" r="1.5" fill="#6366f1"/>
-        <line x1="28" y1="44" x2="34" y2="44" stroke="#34d399" stroke-width="1.5"/>
-        <path d="M33,42 L36,44 L33,46" fill="#34d399"/>
-        <circle cx="40" cy="44" r="4" fill="none" stroke="#475569" stroke-width="1.5"/>
-      </svg>
-      <div>
-        <div style="font-size:24px; font-weight:700; font-variant:small-caps; letter-spacing:0.1em; color:#fff;">Precept</div>
-        <div style="font-size:12px; color:#71717a; margin-top:2px;">A domain integrity engine for .NET</div>
-      </div>
-    </div>
-
-    <div style="margin-top:16px; display:flex; align-items:center; gap:12px;">
-      <span style="font-size:18px; font-weight:700; font-variant:small-caps; letter-spacing:0.1em; color:#fff;">Precept</span>
-      <span class="badge"><span class="label">nuget</span><span class="value" style="background:#4338ca;">v1.0.0</span></span>
-      <span class="badge"><span class="label">.NET</span><span class="value" style="background:#334155;">8.0+</span></span>
-      <span class="badge"><span class="label">license</span><span class="value" style="background:#334155;">MIT</span></span>
-    </div>
-  </div>
-
-  <h3>Code font</h3>
-  <p>Same typeface family. The code grows out of the wordmark.</p>
-  <div style="display:flex; gap:32px; align-items:baseline; margin:8px 0;">
-    <div>
-      <div style="font-size:20px; font-weight:700; font-variant:small-caps; letter-spacing:0.1em; color:#fff;">Precept</div>
-      <div style="font-size:10px; color:#52525b;">Wordmark: 700, small-caps, 0.1em</div>
-    </div>
-    <div>
-      <div style="font-size:13px; font-weight:400; color:#818cf8;">precept LoanApplication</div>
-      <div style="font-size:10px; color:#52525b;">Code: 400, normal case</div>
-    </div>
-  </div>
-</div>
-</div>
-
-<div class="section-divider"></div>
-
-<!-- ===================================================================== -->
-<!-- 6. VISUAL LANGUAGE                                                     -->
-<!-- ===================================================================== -->
+<!-- 2.1 Syntax Editor -->
 <div class="section">
-<h2>6. Visual Language <span class="status-chip">LOCKED</span></h2>
+<h2>2.1 Syntax Editor <span class="status-chip">LOCKED</span></h2>
 
 <div class="card">
-  <h3>Primary surface — DSL syntax as hero</h3>
-  <p style="margin-bottom:12px;">The <code>.precept</code> file format IS the brand. The code is the hero image.</p>
+  <h3>Purpose</h3>
+  <p>The <code>.precept</code> file in VS Code. Primary visual surface where developers author domain contracts. Dark mode, 8-shade semantic color system with constraint-aware italic signaling.</p>
+
+  <h3>Color application</h3>
+  <p>Syntax highlighting uses the 8-shade palette from Brand Identity § 1.4. One hue per category; italic indicates constraint pressure. The color system is automatically applied by the language server during parsing — no DSL annotation needed.</p>
 
   <div class="syntax-block"><span style="color:#4338CA;font-weight:700;">precept</span> <span style="color:#B0BEC5;">LoanApplication</span>
 
@@ -479,63 +490,16 @@
 
 <span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;">Decline</span>
   <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">transition</span> <span style="color:#A898F5;">Declined</span></div>
-</div>
 
-<div class="card">
-  <h3>Secondary surface — state diagrams</h3>
-  <p style="margin-bottom:12px;">The VS Code preview panel uses the same hue families. Shape, not tint, carries initial/final structure.</p>
+  <h3>Constraint-aware highlighting</h3>
+  <p style="margin-bottom:12px;">The editor uses one hue per category. Constraint pressure is shown with italic, not extra colors.</p>
+  <table>
+    <tr><th>Category</th><th>Base</th><th>Constrained</th><th>Meaning</th></tr>
+    <tr><td style="color:#A898F5;">States</td><td><span style="color:#A898F5;">#A898F5</span></td><td><span style="color:#A898F5; font-style:italic;">#A898F5 italic</span></td><td>Participates in <code>in/to/from X assert</code></td></tr>
+    <tr><td style="color:#30B8E8;">Events</td><td><span style="color:#30B8E8;">#30B8E8</span></td><td><span style="color:#30B8E8; font-style:italic;">#30B8E8 italic</span></td><td>Has <code>on X assert</code></td></tr>
+    <tr><td style="color:#B0BEC5;">Data names</td><td><span style="color:#B0BEC5;">#B0BEC5</span></td><td><span style="color:#B0BEC5; font-style:italic;">#B0BEC5 italic</span></td><td>Referenced by an <code>invariant</code></td></tr>
+  </table>
 
-  <svg width="100%" height="140" viewBox="0 0 520 140" style="margin:8px 0;">
-    <rect width="520" height="140" fill="#0c0c0f" rx="8"/>
-
-    <!-- Draft (origin) -->
-    <circle cx="60" cy="70" r="26" fill="none" stroke="#4338CA" stroke-width="2.5"/>
-    <text x="60" y="74" text-anchor="middle" fill="#A898F5" font-size="11" font-family="Inconsolata,monospace" font-weight="600">Draft</text>
-
-    <!-- UnderReview -->
-    <rect x="170" y="46" width="90" height="48" rx="6" fill="none" stroke="#4338CA" stroke-width="1.5"/>
-    <text x="215" y="74" text-anchor="middle" fill="#A898F5" font-size="10" font-family="Inconsolata,monospace">UnderReview</text>
-
-    <!-- Approved (final) -->
-    <rect x="350" y="20" width="80" height="38" rx="6" fill="none" stroke="#6366F1" stroke-width="2"/>
-    <rect x="346" y="16" width="88" height="46" rx="8" fill="none" stroke="#6366F1" stroke-width="1" opacity="0.3"/>
-    <text x="390" y="43" text-anchor="middle" fill="#A898F5" font-size="10" font-family="Inconsolata,monospace" font-style="italic">Approved</text>
-
-    <!-- Declined (final) -->
-    <rect x="350" y="82" width="80" height="38" rx="6" fill="none" stroke="#6366F1" stroke-width="2"/>
-    <rect x="346" y="78" width="88" height="46" rx="8" fill="none" stroke="#6366F1" stroke-width="1" opacity="0.3"/>
-    <text x="390" y="105" text-anchor="middle" fill="#A898F5" font-size="10" font-family="Inconsolata,monospace">Declined</text>
-
-    <!-- Edges -->
-    <defs>
-      <marker id="aFlow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#6366F1"/></marker>
-    </defs>
-    <line x1="86" y1="70" x2="166" y2="70" stroke="#6366F1" stroke-width="1.5" marker-end="url(#aFlow)"/>
-    <text x="126" y="62" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Inconsolata,monospace">Submit</text>
-
-    <line x1="260" y1="56" x2="346" y2="40" stroke="#6366F1" stroke-width="1.5" opacity="0.6" marker-end="url(#aFlow)"/>
-    <text x="303" y="40" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Inconsolata,monospace">Approve</text>
-
-    <line x1="260" y1="82" x2="346" y2="100" stroke="#6366F1" stroke-width="1.5" opacity="0.6" marker-end="url(#aFlow)"/>
-    <text x="303" y="100" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Inconsolata,monospace">Decline</text>
-
-    <!-- Legend -->
-    <g transform="translate(20, 128)">
-      <circle cx="6" cy="0" r="4" fill="none" stroke="#4338CA" stroke-width="2"/>
-      <text x="14" y="4" fill="#52525b" font-size="8" font-family="Inconsolata,monospace">Origin</text>
-      <rect x="60" y="-4" width="8" height="8" rx="2" fill="none" stroke="#4338CA" stroke-width="1.5"/>
-      <text x="72" y="4" fill="#52525b" font-size="8" font-family="Inconsolata,monospace">State</text>
-      <rect x="130" y="-4" width="8" height="8" rx="2" fill="none" stroke="#6366F1" stroke-width="1.5"/>
-      <text x="142" y="4" fill="#52525b" font-size="8" font-family="Inconsolata,monospace">Final</text>
-      <line x1="250" y1="0" x2="264" y2="0" stroke="#6366F1" stroke-width="1.5"/>
-      <text x="268" y="4" fill="#52525b" font-size="8" font-family="Inconsolata,monospace">Flow</text>
-      <line x1="340" y1="0" x2="354" y2="0" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3 2"/>
-      <text x="358" y="4" fill="#52525b" font-size="8" font-family="Inconsolata,monospace">Blocked</text>
-    </g>
-  </svg>
-</div>
-
-<div class="card">
   <h3>Diagnostics</h3>
   <p style="margin-bottom:12px;">PRECEPT codes in indigo. Error bodies in rose. Warnings in amber.</p>
   <div style="background:#0c0c0f; border-radius:6px; padding:16px; border:1px solid #1e1b4b; font-size:12px; line-height:2;">
@@ -545,60 +509,228 @@
     <div style="color:#64748b; margin-top:4px;">2 diagnostics (<span style="color:#f43f5e;">1 error</span>, <span style="color:#fbbf24;">1 warning</span>)</div>
   </div>
 </div>
-
-<div class="card">
-  <h3>Constraint-aware highlighting</h3>
-  <p style="margin-bottom:12px;">The editor uses one hue per category. Constraint pressure is shown with italic, not extra colors.</p>
-  <table>
-    <tr><th>Category</th><th>Base</th><th>Constrained</th><th>Meaning</th></tr>
-    <tr><td style="color:#A898F5;">States</td><td><span style="color:#A898F5;">#A898F5</span></td><td><span style="color:#A898F5; font-style:italic;">#A898F5 italic</span></td><td>Participates in <code>in/to/from X assert</code></td></tr>
-    <tr><td style="color:#30B8E8;">Events</td><td><span style="color:#30B8E8;">#30B8E8</span></td><td><span style="color:#30B8E8; font-style:italic;">#30B8E8 italic</span></td><td>Has <code>on X assert</code></td></tr>
-    <tr><td style="color:#B0BEC5;">Data names</td><td><span style="color:#B0BEC5;">#B0BEC5</span></td><td><span style="color:#B0BEC5; font-style:italic;">#B0BEC5 italic</span></td><td>Referenced by an <code>invariant</code></td></tr>
-  </table>
 </div>
 
-<div class="callout">
-  <strong>The principle:</strong> Every color means something. Nothing is decorative. 8 authoring-time shades plus runtime verdict colors, with comments intentionally outside the semantic palette:
-  <strong style="color:#6366F1;">Indigo</strong> = structure semantic + grammar ·
-  <strong style="color:#A898F5;">Violet</strong> = states (italic when constrained) ·
-  <strong style="color:#30B8E8;">Cyan</strong> = events (italic when constrained) ·
-  <strong style="color:#B0BEC5;">Slate</strong> = data names / types / values ·
-  <strong style="color:#FBBF24;">Gold</strong> = rule messages ·
-  <strong style="color:#9096A6; font-style:italic;">Dusk Indigo</strong> = comments ·
-  <strong style="color:#34D399;">Emerald</strong>/<strong style="color:#F87171;">Coral</strong>/<strong style="color:#FDE047;">Yellow</strong> = verdicts (runtime)
+<div class="section-divider"></div>
+
+<!-- 2.2 State Diagram -->
+<div class="section">
+<h2>2.2 State Diagram <span class="status-chip">LOCKED</span></h2>
+
+<div class="card">
+  <h3>Purpose</h3>
+  <p>The VS Code preview panel state diagram. Renders the precept as a diagrammatic finite-state automaton using the same hue families as syntax highlighting. Shape carries origin/final structure; hue carries category.</p>
+
+  <h3>Color application</h3>
+  <p style="margin-bottom:12px;">State diagrams use the same hue families from Brand Identity § 1.4, but they do not use syntax-layer colors. Shape and color sub-shading encode structural role without adding new hues.</p>
+
+  <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin:24px 0;">
+    <div style="background:#1e1b4b; border-radius:8px; padding:14px; text-align:center;">
+      <div style="width:40px; height:40px; border-radius:50%; border:3px solid #a5b4fc; margin:0 auto 8px; display:flex; align-items:center; justify-content:center;">
+        <span style="color:#a5b4fc; font-size:11px; font-weight:700;">●</span>
+      </div>
+      <div style="color:#a5b4fc; font-weight:600; font-size:14px;">Initial</div>
+      <div style="color:#a5b4fc; font-size:11px; margin-top:4px;">Light Indigo <code style="color:#a5b4fc;">#A5B4FC</code></div>
+      <div style="color:#64748b; font-size:11px;">Entry point. Brand color.</div>
+    </div>
+    <div style="background:#1e1b4b; border-radius:8px; padding:14px; text-align:center;">
+      <div style="width:40px; height:40px; border-radius:8px; border:2px solid #94a3b8; margin:0 auto 8px; display:flex; align-items:center; justify-content:center;">
+        <span style="color:#94a3b8; font-size:11px; font-weight:700;">□</span>
+      </div>
+      <div style="color:#94a3b8; font-weight:600; font-size:14px;">Intermediate</div>
+      <div style="color:#94a3b8; font-size:11px; margin-top:4px;">Slate <code style="color:#94a3b8;">#94A3B8</code></div>
+      <div style="color:#64748b; font-size:11px;">In-progress. Connective.</div>
+    </div>
+    <div style="background:#1e1b4b; border-radius:8px; padding:14px; text-align:center;">
+      <div style="width:40px; height:40px; border-radius:8px; border:3px double #c4b5fd; margin:0 auto 8px; display:flex; align-items:center; justify-content:center;">
+        <span style="color:#c4b5fd; font-size:11px; font-weight:700;">■</span>
+      </div>
+      <div style="color:#c4b5fd; font-weight:600; font-size:14px;">Terminal</div>
+      <div style="color:#c4b5fd; font-size:11px; margin-top:4px;">Lilac <code style="color:#c4b5fd;">#C4B5FD</code></div>
+      <div style="color:#64748b; font-size:11px;">Endpoint. Neutral finality.</div>
+    </div>
+    <div style="background:#0c0c0f; border-radius:8px; padding:14px; text-align:center;">
+      <div style="width:36px; height:36px; margin:0 auto 6px; display:flex; align-items:center; justify-content:center;">
+        <span style="color:#6366F1; font-size:18px;">→</span>
+      </div>
+      <div style="color:#6366F1; font-weight:700; font-size:12px;">Flow</div>
+      <div style="color:#64748b; font-size:10px;">Indigo grammar</div>
+    </div>
+  </div>
+
+  <svg width="100%" height="140" viewBox="0 0 520 140" style="margin:8px 0;">
+    <rect width="520" height="140" fill="#0c0c0f" rx="8"/>
+
+    <!-- Draft (origin) -->
+    <circle cx="60" cy="70" r="26" fill="none" stroke="#4338CA" stroke-width="2.5"/>
+    <text x="60" y="74" text-anchor="middle" fill="#A898F5" font-size="11" font-family="Cascadia Cove,monospace" font-weight="600">Draft</text>
+
+    <!-- UnderReview -->
+    <rect x="170" y="46" width="90" height="48" rx="6" fill="none" stroke="#4338CA" stroke-width="1.5"/>
+    <text x="215" y="74" text-anchor="middle" fill="#A898F5" font-size="10" font-family="Cascadia Cove,monospace">UnderReview</text>
+
+    <!-- Approved (final) -->
+    <rect x="350" y="20" width="80" height="38" rx="6" fill="none" stroke="#6366F1" stroke-width="2"/>
+    <rect x="346" y="16" width="88" height="46" rx="8" fill="none" stroke="#6366F1" stroke-width="1" opacity="0.3"/>
+    <text x="390" y="43" text-anchor="middle" fill="#A898F5" font-size="10" font-family="Cascadia Cove,monospace" font-style="italic">Approved</text>
+
+    <!-- Declined (final) -->
+    <rect x="350" y="82" width="80" height="38" rx="6" fill="none" stroke="#6366F1" stroke-width="2"/>
+    <rect x="346" y="78" width="88" height="46" rx="8" fill="none" stroke="#6366F1" stroke-width="1" opacity="0.3"/>
+    <text x="390" y="105" text-anchor="middle" fill="#A898F5" font-size="10" font-family="Cascadia Cove,monospace">Declined</text>
+
+    <!-- Edges -->
+    <defs>
+      <marker id="aFlow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#6366F1"/></marker>
+    </defs>
+    <line x1="86" y1="70" x2="166" y2="70" stroke="#6366F1" stroke-width="1.5" marker-end="url(#aFlow)"/>
+    <text x="126" y="62" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Cascadia Cove,monospace">Submit</text>
+
+    <line x1="260" y1="56" x2="346" y2="40" stroke="#6366F1" stroke-width="1.5" opacity="0.6" marker-end="url(#aFlow)"/>
+    <text x="303" y="40" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Cascadia Cove,monospace">Approve</text>
+
+    <line x1="260" y1="82" x2="346" y2="100" stroke="#6366F1" stroke-width="1.5" opacity="0.6" marker-end="url(#aFlow)"/>
+    <text x="303" y="100" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Cascadia Cove,monospace">Decline</text>
+
+    <!-- Legend -->
+    <g transform="translate(20, 128)">
+      <circle cx="6" cy="0" r="4" fill="none" stroke="#4338CA" stroke-width="2"/>
+      <text x="14" y="4" fill="#52525b" font-size="8" font-family="Cascadia Cove,monospace">Origin</text>
+      <rect x="60" y="-4" width="8" height="8" rx="2" fill="none" stroke="#4338CA" stroke-width="1.5"/>
+      <text x="72" y="4" fill="#52525b" font-size="8" font-family="Cascadia Cove,monospace">State</text>
+      <rect x="130" y="-4" width="8" height="8" rx="2" fill="none" stroke="#6366F1" stroke-width="1.5"/>
+      <text x="142" y="4" fill="#52525b" font-size="8" font-family="Cascadia Cove,monospace">Final</text>
+      <line x1="250" y1="0" x2="264" y2="0" stroke="#6366F1" stroke-width="1.5"/>
+      <text x="268" y="4" fill="#52525b" font-size="8" font-family="Cascadia Cove,monospace">Flow</text>
+      <line x1="340" y1="0" x2="354" y2="0" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3 2"/>
+      <text x="358" y="4" fill="#52525b" font-size="8" font-family="Cascadia Cove,monospace">Blocked</text>
+    </g>
+  </svg>
+
+  <h3>State lifecycle roles</h3>
+  <p style="margin-bottom:12px;">Three structural roles determined at compile time:</p>
+  <table>
+    <tr><th>Role</th><th>Color</th><th>Detection</th><th>Shape hint</th></tr>
+    <tr><td style="color:#A5B4FC;">Initial</td><td><code>#A5B4FC</code> Light Indigo</td><td>Declared with <code>initial</code> modifier</td><td>Circle (origin node)</td></tr>
+    <tr><td style="color:#94A3B8;">Intermediate</td><td><code>#94A3B8</code> Slate</td><td>Has both inbound and outbound transitions</td><td>Rounded rectangle</td></tr>
+    <tr><td style="color:#C4B5FD;">Terminal</td><td><code>#C4B5FD</code> Lilac</td><td>No outbound transitions</td><td>Double-border rectangle</td></tr>
+  </table>
+
+  <h3>Event lifecycle types</h3>
+  <p style="margin-bottom:12px;">Three event types determined at compile time by analyzing transition rows:</p>
+  <table>
+    <tr><th>Type</th><th>Color</th><th>Detection</th><th>Diagram form</th></tr>
+    <tr><td style="color:#38BDF8;">Transition</td><td><code>#38BDF8</code> Bright Sky</td><td>All transition rows include a <code>transition</code> action</td><td>Solid edge arrow</td></tr>
+    <tr><td style="color:#7DD3FC;">Conditional</td><td><code>#7DD3FC</code> Lighter Sky</td><td>Event has guards/assertions — may transition or reject</td><td>Guard-annotated edge</td></tr>
+    <tr><td style="color:#0EA5E9;">Stationary</td><td><code>#0EA5E9</code> Deeper Sky</td><td>No transition rows produce state change — only <code>set</code> actions</td><td>Self-loop arrow</td></tr>
+  </table>
+
+  <div class="callout" style="margin-top:16px;">
+    <strong>Diagram design principle:</strong> All event shades sit within the sky/cyan family (195–200°), consistent with the locked event syntax color <code>#30B8E8</code>. The three structural roles of states form a visual progression within the indigo family, while events use tighter cyan shades to signal event-specific meaning.
+  </div>
 </div>
 </div>
 
 <div class="section-divider"></div>
 
-<!-- ===================================================================== -->
-<!-- OPEN EXPLORATIONS                                                      -->
-<!-- ===================================================================== -->
+<!-- 2.3 Inspector Panel -->
 <div class="section">
-<h2>Open Explorations</h2>
-<p>Active explorations not yet locked. See <a href="explorations/semantic-color-exploration.html">semantic-color-exploration.html</a> for visual mockups.</p>
+<h2>2.3 Inspector Panel &nbsp;<span style="font-size:12px; font-weight:600; color:#a1a1aa;">[DRAFT — Elaine to contribute]</span></h2>
 
 <div class="card">
-  <table>
-    <tr><th>Item</th><th>Status</th><th>Notes</th></tr>
-    <tr>
-      <td style="color:#e5e5e5;">Token-to-color mapping</td>
-      <td><span style="color:#34D399;">Locked</span></td>
-      <td>Locked as an 8-shade dark-mode syntax system. See §4 Color System.</td>
-    </tr>
-    <tr>
-      <td style="color:#e5e5e5;">Event coloring</td>
-      <td><span style="color:#34D399;">Locked</span></td>
-      <td>Cyan <code>#30B8E8</code> is the event hue. Italic marks constrained events.</td>
-    </tr>
-    <tr>
-      <td style="color:#e5e5e5;">Icon / brand mark</td>
-      <td><span style="color:#fbbf24;">Loop running</span></td>
-      <td>Autonomous prototyping loop in <code>brand/icon-prototyping-loop/</code>. Will apply locked palette once icon direction settles.</td>
-    </tr>
-  </table>
+  <h3>Purpose</h3>
+  <p>Runtime verdict surface. Shows execution outcomes when a precept instance processes events. Displays enabled/blocked/warning verdicts on transitions and state enforcement.</p>
+
+  <h3>Color application</h3>
+  <p style="margin-bottom:12px;">Uses runtime verdict palette from Brand Identity § 1.4: Enabled <code>#34D399</code> (emerald), Blocked <code>#F87171</code> (coral), Warning <code>#FDE047</code> (yellow). These colors never appear in syntax highlighting — they are reserved exclusively for runtime outcomes.</p>
+
+  <div class="callout">
+    <strong>DRAFT:</strong> Full specifications for layout, typography scale, interaction states, and color application in inspector panel pending UX review. Verdict colors are locked; surface design is under development.
+  </div>
 </div>
 </div>
+
+<div class="section-divider"></div>
+
+<!-- 2.4 Docs Site -->
+<div class="section">
+<h2>2.4 Docs Site &nbsp;<span style="font-size:12px; font-weight:600; color:#a1a1aa;">[DRAFT — Elaine to contribute]</span></h2>
+
+<div class="card">
+  <h3>Purpose</h3>
+  <p>Public documentation and code samples. May be rendered in light or dark mode. Uses brand color as accent for code samples and callouts.</p>
+
+  <h3>Color application</h3>
+  <p style="margin-bottom:12px;">Brand indigo <code>#6366F1</code> serves as accent for headings, code syntax, and key concept highlights. Dark background support mirrors the editor palette; light mode requires sufficient contrast testing.</p>
+
+  <div class="callout">
+    <strong>DRAFT:</strong> Light-mode palette, responsive typography scale, and component-specific brand color applications pending documentation design review.
+  </div>
+</div>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- 2.5 CLI / Terminal -->
+<div class="section">
+<h2>2.5 CLI / Terminal &nbsp;<span style="font-size:12px; font-weight:600; color:#a1a1aa;">[DRAFT — Elaine to contribute]</span></h2>
+
+<div class="card">
+  <h3>Purpose</h3>
+  <p>Command-line tool output and diagnostics. Reduced palette for terminal compatibility. Structured output formatting with semantic highlighting.</p>
+
+  <h3>Color application</h3>
+  <p style="margin-bottom:12px;">Terminal palette is constrained by 16-color compatibility. Core brand indigo and verdict colors map to terminal codes; output is structured to remain legible on both light and dark terminal backgrounds.</p>
+
+  <div class="callout">
+    <strong>DRAFT:</strong> Terminal color mapping, output formatting conventions, and structured data representation pending technical specifications.
+  </div>
+</div>
+</div>
+
+</div>
+
+<div class="section-divider"></div>
+
+<!-- ===================================================================== -->
+<!-- SECTION 3: RESEARCH & EXPLORATIONS                                    -->
+<!-- ===================================================================== -->
+<div class="section">
+<h2 style="font-size: 24px; margin-bottom: 24px; color: #6366F1;">3. Research &amp; Explorations</h2>
+
+<div class="card">
+  <h3>Living section</h3>
+  <p>This section documents brand research, design system references, and active explorations. Files are living — updated as new research emerges.</p>
+
+  <h3>Research & Reference</h3>
+  <ul style="margin: 8px 0 16px 20px; line-height: 1.8;">
+    <li><strong><a href="references/brand-spec-structure-research.md">brand-spec-structure-research.md</a></strong> — Surface-first organizing precedent from 13 design systems (GitHub, IBM, Material, VS Code, Vercel, Atlassian, Stripe, Tailwind, Linear, Raycast). Documents why Precept's visual-surfaces-first structure is grounded in real design practice. <em>Status: Complete; filed 2026-07.</em></li>
+  </ul>
+
+  <h3>Active explorations</h3>
+  <p style="margin-bottom: 12px;">Files in <code>brand/explorations/</code>:</p>
+  <ul style="margin: 8px 0 16px 20px; line-height: 1.8;">
+    <li><strong><a href="explorations/color-exploration.html">color-exploration.html</a></strong> — Six color candidate cards (Teal, Amber, Indigo, Monochrome, Slate, Amber+Slate combo) with palette swatches, gradient strips, and contextual mockups. Indigo candidate evolved into locked palette.</li>
+    <li><strong><a href="explorations/semantic-color-exploration.html">semantic-color-exploration.html</a></strong> — 8-shade semantic palette explorations with syntax highlighting mockups. Documents the evolution toward constraint-aware italic signaling.</li>
+    <li><strong><a href="explorations/typography-exploration.html">typography-exploration.html</a></strong> — Cascadia Cove wordmark treatments, weight scales, and small-caps rationale. Reference for typography conventions.</li>
+    <li><strong><a href="explorations/alternative-palette-exploration.html">alternative-palette-exploration.html</a></strong> — Archived candidate palettes. Reference only; superseded by locked system.</li>
+    <li><strong><a href="explorations/visual-language-exploration.html">visual-language-exploration.html</a></strong> — Hero example gallery, rubric scoring, and brand principle visualizations.</li>
+  </ul>
+
+  <div class="callout">
+    <strong>Note:</strong> Explorations files contain working drafts, candidate concepts, and archived decisions. They are preserved as reference material. Locked decisions (marked <span class="status-chip">LOCKED</span> in this spec) supersede any exploration content.
+  </div>
+</div>
+</div>
+
+</div>
+
+<div class="section-divider"></div>
+
+<!-- ===================================================================== -->
+<!-- FOOTER                                                                -->
+<!-- ===================================================================== -->
+
 
 </body>
 </html>

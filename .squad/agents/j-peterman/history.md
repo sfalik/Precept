@@ -13,6 +13,61 @@
 
 ## Learnings
 
+### 2026-04-05 — brand-spec.html restructured: Surfaces-first organization
+
+**File updated:** `brand/brand-spec.html`
+
+**What was done:**
+- Restructured from **color-category-first** (§1-5 Positioning, Narrative, Voice, Color System, Typography; §6 Visual Language; §7-9 Brand Mark, State, Event Appearance) to **visual-surfaces-first** organization.
+- New structure established:
+  - **Section 1: Brand Identity** (Positioning & Narrative, Voice & Tone, Wordmark & Brand Mark, Color System, Typography)
+  - **Section 2: Visual Surfaces** (Syntax Editor, State Diagram, Inspector Panel, Docs Site, CLI/Terminal)
+  - **Section 3: Research & Explorations** (living section with research links and exploration index)
+- Navigation comment block added after `<body>` tag for orientation.
+- Subtitle updated from "Locked Decisions" to "Surfaces & Identity" to reflect new organizing principle.
+- All locked content preserved exactly — reorganized into new skeleton without rewrites. Section numbers updated throughout.
+- Three surface entries marked [DRAFT — Elaine to contribute]: Inspector Panel, Docs Site, CLI/Terminal. Each includes purpose statement, color application notes, and callout indicating pending UX/design review.
+- Research & Explorations section created as living documented entity: links to `brand/references/brand-spec-structure-research.md` and lists all files in `brand/explorations/` with brief descriptions.
+
+**Structural decisions made:**
+- Brand Identity placed first — all five identity layers (positioning, voice, wordmark, color, typography) grouped together as the foundational system before any surface application.
+- State and Event lifecycle colors merged into Surface § 2.2 (State Diagram) rather than isolated in separate sections. This emphasizes the surface context (diagram-layer application) rather than color category.
+- Diagnostics coloring remained in § 2.1 (Syntax Editor) — a surface-specific detail.
+- "Visual Language" concept dissolved into individual surfaces rather than preserved as an abstract organizing principle.
+- Three surfaces deferred as drafts — Elaine's ownership is explicit; pending design contributions are clear.
+
+**Why this structure works:**
+- Research from `brand/references/brand-spec-structure-research.md` supports this approach: VS Code (theme API) and Vercel Geist both use surface-first organization. Identity-first precedent from GitHub, IBM, and others — identity comes before surfaces in every system studied.
+- Each surface section now serves as a complete contract: surface description + color application + typography guidance + examples. A designer reading § 2.1 sees everything needed for syntax editor brand compliance without cross-referencing other sections.
+- Living research section signals that brand evolution is a first-class activity, not an archived afterthought.
+
+**Files affected:** `brand/brand-spec.html` only. All design decisions, locked colors, and content remain unchanged.
+
+### 2026-04-04 — Brand-spec restructure complete; 13 systems researched; charter updated
+
+**Files created/updated:** `brand/brand-spec.html` (restructured), `brand/references/brand-spec-structure-research.md` (research)
+
+**Work delivered:**
+- Restructured `brand/brand-spec.html` from 10-section color-category-first to 3-section surface-first organization (Brand Identity → Visual Surfaces → Research & Explorations)
+- Validated surface-first pattern across 13 design systems: VS Code (theme API), Vercel Geist, GitHub, IBM, Material, and others — all place identity before surfaces
+- Research filed: `brand/references/brand-spec-structure-research.md` (217 lines, 13 systems studied, surface-first validated, identity-first precedent confirmed)
+- Charter updated: now gates technical surface design reviews (Elaine → Peterman → Frank → Shane) to ensure brand consistency
+- Three surfaces marked [DRAFT — Elaine to contribute]: Inspector Panel, Docs Site, CLI/Terminal (with explicit pending callouts)
+- Research & Explorations section activated as "living" — signals brand evolution is first-class activity
+
+**Key decisions locked:**
+- Visual surfaces are organizing principle; each surface has its own visual contract
+- Research & Explorations is a living section (not archived appendix)
+- All locked content preserved; only reorganized into new structure
+
+**Pending:**
+- Fold visual-surfaces-draft.html into brand-spec §2 (post-Shane review, with Elaine contributing)
+- Inspector panel color remapping (Kramer, CSS-only)
+- Docs site scope clarification (Shane)
+- Open decisions #4, #5 (color card treatment, outcome scope) — research filed, Shane approval needed
+
+---
+
 ### 2026-05-01 — Hero Creative Brief written for Phase 3
 
 **File created:** `brand/references/hero-creative-brief.md`

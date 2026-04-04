@@ -2,6 +2,140 @@
 
 ---
 
+## ACTIVE DECISIONS — Current Sprint
+
+### Design Gate: Peterman Brand Compliance Review (2026-04-04)
+**Filed by:** Coordinator (via Shane)  
+**Status:** LOCKED  
+
+The design gate for technical surfaces now requires Peterman's brand compliance review as a formal step between Elaine's UX spec and Frank's architecture review.
+
+**Gate sequence:**
+1. Elaine — UX design spec
+2. Peterman — brand compliance review
+3. Frank — architectural fit
+4. Shane — final sign-off
+
+**Applies to:** VS Code extension, preview webview, state diagram, inspector panel, and any future product surface.
+
+**Why:** Brand should be applied consistently to all surfaces. Peterman's involvement ensures brand decisions made in `brand/brand-spec.html` are honored in technical implementation, not just noted in documentation.
+
+---
+
+### Brand-Spec Restructure: Surface-First Organization (2026-04-04)
+**Filed by:** J. Peterman  
+**Status:** COMPLETE  
+
+`brand/brand-spec.html` restructured from 10-section (color-category-first) to 3-section (visual-surfaces-first) structure.
+
+**New structure:**
+- **Section 1: Brand Identity** — positioning, narrative, voice, wordmark, brand mark, color system, typography
+- **Section 2: Visual Surfaces** — Syntax Editor (locked), State Diagram (locked), Inspector Panel (draft), Docs Site (draft), CLI / Terminal (draft)
+- **Section 3: Research & Explorations** — living section with research links and exploration index
+
+**Deferred surfaces** (marked as DRAFT awaiting contribution):
+- Inspector Panel — pending Elaine's design review
+- Docs Site — scope clarification needed
+- CLI / Terminal — color audit pending
+
+**Research foundation:** `brand/references/brand-spec-structure-research.md` (validated surface-first pattern across 13 systems: VS Code, Vercel, GitHub, IBM, Material, etc.)
+
+---
+
+### Visual Surfaces Draft: Five UX Specifications (2026-04-04)
+**Filed by:** Elaine  
+**Status:** DRAFT FOR REVIEW  
+**File:** `brand/visual-surfaces-draft.html`
+
+Five surfaces drafted with UX descriptions covering purpose, visual concerns, color application, typography, accessibility, and AI-first notes:
+1. **Syntax Editor** — `.precept` file authoring in VS Code
+2. **State Diagram** — visual graph in preview webview for logic verification
+3. **Inspector Panel** — live instance state and field editing (functional, brand drift found)
+4. **Docs Site** — future public documentation surface (scope clarification needed)
+5. **CLI / Terminal** — command-line output (color audit pending)
+
+**Key principles locked:**
+- Semantic unity: all surfaces use the same visual language
+- Color + shape/symbol redundancy for accessibility
+- Verdict colors (green/yellow/red) runtime-only
+- AI-first design: every surface works for humans AND AI agents
+
+**Critical issues flagged:**
+- Inspector panel uses custom palette (#6D7F9B, #8573A8, #1FFF7A, #FF2A57) instead of brand system (violet, cyan, emerald, rose)
+- Inspector uses Segoe UI instead of Cascadia Cove monospace
+- CLI color system audit needed (unknown if existing tools apply colors)
+- Light theme support clarification needed
+
+**Next steps:** Shane review → Elaine/Peterman integration into brand-spec → Kramer inspector color fix
+
+---
+
+### Inspector Panel Design Review: Brand Color Drift Found (2026-04-04)
+**Filed by:** Elaine  
+**Status:** PENDING FIX  
+**File:** `brand/inspector-panel-review.md`
+
+Kramer's inspector panel is functionally complete but diverges from brand system:
+
+**What works:** ✅ List-based layout, constraint violation workflow, edit mode UX, accessibility redundancy
+
+**Brand mismatches (CSS-only fixes):**
+| Element | Current | Brand Target |
+|---------|---------|--------------|
+| State colors | `#6D7F9B` | Violet `#A898F5` |
+| Event colors | `#8573A8` | Cyan `#30B8E8` |
+| Success | `#1FFF7A` | Emerald `#34D399` |
+| Error | `#FF2A57` | Rose `#F87171` |
+| Font | Segoe UI | Cascadia Cove monospace |
+
+**Owner:** Kramer (implementation)  
+**Gate:** Elaine review → Peterman brand compliance → Frank → Shane sign-off
+
+---
+
+### Charter Updates: Peterman + Elaine Design Governance (2026-04-04)
+**Filed by:** Coordinator  
+**Status:** LOCKED  
+
+Two charter amendments formalize design gate participation:
+
+**Peterman (Brand/DevRel) — Design Review Participation (Brand Compliance)**
+- Participates in design reviews for any technical surface where brand is applied
+- Flags brand violations, approves final surface designs before implementation
+- Approval gate: brand identity correctly expressed, color palette applied per locked rules, typography follows conventions, voice consistent
+- Surfaces: syntax highlighting, diagrams, inspector panels, documentation sites, CLI output
+
+**Elaine (UX/Design) — Brand Compliance in Technical Surface Design**
+- Leads design work on technical surfaces: Inspector Panel, Docs Site, CLI output, future surfaces
+- All designs pass through gate: (1) Peterman reviews brand compliance → (2) Frank reviews architecture → (3) Shane signs off
+- Peterman is the brand gate; her approval is prerequisite for architecture review
+- Surface contracts defined in `brand/brand-spec.html §2`; designs must conform before review
+
+---
+
+### Color System Audit: Open Decisions (2026-04-04)
+**Filed by:** J. Peterman  
+**Status:** FINDINGS FOR REVIEW  
+
+Four open brand decisions pending Shane approval:
+
+**Decision #4: Color Card Treatment**
+- **Current state:** `brand/explorations/color-exploration.html` has palette-card format but was never updated after Indigo was chosen
+- **Options:**
+  - (a) Add SUPERSEDED banner to color-exploration.html (like semantic-color-exploration already has)
+  - (b) Create new "brand color card" HTML showing locked Indigo + Gold pair with same format
+  - (c) Both
+- **Recommendation:** Archive color-exploration as reference; no blocking impact
+
+**Decision #5: Outcome Color Scope**
+- **Current framing:** "Runtime outcomes in inspector and diagrams"
+- **Shane's description:** Broader — diagnostics, inspector, UI states, any success/warning/error surface
+- **Question:** Does outcome color layer apply everywhere except syntax highlighting, or is it scope-limited?
+
+**Other open decisions documented in inbox files; recommend Shane review before locking charter updates and brand-spec final section numbering.**
+
+---
+
 # Team Knowledge Refresh — 2026-04-04 Findings
 *Filed by Scribe, 2026-04-04T06:08:06Z. Consolidated from 6 domain reviews.*
 

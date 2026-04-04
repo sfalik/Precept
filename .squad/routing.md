@@ -13,6 +13,7 @@ How to decide who handles what.
 | Testing, xUnit, edge cases, quality gates, regression | Soup Nazi | Test coverage, failing tests, edge case identification, test strategy |
 | Code review, PR review, code quality, standards enforcement | Uncle Leo | PR reviews, code smells, style violations, quality audits |
 | README, docs, brand, marketplace listings, DevRel | J. Peterman | README updates, brand copy, NuGet/VS Code/Claude marketplace content |
+| UX design, VS Code extension UI, diagram layout, interaction design, accessibility | Elaine | Preview webview design, hover UI, state diagram visual layout, UX specs for Kramer to implement |
 | Roadmap, priorities, releases, @ToDo.md, issue triage | Steinbrenner | Feature prioritization, milestone planning, release sequencing |
 | Session logging | Scribe | Automatic — never needs routing |
 

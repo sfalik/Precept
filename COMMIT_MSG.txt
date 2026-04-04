@@ -1,0 +1,13 @@
+brand: restructure brand-spec around visual surfaces
+
+- Reorganize brand-spec.html: Brand Identity → Visual Surfaces → Research & Explorations
+- Add Elaine's visual surfaces draft (5 surfaces: syntax editor, state diagram, inspector, docs site, CLI)
+- Add inspector panel design review (brand color drift identified — fix pending)
+- Add brand-spec structure research (13 systems studied, surface-first validated)
+- Update design gate: Elaine → Peterman → Frank → Shane for all technical surfaces
+- Charter updates: Peterman (design review participation), Elaine (brand compliance gate)
+
+Deferred: CLI color audit, public docs site surface
+Pending: Inspector panel color fix (Kramer), visual surfaces integration into brand-spec
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
