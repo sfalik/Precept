@@ -1,3 +1,57 @@
+## 2026-04-07 — README Rewrite: Direct Contribution Role Defined
+
+### What I Did
+
+Clarified exactly where I contribute directly to the README rewrite vs. where Peterman holds primary ownership. Six direct contribution areas identified:
+
+1. **Title block composition** — above-the-fold layout spec (48px logo, 3 badges max, 550px mobile test)
+2. **Hero format template** — the "Contract/Execution" two-block form and the 60-char line constraint (this is a dependency, not a review — Peterman can't finalize hero code until I validate line lengths)
+3. **Getting Started CTA structure** — the numbered 1/2/3 sequence, single-primary-CTA enforcement, "when you're ready" qualifier on step 3, Copilot plugin removed from this section entirely
+4. **All section headings** — two-pass process: Peterman drafts, I audit for emoji, descriptive language, and H1→H2→H3 hierarchy
+5. **Visual separators and scannability formatting** — `---` placement, 2-3 sentence prose max, bullets over prose for 3+ items
+6. **Contributing section formatting** — code blocks, section position, no contributor content bleeding into user flow
+
+Peterman retains exclusive ownership of: hook copy, differentiation section body, Learn More links, License, and section order.
+
+### Learnings
+
+- **Form and content can be separated cleanly in a README.** Peterman writes words; I author the container. This makes collaboration efficient without constant overlap.
+- **The 60-char line constraint is a hard dependency, not a style preference.** Hero code cannot be finalized before layout is validated. This needs to be established as a blocking checkpoint, not a review note.
+- **"Direct contribution" means: this section cannot ship without me writing or approving a specific thing.** Review is passive; contribution means I author, not just comment.
+- **Heading audits work best on the full draft.** Section-by-section heading review misses hierarchy violations — you need the full document to catch H2→H4 skips.
+
+**Decision written to:** `.squad/decisions/inbox/elaine-readme-contribution-role.md`
+
+---
+
+## 2026-04-05 — Brand Mark Color Revision: Emerald Arrows + Judicious Gold
+
+### What I Did
+
+Revised all three brand-mark SVGs (plus the wordmark lockup icon) in `brand/brand-spec.html`:
+
+1. **Transition arrow → Emerald** in both marks that carry an arrow (state+transition and combined). Indigo was doing double duty as structure *and* flow; Emerald is what the product already says "allowed flow" means — the mark should speak the same language.
+
+2. **Gold less muted in the combined mark** — raised stroke-width from 1→1.5 and opacity from 0.65→0.9. The `because` line was almost invisible; a deliberate signal deserves to be readable.
+
+3. **Gold added to the tablet-only mark** — the shortest bottom line (the `because` position) is now Gold at 0.85 opacity, replacing a barely-visible zinc stroke. Improves mark family consistency without violating restraint.
+
+4. **Color key updated** — added Emerald as a fifth entry, changed Gold's annotation from "(combined mark only)" to "(judicious — tablet & combined)."
+
+5. **Copy updated** throughout: "narrow exception" → "judicious exception," "combined mark only" → "tablet and combined marks." Tone shift from "barely tolerated" to "deliberately placed."
+
+6. **SKILL.md updated** — Emerald row, Gold Syntax Accent row, and Rule #2 all aligned with the new framing.
+
+### Learnings
+
+- **"Judicious" is the right design word for Gold.** It captures both the restraint (used sparingly) and the intention (placed on purpose). "Narrow exception" implied reluctance; "judicious" implies craft. The distinction matters for how future contributors treat the color.
+- **Family consistency is a real reason to extend a color.** The tablet mark felt disconnected without any Gold — not because the mark needed more color, but because the family signal was missing. One line at one position is enough.
+- **Emerald on structural arrows resolves a semantic ambiguity.** Indigo means "structure/frame." Transition arrows are not frame; they are allowed flow. The color was the bug, not the arrow.
+
+**Decision written to:** `.squad/decisions/inbox/elaine-mark-color-revision.md`
+
+---
+
 ## 2026-04-04T20:44:43Z — Team Update: Core Semantic Tokens Table Alignment Fixed
 
 Section 2.1 core semantic tokens table alignment issue resolved. State, Event, Messages, and Comment rows now properly align with the rest of the table by adding the correct `.spm-grid` wrapper class to match the shared mapping table structure.
@@ -1057,3 +1111,51 @@ Also updated:
 **A named exception is not a policy relaxation.** Adding Gold to one specific position in one specific icon does not open the door to Gold badges, Gold borders, or Gold hover states. The exception is coherent precisely because it preserves Gold's existing meaning (human-readable rule) and places it in a non-signal context (brand icon, not status UI). The constraint that makes it safe is specificity: one mark, one line, one semantic reason.
 
 **Amber collision is a real risk to check.** Gold #FBBF24 and Amber #FCD34D are visually close. The reason there's no semantic collision here is context — the brand mark is not a status surface, so viewers don't read the Gold line as a warning state. But if Gold ever appears near an Amber badge or warning chip, that proximity needs to be reviewed. Keep them in separate contexts.
+
+---
+
+## 2026-04-07 — README Rewrite Role / Gating Guidance
+
+### What I Did
+
+Provided role and gating guidance for where Elaine enters the README rewrite flow: two specific gates, not throughout writing. Gate 1 (now): confirm the hero domain is universally relatable before Peterman writes. Gate 2 (post-draft): formal UX compliance audit against the 16 hard constraints, pass/fail per constraint.
+
+Defined the clean split: Peterman writes, Elaine audits structure. Separate passes, separate concerns. Elaine does not write copy. Peterman does not audit viewport resilience.
+
+### Learnings
+
+**Constraints on paper are not enforcement.** A proposal that treats UX requirements as hard non-negotiables, followed by a draft that nobody checks against those requirements, produced advisory constraints. The constraint-holder must close the loop by reviewing the delivered artifact — that's what makes the constraints hard. Filed as new skill: `constraint-holder-review-gate`.
+
+**Beauty in a GitHub README is structural, not decorative.** Scannability, heading hierarchy, viewport resilience, CTA clarity, and AI/human readability are all structural properties — they emerge from decisions about what to put where and how to organize it, not from stylistic polish layered on top. Peterman writes the content. Elaine audits whether the structure serves the reader. These are not the same job.
+
+**The post-draft gate is where my research investment pays off.** I issued 16 hard constraints, all of which are now baked into the proposal. But I won't know if they were honored until I see the draft. My value in the rewrite is not during the writing — it's in the review pass where I check whether the 16 constraints were satisfied in practice, not just in intent.
+
+**Decision written to:** `.squad/decisions/inbox/elaine-readme-role.md`  
+**Skill written to:** `.squad/skills/constraint-holder-review-gate/SKILL.md`
+
+
+---
+
+## Session — Shape-First README Pass Evaluation (2026-04-08)
+
+### What I Did
+
+Evaluated whether Elaine should produce a shape-first skeleton before Peterman writes the README copy. Produced a process recommendation for Shane.
+
+### Recommendation
+
+**Targeted yes, not a full skeleton pass.** The restructure proposal is already a detailed structural spec — section order, heading levels, CTA hierarchy, 16 hard constraints with source attribution, per-section template copy. A full skeleton pass would translate that prose into a blank Markdown file, which is mechanical work that reproduces what the proposal already achieves.
+
+The one genuine gap: **the hero code block.** The ≤60-char line constraint shapes what DSL sample Peterman can write. An annotated hero slot (or a single consultation on domain selection) adds structural value the proposal doesn't deliver — because the proposal specifies the rule, but it doesn't show Peterman what correct looks like in 20 viewport-safe lines.
+
+**The real gate:** Hero domain selection (Order Fulfillment vs. Subscription Billing) is explicitly unresolved in the proposal — deferred to Shane. This is the actual blocker. Neither the skeleton nor the copywriting proceeds cleanly without it.
+
+### Learnings
+
+**A detailed proposal IS the skeleton.** When a proposal includes per-section template copy, exact heading levels, constraint tables with source attribution, and explicit viewport requirements, a separate skeleton file is largely redundant. The value of a skeleton is making constraints impossible to bypass accidentally — but that value only exceeds the cost (extra pass, extra artifact, dual sources of structural truth) when the proposal is abstract. Peterman's proposal is not abstract.
+
+**Inline constraint annotation is the enforceable form.** If Elaine does produce a scaffold artifact, the mechanism that earns its keep is HTML comment annotations co-located with constrained content slots — not a separate rule list. A comment that says `<!-- ≤60 chars per line — viewport constraint #8 -->` directly above the hero code block is harder to accidentally violate than a rule in a document two files away.
+
+**Two sources of structural truth is one too many.** If a scaffold file and a proposal both specify heading structure and they disagree, the executor has to adjudicate. Keep one source of structural truth at each phase: the proposal during planning, the scaffold during writing (if used), the delivered artifact at audit.
+
+**Filed to:** `.squad/decisions/inbox/elaine-shape-first-readme.md`

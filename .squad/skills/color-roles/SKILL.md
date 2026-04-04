@@ -23,14 +23,14 @@ These colors have family names. Use the family names, not plain color words.
 
 | Hex | Family name | Role | Use |
 |-----|-------------|------|-----|
-| `#34D399` | **Emerald** | success | Enabled transitions, passing CI, ✅ indicators |
+| `#34D399` | **Emerald** | success | Enabled transitions, passing CI, ✅ indicators. **Brand marks:** transition arrow in all marks that carry one. |
 | `#FB7185` | **Rose** | error | Blocked transitions, constraint violations — **product UI only** |
 | `#FCD34D` | **Amber** | warning | Unmatched guards, beta/preview callouts, ⚠️ indicators |
 
 ### Syntax Accent
 | Hex | Role | Use |
 |-----|------|-----|
-| `#FBBF24` | gold | Rule messages in `because`/`reject` — **syntax primary**. Narrow exception: a single sparse accent in the **combined brand mark only** (the `because` line that encodes the remembered rule). Never a general UI color, badge, or border. |
+| `#FBBF24` | gold | Rule messages in `because`/`reject` — **syntax primary**. Judicious exception: a sparse accent in the **tablet and combined brand marks** (the `because` line that encodes the remembered rule). Never a general UI color, badge, or border. |
 
 ## README Color Mapping
 - **Primary badge:** shields.io `color=6366F1`
@@ -41,7 +41,7 @@ These colors have family names. Use the family names, not plain color words.
 
 ## Rules
 1. The 8+3 system is closed. No new colors.
-2. Gold is syntax-primary. **Exception:** a single sparse accent in the combined brand mark only (the `because` line — the remembered rule). Never general UI, never badges.
+2. Gold is syntax-primary and used **judiciously**. **Exception:** a sparse accent in the tablet and combined brand marks (the `because` line — the remembered rule). Never general UI, never badges.
 3. Rose is product UI only. Not README, not marketing.
 4. Need a secondary accent? Use brand-light `#818CF8`.
 5. Need a subtle background tint? Use brand-muted `#C7D2FE`.

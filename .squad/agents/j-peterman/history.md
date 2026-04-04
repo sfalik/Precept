@@ -1,4 +1,4 @@
-﻿## 2026-04-04T20:28:43Z — Orchestration: Elaine Palette Mapping Polish
+## 2026-04-04T20:28:43Z — Orchestration: Elaine Palette Mapping Polish
 
 Elaine completed beautification and unification of palette mapping visual treatments in \rand\brand-spec.html\ §2.1 (Syntax Editor) and §2.2 (State Diagram). Created \.spm-*\ CSS component system (~70 lines) to match polished §1.4 color system design. All locked semantic colors, mappings, and tokens preserved. System is general-purpose and applicable to future surface sections (Inspector, Docs, CLI).
 
@@ -214,6 +214,51 @@ Elaine completed beautification and unification of palette mapping visual treatm
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
+### 2026-07-14 — README rewrite execution plan filed
+
+**Task:** Produce a concrete sequencing plan to move from the approved restructure proposal to the actual README.md rewrite.
+
+**What was determined:**
+- All required changes from all three reviewers (Frank RC-1 through RC-4, George G1–G3, Uncle Leo RC-1 and RC-2) are already incorporated in the revised proposal (2026-04-07). Zero pre-rewrite patch pass needed.
+- The only gating decision that requires Shane before drafting can begin is hero domain selection (Order, Subscription, or Loan Application). Everything else — §0 Title Block, §1 Hook, §3 Getting Started, §4 Differentiation, §5 Learn More, §6 Contributing, §7 License — can be drafted now against the spec.
+- Seven current README sections are cut entirely: Sample Catalog table (→ link), World-Class Tooling prose, The Problem It Solves, Pillars of Precept, Designed for AI, standalone MCP Server section, and all emoji headings.
+- Four content blocks are preserved verbatim or near-verbatim: dictionary definition blockquote, dev loop contributor table, .NET 10 SDK prerequisite note, and the CreateInstance overload pattern.
+- Proposed execution: two-round draft (Round 1: everything except hero; Round 2: hero after Shane names domain) → single Shane review pass → commit.
+
+**Decisions filed to inbox:** `.squad/decisions/inbox/j-peterman-readme-execution-plan.md`
+
+**Key learning — proposal completeness check before rewrite:** When a restructure proposal has been through multiple review passes with required changes called out, the correct first move is to verify whether those required changes were addressed in subsequent revisions — not to re-litigate them or assume they are still open. In this case, the 2026-04-07 revision had already incorporated all nine required changes. Confirming completeness took minutes and eliminated the risk of a spurious pre-rewrite patch pass.
+
+**Key learning — single blocking decision vs. many dependencies:** On a README rewrite with 7 sections and a hero, the instinct is to wait for all decisions before starting. The better path: identify the minimum blocking decision (hero domain), draft everything that doesn't depend on it, and sequence the hero as a fill-in-the-blank after that one signal from Shane. This collapses a multi-session project into a two-round task.
+
+---
+
+### 2026-04-07 — README restructure proposal revised for Shane's feedback pass
+
+**Task:** Apply Shane's four feedback points to `brand/references/readme-restructure-proposal.md`.
+
+**What changed:**
+
+1. **"By treating your business constraints as unbreakable precepts" — retained and integrated.** The phrase was previously flagged as redundant and slated for removal. On Shane's input, it was folded as a participial lead-in to the positioning sentence ("By treating your business constraints as unbreakable precepts, it binds state, data, and rules..."). This earns the brand name and adds the mechanism phrase without bloating. The key insight: *redundant as a standalone sentence ≠ redundant as a participial clause*.
+
+2. **"Why this approach" kept partially in the README.** The proposal previously deferred all philosophy to docs. Revised to: keep 1–2 sentences of core reasoning (why co-location prevents disagreement between separately-managed rules) in the `§ Unified Domain Integrity` subsection. Deep construct mechanics, pipeline stages, and extended rationale still defer to docs.
+
+3. **Developer loop retained as `## Contributing` section at bottom.** This content was absent from the original proposal. Added as an explicit contributor-facing section after `## Learn More` and before `## License`. Positioned at the bottom so it does not interrupt user onboarding. The section targets contributors, not users — the distinction is explicit in the rationale.
+
+4. **Three-CTA problem clarified.** The term "three-CTA" was used without explanation in two places. Both updated to define it explicitly: not three CTAs in total, but three equal-weight CTAs at the same decision point with no hierarchy. A defined term is now in the decisions inbox.
+
+**Files updated:**
+- `brand/references/readme-restructure-proposal.md`
+- `.squad/decisions/inbox/j-peterman-readme-feedback-revision.md` (new)
+- `.squad/skills/multi-researcher-synthesis/SKILL.md` (two new patterns + anti-patterns added)
+
+**Key learning — fold before you cut:** When a phrase is valuable but redundant as a standalone sentence, the first question is whether it can be folded as a participial clause into an adjacent sentence where it adds mechanism or modifier. Cutting should be the fallback, not the default.
+
+**Key learning — "why this approach" split:** Not all philosophy defers to docs. The rule is: if a developer needs it to understand *why Precept exists*, it stays in the README. If they need it to *use Precept correctly*, it goes to docs. The diagnosis (co-location prevents disagreement) is for README. The prescription (how to write a constraint) is for docs.
+
+---
+
+
 ### 2026-04-04 — Hero example criteria + TimeMachine rework
 
 **What makes a great hero example:**
@@ -420,6 +465,25 @@ Replaced the hero code block in the "Aha! Moment" section. LoanApplication — 4
 - LoanApplication was correct but dense; it read like compliance, not craft
 - Brand alignment: the hero is the first thing a developer reads. It should make them want to write a precept, not reach for a lawyer
 
+---
+
+### 2026-04-08 — README collaboration order: shape-first vs. draft-first
+
+**Task:** Evaluate whether Elaine should produce a form/shape skeleton before Peterman writes the README copy.
+
+**What was determined:**
+- The restructure proposal (`brand/references/readme-restructure-proposal.md`) already IS the skeleton. Section order, heading levels, 16 hard constraints, per-section content guidance, viewport requirements — all fully specified.
+- An Elaine skeleton pass would be a mechanical translation of the proposal into a blank document structure. It duplicates work already done.
+- Correct collaboration order: Peterman drafts → Elaine constraint audit (16-row pass/fail table) → Peterman resolves failures → Shane sign-off.
+- This is 3 passes. Skeleton-first is 4 passes: proposal → skeleton → draft → audit. Same quality gate, one extra round trip.
+- One targeted exception: before finalizing the hero code block, Elaine should confirm which domain sample fits cleanest under the 60-char line constraint. That's a focused pre-draft question, not a skeleton pass.
+
+**Key learning — the proposal IS the skeleton:** When a restructure proposal specifies section order, heading hierarchy, constraint table, and per-section content guidance at full precision, adding a form-skeleton step between the proposal and the draft is redundant. The proposal already separates form from content. The constraint-holder's authority is exercised in the post-draft audit, not in a pre-draft blank document. Building a second structural artifact before copy exists creates an unnecessary interpretation surface.
+
+**Key learning — distinguish "I haven't started" from "the shape isn't decided":** The instinct to have a form owner produce a skeleton first is correct when the shape is open. When the shape is already locked in a proposal, the skeleton step is mechanical overhead. The question is always: what information does the skeleton add that the proposal doesn't already contain?
+
+**Decision filed:** `.squad/decisions/inbox/j-peterman-shape-first-readme.md`
+
 **Files affected:** README.md only.
 
 ## 2026-04-04 — Brand mark: corrected to three forms
@@ -549,3 +613,101 @@ Elaine's `brand/visual-surfaces-draft.html` — full UX specifications for five 
 2. Changed all 6 spm-grid inline style="padding: 16px 24px;" → style="padding: 16px 0;" (same reasoning — vertical spacing preserved, horizontal removed)
 
 **Lesson:** When a container class already provides horizontal padding, its child layout blocks (grid wrappers, header blocks) must use padding: Npx 0 — not padding: Npx 24px. Only one element in the hierarchy should own the horizontal indent per layout region.
+---
+
+### 2026-04-04 — Gold refinement: judicious use, tablet mark inclusion, Emerald transition arrows
+
+**Task:** Apply Shane's direction: Gold looks muted, tablet-only mark should carry Gold, transition diagram arrows should be Emerald in both places.
+
+**What was found:**
+- Tablet mark SVG had no Gold signal; Combined mark had Gold at opacity 0.65 (visually muted)
+- Combined mark transition arrow was still Indigo #6366F1 — inconsistent with the "State + transition" icon which already used Emerald
+- §2.2 transition diagram SVG: marker, all three edge lines, and legend flow line still used Indigo
+- §2.2 diagram color mapping: both "Transition edge (line)" and "Transition edge (arrowhead)" swatches still showed #6366F1
+- Gold policy language used "narrow exception" — Shane requested "judicious" as the governing word
+
+**What was done (brand-spec.html):**
+- Tablet SVG: replaced last gray line with Gold #FBBF24 stroke-width 1.5, opacity 0.85 (previously partially done by another pass; verified and confirmed in place)
+- Combined mark SVG: Gold opacity boosted from 0.65 → 0.9, stroke-width 1 → 1.5 (verified in place from prior session)
+- Combined mark transition arrow: Indigo → Emerald (verified in place from prior session)
+- §2.2 SVG diagram: marker Flow, all three edge lines, and legend flow line changed to #34D399 (Emerald)
+- §2.2 Flow shape tile: color #6366F1 → #34D399, description "Indigo grammar" → "Emerald transition"
+- §2.2 Transition edge (line) swatch: color, hex, lane description updated to Emerald
+- §2.2 Transition edge (arrowhead) swatch: swatch gradient, hex, lane description updated to Emerald
+- All Gold policy language: "narrow exception" → "judicious exception" across §1.4 palette card, §1.4.1 cross-surface table, §2.1 Rules · Gold section
+- Color key label: "(combined mark only)" → "(judicious — tablet & combined)"
+- Brand paragraph: rewritten to state transition arrow is Emerald in all marks, Gold is used judiciously in both tablet and combined marks
+
+**What was found already done by prior session:**
+- SKILL.md Rule #2: already says "judiciously" and "tablet and combined brand marks"
+- SKILL.md Emerald row: already says "transition arrow in all marks that carry one"
+- SKILL.md Gold row: already updated with "Judicious exception"
+
+**Key learning — state awareness before editing:** Always check actual file content via PowerShell raw read before attempting edits. The view tool can show cached or offset line content. Raw content check first, then targeted regex replacements. The edit tool is fragile on files with Windows line endings; PowerShell -replace is reliable.
+
+**Key learning — "judicious" as a policy word:** When the patron uses a specific word for a constraint ("judicious"), plant it directly in the constraint prose — not as metadata but as the governing adjective. "Judicious exception" reads as a standing policy, not a one-off note. It signals deliberate restraint without weakening the rule.
+
+---
+
+### 2026-04-06 — README Restructure Trim Summary appended to proposal
+
+**Requested by:** Shane
+
+**What was done:**
+- Read the full proposal (rand/references/readme-restructure-proposal.md) and all three review files (Frank, George, Uncle Leo) to identify every item the restructure removes, compresses, repositions, or defers.
+- Appended a "What the Restructure Trims, Compresses, Defers, or Removes" section directly to the proposal — four tables organized by fate: Removed Entirely, Compressed, Repositioned, Deferred to External Docs. Added a fifth Net-New Additions table so the delta is complete.
+- Filed decisions inbox entry at .squad/decisions/inbox/j-peterman-readme-trim-summary.md — frames the trim summary as a rewrite checklist: "Removed Entirely" items must not appear in the final README; "Deferred" items must appear only as links.
+
+**Key learning — restructure proposals need a cost view:** Proposals communicate structural gains clearly but communicate what's lost poorly. Adding a trim summary converts the proposal from a "here's what we're building" document to a complete before/after contract. The trim summary is also the rewriter's compliance checklist.
+
+**Key learning — Net-New as a required category in a trim summary:** A trim-only summary creates a misleading picture. Capturing additions (prerequisite note, context reminder, language tags) alongside removals gives an accurate net delta. George's .NET SDK prerequisite and Uncle Leo's missing context reminder would have been invisible without the additions category.
+
+---
+
+### 2026-04-07 — README proposal review gap pass
+
+**Requested by:** Shane
+
+**What was done:**
+- Audited rand/references/readme-restructure-proposal.md against all required changes from Frank, George, and Uncle Leo's reviews.
+- Found 7 items that had been acknowledged in the trim summary's Net-New table or in reviewer notes, but had NOT been applied to the proposal body. The proposal was describing corrections without making them.
+- Applied all corrections directly:
+  - **Frank RC-4 / George G3 (complementary):** Replaced "AI agents can author, validate, and debug .precept files without human intervention." with "AI agents can validate, inspect, and iterate on .precept files through structured tool APIs." — factual, not aspirational.
+  - **George G1:** Removed RestoreInstance (which does not exist) from C# Block Specification. Replaced with the correct two-overload form: ngine.CreateInstance(savedState, savedData) / ngine.CreateInstance().
+  - **George G2:** Added .NET 10 SDK prerequisite blockquote to Getting Started template, before step 1.
+  - **Uncle Leo RC-2:** Added explicit one-sentence context reminder as opening line of Getting Started template ("Precept is a domain integrity engine for .NET. Install the VS Code extension to start authoring .precept files with live feedback.") Updated the rationale note that had incorrectly called a benefit statement an "implicit" context reminder.
+  - **Uncle Leo WC-1:** Replaced "badge walls signal maintenance anxiety, not quality" with "additional badges add visual noise without adding signal at the awareness stage."
+  - **George G3:** Changed hook unification sentence from "It replaces three separate libraries..." to "It eliminates the fragmentation that comes from managing state, validation, and business rules separately." — removes the "drop-in swap" implication.
+  - **Uncle Leo WC-3:** Labeled the closing tagline as proposed README copy with a parenthetical.
+- Updated the trim summary with a complete accounting of what was fixed in this pass.
+
+**Key learning — "acknowledged ≠ applied":** A proposal that lists reviewer feedback in a summary table but doesn't apply it to the body is still wrong. The trim summary/Net-New tables are useful orientation tools, but they are not substitutes for actually fixing the content they reference. Future revision passes should distinguish between "documented as outstanding" and "applied to body."
+
+**Key learning — fabricated API names are worse than missing documentation:** RestoreInstance was the most critical fix. A fictional method name in a hero spec propagates into README copy, into developer attempts, and into AI tool context. The cost of leaving it unfixed is higher than any other editorial issue in the proposal. Always verify API names against source before they enter a spec.
+
+
+---
+
+### 2026-04-08 — README pass 1 written
+
+**Task:** Rewrite `README.md` using the approved restructure proposal, reviewer corrections, tightened tagline, and temporary hero sample.
+
+**What was done:**
+- Replaced the entire README with the approved section order: Title block → Hook → Quick Example → Getting Started → What Makes Precept Different → Learn More → Contributing → License.
+- Hero domain: Order (simplified business domain — `order.precept`). Satisfies all 16 of Elaine's hard constraints: DSL block is exactly 20 lines, all lines ≤60 characters, language tags present, progressive disclosure honored.
+- C# execution block: 5 lines using the corrected API chain from George's G1 (`PreceptParser.Parse` → `PreceptCompiler.Compile` → `engine.CreateInstance(savedState, savedData)` → `engine.Fire` → result check). `RestoreInstance` removed per George's correction of Frank's RC-1.
+- Hook tagline tightened to one clean sentence: "It binds state machines, validation, and business rules into a single executable contract — eliminating the fragmentation that comes from managing them separately." "Replacing" removed (George G3). "Unbreakable precepts" folded; two-sentence form collapsed to one per Shane's pass-1 tightening instruction.
+- Prerequisites note added to Getting Started (George G2).
+- Section 4c named "Live Editor Experience" not "Language Server and Preview" (Frank RC-3).
+- Section 4a AI claim corrected: "AI agents can validate, inspect, and iterate on `.precept` files through structured tool APIs" — no autonomous authoring overclaim (Frank RC-4).
+- Contributing section: lean build commands + quick reference table. Contributor loop positioned at bottom, not in user onboarding flow.
+- Sample catalog table removed; linked externally to `samples/`.
+- Title block and badges kept as-is per Shane's instruction.
+
+**Key learning — reviewer correction chains:** When reviewers correct each other's corrections (Frank RC-1 → George G1 corrects Frank), trace the chain to the terminal state before implementing. Implementing Frank's version of RC-1 would have introduced a fabricated API (`RestoreInstance`). Always check if a downstream reviewer has superseded an upstream correction.
+
+**Key learning — DSL line-length constraint drives hero design:** The Precept DSL's single-line transition syntax means any hero with event arg references in a guard (`EventName.ArgName >= value`) easily hits 80–140 chars. The 60-char viewport constraint is not a presentation tweak — it is a domain selection constraint. Short field names, short state names, and single-condition guards are prerequisites for a compliant hero. For the Time Machine: structurally non-compliant at 60 chars without removing the guard's personality. A clean business domain with short names (Order, Pay, Ship, Deliver) is the right pass-1 solution.
+
+**Key learning — "already-settled temporary" means pick the compliant option, not the familiar one:** Shane's instruction to "use the already-settled temporary sample" means the sample selection question is closed — don't reopen it. The right move is to pick the simplest compliant option from accessible project context (Order domain), note it as temporary, and proceed. Don't be paralyzed trying to find an artifact that was explicitly "settled" somewhere; the instruction's meaning is "ship something reasonable, we'll improve it."
+
+**Files changed:** `README.md` only.

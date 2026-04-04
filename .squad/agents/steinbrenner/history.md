@@ -21,6 +21,15 @@ Elaine completed beautification and unification of palette mapping visual treatm
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
+### 2026-05-01 — README ship plan: proposal is ready, one gate remains
+
+- **All 7 required review changes have been applied** to the proposal body (Frank RC-1→4, George G1→3, Leo RC-1→2). Verified via `j-peterman-readme-review-gap-pass.md`. The proposal's trim summary and revision notes are accurate — this was confirmed by the acknowledged-vs-applied audit pattern.
+- **The only hard blocker is Shane's sign-off.** Everything else is specified. The rewriter (Peterman) has section order, CTA hierarchy, C# API surface, Elaine's 16 constraints, and a trim checklist. The proposal is among the most fully specified README briefs produced on this project.
+- **Hero domain is the highest churn risk.** If Shane doesn't lock the domain at sign-off, the rewriter will make a call and may need to redo it. Framing the hero domain as a Gate 1 requirement (not an advisory preference) is the right call.
+- **The rewrite is a one-shot operation.** Parallel review (Frank + George simultaneously) + editorial pass (Leo) + constraint validation (Scribe) should close in one session after the draft lands. No iteration loops are expected given the level of specification.
+- **Logo/SVG is not a gate.** The text wordmark is a valid placeholder. The title block structure does not change when the SVG swaps in.
+- **Decision record filed:** `.squad/decisions/inbox/steinbrenner-readme-ship-plan.md`
+
 ### 2026-05-01 — DSL expressiveness research (6 libraries)
 
 - **Libraries studied:** FluentAssertions, Zod/Valibot, xstate, Polly, FluentValidation, LINQ.
