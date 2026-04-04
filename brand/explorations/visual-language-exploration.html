@@ -5,8 +5,8 @@
 <title>Precept Visual Language Exploration</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+  :root { --brand-mono: 'Cascadia Cove', 'Cascadia Code', Consolas, monospace; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #0c0c0f; color: #e5e5e5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; padding: 40px; max-width: 1100px; margin: 0 auto; }
   h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; color: #fff; }
@@ -24,7 +24,7 @@
   .card-body { padding: 16px 24px 24px; }
 
   .syntax-block {
-    font-family: 'Inconsolata', ui-monospace, monospace;
+    font-family: var(--brand-mono);
     font-size: 14px;
     line-height: 1.8;
     background: #0c0c0f;
@@ -58,12 +58,14 @@
   .callout strong { color: #e5e5e5; }
   .status-locked { display: inline-block; background: #166534; color: #34D399; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; vertical-align: middle; margin-left: 8px; }
   .status-open { display: inline-block; background: #422006; color: #FBBF24; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; vertical-align: middle; margin-left: 8px; }
+  [style*="Inconsolata"] { font-family: var(--brand-mono) !important; }
+  svg text { font-family: var(--brand-mono); }
 </style>
 </head>
 <body>
 
 <h1>Precept &mdash; Visual Language Exploration</h1>
-<p class="subtitle">The DSL syntax and state diagrams ARE the visual identity. The icon is one element in a broader system that includes <code>.precept</code> files, state diagrams, diagnostics, and the inspector panel. Background: <code>#0c0c0f</code>. Font: Inconsolata. This page now renders editor-adjacent examples with the locked semantic system: indigo for structure, one violet for all states, cyan for events, slate for data, and gold only for human-readable rule messages.</p>
+<p class="subtitle">The DSL syntax and state diagrams ARE the visual identity. The icon is one element in a broader system that includes <code>.precept</code> files, state diagrams, diagnostics, and the inspector panel. Background: <code>#0c0c0f</code>. Font: Cascadia Cove. This page now renders editor-adjacent examples with the locked semantic system: indigo for structure, one violet for all states, cyan for events, slate for data, and gold only for human-readable rule messages.</p>
 
 <div class="callout" style="margin-bottom:48px;">
   <strong>Locked decisions applied:</strong> Syntax and diagram examples on this page are aligned to the locked semantic model: one hue per category, typography for constraint pressure, and no lifecycle-tier state colors in code. Exploration here is now about composition, layout, and supporting surfaces rather than alternate syntax semantics. See <a href="../brand-decisions.md" style="color:#818CF8;">brand-decisions.md</a> and <a href="../brand-spec.html" style="color:#818CF8;">brand-spec.html</a> for canonical references.
@@ -785,7 +787,7 @@
   <ul style="margin:8px 0 0 16px; line-height:1.8;">
     <li>Does the code+diagram pairing work as a single visual unit, or should the diagram go below?</li>
     <li>NuGet badge in indigo (<span style="color:#6366F1;">#6366F1</span>) &mdash; does it read as a Precept thing or just generic purple?</li>
-    <li>Wordmark treatment: small-caps Inconsolata 700 with 0.1em spacing. Should it appear in the README header or is the plain text name enough?</li>
+    <li>Wordmark treatment: small-caps Cascadia Cove 700 with 0.1em spacing. Should it appear in the README header or is the plain text name enough?</li>
     <li>GitHub dark theme background (#0d1117) vs our background (#0c0c0f) &mdash; close enough, or need the code block to specify its own background?</li>
     <li>Social preview image (og:image) &mdash; probably the code+diagram pairing rendered as a 1280x640 PNG. What else?</li>
   </ul>
@@ -815,7 +817,7 @@
   <strong>What is decided:</strong>
   <ul style="margin:8px 0 0 16px; line-height:1.8;">
     <li>Primary surface = DSL syntax. Secondary = state diagrams. Tertiary = diagnostics. Icon = small mark.</li>
-    <li>Background: <code>#0c0c0f</code> everywhere. Font: Inconsolata (wordmark 700 small-caps, code 400-600).</li>
+    <li>Background: <code>#0c0c0f</code> everywhere. Font: Cascadia Cove (wordmark 700 small-caps, code 400-700).</li>
     <li>Editor-adjacent surfaces on this page use the locked 8-shade dark-mode semantic system.</li>
     <li>State diagrams use the same locked hue families; origin and final status are expressed through shape, not alternate state tints.</li>
   </ul>

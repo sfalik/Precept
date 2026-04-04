@@ -7,6 +7,18 @@ namespace Precept.LanguageServer.Tests;
 public class PreceptSemanticTokensClassificationTests
 {
     [Fact]
+    public void GetClassifiedTokens_Comment_IsPreceptComment()
+    {
+        const string dsl = "# force flashing red until explicitly cleared\nprecept M\nstate Active initial\nevent Go\nfrom Active on Go -> no transition\n";
+
+        var tokens = PreceptSemanticTokensHandler.GetClassifiedTokens(dsl);
+
+        tokens.Should().Contain(t =>
+            t.Text == "# force flashing red until explicitly cleared" &&
+            t.Type == "preceptComment");
+    }
+
+    [Fact]
     public void GetClassifiedTokens_BecauseString_IsPreceptMessage()
     {
         const string dsl = """

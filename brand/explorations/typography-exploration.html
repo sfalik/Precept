@@ -5,8 +5,9 @@
 <title>Precept Typography Exploration</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Sora:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Inconsolata:wght@400;500;600;700;800;900&family=Red+Hat+Mono:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600;700&family=Archivo:wght@400;500;600;700;800;900&family=Familjen+Grotesk:wght@400;500;600;700&family=Urbanist:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Sora:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Red+Hat+Mono:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600;700&family=Archivo:wght@400;500;600;700;800;900&family=Familjen+Grotesk:wght@400;500;600;700&family=Urbanist:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
+  :root { --brand-mono: 'Cascadia Cove', 'Cascadia Code', Consolas, monospace; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #0a0a0a; color: #e5e5e5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; padding: 40px; }
   h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; color: #fff; }
@@ -47,6 +48,7 @@
   .verdict-neutral { background: #141414; border-color: #333; color: #aaa; }
 
   .comparison-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin: 24px 0; }
+  [style*="Inconsolata"] { font-family: var(--brand-mono) !important; }
 </style>
 </head>
 <body>
@@ -273,7 +275,7 @@
 <!-- ========== ARCHIVED: Indigo-Palette Font Explorations (from color system page) ========== -->
 <div class="option-group">
 <h2>Archived: Indigo-Palette Font Explorations</h2>
-<p class="desc">These fonts were evaluated against the indigo brand palette during color system exploration. <strong>Inconsolata was chosen.</strong> Everything below is archived for reference.</p>
+<p class="desc">These fonts were evaluated against the indigo brand palette during color system exploration. <strong>Cascadia Cove is now chosen.</strong> Everything below is archived for reference.</p>
 
 <h3 style="color:#fff; margin-top:24px; margin-bottom:16px;">Sans-Serif Wordmarks (Indigo Palette)</h3>
 
@@ -419,16 +421,16 @@
 </div>
 
 <div class="type-card" style="border-color:#312e81;">
-  <div class="font-label" style="color:#818cf8;">Inconsolata ✅ CHOSEN</div>
+  <div class="font-label" style="color:#818cf8;">Cascadia Cove ✅ CHOSEN</div>
   <div class="wordmark-row">
-    <div style="font-family:'Inconsolata',monospace; font-size:48px; font-weight:700; color:#fff;">Precept</div>
-    <div style="font-family:'Inconsolata',monospace; font-size:24px; font-weight:700; color:#a5b4fc;">Precept</div>
-    <div style="font-family:'Inconsolata',monospace; font-size:14px; font-weight:700; color:#71717a;">Precept</div>
+    <div style="font-family:'Cascadia Cove','Cascadia Code',Consolas,monospace; font-size:48px; font-weight:700; color:#fff;">Precept</div>
+    <div style="font-family:'Cascadia Cove','Cascadia Code',Consolas,monospace; font-size:24px; font-weight:700; color:#a5b4fc;">Precept</div>
+    <div style="font-family:'Cascadia Cove','Cascadia Code',Consolas,monospace; font-size:14px; font-weight:700; color:#71717a;">Precept</div>
   </div>
   <div class="meta-row">
-    <span class="tag">Humanist mono</span> <span class="tag">Narrow</span> <span class="tag">Classic programmer font</span>
+    <span class="tag">Editor-native mono</span> <span class="tag">Sharper posture</span> <span class="tag">Cascadia family</span>
   </div>
-  <div style="font-family:'Inconsolata',monospace; font-size:13px; color:#64748b; margin-top:12px; line-height:1.6;">
+  <div style="font-family:'Cascadia Cove','Cascadia Code',Consolas,monospace; font-size:13px; color:#64748b; margin-top:12px; line-height:1.6;">
     <span style="color:#818cf8;">from</span> <span style="color:#a5b4fc;">Draft</span> <span style="color:#818cf8;">on</span> <span style="color:#c4b5fd;">Submit</span> <span style="color:#818cf8;font-weight:700;">-></span> <span style="color:#818cf8;">transition</span> <span style="color:#94a3b8;">Review</span>
   </div>
 </div>

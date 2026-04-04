@@ -5,8 +5,8 @@
 <title>Precept — Semantic Color System Exploration</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
+  :root { --brand-mono: 'Cascadia Cove', 'Cascadia Code', Consolas, monospace; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #09090b; color: #e5e5e5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; padding: 40px; max-width: 1400px; }
   h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; color: #fff; }
@@ -35,7 +35,7 @@
 
   /* ===== Syntax block ===== */
   .syntax-block {
-    font-family: 'Inconsolata', ui-monospace, monospace;
+    font-family: var(--brand-mono);
     font-size: 13px;
     line-height: 1.8;
     background: #0c0c0f;
@@ -65,6 +65,8 @@
   .wordmark-row { display: flex; align-items: baseline; gap: 32px; flex-wrap: wrap; margin-bottom: 12px; }
   .meta-row { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: #52525b; margin-top: 8px; }
   .meta-row .tag { background: #1e1b4b; border: 1px solid #312e81; border-radius: 4px; padding: 2px 8px; font-size: 10px; color: #a5b4fc; }
+  [style*="Inconsolata"] { font-family: var(--brand-mono) !important; }
+  svg text { font-family: var(--brand-mono); }
 </style>
 </head>
 <body>
@@ -686,17 +688,17 @@
 <div class="section-divider"></div>
 
 <!-- ===================================================================== -->
-<!-- SECTION 6: Inconsolata — Chosen Brand Font                             -->
+<!-- SECTION 6: Cascadia Cove — Chosen Brand Font                           -->
 <!-- ===================================================================== -->
 <div class="section">
-<h2>6. Inconsolata — Chosen Brand Font</h2>
-<p class="desc">Inconsolata is a humanist monospace by Raph Levien — narrower and more elegant than most mono faces. The word "Precept" gains a carved, inscribed quality in it. Small caps amplifies that: it's the typographic convention for defined terms, legal concepts, and axioms — exactly what a precept is. Unchosen candidates archived in <a href="typography-exploration.html" style="color:#818cf8;">typography-exploration.html</a>.</p>
+<h2>6. Cascadia Cove — Chosen Brand Font</h2>
+<p class="desc">Cascadia Cove gives Precept a sharper, more editor-native monospace voice. It keeps the programming signal, but reads a little more engineered than Inconsolata. Small caps still does the semantic work: defined term, inscribed rule, named system. Unchosen candidates archived in <a href="typography-exploration.html" style="color:#818cf8;">typography-exploration.html</a>.</p>
 
 <!-- Weight range -->
 <div class="card">
   <div class="card-header">
     <h3>Weight range — regular to black</h3>
-    <p>Inconsolata's variable axis runs from 400 to 900. Heavier weights have more presence as a wordmark.</p>
+    <p>Cascadia Cove holds up cleanly across regular through bold weights, with enough mass at heavier settings to carry a wordmark.</p>
   </div>
   <div class="card-body">
     <div style="display:flex; flex-direction:column; gap:16px;">
@@ -791,11 +793,11 @@
   </div>
 </div>
 
-<!-- Inconsolata SC in full context: icon + wordmark + tagline -->
+<!-- Cascadia Cove SC in full context: icon + wordmark + tagline -->
 <div class="card" style="margin-top:24px;">
   <div class="card-header">
     <h3>In context — icon + wordmark + tagline</h3>
-    <p>How the small-caps Inconsolata wordmark sits next to the icon and a body-text tagline.</p>
+    <p>How the small-caps Cascadia Cove wordmark sits next to the icon and a body-text tagline.</p>
   </div>
   <div class="card-body">
     <div style="background:#0c0c0f; border-radius:8px; padding:32px; border:1px solid #1e1b4b;">
@@ -835,7 +837,7 @@
   </div>
 </div>
 
-<!-- Inconsolata SC + code pairing -->
+<!-- Cascadia Cove SC + code pairing -->
 <div class="card" style="margin-top:24px;">
   <div class="card-header">
     <h3>Wordmark + DSL code pairing</h3>
@@ -858,13 +860,13 @@
   <span style="color:#818cf8;font-weight:700;">-></span> <span style="color:#818cf8;font-weight:600;">transition</span> <span style="color:#94a3b8;">UnderReview</span></div>
     </div>
     <div class="note" style="margin-top:16px;">
-      Same typeface family for wordmark and code. The wordmark is <strong>Inconsolata 700 small-caps + 0.1em tracking</strong>. The code is <strong>Inconsolata 400-600 normal case</strong>. Zero font-family mismatch — the code literally grows out of the wordmark.
+      Same typeface family for wordmark and code. The wordmark is <strong>Cascadia Cove 700 small-caps + 0.1em tracking</strong>. The code is <strong>Cascadia Cove 400-700 normal case</strong>. Zero font-family mismatch — the code literally grows out of the wordmark.
     </div>
   </div>
 </div>
 
 <div class="callout" style="margin-top:24px;">
-  <strong>Why small caps works for "Precept" specifically:</strong> Small caps are the typographic convention for <em>defined terms</em> — legal codes, philosophical axioms, constitutional clauses. The word "precept" literally means "a strict rule of action." Setting it in small caps isn't a style choice — it's a semantic one. The typography says "this is a defined concept" before you read the word. Combined with Inconsolata's narrow, precise letterforms, it reads like something carved into a specification.
+  <strong>Why small caps works for "Precept" specifically:</strong> Small caps are the typographic convention for <em>defined terms</em> — legal codes, philosophical axioms, constitutional clauses. The word "precept" literally means "a strict rule of action." Setting it in small caps isn't a style choice — it's a semantic one. The typography says "this is a defined concept" before you read the word. Combined with Cascadia Cove's sharper technical letterforms, it reads like something carved into a specification.
 </div>
 </div>
 
@@ -1381,12 +1383,12 @@
           <td colspan="5" style="padding:12px; color:#a5b4fc; font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">Structural &amp; Metadata</td>
         </tr>
         <tr style="border-bottom:1px solid #27272a;">
-          <td style="padding:10px 12px; color:#6a9955; font-weight:600;">Comments</td>
+          <td style="padding:10px 12px; color:#7a8599; font-weight:600;">Comments</td>
           <td style="padding:10px 12px; font-family:'Inconsolata',monospace; font-size:12px;">
-            <span style="color:#6a9955;">// this is a comment</span>
+            <span style="color:#7a8599;">// this is a comment</span>
           </td>
-          <td style="padding:10px 12px;"><span style="color:#6a9955;">&#9632;</span> <span style="color:#94a3b8; font-family:'Inconsolata',monospace; font-size:11px;">#6A9955</span></td>
-          <td style="padding:10px 12px; color:#94a3b8;">Green — standard convention</td>
+          <td style="padding:10px 12px;"><span style="color:#7a8599;">&#9632;</span> <span style="color:#94a3b8; font-family:'Inconsolata',monospace; font-size:11px;">#7A8599</span></td>
+          <td style="padding:10px 12px; color:#94a3b8;">Muted steel — editorial, outside the semantic system</td>
           <td style="padding:10px 12px; color:#52525b;">—</td>
         </tr>
       </tbody>

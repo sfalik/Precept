@@ -445,7 +445,7 @@ Build (npm run compile). Run extension: install task. Verify colors.
       { "scope": "punctuation.separator.arrow.precept",    "settings": { "foreground": "#6366F1" } },
       { "scope": "punctuation.separator.comma.precept",    "settings": { "foreground": "#6366F1" } },
       { "scope": "punctuation.accessor.precept",           "settings": { "foreground": "#6366F1" } },
-      { "scope": "comment.line.number-sign.precept",       "settings": { "foreground": "#6B7280", "fontStyle": "italic" } }
+      { "scope": "comment.line.number-sign.precept",       "settings": { "foreground": "#7A8599", "fontStyle": "italic" } }
     ]
   }
 }
@@ -474,7 +474,9 @@ Add "editor.tokenColorCustomizations" to "configurationDefaults" in
 tools/Precept.VsCode/package.json. Use the exact textMateRules from the plan.
 
 Strings default to #84929F (slate). All keywords default to #4338CA bold.
-Comments to #6B7280 italic.
+Comments to #7A8599 italic.
+Comments must use a Precept-specific semantic token mapped to comment.line.number-sign.precept, not the standard semantic token type comment.
+Also add targeted semantic token color rules for preceptComment and comment:precept so theme comment selectors cannot override Precept comments.
 
 Build (npm run compile). Run extension: install task. Verify fallback colors
 appear before semantic tokens load.

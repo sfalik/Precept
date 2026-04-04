@@ -140,6 +140,10 @@ The only warm hue in the authoring-time palette. Gold is reserved for message pa
 |-------|-----|----|------------|------|
 | Messages | `#FBBF24` | 11.7 | normal | because/reject string content |
 
+#### Comments · Editorial outside the semantic palette
+
+Comments are not part of the executable semantic system, so they intentionally sit outside the 8-shade authoring palette. Use muted steel `#7A8599` in italic for `#` comments: visible enough to read, quiet enough to stay out of the semantic lanes.
+
 #### Verdicts · Runtime only
 
 Never in syntax highlighting — reserved entirely for runtime outcomes. Green/red/yellow can't be confused with authoring-time colors because they only appear in the inspector and diagrams.
@@ -189,19 +193,19 @@ State diagrams align to the same hue families, but they do not use lifecycle-tie
 
 ## ✅ Typography / Wordmark
 
-**Brand font**: Inconsolata (Raph Levien, SIL Open Font License)
+**Brand font**: Cascadia Cove (with Cascadia Code fallback)
 
-Humanist monospace. Narrower and more elegant than most mono faces. Variable weight 400–900.
+Monospace with a slightly more engineered, editor-native feel than Inconsolata. The Cove variant keeps the family recognizable while giving the wordmark and code samples a sharper technical posture.
 
-**Wordmark treatment**: Inconsolata 700, small caps + 0.1em letter-spacing.
+**Wordmark treatment**: Cascadia Cove 700, small caps + 0.1em letter-spacing.
 
 Small caps is the typographic convention for defined terms, legal codes, and axioms — exactly what a precept is. The typography says "this is a defined concept" before you read the word.
 
-**Code font**: Inconsolata 400–600, normal case. Same typeface family — the code literally grows out of the wordmark.
+**Code font**: Cascadia Cove 400–700, normal case. Same typeface family — the code literally grows out of the wordmark.
 
 ```
-Wordmark:  PRECEPT  (Inconsolata 700, font-variant: small-caps, letter-spacing: 0.1em)
-Code:      precept LoanApplication  (Inconsolata 400-600, normal case)
+Wordmark:  PRECEPT  (Cascadia Cove 700, font-variant: small-caps, letter-spacing: 0.1em)
+Code:      precept LoanApplication  (Cascadia Cove 400-700, normal case)
 ```
 
 ## ✅ Visual language

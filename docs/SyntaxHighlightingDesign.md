@@ -40,7 +40,7 @@ Three layers produce highlighting today. None currently apply custom colors — 
 
 **File:** `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`
 
-Regex patterns assign TextMate scopes to tokens. Used as the immediate fallback when semantic tokens haven't loaded, and the permanent source for tokens the language server doesn't cover (comments, strings).
+Regex patterns assign TextMate scopes to tokens. Used as the immediate fallback when semantic tokens haven't loaded, and as the fallback scope map for semantic tokens that intentionally resolve through Precept-owned TextMate scopes.
 
 Current scope assignments:
 
@@ -69,7 +69,7 @@ The language server tokenizes `.precept` source and emits LSP semantic tokens. W
 Current legend:
 
 ```
-TokenTypes:    keyword, type, function, variable, number, string, operator, comment
+TokenTypes:    keyword, type, function, variable, number, string, operator, comment, preceptComment, ...custom Precept types
 TokenModifiers: (none)
 ```
 
@@ -264,13 +264,14 @@ This is new capability. The handler must determine which states, events, and fie
 
 #### E. Extension `package.json` — Type Declarations, `semanticTokenScopes`, and Fallback Scope Rules
 
-**✅ Decided.** Mechanical — follows directly from A and B. Comments are TextMate-only (tokenizer strips them), so comment color is handled entirely in the TextMate fallback (section F).
+**✅ Decided.** Mechanical — follows directly from A and B. Comments are scanned from raw text and emitted as a Precept-specific semantic token (`preceptComment`). In practice, many themes still define aggressive styling for the standard semantic selector `comment`, so the extension also ships a targeted semantic token color override for `preceptComment` and `comment:precept` to force the Precept comment color to win.
 
 Add the custom semantic token type contributions, semantic-token-to-scope mappings, and Precept-owned fallback scope rules:
 
 ```jsonc
 "contributes": {
   "semanticTokenTypes": [
+    { "id": "preceptComment",         "description": "Precept comment" },
     { "id": "preceptKeywordSemantic", "description": "Precept behavioral structure keyword" },
     { "id": "preceptKeywordGrammar",  "description": "Precept connective grammar keyword" },
     { "id": "preceptState",           "description": "Precept state name" },
@@ -287,6 +288,7 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
     {
       "language": "precept",
       "scopes": {
+        "preceptComment": ["comment.line.number-sign.precept"],
         "preceptKeywordSemantic": ["keyword.other.semantic.precept"],
         "preceptKeywordGrammar": ["keyword.other.grammar.precept"],
         "preceptState": ["entity.name.type.state.precept"],
@@ -303,6 +305,12 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
   ],
   "configurationDefaults": {
     "[precept]": { "editor.semanticHighlighting.enabled": true },
+    "editor.semanticTokenColorCustomizations": {
+      "rules": {
+        "preceptComment": { "foreground": "#7A8599", "italic": true },
+        "comment:precept": { "foreground": "#7A8599", "italic": true }
+      }
+    },
     "editor.tokenColorCustomizations": {
       "[*]": {
         "textMateRules": [
@@ -353,13 +361,13 @@ The TextMate grammar already assigns specific scopes. To lock fallback colors be
       { "scope": "punctuation.separator.arrow.precept",    "settings": { "foreground": "#6366F1" } },
       { "scope": "punctuation.separator.comma.precept",    "settings": { "foreground": "#6366F1" } },
       { "scope": "punctuation.accessor.precept",           "settings": { "foreground": "#6366F1" } },
-      { "scope": "comment.line.number-sign.precept",       "settings": { "foreground": "#6B7280", "fontStyle": "italic" } }
+      { "scope": "comment.line.number-sign.precept",       "settings": { "foreground": "#7A8599", "fontStyle": "italic" } }
     ]
   }
 }
 ```
 
-**Note:** TextMate cannot distinguish Structure · Semantic from Structure · Grammar for keywords that share the `keyword.other.precept` scope. This is a known limitation — the semantic tokens layer handles the split when the language server is active. For the TextMate fallback, all keywords get Structure · Semantic (`#4338CA` bold) as the safer default. Grammar-role keywords (`as`, `with`, `default`, etc.) will briefly appear bold until semantic tokens load and correct them. This could be improved by splitting `keyword.other.precept` into dedicated scopes for grammar keywords.
+**Note:** TextMate cannot distinguish Structure · Semantic from Structure · Grammar for keywords that share the `keyword.other.precept` scope. This is a known limitation — the semantic tokens layer handles the split when the language server is active. For the TextMate fallback, all keywords get Structure · Semantic (`#4338CA` bold) as the safer default. Grammar-role keywords (`as`, `with`, `default`, etc.) will briefly appear bold until semantic tokens load and correct them. This could be improved by splitting `keyword.other.precept` into dedicated scopes for grammar keywords. Comments are the exception to the pure scope-map path: they also get a targeted semantic override because themes commonly hard-style the standard `comment` semantic selector.
 
 #### G. String Literal Context — Messages vs. Plain Strings
 
@@ -389,7 +397,7 @@ Italic requires knowing which states/events/fields are constrained. This depends
 
 ### R4: Bold in semantic tokens — ✅ Accepted
 
-VS Code semantic token rules support `"bold": true` in `settings.json` / `configurationDefaults`, but this is applied via CSS `font-weight`. The actual rendering depends on whether the editor font has a bold variant. Inconsolata (the brand font) supports variable weight 400–900, so bold will render correctly if the user has Inconsolata configured. For users with other fonts, bold is best-effort. **Decision:** Acceptable — bold is a brand signal, not a correctness requirement.
+VS Code semantic token rules support `"bold": true` in `settings.json` / `configurationDefaults`, but this is applied via CSS `font-weight`. The actual rendering depends on whether the editor font has a bold variant. Cascadia Cove (the brand font) has a usable weight range for this, so bold will render correctly when that family is available. For users with other fonts, bold is best-effort. **Decision:** Acceptable — bold is a brand signal, not a correctness requirement.
 
 ### R5: TextMate keyword scope granularity — ✅ Accepted
 

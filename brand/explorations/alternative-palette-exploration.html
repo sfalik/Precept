@@ -5,10 +5,10 @@
 <title>Precept — Alternative Palette Exploration: Five Channels</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
+  :root { --brand-mono: 'Cascadia Cove', 'Cascadia Code', Consolas, monospace; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #09090b; color: #e5e5e5; font-family: 'Inconsolata', ui-monospace, monospace; padding: 40px 48px; max-width: 1400px; }
+  body { background: #09090b; color: #e5e5e5; font-family: var(--brand-mono); padding: 40px 48px; max-width: 1400px; }
   h1 { font-size: 28px; font-weight: 700; font-variant: small-caps; letter-spacing: 0.1em; color: #fff; margin-bottom: 4px; }
   .subtitle { color: #71717a; font-size: 14px; margin-bottom: 48px; }
   h2 { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #27272a; }
@@ -29,7 +29,7 @@
   .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: middle; margin-right: 6px; }
 
   .syntax-block {
-    font-family: 'Inconsolata', ui-monospace, monospace;
+    font-family: var(--brand-mono);
     font-size: 13px;
     line-height: 1.8;
     background: #0c0c0f;
@@ -48,6 +48,8 @@
   .label-alt { font-size: 11px; color: #A78BFA; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
 
   .note { font-size: 12px; color: #71717a; border-left: 3px solid #A78BFA; padding-left: 12px; margin-top: 16px; line-height: 1.7; }
+  [style*="Inconsolata"] { font-family: var(--brand-mono) !important; }
+  svg text { font-family: var(--brand-mono); }
 </style>
 </head>
 <body>

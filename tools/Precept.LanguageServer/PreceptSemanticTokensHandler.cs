@@ -28,6 +28,7 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
             "string",
             "operator",
             "comment",
+            "preceptComment",
             "preceptKeywordSemantic",
             "preceptKeywordGrammar",
             "preceptState",
@@ -135,7 +136,7 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
         {
             cancellationToken.ThrowIfCancellationRequested();
             var (line, col) = OffsetToLineCol(text, match.Index);
-            Push(builder, line, col, match.Length, "comment");
+            Push(builder, line, col, match.Length, "preceptComment");
         }
 
         // ── 2. Token stream — keywords, operators, identifiers, literals ──
@@ -177,10 +178,16 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
             return [];
         }
 
-        return ClassifyTokens(tokens, text)
+        var classifiedTokens = LineCommentRegex.Matches(text)
+            .Select(match => new ClassifiedSemanticToken(match.Value, "preceptComment", null))
+            .ToList();
+
+        classifiedTokens.AddRange(ClassifyTokens(tokens, text)
             .Where(x => x.SemanticType != null)
             .Select(x => new ClassifiedSemanticToken(x.Token.ToStringValue(), x.SemanticType!, x.Modifier))
-            .ToList();
+            .ToList());
+
+        return classifiedTokens;
     }
 
     private static IEnumerable<(Token<PreceptToken> Token, string? SemanticType, string? Modifier)> ClassifyTokens(
