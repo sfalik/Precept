@@ -1,15 +1,9 @@
 {
   "version": 1,
   "noHaiku": true,
+  "defaultModel": "claude-sonnet-4.6",
   "agentModelOverrides": {
     "frank": "claude-opus-4.6",
-    "george": "claude-sonnet-4.6",
-    "kramer": "claude-sonnet-4.6",
-    "newman": "claude-sonnet-4.6",
-    "soup-nazi": "claude-sonnet-4.6",
-    "uncle-leo": "gpt-5.4",
-    "j-peterman": "claude-sonnet-4.6",
-    "steinbrenner": "claude-sonnet-4.6",
-    "scribe": "claude-sonnet-4.6"
+    "uncle-leo": "gpt-5.4"
   }
 }
