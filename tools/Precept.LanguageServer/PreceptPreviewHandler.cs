@@ -294,6 +294,7 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
         return new PreceptPreviewSnapshot(
             session.Engine.Name,
             session.Instance.CurrentState,
+            session.Engine.InitialState,
             session.Engine.States,
             transitions,
             events,

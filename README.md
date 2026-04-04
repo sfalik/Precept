@@ -1,9 +1,7 @@
 # Precept 🛡️
 
 [![NuGet Badge](https://img.shields.io/nuget/v/Precept)](https://www.nuget.org/packages/Precept)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/OwnerName/Precept/build.yml?branch=main)](https://github.com/OwnerName/Precept/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![VS Code Extension](https://img.shields.io/visual-studio-marketplace/v/OwnerName.precept-vscode?label=VS%20Code)](https://marketplace.visualstudio.com/items?itemName=OwnerName.precept-vscode)
 
 > **pre·​cept** *(noun)*: A general rule intended to regulate behavior or thought; a strict command or principle of action.
 
@@ -19,7 +17,7 @@
    ```
 2. **Install the VS Code extension:** Search for `Precept DSL` in the marketplace or run:
    ```bash
-   code --install-extension AuthorName.precept-vscode
+   code --install-extension sfalik.precept-vscode
    ```
 3. **Install the Copilot agent plugin** *(optional — requires `chat.plugins.enabled`)*: In VS Code, run `Chat: Install Plugin From Source` and provide the plugin repo URL. This adds the Precept MCP tools plus optional Copilot customizations: the Precept Author agent and two companion skills.
 
@@ -29,47 +27,25 @@
 
 With Precept, you define the rules of your entity in a clean, domain-readable DSL, and then execute those exact rules deterministically in C#.
 
-### 1. The Contract (`loan-application.precept`)
+### 1. The Contract (`time-machine.precept`)
 
 ```
-precept LoanApplication
+precept TimeMachine
 
-# Fields with defaults and invariants
-field ApplicantName as string nullable
-field RequestedAmount as number default 0
-field ApprovedAmount as number default 0
-field CreditScore as number default 0
-field AnnualIncome as number default 0
-field ExistingDebt as number default 0
-field DecisionNote as string nullable
-field DocumentsVerified as boolean default false
-invariant ApprovedAmount <= RequestedAmount because "Approved amount cannot exceed the request"
+field Speed as number default 0
+invariant Speed >= 0 because "Even DeLoreans cannot drive in reverse through time"
 
-# State progression
-state Draft initial
-state UnderReview
-state Approved
-state Funded
-state Declined
+state Parked initial, Accelerating, TimeTraveling
 
-# Events with typed arguments and asserts
-event Submit with Applicant as string, Amount as number, Score as number, Income as number, Debt as number
-on Submit assert Applicant != "" because "An applicant name is required"
-on Submit assert Amount > 0 because "Loan requests must be positive"
+event FloorIt with TargetMph as number, Gigawatts as number
+on FloorIt assert Gigawatts > 0 because "The flux capacitor cannot run on vibes"
 
-event VerifyDocuments
+event Arrive
 
-event Approve with Amount as number, Note as string nullable default null
-on Approve assert Amount > 0 because "Approved amounts must be positive"
-
-event Decline with Note as string
-
-# Flat transition rows — first matching row wins
-from Draft on Submit -> set ApplicantName = Submit.Applicant -> set RequestedAmount = Submit.Amount -> set CreditScore = Submit.Score -> set AnnualIncome = Submit.Income -> set ExistingDebt = Submit.Debt -> transition UnderReview
-from UnderReview on VerifyDocuments -> set DocumentsVerified = true -> no transition
-from UnderReview on Approve when DocumentsVerified && CreditScore >= 680 && AnnualIncome >= ExistingDebt * 2 && RequestedAmount < AnnualIncome / 2 && Approve.Amount <= RequestedAmount -> set ApprovedAmount = Approve.Amount -> set DecisionNote = Approve.Note -> transition Approved
-from UnderReview on Approve -> reject "Approval requires verified documents, strong credit, and affordable debt load"
-from UnderReview on Decline -> set DecisionNote = Decline.Note -> transition Declined
+from Parked on FloorIt -> set Speed = FloorIt.TargetMph -> transition Accelerating
+from Accelerating on FloorIt when FloorIt.TargetMph >= 88 && FloorIt.Gigawatts >= 1.21 -> set Speed = FloorIt.TargetMph -> transition TimeTraveling
+from Accelerating on FloorIt -> reject "Roads? Where we're going, we still need 88 mph and 1.21 gigawatts."
+from TimeTraveling on Arrive -> set Speed = 0 -> transition Parked
 ```
 
 ### 2. The Execution (C#)
@@ -140,13 +116,14 @@ if (editResult.IsSuccess)
 
 ## 📚 Sample Catalog
 
-The `samples/` directory now contains 20 fully commented workflows ordered from simple to complex. Early samples are teaching-first, middle samples broaden feature usage, and later samples combine richer branching with more realistic review and operational rules.
+The `samples/` directory now contains 21 fully commented workflows ordered from simple to complex. Early samples are teaching-first, middle samples broaden feature usage, and later samples combine richer branching with more realistic review and operational rules.
 
 | Sample | Complexity | Learning focus |
 |--------|------------|----------------|
 | `event-registration.precept` | Simple | Scalar fields, payment flow, direct edits |
 | `library-hold-request.precept` | Simple | Queue promotion, stack history, entry and exit actions |
 | `trafficlight.precept` | Simple | Classic state progression, guard priority, `from any` |
+| `crosswalk-signal.precept` | Simple | Boolean fields, `from any`, `edit`, `in <State> assert`, countdown arithmetic |
 | `restaurant-waitlist.precept` | Simple | Queue routing, `peek`, `from any` |
 | `parcel-locker-pickup.precept` | Simple | Timed guards, reminder log stack, `clear` |
 | `building-access-badge-request.precept` | Simple | `set<number>`, `add`, `remove`, `contains`, `.min`, `.max` |
@@ -177,16 +154,16 @@ The catalog is designed so the overall set exercises the full current language s
 | Event assertions | Present across all samples; see `clinic-appointment-scheduling.precept` and `travel-reimbursement.precept` |
 | `when` guards and first-match branching | `refund-request.precept`, `parcel-locker-pickup.precept`, `apartment-rental-application.precept` |
 | `transition`, `no transition`, and `reject` outcomes | Present across the catalog; see `event-registration.precept`, `refund-request.precept`, `loan-application.precept` |
-| `in <State> assert` | `event-registration.precept`, `utility-outage-report.precept`, `warranty-repair-request.precept` |
+| `in <State> assert` | `event-registration.precept`, `crosswalk-signal.precept`, `utility-outage-report.precept`, `warranty-repair-request.precept` |
 | `to <State> assert` | `vehicle-service-appointment.precept`, `apartment-rental-application.precept` |
 | `from <State> assert` | `maintenance-work-order.precept`, `vehicle-service-appointment.precept` |
 | Entry and exit actions | `event-registration.precept`, `library-hold-request.precept`, `parcel-locker-pickup.precept`, `warranty-repair-request.precept` |
-| Editable fields with `edit` | `event-registration.precept`, `building-access-badge-request.precept`, `insurance-claim.precept`, `utility-outage-report.precept` |
+| Editable fields with `edit` | `event-registration.precept`, `crosswalk-signal.precept`, `building-access-badge-request.precept`, `insurance-claim.precept`, `utility-outage-report.precept` |
 | Set collections with `add`, `remove`, `contains` | `building-access-badge-request.precept`, `insurance-claim.precept`, `vehicle-service-appointment.precept`, `hiring-pipeline.precept` |
 | Queue collections with `enqueue`, `dequeue`, `peek` | `library-hold-request.precept`, `restaurant-waitlist.precept`, `it-helpdesk-ticket.precept`, `utility-outage-report.precept` |
 | Stack collections with `push`, `pop`, `peek`, `clear` | `parcel-locker-pickup.precept`, `library-hold-request.precept`, `warranty-repair-request.precept` |
 | Collection accessors `.count`, `.min`, `.max`, `.peek` | `building-access-badge-request.precept`, `restaurant-waitlist.precept`, `it-helpdesk-ticket.precept`, `parcel-locker-pickup.precept` |
-| `from any on` rows | `trafficlight.precept`, `restaurant-waitlist.precept`, `it-helpdesk-ticket.precept`, `utility-outage-report.precept` |
+| `from any on` rows | `trafficlight.precept`, `crosswalk-signal.precept`, `restaurant-waitlist.precept`, `it-helpdesk-ticket.precept`, `utility-outage-report.precept` |
 | Arithmetic operators `+`, `-`, `*`, `/`, `%` | `maintenance-work-order.precept`, `parcel-locker-pickup.precept`, `travel-reimbursement.precept`, `clinic-appointment-scheduling.precept` |
 | Logical operators `&&`, `||`, `!` | `maintenance-work-order.precept`, `library-book-checkout.precept`, `insurance-claim.precept`, `loan-application.precept` |
 
