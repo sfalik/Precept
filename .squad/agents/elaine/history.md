@@ -1,3 +1,25 @@
+## 2026-04-04T20:39:16Z — Team Update: Elaine Model Pin (Sonnet for Design Work)
+
+## 2026-04-04T20:39:37Z — Team Update: Opus Escalation Acceptable When Needed
+
+User clarification: Claude Sonnet 4.6 remains Elaine's default pin. However, aggressive escalation to Claude Opus 4.6 is acceptable when a task requires deeper reasoning or more context than Sonnet can provide.
+
+**Applied to:** Elaine baseline (Sonnet 4.6) with documented escalation path to Opus 4.6 for premium design challenges.
+
+**Rationale:** Balances Sonnet's speed/cost for typical design work with Opus capability for complex decisions. Supersedes 2026-04-04T20:38:09Z directive.
+
+---
+
+User directive (captured 2026-04-04T20:38:09Z): For design/polish work, use Claude Sonnet 4.6 rather than Opus.
+
+**Applied to:** `.squad/config.json` — `agentModelOverrides.elaine = "claude-sonnet-4.6"`
+
+**Rationale:** Sonnet's speed/reasoning balance is better suited for design and UX work than Opus. Directive captured as team memory.
+
+**Decision merged to:** `decisions.md` § Agent Model Override: Elaine
+
+---
+
 ## 2026-04-04T20:37:52Z — Team Update: Model Policy (All Agents)
 
 User directive: Always use the latest version of available models rather than older pinned versions. Global `defaultModel` constraint removed from `.squad/config.json` to enable automatic routing. Agent-specific overrides for Frank (claude-opus-4.6) and Uncle Leo (gpt-5.4) remain.
@@ -975,4 +997,5 @@ The sections had drifted into separate visual treatments:
 ### Learnings
 
 **Legends must echo the taxonomy exactly.** When a section defines a formal taxonomy (Initial/Intermediate/Terminal) and then shows examples, the legend labels should use the exact same terms. Using synonyms ("Origin" instead of "Initial") creates cognitive friction — readers wonder if it's a different concept or just inconsistent naming.
+
 

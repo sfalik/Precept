@@ -3514,6 +3514,18 @@ Always use the latest version of an available model rather than older pinned mod
 
 ---
 
+## Agent Model Override: Elaine → claude-sonnet-4.6
+
+**Filed by:** User (via Copilot)  
+**Date:** 2026-04-04T20:38:09Z  
+**Status:** ACTIVE  
+
+For design and polish work, pin Elaine to Claude Sonnet 4.6 (latest available Sonnet). Applied to `.squad/config.json` via `agentModelOverrides.elaine`.
+
+**Rationale:** Design and UI work benefits from Sonnet's balanced speed/reasoning profile over Opus. User directive captured as team memory.
+
+---
+
 ## Decision: Mapping Table Visual Unification
 
 **Author:** Elaine  
@@ -3531,4 +3543,17 @@ Visual consistency builds trust in the specification. The row-with-swatch patter
 
 ---
 
+
+
+## Model Policy: Opus Escalation Acceptable When Needed
+
+**Filed by:** User (via Copilot)
+**Date:** 2026-04-04T20:38:55Z
+**Status:** ACTIVE
+
+Claude Sonnet 4.6 remains the default model for design and polish work. However, aggressive escalation to Claude Opus 4.6 is acceptable when Sonnet's context or reasoning capability proves insufficient for complex design decisions.
+
+**Applied to:** Elaine agent (baseline Sonnet 4.6) + team-wide escalation policy.
+
+**Rationale:** User directive clarifying nuanced model guidance — Sonnet handles most design polish, but Opus available for premium reasoning tasks.
 
