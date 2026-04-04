@@ -307,8 +307,8 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
     "[precept]": { "editor.semanticHighlighting.enabled": true },
     "editor.semanticTokenColorCustomizations": {
       "rules": {
-        "preceptComment": { "foreground": "#7A8599", "italic": true },
-        "comment:precept": { "foreground": "#7A8599", "italic": true }
+        "preceptComment": { "foreground": "#9096A6", "italic": true },
+        "comment:precept": { "foreground": "#9096A6", "italic": true }
       }
     },
     "editor.tokenColorCustomizations": {
@@ -361,7 +361,7 @@ The TextMate grammar already assigns specific scopes. To lock fallback colors be
       { "scope": "punctuation.separator.arrow.precept",    "settings": { "foreground": "#6366F1" } },
       { "scope": "punctuation.separator.comma.precept",    "settings": { "foreground": "#6366F1" } },
       { "scope": "punctuation.accessor.precept",           "settings": { "foreground": "#6366F1" } },
-      { "scope": "comment.line.number-sign.precept",       "settings": { "foreground": "#7A8599", "fontStyle": "italic" } }
+      { "scope": "comment.line.number-sign.precept",       "settings": { "foreground": "#9096A6", "fontStyle": "italic" } }
     ]
   }
 }

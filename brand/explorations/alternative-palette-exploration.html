@@ -8,7 +8,14 @@
 <style>
   :root { --brand-mono: 'Cascadia Cove', 'Cascadia Code', Consolas, monospace; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #09090b; color: #e5e5e5; font-family: var(--brand-mono); padding: 40px 48px; max-width: 1400px; }
+  body {
+    background: #09090b;
+    color: #e5e5e5;
+    font-family: var(--brand-mono);
+    padding: 40px 48px;
+    width: min(100%, 1800px);
+    margin: 0 auto;
+  }
   h1 { font-size: 28px; font-weight: 700; font-variant: small-caps; letter-spacing: 0.1em; color: #fff; margin-bottom: 4px; }
   .subtitle { color: #71717a; font-size: 14px; margin-bottom: 48px; }
   h2 { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #27272a; }
@@ -48,6 +55,9 @@
   .label-alt { font-size: 11px; color: #A78BFA; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
 
   .note { font-size: 12px; color: #71717a; border-left: 3px solid #A78BFA; padding-left: 12px; margin-top: 16px; line-height: 1.7; }
+  .comment-sample-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .comment-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: #0c0c0f; border: 1px solid #27272a; font-size: 11px; color: #a1a1aa; }
+  @media (max-width: 1350px) { .comment-sample-grid { grid-template-columns: 1fr; } }
   [style*="Inconsolata"] { font-family: var(--brand-mono) !important; }
   svg text { font-family: var(--brand-mono); }
 </style>
@@ -80,6 +90,14 @@
 
 <h1>Five Channels</h1>
 <p class="subtitle">Alternative palette exploration — one unmistakable hue per DSL category &nbsp;·&nbsp; April 2026</p>
+
+<div class="card" style="padding:14px 18px; margin: 0 0 28px 0; border-color:#312e81; background:#111127;">
+  <p style="font-size:12px; color:#c7d2fe; line-height:1.8; margin:0;">
+    Looking for the new comment study? Jump to
+    <a href="#comment-color-alternatives" style="color:#B0E4FF; font-weight:700; text-decoration:none;">§17 Comment Color Alternatives</a>
+    near the end of the file.
+  </p>
+</div>
 
 <!-- ===================================================================== -->
 <!-- 1. CONCEPT                                                             -->
@@ -2053,10 +2071,202 @@
 <div class="section-divider"></div>
 
 <!-- ===================================================================== -->
-<!-- 17. COMPARISON GRID (UPDATED)                                          -->
+<!-- 17. COMMENT COLOR ALTERNATIVES                                         -->
+<!-- ===================================================================== -->
+<div class="section" id="comment-color-alternatives">
+<h2>17. Comment Color Alternatives — 11 Quieter Accents</h2>
+<p style="margin-bottom:8px;">Comments should sit above background noise, but below rule gold, events, and state anchors. These options stay desaturated and mid-value so they read as editorial voice rather than executable content.</p>
+
+<div class="callout" style="margin-bottom:24px;">
+  <strong>What this section is testing:</strong> more presence than the current muted steel, without letting comments compete with <span style="color:#FBBF24;">gold messages</span> or pull focus from <span style="color:#8B7AED;">violet states</span> and <span style="color:#30B8E8;">cyan events</span>. The best candidates should feel legible in peripheral vision, not luminous.
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+  <h3>Quick read</h3>
+  <table>
+    <tr><th>Variant</th><th>Color</th><th>Hue bias</th><th>What it does</th><th>Risk</th></tr>
+    <tr><td>C1</td><td><span style="color:#7A8599;">■ #7A8599</span></td><td>blue-steel</td><td>Current baseline, calm and editorial</td><td>Still a little recessive</td></tr>
+    <tr><td>C2</td><td><span style="color:#8793A8;">■ #8793A8</span></td><td>cool slate</td><td>Cleaner lift in visibility with no palette surprise</td><td>Can start to resemble data slate</td></tr>
+    <tr><td>C3</td><td><span style="color:#8E99B0;">■ #8E99B0</span></td><td>mist lavender</td><td>Quietly harmonizes with violet state anchors</td><td>Could feel slightly branded</td></tr>
+    <tr><td>C4</td><td><span style="color:#8DA0A2;">■ #8DA0A2</span></td><td>teal fog</td><td>Adds freshness without approaching event cyan</td><td>May look cooler than intended</td></tr>
+    <tr><td>C5</td><td><span style="color:#948F82;">■ #948F82</span></td><td>warm taupe</td><td>Editorial, paper-like, separates from blue families</td><td>Too close to gold on some displays</td></tr>
+    <tr><td>C6</td><td><span style="color:#8E9688;">■ #8E9688</span></td><td>olive gray</td><td>Organic and visible without feeling colorful</td><td>Slight green verdict association</td></tr>
+    <tr><td>C7</td><td><span style="color:#9096A6;">■ #9096A6</span></td><td>dusk indigo</td><td>Most prominent cool option that still behaves</td><td>Edges toward token territory</td></tr>
+    <tr><td>C8</td><td><span style="color:#A39A93;">■ #A39A93</span></td><td>stone</td><td>Warm neutral with stronger body than the baseline</td><td>Still quiet on lower-contrast panels</td></tr>
+    <tr><td>C9</td><td><span style="color:#A89E74;">■ #A89E74</span></td><td>muted straw</td><td>Tests whether a yellow complement can feel editorial instead of competitive</td><td>Can drift too close to gold messaging</td></tr>
+    <tr><td>C10</td><td><span style="color:#93A083;">■ #93A083</span></td><td>sage moss</td><td>Tests a complementary green that counterbalances the violet-blue palette</td><td>May imply success-state semantics</td></tr>
+    <tr><td>C11</td><td><span style="color:#9F8A56;">■ #9F8A56</span></td><td>burnished gold</td><td>Tests whether a dimmed gold can feel related without taking over the rule lane</td><td>Still lives uncomfortably near gold messaging</td></tr>
+  </table>
+</div>
+
+<div class="comment-sample-grid">
+  <div class="card" style="margin:0;">
+    <h3 style="margin-top:0; color:#7A8599;">C1: Muted Steel</h3>
+    <p style="font-size:11px; color:#52525b; margin-bottom:10px;">The current choice. Disciplined and unmistakably secondary.</p>
+    <div class="comment-chip"><span class="swatch" style="background:#7A8599; margin-right:0;"></span>#7A8599</div>
+    <div class="syntax-block" style="font-size:12px; padding:14px 16px; margin-top:10px;"><span style="color:#7A8599;font-style:italic;"># Clerk note: waive the fee only after manager review</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#7A8599;font-style:italic;"># Keep the reviewer rationale when approval succeeds</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#4F46E5;font-weight:600;">assert</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">null</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approval note is required"</span>
+<span style="color:#4338CA;font-weight:600;">from</span> <span style="color:#8B7AED;">PendingReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Approve</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;">Note</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Approved</span></div>
+  </div>
+
+  <div class="card" style="margin:0;">
+    <h3 style="margin-top:0; color:#8793A8;">C2: Lifted Slate</h3>
+    <p style="font-size:11px; color:#52525b; margin-bottom:10px;">A straight visibility lift. Probably the safest "more prominent" move.</p>
+    <div class="comment-chip"><span class="swatch" style="background:#8793A8; margin-right:0;"></span>#8793A8</div>
+    <div class="syntax-block" style="font-size:12px; padding:14px 16px; margin-top:10px;"><span style="color:#8793A8;font-style:italic;"># Clerk note: waive the fee only after manager review</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#8793A8;font-style:italic;"># Keep the reviewer rationale when approval succeeds</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#4F46E5;font-weight:600;">assert</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">null</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approval note is required"</span>
+<span style="color:#4338CA;font-weight:600;">from</span> <span style="color:#8B7AED;">PendingReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Approve</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;">Note</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Approved</span></div>
+  </div>
+
+  <div class="card" style="margin:0;">
+    <h3 style="margin-top:0; color:#8E99B0;">C3: Mist Lavender</h3>
+    <p style="font-size:11px; color:#52525b; margin-bottom:10px;">Slight violet kinship. More atmospheric, still clearly non-primary.</p>
+    <div class="comment-chip"><span class="swatch" style="background:#8E99B0; margin-right:0;"></span>#8E99B0</div>
+    <div class="syntax-block" style="font-size:12px; padding:14px 16px; margin-top:10px;"><span style="color:#8E99B0;font-style:italic;"># Clerk note: waive the fee only after manager review</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#8E99B0;font-style:italic;"># Keep the reviewer rationale when approval succeeds</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#4F46E5;font-weight:600;">assert</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">null</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approval note is required"</span>
+<span style="color:#4338CA;font-weight:600;">from</span> <span style="color:#8B7AED;">PendingReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Approve</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;">Note</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Approved</span></div>
+  </div>
+
+  <div class="card" style="margin:0;">
+    <h3 style="margin-top:0; color:#8DA0A2;">C4: Teal Fog</h3>
+    <p style="font-size:11px; color:#52525b; margin-bottom:10px;">A cooler editorial tone that adds body without flashing cyan.</p>
+    <div class="comment-chip"><span class="swatch" style="background:#8DA0A2; margin-right:0;"></span>#8DA0A2</div>
+    <div class="syntax-block" style="font-size:12px; padding:14px 16px; margin-top:10px;"><span style="color:#8DA0A2;font-style:italic;"># Clerk note: waive the fee only after manager review</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#8DA0A2;font-style:italic;"># Keep the reviewer rationale when approval succeeds</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#4F46E5;font-weight:600;">assert</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">null</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approval note is required"</span>
+<span style="color:#4338CA;font-weight:600;">from</span> <span style="color:#8B7AED;">PendingReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Approve</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;">Note</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Approved</span></div>
+  </div>
+
+  <div class="card" style="margin:0;">
+    <h3 style="margin-top:0; color:#948F82;">C5: Warm Taupe</h3>
+    <p style="font-size:11px; color:#52525b; margin-bottom:10px;">Warmer and more textual. Stronger than steel without becoming a gold understudy.</p>
+    <div class="comment-chip"><span class="swatch" style="background:#948F82; margin-right:0;"></span>#948F82</div>
+    <div class="syntax-block" style="font-size:12px; padding:14px 16px; margin-top:10px;"><span style="color:#948F82;font-style:italic;"># Clerk note: waive the fee only after manager review</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#948F82;font-style:italic;"># Keep the reviewer rationale when approval succeeds</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#4F46E5;font-weight:600;">assert</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">null</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approval note is required"</span>
+<span style="color:#4338CA;font-weight:600;">from</span> <span style="color:#8B7AED;">PendingReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Approve</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;">Note</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Approved</span></div>
+  </div>
+
+  <div class="card" style="margin:0;">
+    <h3 style="margin-top:0; color:#8E9688;">C6: Olive Gray</h3>
+    <p style="font-size:11px; color:#52525b; margin-bottom:10px;">Subtle organic warmth. More visible than the baseline, less polished than slate.</p>
+    <div class="comment-chip"><span class="swatch" style="background:#8E9688; margin-right:0;"></span>#8E9688</div>
+    <div class="syntax-block" style="font-size:12px; padding:14px 16px; margin-top:10px;"><span style="color:#8E9688;font-style:italic;"># Clerk note: waive the fee only after manager review</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#8E9688;font-style:italic;"># Keep the reviewer rationale when approval succeeds</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#4F46E5;font-weight:600;">assert</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">null</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approval note is required"</span>
+<span style="color:#4338CA;font-weight:600;">from</span> <span style="color:#8B7AED;">PendingReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Approve</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;">Note</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Approved</span></div>
+  </div>
+
+  <div class="card" style="margin:0;">
+    <h3 style="margin-top:0; color:#9096A6;">C7: Dusk Indigo</h3>
+    <p style="font-size:11px; color:#52525b; margin-bottom:10px;">The boldest cool candidate here. Likely the upper bound before comments feel too active.</p>
+    <div class="comment-chip"><span class="swatch" style="background:#9096A6; margin-right:0;"></span>#9096A6</div>
+    <div class="syntax-block" style="font-size:12px; padding:14px 16px; margin-top:10px;"><span style="color:#9096A6;font-style:italic;"># Clerk note: waive the fee only after manager review</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#9096A6;font-style:italic;"># Keep the reviewer rationale when approval succeeds</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#4F46E5;font-weight:600;">assert</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">null</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approval note is required"</span>
+<span style="color:#4338CA;font-weight:600;">from</span> <span style="color:#8B7AED;">PendingReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Approve</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;">Note</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Approved</span></div>
+  </div>
+
+  <div class="card" style="margin:0;">
+    <h3 style="margin-top:0; color:#A39A93;">C8: Stone</h3>
+    <p style="font-size:11px; color:#52525b; margin-bottom:10px;">A denser neutral with mild warmth. Reads like annotation rather than code token.</p>
+    <div class="comment-chip"><span class="swatch" style="background:#A39A93; margin-right:0;"></span>#A39A93</div>
+    <div class="syntax-block" style="font-size:12px; padding:14px 16px; margin-top:10px;"><span style="color:#A39A93;font-style:italic;"># Clerk note: waive the fee only after manager review</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+  <span style="color:#A39A93;font-style:italic;"># Keep the reviewer rationale when approval succeeds</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#4F46E5;font-weight:600;">assert</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">null</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approval note is required"</span>
+<span style="color:#4338CA;font-weight:600;">from</span> <span style="color:#8B7AED;">PendingReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Approve</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;">Note</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Approved</span></div>
+  </div>
+
+  <div class="card" style="margin:0;">
+    <h3 style="margin-top:0; color:#A89E74;">C9: Muted Straw</h3>
+    <p style="font-size:11px; color:#52525b; margin-bottom:10px;">A yellow-leaning counterpoint, deliberately dulled so it stays commentary rather than warning or rule text.</p>
+    <div class="comment-chip"><span class="swatch" style="background:#A89E74; margin-right:0;"></span>#A89E74</div>
+    <div class="syntax-block" style="font-size:12px; padding:14px 16px; margin-top:10px;"><span style="color:#A89E74;font-style:italic;"># Clerk note: waive the fee only after manager review</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#A89E74;font-style:italic;"># Keep the reviewer rationale when approval succeeds</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#4F46E5;font-weight:600;">assert</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">null</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approval note is required"</span>
+<span style="color:#4338CA;font-weight:600;">from</span> <span style="color:#8B7AED;">PendingReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Approve</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;">Note</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Approved</span></div>
+  </div>
+
+  <div class="card" style="margin:0;">
+    <h3 style="margin-top:0; color:#93A083;">C10: Sage Moss</h3>
+    <p style="font-size:11px; color:#52525b; margin-bottom:10px;">A green-leaning complement that cools the page differently from slate and stone.</p>
+    <div class="comment-chip"><span class="swatch" style="background:#93A083; margin-right:0;"></span>#93A083</div>
+    <div class="syntax-block" style="font-size:12px; padding:14px 16px; margin-top:10px;"><span style="color:#93A083;font-style:italic;"># Clerk note: waive the fee only after manager review</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#93A083;font-style:italic;"># Keep the reviewer rationale when approval succeeds</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#4F46E5;font-weight:600;">assert</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">null</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approval note is required"</span>
+<span style="color:#4338CA;font-weight:600;">from</span> <span style="color:#8B7AED;">PendingReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Approve</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;">Note</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Approved</span></div>
+  </div>
+
+  <div class="card" style="margin:0;">
+    <h3 style="margin-top:0; color:#9F8A56;">C11: Burnished Gold</h3>
+    <p style="font-size:11px; color:#52525b; margin-bottom:10px;">A deliberately dimmed gold. Useful if you want familial relation to the rule channel without the same voltage.</p>
+    <div class="comment-chip"><span class="swatch" style="background:#9F8A56; margin-right:0;"></span>#9F8A56</div>
+    <div class="syntax-block" style="font-size:12px; padding:14px 16px; margin-top:10px;"><span style="color:#9F8A56;font-style:italic;"># Clerk note: waive the fee only after manager review</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
+<span style="color:#9F8A56;font-style:italic;"># Keep the reviewer rationale when approval succeeds</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span> <span style="color:#4F46E5;font-weight:600;">assert</span> <span style="color:#B0BEC5;">Note</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">null</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Approval note is required"</span>
+<span style="color:#4338CA;font-weight:600;">from</span> <span style="color:#8B7AED;">PendingReview</span> <span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Approve</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">set</span> <span style="color:#B0BEC5;font-style:italic;">ReviewNote</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;">Approve</span><span style="color:#52525b;">.</span><span style="color:#B0BEC5;">Note</span>
+  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4F46E5;font-weight:600;">transition</span> <span style="color:#A898F5;">Approved</span></div>
+  </div>
+</div>
+
+<div class="note">
+  <strong>Selected direction:</strong> <span style="color:#9096A6;">C7 #9096A6</span>. It is the strongest cool option without borrowing gold's authority or drifting into verdict-green territory. <span style="color:#9F8A56;">C11 #9F8A56</span> answers the "dimmer gold" question directly, but it still reads like a cousin of rule text rather than a true aside.
+</div>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- ===================================================================== -->
+<!-- 18. COMPARISON GRID (UPDATED)                                          -->
 <!-- ===================================================================== -->
 <div class="section">
-<h2>17. All Strategies — Quick Comparison</h2>
+<h2>18. All Strategies — Quick Comparison</h2>
 
 <div class="card">
   <table>
@@ -2124,7 +2334,7 @@
 <!-- 18. COLOR THEORY ASSESSMENT                                            -->
 <!-- ===================================================================== -->
 <div class="section">
-<h2>18. Color Theory Assessment — Candidate Palette</h2>
+<h2>19. Color Theory Assessment — Candidate Palette</h2>
 <p style="margin-bottom:16px;">Deep analysis of the converged palette: violet states + toned cyan events + bright slate italic data + indigo structure + gold rules. How well do these colors serve the Precept DSL's semantics?</p>
 
 <!-- ─── 18.1 The Candidate Palette ────────────────────────────────────── -->
@@ -2410,7 +2620,7 @@
 <!-- 19. FULL SAMPLES — CANDIDATE PALETTE WITH 3-TIER STATES               -->
 <!-- ===================================================================== -->
 <div class="section">
-<h2>19. Full Samples — Candidate Palette with Final State Tier</h2>
+<h2>20. Full Samples — Candidate Palette with Final State Tier</h2>
 <p style="margin-bottom:8px;">The converged palette with all three state tiers rendered at scale. Three structurally different precepts chosen to stress-test different palette concerns: dense guards, collection operations, many states, and varied field types.</p>
 
 <div class="callout" style="margin-bottom:24px;">
@@ -2698,7 +2908,7 @@
 <!-- 21. DATA COLOR VARIANT — PALE YELLOW vs SLATE                         -->
 <!-- ===================================================================== -->
 <div class="section">
-<h2>21. Data Color Variant — Pale Yellow vs Bright Slate</h2>
+<h2>22. Data Color Variant — Pale Yellow vs Bright Slate</h2>
 <p style="margin-bottom:8px;">Pale yellow data (~48°, low saturation) instead of slate (~215°). The idea: data becomes warm "parchment" text — the domain content written on the indigo blueprint. Fits the "manuscript inscribed in gold" theme, and moves data out of the cool cluster entirely.</p>
 
 <div class="callout" style="margin-bottom:24px;">
@@ -2847,7 +3057,7 @@
 <!-- 20. BRAND THEME CARD — INDIGO + GOLD                                  -->
 <!-- ===================================================================== -->
 <div class="section">
-<h2>20. Brand Theme Card — Indigo + Gold</h2>
+<h2>21. Brand Theme Card — Indigo + Gold</h2>
 <p style="margin-bottom:24px;">The converged palette presented as a brand identity system, in the same format as the original brand color exploration. Indigo is the structural identity; gold is the semantic accent.</p>
 
 <div style="display:flex; gap:32px; flex-wrap:wrap;">
@@ -3089,7 +3299,7 @@
 <!-- NEW: 8-SHADE ITALIC-CONSTRAINED MODEL                                  -->
 <!-- ===================================================================== -->
 <div class="section">
-<h2>22. Locked Syntax v1 Conclusion — 8-Shade Model</h2>
+<h2>23. Locked Syntax v1 Conclusion — 8-Shade Model</h2>
 
 <div class="card">
   <p style="color:#fff; font-size:15px; font-weight:600; margin-bottom:12px;">One color per category. Italic means constrained.</p>

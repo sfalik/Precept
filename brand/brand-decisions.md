@@ -142,7 +142,7 @@ The only warm hue in the authoring-time palette. Gold is reserved for message pa
 
 #### Comments · Editorial outside the semantic palette
 
-Comments are not part of the executable semantic system, so they intentionally sit outside the 8-shade authoring palette. Use muted steel `#7A8599` in italic for `#` comments: visible enough to read, quiet enough to stay out of the semantic lanes.
+Comments are not part of the executable semantic system, so they intentionally sit outside the 8-shade authoring palette. Use dusk indigo `#9096A6` in italic for `#` comments: more legible than the original muted steel, but still quiet enough to stay out of the semantic lanes.
 
 #### Verdicts · Runtime only
 
