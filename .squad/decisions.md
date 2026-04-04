@@ -4,6 +4,33 @@
 
 ## ACTIVE DECISIONS — Current Sprint
 
+### Decision: Gold Brand Mark Exception
+
+**Date:** 2026-04-04
+**By:** Elaine (UX Designer)
+**Status:** Implemented — pending Shane sign-off
+
+#### Decision
+Gold (`#FBBF24`) is permitted as a single sparse accent in the **combined brand mark only** — the third icon (tablet + state machine). It does not appear in the standalone diagram icon or the standalone tablet icon.
+
+#### Placement
+The Gold stroke represents the `because "…"` line — the human-readable rule message baked into the running system. In the SVG, it is the short horizontal line at `y=33` inside the tablet/code area: shorter than the body lines above it (stopping at x=34 vs x=40), stroke-width 1, opacity 0.65. Deliberately dim and singular so it reads as an accent, not a second brand color.
+
+#### Why
+Gold already carries this meaning in syntax highlighting: every `because` and `reject` string is Gold in the editor. The combined mark unifies the state machine and the written rule — it is the only icon that shows both halves. Adding one Gold line there extends an existing meaning rather than inventing a new one. It's a philosophical nod, not a decorative choice.
+
+#### Constraints
+- **One mark only.** The diagram icon and the tablet icon remain unchanged.
+- **One line only.** Gold must not appear on structural elements (rect outlines, arrowheads, circles).
+- **Not a new UI color.** This exception does not permit Gold in badges, borders, button states, status chips, or any other UI surface.
+- **Not a new accent lane.** Gold remains syntax-primary. This is a narrow named exception, not a policy relaxation.
+- Amber (`#FCD34D`) continues to own warning/caution semantics. The visual distance between Gold and Amber is maintained; Gold in the mark is dimmer (`opacity: 0.65`) and lives in a non-signal context (brand icon, not status UI), so no semantic collision occurs.
+
+#### Files Changed
+- `brand/brand-spec.html` — SVG updated, color key updated, prose updated in §1.3, §1.4 intro, §1.4.1, and the Rules · Gold surface section
+- `.squad/skills/color-roles/SKILL.md` — Rule 2 and the Gold row updated to reflect this exception
+
+
 ### Design Gate: Peterman Brand Compliance Review (2026-04-04)
 **Filed by:** Coordinator (via Shane)  
 **Status:** LOCKED  

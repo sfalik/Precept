@@ -1,4 +1,9 @@
-## 2026-04-04T20:37:52Z — Scribe: Model Policy Decision Merged
+## 2026-04-04
+
+### Gold Brand Mark Exception
+- Orchestration, session, and decision logs created for Elaine's update clarifying the Gold accent exception in the combined brand mark.
+- Decision merged into `decisions.md` and inbox cleared.
+T20:37:52Z — Scribe: Model Policy Decision Merged
 
 Processed user directive to always use latest available model versions. Merged 2 decisions from inbox to `.squad/decisions.md`:
 - Model Policy: Latest version selection (automatic routing)

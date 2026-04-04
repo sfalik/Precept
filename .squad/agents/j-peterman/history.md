@@ -1,4 +1,4 @@
-## 2026-04-04T20:28:43Z — Orchestration: Elaine Palette Mapping Polish
+﻿## 2026-04-04T20:28:43Z — Orchestration: Elaine Palette Mapping Polish
 
 Elaine completed beautification and unification of palette mapping visual treatments in \rand\brand-spec.html\ §2.1 (Syntax Editor) and §2.2 (State Diagram). Created \.spm-*\ CSS component system (~70 lines) to match polished §1.4 color system design. All locked semantic colors, mappings, and tokens preserved. System is general-purpose and applicable to future surface sections (Inspector, Docs, CLI).
 
@@ -20,6 +20,23 @@ Elaine completed beautification and unification of palette mapping visual treatm
 - **Created:** 2026-04-04
 
 ## Learnings
+
+### 2026-04-07 — Signal color family names applied consistently
+
+**Task:** Determine whether the three signal colors had proper family names beyond plain green/yellow/red, and if so, update all occurrences to use those names.
+
+**What was found:**
+- Family names already existed in the spec, but only partially and inconsistently: "Emerald #34D399" appeared once in the brand mark section; "rose" and "amber" appeared in the CLI and inspector diagnostic sections. The signal color swatches, §1.4 intro, §1.4.1 cross-surface table, §2.1 intro, §2.1 verdict colors note, §2.2 state diagram intro, and README application table all still used plain "Green", "Yellow", "Red".
+- Emerald = `#34D399` · Amber = `#FCD34D` · Rose = `#FB7185`
+
+**What was done:**
+- Updated 13 occurrences across `brand/brand-spec.html`: swatch labels, §1.4 intro paragraph, semantic color callout, §1.4.1 table, §2.1 color application, §2.1 verdict colors note, §2.2 state diagram intro, README badge and checkmark table rows, "do not use Rose" README rule.
+- Left "red/green color blindness" (line 1441) intact — clinical terminology, not a signal color reference.
+- No new names invented. No content meaning changed.
+
+**Key learning — partial name adoption:** When family names exist in some sections but not others, the fix is strictly mechanical — identify all plain references and replace. The names were already decided; only the application was inconsistent. This is a terminology alignment task, not a design task.
+
+---
 
 ### 2026-04-07 — Brand-spec color information architecture implemented
 
@@ -518,3 +535,17 @@ Elaine's `brand/visual-surfaces-draft.html` — full UX specifications for five 
 
 **Remaining blocker:** The only unresolved brand-spec item in this lane is still Shane’s sign-off on the current state indicator treatment in §2.2. The cleanup pass closes palette drift; it does not resolve that open decision.
 
+
+## Learnings
+
+### 2026-04-04 — Swatch column double-padding fix (brand-spec.html §2.1)
+
+**Problem:** The spm-swatch elements in the Core Semantic Tokens table (Semantic, State, Event, Names, Messages, Comment rows) were rendering 24px further right than sf-swatch elements in the adjacent Reserved · Verdict Colors table, causing visible left-alignment mismatch.
+
+**Root cause:** Double-padding in the CSS cascade. spm-group { padding: 16px 24px } already provides 24px horizontal indent for all children. But both spm-header { padding: 18px 24px } (CSS class) and the 6 spm-grid elements (inline style="padding: 16px 24px;") were adding a redundant second 24px, pushing content to 48px from the surface edge. The sf-row comparators were correctly indented at 24px (single-padding from sf-group only).
+
+**Fix:**
+1. Changed .spm-header { padding: 18px 24px } → padding: 18px 0 in CSS (removes the header sub-section's own horizontal padding — the parent spm-group provides it)
+2. Changed all 6 spm-grid inline style="padding: 16px 24px;" → style="padding: 16px 0;" (same reasoning — vertical spacing preserved, horizontal removed)
+
+**Lesson:** When a container class already provides horizontal padding, its child layout blocks (grid wrappers, header blocks) must use padding: Npx 0 — not padding: Npx 24px. Only one element in the hierarchy should own the horizontal indent per layout region.

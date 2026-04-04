@@ -1008,4 +1008,52 @@ The sections had drifted into separate visual treatments:
 
 **Double horizontal padding in spm-row wrappers.** The `.spm-row` CSS class carries `padding: 14px 24px`. When a single row sits inside a bare `<div style="padding: 16px 24px;">` wrapper, both padding values stack — the row content ends up 48px from the section edge instead of 24px. Multi-row groups avoid this because `.spm-grid > .spm-row { padding: 12px 0; }` zeroes the row's horizontal padding, deferring to the container. The fix for single-row groups: add `class="spm-grid"` to the wrapper div. This activates the same override and keeps all rows flush at the same left edge.
 
+---
 
+## 2026-04-04 — Brand Mark Icon Alignment to §1.3/§2.2 Spec
+
+### What I Did
+
+**Aligned all three brand mark icons (§1.3) and the lockup combined icon to the locked diagram spec in §2.2.**
+
+**State diagram icon:**
+- Initial circle border: `#6366f1` → `#4338CA` (Semantic indigo per §2.2 initial node spec)
+- Transition arrow: `#34d399` (Emerald) → `#6366F1` (Grammar indigo — Emerald is a signal/verdict color, not for static flow)
+- Destination node: circle (Initial shape) → rounded rect (Intermediate shape, `#4338CA` border at 1.5px)
+
+**Combined mark (tablet + state machine) — both §1.3 and lockup instances:**
+- Code page border: `#27272a` → `#6366f1` (matches standalone tablet icon — eliminates the "dark outline that fades out" issue)
+- Secondary code lines: `#27272a` → `#71717a` (matches standalone tablet)
+- State machine sub-elements: same fixes as the state diagram icon above
+
+**Color key updated:** Removed Emerald and `#27272A` border (no longer used). Replaced with Semantic `#4338CA`, Grammar `#6366F1`, Accent `#818CF8`, Ground `#1E1B4B` — reflecting the actual icon palette.
+
+**Tablet icon (standalone):** No changes needed — already spec-compliant.
+
+### Learnings
+
+**Brand mark icons must use the same semantic color logic as the diagram surface they represent.** The original state diagram icon used Emerald for transition arrows, but §2.2 explicitly says flow edges are Grammar Indigo and Emerald is reserved for runtime verdict overlay. Icons are abstractions, but they still speak the spec's visual language — they shouldn't introduce color mappings that contradict the system they represent.
+
+**Shape vocabulary matters even at icon scale.** A circle means "Initial" in the spec. Using circles for both source and destination states says "two initial states," which is structurally meaningless. A rounded rect for the destination immediately communicates a different lifecycle role without needing labels.
+
+
+
+
+---
+
+## 2026-04-04 — Gold Accent in Combined Brand Mark
+
+### What I Did
+
+Added a single Gold (#FBBF24) accent stroke to the combined brand mark SVG (the tablet + state machine icon). The Gold stroke represents the ecause "…" line — the human-readable rule text that lives inside the running system. It is the short line at y=33 inside the tablet's code area: shorter than the body lines, stroke-width 1, opacity 0.65. Deliberately dim and singular.
+
+Also updated:
+- rand/brand-spec.html — color key for §1.3 marks, descriptive prose in §1.3, §1.4, §1.4.1, and the Rules · Gold surface section
+- .squad/skills/color-roles/SKILL.md — Rule 2 and the Gold row updated
+- Created .squad/decisions/inbox/elaine-gold-mark-exception.md
+
+### Learnings
+
+**A named exception is not a policy relaxation.** Adding Gold to one specific position in one specific icon does not open the door to Gold badges, Gold borders, or Gold hover states. The exception is coherent precisely because it preserves Gold's existing meaning (human-readable rule) and places it in a non-signal context (brand icon, not status UI). The constraint that makes it safe is specificity: one mark, one line, one semantic reason.
+
+**Amber collision is a real risk to check.** Gold #FBBF24 and Amber #FCD34D are visually close. The reason there's no semantic collision here is context — the brand mark is not a status surface, so viewers don't read the Gold line as a warning state. But if Gold ever appears near an Amber badge or warning chip, that proximity needs to be reviewed. Keep them in separate contexts.
