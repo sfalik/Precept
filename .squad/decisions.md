@@ -3504,4 +3504,31 @@ Full analysis: `brand/references/readme-research-steinbrenner.md`
 
 ---
 
+## Model Policy: Use Latest Available Versions
+
+**Filed by:** User (via Copilot)  
+**Date:** 2026-04-04T20:30:36Z  
+**Status:** ACTIVE  
+
+Always use the latest version of an available model rather than older pinned model versions. Global `defaultModel` constraint removed from `.squad/config.json` to enable automatic routing. Agent-specific overrides (Frank, Uncle Leo) remain intact.
+
+---
+
+## Decision: Mapping Table Visual Unification
+
+**Author:** Elaine  
+**Date:** 2026-04-05  
+**Status:** Proposed  
+**Category:** UX Design
+
+Convert all three mapping tables in `brand/brand-spec.html` (§2.1 Reserved Verdict Colors, §2.2 Static Elements Compile-Time, §2.2 Runtime Verdict Overlay) to use identical `.sf-palette` component structure from §1.4:
+- Card container with rounded corners, dark background, gradient header
+- Title + subtitle describing purpose
+- Grouped sections with semantic labels
+- Row structure with 56px gradient swatches and info grid
+
+Visual consistency builds trust in the specification. The row-with-swatch pattern is more scannable than tabular data for color reference. All three tables now share exact visual DNA with §1.4.
+
+---
+
 

@@ -1,8 +1,8 @@
 {
   "version": 1,
   "noHaiku": true,
-  "defaultModel": "claude-sonnet-4.6",
   "agentModelOverrides": {
+    "elaine": "claude-sonnet-4.6",
     "frank": "claude-opus-4.6",
     "uncle-leo": "gpt-5.4"
   }

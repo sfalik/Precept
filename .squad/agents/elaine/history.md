@@ -1,3 +1,11 @@
+## 2026-04-04T20:37:52Z — Team Update: Model Policy (All Agents)
+
+User directive: Always use the latest version of available models rather than older pinned versions. Global `defaultModel` constraint removed from `.squad/config.json` to enable automatic routing. Agent-specific overrides for Frank (claude-opus-4.6) and Uncle Leo (gpt-5.4) remain.
+
+**Impact:** Routing now selects the best model per task type automatically, ensuring access to latest capabilities.
+
+---
+
 ## 2026-04-04T20:28:43Z — Orchestration: Elaine Palette Mapping Polish
 
 Elaine completed beautification and unification of palette mapping visual treatments in \rand\brand-spec.html\ §2.1 (Syntax Editor) and §2.2 (State Diagram). Created \.spm-*\ CSS component system (~70 lines) to match polished §1.4 color system design. All locked semantic colors, mappings, and tokens preserved. System is general-purpose and applicable to future surface sections (Inspector, Docs, CLI).
@@ -924,4 +932,47 @@ The sections had drifted into separate visual treatments:
 **Tables can be beautiful.** The §2.2 diagram mapping tables contain detailed technical information that works best in tabular form. The upgrade (section headers, mini-swatches, refined spacing) preserved the table's utility while bringing it into visual alignment with the rest of the document.
 
 **Component reuse across surfaces.** The `.spm-*` system is intentionally general enough to apply to future surface sections (Inspector, Docs, CLI) if they need detailed element-to-color mappings.
+
+---
+
+## Session — Mapping Table Style Unification (2026-04-05)
+
+### What I Did
+
+**Converted the three mapping/overlay tables in §2.1 and §2.2 to match the sf-palette family treatment from §1.4.** Shane requested a stricter visual match — the previous `.spm-table` HTML tables looked like data grids, not like the cohesive palette cards in the semantic family reference. Now all three tables use the same visual DNA: rounded card container, gradient header with title/subtitle, grouped sections with group labels, and rows with 56px swatches + info columns.
+
+**Tables converted:**
+
+1. **§2.1 Reserved · Verdict Colors** — now uses `sf-group` with `sf-row` pattern, same swatch + info layout as §1.4
+2. **§2.2 Static Elements · Compile-Time** — full `sf-palette` card with grouped sections (Structure · Indigo, Transitions · Grammar, Labels & Text)
+3. **§2.2 Runtime Verdict Overlay** — full `sf-palette` card with grouped sections (Current State, Transition Verdict, Event Labels)
+
+**No information lost.** All original data columns (element, color, hex, condition, style) are preserved inside the new layout — either as named spans in the info grid or as semantic labels. The visual presentation changed but the content is identical.
+
+### Learnings
+
+**Visual consistency requires identical structure, not just similar styling.** The previous `.spm-table` CSS echoed the palette cards (rounded corners, dark background) but used HTML tables inside. The real family resemblance comes from matching the exact container/header/group/row hierarchy — not just approximate color similarity.
+
+**Grouped rows beat flat lists for dense reference material.** Breaking the Static Elements table into three groups (Structure, Transitions, Labels) makes it easier to scan than a flat 12-row table. The grouping also reinforces the semantic family structure from §1.4.
+
+---
+
+## Session — Diagram Legend Terminology Fix (2026-04-05)
+
+### What I Did
+
+**Fixed terminology mismatch between shape taxonomy tiles and diagram legend in §2.2.** The shape taxonomy (lines 930-969) correctly defines three lifecycle roles using specific terms: Initial, Intermediate, Terminal. But the diagram legend (within the SVG) used different terms: Origin, State, Final.
+
+**Legend corrections:**
+- "Origin" → "Initial" (matches shape taxonomy term)
+- "State" → "Intermediate" (matches shape taxonomy term)  
+- "Final" → "Terminal" (matches shape taxonomy term)
+
+**Additionally, the Terminal legend item was only a single-border rectangle.** I added the double-border treatment to match the shape taxonomy definition and the Approved/Declined nodes in the diagram itself.
+
+**No content changes.** This was strictly a terminology consistency fix — the diagram nodes already rendered with the correct shapes (circle for Draft, rounded rect for UnderReview, double-border for Approved/Declined). The mismatch was only in the legend labels.
+
+### Learnings
+
+**Legends must echo the taxonomy exactly.** When a section defines a formal taxonomy (Initial/Intermediate/Terminal) and then shows examples, the legend labels should use the exact same terms. Using synonyms ("Origin" instead of "Initial") creates cognitive friction — readers wonder if it's a different concept or just inconsistent naming.
 

@@ -1,3 +1,13 @@
+## 2026-04-04T20:37:52Z — Scribe: Model Policy Decision Merged
+
+Processed user directive to always use latest available model versions. Merged 2 decisions from inbox to `.squad/decisions.md`:
+- Model Policy: Latest version selection (automatic routing)
+- Elaine's Mapping Table Visual Unification decision
+
+Deleted inbox files. Appended updates to agent histories.
+
+---
+
 # Project Context
 
 - **Owner:** shane

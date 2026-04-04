@@ -1,3 +1,11 @@
+## 2026-04-04T20:37:52Z — Team Update: Model Policy
+
+User directive: Always use the latest version of available models rather than older pinned versions. Global `defaultModel` constraint removed from `.squad/config.json` to enable automatic routing. Agent-specific overrides remain.
+
+**Impact:** Frank's model assignment (claude-opus-4.6) and Uncle Leo's (gpt-5.4) stay locked. Routing for other tasks automatically selects latest.
+
+---
+
 ## 2026-04-04T20:28:43Z — Orchestration: Elaine Palette Mapping Polish
 
 Elaine completed beautification and unification of palette mapping visual treatments in \rand\brand-spec.html\ §2.1 (Syntax Editor) and §2.2 (State Diagram). Created \.spm-*\ CSS component system (~70 lines) to match polished §1.4 color system design. All locked semantic colors, mappings, and tokens preserved. System is general-purpose and applicable to future surface sections (Inspector, Docs, CLI).
