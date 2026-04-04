@@ -1,0 +1,60 @@
+{
+  "agents": {
+    "lead-architect": {
+      "persistent_name": "Frank",
+      "universe": "Seinfeld",
+      "created_at": "2026-04-04T04:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "runtime-dev": {
+      "persistent_name": "George",
+      "universe": "Seinfeld",
+      "created_at": "2026-04-04T04:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "tooling-dev": {
+      "persistent_name": "Kramer",
+      "universe": "Seinfeld",
+      "created_at": "2026-04-04T04:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "mcp-ai-dev": {
+      "persistent_name": "Elaine",
+      "universe": "Seinfeld",
+      "created_at": "2026-04-04T04:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "tester": {
+      "persistent_name": "Soup Nazi",
+      "universe": "Seinfeld",
+      "created_at": "2026-04-04T04:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "code-reviewer": {
+      "persistent_name": "Uncle Leo",
+      "universe": "Seinfeld",
+      "created_at": "2026-04-04T04:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "brand-devrel": {
+      "persistent_name": "J. Peterman",
+      "universe": "Seinfeld",
+      "created_at": "2026-04-04T04:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "pm": {
+      "persistent_name": "Steinbrenner",
+      "universe": "Seinfeld",
+      "created_at": "2026-04-04T04:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    }
+  }
+}

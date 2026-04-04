@@ -1,0 +1,25 @@
+{
+  "universe_usage_history": [
+    {
+      "universe": "Seinfeld",
+      "assignment_id": "precept-2026-04-04",
+      "used_at": "2026-04-04T04:00:00Z"
+    }
+  ],
+  "assignment_cast_snapshots": {
+    "precept-2026-04-04": {
+      "universe": "Seinfeld",
+      "agents": {
+        "lead-architect": "Frank",
+        "runtime-dev": "George",
+        "tooling-dev": "Kramer",
+        "mcp-ai-dev": "Elaine",
+        "tester": "Soup Nazi",
+        "code-reviewer": "Uncle Leo",
+        "brand-devrel": "J. Peterman",
+        "pm": "Steinbrenner"
+      },
+      "created_at": "2026-04-04T04:00:00Z"
+    }
+  }
+}
