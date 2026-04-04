@@ -1,5 +1,231 @@
 # Squad Decisions
 
+---
+
+# Team Knowledge Refresh — 2026-04-04 Findings
+*Filed by Scribe, 2026-04-04T06:08:06Z. Consolidated from 6 domain reviews.*
+
+---
+
+## CRITICAL SYNC RULE: Grammar-Completions Drift
+**Priority:** HIGH — NON-NEGOTIABLE  
+**Owner:** Kramer (Tooling), Frank (Architecture)  
+**From:** kramer-tooling-review.md
+
+The DSL parser and VS Code tooling are loosely coupled via regex patterns in `PreceptAnalyzer.cs` and `syntaxes/precept.tmLanguage.json`. No automated drift detection exists.
+
+**Finding:** When the parser syntax changes, both files MUST be updated in the same PR or the tooling drifts silently. Example: `NewFieldDeclRegex`, `NewCollectionFieldRegex`, `NewEventWithArgsRegex` are hand-written and not derived from the parser grammar.
+
+**Action:** 
+1. Add a documented checklist comment to `PreceptAnalyzer.cs` header:
+   ```csharp
+   // ⚠️ GRAMMAR SYNC REQUIRED: If DSL syntax changes, update these regexes:
+   //   - field syntax: NewFieldDeclRegex, NewCollectionFieldRegex
+   //   - event syntax: NewEventWithArgsRegex
+   //   - transition syntax: SetAssignmentExpressionRegex, CollectionMutationExpressionRegex
+   // Test by running samples/*.precept through the parser and verifying regex matches.
+   ```
+2. Establish review rule: Kramer must review tooling whenever parser syntax lands.
+
+---
+
+## Medium-Priority Architectural Concerns
+**From:** frank-arch-review.md
+
+### 1. Thin-Wrapper Violation Risk in MCP Tools
+**Risk:** Some MCP tools independently versioned. Over time, tools accumulate business logic (validation, transformation) that should live in `src/Precept/`.
+
+**Recommendation:** Establish "tool hygiene rule": if tool method exceeds ~50 lines of non-serialization code, logic belongs in core. Audit all 5 tools quarterly against this rule. **Action:** Audit before GA.
+
+### 2. Expression Evaluator Isolation
+**Risk:** `PreceptExpressionEvaluator` tested end-to-end through runtime/inspect tests, but has no dedicated unit suite. Null handling, operator precedence, arithmetic overflow tested indirectly.
+
+**Recommendation:** Add `ExpressionEvaluatorTests.cs` with 20–30 test cases covering:
+- All operator combinations with null operands
+- Operator precedence (e.g., `1 + 2 * 3 == 7`, not `9`)
+- Division by zero handling
+- Numeric overflow/underflow
+- String/boolean operator mismatches
+
+**Action:** Add when expression-related bugs surface or before 1.0 GA.
+
+### 3. Naming Density in Violation Model
+**Risk:** `ConstraintViolation`, `ConstraintSource`, `ConstraintTarget`, `ConstraintSourceKind`, `ConstraintTargetKind`, `AssertAnchor`, `StateTarget`, `FieldTarget`, `EventTarget`, `EventArgTarget`, `DefinitionTarget` — 11 types, 4 enums, lots of discriminated unions. Maintainers and AI reading the code can get confused.
+
+**Recommendation:** Add **Violation Model Guide** (`docs/ViolationModelGuide.md`) explaining type hierarchy, when each type is used, with worked examples. Keep under 2 pages (visual diagrams preferred).
+
+**Action:** Create before public distribution.
+
+### 4. Edit Mode Protocol Complexity
+**Risk:** `PreceptPreviewProtocol` carries typed field data, edit metadata, and bidirectional graphs collapsed to index arrays. Well-designed but brittle; future changes could require careful migration.
+
+**Recommendation:** 
+- Document protocol version in `PreceptPreviewProtocol.cs` file header: `// Protocol version: 2 (2026-04-06, adds EditableFields)`
+- Establish stability pledge: "Breaking changes require major version bump and migration guide."
+- Add protocol changelog as comments in the file.
+
+**Action:** Document and lock before Marketplace submission.
+
+### 5. Graph Analysis Completeness vs. Data Constraint Detection
+**Risk:** `PreceptAnalysis.cs` is deliberately incomplete. Does not detect impossible entry conditions, provably impossible guards, or deadlock states.
+
+**Rationale:** Out of scope for MVP; inspector catches runtime impossibilities.
+
+**Recommendation:** Document explicitly in `docs/PreceptLanguageDesign.md` § Compile-time checks: "The checker detects reachability, orphaned events, and reject-only pairs. It does not detect impossible data constraints (e.g., `X > 0 && X < 0`) — these are left to runtime inspection."
+
+**Action:** Already handled by documentation. Confirm C48 warning is being emitted.
+
+### 6. No Cross-Precept Composition
+**Finding:** Precepts are isolated. No import, inheritance, reference, or composition across preceptsinstances.
+
+**Recommendation:** Document as a deliberate scoping decision (not a bug) in `docs/RoadmapFuture.md` or README. If composition becomes a requirement, design a separate feature.
+
+**Action:** Confirm with shane that this is intentional; document as known limitation if needed.
+
+---
+
+## Runtime Edge Case Review
+**From:** george-runtime-review.md
+
+Eight edge cases reviewed; 7 working-as-designed. **One medium-risk finding:**
+
+### Dotted Name Resolution in Constraints ⚠️ MEDIUM RISK
+**Location:** `ConstraintViolation.cs` lines 116–124 (`ExpressionSubjects.Walk`)
+
+**Scenario:** Invariant references field with dotted property:
+```precept
+invariant Items.count > 0
+```
+
+**Issue:** Walk behavior identifies `Items.count` as `("Items", "count")` — treats it as EventArg reference instead of field property. Violation targets would be `EventArgTarget("Items", "count")` instead of `FieldTarget("Items")`.
+
+**Impact:** Affects violation attribution in UI/API, not engine correctness.
+
+**Mitigation:** Type checker validates at compile time — dotted refs in non-event-assert scopes are flagged if prefix isn't an event name.
+
+**Recommendation:** Add defensive check in constraint extraction; if Walk produces arg-targets for field expressions, log warning.
+
+---
+
+## Language Server & Extension Gaps
+**From:** kramer-tooling-review.md
+
+### Syntax Highlighting Implementation (Phases 0-7)
+**Status:** Design docs exist; implementation not started.
+
+**Current state:**
+- Phase 0 (Grammar refactor) — not started
+- Phase 1-2 (Custom semantic tokens) — not started
+- Phase 3-7 (Color binding + modifiers) — not started
+
+**Impact:** 8-shade palette defined but not implemented; users see generic theme colors.
+
+**Recommendation:** Lane assignment: **George** (Phases 0-1), **Kramer** (Phases 2-7). Multi-week project, not urgent, but blocks "design locked" claims in marketing.
+
+### Completions Type-Awareness Gaps
+**Finding:** Completions lack type-aware filtering in three scenarios:
+1. Set assignment expressions — suggests all fields, not just same-type values
+2. Collection mutations — suggests all expressions, not just inner-type values
+3. Dequeue/pop "into" targets — partially implemented; doesn't exclude captured fields
+
+**Status:** Nice-to-have validations; parser already catches errors. Queue as Phase 2 enhancement. Low priority.
+
+### Semantic Token Modifiers Not Emitted
+**Finding:** `preceptConstrained` modifier registered but never emitted. Design calls for italic text on constrained fields/states/events.
+
+**Status:** Phase 7 of implementation plan. Queue after colors bound (Phase 5).
+
+### Hover & Definition Limitations
+1. **Built-in collection members** — hovering over `Floors.count` shows no tooltip
+2. **Precept name** — top-level machine name not clickable for "go to definition"
+
+**Status:** Design limitations. Built-in members should have dedicated hover tooltip in Phase 2. Top-level name requires workspace scanning.
+
+### Document Intelligence Fallback Parsing
+**Finding:** `PreceptDocumentIntellisense.cs` uses regex to extract declarations when main parser returns null (incomplete/invalid syntax). Patterns separate from canonical parser patterns.
+
+**Recommendation:** Already documented as "fallback-path code." No change needed, but make clear that regex drift is a known risk. Mitigate via PR review + testing.
+
+---
+
+## Rule Analyzer Diagnostic Gaps
+**From:** soup-nazi-rule-analyzer-gaps.md  
+**Priority:** MEDIUM (UX/DX, not correctness)
+
+### Problem
+PreceptAnalyzerRuleWarningTests.cs has only **1 test**, covering 1 warning scenario. **Seven critical diagnostic cases are untested:**
+
+1. **From-state asserts never checked** — no incoming transitions to state
+2. **Field rule scope violations** — references field other than its own
+3. **Event rule scope violations** — references instance data (only args visible)
+4. **Top-level rule forward reference** — references field before declaration
+5. **Null expression failure in rule** — may fail if nullable field is null
+6. **Rule violated by field defaults** — default value violates invariant
+7. **Initial state rule violated by defaults** — boot failure scenario
+
+### Why This Matters
+These diagnostics are **compile-time checks already** (parser + compiler validate them). The analyzer should expose them via Diagnostic objects for real-time IDE highlighting. Without them:
+- User edits rule, hits save → no red squiggles
+- User publishes → compile fails at deploy time
+- Or: code compiles but rule is silently never checked
+
+### Action
+Write 7 additional test methods in `test/Precept.LanguageServer.Tests/PreceptAnalyzerRuleWarningTests.cs`:
+
+```csharp
+[Fact] public void Diagnostics_FromStateAssertWithoutExitingTransitions_ProducesWarning() { ... }
+[Fact] public void Diagnostics_FieldRuleReferencesAnotherField_ProducesError() { ... }
+[Fact] public void Diagnostics_EventRuleReferencesInstanceData_ProducesError() { ... }
+[Fact] public void Diagnostics_RuleForwardReferencesField_ProducesError() { ... }
+[Fact] public void Diagnostics_NullableFieldInNonNullExpression_ProducesWarning() { ... }
+[Fact] public void Diagnostics_FieldDefaultViolatesRule_ProducesError() { ... }
+[Fact] public void Diagnostics_InitialStateRuleViolatedByDefaults_ProducesError() { ... }
+```
+
+---
+
+## Code Quality Concerns
+**From:** uncle-leo-code-review.md
+
+### 1. Unsafe Null-Forgiveness Pattern (LOW SEVERITY)
+**Location:** `tools/Precept.LanguageServer/PreceptAnalyzer.cs:35`
+
+```csharp
+public bool TryGetDocumentText(DocumentUri uri, out string text)
+    => _documents.TryGetValue(uri, out text!);
+```
+
+**Issue:** `text!` bypasses type system. While technically safe, it's a code smell that breaks nullable flow analysis. If logic changes, suppressed compiler warnings would catch the bug.
+
+**Fix (ranked):**
+1. **Explicit assignment** (Option 1) — most explicit, zero surprise
+2. **Assertion** with comment explaining unreachability
+3. **Accept pattern** — document inline if performance-critical
+
+**Recommendation:** Option 1 (explicit assignment).
+
+### 2. Hydrate/Dehydrate Dual-Format Complexity (MEDIUM SEVERITY)
+**Location:** `src/Precept/Dsl/PreceptRuntime.cs:162–253`
+
+**Issue:** Instance data lives in two formats:
+- **Public:** Field names → values (no prefix). Collections are `List<object>`.
+- **Internal:** `__collection__<fieldName>` → `CollectionValue` objects.
+
+Three methods (`Hydrate`, `Dehydrate`, `CloneCollections`) invoked at three mutation sites (Fire, Inspect, Update). If any site forgets one step, **silent data corruption** occurs.
+
+**Fix (ranked by effort):**
+1. **Highest confidence (Medium effort):** Extract `DataMutation` record encapsulating triple: `(Clean, Internal, Collections)`. Pass through mutation methods instead of juggling three variables.
+2. **Good practice (Low effort, high ROI):** Add invariant checks before returning:
+   ```csharp
+   foreach (var kvp in resultData) {
+       if (kvp.Key.StartsWith("__collection__")) {
+           throw new InvalidOperationException("Dehydrate forgot to strip collection prefix");
+       }
+   }
+   ```
+3. **Documentation (Immediate):** Add comment explaining three-step protocol.
+
+**Recommendation:** Implement option 2 immediately (catches mistakes in testing). Schedule option 1 for next refactor.
 
 ---
 

@@ -42,6 +42,9 @@
 - **Hero domain conflict recorded:** User prefers TimeMachine (reworked by J. Peterman to 18 lines, full feature coverage). Steinbrenner spec verdict favors Subscription (higher score, no fantasy domain). Both candidates on shortlist pending team decision.
 - **Brand research observations filed:** (1) reference files need STATUS headers to prevent re-litigation; (2) AI-native frame is undersold; (3) hero snippet is the most consequential brand asset; (4) wordmark rationale should surface in public docs.
 
-### 2026-04-05 — Philosophy coverage added
+### 2026-04-05 — TimeMachine hero snippet trimmed to 15 lines
+
+Shane approved the two cuts. Removed `field FluxLevel number = 0` (and all `set FluxLevel = ...` references in transition rows) and removed the `on FloorIt assert TargetMph > 0 because "The car has to be moving, Doc"` line — keeping only the gigawatts assert. Also removed the blank separator between `event Arrive` and the transition rows to land at exactly 15 lines. Label in candidate card and index entry both updated from "18 lines" to "15 lines". All span spacing verified clean after surgical removal.
+
 
 `brand/philosophy.md` is now synthesized into `brand-brief.md` under `## Philosophy`. Covers: the feeling of use (prevention/inspectability as product experience), the four differentiators framed for brand copy, the name "Precept" and why it is exact rather than evocative, and the icon brief — specifically the open/closed-path geometry and containment as the visual expression of the engine's structural guarantee. Color guidance from philosophy (dark background, monochrome-strong, semantic color optional) is captured. Metaphors to avoid (generic SaaS badge, vague concepts) are documented.
