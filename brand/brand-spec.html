@@ -176,7 +176,7 @@
 <div class="section">
 <h2>4. Color System <span class="status-chip">LOCKED</span></h2>
 
-<p>8 authoring-time shades in 5 families, plus 3 runtime verdict colors. Background <code>#0c0c0f</code>. Every color has a fixed meaning. Nothing is decorative.</p>
+<p>8 authoring-time shades in 5 families, plus 3 runtime verdict colors. Comments sit outside that semantic palette as an editorial lane. Background <code>#0c0c0f</code>. Every color has a fixed meaning. Nothing is decorative.</p>
 
 <div class="callout">
   <strong>Locked design</strong>
@@ -262,6 +262,18 @@
     <div style="display:flex; align-items:center; gap:10px;">
       <div style="width:56px; height:36px; border-radius:6px; background:#FBBF24; flex-shrink:0;"></div>
       <div><span style="color:#FBBF24; font-weight:600; font-size:12px;">Messages #FBBF24</span><div style="font-size:10px; color:#52525b;">normal · because / reject string content</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Comments -->
+<div class="card">
+  <h3 style="color:#9096A6;">Comments · Editorial Outside The Palette</h3>
+  <p style="font-size:11px; color:#52525b; margin-bottom:12px;">Comments are visible but intentionally excluded from the executable semantic lanes. They use dusk indigo so they read as annotation rather than state, event, data, or rule content.</p>
+  <div style="display:grid; grid-template-columns:1fr; gap:12px; max-width:340px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div style="width:56px; height:36px; border-radius:6px; background:#9096A6; flex-shrink:0;"></div>
+      <div><span style="color:#9096A6; font-weight:600; font-size:12px; font-style:italic;">Comment #9096A6</span><div style="font-size:10px; color:#52525b;">italic · <code>#</code> comments only, outside the 8 semantic shades</div></div>
     </div>
   </div>
 </div>
@@ -544,12 +556,13 @@
 </div>
 
 <div class="callout">
-  <strong>The principle:</strong> Every color means something. Nothing is decorative. 8 authoring-time shades plus runtime verdict colors:
+  <strong>The principle:</strong> Every color means something. Nothing is decorative. 8 authoring-time shades plus runtime verdict colors, with comments intentionally outside the semantic palette:
   <strong style="color:#6366F1;">Indigo</strong> = structure semantic + grammar ·
   <strong style="color:#A898F5;">Violet</strong> = states (italic when constrained) ·
   <strong style="color:#30B8E8;">Cyan</strong> = events (italic when constrained) ·
   <strong style="color:#B0BEC5;">Slate</strong> = data names / types / values ·
   <strong style="color:#FBBF24;">Gold</strong> = rule messages ·
+  <strong style="color:#9096A6; font-style:italic;">Dusk Indigo</strong> = comments ·
   <strong style="color:#34D399;">Emerald</strong>/<strong style="color:#F87171;">Coral</strong>/<strong style="color:#FDE047;">Yellow</strong> = verdicts (runtime)
 </div>
 </div>
