@@ -12,6 +12,23 @@
 
 ## Learnings
 
+### Hero Candidate DSL Validation 2026-04-10
+
+**Task:** Compile-validated all 30 hero sample candidates from `hero-deliberation.md` using `precept_compile`.
+
+**Result: 30/30 PASS. Zero compile errors.**
+
+**Advisory pattern found:** PRECEPT050 (hint) + PRECEPT051 (warning) on Candidates 1 (Subscription Billing) and 3 (Pull Request Review). Both use `reject` on a terminal state to communicate structural impossibility — the compiler flags it as redundant since `Undefined` would fire anyway. This is a pedagogical choice, not a defect. The advisories are `hint`/`warning` severity, not `error`.
+
+**Key insight:** The `reject`-on-terminal pattern is the deliberate "structural fence" showcase for the hero. The compiler's advisory is a legitimate style observation. If advisory-free output is required, Candidate 28 (SaaS Trial) achieves the same score (29) with zero diagnostics by using conditional `reject` paths instead.
+
+**Coverage note:** All 30 candidates correctly exercise dotted arg access (`Event.Arg`), guarded transitions (`when`), `reject` with `because`-style messages, `no transition`, `invariant`, typed event args, and `on Event assert`. The DSL surface is uniformly well-represented across the candidate set.
+
+**Report filed:** `.squad/agents/soup-nazi/validation-report.md`
+**Decision filed:** `.squad/decisions/inbox/soup-nazi-validation-results.md`
+
+
+
 ### Test Refresh 2026-04-10 (Comprehensive Coverage Analysis)
 
 **Test Suite Status: 703 tests passing, 0 failures.**

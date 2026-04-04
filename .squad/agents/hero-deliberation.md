@@ -112,9 +112,9 @@ from Trial on Activate when PlanName == null
   -> set PlanName = Activate.Plan
   -> set MonthlyPrice = Activate.Price
   -> transition Active
-from Active on Activate -> set MonthlyPrice = Activate.Price -> no transition
+from Active on Activate when Activate.Price >= MonthlyPrice -> set MonthlyPrice = Activate.Price -> no transition
+from Active on Activate -> reject "Cannot downgrade to a lower plan price"
 from Active on Cancel -> transition Cancelled
-from Cancelled on Activate -> reject "Cancelled subscriptions cannot be reactivated"
 ```
 
 | DSL | Eco | Leg | Wit | Hook | Diff | Total |
@@ -158,7 +158,7 @@ from Triaged on Resolve -> transition Resolved
 
 ### Candidate 3: Pull Request Review
 
-**Theme:** Approval accumulation with a threshold gate — you can't merge until enough reviewers agree, and you can't reopen what's been merged.
+**Theme:** Approval accumulation with a threshold gate — you can't merge until enough reviewers agree, and merged PRs become structurally frozen.
 
 ```
 precept PullRequest
@@ -179,8 +179,9 @@ event Merge
 from Draft on Submit -> set Title = Submit.Name -> transition Review
 from Review on Approve when ApprovalCount + 1 >= 2 -> set ApprovalCount = ApprovalCount + 1 -> transition Approved
 from Review on Approve -> set ApprovalCount = ApprovalCount + 1 -> no transition
+from Review on Merge when ApprovalCount >= 2 -> transition Merged
+from Review on Merge -> reject "Pull request has not received enough approvals to merge"
 from Approved on Merge -> transition Merged
-from Merged on Submit -> reject "Merged pull requests cannot be reopened"
 ```
 
 | DSL | Eco | Leg | Wit | Hook | Diff | Total |

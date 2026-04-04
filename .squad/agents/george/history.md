@@ -110,3 +110,33 @@ Format: `PRECEPT###` derived from constraint ID (C1 → PRECEPT001). LanguageCon
 - `DiagnosticCatalog.cs` → constraint registry (C1–C54)
 - `ConstructCatalog.cs` → parser form documentation (used by error messages & language server)
 - `PreceptExpressionEvaluator.cs` → expression runtime evaluation (no side effects)
+
+### Language Theory Research (2026-04-04)
+
+Produced five language theory reference documents in `docs/research/language-references/`:
+
+1. **`expression-compactness.md`** — Syntactic sugar and derived forms. Precept already has a solid shorthand inventory (multi-state `from`, `from any`, multi-name declarations). The main gap is error attribution through desugaring. Key finding: any new derived form must desugar before type-checking and reattach source spans for diagnostics. Implementation cost is medium due to span tracking requirements.
+
+2. **`constraint-composition.md`** — Predicate combinators and collect-all semantics. Precept already implements collect-all evaluation correctly. The key gap is named reusable predicates — long `when` guards with repeated sub-conditions appear in nearly every complex sample. A `require Name BoolExpr because "..."` form would be the formal equivalent of Alloy predicates. Scope leakage (event arg references in reusable predicates) is the main risk.
+
+3. **`state-machine-expressiveness.md`** — Statecharts vs. flat state machines. Hierarchical states and parallel regions are high semantic cost and not suited to Precept's domain model. The flat self-contained row model is a feature. Low-cost opportunities: multi-event `on` clause and catch-all `on any` row. Harel (1987) and xstate v5 cited.
+
+4. **`multi-event-shorthand.md`** — Multi-event in the `on` clause. The existing multi-state `from` shorthand establishes the desugaring pattern. Multi-event `on` (no-arg form) is the highest-value near-term addition. Arg substitution semantics for events with shared arg names is the tricky case — requires type-checking each expansion. CSP and symbolic automata provide the formal grounding.
+
+5. **`expression-evaluation.md`** — Principled expression expansion. Precept's current expression set is a decidable many-sorted FOL fragment. Safe additions: `length` accessor for strings, `startsWith`/`endsWith` operators (same grammar level as `contains`), `sum` for numeric collections. Risky additions: `matches` with open regex (ReDoS risk), quantified expressions (high parser cost). The `!= ""` workaround in every string-arg sample is the strongest signal that `length` or `startsWith` would have immediate impact.
+
+Also wrote `docs/research/language-references/README.md` with a relevance ranking table and priority observations for Phase 2.
+
+**Key cross-file finding:** Any parser-level addition requires synchronized updates to: parser → tokenizer (for new keyword tokens) → type-checker → expression evaluator → `ExpressionSubjects.Extract()` (for violation attribution) → `precept_language` MCP tool → language server completions. The chain is longer than it looks.
+
+### Phase 1 Research Contribution (2026-04-04)
+
+Contributed three research documents to the Phase 1 hero research sprint:
+
+- **`expression-compactness.md`** — Syntactic sugar and derived forms. Identified that any new derived form must desugar before type-checking and reattach source spans for diagnostics.
+- **`constraint-composition.md`** — Predicate combinators. Identified named reusable predicates as the key gap — long `when` guards with repeated sub-conditions appear in nearly every complex sample.
+- **`state-machine-expressiveness.md`** — Statecharts vs. flat state machines. Confirmed flat self-contained row model is a feature; identified multi-event `on` clause as lowest-cost high-value addition.
+- **`multi-event-shorthand.md`** — Multi-event in `on` clause as highest-priority near-term addition (LOW COST, HIGH VALUE).
+- **`expression-evaluation.md`** — String predicates (`.length`, `startsWith`, `endsWith`) as lowest-risk expression additions. The `!= ""` workaround in every string-arg sample is the strongest signal.
+
+**Cross-phase finding:** Documented the 9-point sync chain required for any parser-level addition — this is the main cost driver for future language work.
