@@ -1,0 +1,33 @@
+precept CrosswalkSignal
+
+# A pedestrian crosswalk signal. Pedestrians press a request button to
+# trigger a Walk phase. The signal cycles through Walk and FlashingDontWalk
+# with a decreasing countdown before returning to DontWalk.
+
+field RequestPending as boolean default false
+field CycleCount as number default 0
+field CountdownSeconds as number default 0
+
+invariant CycleCount >= 0 because "Cycle count cannot be negative"
+invariant CountdownSeconds >= 0 because "Countdown seconds cannot be negative"
+
+state DontWalk initial
+state Walk
+state FlashingDontWalk
+
+in Walk assert CountdownSeconds > 0 because "Walk phase requires a positive countdown"
+
+in DontWalk edit RequestPending
+
+event PedestrianRequest
+event Advance
+
+from any on PedestrianRequest -> set RequestPending = true -> no transition
+
+from DontWalk on Advance when RequestPending -> set RequestPending = false -> set CountdownSeconds = 20 -> set CycleCount = CycleCount + 1 -> transition Walk
+from DontWalk on Advance -> no transition
+
+from Walk on Advance -> set CountdownSeconds = 7 -> set CycleCount = CycleCount + 1 -> transition FlashingDontWalk
+
+from FlashingDontWalk on Advance when CountdownSeconds <= 1 -> set CountdownSeconds = 0 -> set CycleCount = CycleCount + 1 -> transition DontWalk
+from FlashingDontWalk on Advance -> set CountdownSeconds = CountdownSeconds - 1 -> no transition
