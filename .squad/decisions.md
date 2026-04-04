@@ -3557,3 +3557,26 @@ Claude Sonnet 4.6 remains the default model for design and polish work. However,
 
 **Rationale:** User directive clarifying nuanced model guidance — Sonnet handles most design polish, but Opus available for premium reasoning tasks.
 
+---
+
+## Decision: spm-row Horizontal Padding in Single-Row Groups
+
+**Author:** Elaine  
+**Date:** 2025-07-16  
+**Section:** §2.1 Syntax Editor — Core Semantic Tokens table  
+**Status:** Resolved
+
+### Problem
+
+In the `.spm-*` surface palette mapping layout, the CSS rule for `.spm-row` sets `padding: 14px 24px`. For multi-row groups (Structure · Indigo, Data · Bright Slate) the rows are inside an `spm-grid` wrapper, and `.spm-grid > .spm-row { padding: 12px 0; }` correctly removes the horizontal padding so only the container's `padding: 16px 24px` applies.
+
+Single-row groups (State, Event, Messages, Comment) used bare `<div style="padding: 16px 24px;">` wrappers — no `spm-grid` class. The row's own 24px horizontal padding stacked on the container's 24px, visually indenting those rows ~48px from the section edge vs. ~24px for multi-row groups.
+
+### Decision
+
+Add `class="spm-grid"` to the single-row wrapper `div`s. This activates the `.spm-grid > .spm-row` override without requiring any new CSS rules or content changes.
+
+### Pattern
+
+**Rule:** All `.spm-row` elements must be direct children of a `.spm-grid` wrapper. Never place a `.spm-row` inside a bare div with explicit horizontal padding — the double-indent is unavoidable without the `spm-grid` class.
+

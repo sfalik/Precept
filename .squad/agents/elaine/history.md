@@ -1,3 +1,11 @@
+## 2026-04-04T20:44:43Z — Team Update: Core Semantic Tokens Table Alignment Fixed
+
+Section 2.1 core semantic tokens table alignment issue resolved. State, Event, Messages, and Comment rows now properly align with the rest of the table by adding the correct `.spm-grid` wrapper class to match the shared mapping table structure.
+
+**Decision merged to:** `decisions.md` § spm-row Horizontal Padding in Single-Row Groups
+
+---
+
 ## 2026-04-04T20:39:16Z — Team Update: Elaine Model Pin (Sonnet for Design Work)
 
 ## 2026-04-04T20:39:37Z — Team Update: Opus Escalation Acceptable When Needed
@@ -997,5 +1005,7 @@ The sections had drifted into separate visual treatments:
 ### Learnings
 
 **Legends must echo the taxonomy exactly.** When a section defines a formal taxonomy (Initial/Intermediate/Terminal) and then shows examples, the legend labels should use the exact same terms. Using synonyms ("Origin" instead of "Initial") creates cognitive friction — readers wonder if it's a different concept or just inconsistent naming.
+
+**Double horizontal padding in spm-row wrappers.** The `.spm-row` CSS class carries `padding: 14px 24px`. When a single row sits inside a bare `<div style="padding: 16px 24px;">` wrapper, both padding values stack — the row content ends up 48px from the section edge instead of 24px. Multi-row groups avoid this because `.spm-grid > .spm-row { padding: 12px 0; }` zeroes the row's horizontal padding, deferring to the container. The fix for single-row groups: add `class="spm-grid"` to the wrapper div. This activates the same override and keeps all rows flush at the same left edge.
 
 
