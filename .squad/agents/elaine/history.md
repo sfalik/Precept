@@ -91,6 +91,70 @@ UX is responsible for surfaces 1 and 2. The authoring and preview experience IS 
 
 ---
 
+## Session 3 — README Research Review (2026-04-04)
+
+### What I Did
+
+**Reviewed Peterman and Steinbrenner's README research from UX/IA perspective.** Read both research documents plus current README and brand positioning. Identified what holds up, what needs refinement, and what both researchers missed from a user experience standpoint.
+
+**Key findings:**
+
+**Peterman's research (brand/copy angle):**
+- Hybrid model recommendation is correct — aligns with progressive disclosure principles
+- 18-line hero target is supported by cognitive load research (working memory = 5-7 line chunks)
+- AI-first section placement needs revision (should come AFTER quickstart, not before)
+- "DSL only" hero needs a follow-up C# usage section to complete the mental model
+
+**Steinbrenner's research (PM/adoption angle):**
+- Four-stage evaluation journey is correct and well-mapped to README sections
+- "Above the fold" recommendation valid but needs mobile-first definition (550px viewport)
+- Comparison handling taxonomy is sound; implicit differentiation is right for Precept
+- Minimum path to first working file is conceptually right but operationally incomplete
+
+**UX/IA gaps both missed:**
+
+1. **Scannability:** Current README has wall-of-text paragraphs, buried bullet lists, no visual hierarchy. F-pattern and Z-pattern scanning research not applied.
+
+2. **Two-audience architecture (human + AI):** README written for humans only. AI agents consume READMEs differently — need semantic heading hierarchy, language-tagged code blocks, descriptive link text, image alt text. Added "AI Parseability Checklist" to requirements.
+
+3. **Progressive disclosure:** Current README front-loads complexity (sample catalog before quickstart, tooling features before basic usage, philosophical content interrupting onboarding). Violates principle that each section deepens commitment without overwhelming.
+
+4. **CTA clarity:** Three competing CTAs in Getting Started (package, extension, plugin) with equal weight = decision paralysis. Need single primary CTA with numbered sequence.
+
+5. **Viewport and accessibility:** Not tested at narrow viewports (400px, 600px). Hero code (49 lines) requires scrolling on all devices. Emoji in headings (screen reader noise), missing alt text on images, heading hierarchy violations (H2 → H4 skips).
+
+**Deliverables created:**
+
+| File | Purpose |
+|------|---------|
+| `brand/references/readme-research-elaine.md` | Full UX/IA review with assessment of both research docs + synthesis of UX requirements for proposal |
+| `.squad/decisions/inbox/elaine-readme-ux-requirements.md` | Extracted non-negotiable constraints the proposal must satisfy |
+
+**Non-negotiable UX requirements for README restructure:**
+
+1. Mobile-first "above the fold" (550px viewport)
+2. Single primary CTA (numbered sequence)
+3. Semantic heading hierarchy (H1 → H2 → H3, no skips)
+4. Progressive disclosure (What → Read → Use → Why → Learn)
+5. Scannable formatting (2-3 sentence paragraphs, bullets for features)
+6. Viewport resilience (no horizontal scroll at 600px)
+7. Screen reader compatibility (emoji placement, alt text, labels)
+8. AI parseability (language tags, link text, image descriptions)
+
+### Learnings
+
+**F-pattern and Z-pattern scanning matter for README structure.** Developers don't read documentation linearly — they scan headings (left edge), sweep across headlines (top), and look for CTAs (bottom right). The README structure must support this scanning behavior or lose readers in the first 5 seconds.
+
+**AI agents are first-class README consumers, not just feature users.** When a developer asks Claude "What is Precept?", Claude reads `README.md`. If the structure isn't AI-parseable (semantic headings, language-tagged code, descriptive links), Claude gives shallow or hallucinated answers. AI parseability isn't a nice-to-have — it's required for AI-native positioning to be credible.
+
+**Progressive disclosure is violated when you show "what makes this different" before proving "can I use this."** The current README jumps to MCP tools, sample catalog, and philosophical pillars before showing a working quickstart. This assumes the developer has already committed. In reality, developers bounce if they can't visualize the integration path.
+
+**CTA clarity requires hierarchy, not democracy.** Presenting three installation options (package, extension, plugin) as equals creates decision paralysis. The README must funnel developers to one action (install extension), then offer next steps (add package), then mention advanced options (plugin). Single-column flow beats multi-option menus.
+
+**Mobile-first viewport testing is non-negotiable for GitHub READMEs.** GitHub's mobile web traffic is significant, and the README renders in a narrow column. "Above the fold" at 1200px desktop ≠ "above the fold" at 400px mobile. If the hero code requires scrolling on a phone, you've lost mobile users before they see the value prop.
+
+**Heading hierarchy affects both screen readers and AI agents.** Skipping from H2 to H4 breaks screen reader navigation (users jump between heading levels) and confuses AI document parsers (outline structure is invalid). This isn't just accessibility compliance — it's core IA.
+
 ### User-Facing Surfaces Inventory
 
 Every surface where users interact with Precept:
@@ -483,8 +547,173 @@ For each surface, drafted UX description covering: Purpose, Primary visual conce
 - It is not decorative. Every color choice has a semantic reason. Every shape in a diagram means something. Every symbol in the CLI means something. This is precisely what Precept claims to be: nothing is random, everything is meaningful.
 - It requires discipline. If the inspector panel starts adding "nice to have" pastel backgrounds or decorative accent colors, the system breaks. Once this draft is locked, enforcement is critical.
 
+**Note:** The 5-surface visual UX spec draft from this session was incorporated into `brand/brand-spec.html` §2.3–2.5 on 2026-04-04. See Session 3 entry above for full incorporation details.
+
+---
+
+## Session 3 — Visual Surfaces Incorporation & Color Compliance (2026-04-04)
+
+### Task
+Incorporated the 5-surface visual UX spec draft into `brand/brand-spec.html` as fully specified sections, resolved open questions with inline notes, and performed color compliance audit on brand mark SVGs and indigo overview card.
+
+### Output
+- **§2.3 Inspector Panel:** Filled DRAFT placeholder with complete UX spec covering purpose, visual concerns, color application, typography, accessibility notes, and AI-first design. Marked as LOCKED.
+- **§2.4 Docs:** Clarified scope as internal team documentation artifacts (not a public-facing site), filled with complete spec. Marked as LOCKED. Light theme noted as backlog item.
+- **§2.5 CLI / Terminal:** Filled with complete spec covering verdict color usage, symbol redundancy, terminal compatibility constraints, and AI-parseable output structure. Marked as LOCKED. CLI color audit noted as backlog item.
+- **Color compliance fixes:** Replaced all instances of `#475569` (slate-600, NOT in the locked 8+3 system) with correct system colors in brand marks:
+  - Document outline/border: `#475569` → `#27272A` (border)
+  - Document content lines: `#475569` → `#71717A` (text-muted) for the "tablet" icon, `#27272A` (border) for combined icon
+  - Inactive state circle: `#475569` → `#27272A` (border)
+  - Applied same fixes to `brand/explorations/visual-language-exploration.html` brand marks and badge backgrounds
+
+### Learnings
+
+**What clicked:**
+1. **The 5-surface model is complete.** Every surface where a developer or AI agent encounters Precept is now specified with locked color, typography, and accessibility rules. No guesswork left for implementation.
+
+2. **Inspector panel is the constraint feedback surface.** It's where verdict colors earn their keep — Enabled/Blocked/Warning with icon redundancy for accessibility. The spec makes explicit what Kramer's implementation already intuited: constraint violations need both color and symbol.
+
+3. **Docs ≠ docs site.** Shane's clarification: "docs" means internal team artifacts (the `docs/` folder), not a public-facing documentation website. This distinction matters — internal docs can stay dark-mode-only and don't need responsive layout or SEO considerations. If Peterman designs a public docs site later, that's a separate surface.
+
+4. **CLI color is constrained by terminal realities.** Deep indigo `#6366F1` doesn't work on light terminal themes. The spec locks verdict colors (success/error/warning) as the only CLI colors and leaves structural color (file paths, context) as default terminal foreground. This is the right call — terminal diversity makes palette application fragile.
+
+5. **Color compliance reveals brand drift.** The brand marks were using `#475569` (Tailwind slate-600) for inactive states and structural elements. This was never in the locked 8+3 system. The replacement — `#27272A` (border) for structural elements, `#71717A` (text-muted) for secondary content — brings the marks into compliance and creates visual consistency with the rest of the system.
+
+6. **Light theme is a backlog item across all surfaces.** The entire system is designed dark-mode-first. Light theme support would require color recalibration (especially verdict colors) and is explicitly noted as future work for accessibility.
+
+**Open questions resolved inline:**
+- Inspector panel → fully implemented, spec reflects real behavior
+- "Docs site" → clarified as internal team docs, not public-facing
+- Light theme → backlog for all surfaces
+- Accessibility audit → backlog (contrast ratios documented, formal color-blind/screen-reader testing pending)
+- CLI color audit → backlog (current CLI tools may not align to spec)
+
+**What the spec does:**
+- **For Kramer:** Implementation contract. Every color hex, every typography rule, every accessibility requirement is now explicit. If a surface exists, it has a locked spec.
+- **For Peterman:** Brand compliance gate. The specs translate brand decisions into surface-specific application rules. Peterman can review any UI artifact against its corresponding section.
+- **For AI agents:** Structured design knowledge. Each surface spec includes an "AI-first note" explaining how the design serves both human and AI consumers simultaneously.
+- **For Shane:** Decision record. The specs document what was decided, when, and why. Future changes require spec updates, not just code changes.
+
+**What's enforced:**
+1. **Semantic unity across surfaces:** Indigo = structure, violet = states, cyan = events, slate = data, gold = messages. This language holds in editor, diagram, inspector, docs, and CLI.
+2. **Verdict colors stay runtime-only:** Green/red/yellow never appear in syntax highlighting. Only in inspector, diagrams during inspection, and CLI success/failure messages.
+3. **Color + shape/symbol redundancy:** Accessibility floor. Diagrams use color AND shape. Inspector and CLI use color AND icon. Color-blind users don't lose information.
+4. **Monospace typography as brand:** Cascadia Cove across all surfaces. The code font IS the brand font.
+
+---
+
+## Session 4 — §1.4 Palette Card Fix & Color Usage Roles (2026-07-12)
+
+### Task
+Fix the brand-spec.html §1.4 palette card to correctly reflect the locked 8+3 color system, and define comprehensive color usage roles for every color in the system — with specific guidance for the upcoming README revamp.
+
+### What Was Wrong with §1.4
+
+1. **Palette card showed wrong system.** The `pc-card` was an "Indigo · 239°" card copied from the color exploration phase. It displayed an 8-shade indigo gradient (`#1e1b4b` through `#c7d2fe`) including `#a5b4fc` — explicitly called out as off-system by Shane. This was the old "which brand color should we pick?" exploration card, not the locked 8+3 brand palette.
+
+2. **Verdict colors were wrong.** The Verdicts section used `#F87171` (Tailwind red-400) instead of the locked error color `#FB7185`, and `#FDE047` (Tailwind yellow-300) instead of the locked warning color `#FCD34D`. These were carried over from an earlier exploration iteration.
+
+3. **No color usage guidance existed.** §1.4 documented what each syntax highlighting color IS, but never defined how brand colors should be USED across product surfaces, README, badges, etc.
+
+### What I Fixed
+
+1. **Replaced the pc-card** with a new full-width palette card showing all 8+3 colors organized as: Brand Family (indigo trio) → Text Family → Structural (border, bg) → Semantic (success, error, warning), plus a gold accent note. Uses `pc-palette-*` CSS classes extending the existing `pc-*` namespace.
+
+2. **Fixed verdict colors:** `#F87171` → `#FB7185` (error), `#FDE047` → `#FCD34D` (warning). Also aligned verdict labels from runtime terms (Enabled/Blocked/Warning) to system role names (Success/Error/Warning).
+
+3. **Added §1.4.1 Color Usage** — a new LOCKED subsection with:
+   - **Color Roles table:** All 12 colors (8+3+gold) with role name and specific product surface uses
+   - **README & Markdown Application table:** How color maps to GitHub constraints (wordmark SVG, shields.io parameters, emoji alignment)
+   - **Color Usage Q&A:** Five concrete questions about secondary highlights, when to use semantic colors, error in README (no), gold in UI (no)
+   - **README Color Contract callout:** Defines the three channels for brand identity in plain Markdown
+
+### Color Usage Decisions Made
+
+| Decision | Rationale |
+|----------|-----------|
+| Error rose never appears in README | Marketing copy doesn't communicate failure. Fix the product, don't badge it red. |
+| Gold is syntax-only | It exists to distinguish human-readable rule messages from machine code. Diluting it to UI would lose that signal. |
+| Brand identity in GitHub Markdown = SVG + badges + keyword rhythm | Can't fight the platform. Three channels survive GitHub's rendering. |
+| Warning amber is valid in README | Unlike error, warning means "attention needed" — appropriate for beta/preview callouts. |
+| Secondary highlight = brand-light, not a new color | The 8+3 system is closed. Brand-light `#818CF8` IS the accent. |
+
+### Key Deliverables
+
+| File | Change |
+|------|--------|
+| `brand/brand-spec.html` | §1.4 palette card corrected, verdict colors fixed, §1.4.1 Color Usage added |
+| `.squad/decisions/inbox/elaine-color-usage-roles.md` | Decision record for all color usage roles |
+| `.squad/agents/elaine/history.md` | This entry |
+
+## Learnings
+
+1. **Color exploration artifacts linger.** The §1.4 palette card was a relic of the "which brand color?" exploration — it survived the restructure because it looked right (it was styled nicely) even though its content was wrong (it showed exploration shades, not the locked system). Lesson: aesthetic quality ≠ correctness. Always validate content against the locked specification.
+
+2. **Verdict colors drifted silently.** `#F87171` and `#FDE047` were close enough to the correct values that nobody caught the mismatch. This is the danger of "close enough" in a system where hex values ARE the specification. Even a small difference means you're using a different color, and someone will eventually notice the inconsistency.
+
+3. **Usage guidance is the bridge between palette and implementation.** The palette card says "these are the colors." The usage guidance says "this is what you do with them." Without the bridge, every implementer reinvents the mapping — and they'll all invent slightly different ones. The Q&A format turned out to be the most useful part — it answers the questions people actually ask ("can I use gold for a badge?") rather than the questions a designer would ask ("what is the role taxonomy?").
+
+4. **README color is a constrained problem.** GitHub strips CSS. The brand identity has to survive hostile rendering. The three-channel model (SVG + badges + keyword rhythm) is the pragmatic answer — you work with what survives, not against what's stripped. This reframes the README from "how do we apply our palette?" to "what assets carry our identity through rendering?"
+
+**Brand mark color mapping locked:**
+- `#6366F1` (indigo) — active/origin state circle, document outline in "tablet" icon
+- `#34D399` (emerald) — transition arrow
+- `#27272A` (border) — inactive/destination state circle, combined icon document outline, structural elements
+- `#71717A` (text-muted) — secondary content lines in "tablet" icon
+- `#818CF8` (brand-light) — header line in document
+- `#1E1B4B` (deep indigo background) — icon ground
+
+**Implementation status:**
+- Syntax Editor (§2.1): ✅ Implemented, spec describes current behavior
+- State Diagram (§2.2): ✅ Implemented, spec describes current behavior
+- Inspector Panel (§2.3): ✅ Implemented, spec describes current behavior with brand color recommendations
+- Docs (§2.4): ⏳ Spec locked, implementation is current `docs/` folder structure
+- CLI (§2.5): ⚠️ Spec locked, current CLI tools need audit for compliance
+
 ---
 
 ## Learnings
 
 (This section accumulates lessons that apply across sessions and inform future work.)
+
+---
+
+## Session 3 — Reviewer Corrections Applied (2026-04-04)
+
+### What I Did
+
+**Applied all corrections from George, Peterman, and Frank to rand/brand-spec.html:**
+
+1. **Diagnostic range (George #1):** Fixed PRECEPT001–PRECEPT047 → PRECEPT001–PRECEPT054 (line 632).
+
+2. **Inspector yellow NotApplicable state (George #2):** Removed reference to yellow warning state for unmatched guards. The inspector does NOT show a yellow NotApplicable state — that outcome is filtered out. Updated color application description (line 788) to reflect actual inspector states (enabled green, noTransition green dimmed, blocked red, undefined red dimmed).
+
+3. **CLI surface aspirational flag (George #3, Frank #6):** Changed §2.5 status from "LOCKED" to "ASPIRATIONAL" and added prominent callout at section start explaining that the precept CLI tool described does not currently exist. PRECEPT codes appear in VS Code Problems panel, not terminal output. This section is a design contract for future implementation.
+
+4. **Read-only fields correction (George #4):** Fixed "computed, state-derived" characterization. Read-only in inspector means fields not declared editable in the current state via in State edit Field — NOT a field type distinction. Updated line 786.
+
+5. **State Diagram colors (Peterman #5):** Removed ALL off-system hex values (#A5B4FC, #94A3B8, #C4B5FD for state lifecycle roles; #38BDF8, #7DD3FC, #0EA5E9 for event subtypes). Replaced with locked system colors. States now use #6366F1 indigo for borders and #A898F5 violet for state names. Shape (circle, rounded rect, double-border) encodes lifecycle role, not color tints. Events use locked cyan #30B8E8 with edge styling (solid, dashed, self-loop) for subtype differentiation. Added explicit callout: "No lifecycle tints — shape carries that signal."
+
+6. **CLI surface aspirational (Frank #6, same as George #3):** Addressed above.
+
+7. **Docs surface terminology (Frank #7):** Verified throughout §2.4 — surface correctly described as internal team artifacts, not a public docs site. Already correct from prior session.
+
+8. **State Diagram InitialState gap (Frank #8):** Added TODO callout in §2.2 noting that PreceptPreviewSnapshot does not currently expose InitialState, so initial state highlighting depends on a runtime protocol fix.
+
+### Corrections Summary
+
+All corrections applied successfully. All sections (§2.1–2.5) now align with:
+- George's technical corrections (diagnostic range, inspector states, CLI scope, read-only field semantics)
+- Peterman's brand corrections (off-system colors removed, locked 8+3 palette enforced, no lifecycle tints)
+- Frank's architectural corrections (CLI aspirational flag, InitialState protocol gap documented)
+
+No remaining open items from reviewer feedback.
+
+### Key Deliverables
+
+| File | Change |
+|------|--------|
+| rand/brand-spec.html | All reviewer corrections applied to §2.1–2.5 |
+| .squad/decisions/inbox/elaine-reviewer-corrections.md | Decision record documenting all corrections |
+| .squad/agents/elaine/history.md | This entry |
+

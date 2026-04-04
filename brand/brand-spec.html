@@ -58,6 +58,38 @@
   .palette-card .hex { font-size: 11px; opacity: 0.8; margin-top: 4px; }
   .palette-card .role { font-size: 10px; margin-top: 6px; opacity: 0.6; }
 
+  /* Exploration-format palette card (mirrors color-exploration.html) */
+  .pc-card { width: 320px; background: #141414; border: 1px solid #222; border-radius: 12px; overflow: hidden; margin: 16px 0; }
+  .pc-card h2 { font-size: 16px; font-weight: 600; padding: 20px 20px 4px; color: #e5e5e5; margin: 0; text-transform: none; letter-spacing: normal; border: none; }
+  .pc-hex { font-size: 13px; color: #888; padding: 0 20px 16px; font-family: ui-monospace, monospace; }
+  .pc-swatch-bar { height: 64px; }
+  .pc-swatch-gradient { height: 32px; display: flex; }
+  .pc-swatch-gradient div { flex: 1; }
+  .pc-context-block { padding: 16px 20px; border-top: 1px solid #1e1e1e; }
+  .pc-context-block h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #666; margin: 0 0 10px; font-weight: 600; border: none; padding: 0; }
+  .pc-syntax { font-family: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace; font-size: 12px; line-height: 1.7; background: #0d0d0d; border-radius: 6px; padding: 12px 14px; margin: 8px 0; white-space: pre; overflow-x: auto; }
+  .pc-diagram { margin: 8px 0; }
+  .pc-diagram svg { width: 100%; display: block; }
+  .pc-icon-row { display: flex; align-items: center; gap: 16px; }
+
+  /* 8+3 Palette System Card */
+  .pc-palette { background: #141414; border: 1px solid #27272A; border-radius: 12px; overflow: hidden; margin: 24px 0; }
+  .pc-palette-header { background: #6366F1; padding: 20px 24px; }
+  .pc-palette-header h2 { font-size: 18px; font-weight: 700; color: #fff; margin: 0; text-transform: none; letter-spacing: normal; border: none; }
+  .pc-palette-header p { font-size: 13px; color: rgba(255,255,255,0.7); margin: 4px 0 0; }
+  .pc-palette-body { padding: 24px; }
+  .pc-palette-group { margin-bottom: 24px; }
+  .pc-palette-group:last-child { margin-bottom: 0; }
+  .pc-palette-group h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #71717A; margin: 0 0 12px; font-weight: 600; border: none; padding: 0; }
+  .pc-palette-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .pc-palette-swatch { display: flex; align-items: center; gap: 10px; min-width: 180px; }
+  .pc-palette-swatch .swatch-block { width: 48px; height: 32px; border-radius: 6px; flex-shrink: 0; }
+  .pc-palette-swatch .swatch-info { font-size: 12px; }
+  .pc-palette-swatch .swatch-role { font-weight: 600; }
+  .pc-palette-swatch .swatch-hex { font-family: ui-monospace, monospace; font-size: 11px; color: #71717A; margin-top: 2px; }
+  .pc-palette-note { background: #18181b; border: 1px solid #27272A; border-radius: 8px; padding: 12px 16px; margin-top: 20px; font-size: 12px; color: #A1A1AA; display: flex; align-items: center; gap: 12px; }
+  .pc-palette-note .swatch-block { width: 28px; height: 28px; border-radius: 4px; flex-shrink: 0; }
+
   .lockup { display: flex; align-items: center; gap: 16px; margin: 16px 0; }
 
   .status-chip { display: inline-block; background: #14532d; color: #34d399; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; letter-spacing: 0.5px; margin-left: 8px; vertical-align: middle; }
@@ -127,7 +159,7 @@
 
 <!-- 1.2 Voice & Tone -->
 <div class="section">
-<h2>1.2 Voice &amp; Tone <span class="status-chip">LOCKED</span></h2>
+<h2>1.2 Voice &amp; Tone <span class="status-chip" style="background:#1e3a5f; color:#60a5fa;">REVISED</span></h2>
 
 <div class="card">
   <p style="color:#fff; font-size:15px; font-weight:600; margin-bottom:12px;">Authoritative with warmth.</p>
@@ -135,12 +167,12 @@
   <table>
     <tr><th>Dimension</th><th>Setting</th></tr>
     <tr><td>Formal ↔ Casual</td><td>Slightly casual. Contractions fine. Occasional explanatory asides.</td></tr>
-    <tr><td>Serious ↔ Funny</td><td>Serious. No jokes.</td></tr>
+    <tr><td>Serious ↔ Funny</td><td>Dry wit welcome. Never forced. Precision finds the humor in the truth.</td></tr>
     <tr><td>Respectful ↔ Irreverent</td><td>Respectful.</td></tr>
     <tr><td>Matter-of-fact ↔ Enthusiastic</td><td>Matter-of-fact with clarifying asides.</td></tr>
   </table>
 
-  <p style="margin-top:12px;">The voice states facts. It doesn't hedge. It doesn't oversell. But it occasionally explains <em>when</em> something matters.</p>
+  <p style="margin-top:12px;">The voice states facts. It doesn't hedge. It doesn't oversell. It finds the wit in precision. When something matters, it says why — and the clarity itself can be the humor.</p>
   <p style="margin-top:4px;"><strong style="color:#e5e5e5;">Models:</strong> Serilog's professionalism + MediatR's economy + Workflow Core's clarifying warmth.</p>
 </div>
 
@@ -153,6 +185,8 @@
       <li>"Think: scattered validation across six services — Precept puts it in one file."</li>
       <li>"Same definition + same data = same outcome."</li>
       <li>"One file. Every rule."</li>
+      <li>"If you've been writing the same validation in four services, Precept has questions."</li>
+      <li>"Turns out business rules don't change just because you moved them to a different service."</li>
     </ul>
   </div>
   <div class="dont-col">
@@ -212,15 +246,15 @@
     <div class="lockup">
       <svg width="40" height="40" viewBox="0 0 64 64">
         <rect width="64" height="64" rx="12" fill="#1e1b4b"/>
-        <rect x="14" y="10" width="36" height="44" rx="3" fill="none" stroke="#475569" stroke-width="1.5"/>
+        <rect x="14" y="10" width="36" height="44" rx="3" fill="none" stroke="#27272a" stroke-width="1.5"/>
         <line x1="20" y1="20" x2="44" y2="20" stroke="#818cf8" stroke-width="1.5"/>
-        <line x1="20" y1="27" x2="40" y2="27" stroke="#475569" stroke-width="1" opacity="0.5"/>
-        <line x1="20" y1="33" x2="42" y2="33" stroke="#475569" stroke-width="1" opacity="0.5"/>
+        <line x1="20" y1="27" x2="40" y2="27" stroke="#27272a" stroke-width="1" opacity="0.5"/>
+        <line x1="20" y1="33" x2="42" y2="33" stroke="#27272a" stroke-width="1" opacity="0.5"/>
         <circle cx="24" cy="44" r="4" fill="none" stroke="#6366f1" stroke-width="1.5"/>
         <circle cx="24" cy="44" r="1.5" fill="#6366f1"/>
         <line x1="28" y1="44" x2="34" y2="44" stroke="#34d399" stroke-width="1.5"/>
         <path d="M33,42 L36,44 L33,46" fill="#34d399"/>
-        <circle cx="40" cy="44" r="4" fill="none" stroke="#475569" stroke-width="1.5"/>
+        <circle cx="40" cy="44" r="4" fill="none" stroke="#27272a" stroke-width="1.5"/>
       </svg>
       <div>
         <div style="font-size:24px; font-weight:700; font-variant:small-caps; letter-spacing:0.1em; color:#fff;">Precept</div>
@@ -251,33 +285,58 @@
 </div>
 
 <div class="card">
-  <h3>Brand mark form</h3>
-  <p style="margin-bottom:16px;">Filled indigo circle → emerald arrow → open slate circle. On a dark indigo ground.</p>
+  <h3>Brand mark — three forms</h3>
+  <p style="margin-bottom:16px;">Three marks, one visual language. Diagram, code, combined.</p>
 
-  <div style="display:flex; gap:32px; align-items:center; flex-wrap:wrap;">
-    <!-- Full mark -->
+  <div style="display:flex; gap:32px; align-items:flex-start; flex-wrap:wrap; margin-bottom:20px;">
     <div style="text-align:center;">
-      <svg width="80" height="80" viewBox="0 0 64 64">
+      <svg width="64" height="64" viewBox="0 0 64 64">
         <rect width="64" height="64" rx="12" fill="#1e1b4b"/>
         <circle cx="18" cy="32" r="8" fill="none" stroke="#6366f1" stroke-width="2.5"/>
         <circle cx="18" cy="32" r="3" fill="#6366f1"/>
         <line x1="26" y1="32" x2="38" y2="32" stroke="#34d399" stroke-width="2.5"/>
         <path d="M36,28 L42,32 L36,36" fill="#34d399"/>
-        <circle cx="48" cy="32" r="8" fill="none" stroke="#475569" stroke-width="2"/>
+        <circle cx="48" cy="32" r="8" fill="none" stroke="#27272a" stroke-width="2"/>
       </svg>
-      <div style="font-size:11px; color:#52525b; margin-top:4px;">Full mark</div>
+      <div style="font-size:11px;color:#52525b;margin-top:6px;">State + transition</div>
+    </div>
+    <div style="text-align:center;">
+      <svg width="64" height="64" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="12" fill="#1e1b4b"/>
+        <rect x="16" y="12" width="32" height="40" rx="3" fill="none" stroke="#6366f1" stroke-width="2"/>
+        <line x1="22" y1="22" x2="42" y2="22" stroke="#818cf8" stroke-width="1.5"/>
+        <line x1="22" y1="29" x2="38" y2="29" stroke="#71717a" stroke-width="1.5" opacity="0.6"/>
+        <line x1="22" y1="36" x2="40" y2="36" stroke="#71717a" stroke-width="1.5" opacity="0.6"/>
+        <line x1="22" y1="43" x2="34" y2="43" stroke="#71717a" stroke-width="1.5" opacity="0.4"/>
+      </svg>
+      <div style="font-size:11px;color:#52525b;margin-top:6px;">Tablet / precept</div>
+    </div>
+    <div style="text-align:center;">
+      <svg width="64" height="64" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="12" fill="#1e1b4b"/>
+        <rect x="14" y="10" width="36" height="44" rx="3" fill="none" stroke="#27272a" stroke-width="1.5"/>
+        <line x1="20" y1="20" x2="44" y2="20" stroke="#818cf8" stroke-width="1.5"/>
+        <line x1="20" y1="27" x2="40" y2="27" stroke="#27272a" stroke-width="1" opacity="0.5"/>
+        <line x1="20" y1="33" x2="42" y2="33" stroke="#27272a" stroke-width="1" opacity="0.5"/>
+        <circle cx="24" cy="44" r="4" fill="none" stroke="#6366f1" stroke-width="1.5"/>
+        <circle cx="24" cy="44" r="1.5" fill="#6366f1"/>
+        <line x1="28" y1="44" x2="34" y2="44" stroke="#34d399" stroke-width="1.5"/>
+        <path d="M33,42 L36,44 L33,46" fill="#34d399"/>
+        <circle cx="40" cy="44" r="4" fill="none" stroke="#27272a" stroke-width="1.5"/>
+      </svg>
+      <div style="font-size:11px;color:#52525b;margin-top:6px;">Tablet + state machine</div>
     </div>
 
     <!-- Color key -->
-    <div style="font-size:12px; line-height:2.2;">
-      <div><span class="swatch" style="background:#6366F1;"></span><span style="color:#6366F1; font-weight:600;">Indigo #6366F1</span> — origin state (brand color)</div>
-      <div><span class="swatch" style="background:#34D399;"></span><span style="color:#34D399; font-weight:600;">Emerald #34D399</span> — transition arrow (enabled)</div>
-      <div><span class="swatch" style="background:#475569;"></span><span style="color:#94A3B8; font-weight:600;">Slate #475569</span> — destination state (chrome)</div>
-      <div><span class="swatch" style="background:#1E1B4B;"></span><span style="color:#71717a; font-weight:600;">Ground #1E1B4B</span> — dark indigo surface</div>
+    <div style="font-size:12px; line-height:2.0; margin-left:12px;">
+      <div><span class="swatch" style="background:#6366F1;"></span><span style="color:#6366F1; font-weight:600;">Indigo #6366F1</span></div>
+      <div><span class="swatch" style="background:#34D399;"></span><span style="color:#34D399; font-weight:600;">Emerald #34D399</span></div>
+      <div><span class="swatch" style="background:#27272A;"></span><span style="color:#94A3B8; font-weight:600;">Border #27272A</span></div>
+      <div><span class="swatch" style="background:#1E1B4B;"></span><span style="color:#71717a; font-weight:600;">Ground #1E1B4B</span></div>
     </div>
   </div>
 
-  <p style="margin-top:16px;">The mark encodes the atomic unit of Precept — one origin state (indigo circle, filled, active), one enabled transition (emerald arrow), one destination (slate circle, open, waiting). Every precept, no matter how complex, is built from this repeated form.</p>
+  <p style="margin-top:16px;">The three marks share one palette and one conceptual language. Each surfaces a different aspect of Precept: the state machine, the written rule, and the two ideas combined. The combined form is the primary mark.</p>
 
   <div class="callout" style="margin-top:16px;">
     <strong>Note:</strong> The icon prototyping loop in <code>brand/icon-prototyping-loop/</code> continues to explore icon variations. This section locks the <em>conceptual form</em> and <em>color mapping</em> of the brand mark. Final icon rendering (corner radii, stroke weights, optical sizing) may refine through the prototyping loop without changing the locked form.
@@ -307,6 +366,123 @@
     <li><strong>Rules are mostly absorbed into structure</strong> — <code>assert</code>, <code>reject</code>, <code>when</code>, and <code>no</code> are structural drivers. Gold is reserved for human-language messages.</li>
     <li><strong>Verdicts stay runtime-only</strong> — enabled / blocked / warning remain outside authoring-time syntax, so green and red cannot be mistaken for static code meaning.</li>
   </ul>
+</div>
+
+<!-- 8+3 Brand Color System — Source of Truth -->
+<div class="pc-palette">
+  <div class="pc-palette-header">
+    <h2>Precept Color System · 8 + 3</h2>
+    <p>8 core colors · 3 semantic colors · 1 syntax accent</p>
+  </div>
+  <div class="pc-palette-body">
+
+    <div class="pc-palette-group">
+      <h3>Brand Family · Indigo</h3>
+      <div class="pc-palette-row">
+        <div class="pc-palette-swatch">
+          <div class="swatch-block" style="background: #6366F1;"></div>
+          <div class="swatch-info">
+            <div class="swatch-role" style="color: #6366F1;">brand</div>
+            <div class="swatch-hex">#6366F1</div>
+          </div>
+        </div>
+        <div class="pc-palette-swatch">
+          <div class="swatch-block" style="background: #818CF8;"></div>
+          <div class="swatch-info">
+            <div class="swatch-role" style="color: #818CF8;">brand-light</div>
+            <div class="swatch-hex">#818CF8</div>
+          </div>
+        </div>
+        <div class="pc-palette-swatch">
+          <div class="swatch-block" style="background: #C7D2FE;"></div>
+          <div class="swatch-info">
+            <div class="swatch-role" style="color: #C7D2FE;">brand-muted</div>
+            <div class="swatch-hex">#C7D2FE</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pc-palette-group">
+      <h3>Text Family</h3>
+      <div class="pc-palette-row">
+        <div class="pc-palette-swatch">
+          <div class="swatch-block" style="background: #E5E5E5;"></div>
+          <div class="swatch-info">
+            <div class="swatch-role" style="color: #E5E5E5;">text</div>
+            <div class="swatch-hex">#E5E5E5</div>
+          </div>
+        </div>
+        <div class="pc-palette-swatch">
+          <div class="swatch-block" style="background: #A1A1AA;"></div>
+          <div class="swatch-info">
+            <div class="swatch-role" style="color: #A1A1AA;">text-secondary</div>
+            <div class="swatch-hex">#A1A1AA</div>
+          </div>
+        </div>
+        <div class="pc-palette-swatch">
+          <div class="swatch-block" style="background: #71717A;"></div>
+          <div class="swatch-info">
+            <div class="swatch-role" style="color: #71717A;">text-muted</div>
+            <div class="swatch-hex">#71717A</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pc-palette-group">
+      <h3>Structural</h3>
+      <div class="pc-palette-row">
+        <div class="pc-palette-swatch">
+          <div class="swatch-block" style="background: #27272A; border: 1px solid #3f3f46;"></div>
+          <div class="swatch-info">
+            <div class="swatch-role" style="color: #A1A1AA;">border</div>
+            <div class="swatch-hex">#27272A</div>
+          </div>
+        </div>
+        <div class="pc-palette-swatch">
+          <div class="swatch-block" style="background: #09090B; border: 1px solid #27272A;"></div>
+          <div class="swatch-info">
+            <div class="swatch-role" style="color: #A1A1AA;">bg</div>
+            <div class="swatch-hex">#09090B</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pc-palette-group">
+      <h3>Semantic</h3>
+      <div class="pc-palette-row">
+        <div class="pc-palette-swatch">
+          <div class="swatch-block" style="background: #34D399;"></div>
+          <div class="swatch-info">
+            <div class="swatch-role" style="color: #34D399;">success</div>
+            <div class="swatch-hex">#34D399</div>
+          </div>
+        </div>
+        <div class="pc-palette-swatch">
+          <div class="swatch-block" style="background: #FB7185;"></div>
+          <div class="swatch-info">
+            <div class="swatch-role" style="color: #FB7185;">error</div>
+            <div class="swatch-hex">#FB7185</div>
+          </div>
+        </div>
+        <div class="pc-palette-swatch">
+          <div class="swatch-block" style="background: #FCD34D;"></div>
+          <div class="swatch-info">
+            <div class="swatch-role" style="color: #FCD34D;">warning</div>
+            <div class="swatch-hex">#FCD34D</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pc-palette-note">
+      <div class="swatch-block" style="background: #F59E0B;"></div>
+      <span><strong style="color: #F59E0B;">Gold #F59E0B</strong> — syntax accent only. Used for human-readable rule messages (<code>because</code> / <code>reject</code> strings). Not a general-purpose UI color.</span>
+    </div>
+
+  </div>
 </div>
 
 <!-- Structure -->
@@ -400,15 +576,15 @@
   <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
     <div style="display:flex; align-items:center; gap:10px;">
       <div style="width:56px; height:36px; border-radius:6px; background:#34D399; flex-shrink:0;"></div>
-      <div><span style="color:#34D399; font-weight:600; font-size:12px;">Enabled #34D399</span><div style="font-size:10px; color:#52525b;">CR 10.2 · enabled, valid, success</div></div>
+      <div><span style="color:#34D399; font-weight:600; font-size:12px;">Success #34D399</span><div style="font-size:10px; color:#52525b;">enabled, valid, success</div></div>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
-      <div style="width:56px; height:36px; border-radius:6px; background:#F87171; flex-shrink:0;"></div>
-      <div><span style="color:#F87171; font-weight:600; font-size:12px;">Blocked #F87171</span><div style="font-size:10px; color:#52525b;">CR 7.1 · blocked, rejected, violated</div></div>
+      <div style="width:56px; height:36px; border-radius:6px; background:#FB7185; flex-shrink:0;"></div>
+      <div><span style="color:#FB7185; font-weight:600; font-size:12px;">Error #FB7185</span><div style="font-size:10px; color:#52525b;">blocked, rejected, violated</div></div>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
-      <div style="width:56px; height:36px; border-radius:6px; background:#FDE047; flex-shrink:0;"></div>
-      <div><span style="color:#FDE047; font-weight:600; font-size:12px;">Warning #FDE047</span><div style="font-size:10px; color:#52525b;">CR 14.8 · unmatched, warning</div></div>
+      <div style="width:56px; height:36px; border-radius:6px; background:#FCD34D; flex-shrink:0;"></div>
+      <div><span style="color:#FCD34D; font-weight:600; font-size:12px;">Warning #FCD34D</span><div style="font-size:10px; color:#52525b;">unmatched, warning</div></div>
     </div>
   </div>
 </div>
@@ -433,6 +609,155 @@
     <tr><td>Data names</td><td><span style="color:#B0BEC5;">#B0BEC5</span></td><td><span style="color:#B0BEC5; font-style:italic;">#B0BEC5 italic</span></td><td>Referenced by an <code>invariant</code></td></tr>
   </table>
 </div>
+
+<!-- 1.4.1 Color Usage -->
+<div class="section" style="margin-top: 48px;">
+<h2>1.4.1 Color Usage <span class="status-chip">LOCKED</span></h2>
+
+<p>How each color is used across product surfaces. When in doubt about what color goes where, this table governs.</p>
+
+<div class="card">
+  <h3>Color Roles</h3>
+  <table>
+    <tr><th style="width:130px;">Color</th><th style="width:120px;">Role</th><th>Specific Uses</th></tr>
+    <tr>
+      <td><span class="swatch" style="background:#6366F1;"></span> <code>#6366F1</code></td>
+      <td><strong style="color:#6366F1;">brand</strong></td>
+      <td>Primary brand identifier. Wordmark, section headers, active UI states, primary CTA buttons, NuGet badge background, diagram state borders, grammar keywords in syntax highlighting.</td>
+    </tr>
+    <tr>
+      <td><span class="swatch" style="background:#818CF8;"></span> <code>#818CF8</code></td>
+      <td><strong style="color:#818CF8;">brand-light</strong></td>
+      <td>Indigo accent. Hover states, secondary highlights, state names in diagrams and syntax, header accents in documents. When you need "brand but softer" — this is it.</td>
+    </tr>
+    <tr>
+      <td><span class="swatch" style="background:#C7D2FE;"></span> <code>#C7D2FE</code></td>
+      <td><strong style="color:#C7D2FE;">brand-muted</strong></td>
+      <td>Subtle brand presence. Feature card backgrounds, table header tints, callout text in indigo-tinted panels, badge text on dark backgrounds. The whisper of indigo.</td>
+    </tr>
+    <tr>
+      <td><span class="swatch" style="background:#E5E5E5;"></span> <code>#E5E5E5</code></td>
+      <td><strong style="color:#E5E5E5;">text</strong></td>
+      <td>All primary body copy. README prose, card descriptions, documentation paragraphs, main headings, button labels. The default reading color.</td>
+    </tr>
+    <tr>
+      <td><span class="swatch" style="background:#A1A1AA;"></span> <code>#A1A1AA</code></td>
+      <td><strong style="color:#A1A1AA;">text-secondary</strong></td>
+      <td>Secondary content. Captions, metadata labels, table cell text, version numbers, secondary badge labels.</td>
+    </tr>
+    <tr>
+      <td><span class="swatch" style="background:#71717A;"></span> <code>#71717A</code></td>
+      <td><strong style="color:#71717A;">text-muted</strong></td>
+      <td>Deemphasized content. Placeholder text, disabled labels, section subtitles, timestamps, tertiary descriptions. Visible but clearly subordinate.</td>
+    </tr>
+    <tr>
+      <td><span class="swatch" style="background:#27272A; border:1px solid #3f3f46;"></span> <code>#27272A</code></td>
+      <td><strong style="color:#A1A1AA;">border</strong></td>
+      <td>All structural dividers. Card outlines, table borders, section separators, inactive state circles in brand mark, input field borders. The structural skeleton of every surface.</td>
+    </tr>
+    <tr>
+      <td><span class="swatch" style="background:#09090B; border:1px solid #27272A;"></span> <code>#09090B</code></td>
+      <td><strong style="color:#A1A1AA;">bg</strong></td>
+      <td>Page and surface background. The ground plane. All dark-mode surfaces sit on this. Provides maximum contrast for the text family.</td>
+    </tr>
+    <tr>
+      <td><span class="swatch" style="background:#34D399;"></span> <code>#34D399</code></td>
+      <td><strong style="color:#34D399;">success</strong></td>
+      <td>Enabled transitions, passing checks, valid state indicators. Inspector "Enabled" verdict, ✅ checkmarks in feature lists, CI passing badges.</td>
+    </tr>
+    <tr>
+      <td><span class="swatch" style="background:#FB7185;"></span> <code>#FB7185</code></td>
+      <td><strong style="color:#FB7185;">error</strong></td>
+      <td>Blocked transitions, failed constraints, rejection states. Inspector "Blocked" verdict, ❌ indicators, constraint violation messages. <strong>Product UI only — not used in README or marketing copy.</strong></td>
+    </tr>
+    <tr>
+      <td><span class="swatch" style="background:#FCD34D;"></span> <code>#FCD34D</code></td>
+      <td><strong style="color:#FCD34D;">warning</strong></td>
+      <td>Cautionary states, unmatched guards, attention-needed indicators. Inspector "Warning" verdict, ⚠️ callouts, beta/preview feature badges.</td>
+    </tr>
+    <tr>
+      <td><span class="swatch" style="background:#F59E0B;"></span> <code>#F59E0B</code></td>
+      <td><strong style="color:#F59E0B;">gold</strong> <em style="color:#71717A;">(syntax only)</em></td>
+      <td>Human-readable rule messages in <code>because</code> and <code>reject</code> clauses. <strong>Never appears outside syntax highlighting.</strong> Not a UI color, not a badge color, not a surface color.</td>
+    </tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3>README & Markdown Application</h3>
+  <p style="margin-bottom: 16px;">GitHub Markdown strips custom CSS. Brand color identity comes through these specific channels:</p>
+
+  <table>
+    <tr><th style="width:180px;">Surface Element</th><th style="width:180px;">Color Treatment</th><th>Implementation</th></tr>
+    <tr>
+      <td>Wordmark / logo</td>
+      <td>Brand <code>#6366F1</code></td>
+      <td>SVG wordmark rendered as image. The indigo is baked into the asset — GitHub can't strip it.</td>
+    </tr>
+    <tr>
+      <td>Primary badges (version, install)</td>
+      <td>Brand <code>#6366F1</code></td>
+      <td>shields.io <code>color=6366F1</code> parameter. The indigo badge is the README's strongest color signal.</td>
+    </tr>
+    <tr>
+      <td>Secondary badges (.NET, license)</td>
+      <td>Border <code>#27272A</code> bg + Text-secondary <code>#A1A1AA</code> text</td>
+      <td>shields.io <code>color=27272A&amp;labelColor=27272A</code>. Neutral badges don't compete with brand indigo.</td>
+    </tr>
+    <tr>
+      <td>CI / status badges</td>
+      <td>Success <code>#34D399</code> (passing) · Warning <code>#FCD34D</code> (pending)</td>
+      <td>shields.io uses GitHub Actions status colors by default — override with <code>color=34D399</code> for manual badges.</td>
+    </tr>
+    <tr>
+      <td>Section headings (H2)</td>
+      <td>Default GitHub rendering</td>
+      <td>Markdown headings render in GitHub's native text color. Brand intent is "brand indigo <code>#6366F1</code>" — realized via the wordmark and badge row, not heading color override.</td>
+    </tr>
+    <tr>
+      <td>Hero code block</td>
+      <td>GitHub's syntax theme</td>
+      <td>Use <code>```precept</code> language fence. GitHub renders with its own theme — brand identity comes from the DSL keyword rhythm and structure, not color control.</td>
+    </tr>
+    <tr>
+      <td>Feature checkmarks (✅)</td>
+      <td>Success <code>#34D399</code> intent</td>
+      <td>Unicode ✅ renders in GitHub's emoji color. The green aligns with our success semantic — no override needed.</td>
+    </tr>
+    <tr>
+      <td>Beta / preview callouts</td>
+      <td>Warning <code>#FCD34D</code> intent</td>
+      <td>Use ⚠️ emoji + text for inline warnings. For shields.io badges: <code>color=FCD34D</code>.</td>
+    </tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3>Color Usage Q&amp;A</h3>
+
+  <p style="margin-bottom: 8px;"><strong style="color:#818CF8;">Q: I need a secondary palette highlight. What do I use?</strong></p>
+  <p style="margin-bottom: 20px;">Brand-light <code>#818CF8</code>. It's the indigo accent — use it for hover states, secondary emphasis, or anywhere you need "brand but one step back." If brand-light is still too strong, brand-muted <code>#C7D2FE</code> provides a whisper of indigo for backgrounds and tints.</p>
+
+  <p style="margin-bottom: 8px;"><strong style="color:#34D399;">Q: When does success green appear in the README?</strong></p>
+  <p style="margin-bottom: 20px;">CI passing badges, feature-available checkmarks (✅), and any "this works" indicator. Shields.io badges for build status use <code>color=34D399</code>. Feature lists use ✅ emoji, which renders green naturally.</p>
+
+  <p style="margin-bottom: 8px;"><strong style="color:#FCD34D;">Q: Is there a role for warning amber in the README?</strong></p>
+  <p style="margin-bottom: 20px;">Yes — beta/preview callouts and "attention needed" badges. Use ⚠️ emoji for inline warnings. For shields.io: <code>color=FCD34D&amp;label=preview</code>. Warning amber signals "this is real but not final."</p>
+
+  <p style="margin-bottom: 8px;"><strong style="color:#FB7185;">Q: Is error rose ever used in the README?</strong></p>
+  <p style="margin-bottom: 20px;">No. Error rose <code>#FB7185</code> is a product UI color — it appears in the inspector when a transition is blocked or a constraint is violated. Marketing copy (README, docs, badges) should never communicate failure. If something doesn't work, fix the product — don't badge it red.</p>
+
+  <p style="margin-bottom: 8px;"><strong style="color:#F59E0B;">Q: Can I use gold outside of syntax highlighting?</strong></p>
+  <p>No. Gold <code>#F59E0B</code> is locked to syntax highlighting for <code>because</code> and <code>reject</code> message strings. It exists to make human-readable rule text visually distinct from machine-interpreted code. Using it in UI or badges would dilute that semantic precision.</p>
+</div>
+
+<div class="callout">
+  <strong>The README color contract</strong>
+  <p style="margin:8px 0 0; line-height:1.7;">In a GitHub Markdown context, Precept's brand identity comes through three channels: (1) the SVG wordmark baked in brand indigo <code>#6366F1</code>, (2) the shields.io badge row using <code>#6366F1</code> as the primary badge color, and (3) the <code>.precept</code> hero code block whose keyword rhythm is recognizable even in GitHub's default syntax theme. Everything else — headings, prose, tables — renders in GitHub's native styles. The brand is unmistakable without fighting the platform.</p>
+</div>
+
+</div>
+
 </div>
 
 <div class="section-divider"></div>
@@ -504,7 +829,7 @@
   <p style="margin-bottom:12px;">PRECEPT codes in indigo. Error bodies in rose. Warnings in amber.</p>
   <div style="background:#0c0c0f; border-radius:6px; padding:16px; border:1px solid #1e1b4b; font-size:12px; line-height:2;">
     <div><span style="color:#818cf8;">PRECEPT001</span> <span style="color:#f43f5e;">error</span>: Unreachable state <span style="color:#94a3b8;">Archived</span> — no transitions lead here</div>
-    <div><span style="color:#818cf8;">PRECEPT047</span> <span style="color:#fbbf24;">warning</span>: Dead-end state <span style="color:#94a3b8;">Approved</span> — no outgoing transitions</div>
+    <div><span style="color:#818cf8;">PRECEPT054</span> <span style="color:#fbbf24;">warning</span>: Dead-end state <span style="color:#94a3b8;">Approved</span> — no outgoing transitions</div>
     <div style="margin-top:8px; color:#334155;">──────────────────────────────────────</div>
     <div style="color:#64748b; margin-top:4px;">2 diagnostics (<span style="color:#f43f5e;">1 error</span>, <span style="color:#fbbf24;">1 warning</span>)</div>
   </div>
@@ -522,32 +847,36 @@
   <p>The VS Code preview panel state diagram. Renders the precept as a diagrammatic finite-state automaton using the same hue families as syntax highlighting. Shape carries origin/final structure; hue carries category.</p>
 
   <h3>Color application</h3>
-  <p style="margin-bottom:12px;">State diagrams use the same hue families from Brand Identity § 1.4, but they do not use syntax-layer colors. Shape and color sub-shading encode structural role without adding new hues.</p>
+  <p style="margin-bottom:12px;">State diagrams use the same hue families from Brand Identity § 1.4, but they do not use syntax-layer colors. Shape encodes structural role; color uses only locked system values.</p>
+
+  <div class="callout" style="margin-bottom:16px;">
+    <strong>No lifecycle tints:</strong> States are not tinted by role (initial/intermediate/terminal). Shape carries that signal. All state nodes use locked indigo for borders and violet for state names.
+  </div>
 
   <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin:24px 0;">
     <div style="background:#1e1b4b; border-radius:8px; padding:14px; text-align:center;">
-      <div style="width:40px; height:40px; border-radius:50%; border:3px solid #a5b4fc; margin:0 auto 8px; display:flex; align-items:center; justify-content:center;">
-        <span style="color:#a5b4fc; font-size:11px; font-weight:700;">●</span>
+      <div style="width:40px; height:40px; border-radius:50%; border:3px solid #6366F1; margin:0 auto 8px; display:flex; align-items:center; justify-content:center;">
+        <span style="color:#6366F1; font-size:11px; font-weight:700;">●</span>
       </div>
-      <div style="color:#a5b4fc; font-weight:600; font-size:14px;">Initial</div>
-      <div style="color:#a5b4fc; font-size:11px; margin-top:4px;">Light Indigo <code style="color:#a5b4fc;">#A5B4FC</code></div>
-      <div style="color:#64748b; font-size:11px;">Entry point. Brand color.</div>
+      <div style="color:#6366F1; font-weight:600; font-size:14px;">Initial</div>
+      <div style="color:#71717A; font-size:11px; margin-top:4px;">Shape: Circle</div>
+      <div style="color:#64748b; font-size:11px;">Entry point.</div>
     </div>
     <div style="background:#1e1b4b; border-radius:8px; padding:14px; text-align:center;">
-      <div style="width:40px; height:40px; border-radius:8px; border:2px solid #94a3b8; margin:0 auto 8px; display:flex; align-items:center; justify-content:center;">
-        <span style="color:#94a3b8; font-size:11px; font-weight:700;">□</span>
+      <div style="width:40px; height:40px; border-radius:8px; border:2px solid #6366F1; margin:0 auto 8px; display:flex; align-items:center; justify-content:center;">
+        <span style="color:#6366F1; font-size:11px; font-weight:700;">□</span>
       </div>
-      <div style="color:#94a3b8; font-weight:600; font-size:14px;">Intermediate</div>
-      <div style="color:#94a3b8; font-size:11px; margin-top:4px;">Slate <code style="color:#94a3b8;">#94A3B8</code></div>
-      <div style="color:#64748b; font-size:11px;">In-progress. Connective.</div>
+      <div style="color:#6366F1; font-weight:600; font-size:14px;">Intermediate</div>
+      <div style="color:#71717A; font-size:11px; margin-top:4px;">Shape: Rounded rect</div>
+      <div style="color:#64748b; font-size:11px;">In-progress.</div>
     </div>
     <div style="background:#1e1b4b; border-radius:8px; padding:14px; text-align:center;">
-      <div style="width:40px; height:40px; border-radius:8px; border:3px double #c4b5fd; margin:0 auto 8px; display:flex; align-items:center; justify-content:center;">
-        <span style="color:#c4b5fd; font-size:11px; font-weight:700;">■</span>
+      <div style="width:40px; height:40px; border-radius:8px; border:3px double #6366F1; margin:0 auto 8px; display:flex; align-items:center; justify-content:center;">
+        <span style="color:#6366F1; font-size:11px; font-weight:700;">■</span>
       </div>
-      <div style="color:#c4b5fd; font-weight:600; font-size:14px;">Terminal</div>
-      <div style="color:#c4b5fd; font-size:11px; margin-top:4px;">Lilac <code style="color:#c4b5fd;">#C4B5FD</code></div>
-      <div style="color:#64748b; font-size:11px;">Endpoint. Neutral finality.</div>
+      <div style="color:#6366F1; font-weight:600; font-size:14px;">Terminal</div>
+      <div style="color:#71717A; font-size:11px; margin-top:4px;">Shape: Double-border</div>
+      <div style="color:#64748b; font-size:11px;">Endpoint.</div>
     </div>
     <div style="background:#0c0c0f; border-radius:8px; padding:14px; text-align:center;">
       <div style="width:36px; height:36px; margin:0 auto 6px; display:flex; align-items:center; justify-content:center;">
@@ -608,26 +937,26 @@
   </svg>
 
   <h3>State lifecycle roles</h3>
-  <p style="margin-bottom:12px;">Three structural roles determined at compile time:</p>
+  <p style="margin-bottom:12px;">Three structural roles determined at compile time. All states use locked indigo border <code>#6366F1</code> and violet state names <code>#A898F5</code>. Shape encodes role:</p>
   <table>
-    <tr><th>Role</th><th>Color</th><th>Detection</th><th>Shape hint</th></tr>
-    <tr><td style="color:#A5B4FC;">Initial</td><td><code>#A5B4FC</code> Light Indigo</td><td>Declared with <code>initial</code> modifier</td><td>Circle (origin node)</td></tr>
-    <tr><td style="color:#94A3B8;">Intermediate</td><td><code>#94A3B8</code> Slate</td><td>Has both inbound and outbound transitions</td><td>Rounded rectangle</td></tr>
-    <tr><td style="color:#C4B5FD;">Terminal</td><td><code>#C4B5FD</code> Lilac</td><td>No outbound transitions</td><td>Double-border rectangle</td></tr>
-  </table>
-
-  <h3>Event lifecycle types</h3>
-  <p style="margin-bottom:12px;">Three event types determined at compile time by analyzing transition rows:</p>
-  <table>
-    <tr><th>Type</th><th>Color</th><th>Detection</th><th>Diagram form</th></tr>
-    <tr><td style="color:#38BDF8;">Transition</td><td><code>#38BDF8</code> Bright Sky</td><td>All transition rows include a <code>transition</code> action</td><td>Solid edge arrow</td></tr>
-    <tr><td style="color:#7DD3FC;">Conditional</td><td><code>#7DD3FC</code> Lighter Sky</td><td>Event has guards/assertions — may transition or reject</td><td>Guard-annotated edge</td></tr>
-    <tr><td style="color:#0EA5E9;">Stationary</td><td><code>#0EA5E9</code> Deeper Sky</td><td>No transition rows produce state change — only <code>set</code> actions</td><td>Self-loop arrow</td></tr>
+    <tr><th>Role</th><th>Shape</th><th>Detection</th></tr>
+    <tr><td>Initial</td><td>Circle (origin node)</td><td>Declared with <code>initial</code> modifier</td></tr>
+    <tr><td>Intermediate</td><td>Rounded rectangle</td><td>Has both inbound and outbound transitions</td></tr>
+    <tr><td>Terminal</td><td>Double-border rectangle</td><td>No outbound transitions</td></tr>
   </table>
 
   <div class="callout" style="margin-top:16px;">
-    <strong>Diagram design principle:</strong> All event shades sit within the sky/cyan family (195–200°), consistent with the locked event syntax color <code>#30B8E8</code>. The three structural roles of states form a visual progression within the indigo family, while events use tighter cyan shades to signal event-specific meaning.
+    <strong>Protocol gap — TODO:</strong> <code>PreceptPreviewSnapshot</code> does not currently expose <code>InitialState</code>. Initial state highlighting in diagrams depends on adding this field to the protocol.
   </div>
+
+  <h3>Event lifecycle types</h3>
+  <p style="margin-bottom:12px;">Three event types determined at compile time by analyzing transition rows. All events use locked cyan <code>#30B8E8</code>. Differentiation is achieved through edge styling (solid, dashed, self-loop):</p>
+  <table>
+    <tr><th>Type</th><th>Detection</th><th>Diagram form</th></tr>
+    <tr><td>Transition</td><td>All transition rows include a <code>transition</code> action</td><td>Solid edge arrow</td></tr>
+    <tr><td>Conditional</td><td>Event has guards/assertions — may transition or reject</td><td>Guard-annotated edge (dashed)</td></tr>
+    <tr><td>Stationary</td><td>No transition rows produce state change — only <code>set</code> actions</td><td>Self-loop arrow</td></tr>
+  </table>
 </div>
 </div>
 
@@ -635,18 +964,49 @@
 
 <!-- 2.3 Inspector Panel -->
 <div class="section">
-<h2>2.3 Inspector Panel &nbsp;<span style="font-size:12px; font-weight:600; color:#a1a1aa;">[DRAFT — Elaine to contribute]</span></h2>
+<h2>2.3 Inspector Panel <span class="status-chip">LOCKED</span></h2>
 
 <div class="card">
   <h3>Purpose</h3>
-  <p>Runtime verdict surface. Shows execution outcomes when a precept instance processes events. Displays enabled/blocked/warning verdicts on transitions and state enforcement.</p>
+  <p>Runtime verdict surface. The data/field inspector in the preview webview, showing live instance state during event firing. Developers inspect field values, constraint violations, and the effect of transitions. The panel is where data becomes concrete — where abstract rules meet runtime reality.</p>
+
+  <h3>Primary visual concerns</h3>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li>Field visibility and hierarchy — which fields are set, which are null/default, which are guarded by invariants</li>
+    <li>Constraint feedback — if a field violates an invariant, the violation must be obvious without requiring text parsing</li>
+    <li>Event argument preview — when firing an event, the panel shows what arguments are available and their values</li>
+    <li>State transition clarity — before and after state, with visual indication of which fields changed</li>
+  </ul>
 
   <h3>Color application</h3>
-  <p style="margin-bottom:12px;">Uses runtime verdict palette from Brand Identity § 1.4: Enabled <code>#34D399</code> (emerald), Blocked <code>#F87171</code> (coral), Warning <code>#FDE047</code> (yellow). These colors never appear in syntax highlighting — they are reserved exclusively for runtime outcomes.</p>
+  <p style="margin-bottom:8px;">Inspector uses the data and verdict color systems:</p>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li><strong>Field names:</strong> Slate <code>#B0BEC5</code>, normal or italic if guarded by invariant. Same as syntax highlighting so the reader recognizes the field</li>
+    <li><strong>Field types:</strong> Slate <code>#9AA8B5</code>. Type info is secondary to the name and value</li>
+    <li><strong>Field values:</strong> Slate <code>#84929F</code> for normal values, or verdict colors if a constraint is violated</li>
+    <li><strong>Current state label:</strong> Violet <code>#A898F5</code> — matches syntax highlighting and diagram state naming</li>
+    <li><strong>Constraint violation indicators:</strong> Blocked <code>#F87171</code> for rejected events or invariant violations. Verdict colors signal runtime constraint feedback</li>
+    <li><strong>Enabled indicators:</strong> Enabled <code>#34D399</code> for valid state, successful transitions, or non-violated fields</li>
+    <li><strong>Read-only field indicators:</strong> Dusk indigo <code>#9096A6</code> or a neutral shade for fields not declared editable in the current state via <code>in State edit Field</code></li>
+  </ul>
 
-  <div class="callout">
-    <strong>DRAFT:</strong> Full specifications for layout, typography scale, interaction states, and color application in inspector panel pending UX review. Verdict colors are locked; surface design is under development.
-  </div>
+  <h3>Typography application</h3>
+  <p style="margin-bottom:8px;">Cascadia Cove monospace, 12–13px for field names and values:</p>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li><strong>Field name:</strong> Normal weight, 12px, left-aligned. Field names that are invariant-guarded can be italic</li>
+    <li><strong>Field value:</strong> 12px, monospace to match code appearance. Wider line-height (1.6–1.8) for readability in a tabular layout</li>
+    <li><strong>Constraint message:</strong> 11px, gold <code>#FBBF24</code> text below the violated field. Message text is the human explanation, so it earns color emphasis and smaller size to distinguish from data values</li>
+  </ul>
+
+  <h3>Accessibility notes</h3>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li>Color + icon redundancy: Constraint violations use both color (Blocked red) and an icon (✗ or warning symbol). A color-blind developer still sees the symbol</li>
+    <li>Table structure: If inspector data is rendered as a table (field name | type | value), use proper <code>&lt;th&gt;</code> headers and <code>&lt;tr&gt;/&lt;td&gt;</code> semantics so screen readers announce the structure</li>
+    <li>Formal accessibility audit (color-blind simulation, screen reader testing) is a backlog item</li>
+  </ul>
+
+  <h3>AI-first note</h3>
+  <p>The inspector panel is JSON-serializable state data. An AI agent reading the inspector output needs to understand: current state, current field values, which constraints are violated, and what the next transition would do. Structured layout with consistent field ordering and color-coded constraint feedback means the agent can parse violations without string matching on error text. The inspector is both a human debugging tool and an API contract for AI tools.</p>
 </div>
 </div>
 
@@ -654,18 +1014,47 @@
 
 <!-- 2.4 Docs Site -->
 <div class="section">
-<h2>2.4 Docs Site &nbsp;<span style="font-size:12px; font-weight:600; color:#a1a1aa;">[DRAFT — Elaine to contribute]</span></h2>
+<h2>2.4 Docs <span class="status-chip">LOCKED</span></h2>
 
 <div class="card">
   <h3>Purpose</h3>
-  <p>Public documentation and code samples. May be rendered in light or dark mode. Uses brand color as accent for code samples and callouts.</p>
+  <p>Internal documentation artifacts (design docs, tutorials, reference material). These are team-facing documents, not a public-facing documentation site. Where developers learn Precept concepts, read language design docs, explore sample files, and navigate API reference.</p>
+
+  <h3>Primary visual concerns</h3>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li>Hierarchy and scanability — tutorials, reference, samples, and theory must be visually stratified so a developer finds what they need instantly</li>
+    <li>Code sample rendering — <code>.precept</code> files embedded in docs must use the same syntax highlighting colors as the editor, so readers feel continuity</li>
+    <li>Conceptual callouts — "this is a precept" (small caps), "this is a pattern" (styled differently from narrative prose)</li>
+  </ul>
 
   <h3>Color application</h3>
-  <p style="margin-bottom:12px;">Brand indigo <code>#6366F1</code> serves as accent for headings, code syntax, and key concept highlights. Dark background support mirrors the editor palette; light mode requires sufficient contrast testing.</p>
+  <p style="margin-bottom:8px;">Docs maintain the dark-mode semantic palette but may introduce additional neutral/gray shades for navigation, backgrounds, and UI chrome:</p>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li><strong>Code blocks embedded in prose:</strong> Use the full syntax highlighting palette — indigo for structure, violet for states, cyan for events, slate for data, gold for messages. Readers see the same colors as in their editor</li>
+    <li><strong>Brand color accents:</strong> Navigation, headings, and link highlights use deep indigo <code>#6366F1</code>. This keeps the brand color family visible throughout the docs without overwhelming</li>
+    <li><strong>Callout boxes:</strong> Locked brand decisions, conceptual definitions, and "Precept principle" statements may use subtle indigo background (current practice in brand-spec.html callout style)</li>
+    <li><strong>Verdict colors in diagrams and reference tables:</strong> If diagrams are embedded in docs, use the same color system as the preview webview (§2.2)</li>
+    <li><strong>Neutral grays for structure:</strong> Navigation backgrounds, borders, table headers, and dividers use the muted palette (<code>#27272a</code>, <code>#18181b</code>, <code>#0c0c0f</code>) to avoid competition with semantic colors</li>
+  </ul>
 
-  <div class="callout">
-    <strong>DRAFT:</strong> Light-mode palette, responsive typography scale, and component-specific brand color applications pending documentation design review.
-  </div>
+  <h3>Typography application</h3>
+  <p style="margin-bottom:8px;">Cascadia Cove for code, primary brand font for headings and UI:</p>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li><strong>Page headings (H1):</strong> Cascadia Cove 700, small caps, 0.1em letter-spacing — same wordmark treatment as README and brand-spec</li>
+    <li><strong>Section headings (H2, H3):</strong> Cascadia Cove 600–700, normal case. Hierarchy through size and weight, not typeface</li>
+    <li><strong>Prose:</strong> System font stack or Cascadia Cove 400, 14–16px line-height 1.6–1.8. Readable for long-form content</li>
+    <li><strong>Code samples:</strong> Cascadia Cove 400, 12–13px with 1.8 line-height. Syntax highlighting colors applied</li>
+  </ul>
+
+  <h3>Accessibility notes</h3>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li>Heading hierarchy: H1 → H2 → H3, no skips. Screen readers rely on hierarchy to navigate long docs</li>
+    <li>Code sample alt text or captions: Embedded <code>.precept</code> samples should have a descriptive caption or nearby prose explaining the concept they demonstrate</li>
+    <li>Light theme: Not planned. Docs are dark-mode-only, matching the editor experience. Light theme support is a backlog item.</li>
+  </ul>
+
+  <h3>AI-first note</h3>
+  <p>The docs are where AI agents gather context before writing Precept. Claude agents reading the tutorial section learn syntax and patterns. Reference docs with clear structure (headings, code blocks in <code>&lt;pre&gt;</code>, definition lists) are easier for agents to parse. Embedded <code>.precept</code> samples double as training data — the agent can read a sample and a caption and learn a pattern. Docs design matters as much for AI comprehension as human comprehension.</p>
 </div>
 </div>
 
@@ -673,18 +1062,53 @@
 
 <!-- 2.5 CLI / Terminal -->
 <div class="section">
-<h2>2.5 CLI / Terminal &nbsp;<span style="font-size:12px; font-weight:600; color:#a1a1aa;">[DRAFT — Elaine to contribute]</span></h2>
+<h2>2.5 CLI / Terminal <span class="status-chip">ASPIRATIONAL</span></h2>
+
+<div class="callout" style="margin-bottom:16px; background:#3F3F46; border-left:4px solid #FCD34D;">
+  <strong>⚠️ CLI surface is planned; not yet implemented.</strong> A standalone <code>precept</code> CLI tool does not currently exist. PRECEPT diagnostic codes (PRECEPT001–PRECEPT054) are surfaced in VS Code's Problems panel via the language server, not in terminal output. <code>dotnet build</code> uses standard MSBuild formatting. This section defines a design contract for a future CLI tool.
+</div>
 
 <div class="card">
   <h3>Purpose</h3>
-  <p>Command-line tool output and diagnostics. Reduced palette for terminal compatibility. Structured output formatting with semantic highlighting.</p>
+  <p>Command-line output, build logs, diagnostic messages, and error reporting for a future <code>precept</code> CLI tool. When implemented, developers would see this surface when running diagnostics, validation, or compilation from the terminal. This is where the brand system meets terminal constraints.</p>
+
+  <h3>Primary visual concerns</h3>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li>Error signal clarity — a developer must instantly see "this is an error" without reading prose</li>
+    <li>Terminal color support — many terminals support 256-color or true color; output must be legible in both dark and light terminal themes</li>
+    <li>Structured output — diagnostic messages, file paths, line numbers, and error text must separate visually even in monospace</li>
+    <li>No ambiguity with success/failure — the verdict colors (green/red/yellow) must be reserved for actual success/failure signals, not decorative accents</li>
+  </ul>
 
   <h3>Color application</h3>
-  <p style="margin-bottom:12px;">Terminal palette is constrained by 16-color compatibility. Core brand indigo and verdict colors map to terminal codes; output is structured to remain legible on both light and dark terminal backgrounds.</p>
+  <p style="margin-bottom:8px;">CLI output uses verdict colors strategically and sparingly:</p>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li><strong>Success messages:</strong> Enabled <code>#34D399</code> — "Build succeeded" or "✓ All checks passed"</li>
+    <li><strong>Error messages:</strong> Blocked <code>#F87171</code> — "Error: Invalid syntax at line 12" or "✗ Constraint violated"</li>
+    <li><strong>Warnings:</strong> Warning <code>#FDE047</code> — "Warning: Event 'Activate' has no guard; all paths succeed"</li>
+    <li><strong>Neutral output (file paths, context info):</strong> Default terminal color (no color applied). The terminal's default foreground color is most readable across theme variations</li>
+    <li><strong>Emphasis (bold text):</strong> File names, identifiers, and code elements can use bold or backtick quoting to stand out. Avoid color for emphasis on the CLI</li>
+    <li><strong>No structural indigo on CLI.</strong> Deep indigo <code>#6366F1</code> does not render well on light terminal themes and may be illegible. Reserved for UI only</li>
+  </ul>
 
-  <div class="callout">
-    <strong>DRAFT:</strong> Terminal color mapping, output formatting conventions, and structured data representation pending technical specifications.
-  </div>
+  <h3>Typography application</h3>
+  <p style="margin-bottom:8px;">Monospace rendering, standard terminal fonts:</p>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li><strong>Error/warning headers:</strong> Bold + verdict color, e.g., <code>✗ ERROR:</code> (bold red) followed by the message</li>
+    <li><strong>File path and line number:</strong> Normal weight, default color, e.g., <code>file.precept:12:5:</code> (no color formatting)</li>
+    <li><strong>Diagnostic message:</strong> Normal weight, default color. If a message quotes code, use backticks: <code>`FieldName`</code> or double-quotes: <code>"message text"</code></li>
+    <li><strong>Suggestion or hint:</strong> Dim/muted color if the terminal supports it; otherwise, normal color with a → prefix</li>
+  </ul>
+
+  <h3>Accessibility notes</h3>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li>Color + symbol redundancy: Errors use both color (red) and a symbol (✗). Warnings use both color (yellow) and a symbol (⚠ or ⚡). A developer with red/green color blindness still sees the symbol</li>
+    <li>Light terminal compatibility: Verdict colors (<code>#34D399</code>, <code>#F87171</code>, <code>#FDE047</code>) are calibrated for dark backgrounds. For light terminals, either detect theme and swap to darker shades, or remove color and rely on symbols only</li>
+    <li>CLI color audit: Current CLI tool color application needs an audit pass to ensure consistency with these principles. This is a backlog item.</li>
+  </ul>
+
+  <h3>AI-first note</h3>
+  <p>CLI output is often captured by AI tools and parsed as structured data. If a future CLI tool provides JSON output, that would be machine-readable; human-readable error messages should be parseable too. Consistent error formatting (error symbol + colon + error code + message) means an AI agent can regex-parse failures. Color codes in terminal output can be captured or stripped by tools, so color should never be the only signal — symbol and text structure matter more.</p>
 </div>
 </div>
 
