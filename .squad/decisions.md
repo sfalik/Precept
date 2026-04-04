@@ -49,6 +49,28 @@ The design gate for technical surfaces now requires Peterman's brand compliance 
 
 ---
 
+### Decision: README Syntax Highlighting for Precept DSL (2026-04-05)
+**Filed by:** Kramer (Tooling Dev)  
+**Status:** No Change Required
+
+README already uses the correct approach: ` ```precept ` fence for DSL code samples.
+
+**Research findings:**
+- GitHub Linguist does NOT recognize `precept` as a language identifier
+- Unknown language fences render as plain monospace text without syntax highlighting
+- Industry practice (Terraform, etc.) uses custom language names before Linguist support exists
+
+**Options considered:**
+- **Option A: Keep ` ```precept `** (SELECTED) — Truthful, future-proof, standard practice. Auto-highlights if/when Precept joins Linguist.
+- **Option B: Use similar language tag** (e.g., `yaml`, `text`) — Rejected: misleading, provides false/inappropriate highlighting.
+- **Option C: No language tag** (empty ` ``` `) — Rejected: same rendering as Option A but loses documentation value.
+
+**Rationale:** No real improvement exists—GitHub cannot highlight unknown languages. Mislabeling would mislead readers. Current approach is already optimal and future-compatible.
+
+**Future path:** To enable syntax highlighting, submit a Linguist PR with the TextMate grammar from `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`. All existing fences will automatically gain highlighting once merged.
+
+---
+
 ### Brand-Spec Restructure: Surface-First Organization (2026-04-04)
 **Filed by:** J. Peterman  
 **Status:** COMPLETE  
