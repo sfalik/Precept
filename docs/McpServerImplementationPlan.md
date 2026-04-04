@@ -4,7 +4,7 @@ Date: 2025-03-05
 Spec: `docs/McpServerDesign.md`
 Prerequisite: Language redesign complete (`docs/PreceptLanguageImplementationPlan.md` — all 9 phases)
 
-> **Status (2026-03-27):** Phases 0–6 and the MCP Redesign Phase are implemented — the 5-tool surface (language, compile, inspect, fire, update) is live and tested with text input and structured feedback. Phases 7–8 are implemented — the agent plugin uses the Claude format (`.claude-plugin/plugin.json`) for `${CLAUDE_PLUGIN_ROOT}` expansion; the Precept Author agent and companion skills (precept-authoring, precept-debugging) are drafted and validated. Phase 9 is in progress — README and design docs are updated, MCP provider removed from extension; distribution (publish to marketplace) and remaining testing items are pending.
+> **Status (2026-04-03):** Phases 0–6 and the MCP Redesign Phase are implemented — the 5-tool surface (language, compile, inspect, fire, update) is live and tested with text input and structured feedback. Phases 7–8 are implemented — the agent plugin uses the Claude format (`.claude-plugin/plugin.json`); the plugin's `.mcp.json` uses the distribution format (`dotnet tool run precept-mcp`) for both VS Code and Copilot CLI consumers, with `.vscode/mcp.json` overriding for dev-time lazy build. The Precept Author agent and companion skills (precept-authoring, precept-debugging) are drafted and validated. Phase 9 is in progress — README and design docs are updated, MCP provider removed from extension; distribution (publish to marketplace) and remaining testing items are pending.
 
 This plan builds the MCP server as a new project in `tools/Precept.Mcp/`. Each phase adds one tool, fully tested, before moving to the next. The core `src/Precept/` infrastructure (catalogs, parser, runtime) is already in place from the language redesign — this plan only adds tool wrappers and MCP transport.
 
@@ -439,18 +439,9 @@ Use this prompt to execute the redesign phase in a new Copilot Chat session:
   ├── .mcp.json
   └── README.md
   ```
-- [x] Create `.claude-plugin/plugin.json` with name, description, version, agents, and skills arrays *(Claude format required for `${CLAUDE_PLUGIN_ROOT}` expansion)*
-- [x] Create dev `.mcp.json` referencing the shared launcher script via `${CLAUDE_PLUGIN_ROOT}`:
-  ```json
-  {
-    "mcpServers": {
-      "precept": {
-        "command": "node",
-        "args": ["${CLAUDE_PLUGIN_ROOT}/../scripts/start-precept-mcp.js"]
-      }
-    }
-  }
-  ```
+- [x] Create `.claude-plugin/plugin.json` with name, description, version, agents, and skills arrays *(Claude format)*
+- [x] Create `.mcp.json` with the distribution command (`dotnet tool run precept-mcp`) — works across both VS Code plugin system and Copilot CLI
+- [x] Create `.vscode/mcp.json` with the dev launcher script override (`tools/scripts/start-precept-mcp.js`) — overrides the plugin's MCP config during development for lazy build + shadow copy
 - [x] Move the MCP launcher script from `tools/Precept.VsCode/scripts/start-precept-mcp.js` to `tools/scripts/start-precept-mcp.js`
 - [x] Remove the `Precept Dev` entry from `.vscode/mcp.json` (the plugin now provides the MCP server)
 - [x] Create `tools/scripts/toggle-plugin.js` — reads/writes `chat.pluginLocations` in `.vscode/settings.json` *(already implemented)*
@@ -552,7 +543,7 @@ Use this prompt to execute Phase 8 in a new Copilot Chat session:
 - [ ] Verify `docs/CatalogInfrastructureDesign.md` cross-references are still accurate
 - [x] Remove `registerMcpServerDefinitionProvider()` from VS Code extension (MCP now lives in plugin)
 - [x] Remove `mcpServerDefinitionProviders` contribution from `tools/Precept.VsCode/package.json`
-- [x] Update distribution `.mcp.json` to use `dotnet tool run precept-mcp` (created `.mcp.dist.json`; CI copies to `.mcp.json` at publish time)
+- [x] Update distribution `.mcp.json` to use `dotnet tool run precept-mcp` (plugin's `.mcp.json` now uses dist format directly; `.mcp.dist.json` removed; `.vscode/mcp.json` provides dev override)
 - [x] Configure `Precept.Mcp.csproj` as a .NET tool (`PackAsTool`, `ToolCommandName: precept-mcp`)
 - [x] Add bundled language server mode to VS Code extension (`server/` directory, framework-dependent)
 - [x] Add `package:marketplace` script for building marketplace VSIX with bundled language server

@@ -49,4 +49,4 @@ After enabling, reload the window (`Developer: Reload Window`). Copilot will dis
 
 Once loaded, the MCP tools are available to Copilot without requiring an explicit agent switch. The agent and skills are additional layers on top of the same tool surface.
 
-The dev `.mcp.json` uses a launcher script that builds the MCP server from source and shadow-copies the output to prevent file locking during rebuilds. At publish time, CI rewrites `.mcp.json` to use `dotnet tool run precept-mcp`.
+The plugin's `.mcp.json` uses `dotnet tool run precept-mcp` — the same command for both VS Code and Copilot CLI consumers. During development, `.vscode/mcp.json` overrides this with a launcher script that builds from source and shadow-copies the output to prevent file locking during rebuilds.

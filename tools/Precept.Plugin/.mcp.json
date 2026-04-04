@@ -1,8 +1,9 @@
 {
   "mcpServers": {
     "precept": {
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/../scripts/start-precept-mcp.js"]
+      "command": "dotnet",
+      "args": ["tool", "run", "precept-mcp"],
+      "env": {}
     }
   }
 }

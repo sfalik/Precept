@@ -484,11 +484,11 @@ tools/Precept.Plugin/
 │   │   └── SKILL.md               # Authoring workflow skill
 │   └── precept-debugging/
 │       └── SKILL.md               # Debugging/diagnosis skill
-├── .mcp.json                      # MCP server definition (dev: launcher, dist: dotnet tool)
+├── .mcp.json                      # MCP server definition (dotnet tool run precept-mcp)
 └── README.md
 ```
 
-The plugin uses the **Claude format** (`.claude-plugin/plugin.json`) because `${CLAUDE_PLUGIN_ROOT}` expansion in `.mcp.json` only works with this format. The GitHub format (`.github/plugin/plugin.json`) does not expand `${CLAUDE_PLUGIN_ROOT}` or `${PLUGIN_ROOT}` as of VS Code 1.114.0-insider.
+The plugin uses the **Claude format** (`.claude-plugin/plugin.json`). The `.mcp.json` uses `dotnet tool run precept-mcp` — a globally resolvable command that works across both VS Code and Copilot CLI consumers. During development, `.vscode/mcp.json` overrides the plugin's MCP config with a launcher script that builds from source.
 
 ### .claude-plugin/plugin.json
 
@@ -508,7 +508,7 @@ The plugin uses the **Claude format** (`.claude-plugin/plugin.json`) because `${
 }
 ```
 
-### .mcp.json (Distribution)
+### .mcp.json
 
 ```json
 {
@@ -522,24 +522,24 @@ The plugin uses the **Claude format** (`.claude-plugin/plugin.json`) because `${
 }
 ```
 
-The distributed plugin uses `dotnet tool run precept-mcp` to launch the MCP server. This requires .NET on the user's machine but eliminates per-platform binary bundling entirely — the dotnet tool restores and runs the correct binary automatically. End users must have the .NET SDK installed (same prerequisite as using the Precept NuGet package).
+The plugin uses `dotnet tool run precept-mcp` to launch the MCP server. This is a globally resolvable command that works across both VS Code (via the plugin system) and Copilot CLI (via `/plugin install`). End users must have the .NET SDK installed (same prerequisite as using the Precept NuGet package).
 
-### .mcp.json (Development)
+### .vscode/mcp.json (Development Override)
 
-During development in this repo, the plugin's `.mcp.json` uses a launcher script instead:
+During development in this repo, `.vscode/mcp.json` overrides the plugin's MCP config with a launcher script:
 
 ```json
 {
-  "mcpServers": {
+  "servers": {
     "precept": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/../scripts/start-precept-mcp.js"]
+      "args": ["tools/scripts/start-precept-mcp.js"]
     }
   }
 }
 ```
 
-The `${CLAUDE_PLUGIN_ROOT}` token is expanded by VS Code to the plugin's absolute path at runtime, making the reference unambiguous regardless of working directory. The launcher (`tools/scripts/start-precept-mcp.js`) builds from source, shadow-copies the output, and runs the copy — preventing file locking during rebuilds. At publish time, CI rewrites the `.mcp.json` to the `dotnet tool run` form. The launcher script is not included in the published plugin.
+The launcher (`tools/scripts/start-precept-mcp.js`) builds from source, shadow-copies the output, and runs the copy — preventing file locking during rebuilds. Per the MCP loading precedence, `.vscode/mcp.json` is checked before plugin configs in both VS Code and Copilot CLI — but plugin configs (level 3) override workspace configs (level 2) when both define the same server name. In practice this is fine: developers working from source don't install the plugin from a marketplace, and external users don't have this `.vscode/mcp.json`. The path is relative so it resolves correctly in both VS Code (`${workspaceFolder}` as cwd) and Copilot CLI (launched from the workspace root).
 
 ### Distribution Channels
 
@@ -622,7 +622,7 @@ The running process never locks the build output directory. Old runtime copies a
 | Concern | Development (this repo) | Distribution (end users) |
 |---|---|---|
 | Language server | Dev build + shadow copy (auto-restart on `Ctrl+Shift+B`) | Bundled in VSIX under `server/` (framework-dependent) |
-| MCP server launch | Launcher script (build + shadow copy) | `dotnet tool run precept-mcp` (`.mcp.dist.json`) |
+| MCP server launch | `.vscode/mcp.json` override with launcher script (build + shadow copy) | Plugin `.mcp.json` with `dotnet tool run precept-mcp` |
 | Plugin registration | `chat.pluginLocations` → `./tools/Precept.Plugin` | Marketplace install or Git URL |
 | Extension registration | `extension: install` task | VS Code Marketplace |
 | Plugin toggle | `plugin: enable` / `plugin: disable` tasks | Extensions panel |
@@ -630,7 +630,7 @@ The running process never locks the build output directory. Old runtime copies a
 
 **Extension packaging for marketplace:** Run `npm run package:marketplace` in `tools/Precept.VsCode/`. This publishes the language server into `server/` (framework-dependent, no self-contained runtime) and packages the VSIX. The `vscode:prepublish` hook runs the same `dotnet publish` step automatically.
 
-**Plugin packaging for distribution:** At publish time, copy `.mcp.dist.json` to `.mcp.json` in the published plugin. The launcher script (`tools/scripts/start-precept-mcp.js`) is not included in the published plugin.
+**Plugin packaging for distribution:** The plugin's `.mcp.json` already uses the distribution format (`dotnet tool run precept-mcp`). No rewriting is needed at publish time. The launcher script (`tools/scripts/start-precept-mcp.js`) and `.vscode/mcp.json` are workspace-level dev infrastructure, not part of the published plugin.
 
 ### Precept Author Agent
 
@@ -675,7 +675,7 @@ Both skills follow the [Agent Skills specification](https://agentskills.io/speci
 
 The plugin assembly work depends on the MCP project existing first. The agent and skill content can be drafted in parallel with MCP tool development since they are plain markdown files. The plugin packaging step combines MCP server (via `dotnet tool run`) + agent + skills into the final plugin directory structure.
 
-The VS Code extension has no dependency on the plugin — they are separate distribution artifacts. The extension's `registerMcpServerDefinitionProvider()` is removed once the plugin is the shipping path for MCP. The `Precept Dev` entry in `.vscode/mcp.json` is removed when the plugin is created (Phase 7), since the plugin replaces it. The MCP launcher script (`tools/scripts/start-precept-mcp.js`) is shared infrastructure used by the plugin's dev `.mcp.json`.
+The VS Code extension has no dependency on the plugin — they are separate distribution artifacts. The extension's `registerMcpServerDefinitionProvider()` is removed once the plugin is the shipping path for MCP. During development, `.vscode/mcp.json` overrides the plugin's MCP config with the launcher script (`tools/scripts/start-precept-mcp.js`), which provides lazy build + shadow-copy for file-locking safety.
 
 ---
 

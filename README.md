@@ -380,7 +380,7 @@ The plugin provides the Precept Author agent, companion skills, and MCP server t
 
 1. Edit source in `tools/Precept.Mcp/`.
 2. Run `Developer: Reload Window`, then invoke any MCP tool (e.g. `precept_compile`).
-3. The plugin's launcher rebuilds `tools/Precept.Mcp` into `temp/dev-mcp`, creates a fresh shadow copy under `temp/dev-mcp/runtime`, and starts the new runtime on demand. The rebuild happens lazily on the next tool invocation after reload.
+3. The workspace's `.vscode/mcp.json` overrides the plugin's MCP config with a launcher script that rebuilds `tools/Precept.Mcp` into `temp/dev-mcp`, creates a fresh shadow copy under `temp/dev-mcp/runtime`, and starts the new runtime on demand. The rebuild happens lazily on the next tool invocation after reload.
 
 **First-time setup:**
 

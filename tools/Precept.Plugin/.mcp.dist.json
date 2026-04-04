@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "precept": {
-      "command": "dotnet",
-      "args": ["tool", "run", "precept-mcp"],
-      "env": {}
-    }
-  }
-}
