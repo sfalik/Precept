@@ -136,12 +136,29 @@
   <strong>The authoring experience is the value proposition.</strong> A precept reads top to bottom in natural sections &mdash; data, states, events, behavior &mdash; each one self-explanatory. Whether you write it by hand or an AI generates it from a conversation, the result is immediately readable. The coloring reinforces the sections: you can scan the left edge and know exactly where you are.
 </div>
 
+<div class="card" style="margin-top:24px;">
+  <div class="card-header">
+    <h3>Comment Lane Preview <span class="status-locked">Locked</span></h3>
+    <p>Editorial notes are allowed, but they must stay outside the executable semantic lanes.</p>
+  </div>
+  <div class="card-body">
+    <div class="syntax-block"><span style="color:#9096A6;font-style:italic;"># Intake note: applications above 50k usually need manual review</span>
+<span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
+<span style="color:#4338CA;font-weight:600;">event</span> <span style="color:#30B8E8;">Submit</span>
+<span style="color:#9096A6;font-style:italic;"># Editorial voice stays dusk indigo, never gold or state violet</span>
+<span style="color:#4F46E5;font-weight:600;">on</span> <span style="color:#30B8E8;">Submit</span> <span style="color:#B8860B;font-weight:600;">assert</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span> <span style="color:#9AA8B5;font-style:italic;">&gt;=</span> <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#B8860B;font-weight:600;">because</span> <span style="color:#FBBF24;">"Amounts cannot be negative"</span></div>
+    <div class="note" style="margin-top:16px;">
+      <strong>Canonical rule:</strong> comments use italic dusk indigo <code>#9096A6</code>. They are annotations for humans, not another semantic category in the 8-shade authoring palette.
+    </div>
+  </div>
+</div>
+
 <div class="callout" style="margin-top:12px; background:rgba(56,189,248,0.06); border-color:#0c4a6e;">
   <strong>What to explore:</strong>
   <ul style="margin:8px 0 0 16px; line-height:1.8;">
     <li>How does the hero adapt for GitHub dark/light themes? (GitHub strips inline styles from markdown code blocks.)</li>
     <li>Minimum viable snippet &mdash; what is the shortest precept that still communicates the feel?</li>
-    <li>Comments vs no comments &mdash; current hero samples still omit them, but if we introduce them they should sit in the new dusk-indigo editorial lane rather than enter the 8 semantic shades.</li>
+    <li>Comments vs no comments &mdash; the lane is now defined. The remaining question is whether the README hero should stay comment-free or include a single editorial nudge.</li>
     <li>Authoring-first identity &mdash; should the README lead with "what it looks like to write one" rather than "what it does"?</li>
     <li>AI generation as a brand moment &mdash; when an AI generates a precept from conversation, should we show that workflow? ("describe your approval process" &rarr; generates the precept)</li>
   </ul>
@@ -155,7 +172,7 @@
   </div>
   <div class="card-body">
     <!-- Full stress test: every family on white -->
-    <div data-semantic-preview="true" style="font-family:'Inconsolata',monospace; font-size:13px; line-height:1.8; background:#ffffff; border-radius:8px; padding:20px 24px; white-space:pre; border:1px solid #d1d5db; margin-bottom:16px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
+    <div data-semantic-preview="true" style="font-family:var(--brand-mono); font-size:13px; line-height:1.8; background:#ffffff; border-radius:8px; padding:20px 24px; white-space:pre; border:1px solid #d1d5db; margin-bottom:16px;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
 
 <span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">ApplicantName</span>    <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">string</span>  <span style="color:#6366F1;">nullable</span>
 <span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span>  <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>  <span style="color:#6366F1;">default</span> <span style="color:#84929F;font-style:italic;">0</span>
@@ -189,7 +206,7 @@
       <!-- Structure -->
       <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
         <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Structure (Indigo)</div>
-        <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
+        <div style="font-family:var(--brand-mono); font-size:13px; line-height:2;">
           <span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#a3a3a3;">Declaration</span><br>
           <span style="color:#4338CA;font-weight:600;">from</span> <span style="color:#a3a3a3;">... </span><span style="color:#4338CA;font-weight:600;">on</span><br>
           <span style="color:#6366F1;">as</span> <span style="color:#a3a3a3;">... </span><span style="color:#6366F1;">default</span> <span style="color:#a3a3a3;">... </span><span style="color:#6366F1;">when</span>
@@ -199,7 +216,7 @@
       <!-- States -->
       <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
         <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">States (Violet)</div>
-        <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
+        <div style="font-family:var(--brand-mono); font-size:13px; line-height:2;">
           <span style="color:#A898F5;">Draft</span> <span style="color:#a3a3a3;">unconstrained</span><br>
           <span style="color:#A898F5;">UnderReview</span> <span style="color:#a3a3a3;">same hue</span><br>
           <span style="color:#A898F5;font-style:italic;">Approved</span> <span style="color:#a3a3a3;">constrained</span>
@@ -209,7 +226,7 @@
       <!-- Events -->
       <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
         <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Events (Cyan)</div>
-        <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
+        <div style="font-family:var(--brand-mono); font-size:13px; line-height:2;">
           <span style="color:#30B8E8;font-style:italic;">Submit</span> <span style="color:#a3a3a3;">constrained</span><br>
           <span style="color:#30B8E8;">Approve</span> <span style="color:#a3a3a3;">conditional</span><br>
           <span style="color:#30B8E8;">Verify</span> <span style="color:#a3a3a3;">stationary</span>
@@ -221,7 +238,7 @@
       <!-- Data -->
       <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
         <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Data (Bright Slate)</div>
-        <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
+        <div style="font-family:var(--brand-mono); font-size:13px; line-height:2;">
           <span style="color:#B0BEC5;font-style:italic;">ApplicantName</span> <span style="color:#a3a3a3;">names</span><br>
           <span style="color:#9AA8B5;font-style:italic;">string</span> <span style="color:#a3a3a3;">types+ops</span><br>
           <span style="color:#84929F;font-style:italic;">0</span> <span style="color:#a3a3a3;">... </span><span style="color:#84929F;font-style:italic;">false</span> <span style="color:#a3a3a3;">values</span>
@@ -231,7 +248,7 @@
       <!-- Rules -->
       <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
         <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Rules (Messages Only)</div>
-        <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
+        <div style="font-family:var(--brand-mono); font-size:13px; line-height:2;">
           <span style="color:#6366F1;">because</span> <span style="color:#a3a3a3;">grammar</span><br>
           <span style="color:#4338CA;font-weight:600;">assert</span> <span style="color:#a3a3a3;">... </span><span style="color:#4338CA;font-weight:600;">reject</span><br>
           <span style="color:#FBBF24;">"message text"</span>
@@ -241,7 +258,7 @@
       <!-- Verdicts -->
       <div style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px;">
         <div style="font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Verdicts</div>
-        <div style="font-family:'Inconsolata',monospace; font-size:13px; line-height:2;">
+        <div style="font-family:var(--brand-mono); font-size:13px; line-height:2;">
           <span style="color:#34D399;">Enabled</span> <span style="color:#a3a3a3;">#34D399</span><br>
           <span style="color:#F87171;">Blocked</span> <span style="color:#a3a3a3;">#F87171</span><br>
           <span style="color:#FDE047;">Warning</span> <span style="color:#a3a3a3;">#FDE047</span>
@@ -704,7 +721,7 @@
       <p>Error messages as a brand surface.</p>
     </div>
     <div class="card-body">
-      <div style="font-family:'Inconsolata',monospace; font-size:12px; background:#0c0c0f; border-radius:6px; padding:16px; line-height:1.8; border:1px solid #1e1b4b;">
+      <div style="font-family:var(--brand-mono); font-size:12px; background:#0c0c0f; border-radius:6px; padding:16px; line-height:1.8; border:1px solid #1e1b4b;">
         <div><span style="color:#818cf8;">PRECEPT001</span> <span style="color:#F87171;">error</span>: Unreachable state <span style="color:#A898F5;">Archived</span> &mdash; no transitions lead here</div>
         <div><span style="color:#818cf8;">PRECEPT038</span> <span style="color:#F87171;">error</span>: Type mismatch in guard: expected <span style="color:#9AA8B5;font-style:italic;">number</span>, got <span style="color:#9AA8B5;font-style:italic;">string</span></div>
         <div><span style="color:#818cf8;">PRECEPT047</span> <span style="color:#FDE047;">warning</span>: Dead-end state <span style="color:#A898F5;">Approved</span> &mdash; no outgoing transitions</div>
@@ -729,7 +746,7 @@
 <div class="readme-mock">
   <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px;">
     <!-- Wordmark -->
-    <span style="font-family:'Inconsolata',monospace; font-weight:700; font-size:28px; color:#6366F1; font-variant:small-caps; letter-spacing:0.1em;">Precept</span>
+    <span style="font-family:var(--brand-mono); font-weight:700; font-size:28px; color:#6366F1; font-variant:small-caps; letter-spacing:0.1em;">Precept</span>
   </div>
   <p class="tagline">A domain integrity engine for .NET &mdash; a single declarative contract that binds state, data, and business rules into an engine where invalid states are structurally impossible.</p>
   <div class="badges">
@@ -740,7 +757,7 @@
 
   <!-- Hero code + diagram side by side -->
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;">
-    <div data-semantic-preview="true" style="background:#0c0c0f; border:1px solid #1e1b4b; border-radius:6px; padding:16px; font-family:'Inconsolata',monospace; font-size:11px; line-height:1.7; white-space:pre; overflow-x:auto;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
+    <div data-semantic-preview="true" style="background:#0c0c0f; border:1px solid #1e1b4b; border-radius:6px; padding:16px; font-family:var(--brand-mono); font-size:11px; line-height:1.7; white-space:pre; overflow-x:auto;"><span style="color:#4338CA;font-weight:600;">precept</span> <span style="color:#B0BEC5;font-style:italic;">LoanApplication</span>
 
 <span style="color:#4338CA;font-weight:600;">field</span> <span style="color:#B0BEC5;font-style:italic;">Amount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;font-style:italic;">number</span>
 <span style="color:#4338CA;font-weight:600;">state</span> <span style="color:#8B7AED;">Draft</span> <span style="color:#8B7AED;">initial</span>

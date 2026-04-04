@@ -301,7 +301,7 @@
 <!-- Hue map -->
 <div class="callout">
   <strong>Hue map (°):</strong>
-  <div style="font-family:'Inconsolata',monospace; font-size:11px; margin-top:6px; color:#a1a1aa;">
+  <div style="font-family:var(--brand-mono); font-size:11px; margin-top:6px; color:#a1a1aa;">
     45° Gold —<span style="color:#52525b;">150°</span>— 195° Cyan —<span style="color:#52525b;">20°</span>— 215° Slate —<span style="color:#52525b;">24°</span>— 239° Indigo —<span style="color:#52525b;">21°</span>— 260° Violet
   </div>
   <div style="font-size:10px; color:#52525b; margin-top:4px;">Within the cool cluster, hue carries category while typography carries constraint pressure.</div>
@@ -326,14 +326,14 @@
   <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px;">
     <div style="background:#0c0c0f; border-radius:8px; padding:14px; text-align:center;">
       <div style="width:36px; height:36px; border-radius:6px; border:2px solid #4338CA; margin:0 auto 6px; display:flex; align-items:center; justify-content:center;">
-        <span style="color:#A898F5; font-size:10px; font-family:Inconsolata,monospace;">State</span>
+        <span style="color:#A898F5; font-size:10px; font-family:var(--brand-mono);">State</span>
       </div>
       <div style="color:#4338CA; font-weight:700; font-size:12px;">Node Borders</div>
       <div style="color:#64748b; font-size:10px;">Indigo · structure</div>
     </div>
     <div style="background:#0c0c0f; border-radius:8px; padding:14px; text-align:center;">
       <div style="width:36px; height:12px; margin:12px auto 18px; display:flex; align-items:center; justify-content:center;">
-        <span style="color:#A898F5; font-size:11px; font-family:Inconsolata,monospace; font-weight:600;">Draft</span>
+        <span style="color:#A898F5; font-size:11px; font-family:var(--brand-mono); font-weight:600;">Draft</span>
       </div>
       <div style="color:#A898F5; font-weight:700; font-size:12px;">State Names</div>
       <div style="color:#64748b; font-size:10px;">One violet hue</div>
@@ -347,7 +347,7 @@
     </div>
     <div style="background:#0c0c0f; border-radius:8px; padding:14px; text-align:center;">
       <div style="width:36px; height:12px; margin:12px auto 18px; display:flex; align-items:center; justify-content:center;">
-        <span style="color:#30B8E8; font-size:10px; font-family:Inconsolata,monospace;">Submit</span>
+        <span style="color:#30B8E8; font-size:10px; font-family:var(--brand-mono);">Submit</span>
       </div>
       <div style="color:#30B8E8; font-weight:700; font-size:12px;">Event Labels</div>
       <div style="color:#64748b; font-size:10px;">Cyan · same as syntax</div>
@@ -371,9 +371,11 @@
 
   <h3>Wordmark</h3>
   <div style="margin:12px 0 20px;">
-    <div style="font-family:'Inconsolata',monospace; font-size:48px; font-weight:700; font-variant:small-caps; letter-spacing:0.1em; color:#fff;">Precept</div>
+    <div style="font-family:var(--brand-mono); font-size:48px; font-weight:700; font-variant:small-caps; letter-spacing:0.1em; color:#fff;">Precept</div>
     <div style="font-size:11px; color:#52525b; margin-top:4px;">Cascadia Cove 700 · font-variant: small-caps · letter-spacing: 0.1em</div>
   </div>
+
+  <p style="font-size:12px; color:#71717a; margin-top:-6px;">Source note: some archived snippets elsewhere in the brand folder still carry literal Inconsolata declarations, but active brand surfaces normalize to the shared Cascadia Cove <code>--brand-mono</code> stack.</p>
 
   <h3>Weight range</h3>
   <div style="display:flex; flex-direction:column; gap:8px; margin:8px 0;">

@@ -89,13 +89,14 @@
 </div>
 
 <h1>Five Channels</h1>
-<p class="subtitle">Alternative palette exploration — one unmistakable hue per DSL category &nbsp;·&nbsp; April 2026</p>
+<p class="subtitle">Archived alternative palette exploration — preserved design archaeology from before the locked syntax-v1 decision &nbsp;·&nbsp; April 2026</p>
 
 <div class="card" style="padding:14px 18px; margin: 0 0 28px 0; border-color:#312e81; background:#111127;">
   <p style="font-size:12px; color:#c7d2fe; line-height:1.8; margin:0;">
-    Looking for the new comment study? Jump to
+    Most of this file is now archive material. Sections 1-22 preserve rejected or superseded directions; the active checkpoints are
     <a href="#comment-color-alternatives" style="color:#B0E4FF; font-weight:700; text-decoration:none;">§17 Comment Color Alternatives</a>
-    near the end of the file.
+    and
+    <a href="#locked-syntax-v1" style="color:#B0E4FF; font-weight:700; text-decoration:none;">§23 Locked Syntax v1 Conclusion</a>.
   </p>
 </div>
 
@@ -3078,7 +3079,7 @@
   </div>
 
   <h3 style="font-size:16px; font-weight:600; padding:20px 20px 4px; color:#fff;">G: Indigo + Gold</h3>
-  <div style="font-size:13px; color:#888; padding:0 20px 16px; font-family:ui-monospace, monospace;">Primary #4338CA · Accent #B8860B · Hero #FBBF24</div>
+  <div style="font-size:13px; color:#888; padding:0 20px 16px; font-family:var(--brand-mono);">Primary #4338CA · Accent #B8860B · Hero #FBBF24</div>
 
   <!-- NuGet Badges -->
   <div style="padding:0 20px 16px;">
@@ -3110,25 +3111,25 @@
     <div style="font-size:12px; text-transform:uppercase; letter-spacing:1px; color:#666; margin-bottom:10px;">Icon Mock (64px / 32px / 16px)</div>
     <div style="display:flex; align-items:center; gap:16px;">
       <div style="width:64px; height:64px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:#4338CA;">
-        <span style="font-size:32px; font-weight:700; color:#FBBF24; font-family:'Inconsolata',monospace;">P</span>
+        <span style="font-size:32px; font-weight:700; color:#FBBF24; font-family:var(--brand-mono);">P</span>
       </div>
       <div style="width:32px; height:32px; border-radius:6px; display:flex; align-items:center; justify-content:center; background:#4338CA;">
-        <span style="font-size:16px; font-weight:700; color:#FBBF24; font-family:'Inconsolata',monospace;">P</span>
+        <span style="font-size:16px; font-weight:700; color:#FBBF24; font-family:var(--brand-mono);">P</span>
       </div>
       <div style="width:16px; height:16px; border-radius:3px; display:flex; align-items:center; justify-content:center; background:#4338CA;">
-        <span style="font-size:9px; font-weight:700; color:#FBBF24; font-family:'Inconsolata',monospace;">P</span>
+        <span style="font-size:9px; font-weight:700; color:#FBBF24; font-family:var(--brand-mono);">P</span>
       </div>
       <span style="font-size:13px; color:#888;">gold on indigo</span>
     </div>
     <div style="display:flex; align-items:center; gap:16px; margin-top:10px;">
       <div style="width:64px; height:64px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:#1e1b4b; border:2px solid #4338CA;">
-        <span style="font-size:32px; font-weight:700; color:#6366F1; font-family:'Inconsolata',monospace;">P</span>
+        <span style="font-size:32px; font-weight:700; color:#6366F1; font-family:var(--brand-mono);">P</span>
       </div>
       <div style="width:32px; height:32px; border-radius:6px; display:flex; align-items:center; justify-content:center; background:#1e1b4b; border:2px solid #4338CA;">
-        <span style="font-size:16px; font-weight:700; color:#6366F1; font-family:'Inconsolata',monospace;">P</span>
+        <span style="font-size:16px; font-weight:700; color:#6366F1; font-family:var(--brand-mono);">P</span>
       </div>
       <div style="width:16px; height:16px; border-radius:3px; display:flex; align-items:center; justify-content:center; background:#1e1b4b; border:1px solid #4338CA;">
-        <span style="font-size:9px; font-weight:700; color:#6366F1; font-family:'Inconsolata',monospace;">P</span>
+        <span style="font-size:9px; font-weight:700; color:#6366F1; font-family:var(--brand-mono);">P</span>
       </div>
       <span style="font-size:13px; color:#888;">indigo on deep</span>
     </div>
@@ -3298,14 +3299,15 @@
 <!-- ===================================================================== -->
 <!-- NEW: 8-SHADE ITALIC-CONSTRAINED MODEL                                  -->
 <!-- ===================================================================== -->
-<div class="section">
+<div class="section" id="locked-syntax-v1">
 <h2>23. Locked Syntax v1 Conclusion — 8-Shade Model</h2>
 
 <div class="card">
   <p style="color:#fff; font-size:15px; font-weight:600; margin-bottom:12px;">One color per category. Italic means constrained.</p>
-  <p style="margin-bottom:8px; color:#71717a;">This concluding section supersedes the earlier syntax-color directions in this file. The earlier comparisons remain valuable as archaeology, but this is the final editor-highlighting outcome.</p>
+  <p style="margin-bottom:8px; color:#71717a;">This concluding section supersedes the earlier syntax-color directions in this file. Everything above remains useful as archaeology, but this is the final editor-highlighting outcome.</p>
   <p>Each DSL category gets one color. Typography carries the constraint signal: <strong>italic = has assert rules</strong> (states, events) or <strong>appears in an invariant</strong> (fields). 7 of 8 shades map directly to standard editor conventions. The italic-constrained signal is the one Precept-specific innovation.</p>
   <p style="margin-top:8px;">Rule keywords (<code>assert</code>, <code>reject</code>, <code>when</code>, <code>no</code>) join Structure · Semantic in bold indigo. Types and values return as separate Data shades. Only <code>because</code>/<code>reject</code> message strings stay gold.</p>
+  <p style="margin-top:8px; color:#71717a;">Typography note: older archived samples still contain literal Inconsolata declarations in source markup, but active rendering across these brand files is normalized through the shared Cascadia Cove <code>--brand-mono</code> stack.</p>
 </div>
 
 <div class="callout">
