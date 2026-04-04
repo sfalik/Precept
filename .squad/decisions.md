@@ -3607,3 +3607,1178 @@ Add `class="spm-grid"` to the single-row wrapper `div`s. This activates the `.sp
 
 **Rule:** All `.spm-row` elements must be direct children of a `.spm-grid` wrapper. Never place a `.spm-row` inside a bare div with explicit horizontal padding — the double-indent is unavoidable without the `spm-grid` class.
 
+---
+
+### 2026-04-04T21:23:19Z: User directive
+**By:** shane (via Copilot)
+**What:** Gold is the hero color and should have a prominent role in hero samples and syntax coloring so rule-oriented content stands out.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-04T21:31:26Z: User directive
+**By:** shane (via Copilot)
+**What:** Relax the Gold syntax-only rule so Gold can be used sparingly as a hero color to highlight what is truly valuable and important, where appropriate. Exact wording still needs refinement.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-04T21:40:08Z: User directive
+**By:** shane (via Copilot)
+**What:** Use the word "judicious" to describe Gold usage; Gold should be present in the tablet-only mark as well, and Emerald should own the transition arrow in both brand-mark contexts.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-04T21:55:44Z: User directive
+**By:** shane (via Copilot)
+**What:** README restructure should retain some of the 'why this approach' in the README, keep contributor-focused developer loop content at the bottom, and work back in the phrase about treating business constraints as unbreakable precepts while keeping the message tight.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-04T22:30:43Z: User directive
+**By:** shane (via Copilot)
+**What:** For README pass 1, use the already-settled temporary sample, tweak the tagline, and use the current brand mark for now; all three can be revisited later.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-04T22:49:59Z: User directive
+**By:** shane (via Copilot)
+**What:** Stop using Haiku. Existing no-Haiku preference must be enforced consistently for squad routing and agent launches.
+**Why:** User request — captured for team memory
+
+---
+
+# Decision: Reduce Emerald Arrow Visual Weight
+
+**Author:** Elaine (UX Designer)
+**Date:** 2025-07-25
+**File:** brand/brand-spec.html
+
+## Context
+
+After the latest brand mark revision, the Emerald transition arrow and arrowhead read slightly heavy across all three brand-mark contexts. The task was to dial them back a notch — keeping them clearly readable as flow indicators, but reducing their dominance.
+
+## Changes Made
+
+### State + transition icon (64×64)
+- Arrow line: `stroke-width="2"` → `stroke-width="1.5"`
+- Arrowhead path: `M36,28 L42,32 L36,36` (8px tall) → `M37,29.5 L42,32 L37,34.5` (5px tall). Trimmed both height and width proportionally.
+
+### Combined mark — wordmark-in-context instance
+- Arrow line: `stroke-width="1.5"` → `stroke-width="1.2"`
+- Arrowhead path: `M33,42 L36,44 L33,46` (4px tall) → `M33.5,42.5 L36,44 L33.5,45.5` (3px tall)
+
+### Combined mark — three-forms instance
+- Same adjustments as above (these two instances were in sync and kept in sync).
+
+### State machine diagram edges + marker
+- All three edge lines: `stroke-width="1.5"` → `stroke-width="1.2"`
+- Marker definition: `markerWidth/Height 8×8, refX=7` → `7×7, refX=6, refY=3.5`, path proportionally scaled `M0,0 L7,3.5 L0,7`
+- Legend "Flow" line: `stroke-width="1.5"` → `stroke-width="1.2"`
+
+## Rationale
+
+- The state+transition icon carried a 2px arrow stroke — noticeably thicker than all other strokes in the icon system (which run at 1.5). Bringing it to 1.5 aligns with the existing weight vocabulary.
+- The arrowhead fill paths were sized generously relative to their context. Trimming them by ~30% keeps them legible as directional cues without competing with the state node and target shapes.
+- The diagram edges at 1.5 were heavier than the diagrammatic convention warrants for supporting elements. 1.2 keeps them present and readable while letting the state nodes (2.5/2.0) hold hierarchy.
+- All four contexts were updated in the same pass to maintain consistency across the brand mark system.
+
+---
+
+# Brand Mark Icons: Spec Alignment
+
+**Author:** Elaine (UX Designer)
+**Date:** 2026-04-04
+**Scope:** §1.3 Brand Mark — three forms + lockup combined icon
+
+## Decision
+
+Brand mark icons now follow the same semantic color and shape vocabulary as §2.2 State Diagram.
+
+### Color changes
+- **Transition arrows** use Grammar Indigo `#6366F1`, not Emerald `#34D399`. Emerald is reserved for verdict overlay per §1.4/§2.2.
+- **Node borders** use Semantic Indigo `#4338CA` (initial: 2.5px, intermediate: 1.5px) per the §2.2 diagram color mapping.
+- **Combined mark code page border** uses `#6366f1` (matching standalone tablet icon) instead of `#27272a` (was nearly invisible against `#1e1b4b` ground).
+
+### Shape changes
+- **Destination state node** changed from circle (Initial shape) to rounded rectangle (Intermediate shape) — circles are reserved for Initial nodes per §2.2 lifecycle roles.
+
+### Color key
+Updated to reflect actual icon palette: Semantic `#4338CA`, Grammar `#6366F1`, Accent `#818CF8`, Ground `#1E1B4B`.
+
+## Rationale
+
+Icons are abstractions, but they still speak the spec's locked visual language. Using Emerald for transitions and circles for non-initial states contradicted §2.2's explicit rules. The combined mark's code page border at `#27272a` created an undesirable fade-out effect that undermined the icon's legibility.
+
+## Pattern established
+
+**Brand mark icons inherit their parent surface's semantic rules.** If a brand mark depicts a state diagram, it uses §2.2 diagram colors and shapes. If it depicts a code page, it uses §2.1 syntax colors. The icons don't get to invent their own palette — they are small-scale renderings of the locked system.
+
+---
+
+# Decision: Gold Brand Mark Exception
+
+**Date:** 2026-04-04  
+**By:** Elaine (UX Designer)  
+**Status:** Implemented — pending Shane sign-off  
+
+## Decision
+
+Gold (`#FBBF24`) is permitted as a single sparse accent in the **combined brand mark only** — the third icon (tablet + state machine). It does not appear in the standalone diagram icon or the standalone tablet icon.
+
+## Placement
+
+The Gold stroke represents the `because "…"` line — the human-readable rule message baked into the running system. In the SVG, it is the short horizontal line at `y=33` inside the tablet/code area: shorter than the body lines above it (stopping at x=34 vs x=40), stroke-width 1, opacity 0.65. Deliberately dim and singular so it reads as an accent, not a second brand color.
+
+## Why
+
+Gold already carries this meaning in syntax highlighting: every `because` and `reject` string is Gold in the editor. The combined mark unifies the state machine and the written rule — it is the only icon that shows both halves. Adding one Gold line there extends an existing meaning rather than inventing a new one. It's a philosophical nod, not a decorative choice.
+
+## Constraints
+
+- **One mark only.** The diagram icon and the tablet icon remain unchanged.
+- **One line only.** Gold must not appear on structural elements (rect outlines, arrowheads, circles).
+- **Not a new UI color.** This exception does not permit Gold in badges, borders, button states, status chips, or any other UI surface.
+- **Not a new accent lane.** Gold remains syntax-primary. This is a narrow named exception, not a policy relaxation.
+- Amber (`#FCD34D`) continues to own warning/caution semantics. The visual distance between Gold and Amber is maintained; Gold in the mark is dimmer (`opacity: 0.65`) and lives in a non-signal context (brand icon, not status UI), so no semantic collision occurs.
+
+## Files Changed
+
+- `brand/brand-spec.html` — SVG updated, color key updated, prose updated in §1.3, §1.4 intro, §1.4.1, and the Rules · Gold surface section
+- `.squad/skills/color-roles/SKILL.md` — Rule 2 and the Gold row updated to reflect this exception
+
+---
+
+# Decision: Brand Mark Color Revision — Gold Judicious + Emerald Arrows
+
+**Date:** 2026-04-05  
+**Author:** Elaine (UX Designer)  
+**Requested by:** Shane
+
+## What Changed
+
+### 1. Transition Arrow → Emerald (#34D399)
+All three brand mark SVGs that carry a transition arrow now use Emerald for the arrow line and arrowhead. Previously both were Indigo (`#6366F1`). Emerald is already the "allowed flow / enabled transition" color across the product — the mark should say the same thing.
+
+**Affected SVGs:**
+- State + transition mark (standalone): arrow line + arrowhead
+- Combined mark (tablet + state machine): arrow line + arrowhead
+- Wordmark lockup icon (combined form, header context): arrow line + arrowhead
+
+### 2. Gold — Less Muted, Now in Tablet Mark Too
+**Combined mark:** Gold `because` line raised from `stroke-width="1" opacity="0.65"` to `stroke-width="1.5" opacity="0.9"`. It was too easy to overlook; the remembered rule should register.
+
+**Tablet-only mark:** The shortest bottom line (the `because`-text position) is now Gold `#FBBF24` at `opacity="0.85"`, up from a muted zinc line at `opacity="0.4"`. This gives the tablet mark a family-consistent Gold signal without adding structural noise.
+
+**Design rationale:** The word "judicious" was Shane's framing — Gold earns its place by being sparse and meaningful. Giving it presence in the tablet mark improves family consistency. The restraint is still intact: it's one line, at the bottom, in a role that encodes human language.
+
+### 3. Language: "Judicious" replaces "Narrow exception"
+All copy and skill rules that said "narrow exception" or "combined mark only" for Gold now say "judicious exception" or "tablet and combined marks." The tone shift from "barely allowed" to "deliberately placed" aligns with how the mark system actually works.
+
+## Color Key Updated
+The brand mark color key now shows Emerald as a fifth entry (Transition #34D399) alongside the existing four, and Gold's annotation reads "(judicious — tablet & combined)".
+
+## Files Changed
+- `brand/brand-spec.html` — three SVG marks, wordmark lockup, color key, §1.4 Gold description, §1.4 usage rules table, §2.1 Gold copy
+- `.squad/skills/color-roles/SKILL.md` — Emerald row, Gold Syntax Accent row, Rule #2
+
+## Guardrails Maintained
+- Emerald is not a second structural lane — it only appears on the transition arrow (one element per mark)
+- Gold does not appear on the state-only mark (no `because` line there; nothing to represent)
+- State shapes and Indigo/Violet structure unchanged
+
+---
+
+# Decision: Elaine's Direct Contribution Role in README Rewrite
+
+**Author:** Elaine (UX Designer)  
+**Date:** 2026-04-07  
+**Status:** Guidance — not yet implemented  
+**Context:** Peterman holds primary ownership of the README rewrite. This document defines where Elaine contributes directly vs. where she reviews.
+
+---
+
+## Decision
+
+Elaine co-authors six specific areas. Peterman authors everything else. No section gets final sign-off without Elaine's explicit approval on the areas listed below.
+
+---
+
+## Elaine's Direct Contribution Areas
+
+### 1. Title Block — Above-the-Fold Composition
+
+Elaine owns the layout spec, not the copy:
+- Logo at **48px** (not 64px SVG full) to clear the 550px mobile viewport with room for one badge row, one blockquote, and the two-sentence hook
+- **Badge count: 3 maximum** — NuGet version, MIT license, build status, in that order
+- Badge alt text template: each must include the actual value (e.g. `NuGet version 1.2.3`, `Build: passing`)
+- The complete title block must be tested at **400px, 550px, and 800px** viewport widths before finalizing
+
+Peterman writes the copy. Elaine validates the layout passes the mobile test.
+
+---
+
+### 2. Hero Format Template — Quick Example Section
+
+Elaine owns the **form**, not the code:
+- Two labeled blocks under `## Quick Example`: `**The Contract** (filename.precept):` and `**The Execution** (C#):`
+- DSL block: 18-20 lines, **≤60 characters per line** — this is a hard layout constraint, not a style preference
+- C# block: 5 lines maximum, no comments, no imports
+- Both blocks tagged with language identifiers (` ```precept `, ` ```csharp `)
+
+The 60-character line constraint shapes what Peterman can write in the DSL hero. He needs Elaine's template before authoring the hero code. **This is a dependency, not a review.**
+
+---
+
+### 3. Getting Started — CTA Structure
+
+Elaine directly authors the structural template for Getting Started:
+- Numbered 1/2/3 sequence is Elaine's format (not Peterman's preference)
+- Step 1 must install VS Code extension — not NuGet, not Copilot plugin
+- Step 3 must carry the "when you're ready" qualifier to signal it is a progression, not a simultaneous decision
+- Copilot plugin is **removed from Getting Started entirely** — it surfaces only in Section 4 (AI-Native Tooling)
+
+The words inside each step are Peterman's. The order, the hierarchy signal, and the single-primary-CTA enforcement are Elaine's.
+
+---
+
+### 4. All Section Headings
+
+Elaine directly approves every H2 and H3 heading before the rewrite ships:
+- No emoji at heading start (screen reader and AI parseability requirement)
+- Headings are descriptive, not clever — "Live Editor Experience" not "World-Class Tooling"
+- H1 → H2 → H3 with no level skips — verified by Elaine after the full draft exists
+
+This is a two-pass process: Peterman drafts headings; Elaine audits and edits them. Peterman does not unilaterally finalize headings.
+
+---
+
+### 5. Visual Separators and Prose Scannability
+
+Elaine owns the formatting rules applied throughout:
+- `---` horizontal rule between every major H2 section — Elaine places these, not Peterman
+- Prose paragraphs: **maximum 2-3 sentences** — Elaine edits any paragraph that exceeds this
+- Feature lists: **bullets, not prose** — Elaine converts any 3+ item run into a bulleted list
+- Blockquote callouts (`> **Note:** ...`) for important asides — Elaine decides which asides qualify
+
+Peterman writes the content. Elaine applies and enforces the scannability format throughout the full document.
+
+---
+
+### 6. Contributing Section — Formatting Pass
+
+Elaine owns the formatting of the Contributing section:
+- All build commands in properly tagged ` ```bash ` blocks
+- Section placed **after Learn More, before License** — Elaine enforces this position
+- No contributor content bleeds into the primary user flow above it
+- Section opens with a single-sentence scope statement ("Precept is built with .NET 10.0 and TypeScript. The VS Code extension, language server, MCP server, and runtime are all in this repository.")
+
+---
+
+## What Peterman Owns Exclusively
+
+- Hook copy (brand voice: the definition blockquote, positioning sentence, clarifier sentence)
+- Section 4 differentiation copy (AI-Native Tooling, Unified Domain Integrity, Live Editor Experience — body content)
+- Learn More link list (link text and ordering)
+- License section
+- Overall section order (already locked in the restructure proposal)
+- Hero domain selection (Order Fulfillment vs. Subscription Billing — deferred to Shane)
+
+---
+
+## Collaboration Protocol
+
+- Peterman drafts full sections → Elaine does a formatting pass → no copy changes, only structural/formatting edits
+- Any conflict between Elaine's formatting pass and Peterman's intended copy hierarchy gets escalated to Shane
+- Heading audit happens on the full draft, not section by section
+- The 60-char line constraint in the hero is a **hard block** — Peterman cannot finalize hero code without Elaine's line-length validation
+
+---
+
+# Decision: Elaine's Gate Role in README Rewrite Flow
+
+**Date:** 2026-04-07  
+**By:** Elaine (UX Designer)  
+**Status:** Recommendation — pending Shane acknowledgment  
+
+---
+
+## Decision
+
+Elaine enters the README rewrite at **two specific gates**, not throughout the writing process.
+
+### Gate 1 — Pre-Draft Hero Domain Confirmation (now)
+
+Before Peterman writes a line, the hero domain must be locked. Elaine's role: confirm the selected domain satisfies the "universally relatable" requirement (no SaaS jargon, immediately recognizable by any .NET developer). This is a 5-minute validation, not a design pass. Per the `proposal-gate-analysis` skill: hero domain is always a Gate-Before-Start item. Changing it after the draft undoes the draft.
+
+### Gate 2 — Post-Draft UX Compliance Audit
+
+After Peterman delivers the first draft, Elaine runs a formal pass against the 16 hard constraints already embedded in the proposal. The audit is pass/fail per constraint — not a copy edit, not a rewrite. Peterman resolves any failures. Shane signs off after both Peterman and Elaine clear.
+
+---
+
+## Elaine Owns (Structural UX Layer)
+
+| # | What | Why |
+|---|------|-----|
+| 1 | Above-the-fold audit (550px viewport) | Constraint #1 |
+| 2 | Viewport resilience (no horizontal scroll at 400px) | Constraint #2 |
+| 3 | CTA hierarchy enforcement | Constraint #3 |
+| 4 | Heading hierarchy audit (H1→H2→H3, no skips) | Constraints #4, #5 |
+| 5 | Scannability mechanics (prose length, bullets, separators) | Constraints #6, #7 |
+| 6 | Hero line length audit (≤60 chars/line) | Constraint #8 |
+| 7 | Progressive disclosure order | Constraint #10 |
+| 8 | AI/human readability compliance (code block tags, link text, alt text) | Constraints #11–#14 |
+
+---
+
+## Peterman Owns (Brand/Copy Layer)
+
+- Copy quality, brand voice, tone
+- Positioning language (exact form of category claim)
+- Hero sample content (DSL lines, within Elaine's line-length constraints)
+- Section content decisions
+- Badge selection and ordering
+- Link anchor text (Elaine ensures form, Peterman ensures content)
+
+---
+
+## The Clean Split
+
+**Peterman writes. Elaine audits structure.** These are separate passes, not concurrent collaboration. Peterman does not need Elaine present while writing. Elaine does not write copy. If there is a heading skip, Elaine flags it — Peterman corrects it. If the CTA hierarchy is correct but the positioning language is weak, Peterman owns that.
+
+---
+
+## Why This Matters
+
+Elaine's constraints were treated as hard non-negotiables in the proposal precisely because they are prerequisites, not suggestions. But constraints on paper are not enforcement. The only way they hold is if the constraint-holder reviews the final artifact. A proposal that satisfies all 16 constraints structurally, delivered as a README that satisfies none of them, is a failure. Elaine's post-draft gate is what closes that loop.
+
+---
+
+## Gate Sequence (Full)
+
+1. Shane — hero domain lock (Gate-Before-Start)
+2. Peterman — writes draft
+3. Elaine — UX compliance audit (post-draft)
+4. Peterman — resolves Elaine's flagged issues
+5. Frank — architectural accuracy check (contributor section, commands)
+6. Shane — final sign-off
+
+---
+
+# Decision: README Form/Shape Pass
+
+**Author:** Elaine (UX)  
+**Date:** 2026-04-07  
+**Status:** Applied
+
+## What Changed
+
+Form/shape improvements to README.md for improved scannability and viewport efficiency:
+
+1. **Title block** — Removed emoji from H1, shortened badge labels ("NuGet version" → "NuGet"), tightened definition blockquote (removed invisible Unicode spacing)
+
+2. **Quick Example** — Shortened C# variable names (`definition` → `def`, `engine` → `eng`, `instance` → `inst`) for visual compactness; kept vertical layout (side-by-side tables don't render code blocks reliably on GitHub)
+
+3. **Getting Started** — Moved prerequisite to a single bold line (was a blockquote callout), cut redundant intro sentence, tightened step prose to single sentences where possible
+
+4. **What Makes Precept Different** — Collapsed three H3 subsections into bold inline headers with em-dash lead-ins; preserved the bullet list for Unified Domain Integrity; cut granular bullet details from AI-Native and Live Editor (now single-sentence summaries)
+
+5. **Learn More** — Changed from bullet list to table format for better scanability and alignment
+
+6. **Contributing** — Collapsed language server and VS Code extension build details into a simpler two-command code block; trimmed quick-reference table to essential rows
+
+## Rationale
+
+The previous draft had good content but felt dense. Each section competed for attention. These changes improve heading rhythm, reduce vertical scroll, and make the README feel "shaped" rather than "stacked."
+
+## What I Did Not Change
+
+- Core messaging and word choices (Peterman's domain)
+- Section order
+- The brand mark (kept current state per task brief)
+- Hero domain (Order) — marked as temporary but acceptable
+
+---
+
+# Decision: Shape-First README Pass — Elaine's Position
+
+**Filed by:** Elaine  
+**Date:** 2026-04-08  
+**Status:** Recommendation — Pending Shane sign-off  
+**Context:** Shane asked whether Elaine should produce a form/shape skeleton before Peterman writes the README copy.
+
+---
+
+## Recommendation
+
+**Targeted scaffold — not a full skeleton pass.**
+
+The restructure proposal already IS the structural spec at high fidelity. A full skeleton pass reproduces that work in a different format. The targeted intervention that adds genuine value is a **hero code block scaffold**: an annotated Markdown stub showing Peterman exactly what viewport-safe DSL looks like in 18-20 lines at ≤60 chars per line — with constraint callouts embedded as HTML comments.
+
+---
+
+## What Elaine Would Produce in Shape-First Mode
+
+A `README-scaffold.md` file (not README.md itself) containing:
+
+- All headings in place at correct H1/H2/H3 levels
+- Badge row slot with alt-text annotation
+- Blockquote definition slot
+- Two-sentence hook slot with word-count annotation
+- Hero DSL block as a commented stub:
+  ```
+  <!-- ≤20 lines | ≤60 chars per line | viewport constraint #8 -->
+  <!-- Required: precept decl, 2-3 fields, 3 states (initial marked), 2 events, 1 guard, 1 invariant/assert -->
+  ```
+- 5-line C# execution block slot
+- All section headings and visual separators in place
+- Constraint callout comments above each constrained content slot
+
+**What it is not:** copy. No body prose. No positioning language. Peterman owns all of that.
+
+---
+
+## Does This Reduce or Increase Churn?
+
+**Reduces churn marginally for the full file; meaningfully for the hero block.**
+
+The proposal is specific enough that section-level violations are unlikely. The real risk is the hero — Peterman writes a sample, we find at constraint audit that line 7 is 78 characters, and that means a content rewrite after copywriting is done. An annotated hero slot catches that class of issue before pen touches paper.
+
+For everything outside the hero, the scaffold is a convenience, not a necessity.
+
+---
+
+## Peterman's Counter-Position
+
+Peterman filed a recommendation (`.squad/decisions/inbox/j-peterman-shape-first-readme.md`) that the skeleton pass is redundant and adds an extra round trip. His argument is sound for the full file. The disagreement is narrow: Elaine's position is that the hero block specifically benefits from a pre-draft structural artifact. Peterman's position is that this is a "single targeted question, not a skeleton pass."
+
+**They're describing the same intervention at different scopes.** Shane can resolve this by scope-limiting: no full skeleton, but a specific hero consultation before Peterman writes that section.
+
+---
+
+## What Must Be Locked Before Copywriting Starts
+
+| Item | Status | Action Required |
+|------|--------|----------------|
+| Section order | Locked in proposal | None |
+| 16 hard constraints | Locked | None |
+| Badge count (3 max) | Specified, not signed off | Shane confirms |
+| **Hero domain** (Order Fulfillment vs. Subscription Billing) | **Unresolved — deferred to Shane** | **Shane decides** |
+| Time Machine hero — retire it | Proposed, not explicitly signed off | **Shane signs off** |
+| Above-the-fold test baseline | Specified at 550px | Confirm before final |
+
+**Hero domain selection is the hard gate.** Everything else can proceed without Elaine's scaffold. The hero cannot.
+
+---
+
+## Correct Gate Sequence If Shane Approves Scaffold
+
+1. **Shane** — selects hero domain; signs off on Time Machine retirement
+2. **Elaine** — produces `README-scaffold.md` (scope: hero stub + heading skeleton only; ~30 minutes)
+3. **Peterman** — writes README copy into the scaffold
+4. **Elaine** — constraint audit: 16-row pass/fail table
+5. **Peterman** — resolves any failures
+6. **Shane** — final sign-off
+
+---
+
+## Correct Gate Sequence If Shane Skips the Scaffold
+
+1. **Shane** — selects hero domain; signs off on Time Machine retirement
+2. **Elaine** — single hero consultation: what domain fits cleanest in ≤60 chars/line?
+3. **Peterman** — writes README against the proposal directly
+4. **Elaine** — constraint audit: 16-row pass/fail table
+5. **Peterman** — resolves any failures
+6. **Shane** — final sign-off
+
+Both paths are valid. The scaffold path prevents one class of hero-related rework. The no-scaffold path is one pass shorter. The hero domain decision is required in both cases.
+
+---
+
+# Decision: Gold — Judicious Use, Tablet Mark Inclusion, Emerald Transition Arrows
+
+**Date:** 2026-04-07  
+**By:** J. Peterman (Brand/DevRel)  
+**Status:** Implemented — Shane sign-off requested  
+
+## Summary
+
+Three related changes to the brand color system, directed by Shane:
+
+1. **Gold policy language** — "narrow exception" replaced with "judicious exception" everywhere Gold's limited use is described. The word governs the policy; it is not decorative.
+
+2. **Tablet mark carries Gold** — The standalone tablet icon now includes a single Gold `because` line (same signal as the combined mark). The family of marks reads consistently: where a tablet form appears, the remembered rule is present. The combined mark's Gold opacity was also boosted from 0.65 → 0.9 (was visually muted).
+
+3. **Transition arrows are Emerald** — The §2.2 state diagram SVG (marker, edge lines, legend) and the §2.2 diagram color mapping swatches now use Emerald `#34D399`. The "State + transition" brand mark icon was already Emerald; the combined mark icon has also been updated. Emerald owns transition directionality across the system — "allowed flow," not "grammar structure."
+
+## Rationale
+
+Gold's prior scope ("combined brand mark only") was a Elaine-era constraint based on a philosophy of maximum restraint. Shane's direction expands the scope minimally: the tablet form is the vessel for written rules across all three marks, so Gold belongs there wherever the tablet appears. The combined mark is primary, but the standalone tablet is the same conceptual object — it would be peculiar for it to be silent about the rule it represents.
+
+Emerald on transition arrows is semantically correct: Emerald means "allowed, do, go." A transition arrow is the diagram's way of saying the system may move. Indigo on arrows was a structural reading (grammar connective tissue); Emerald is a semantic reading (the allowed path forward). The latter is more honest.
+
+## Gold Policy As It Stands
+
+- **Primary:** `because` / `reject` string content in syntax highlighting. Always.
+- **Judicious exception:** A single `because` line in the tablet mark and combined mark. One line. No other uses.
+- **Never:** badges, borders, button states, status chips, general UI emphasis, signal overlay.
+
+## Files Changed
+
+- `brand/brand-spec.html` — tablet SVG, combined mark, §2.2 SVG diagram, §2.2 color mapping, §1.4 palette card, §1.4.1 cross-surface table, §2.1 Rules · Gold description, brand paragraph, color key
+- `.squad/skills/color-roles/SKILL.md` — (already updated in prior session; confirmed current)
+
+---
+
+# Decision: Canonical hero snippet now lives in brand-spec §2.6
+
+**Date:** 2026-04-08
+**By:** J. Peterman (Brand/DevRel)
+**Status:** Complete — Ready for review & merge to decisions.md
+
+---
+
+## Decision
+
+Reworked `brand/brand-spec.html` §2.6 into the canonical reusable hero-snippet artifact for the current README example. The section now mirrors the live README sample verbatim, keeps its **TEMPORARY** status explicit, and provides cross-surface reuse rules for README, VS Code Marketplace, NuGet, Claude Marketplace, and AI prompt contexts.
+
+## Why this was necessary
+
+The previous §2.6 had already established the right intent, but it had drifted from reality in four important ways:
+
+1. The DSL rendering no longer matched the live README exactly (`>= 0` had drifted to `= 0`).
+2. The C# execution block omitted the closing result comment that exists in README.
+3. The guidance treated color rendering as canonical, even though README/NuGet/AI contexts depend on plain text first.
+4. It referenced a nonexistent `samples/Order.precept` file as though the temporary hero already had a raw sample file.
+
+For a reusable brand artifact, copy fidelity matters more than decorative rendering. The source of truth must match the live public surface exactly.
+
+## What §2.6 now contains
+
+- **Status framing:** approved for reuse now, still explicitly temporary
+- **Exact canonical text:** verbatim DSL block (20 lines, 60-character max) and verbatim C# execution block
+- **Cross-surface usage table:** README, VS Code Marketplace, NuGet, Claude Marketplace, AI prompt context
+- **Portable constraints:** preserve exact wording, preserve blank lines, keep plaintext legibility primary, update README + brand spec together
+- **Refresh triggers:** usability review, language/API drift, or deliberate promotion of a dedicated hero sample file
+- **Source references:** README as live surface, §2.6 as reuse reference, explicit note that there is no standalone `samples/` file yet
+
+## Team-relevant decision
+
+Until the usability review says otherwise, the current README Order example is the temporary canonical hero sample across brand surfaces. Treat the exact text plus its reuse rules as locked; treat the domain itself as provisional.
+
+## Impact
+
+- **README:** No content change required; the live README already contains the approved temporary hero text.
+- **Marketplace copy:** Teams can now copy from §2.6 without inventing surface-specific variations.
+- **AI-facing docs/prompts:** Plaintext reuse is now explicitly blessed, which matches how agents actually consume the sample.
+
+## Next steps
+
+1. Merge this into `decisions.md` after review.
+2. Use §2.6 as the source when updating README-adjacent marketplace copy.
+3. Revisit only if usability testing or language/API changes force a new hero.
+
+---
+
+# Decision: README Rewrite Execution Path
+
+**Author:** J. Peterman  
+**Date:** 2026-07-14  
+**Status:** Awaiting Shane sign-off on one gating decision
+
+---
+
+## Situation
+
+The restructure proposal has been through three review passes (Frank, George, Uncle Leo — all approved with required changes). The revised proposal (2026-04-07) already incorporates every required change from all three reviewers. The proposal is ready to execute. No further review pass is needed.
+
+## Gating Decision for Shane
+
+**The only decision that blocks drafting §2 (Quick Example / hero) is: what is the hero domain?**
+
+Three options the proposal has already pre-analyzed:
+- **Order Fulfillment** — universally relatable; Elaine's preference
+- **Subscription Billing** — 18 DSL statements; Peterman's original recommendation
+- **Loan Application** — already exists in samples; complex but proven
+
+The rest of the README (§0 title block, §1 hook, §3 getting started, §4 differentiation, §5 learn more, §6 contributing, §7 license) can be fully drafted before this decision is made. Hero domain only gates §2.
+
+**Recommended path:** Shane names the hero domain, then the agent drafts §2 in the same pass as everything else and delivers a complete README ready for a single review pass.
+
+## What Must Be Preserved
+
+- Dictionary definition blockquote — `> **pre·​cept** *(noun)*: A general rule intended to regulate behavior or thought.` — confirmed in proposal §Hook
+- C# API examples (trimmed: current is 45+ lines, target is 5 lines flat)
+- Dev loop contributor table (the `What you changed / What to do / Window reload?` table in Current README § Local Development Loop) — good content, fits directly into the new Contributing section
+- .NET 10 SDK prerequisite — exists in current README; must appear as a callout before Getting Started step 1
+- License badge + MIT statement
+- The `CreateInstance` overload pattern (current README shows it correctly; George confirmed both overloads are real)
+
+## What Gets Cut
+
+| Current section | Fate |
+|---|---|
+| `📚 Sample Catalog` (21-row table + feature matrix) | Remove from README; link to external docs in Learn More |
+| `🛠️ World-Class Tooling` (150-word prose block) | Cut prose; distill to 4 bullets under §4c Live Editor Experience |
+| `🧠 The Problem It Solves` | Absorbed into §1 Hook second sentence; the diagnosis lives there, not as a standalone section |
+| `🏗️ The Pillars of Precept` (4 subsections) | Content folded into §4b Unified Domain Integrity bullets; no standalone section |
+| `🤖 Designed for AI` (5 prose bullets) | Absorbed into §4a AI-Native Tooling; prose format replaced by bullets |
+| `🤖 MCP Server` section (current standalone) | Folded into §4a AI-Native Tooling |
+| Emoji in all heading prefixes (🚀 💡 📚 🛠️ 🤖 🧠 🏗️) | All removed — Elaine constraint #5: no emoji at heading start |
+| Installation table + Copilot plugin steps in Getting Started | Plugin steps moved to §4a; Installation simplified to NuGet in Getting Started step 3 |
+| `💡 The "Aha!" Moment` heading | Replaced by `## Quick Example` — descriptive, not clever |
+
+## Draft Sequencing (Minimal Churn Path)
+
+**Round 1 — No dependencies, draft immediately:**
+1. §0 Title Block + Badges (logo placeholder, 3 badges, badge alt text)
+2. §1 Hook (definition blockquote + 2-sentence positioning)
+3. §3 Getting Started (template is fully spec'd in proposal)
+4. §4 What Makes Precept Different — all three subsections (copy spec is detailed)
+5. §5 Learn More (link list, external URLs TBD)
+6. §6 Contributing (dev loop table + build commands, adapted from current README)
+7. §7 License
+
+**Round 2 — After Shane names the hero domain:**
+1. §2 Quick Example — draft the 18-20 line DSL hero + 5-line C# execution block
+
+**Round 3 — Shane single review pass:**
+- Full README in proposed structure
+- Check viewport compliance (≤60 char lines, above-the-fold test at 550px)
+- Confirm hero domain/sample reads as real business logic, not toy demo
+- Confirm badge values (NuGet version, build status URL)
+- Confirm external doc links (placeholder during draft, real URLs before merge)
+
+**Commit after Shane approves Round 3.**
+
+## Required Changes from Reviews — Status Check
+
+All required changes from Frank, George, and Uncle Leo are incorporated into the revised proposal (2026-04-07). No pre-rewrite patch pass needed.
+
+| RC | Status |
+|---|---|
+| Frank RC-1 (C# API chain) | Fixed by George G1: CreateInstance overloads documented correctly, RestoreInstance removed |
+| Frank RC-2 (Step 3 title) | Fixed: "Add the NuGet Package" throughout |
+| Frank RC-3 (Section 4c name) | Fixed: "Live Editor Experience" |
+| Frank RC-4 (AI claims) | Fixed: "AI agents can validate, inspect, and iterate..." |
+| George G1 (RestoreInstance) | Fixed |
+| George G2 (Prerequisites) | Fixed: .NET 10 SDK prerequisite in Getting Started template |
+| George G3 ("replacing") | Fixed: "eliminating the fragmentation" |
+| Uncle Leo RC-1 (H3 vs bold labels) | Fixed: Section map now shows `[bold lead-in: The Contract / The Execution]` |
+| Uncle Leo RC-2 (context reminder) | Fixed: Explicit one-sentence context reminder in Getting Started template |
+
+---
+
+# Decision: README Restructure Proposal — Shane Feedback Revision
+
+**Author:** J. Peterman  
+**Date:** 2026-04-07  
+**Source:** Shane's feedback pass on `brand/references/readme-restructure-proposal.md`  
+**Status:** Inbox — awaiting Shane sign-off  
+
+---
+
+## Decisions Established by This Revision
+
+### 1. "By treating your business constraints as unbreakable precepts" — Retained and Integrated
+
+**Decision:** The phrase is not cut. It is folded as the mechanism half of the positioning sentence.
+
+**Approved form:**
+> **Precept is a domain integrity engine for .NET.** By treating your business constraints as unbreakable precepts, it binds state, data, and rules into a single executable contract where invalid states are structurally impossible.
+
+**Rationale:** The phrase earns the brand name — it connects the dictionary definition to the mechanism in one beat. As a standalone third sentence it was redundant; as a participial lead-in to the positioning sentence it carries weight without bloating.
+
+**Constraint:** The mechanism phrase must always appear as a participial fold into the positioning sentence. It is not a standalone tagline. It is not a separate sentence.
+
+---
+
+### 2. "Why This Approach" Content Stays Partially in the README
+
+**Decision:** Not all philosophical/rationale content is deferred to docs. The core reasoning belongs in the README.
+
+**What stays in README:**
+- 1–2 sentences in `§ Unified Domain Integrity` explaining *why* co-location prevents disagreement between separately-managed rules
+- The "prevention, not detection" framing
+
+**What defers to docs:**
+- Full pipeline mechanics (6-stage fire, working copy behavior)
+- Construct catalog with full syntax reference
+- Extended design rationale and comparison to alternative approaches
+
+**Rule:** If a developer needs it to understand why Precept exists, it stays. If they need it to use Precept correctly, it goes to docs.
+
+---
+
+### 3. Contributing / Developer Loop — Retained at Bottom
+
+**Decision:** The developer build loop (language server → extension auto-detect → edit → diagnostics) is explicitly retained in the README as a `## Contributing` section, positioned after `## Learn More` and before `## License`.
+
+**This is not user onboarding.** The section is scoped to contributors. Users of Precept do not need to build the language server. Contributors do.
+
+**Content minimum:** `dotnet build`, language server build command, `npm run compile` / `npm run loop:local`, `dotnet test`, link to CONTRIBUTING.md.
+
+---
+
+### 4. Three-CTA Problem — Definition Locked
+
+**Decision:** "Three-CTA problem" is now a defined term in this project's README vocabulary. It means: three equal-weight next steps presented simultaneously at the same decision point, with no hierarchy. The problem is not the count — three CTAs remain in the restructured README. The problem is the simultaneous presentation.
+
+**Canonical description (for use in any related document):**
+> The current README's Getting Started presents VS Code extension, NuGet package, and Copilot plugin as three simultaneously equal next steps with no hierarchy. The problem is not having three CTAs — it is having three primary CTAs at the same decision point.
+
+---
+
+*Written to inbox by J. Peterman, 2026-04-07.*
+
+---
+
+### README Pass 1 — Structural Decisions Made During Rewrite
+
+**Date:** 2026-04-08
+**By:** J. Peterman
+**Status:** COMPLETE — Shane awareness
+
+---
+
+#### Decision 1: Hero Domain — Order (Temporary)
+
+**What:** Used a simplified Order domain (`order.precept`) as the pass-1 hero. Four states (New, Paid, Shipped, Delivered), one invariant, two event args, one guard, one reject, 20 lines, all lines ≤60 characters.
+
+**Why:** Neither Time Machine nor LoanApplication fit the 60-char line constraint without either stripping personality (Time Machine) or structural complexity (LoanApplication). The Order domain is the cleanest compliant fit in accessible context. Shane's instruction "already-settled temporary sample" confirmed this is explicitly a placeholder.
+
+**Status:** Temporary. The Phase 3 hero creative brief process (8 domain ideas, Duel at Dawn / Heist Safe ranked highest) remains open and should replace this in a future pass.
+
+---
+
+#### Decision 2: Hook Tagline — One Sentence
+
+**What:** Reduced the proposal's two-sentence hook to one: "It binds state machines, validation, and business rules into a single executable contract — eliminating the fragmentation that comes from managing them separately."
+
+**Why:** Shane's pass-1 tightening instruction + George's G3 (remove "replacing") + Uncle Leo's WC redundancy note. The "unbreakable precepts" phrase was cut for pass-1 compression; it can be reintroduced in pass 2 as a participial phrase if the team wants it back.
+
+**Open:** Whether "unbreakable precepts" reconnects the brand name to the mechanism in the hook is a pass-2 copy decision. Not blocking.
+
+---
+
+#### Decision 3: Copilot Plugin CTA in AI-Native Tooling
+
+**What:** Added one-sentence Copilot plugin install call to action in "AI-Native Tooling": "Install the plugin via `Chat: Install Plugin From Source` or enable it from the plugin marketplace."
+
+**Why:** The plugin CTA needed to appear somewhere in the README (it was removed from Getting Started per the proposal). "AI-Native Tooling" is the correct adoption-stage location per the CTA strategy.
+
+**Status:** Placeholder instruction. The exact install path may need updating when the plugin is marketplace-published.
+
+---
+
+#### Decision 4: Learn More links use relative doc paths
+
+**What:** `Learn More` links point to `docs/PreceptLanguageDesign.md`, `samples/`, `docs/McpServerDesign.md`. `CONTRIBUTING.md` is referenced but does not exist yet.
+
+**Why:** No published docs site URLs exist. Relative paths to existing repo docs are the best available option.
+
+**Open:** Replace with absolute docs site URLs when the site ships. Create `CONTRIBUTING.md` to resolve the dangling reference.
+
+---
+
+---
+date: 2026-04-08T00:00:00Z
+author: j-peterman
+status: ready_for_shane
+phase: readme_copy_refinement
+---
+
+# README Copy Polish Pass — Decision Summary
+
+**Decision:** Complete focused copy polish on README.md post-Elaine's structural design pass. Preserve all structural improvements. Tighten prose only for clarity, cadence, and brand voice.
+
+## What Changed
+
+| Line | Original | Tightened | Rationale |
+|------|----------|-----------|-----------|
+| 8 | "It binds state machines, validation, and business rules into a single executable contract — eliminating the fragmentation that comes from managing them separately." | "By treating business constraints as unbreakable precepts, it binds state machines, validation, and business rules into a single executable contract where invalid states are structurally impossible." | Integrates "unbreakable precepts" mechanism phrase (from design review) into main positioning sentence. Connects brand name to core idea. Removes vague "fragmentation" → uses concrete "structurally impossible" outcome. |
+| 79 | "MCP server (5 tools), GitHub Copilot plugin, and a language server that gives AI agents structured access…" | "MCP server with 5 core tools, GitHub Copilot plugin, and language server give AI agents structured access…" | Removes parenthetical restatement. Fixes parallel structure ("give" → plural subject). Preserves all three components and tool count. |
+| 81 | "Precept co-locates them: constraints live next to the state they govern." | "Precept unifies them into one definition." | Same meaning, 9 fewer words. "Unify" is more direct than "co-locate/constraints live next to." Clearer antecedent. |
+| 84 | "One file, complete rules…" | "One file, all rules…" | "All rules" matches "together" grammatically. Slightly more precise. |
+| 85 | "…without mutation" | "…without executing it" | Avoids misreading "mutation" as data structure mutation. Actual meaning: avoiding execution. More precise verb. |
+| 88 | "Context-aware completions, semantic highlighting, inline diagnostics, and a live state diagram preview." | "Completions, semantic highlighting, inline diagnostics, and a live state diagram preview in VS Code." | Removes redundant "context-aware" (implicit in completions). Adds "in VS Code" (concrete location, serves mobile navigation and AI reader). |
+
+## Design Decisions Preserved
+
+- ✅ Elaine's structural hierarchy (Title → Hook → Quick Example → Getting Started → Differentiation → Learn More → License)
+- ✅ Hero code sample (Order fulfillment business domain, 18-20 lines DSL, 5-line C# execution)
+- ✅ CTA hierarchy (VS Code extension as primary, NuGet as secondary)
+- ✅ All technical claims, links, and prerequisite language
+- ✅ Brand positioning: "domain integrity engine" + mechanism phrase
+
+## Key Phrase Decision
+
+The phrase "treating business constraints as unbreakable precepts" was flagged in earlier drafts as potentially redundant. On review, it does distinct work: it connects brand name to mechanism in one moment, making the name feel earned rather than invented. Rather than cutting, integrated it as a participial phrase in the main positioning sentence.
+
+## Files Modified
+
+- `README.md` — 5 text edits, all prose tightening (no structural changes)
+- `.squad/agents/j-peterman/history.md` — appended learning entry
+
+## Status
+
+Ready for Shane sign-off. README is near-signoff state: structure locked by Elaine, prose tightened for clarity and cadence, all approved messaging preserved.
+
+## Validation
+
+- ✅ Approved message intact ("domain integrity engine" + "unbreakable precepts" mechanism)
+- ✅ Key phrase about business constraints preserved and integrated naturally
+- ✅ Copy factual, aligned with prior reviewer corrections
+- ✅ Brand voice consistent (authoritative, matter-of-fact, no hedging)
+- ✅ No structural changes introduced
+- ✅ No new hero domain introduced (Order sample retained)
+
+---
+
+# Decision: README Proposal Review Gap Pass — All Required Changes Applied
+
+**Author:** J. Peterman  
+**Date:** 2026-04-07  
+**Status:** Applied — ready for Shane sign-off  
+**File modified:** `brand/references/readme-restructure-proposal.md`
+
+---
+
+## Summary
+
+Seven required changes from the Frank/George/Uncle Leo review round were documented in the proposal's trim summary but had not been applied to the proposal body. All seven are now corrected.
+
+---
+
+## Changes Applied
+
+| Reviewer | Item | Old | New |
+|----------|------|-----|-----|
+| Frank RC-4 | AI capability claim | "AI agents can author, validate, and debug `.precept` files without human intervention." | "AI agents can validate, inspect, and iterate on `.precept` files through structured tool APIs." |
+| George G1 | Fabricated API name | `engine.CreateInstance(...)` (or `RestoreInstance`) | `engine.CreateInstance(savedState, savedData)` (or `engine.CreateInstance()` for new entity) |
+| George G2 | Missing prerequisite | Getting Started steps with no .NET prereq | Explicit `.NET 10 SDK` prerequisite blockquote before step 1 |
+| Uncle Leo RC-2 | Missing context reminder | "Here it's implicit in step 1's description..." (not actually present) | Explicit one-sentence context reminder as opening line of Getting Started template |
+| Uncle Leo WC-1 | Badge-wall phrasing | "badge walls signal maintenance anxiety, not quality" | "additional badges add visual noise without adding signal at the awareness stage" |
+| George G3 | Overclaiming hook | "It replaces three separate libraries..." | "It eliminates the fragmentation that comes from managing state, validation, and business rules separately." |
+| Uncle Leo WC-3 | Unlabeled tagline | "One file. Every rule. Prove it in 30 seconds." (ambiguous: proposal copy or README copy?) | *(Proposed README tagline — confirm or substitute during rewrite):* One file. Every rule. Prove it in 30 seconds. |
+
+---
+
+## Decision for Shane
+
+The proposal now accurately reflects the review feedback. No structural changes were required — all corrections were precision edits to content and copy specifications within the existing structure.
+
+The proposal is ready for Shane's sign-off. The rewrite can begin.
+
+---
+
+## What Was Not Changed
+
+- Frank RC-1/RC-2/RC-3 — already addressed in the prior Shane feedback pass
+- Uncle Leo RC-1 (H3 vs bold lead-ins in section map) — already addressed in the prior pass
+- Frank/George advisory notes (AN-1, AN-2, AN-3, Inspect args note, TransitionOutcome enum note) — non-blocking; addressed by the rewriter
+- Uncle Leo WC-2 (Section 4a rationale sentence structure) — wording concern; non-blocking; addressable during rewrite
+
+---
+
+# Decision: README Restructure Trim Summary Added to Proposal
+
+**Filed by:** J. Peterman  
+**Date:** 2026-04-06  
+**Status:** Proposed — pending Shane review  
+
+---
+
+## Decision
+
+A "What the Restructure Trims, Compresses, Defers, or Removes" section has been appended to `brand/references/readme-restructure-proposal.md`. This section is a permanent part of the proposal document — not a separate artifact.
+
+## Rationale
+
+Restructure proposals communicate gains well. They communicate costs poorly. Before a rewrite begins, Shane should be able to evaluate the restructure against what it removes, not just what it adds. The trim summary makes that cost explicit and scannable.
+
+## What the Summary Covers
+
+The trim summary is organized into four categories:
+
+1. **Removed entirely** — content that does not survive in any form (third hook sentence, full C# boilerplate, badge walls)
+2. **Compressed** — content that stays but shrinks (49-line hero → 18-20 lines + 5-line C#; 150-word "World-Class Tooling" → 4 bullets; three front-loaded differentiation sections → one post-trial section with bullets)
+3. **Repositioned** — same content, lower prominence or different section (AI tooling CTA, Time Machine hero, differentiation-before-installation → differentiation-after-installation)
+4. **Deferred to external docs** — content moved from README to linked references (sample catalog table, full quickstart walkthrough, language reference, MCP docs, philosophy)
+
+A fifth category — **Net-New Content** — captures additions the restructure requires (prerequisite note, context reminder, language tags). This ensures Shane evaluates the full delta, not just what's cut.
+
+## Files Changed
+
+- `brand/references/readme-restructure-proposal.md` — trim summary section appended
+
+## Team Impact
+
+The trim summary is a reference artifact for whoever executes the rewrite. It functions as a checklist: if any item in the "Removed Entirely" list appears in the rewritten README, something went wrong. If any item in "Deferred to External Docs" appears as embedded content (not a link), that is also a regression.
+
+---
+
+# Decision: README Collaboration Order — Shape-First vs. Draft-First
+
+**Filed by:** J. Peterman  
+**Date:** 2026-04-08  
+**Status:** Recommendation — Pending Shane sign-off  
+**Context:** Shane asked whether Elaine should produce a form/shape skeleton before Peterman writes the README copy.
+
+---
+
+## Recommendation
+
+**Skip the skeleton pass. Peterman drafts first. Elaine audits after.**
+
+The restructure proposal (`brand/references/readme-restructure-proposal.md`) already IS the skeleton. It defines:
+- Section order and heading levels
+- 16 hard constraints with explicit source attribution
+- Per-section content guidance with placeholder examples
+- Viewport requirements, CTA hierarchy, progressive disclosure order
+
+An Elaine skeleton pass would translate that proposal into a blank document structure — a mechanical step that reproduces work already done.
+
+---
+
+## The Shape Is Already Fixed
+
+The proposal documents form at the same precision Elaine would produce in a skeleton:
+
+| Form element | Already in proposal |
+|---|---|
+| Section order | Yes — explicit recommended order with rationale |
+| H1/H2/H3 hierarchy | Yes — Constraint #4, per-section heading levels specified |
+| Mobile-first above-the-fold | Yes — Constraint #1, 550px requirement, explicit test instruction |
+| CTA structure | Yes — Constraint #3, primary vs. secondary subordination |
+| Code block format | Yes — Constraints #8/#9, 60-char limit, 5-line C# block |
+| Visual separators | Yes — Constraint #7, `---` between major sections |
+
+---
+
+## Why Skeleton-First Adds an Extra Pass Without Adding Value
+
+Collaboration order if Elaine goes first:
+1. Peterman proposal (done)
+2. Elaine skeleton (translates proposal to blank doc)
+3. Peterman draft (fills skeleton with copy)
+4. Elaine constraint audit (checks 16 hard constraints)
+
+Total: 4 passes.
+
+Collaboration order if Peterman goes first:
+1. Peterman proposal (done)
+2. Peterman draft (writes against the proposal directly)
+3. Elaine constraint audit (checks 16 hard constraints)
+
+Total: 3 passes. Same quality gate. One less round trip.
+
+---
+
+## The Risk of Skeleton-First
+
+The skeleton pass creates a new artifact that Peterman must interpret. Any ambiguity in placeholder structure — heading text, container depth, code block labels — becomes a negotiation surface that didn't need to exist. The proposal already has this precision. Two sources of structural truth is one too many.
+
+---
+
+## The One Exception
+
+**Hero code block.** The 60-character line constraint (#8) shapes what DSL sample Peterman can write — short field names, abbreviated rule copy. Before Peterman finalizes the hero DSL, Elaine should confirm which sample domain (Subscription Billing, Order Fulfillment, Loan Application) fits cleanest in a narrow viewport. This is a single targeted question, not a skeleton pass.
+
+---
+
+## Correct Gate Sequence for README Rewrite
+
+1. **Peterman** — drafts full README against the restructure proposal
+2. **Elaine** — constraint audit pass: 16-row pass/fail table, no copy edits
+3. **Peterman** — resolves any constraint failures
+4. **Frank** — optional architecture review (contributing section accuracy)
+5. **Shane** — final sign-off
+
+This matches the existing `constraint-holder-review-gate` skill pattern documented in `.squad/skills/`.
+
+---
+
+## What This Decision Is Not
+
+This is not a ruling against Elaine's involvement. Elaine's structural requirements already govern this rewrite. The question is sequencing. Her form authority is exercised through the post-draft constraint audit, not through a pre-draft skeleton — because the skeleton already exists in the proposal.
+
+---
+
+# Decision: Signal Color Family Names
+
+**Date:** 2026-04-07
+**Agent:** j-peterman
+**Status:** Applied — no new decision required
+
+## Summary
+
+The three semantic signal colors in the Precept color system have proper family names. They were already present in the spec in isolated sections but had not been applied consistently to the signal color definitions.
+
+| Plain name | Family name | Hex |
+|---|---|---|
+| Green | Emerald | `#34D399` |
+| Yellow | Amber | `#FCD34D` |
+| Red | Rose | `#FB7185` |
+
+## What was done
+
+Updated `brand/brand-spec.html` to use the family names (Emerald, Amber, Rose) consistently everywhere the signal colors are named — swatch labels, intro paragraphs, cross-surface application table, syntax editor notes, state diagram intro, and README surface table.
+
+## Implication for team
+
+All future references to these colors — in docs, copy, surface specs, and team communications — should use **Emerald**, **Amber**, and **Rose**. Plain "green/yellow/red" is now retired from brand vocabulary.
+
+---
+
+# Decision: spm-* layout blocks must not add horizontal padding when parent spm-group already provides it
+
+**Date:** 2026-04-04  
+**Author:** J. Peterman  
+**Status:** Resolved
+
+## Context
+
+The `spm-surface` component system (used in §2.1 and §2.2) has a three-level container hierarchy:
+
+```
+spm-surface
+  spm-group        ← owns horizontal indent: padding: 16px 24px
+    spm-header     ← section sub-header (e.g. "Structure · Indigo")
+    spm-grid       ← swatch row container
+      spm-row      ← individual token rows
+        spm-swatch ← the colored block
+```
+
+The `sf-group` system (used in §1.4 and Reserved Verdict Colors) has a simpler hierarchy:
+
+```
+sf-group           ← owns horizontal indent: padding: 20px 24px
+  sf-row           ← padding: 10px 0 (no horizontal)
+    sf-swatch      ← the colored block
+```
+
+## Problem
+
+Both `spm-header` (CSS class, `padding: 18px 24px`) and `spm-grid` (inline `style="padding: 16px 24px;"`) were adding their own 24px horizontal padding *in addition to* the 24px from the parent `spm-group`. This caused swatch content to render at 48px from the surface edge instead of 24px — a 24px misalignment vs. sf-swatch in the same card.
+
+## Decision
+
+**Rule:** In the `spm-*` component system, horizontal padding is the exclusive responsibility of the parent container (`spm-group`). Child layout blocks (`spm-header`, `spm-grid`) must use `padding: Npx 0` — vertical spacing only.
+
+## Change Made
+
+- `.spm-header { padding: 18px 0 }` (was `18px 24px`)
+- All 6 `spm-grid` inline styles: `style="padding: 16px 0;"` (was `16px 24px`)
+
+## Applies To
+
+Any future `spm-*` sections (§2.3 Inspector, §2.4 Docs Site, §2.5 CLI/Terminal) must follow this rule when adding new `spm-header` or `spm-grid` blocks inside `spm-group`.
+
+---
+
+# Decision: README Ship Plan — Shortest Safe Path to Published README
+
+**Author:** Steinbrenner (PM)
+**Date:** 2026-05-01
+**Status:** Recommendation — awaiting Shane sign-off
+**Input artifacts:** readme-restructure-proposal.md (revised 2026-04-07), reviews from Frank, George, Uncle Leo, and j-peterman-readme-review-gap-pass.md
+
+---
+
+## Current State
+
+The proposal is ready. All 7 required changes from the Frank/George/Uncle Leo review round have been applied to the proposal body (verified via `j-peterman-readme-review-gap-pass.md`). The reviewed issues that remain advisory/non-blocking are explicitly tracked and addressable by the rewriter without Shane involvement.
+
+**The single remaining blocker is Shane's sign-off.**
+
+---
+
+## Gate 1 — Shane Decisions (Required Before Rewrite Begins)
+
+These are the only four things that require Shane before the rewriter can start. None of them require a doc; they can be resolved in a single conversation.
+
+| # | Decision | Options | Default if Shane passes |
+|---|----------|---------|------------------------|
+| G1 | **Approve the proposal** — structural, CTA hierarchy, section order | Approve / Approve with changes / Reject | Blocked |
+| G2 | **Hero domain** — which sample domain goes in Quick Example | Subscription (team recommendation), TimeMachine (Shane prior approval), other | Blocked — no default |
+| G3 | **Tagline** — confirm or substitute the proposed closing tagline | "One file. Every rule. Prove it in 30 seconds." or substitute | Rewriter picks during draft |
+| G4 | **Logo/SVG** — is a brand mark SVG ready, or should title block use text wordmark only? | SVG at 48px / text wordmark placeholder | Text wordmark — rewriter proceeds, logo swaps in later without structural change |
+
+G1 is the formal gate. G2 is the highest-churn risk — if the hero domain is not locked before the draft, the rewriter will make a call and may have to redo it. G3 and G4 can slip into the draft without blocking.
+
+---
+
+## In-Flight Decisions (Rewriter Resolves Without Shane)
+
+These items are non-blocking per the reviews but must not be dropped silently:
+
+| Item | Decision owner | Guidance |
+|------|---------------|---------|
+| Section 4 heading: "What Makes Precept Different" vs "What Precept Does" | J. Peterman | Leo's AN-2 flagged this as a copywriting call. Either is acceptable. "What Precept Does" is more category-creation-consistent; "What Makes Precept Different" is what developers scan for. |
+| Section 4a rationale sentence structure (AI tooling "lead with / don't bury" conflation) | J. Peterman | Leo WC-2: split into two sentences per Leo's suggested rewrite. No Shane input needed. |
+| `engine.Inspect` args footnote | George | If hero uses an event with required args, add a comment clarifying partial inspection behavior. George advises. |
+| Context reminder wording (Getting Started opening line) | J. Peterman + Uncle Leo | The structure is locked ("Precept is a domain integrity engine for .NET. Install..."). The exact prose is Peterman's call; Leo reviews. |
+| Badge alt text values (version/status) | J. Peterman | Pull current NuGet version and build status values at draft time. Constraint #14. |
+
+---
+
+## Explicitly Out of Scope — First Rewrite Pass
+
+These items must not block or delay the first README rewrite. If they come up during drafting, defer them.
+
+| Out of scope | Why |
+|---|---|
+| Color/palette application within the README document | Elaine's palette/usage pass for the README surface has not landed. Use shields.io defaults for badges; no custom README styling in this pass. |
+| New DSL language features | Named guards, ternary in `set`, `string.length` — all in the research proposal pipeline, none implemented. The README must describe what exists. |
+| CLI section | CLI design exists, implementation deferred. Do not add CLI content to the README until implemented. |
+| Comparison table ("Precept vs. Stateless vs. FluentValidation") | Implicit differentiation strategy is locked. No comparison table. |
+| Full pipeline mechanics | 6-stage fire, working copy behavior, TransitionOutcome enum values → deferred to docs. The README links out. |
+| Sample catalog table | Per Elaine constraint #15: removed from main README, linked externally. |
+| New screenshots or state diagram images | If no current screenshot is available, use a descriptive alt text placeholder. Do not delay the draft for new assets. |
+
+---
+
+## Execution Path After Gate 1 Clears
+
+This is a one-shot draft → parallel review → ship sequence. No iteration loops.
+
+```
+1. J. Peterman writes README draft (one pass, targeting all 16 Elaine constraints)
+2. Frank + George co-review in parallel (Frank: structure/narrative; George: API accuracy + runtime claims)
+3. Uncle Leo editorial pass (copy, clarity, redundancy)
+4. Scribe validates constraint checklist (16 Elaine constraints, explicit check)
+5. Shane final read — no surprises expected if gates cleared upfront
+6. Ship
+```
+
+**Estimated elapsed time after Gate 1 clears:** 1–2 sessions (draft + review). The proposal is highly specified — the rewriter does not need to invent structure, section order, CTA hierarchy, or C# API calls. Those are all locked.
+
+**Churn risk:** Hero domain is the highest risk factor. A domain selected without conviction tends to get revised. Lock it in Gate 1.
+
+---
+
+## Appendix: What "Approved" Means for the Proposal
+
+The proposal (revised 2026-04-07) includes:
+- Recommended section order (finalized)
+- All 16 Elaine hard constraints (listed)
+- Section-by-section rationale with copy templates
+- Hero treatment (DSL block spec + C# block spec with correct API surface)
+- CTA hierarchy (primary/secondary/tertiary)
+- Trim summary (what is removed, compressed, repositioned, deferred)
+- Dual-audience (human/AI) structural validation table
+
+A rewriter working from this proposal needs one thing: the hero sample. Everything else is already specified.
+
+---
+
+### 2026-04-04T23:00:50Z: User directive
+**By:** shane (via Copilot)
+**What:** Use the top-rated hero snippet from the visual-language exploration as the temporary live hero until the final hero question is settled later.
+**Why:** User request — captured for team memory
+
