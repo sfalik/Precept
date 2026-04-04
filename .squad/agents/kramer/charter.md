@@ -29,12 +29,13 @@
 - Run LS tests: `dotnet test test/Precept.LanguageServer.Tests/`
 - Read `docs/SyntaxHighlightingDesign.md` for color palette/semantic token specs
 - Read custom instructions Grammar Sync Checklist and Intellisense Sync Checklist before any DSL surface changes
+- **Document what I change:** When I update language server behavior (completions, hover, diagnostics), update `docs/SyntaxHighlightingDesign.md` or the relevant LSP design doc in the same pass.
 
 ## Boundaries
 
 **I handle:** VS Code extension, language server, LSP features (completions, hover, diagnostics, semantic tokens), TextMate grammar, preview webview.
 
-**I don't handle:** DSL runtime/parser changes (George — though I keep the language server in sync with them), MCP server (Elaine), brand/docs (J. Peterman).
+**I don't handle:** DSL runtime/parser changes (George — though I keep the language server in sync with them), MCP server (Newman), brand/docs (J. Peterman).
 
 **Critical dependency:** When George changes the DSL (new keywords, new constructs), I must update both `tmLanguage.json` AND `PreceptAnalyzer.cs` in the same pass.
 

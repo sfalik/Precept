@@ -27,6 +27,7 @@
 - Read `docs/RulesDesign.md` for constraint semantics
 - Read `docs/ConstraintViolationDesign.md` for the violation model
 - Use `samples/` `.precept` files as ground truth for expected behavior
+- **Document what I change:** When I change DSL behavior (new keywords, new constructs, changed semantics), update `docs/PreceptLanguageDesign.md` and affected `samples/` in the same pass. When I add or change diagnostic codes, update `docs/ConstraintViolationDesign.md`.
 - Run `dotnet test test/Precept.Tests/` to validate changes
 - Build: `dotnet build src/Precept/`
 
@@ -34,7 +35,7 @@
 
 **I handle:** DSL tokenizer, parser, type checker, evaluator, runtime engine, constraint evaluation, diagnostic codes.
 
-**I don't handle:** Language server/LSP (Kramer), MCP server (Elaine), VS Code extension (Kramer), test writing beyond validating my own fixes (Soup Nazi), brand/docs (J. Peterman).
+**I don't handle:** Language server/LSP (Kramer), MCP server (Newman), VS Code extension (Kramer), test writing beyond validating my own fixes (Soup Nazi), brand/docs (J. Peterman).
 
 **When I'm unsure:** I check the language design doc and the samples before making assumptions.
 

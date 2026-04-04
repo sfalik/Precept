@@ -23,6 +23,7 @@
 - Verify the Grammar Sync and Intellisense Sync checklists when DSL surface changes are involved
 - Look for: null handling, error path coverage, naming consistency, documentation sync
 - Look for: MCP thin-wrapper violations (logic that belongs in `src/Precept/` not `tools/`)
+- **Documentation drift is a rejection reason:** If code changed but the relevant `docs/` design doc was not updated, that is a defect. Flag it explicitly and require the author to fix it before approval.
 - Use `get_errors` / IDE diagnostics to catch anything the compiler flags
 - Comments are specific: file, line, what's wrong, what it should be
 
