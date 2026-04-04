@@ -28,7 +28,7 @@ Background: `#0c0c0f`
 | 5 | Data · Names | `#B0BEC5` | normal / *italic if guarded* | Field names, argument names |
 | 6 | Data · Types | `#9AA8B5` | normal | `string`, `number`, `boolean`, `set`, `queue`, `stack` |
 | 7 | Data · Values | `#84929F` | normal | `true`, `false`, `null`, string literals, number literals |
-| 8 | Rules · Messages | `#FBBF24` | normal | String content in `because` / `reject` |
+| 8 | Rules · Messages | `#FBBF24` | normal | String content in `because` / `reject`, and the precept name |
 
 Verdict colors (`#34D399` enabled, `#F87171` blocked, `#FDE047` warning) are runtime-only — never in syntax highlighting.
 
@@ -236,16 +236,20 @@ Every category now maps to exactly one shade — no per-token overrides needed.
 
 #### C. Language Server — `ClassifyIdentifier()` Reclassification
 
+**✅ Decided.**
+
 | Context | Current → New |
 |---------|---------------|
 | After state-context tokens | `type` → `preceptState` |
 | After event-context tokens | `function` → `preceptEvent` |
 | After field-context tokens | `variable` → `preceptFieldName` |
-| After `precept` | `type` → `preceptKeywordSemantic` scope (precept name = structure) |
+| After `precept` | `type` → **`preceptMessage`** (gold — the contract identity) |
 | After `.` | `variable` → `preceptFieldName` (member access) |
 | Default (bare identifier) | `variable` → `preceptFieldName` |
 
 #### D. Language Server — Constraint Detection for Italic Modifier
+
+**✅ Decided.** Deferred to Phase 7 (after colors ship). Analysis uses the parsed `PreceptDefinition` from `SharedAnalyzer`. Fail open — no italic when parse is incomplete.
 
 This is new capability. The handler must determine which states, events, and fields are constrained and emit the `preceptConstrained` modifier for those tokens.
 
@@ -255,11 +259,11 @@ This is new capability. The handler must determine which states, events, and fie
 2. **Constrained events:** Collect all event names that have `on <Event> assert` blocks.
 3. **Guarded fields:** Collect all field names referenced in `invariant` expressions.
 
-**Implementation approach:** Before the per-token loop, do a pre-pass over the token stream (or use the parsed `PreceptDefinition` model if available in the sync handler) to build three `HashSet<string>` collections: `constrainedStates`, `constrainedEvents`, `guardedFields`. Then during token emission, when an identifier is classified as `preceptState`/`preceptEvent`/`preceptFieldName`, check membership and add the modifier.
-
-**Dependency:** The current `Tokenize()` method works from the raw token stream, not the parsed model. The `PreceptTextDocumentSyncHandler.SharedAnalyzer` does have the parsed model available. The simplest path is to extract the constraint sets from the analyzer's `PreceptDefinition` for the document.
+**Implementation approach:** Before the per-token loop, extract constraint sets from the analyzer's `PreceptDefinition` for the document, building three `HashSet<string>` collections: `constrainedStates`, `constrainedEvents`, `guardedFields`. Then during token emission, when an identifier is classified as `preceptState`/`preceptEvent`/`preceptFieldName`, check membership and add the modifier. If the parse is incomplete or failed, skip italic entirely (fail open).
 
 #### E. Extension `package.json` — `semanticTokenColors` and Type Declarations
+
+**✅ Decided.** Mechanical — follows directly from A and B. Comments are TextMate-only (tokenizer strips them), so comment color is handled entirely in the TextMate fallback (section F).
 
 Add the custom semantic token type contributions and color mappings:
 
@@ -302,6 +306,8 @@ Add the custom semantic token type contributions and color mappings:
 
 #### F. TextMate Grammar — Fallback Color Anchoring
 
+**✅ Decided.** Strings default to slate (Data · Values) in TextMate fallback. Message strings flash slate→gold briefly when semantic tokens load. This keeps non-message strings (more common in default values) correct immediately.
+
 The TextMate grammar already assigns specific scopes. To lock fallback colors before the language server loads, add `tokenColorCustomizations` in `configurationDefaults`:
 
 ```jsonc
@@ -318,7 +324,7 @@ The TextMate grammar already assigns specific scopes. To lock fallback colors be
       { "scope": "storage.type.precept",                   "settings": { "foreground": "#9AA8B5" } },
       { "scope": "constant.language.precept",              "settings": { "foreground": "#84929F" } },
       { "scope": "constant.numeric.precept",               "settings": { "foreground": "#84929F" } },
-      { "scope": "string.quoted.double.precept",           "settings": { "foreground": "#FBBF24" } },
+      { "scope": "string.quoted.double.precept",           "settings": { "foreground": "#84929F" } },
       { "scope": "keyword.operator.comparison.precept",    "settings": { "foreground": "#6366F1" } },
       { "scope": "keyword.operator.logical.precept",       "settings": { "foreground": "#6366F1" } },
       { "scope": "keyword.operator.arithmetic.precept",    "settings": { "foreground": "#6366F1" } },
@@ -336,47 +342,38 @@ The TextMate grammar already assigns specific scopes. To lock fallback colors be
 
 #### G. String Literal Context — Messages vs. Plain Strings
 
+**✅ Decided.** Mechanical — uses existing `previousKind` tracking.
+
 The locked palette assigns `#FBBF24` (gold) to rule message strings (in `because` / `reject`) but treats other string contexts as Data · Values (`#84929F`). The current handler emits all `StringLiteral` tokens as `"string"` without context.
 
 **Required change:** Track whether a string literal follows a `because` or `reject` keyword. If so, emit `preceptMessage`; otherwise emit `preceptValue`.
 
-## Implementation Order
+## Implementation Plan
 
-| Phase | Scope | Files | Dependency |
-|-------|-------|-------|------------|
-| **1. Token types** | Register custom types + modifiers in legend | `PreceptSemanticTokensHandler.cs` | None |
-| **2. Type map** | Reclassify `BuildSemanticTypeMap()` to emit Precept types | `PreceptSemanticTokensHandler.cs` | Phase 1 |
-| **3. Identifier split** | Update `ClassifyIdentifier()` for new types | `PreceptSemanticTokensHandler.cs` | Phase 1 |
-| **4. String context** | Distinguish message strings from value strings | `PreceptSemanticTokensHandler.cs` | Phase 1 |
-| **5. Color lock** | Add `semanticTokenTypes`, `semanticTokenModifiers`, `semanticTokenColorCustomizations` | `package.json` | Phase 1 |
-| **6. TextMate fallback** | Add `tokenColorCustomizations` for immediate coloring | `package.json` | None |
-| **7. Constraint detection** | Build constraint sets, emit `preceptConstrained` modifier | `PreceptSemanticTokensHandler.cs` | Phase 1, parsed model access |
-| **8. Grammar scope split** | Optionally split `keyword.other.precept` for better TextMate fallback | `precept.tmLanguage.json` | None |
-
-Phases 1–6 can be done as a single implementation pass. Phase 7 (constraint detection) adds italic and depends on parsed model access. Phase 8 is an optional polish step.
+See `docs/SyntaxHighlightingImplementationPlan.md` for the phased execution plan (9 phases, checkpoints, prompts, and status tracker).
 
 ## Risks and Open Questions
 
-### R1: `configurationDefaults` scope precedence
+### R1: `configurationDefaults` scope precedence — ✅ Accepted
 
-`editor.semanticTokenColorCustomizations` in `configurationDefaults` sets defaults that the user can override in their `settings.json`. This is the correct behavior for most extensions. However, the brand spec says "no user-facing palette overrides." True enforcement would require injecting colors at the decoration level (via `createTextEditorDecorationType`), which is significantly more complex. **Recommendation:** Accept `configurationDefaults` — users who override are power users making a deliberate choice.
+`editor.semanticTokenColorCustomizations` in `configurationDefaults` sets defaults that the user can override in their `settings.json`. This is the correct behavior for most extensions. However, the brand spec says "no user-facing palette overrides." True enforcement would require injecting colors at the decoration level (via `createTextEditorDecorationType`), which is significantly more complex. **Decision:** Accept `configurationDefaults` — users who override are power users making a deliberate choice.
 
-### R2: Theme interaction
+### R2: Theme interaction — ✅ Accepted
 
-The `[*]` selector applies to all themes. On light themes, the dark-mode palette will have poor contrast against a light background. **Recommendation:** The brand spec explicitly scopes to dark-mode-only. We could restrict to dark themes (`[*Dark*]`, `[Default Dark+]`, etc.) but that would leave light-theme users with zero Precept-specific coloring. **Decision needed:** Apply to all themes (dark-mode colors on light backgrounds) or restrict to dark themes only?
+The `[*]` selector applies to all themes. On light themes, the dark-mode palette will have poor contrast against a light background. Restricting to dark themes would leave light-theme users with zero Precept-specific coloring. **Decision:** Apply to all themes. Light-theme contrast is a known limitation for v1.
 
-### R3: Constraint detection accuracy
+### R3: Constraint detection accuracy — ✅ Accepted
 
-Italic requires knowing which states/events/fields are constrained. This depends on a successful parse. For files with syntax errors, the constraint sets may be incomplete or absent, causing italic to flicker as the user types. **Recommendation:** Fail open — if the parse is incomplete, skip italic rather than showing stale data. Italic is a progressive enhancement.
+Italic requires knowing which states/events/fields are constrained. This depends on a successful parse. For files with syntax errors, the constraint sets may be incomplete or absent, causing italic to flicker as the user types. **Decision:** Fail open — if the parse is incomplete, skip italic rather than showing stale data. Italic is a progressive enhancement. Deferred to Phase 7.
 
-### R4: Bold in semantic tokens
+### R4: Bold in semantic tokens — ✅ Accepted
 
-VS Code semantic token rules support `"bold": true` in `settings.json` / `configurationDefaults`, but this is applied via CSS `font-weight`. The actual rendering depends on whether the editor font has a bold variant. Inconsolata (the brand font) supports variable weight 400–900, so bold will render correctly if the user has Inconsolata configured. For users with other fonts, bold is best-effort. **Recommendation:** Acceptable — bold is a brand signal, not a correctness requirement.
+VS Code semantic token rules support `"bold": true` in `settings.json` / `configurationDefaults`, but this is applied via CSS `font-weight`. The actual rendering depends on whether the editor font has a bold variant. Inconsolata (the brand font) supports variable weight 400–900, so bold will render correctly if the user has Inconsolata configured. For users with other fonts, bold is best-effort. **Decision:** Acceptable — bold is a brand signal, not a correctness requirement.
 
-### R5: TextMate keyword scope granularity
+### R5: TextMate keyword scope granularity — ✅ Accepted
 
-The current grammar uses `keyword.other.precept` for both semantic and grammar keywords. Until Phase 8, TextMate fallback cannot distinguish Structure · Semantic (bold `#4338CA`) from Structure · Grammar (normal `#6366F1`). All keywords will appear as `#4338CA` bold in the 1–2 second window before semantic tokens load. **Recommendation:** Acceptable for v1. Phase 8 can add `keyword.other.grammar.precept` later if the flash is noticeable.
+The current grammar uses `keyword.other.precept` for both semantic and grammar keywords. Until Phase 8, TextMate fallback cannot distinguish Structure · Semantic (bold `#4338CA`) from Structure · Grammar (normal `#6366F1`). All keywords will appear as `#4338CA` bold in the 1–2 second cold-start window before semantic tokens load. **Decision:** Acceptable for v1. Phase 8 can add `keyword.other.grammar.precept` later if the flash is noticeable.
 
-### R6: Dual-category tokens
+### R6: Dual-category tokens — ✅ Accepted
 
-Some tokens have multiple `[TokenCategory]` attributes (e.g., `set` is both `Action` and `Type`). `GetCategory()` returns only the primary (first) attribute. The current design maps the primary category. If a dual-role token needs different colors in different syntactic positions, the handler would need context-aware logic beyond the category map. **Current assessment:** This is already handled implicitly — `set` as a keyword gets Structure · Semantic from its Action category; `set` as a collection type in a field declaration gets Data · Types from the Type category. The tokenizer disambiguates based on position.
+Some tokens have multiple `[TokenCategory]` attributes (e.g., `set` is both `Action` and `Type`). `GetCategory()` returns only the primary (first) attribute. The current design maps the primary category. If a dual-role token needs different colors in different syntactic positions, the handler would need context-aware logic beyond the category map. **Decision:** Already handled implicitly — `set` as a keyword gets Structure · Semantic from its Action category; `set` as a collection type in a field declaration gets Data · Types from the Type category. The tokenizer disambiguates based on position. No change needed.
