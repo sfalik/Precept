@@ -13,6 +13,59 @@
 
 ## Learnings
 
+### 2026-04-06 — Brand-spec § 1.4 palette structure review
+
+**Task:** Assess whether the second palette (per-category syntax cards) in § 1.4 belongs in § 2.1, and whether § 1.4.1 overlaps with / creates redundancy against that second palette or the main palette card.
+
+**What was found:**
+- § 1.4 contains two distinct color systems: the brand palette (`pc-palette` card) and the syntax highlighting palette (per-category token cards: Structure, States, Events, Data, Rules, Comments, Verdicts). These are structurally unseparated.
+- Both systems label themselves "8+3" but count different colors: the intro paragraph uses "8+3" to mean 8 syntax token shades + 3 runtime verdicts; the palette card uses "8+3" to mean 8 brand/UI colors + 3 semantic verdicts. Same label, different meaning.
+- § 1.4.1 "Color Roles" table re-lists the same 12 colors from the palette card — only new content is the "Specific Uses" column. Redundant without being obviously so.
+- The constraint signaling table appears verbatim in both § 1.4 and § 2.1 (triple-duplication if you count the constraint-aware highlighting table in 2.1 as the same content).
+
+**What was produced:**
+- `brand/references/brand-spec-palette-structure-review-peterman.md` — full review with problem analysis, evidence, and clean section structure recommendation
+- `.squad/decisions/inbox/j-peterman-brandspec-palette-structure.md` — team-relevant decision for Shane's sign-off
+
+**Key recommendation:** Move per-category syntax cards + constraint signaling table from § 1.4 → § 2.1. Trim § 1.4.1 Color Roles table (remove what's already in palette card). Rename § 1.4.1 to "Cross-Surface Color Application." Rewrite § 1.4 intro to clarify two-layer system.
+
+**Brand-spec rule reinforced:** When a section serves two distinct audiences (brand palette consumers vs. syntax surface implementers), split it. Audience clarity > section density.
+
+---
+
+### 2026-04-05 — Section 1.3 restored: Brand mark size variants + two surfaces card
+
+**File updated:** `brand/brand-spec.html`
+
+**What was done:**
+- Expanded "Brand mark form" card (§1.3) to show three size variants in horizontal layout:
+  - **Full (64px)** — NuGet, GitHub, VS Code extension icon; uses existing SVG at full scale
+  - **Badge (32px)** — sidebar, compact contexts; scaled SVG with label and use-case note
+  - **Micro (16px)** — favicon, status bar; simplified SVG with just indigo circle + emerald arrow (dropped destination circle)
+- All three variants displayed in a flex row with SVG + label + use-case beneath each
+- Simplified color key moved inline: four swatches (indigo, emerald, slate, ground) without the verbose role descriptions
+- Added new card: "Brand in system: the two primary surfaces"
+  - Two-column grid layout showing DSL Code (left) and State Diagram (right) side-by-side
+  - Demonstrates how the brand mark lives within the visual system — one palette, two surfaces
+  - Uses locked palette: keywords #4338CA, states #A898F5, events #30B8E8, operators #6366F1, transition arrow #34D399, ground #1e1b4b
+  - Subtitle emphasizes the connection: *"DSL code and state diagram. One palette. Every precept file becomes a brand moment."*
+  - Content adapted from `visual-language-exploration.html` § 3 (lines 2132–2174)
+
+**Structural decisions made:**
+- Grid layout for two surfaces (not `.side-by-side` class) — uses inline `grid-template-columns: 1fr 1fr` with gap, consistent with brand-spec card styles
+- Each surface panel (code and diagram) has its own border and background (#0c0c0f with #1e1b4b border)
+- Size variants shown in order of prominence: Full → Badge → Micro, left-to-right
+- Micro variant simplified (removed destination circle) to maintain legibility at 16px viewBox scale
+
+**Reasoning:**
+- Size variants clarify where the brand mark appears across product surfaces — no ambiguity about icon sizing
+- Two-surfaces card reinforces the visual language principle: the same DSL semantics live in two visual forms with one locked palette
+- Placement after the brand mark card in § 1.3 (not in § 2: Visual Surfaces) keeps the brand mark as a complete identity system before moving to surface applications
+
+**Files affected:** `brand/brand-spec.html` only.
+
+---
+
 ### 2026-04-05 — brand-spec.html restructured: Surfaces-first organization
 
 **File updated:** `brand/brand-spec.html`
@@ -82,6 +135,31 @@
 - Decision recommendation filed to inbox: statement-count tension and Phase 3 gate interpretation.
 
 
+
+### 2026-04-05 — README Restructure Proposal filed
+
+**File created:** `brand/references/readme-restructure-proposal.md`
+
+**What was done:**
+- Synthesized three research passes (Peterman brand/copy, Steinbrenner PM/adoption, Elaine UX/IA) into a single concrete README structure recommendation.
+- Established 16 hard constraints from Elaine's review — all must be satisfied before rewrite ships.
+- Recommended section order: Title block → Hook → Quick Example (DSL hero + C# execution) → Getting Started → What Makes Precept Different → Learn More → License.
+- Specified hero treatment: 18-20 line DSL block (≤60 chars/line) + separate 5-line C# block; business domain (not Time Machine); both with language tags.
+- CTA hierarchy: Primary = VS Code extension, Secondary = NuGet, Tertiary = Copilot plugin (deferred to differentiation section).
+- Dual-audience architecture documented: every structural decision validated against both human (F-pattern, cognitive load, mobile viewport) and AI reader (semantic structure, language tags, descriptive alt text) requirements.
+- Palette usage roles deferred to Elaine's pending palette/usage pass; anchored to locked indigo-first system.
+
+**Key decisions made:**
+- Hero sample domain deferred to Shane's judgment (Order vs. Subscription Billing vs. LoanApplication) — structural specification is locked.
+- Time Machine sample moved to sample catalog; hero must use real business logic domain.
+- Copilot plugin CTA removed from Getting Started entirely; repositioned under AI-Native Tooling differentiation section.
+- Sample catalog table removed from main README; linked externally.
+
+**Key file paths:**
+- `brand/references/readme-restructure-proposal.md` — the proposal
+- `brand/references/readme-research-peterman.md` — brand/copy research (input)
+- `docs/references/readme-research-steinbrenner.md` — PM/adoption research (input)
+- `brand/references/readme-research-elaine.md` — UX/IA review (hard constraints source)
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
@@ -222,3 +300,170 @@ Prose descriptions, ecause messages, and DSL code snippets were left untouched.
 - because messages = highest-weight brand element (Voice/Wit, 25pts)
 - in <State> assert = strongest differentiator (no equivalent in competitors)
 - Fictional domains preferred — readers project themselves without real-world constraints
+
+### Voice & Tone Revision: Wit Integration (2026-XX-XX)
+
+**Requested by:** Shane Falik  
+**Change:** Section 1.2 Voice & Tone in brand-spec.html updated to acknowledge and embrace dry wit.
+
+**What Changed:**
+- **Table row (Serious ↔ Funny):** Replaced "Serious. No jokes." with "Dry wit welcome. Never forced. Precision finds the humor in the truth."
+- **Prose paragraph:** Expanded to acknowledge wit as integral to voice — "The voice states facts. It doesn't hedge. It doesn't oversell. It finds the wit in precision. When something matters, it says why — and the clarity itself can be the humor."
+- **Do examples:** Added two wit examples showcasing precision humor:
+  - "If you've been writing the same validation in four services, Precept has questions."
+  - "Turns out business rules don't change just because you moved them to a different service."
+- **Status chip:** Changed from "LOCKED" to "REVISED" (blue background, lighter text).
+
+**Reasoning:**  
+Precept's wit is not performance—it's earned from specificity. The tool knows what it does. The alternatives are slightly absurd. This wit doesn't mock the user; it states the truth in a way that makes the truth funnier than a joke. Like Stripe docs, like the best changelogs. Precision humor.
+
+**Files Modified:**
+- rand/brand-spec.html (section 1.2 only)
+
+
+---
+
+### 2026-04-05 — Section 1.4: Indigo Color System Overview card added
+
+**File updated:** `brand/brand-spec.html`
+
+**What was done:**
+- Added a new **"Indigo Color System — Overview"** card at the TOP of section 1.4 (Color System), before the existing "Structure · Indigo" card.
+- Card structure follows color-exploration.html palette-card format, adapted with inline styles to match .card class typography in brand-spec.
+- Card contents:
+  1. **Swatch bar** — 48px solid block at #6366F1, full-width bleed
+  2. **Gradient ramp** — 8 equal segments from #1e1b4b (ground) → #312e81 → #3730a3 → #4338ca → #6366f1 → #818cf8 → #a5b4fc → #c7d2fe (pale)
+  3. **Title**: "Indigo · 239°" in #6366F1; subtitle describes the 8-shade system
+  4. **Color role table** — grid layout: swatch dot · hex · role name · usage description; Semantic/Grammar rows colored for legibility
+  5. **NuGet badge** — using #6366f1 brand primary
+  6. **Syntax snippet** — 5-line LoanApplication DSL with #4338CA keywords and #6366F1 grammar connectives
+  7. **State diagram** — 280×80 SVG: Draft → Submit → UnderReview, #4338CA stroke, #A898F5 state text, #30B8E8 event text, #34D399 arrow
+  8. **Bottom note** — italic sign-off on the indigo selection rationale
+
+**Structural decisions made:**
+- Card uses negative margins on swatch bar and ramp to achieve full-bleed effect inside the .card padding box
+- Color role table built as grid-template-columns: 14px 80px 96px 1fr — swatch dot, hex, role, usage
+- No new CSS classes introduced — all styling is inline per brief
+- Arrow marker ID scoped as indigo-arrow-overview to avoid SVG <defs> collisions with other diagrams on the page
+- #4338CA (Semantic) and #6366F1 (Grammar) rows use the actual token color for text, all other role names in #a1a1aa
+
+**Reasoning:**
+- The overview card gives readers the full picture — all 8 shades in one scan — before the per-role breakdown in the Structure card below
+- The in-context examples (badge, snippet, diagram) demonstrate the palette live, not in abstraction
+- Indigo-only treatment (no emerald/cyan/violet here) keeps the overview focused on the family
+
+**Files affected:** `brand/brand-spec.html` only.
+
+
+### 2026-07-11 — README hero example replaced: LoanApplication → TimeMachine
+
+**File updated:** README.md
+
+**What was done:**
+Replaced the hero code block in the "Aha! Moment" section. LoanApplication — 40+ lines, bureaucratic, deeply nested guard logic — swapped for TimeMachine (15 lines). Clean structural confidence: one field, one invariant, 3 states, 2 events, dotted arg access, a when guard on 88 mph && 1.21 gigawatts, a reject with brand voice, and a tidy arrival loop. Comments stripped for austere register. Language tag removed from fence (plain monospace, no GitHub syntax highlighting).
+
+**Why:**
+- TimeMachine demonstrates Precept's core primitives more memorably — invariant, guard, reject, dotted access — in half the lines
+- The error messages land: "The flux capacitor cannot run on vibes" communicates constraint philosophy faster than any explainer
+- LoanApplication was correct but dense; it read like compliance, not craft
+- Brand alignment: the hero is the first thing a developer reads. It should make them want to write a precept, not reach for a lawyer
+
+**Files affected:** README.md only.
+
+## 2026-04-04 — Brand mark: corrected to three forms
+
+**Task:** Replace single-mark (Full/Badge/Micro size variants) in rand/brand-spec.html section 1.3 with the correct three marks from rand/explorations/semantic-color-exploration.html section 5. Also sync rand/explorations/visual-language-exploration.html Surface 3 icon section.
+
+**What was wrong:**
+- A previous agent replaced the brand mark card with a Full/Badge/Micro size-variant display — three sizes of the *same* mark. That was incorrect.
+- A previous agent added a "Brand in system: the two primary surfaces" card with DSL code + state diagram — also incorrect placement.
+- isual-language-exploration.html Surface 3 still showed TBD placeholder boxes.
+
+**What was fixed:**
+- rand/brand-spec.html section 1.3: Replaced "Brand mark form" card (size variants) + removed "Brand in system" card → new "Brand mark — three forms" card showing all 3 correct marks side by side with labels.
+- rand/explorations/visual-language-exploration.html: Replaced TBD placeholder → same 3-mark display.
+- All three SVGs copied exactly from semantic-color-exploration.html section 5, lines 637–675.
+- Marks: State + transition / Tablet / precept / Tablet + state machine (primary).
+
+
+### 2026-05-01 — Section 1.4: Indigo overview card reformatted to palette-card style
+
+**Requested by:** Shane
+
+**File updated:** `brand/brand-spec.html`
+
+**What was done:**
+- Replaced the bespoke `.card`-based indigo overview block in § 1.4 with a `.pc-card` that exactly mirrors the `palette-card` format from `brand/explorations/color-exploration.html`.
+- New card structure: 64px solid swatch bar (#6366F1) → 32px 8-shade gradient ramp → h2 title "Indigo · 239°" → monospace hex line → four `.pc-context-block` sections (NuGet Badge, Icon Mock, Syntax Highlighting, State Diagram Accent).
+- Added `pc-*` CSS class family to brand-spec.html's `<style>` block to reproduce the exact dimensions, colors, and typography of the exploration format without colliding with the existing `.palette-card` grid styles.
+- Replaced the old role table + two-column NuGet/Syntax layout + separate diagram block with the unified four-section palette-card layout.
+- NuGet badges: `v1.0.0` (indigo #4338ca), `.NET 8.0` and `license MIT` (slate).
+- Icon mocks: combined tablet + state machine SVG at 64px and 32px.
+- Syntax snippet: keywords #4338ca bold, state names #818cf8, event #30b8e8, operators #6366f1.
+- State diagram: Draft → Submit → Review with indigo stroke (#6366f1) and emerald arrow (#34d399).
+
+**Structural decisions made:**
+- Used a new `pc-` class prefix rather than overriding `.palette-card` — the existing class is used as a grid item in a different context (§ 1.4 palette swatches).
+- Kept all surrounding content intact: § 1.4 heading, both callouts, and all cards below the overview card.
+
+**Decision record:** `.squad/decisions/inbox/peterman-indigo-card-format.md`
+
+### 2026-04-04 — Brand compliance review: Elaine's 5-Surface Visual UX Spec
+
+**Requested by:** Shane
+
+**Review filed:** `.squad/decisions/inbox/j-peterman-surfaces-review.md`
+
+**What was reviewed:**
+Elaine's `brand/visual-surfaces-draft.html` — full UX specifications for five surfaces: Syntax Editor, State Diagram, Inspector Panel, Docs Site, CLI/Terminal.
+
+**Overall verdict:** Approved with notes. The draft is grounded in the locked system throughout. One priority issue blocks integration into brand-spec.html; everything else is minor or aspirational.
+
+**Key findings:**
+
+1. **State Diagram — priority issue.** The color table lists three off-system hex values (`#A5B4FC`, `#94A3B8`, `#C4B5FD`) as lifecycle-tinted node colors — directly contradicting the spec's own "no lifecycle tints" callout and brand-decisions.md. Additionally, three off-system cyan sub-shades (`#38BDF8`, `#7DD3FC`, `#0EA5E9`) were introduced for event subtype differentiation. Both must be corrected: state nodes use indigo borders + violet text (`#A898F5`); event sub-shading either uses the single locked cyan or goes through a palette extension decision.
+
+2. **Syntax Editor** — fully compliant. Eight-shade palette, typography signal, and AI-first note are all accurate and well-stated.
+
+3. **Inspector Panel** — compliant. Verdict colors applied correctly. Gold (`#FBBF24`) used for constraint message text; this is defensible (human-readable explanation earns the warm interrupt) and spatially distinct from syntax gold. Minor: `#9096A6` (editorial/comments shade) repurposed for read-only field indicators — valid secondary use, should be documented.
+
+4. **Docs Site** — aspirational, correctly held as future spec. Minor: "system font stack" should read Cascadia Cove with monospace fallback chain, not as an alternative typeface.
+
+5. **CLI / Terminal** — compliant. Decision to exclude brand indigo from terminal output is correct given light terminal rendering constraints. Verdict colors + symbol redundancy is right.
+
+**Brand positioning quality:** Strong across all five surfaces. The inspector framing ("both a human debugging tool and an API contract for AI tools") and the CLI note ("color should never be the only signal") reflect exactly the right positioning for a domain integrity engine used by both developers and AI agents.
+
+---
+
+### 2025-01-18 — README research complete: 13 projects studied, Hybrid model recommended
+
+**Files created:** `brand/references/readme-research-peterman.md`
+
+**Research delivered:**
+- Studied 13 READMEs (8 comparable libraries, 5 exemplar projects) with real data: opening hooks (6–32 words), hero placement (2–51 lines from top), hero code (6–26 lines), section structure, positioning claims, AI-first signals
+- Measured every metric from fetched content — no inference, no imagination
+- Three README models identified: Content-Rich (XState, Stateless, Polly), Gateway (Bun, Biome, FastEndpoints), Hybrid (Zod, FluentValidation, React)
+- AI-first positioning is **rare** (only NRules mentions GPT tooling) — Precept's MCP + Copilot + LSP story is unique opportunity
+- Hero code ranges 6–26 lines; median 13 lines. Precept target: 18 lines (Subscription Billing DSL)
+
+**Key findings:**
+1. **Structural pattern:** Hybrid model works for Precept — hook → hero → AI tooling → features → links (not Content-Rich deep dives, not Gateway redirect-only)
+2. **Hero conventions:** 18-line DSL sample (no runtime code), complete round trip (definition → usage), real domain (Subscription Billing not foo/bar), proves DSL readability in 30 seconds
+3. **Positioning language:** Category-creating tools use "[X] is a [new category] for [platform]" structure. Recommendation: "Precept is a domain integrity engine for .NET that binds an entity's state, data, and business rules into a single executable DSL contract." (23 words)
+4. **AI-first section:** Add dedicated "AI-First Tooling" section after hero with MCP server (5 tools), Copilot plugin (agent + 2 skills), language server (LSP) — this is **unique to Precept** and factual
+5. **Copy tone:** Declarative present tense, concrete metrics (18-line hero, 9 DSL constructs, 5 MCP tools), technical precision (DSL runtime, interpreter, contract), no hedging
+6. **Anti-patterns:** Don't bury hero after 50 lines (Polly), don't show runtime invocation in hero (MediatR), don't redirect before showing code (Vue), don't use 32-word opening sentence (Polly)
+
+**Recommendations synthesized:**
+- **Structure:** Hybrid README (hook + hero + AI tooling + features + links)
+- **Hero:** Subscription Billing 18-line DSL sample (aligns with line-economy research pole star)
+- **Positioning:** "Domain integrity engine for .NET" (category-creating language, not comparative)
+- **AI-first:** Lead with MCP + Copilot + LSP as differentiated tooling story
+- **Copy:** J. Peterman voice (evocative but precise, concrete, confident, technical)
+
+**What this unblocks:**
+- README revision with research-backed structure (not guesswork)
+- AI-first positioning as competitive advantage (no comparable library leads with MCP/Copilot/LSP)
+- Hero sample selection finalized (Subscription Billing at 18 DSL statements is research-validated length)
+
+**Next:** Draft new README.md using Hybrid model, 18-line hero, AI-first section.

@@ -676,6 +676,18 @@ Fix the brand-spec.html §1.4 palette card to correctly reflect the locked 8+3 c
 
 (This section accumulates lessons that apply across sessions and inform future work.)
 
+**"Specified" and "complete" are different things.** §2.2 had correct structural colors — node borders, state names, event labels all had locked hex values. But the section was incomplete because it only covered the compile-time static layer. The runtime verdict overlay (enabled/blocked/muted edges, current state highlighting, hover interactions) exists in the implementation but not the spec. A section can be accurate in everything it says and still be inadequate for what it doesn't say. The test: "Can an implementer build this surface from the spec alone?" If they'd need to reverse-engineer behavior from the codebase, the spec is incomplete.
+
+**Implementation drift is most dangerous where the spec is silent.** The webview uses `#1FFF7A`, `#FF2A57`, `#6D7F9B` for diagram edges — all off-system colors. But this isn't Kramer's fault. The spec never specified what colors to use for runtime edge states. When the spec is silent on a visual behavior, the implementer fills the gap with whatever works. The fix isn't "correct the implementation" — it's "write the spec, then the implementation naturally aligns." Drift is a spec gap symptom, not an implementation quality problem.
+
+**Diagram color has two layers, not one.** The structural layer (compile-time: what the precept definition determines) and the runtime overlay (inspection-time: what the current state and verdict data determine) need separate treatment because they have different sources of truth. Structural colors come from the precept definition. Runtime colors come from the inspector engine. Mixing them in one table creates confusion about what's always-visible vs. what's context-dependent. Separate tables, separate mental models.
+
+**Information architecture trumps visual completeness.**My prior pass focused on getting the palette card *correct* (replacing wrong hex values, adding the 8+3 system, expanding §1.4.1). That was necessary, but I didn't step back and ask whether the *structure* was right. The category cards looked like they belonged in §1.4 because they used the same visual style as the palette card — but their *content scope* was surface-specific, not brand-level. Lesson: after fixing content accuracy, always re-evaluate placement. "Right content, wrong location" is an IA error that correct hex values won't fix.
+
+**Duplication signals a scope problem.** The constraint signaling table appearing in both §1.4 and §2.1, and Gold's restriction appearing four times across 300 lines, are symptoms of content that doesn't have a clear home. When the same fact needs to be stated more than twice, the section boundaries are in the wrong place. Fix the structure, and the duplication resolves itself.
+
+**The brand/surface seam is the natural split point.** §1.4 should answer "what colors does Precept use?" §2.1 should answer "how does the editor use those colors?" When a section tries to answer both, readers get two palettes in a row and can't tell which one is authoritative. The fix is always the same: split along the seam that already exists in the content's scope.
+
 ---
 
 ## Session 3 — Reviewer Corrections Applied (2026-04-04)
@@ -717,3 +729,42 @@ No remaining open items from reviewer feedback.
 | .squad/decisions/inbox/elaine-reviewer-corrections.md | Decision record documenting all corrections |
 | .squad/agents/elaine/history.md | This entry |
 
+---
+
+## Session 4 — Diagram Color Mapping UX Review (2026-04-04)
+
+### What I Did
+
+**Diagram color mapping clarity review completed.** Reviewed the color mapping specification for §2.2 State Diagram in brand-spec and identified missing UX clarity around structural element mapping and runtime verdict overlay.
+
+**Key recommendations:** Add two new h3 subsections within §2.2:
+1. **"Diagram color mapping"** — complete element-to-color reference table covering every visible diagram component (canvas, node borders, node fills, state name text, event label text, transition arrows, arrow markers, guard annotations, legend text)
+2. **"Runtime verdict overlay"** — how diagram colors change when paired with an active inspector instance. Covers: current state highlighting, enabled/blocked/warning edge coloring, muted non-current-state edges, transition glow effects, hover interaction colors
+
+**Why this is needed:**
+- **Scattered specification:** Diagram colors mentioned inline in §2.2 prose, partially in §1.4.1, and in brand-decisions.md — but never collected into one reference. Implementers must reconstruct the mapping from multiple sources.
+- **Implementation drift:** The webview currently uses #1FFF7A / #FF2A57 / #6D7F9B for diagram edges. The locked system specifies #34D399 / #F87171 / TBD. Without explicit spec, drift isn't visible or closeable.
+- **Runtime overlay unspecified:** Verdict-colored edges (enabled green, blocked red, muted gray) based on inspector state exist in implementation but have no brand-spec backing.
+- **Current state indicator undefined:** The "you are here" node visual distinction is not specified anywhere.
+
+**Placement rationale:**
+- NOT in §1.4 (that's brand identity, not surface application)
+- NOT in §2.1 (that's the syntax editor surface)
+- Within §2.2 as new h3 blocks — consistent with how all §2.x surfaces use h3 for subsections
+
+**Three flagged UX decisions for Shane:**
+1. **Current state indicator style:** Fill tint (#1e1b4b at low opacity) vs. border glow vs. badge dot. **Recommend: fill tint** for consistency with inspector highlight pattern.
+2. **Muted edge color:** #71717A (text-muted, in system) vs. #52525b (zinc-600, off-system). **Recommend: #71717A** to stay within established system.
+3. **Guard annotation text color:** Slate #B0BEC5 (data family). **Recommend: this value** for consistency with other data-role text.
+
+### Key Deliverables
+
+| File | Purpose |
+|------|---------|
+| .squad/decisions/inbox/elaine-diagram-color-mapping.md | Full decision document with placement rationale, content scope, three flagged UX decisions |
+| rand/references/brand-spec-diagram-color-mapping-review-elaine.md | Full analysis document |
+
+### Status
+
+✓ Decision filed to decisions.md (merged 2026-04-04)
+⏳ Awaiting Shane resolution on three flagged UX decisions

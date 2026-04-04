@@ -107,3 +107,15 @@
   3. **String `.length` Accessor (MEDIUM)** — Zod and FluentValidation have first-class string validation. Precept has `.count` on collections but nothing on strings.
 - **Strategic finding:** State-scoped `in <State> assert` has no equivalent in any studied library — this is Precept's strongest hero-sample differentiator and must appear prominently in hero candidate.
 - **Decision inbox filed:** Three proposals ready for team review and design gating.
+
+### 2026-04-04 — README Research (PM/Product Adoption Perspective)
+
+- **Deliverable:** `brand/references/readme-research-steinbrenner.md` — analysis of 9 category-defining tools from product adoption angle
+- **Projects studied:** xstate, Polly, Temporal, Docker, Terraform, FastEndpoints, Bun, Deno, TypeScript, Axios
+- **Core finding:** Successful category-defining READMEs **teach a mental model first, show code second**. Developers evaluate through a 4-stage journey (Awareness → Evaluation → Trial → Adoption), and section order must map to this journey.
+- **Optimal README structure identified:** Logo/hook → Problem statement → Social proof → Installation → Quickstart (≤20 lines) → Differentiators → Feature overview → Docs link → Community
+- **Comparison strategy for Precept:** Use **implicit differentiation** (Pattern #1) — establish "domain integrity" as a category, educate on the category, never name xstate/FluentValidation/Stateless. If comparison table needed, place it **below** quickstart.
+- **Critical gap identified:** Precept README currently has no problem statement, no quickstart, and no "What is domain integrity?" educational section. The README reads like API docs, not a product landing page.
+- **Unique positioning opportunity:** Lead with **tooling story** (MCP, VS Code extension, live preview, AI-native design) as primary differentiator. Other comparable tools bury tooling — Precept can invert this: "tooling-first, DSL-second."
+- **Minimum viable quickstart:** 1-command install → 10-line domain example → 3-line C# usage OR CLI validation. Must be domain-relevant (Order/Subscription), not "Hello World."
+- **Decision inbox filed:** Scope/priority recommendation for README revamp from product perspective.

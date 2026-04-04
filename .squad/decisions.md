@@ -134,6 +134,67 @@ Four open brand decisions pending Shane approval:
 
 **Other open decisions documented in inbox files; recommend Shane review before locking charter updates and brand-spec final section numbering.**
 
+
+### Diagram Color Mapping — Section Placement and Scope (2026-04-04)
+**Filed by:** Frank (Lead/Architect)
+**Status:** RECOMMENDATION — awaiting Shane sign-off
+
+Add a **"Diagram color mapping"** h3 subsection to **§2.2 State Diagram** in brand-spec.html. This is the authoritative reference for every color decision in the state diagram surface.
+
+**Placement:** Within §2.2, between the "No lifecycle tints" callout and the shape tiles. Reader flow: Purpose → Color intro → **Color mapping table** → Shape tiles → SVG example → Lifecycle tables.
+
+**Scope boundaries:**
+| Concern | Section | Owns |
+|---------|---------|------|
+| "Violet means states" | §1.4 | Semantic family identity |
+| "State names in syntax: #A898F5, italic when constrained" | §2.1 | Syntax-level application |
+| "State names in diagram: #A898F5, italic when constrained" | **§2.2** | Diagram-level application |
+| "Blocked transitions: #FB7185 dashed" | **§2.2** | Diagram-specific element |
+| "Active state: #4338CA fill overlay" | **§2.2** | Diagram-specific interactive state |
+| "Error rose used in diagrams and inspector" | §1.4.1 | Cross-cutting usage note |
+
+**Minimum mapping (4 categories):**
+1. **Static elements** — canvas bg, node borders (per lifecycle role), node fill, state names, transition edges + arrowheads, event labels, guard annotations, legend
+2. **Interactive elements** — active state highlight, enabled/blocked/warning transition edges + labels
+3. **Semantic signals** — constrained state/event italic, orphaned node opacity, dead-end shape
+4. **Exclusions** — data fields (inspector), rule messages (syntax-only), comments (editorial)
+
+**Hex discrepancies to fix:**
+| Element | Current | Correct (palette card source of truth) |
+|---------|---------|---------------------------------------|
+| Blocked legend SVG | #f43f5e | #FB7185 |
+| brand-decisions.md Blocked | #F87171 | #FB7185 |
+| brand-decisions.md Warning | #FDE047 | #FCD34D |
+
+**Full analysis:** rand/references/brand-spec-diagram-color-mapping-review-frank.md
+
+---
+
+### Diagram Color Mapping Section (2026-04-04)
+**Filed by:** Elaine (UX/Design)
+**Status:** PROPOSED — needs Shane sign-off
+
+Add a dedicated diagram color mapping subsection to §2.2 State Diagram in rand/brand-spec.html.
+
+**What:**
+Two new <h3> blocks within the existing §2.2 card:
+1. **"Diagram color mapping"** — a complete element-to-color reference table covering every visible diagram component (canvas, node borders, node fills, state name text, event label text, transition arrows, arrow markers, guard annotations, legend text).
+2. **"Runtime verdict overlay"** — how diagram colors change when paired with an active inspector instance. Covers: current state highlighting, enabled/blocked/warning edge coloring, muted non-current-state edges, transition glow effects, hover interaction colors.
+
+**Why:**
+- Scattered specification — diagram colors mentioned inline in §2.2 prose, partially in §1.4.1, and in brand-decisions.md; never collected into one reference
+- Implementation drift — webview uses #1FFF7A / #FF2A57 / #6D7F9B; locked system specifies #34D399 / #F87171 / TBD
+- Runtime overlay unspecified — verdict-colored edges exist in implementation but have no brand-spec backing
+- Current state indicator undefined — not specified anywhere
+
+**Open sub-decisions for Shane:**
+1. **Current state indicator style:** Fill tint (#1e1b4b at low opacity) vs. border glow vs. badge dot. Elaine recommends fill tint.
+2. **Muted edge color:** #71717A (text-muted, in system) vs. #52525b (zinc-600, off-system). Elaine recommends #71717A.
+3. **Guard annotation text color:** Slate #B0BEC5 (data family). Elaine recommends this.
+
+**Full analysis:** rand/references/brand-spec-diagram-color-mapping-review-elaine.md
+
+---
 ---
 
 # Team Knowledge Refresh — 2026-04-04 Findings
@@ -910,3 +971,4 @@ This section consolidates inbox items from Phase 1 research agents:
 - uncle-leo-verbosity-analysis.md
 - george-language-research.md
 - j-peterman-hero-creative-brief.md
+

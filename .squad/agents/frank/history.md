@@ -10,6 +10,20 @@
 
 ## Learnings
 
+### 2026-04-04 — Elaine's 5-Surface UX Spec Review
+
+Reviewed Elaine's `brand/visual-surfaces-draft.html` against the actual runtime API, preview protocol, and language server implementation. Filed architectural review to `.squad/decisions/inbox/frank-surfaces-review.md`.
+
+**Key findings:**
+- **Editor surface:** Architecturally sound. `preceptConstrained` semantic modifier is implemented. Minor: "inline constraint indicators" is ambiguous wording.
+- **State Diagram:** One concrete protocol gap — `PreceptPreviewSnapshot` does not expose `InitialState`. Diagram renderer cannot distinguish initial state from the snapshot alone. Blocker requiring a one-field protocol addition before implementation.
+- **Inspector Panel:** Solid alignment with `PreceptPreviewProtocol.cs`. Three warnings: no field change delta (client must diff), `Violation` is string (loses multi-target attribution), read-only field detection requires set subtraction. None are blockers.
+- **Docs surface:** Misclassified. Spec describes a future public docs website; actual "docs" in this project is `docs/*.md` internal artifacts. No architecture to review. Must be retitled or removed.
+- **CLI surface:** Rejected. No standalone `precept` CLI tool exists. The fictional `--json` flag is a concrete error. Spec conflates VS Code Problems panel with terminal output. Must be removed or redesigned as "Diagnostic Output / VS Code Problems Panel."
+- **AI-first notes:** Generally excellent across editor, diagram, and inspector. CLI AI-first note contains a false claim (`--json` flag). Docs AI-first note is well-reasoned but premature.
+
+**Status:** Needs revision. Two surfaces (CLI, Docs) must be corrected; one protocol fix needed (InitialState) before implementation proceeds.
+
 ### 2026-04-06 — Architectural Knowledge Refresh
 
 #### I. Component Map (Ownership)
@@ -167,6 +181,18 @@ Three layers prevent catalog/grammar/completions from going stale:
 - All model type names in `PreceptModel.cs` must match public API names in `PreceptRuntime.cs` and documentation.
 - `docs/PreceptLanguageDesign.md` constraint codes (C38–C53) must match `DiagnosticCatalog` IDs.
 
+### 2025-07-15 — Diagram Color Mapping Section Review
+
+Reviewed brand-spec architecture to determine where a dedicated diagram color mapping section belongs. Three key findings:
+
+1. **Placement: §2.2, not §1.4.** Diagram color mapping is surface-specific implementation — same abstraction level as syntax family cards are for §2.1. The two-level architecture (§1.4 = identity, §2.x = surface implementation) established by all three palette structure reviews applies here identically.
+
+2. **Scope boundary is clean.** "Violet means states" is §1.4 identity. "State names in diagram use #A898F5, italic when constrained" is §2.2 implementation. Diagram-only elements (edges, fills, interactive overlays, blocked dashed lines) have no counterpart in other surfaces — purely §2.2.
+
+3. **Three hex discrepancies found.** SVG legend uses `#f43f5e` instead of brand error `#FB7185`. brand-decisions.md uses `#F87171`/`#FDE047` instead of palette card `#FB7185`/`#FCD34D`. Palette card is source of truth — others need correction.
+
+**Filed:** `brand/references/brand-spec-diagram-color-mapping-review-frank.md`, `.squad/decisions/inbox/frank-diagram-color-mapping.md`
+
 #### VII. Architectural Concerns Flagged
 
 1. **Thin-wrapper violations in MCP tools** — Some tools have <20 lines of business logic but are independently maintained. Ensure logic stays in `src/Precept/` and tools only serialize/deserialize. Regular audit needed.
@@ -211,3 +237,51 @@ Three layers prevent catalog/grammar/completions from going stale:
 - **Precept.Mcp.Tests** (48 tests) — Tool input/output, serialization, protocol.
 
 All use xUnit + FluentAssertions. No project-specific test framework — standard .NET conventions. Drift-defense tests (construct examples, constraint triggers, token attributes) woven throughout.
+
+### 2026-04-07 — brand-spec §1.4 Palette Structure Review
+
+Reviewed §1.4 Color System, §1.4.1 Color Usage, and §2.1 Syntax Editor at Shane's request. Found two distinct palettes conflated in §1.4 — brand UI tokens vs syntax-surface color mappings — with an ambiguous "8" count in the section intro (two different sets of 8) and duplicated constraint signaling tables between §1.4 and §2.1.
+
+**Key recommendation:** Move syntax family cards (Structure · Indigo through Constraint Signaling) from §1.4 to §2.1. Replace them in §1.4 with a brief Semantic Family Reference table at the identity level. §1.4 owns "what colors mean" (brand tokens + family identities); §2.1 owns "what colors do in the editor" (shades, typography, keyword lists, constraint detection). No content loss, no locked value changes.
+
+**Artifacts:**
+- Review: `brand/references/brand-spec-palette-structure-review-frank.md`
+- Decision: `.squad/decisions/inbox/frank-brandspec-palette-structure.md`
+
+**Skill acquired:** Brand spec information architecture reviews require checking abstraction-level consistency — identity-level claims belong in §1 (Brand Identity), implementation-level detail belongs in §2 (Visual Surfaces). When the same "number" (like "8") appears with two different referents in the same section, that's a structural smell.
+---
+
+## Session 4 — Diagram Color Mapping Architectural Review (2026-04-04)
+
+### What I Did
+
+**Diagram color mapping review completed.** Reviewed the color mapping placement, scope, and architectural alignment for §2.2 State Diagram in brand-spec.
+
+**Key recommendation:** Add a dedicated "Diagram color mapping" h3 subsection to §2.2 State Diagram between the "No lifecycle tints" callout and shape tiles. This establishes the authoritative reference for every color decision in the state diagram surface.
+
+**Scope boundaries clarified:** Four mapping categories defined:
+1. **Static elements** — canvas background, node borders, node fills, state names, transition edges, event labels, guard annotations, legend
+2. **Interactive elements** — active state highlight, enabled/blocked/warning transition edges and labels
+3. **Semantic signals** — constrained state/event italic formatting, orphaned node opacity, dead-end shapes
+4. **Exclusions** — data fields (inspector domain), rule messages (syntax-only), comments (editorial only)
+
+**Hex discrepancies identified and fixed:**
+| Element | Current | Correct |
+|---------|---------|---------|
+| Blocked legend SVG | #f43f5e | #FB7185 |
+| brand-decisions.md Blocked | #F87171 | #FB7185 |
+| brand-decisions.md Warning | #FDE047 | #FCD34D |
+
+**Interaction with family-card restructure:** This section can land independently but ideally ships in the same pass. The restructure establishes the pattern (each §2.x gets its own color spec); this section extends it. Cross-reference in §2.2 intro should distinguish diagram from syntax: "diagrams use shape and edge styling — not typography — to carry structural and constraint information."
+
+### Key Deliverables
+
+| File | Purpose |
+|------|---------|
+| .squad/decisions/inbox/frank-diagram-color-mapping.md | Full decision document with scope boundaries, mapping categories, hex discrepancies, and rationale |
+| rand/references/brand-spec-diagram-color-mapping-review-frank.md | Full analysis document |
+
+### Status
+
+✓ Decision filed to decisions.md (merged 2026-04-04)
+⏳ Awaiting Shane sign-off for implementation

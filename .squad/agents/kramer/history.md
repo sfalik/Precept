@@ -164,3 +164,22 @@
 3. **New token categories** → Update `BuildSemanticTypeMap()`, `BuildKeywordItems()`, and consumers
 4. **Event args / field types** → Cross-check `PreceptDocumentIntellisense.cs` regex patterns
 5. **Completions behavior change** → Update tests in `PreceptAnalyzerCompletionTests.cs`
+
+### 2026-04-05: README Badge Cleanup + Sample Count Fix
+
+**Requested by:** Shane
+
+#### Badge fixes
+- **Removed** broken Build Status badge — no `build.yml` CI workflow exists in `.github/workflows/` (only squad/sync workflows). Badge would have permanently shown "unknown".
+- **Removed** broken VS Code Extension marketplace badge — `package.json` publisher is `"local"` (unpublished). Badge would permanently fail against marketplace API.
+- **NuGet badge** already correct — package ID is `Precept`, matching `src/Precept/Precept.csproj` (no explicit `<PackageId>`, defaults to project name).
+- **License badge** already correct.
+- **Fixed** placeholder `AuthorName.precept-vscode` → `sfalik.precept-vscode` in Quick Start install command (derived from `git remote get-url origin` → `https://github.com/sfalik/Precept.git`).
+
+#### Sample count fix
+- README claimed "20 fully commented workflows" but `samples/` contained 21 `.precept` files.
+- Missing entry: `crosswalk-signal.precept` (Simple complexity — boolean fields, `from any on`, `edit`, `in <State> assert`, countdown arithmetic).
+- Updated count to 21, added row to sample catalog table after `trafficlight.precept`, and added to 3 feature coverage matrix rows (`in <State> assert`, `edit`, `from any on`).
+
+#### No catalog/constructs count claim found
+- Searched README for numeric claims about constructs, catalog items, or language features. None found.

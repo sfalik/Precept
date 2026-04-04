@@ -140,3 +140,39 @@ Contributed three research documents to the Phase 1 hero research sprint:
 - **`expression-evaluation.md`** — String predicates (`.length`, `startsWith`, `endsWith`) as lowest-risk expression additions. The `!= ""` workaround in every string-arg sample is the strongest signal.
 
 **Cross-phase finding:** Documented the 9-point sync chain required for any parser-level addition — this is the main cost driver for future language work.
+
+### Elaine 5-Surface UX Spec Review (2026-04-04)
+
+Reviewed Elaine's `brand/visual-surfaces-draft.html` for technical accuracy. Key findings recorded in `.squad/decisions/inbox/george-surfaces-review.md`:
+
+**Inspector Panel (confirmed implemented):** `tools/Precept.VsCode/webview/inspector-preview.html` is a complete working webview. Key detail Elaine needs: the inspector event bar has **four** outcome states — `enabled` (green), `noTransition` (green dimmed), `blocked` (red), `undefined` (red dimmed). The `notApplicable` outcome is filtered out of the UI entirely — not shown as yellow warning. If yellow/warning for NotApplicable is wanted, it's a new implementation requirement for Kramer.
+
+**Diagnostic code range:** C1–C54 = PRECEPT001–PRECEPT054. Elaine cited PRECEPT001–PRECEPT047. Off by 7.
+
+**CLI surface:** There is no standalone `precept` CLI tool. PRECEPT diagnostic codes appear only in the VS Code Problems panel (via language server), not in `dotnet build` output. The CLI surface as written is aspirational — describing a future tool that doesn't exist yet.
+
+**Terminal states:** "Terminal" is inferred by `PreceptAnalysis.cs` (states with no outgoing transitions to other states). It's a computed analysis property, not a DSL keyword. `state <Name> initial` is the only lifecycle marker in the grammar.
+
+**Docs terminology:** The team calls it "docs" (internal artifacts in `docs/`). "Docs Site" implies a public website that doesn't exist. Flagged as naming issue.
+
+### InitialState Protocol Fix (2026-04-04)
+
+Implemented Frank's protocol fix from his architecture review of Elaine's visual surfaces spec. Fixed blocking gap that prevented state diagram implementation.
+
+**Changes:**
+- Added `InitialState: string` property to `PreceptPreviewSnapshot` record in `tools\Precept.LanguageServer\PreceptPreviewProtocol.cs` (line 33, positional parameter after `CurrentState`)
+- Updated `BuildSnapshot()` in `tools\Precept.LanguageServer\PreceptPreviewHandler.cs` (line 296) to populate `InitialState` from `session.Engine.InitialState`
+- `PreceptEngine.InitialState` was already available — sourced from `model.InitialState.Name` during compilation
+
+**Build/test status:**
+- `dotnet build tools\Precept.LanguageServer\` → succeeded (6.6s)
+- `dotnet test test\Precept.LanguageServer.Tests\` → 84/84 passed (1.6s)
+- No regressions
+
+**Downstream consumers:**
+- **Webview (`tools\Precept.VsCode\webview\inspector-preview.html`)**: Consumes `PreceptPreviewSnapshot` at line 1387 (reads `CurrentState`). `InitialState` now available but not yet used. Diagram renderer not yet implemented — this fix unblocks Kramer's diagram implementation (Frank's blocker resolution).
+- **MCP tools (`tools\Precept.Mcp\Tools\`)**: No files reference `PreviewSnapshot` — MCP tools use core engine types directly, not preview protocol. Newman's MCP tools are unaffected.
+
+**Documentation:** Preview protocol is not formally documented in a single design doc. Protocol types in `PreceptPreviewProtocol.cs` serve as implementation documentation. `EditableFieldsDesign.md` and `RulesDesign.md` reference the protocol in context of future work but don't document the full structure.
+
+**Design gate compliance:** Shane approved Frank's review plan. This is a one-field additive protocol change with no DSL semantics, parser, type checker, or runtime execution changes — within charter bounds for non-design-gated work. Fix exactly matches Frank's architectural specification in `.squad/decisions/inbox/frank-surfaces-review.md` § Surface 2 blocker resolution.
