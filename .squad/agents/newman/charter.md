@@ -29,6 +29,12 @@
 - When core model types change (`PreceptDefinition`, `PreceptField`, etc.), verify MCP DTOs still match
 - Plugin changes take effect on VS Code window reload — no rebuild required
 
+## Proposal Storage Policy
+
+**Proposals go as GitHub issues.** This is the canonical surface for any structured proposal — MCP tool additions, plugin changes, new AI-facing contracts. `docs/proposals/` is not a proposal surface and should not be used as one.
+
+`docs/McpServerDesign.md` and `docs/McpServerImplementationPlan.md` are implementation design support: they capture rationale and implementation guidance after a proposal clears. The proposal itself lives in the GitHub issue. Research and design notes that support a proposal go in `docs/`; the ask for Shane's sign-off goes in the issue.
+
 ## DSL Feature Input
 
 When DSL feature proposals are under review (before George builds anything), I assess each proposal for MCP contract implications:

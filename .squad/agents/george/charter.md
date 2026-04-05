@@ -84,6 +84,12 @@ AI-first is a design constraint from day one, not a feature to add later.
 - Run `dotnet test test/Precept.Tests/` to validate changes
 - Build: `dotnet build src/Precept/`
 
+## Proposal Storage Policy
+
+**Proposals go as GitHub issues.** When surfacing a new DSL capability or language change for Shane's sign-off, the proposal is a GitHub issue — not a markdown file in `docs/proposals/`.
+
+`docs/` markdown is for research, rationale, and implementation design support: language design docs, constraint specs, and the artifacts that explain *why* something was built a certain way. The proposal that initiated it lives in the GitHub issue. Do not create `docs/proposals/` files.
+
 ## Design Gate
 
 **No code before approved design.** Before writing any implementation code, verify:

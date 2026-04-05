@@ -1,280 +1,160 @@
-# Inspector Panel Design Review
+# Inspector / Preview Surface Freshness Review
+
 **Reviewer:** Elaine (UX Designer)  
-**Developer:** Kramer (Tooling Dev)  
-**Date:** [Review Session]  
-**Reference Spec:** `brand/visual-surfaces-draft.html § Inspector Panel`
+**Requested by:** Shane  
+**Date:** 2026-04-05  
+**Reference spec:** `brand/brand-spec.html § 2.3 Inspector Panel`  
+**Compared against:** `tools/Precept.VsCode/webview/inspector-preview.html`, `tools/Precept.VsCode/mockups/interactive-inspector-mockup.html`, `docs/archive/InteractiveInspectorMockup.md`
 
 ---
 
-## Executive Summary
+## Freshness verdict
 
-The inspector panel implementation is **functionally complete and structurally sound**, but uses a **custom color palette** that diverges significantly from the established brand color system. The panel successfully renders field data, constraint violations, and edit workflows — but the current colors don't align with the semantic color vocabulary drafted for Precept's visual surfaces.
+**Verdict: partially stale — refresh required before using this as PRD input.**
 
-This review identifies specific color gaps and proposes a migration path to bring the implementation into alignment with brand principles while preserving the solid UX patterns already in place.
-
----
-
-## What Was Found
-
-### Implementation Location
-- **File:** `tools/Precept.VsCode/webview/inspector-preview.html`
-- **CSS Variables (`:root`):**
-  ```css
-  --state: #6D7F9B;      /* Current state label color */
-  --event: #8573A8;      /* Event name color */
-  --ok: #1FFF7A;         /* Success/enabled indicator */
-  --err: #FF2A57;        /* Error/blocked indicator */
-  --muted: #59657A;      /* Secondary text */
-  --text: #FFFFFF;       /* Primary text */
-  --border: #59657A;     /* UI chrome borders */
-  ```
-
-### Rendering Structure
-The panel renders field data in a **list-based layout** (`<ul class="data-list">`):
-- **Field names** render in `.data-key` spans (no explicit color; inherits from parent)
-- **Field values** render in `.data-value-stack` spans with `.muted` class applied to read-only values
-- **Constraint violation messages** render in `.data-edit-violation-msg` spans with `color: var(--err)`
-- **Edit inputs** use `.data-edit-shell` wrappers with `.violation` class toggled on constraint errors
-
-### Typography
-- Font family: `"Segoe UI", Arial, sans-serif` (system UI font, **not** Cascadia Cove monospace)
-- Font size: 12px for field data (aligns with spec)
-- Line height: Not explicitly set for data list items (defaults to ~1.4)
+The old review was right about the **brand drift**. It is no longer current about the **surface scope**. The implementation is now a combined preview/inspector webview with a diagram, in-canvas data lane, event dock, edit workflow, runtime banners, and host messaging. A PRD should use this refreshed audit, not the prior color-only review, as the starting point.
 
 ---
 
-## What Aligns with Brand Principles
+## What is still current
 
-### ✅ Structural Layout
-The list-based field rendering is clean and scannable. The `.data-key` / `.data-value-stack` split creates clear visual hierarchy between field names and values.
+These findings still hold and should stay in the PRD:
 
-### ✅ Constraint Violation Workflow
-Violations are marked with **both color and icon redundancy** — the `.violation` class applies border color, and violation messages display below the field. This matches the accessibility principle from the spec.
-
-### ✅ Edit Mode UX
-The edit/view mode toggle and field-level editing with draft validation is well-implemented. The live validation feedback (showing constraint violations as the user types) is exactly what an inspector panel should do.
-
-### ✅ AI-First Structure
-The panel renders structured data with clear field/value separation and violation messages. An AI agent parsing the DOM can extract field names, current values, and constraint violations without ambiguity.
+- **Custom palette drift remains unresolved.** The webview still defines off-system colors in `:root` (`--state: #6D7F9B`, `--event: #8573A8`, `--ok: #1FFF7A`, `--err: #FF2A57`, `--muted: #59657A`) instead of the locked inspector colors from `brand-spec.html §2.3`.
+- **Typography drift remains unresolved.** `body` still uses `"Segoe UI", Arial, sans-serif` instead of the locked Cascadia Cove-based mono treatment for field data.
+- **Field hierarchy still needs brand mapping.** Field names still read as plain white/inherited text, read-only values still lean on the blue-gray muted color, and inline violation text still uses error red instead of the spec's gold message treatment.
+- **Field types are still not surfaced.** The runtime already carries `fieldType` for editable fields, but the panel does not render type information in the data lane.
 
 ---
 
-## What Doesn't Align with Brand Principles
+## What was stale in the old review
 
-### ❌ Color System Mismatch
+### 1. The reference spec was outdated
 
-| Element | Current Color | Brand Spec Color | Gap |
-|---------|---------------|------------------|-----|
-| **Field names** | No explicit color (inherits white `--text`) | Slate `#B0BEC5` | Field names should be muted slate, not pure white |
-| **Field values (read-only)** | `--muted: #59657A` | Slate `#84929F` | Current muted color is too blue-gray; spec calls for warmer slate |
-| **Current state label** | `--state: #6D7F9B` | Violet `#A898F5` | State label should match syntax highlighting violet |
-| **Event names** | `--event: #8573A8` | Cyan `#30B8E8` | Event names should match syntax highlighting cyan |
-| **Success indicator** | `--ok: #1FFF7A` (bright green) | Enabled `#34D399` | Current green is too neon; spec uses softer emerald |
-| **Error indicator** | `--err: #FF2A57` (pink-red) | Blocked `#F87171` | Current red is cooler; spec uses warmer rose-red |
-| **Constraint messages** | `--err: #FF2A57` | Gold `#FBBF24` | Violation messages should use gold (human explanation color), not error red |
+The old review cited `brand/visual-surfaces-draft.html`. That is no longer the right source of truth. The live reference is now:
 
-**Key Finding:** The panel uses a **five-color custom palette** (`state`, `event`, `ok`, `err`, `muted`) instead of the **locked 8+3 brand system** (8 authoring shades + 3 verdict colors). This creates visual discontinuity between the syntax editor, diagram, and inspector — colors that mean one thing in the editor mean something else in the panel.
+- `brand/brand-spec.html § 2.3 Inspector Panel`
 
-### ❌ Typography Choice
+That matters because the color and semantics guidance has been tightened since the draft surface writeup.
 
-| Element | Current Font | Brand Spec Font |
-|---------|--------------|-----------------|
-| Field names/values | `"Segoe UI", Arial, sans-serif` | Cascadia Cove monospace |
+### 2. The review described too small a surface
 
-The spec calls for **Cascadia Cove monospace** to match code appearance. Field names and values are identifiers from the `.precept` file — using a monospace font maintains visual continuity with the syntax editor.
+The current implementation is not just a field list with edit inputs. It is a **combined preview shell** with three UX zones:
 
-### ⚠️ Missing Field Type Display
+1. **Header shell** — title, source file name, follow/lock mode indicator, Edit / Save / Cancel / Reset actions  
+2. **Diagram canvas** — animated state diagram with runtime verdict overlays  
+3. **Inspector controls** — in-canvas data lane plus bottom event dock with inline arguments and row feedback
 
-The spec describes field types as "Slate (#9AA8B5). Type info is secondary to the name and value." The current implementation **does not render field types** in the inspector panel (only field names and values are shown). This is a minor gap — type info is useful for debugging but not critical for core functionality.
+The archived mockup and the current implementation largely agree on this shape. The old review only really covered the data list.
 
----
+### 3. Several implemented behaviors were missing entirely
 
-## Accessibility Check
+The current surface includes behavior the old review did not mention:
 
-### ✅ Color + Icon Redundancy
-Constraint violations use **both color (border + message) and text content** (the violation message itself). A color-blind developer can still identify violated fields by reading the inline error text.
+- rule-violations banner in the data lane
+- state-rules badge with tooltip
+- draft-validation banner during edit mode
+- field-level rule icons
+- nullable-field toggle in edit mode
+- transient `before → after` value toasts after fire/save
+- row-level event feedback in the dock
+- inline event argument validation
+- preview follow/lock status in the header
+- structured host request/response messaging between the webview and extension host
 
-**Recommendation:** Add a **visual symbol** (e.g., `✗` or `⚠`) before the violation message text to strengthen non-color signaling. The spec suggests "Color + icon redundancy" — the current implementation has color + text, but adding an icon would be belt-and-suspenders.
+For PRD work, these are not edge cases. They are part of the baseline interaction model.
 
-### ⚠️ Table Structure
-The current implementation uses a `<ul>` list with `<li>` items. The spec recommends "proper `<th>` headers and `<tr>/<td>` semantics" for screen reader accessibility.
+### 4. The accessibility read was too blunt
 
-**Status:** The list structure is acceptable (screen readers handle lists well), but a semantic table (`<table>`) with column headers would be more robust for assistive tech. This is a **nice-to-have**, not a blocker.
+The old review implied a semantic table would be the preferred destination. That is too simplistic for the current surface.
 
----
+The inspector now lives inside an in-canvas overlay with constrained width and internal scrolling. A table **may** still be the right accessibility answer, but it is not automatically better than the current list. The real requirement is:
 
-## AI-First Check
+- clear field/value pairing
+- strong keyboard behavior
+- screen-reader-announced structure
+- non-color signaling for violations
 
-### ✅ Structured Output
-The panel renders field data in a consistent, parseable structure:
-- Field names in `.data-key` spans
-- Values in `.data-value-stack` spans
-- Violation messages in `.data-edit-violation-msg` spans with `data-field` attributes
+The PRD should evaluate structure from those goals, not assume "table" by default.
 
-An AI agent parsing the inspector HTML can extract:
-- Current state (via `currentState` variable in JS)
-- Field names and values (via `.data-key` and value rendering)
-- Constraint violations (via `.violation` classes and violation message elements)
+### 5. The AI-first recommendation needs reframing
 
-**Recommendation:** Ensure the inspector panel can **export JSON** (not just render HTML). The spec says "The inspector panel is JSON-serializable state data" — the JS code should expose a `getInspectorState()` method that returns a structured object with `{ currentState, fields, violations }` for AI consumption.
+The old review recommended a DOM-level `getInspectorState()` helper. That recommendation is stale as written.
 
----
+The current surface already participates in a structured host protocol (`previewRequest` / `previewResponse`, plus snapshot, inspect, update, fire, reset flows). For PRD purposes, the AI-first question is not "should the DOM expose a helper?" It is:
 
-## Recommended Next Steps
+- what structured state contract must the preview host guarantee?
+- what data must remain stable for both human UX and agent consumption?
 
-### Priority 1: Color System Migration (High Impact, Medium Effort)
-
-**Goal:** Replace the custom 5-color palette with the locked brand color system.
-
-**Changes:**
-1. **Update CSS variables** in `inspector-preview.html`:
-   ```css
-   :root {
-     /* Brand structural colors */
-     --indigo: #6366F1;           /* Structure grammar */
-     --indigo-semantic: #4338CA;  /* Semantic structure keywords */
-     --violet: #A898F5;           /* State names */
-     --cyan: #30B8E8;             /* Event names */
-     
-     /* Brand data shades (slate family) */
-     --slate-names: #B0BEC5;      /* Field names */
-     --slate-types: #9AA8B5;      /* Field types */
-     --slate-values: #84929F;     /* Field values */
-     
-     /* Brand verdict colors */
-     --enabled: #34D399;          /* Success/enabled */
-     --blocked: #F87171;          /* Error/blocked */
-     --warning: #FDE047;          /* Warning */
-     
-     /* Brand message color */
-     --gold: #FBBF24;             /* Human explanation text */
-     
-     /* Neutral UI colors */
-     --text: #FFFFFF;
-     --border: #59657A;
-     --muted: #9096A6;            /* Dusk indigo for read-only indicators */
-   }
-   ```
-
-2. **Remap element colors:**
-   - Field names (`.data-key`): Apply `color: var(--slate-names);`
-   - Field values (`.muted`): Change to `color: var(--slate-values);`
-   - Current state label: Change to `color: var(--violet);`
-   - Event labels: Change to `color: var(--cyan);`
-   - Constraint violation messages (`.data-edit-violation-msg`): Change to `color: var(--gold);`
-   - Success indicators: Change `--ok` to `--enabled: #34D399;`
-   - Error indicators: Change `--err` to `--blocked: #F87171;`
-
-**Rationale:** This brings the inspector panel into alignment with the syntax editor and diagram, creating visual continuity across all three surfaces. A developer seeing violet state names in the editor will immediately recognize the same violet in the inspector.
+That is a better framing than adding a webview-only helper method.
 
 ---
 
-### Priority 2: Typography Correction (Medium Impact, Low Effort)
+## Current surface snapshot
 
-**Goal:** Switch from system UI font to Cascadia Cove monospace.
+### Layout that exists today
 
-**Changes:**
-1. Update the `body` font declaration:
-   ```css
-   body {
-     font-family: "Cascadia Cove", "Cascadia Code", "Consolas", monospace;
-     /* ... */
-   }
-   ```
+- **Header:** `State Diagram` title, file name, follow/lock mode label, Edit / Save / Cancel / Reset
+- **Main canvas:** scrollable SVG diagram
+- **Data lane:** inspector list rendered inside the diagram canvas, with rule and draft banners above it
+- **Event dock:** current-state event list with inline args, microstatus glyphs, inline reasons, and row feedback
 
-2. Verify monospace rendering:
-   - Field names and values should appear in monospace
-   - UI chrome (buttons, headers) can remain in system font (add explicit `font-family` overrides to `.header`, `.actions`, etc.)
+### Interaction patterns that match the archived mockup
 
-**Rationale:** Field names like `orderTotal` or `isApproved` are code identifiers — monospace rendering maintains continuity with the syntax editor where those same identifiers appear.
+These patterns are implemented and should be treated as real baseline behavior:
 
----
+- diagram-first layout with data inside the canvas and events in a bottom dock
+- inline event args beside the relevant event row
+- transient `before → after` data feedback
+- row-anchored fire feedback
+- hover/focus-driven event emphasis
+- keyboard event navigation
+- reset flow
 
-### Priority 3: Add Field Type Display (Low Impact, Medium Effort)
+### Important implementation additions beyond the archived mockup
 
-**Goal:** Show field types as secondary info next to field names.
-
-**Changes:**
-1. Modify the `dataList.innerHTML` rendering to include type info:
-   ```html
-   <span class="data-key">
-     ${fieldName}
-     <span class="data-type">${fieldType}</span>
-     ${ruleIcon}
-   </span>
-   ```
-
-2. Add CSS for `.data-type`:
-   ```css
-   .data-type {
-     color: var(--slate-types);
-     font-size: 10px;
-     margin-left: 4px;
-     opacity: 0.75;
-   }
-   ```
-
-**Rationale:** Type info helps developers debug type mismatches (e.g., "Why is `count` showing 'abc'? Oh, it's a string field, not a number."). Secondary to the core workflow but useful for clarity.
+- explicit field edit mode with Save / Cancel
+- live draft validation via host round-trips
+- state-rule and rule-violation callouts
+- file-following vs locked preview mode in the shell
 
 ---
 
-### Priority 4: Strengthen Accessibility (Low Impact, Low Effort)
+## PRD implications
 
-**Goal:** Add visual symbols to violation messages.
+### Keep as baseline
 
-**Changes:**
-1. Prepend a symbol to violation messages:
-   ```html
-   <span class="data-edit-violation-msg" data-field="${canonicalFieldName}">
-     ✗ ${violationText}
-   </span>
-   ```
+- the **diagram + in-canvas data lane + bottom event dock** triad
+- inline event arguments and row-level feedback
+- transient field-change feedback after fire/save
+- edit mode as a deliberate workflow, not inline freeform mutation everywhere
 
-**Rationale:** Belt-and-suspenders redundancy — color + icon + text ensures no developer misses a constraint violation, regardless of visual ability or terminal theme.
+### Redesign focus areas
 
----
+1. **Brand alignment**
+   - migrate the webview off the legacy palette
+   - apply the locked inspector typography and data hierarchy
 
-### Optional: JSON Export for AI Agents
+2. **Shell clarity**
+   - decide whether current state needs an explicit textual label in the header in addition to the diagram
+   - clarify how file name, follow/lock status, and actions are visually prioritized
 
-**Goal:** Expose a structured API for AI tools to extract inspector state.
+3. **Inspector readability**
+   - decide whether field types should be visible
+   - improve field/value/violation scanning without losing the compact overlay model
 
-**Changes:**
-1. Add a `getInspectorState()` function in the JS:
-   ```js
-   function getInspectorState() {
-     return {
-       currentState: currentState,
-       fields: Object.entries(data).map(([key, value]) => ({
-         name: key,
-         value: value,
-         editable: Boolean(getEditableFieldForUiKey(key)),
-         violations: /* extract from currentEditableFields */
-       })),
-       violations: /* extract from draftFieldErrors */
-     };
-   }
-   ```
+4. **Accessibility**
+   - strengthen violation redundancy at the field level
+   - validate keyboard flow across event rows, inline args, edit mode, and overlay scrolling
+   - choose the right semantic structure for the data lane based on assistive-tech behavior, not assumption
 
-2. Expose this method to the host extension (via `postMessage` or similar).
-
-**Rationale:** The spec says "The inspector is both a human debugging tool and an API contract for AI tools." JSON export ensures AI agents can consume inspector state programmatically, not just by parsing HTML.
+5. **AI-first contract**
+   - define the stable structured state the preview host must expose
+   - avoid tying agent consumption to fragile DOM scraping
 
 ---
 
-## Summary
+## Concise recommendation
 
-Kramer's inspector panel implementation is **structurally excellent** — the edit workflow, constraint validation, and layout are well-designed and fully functional. The **primary gap** is the color system: the panel uses a custom palette that doesn't align with the locked brand colors from `visual-surfaces-draft.html`.
-
-**Recommendation:** Migrate to the brand color system (Priority 1) and switch to Cascadia Cove monospace (Priority 2) in the next iteration. These changes preserve all existing functionality while creating visual continuity across the syntax editor, diagram, and inspector.
-
-The panel is **production-ready as-is** for functional testing, but should be brought into brand alignment before public release.
-
----
-
-## Next Steps for Shane
-
-1. **Review this report** and confirm the color/typography migration approach.
-2. **Decide priority:** Should Kramer address Priority 1 + 2 immediately, or defer to a polish pass after feature completion?
-3. **Clarify JSON export:** Is AI-first JSON export a requirement, or is the current HTML structure sufficient?
-
-Once priorities are confirmed, Kramer can execute the color migration with confidence — the changes are CSS-only and don't require rework of the core rendering logic.
+**Use this file as PRD input, not the older review framing.**  
+The redesign should assume the current preview surface is **functionally rich but visually inconsistent**: interaction model mostly worth preserving, brand system and information hierarchy still in need of a proper pass.

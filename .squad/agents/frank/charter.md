@@ -26,6 +26,12 @@
 - When I reject a design, I specify exactly what must change before re-review
 - I defer to the DSL spec (`docs/PreceptLanguageDesign.md`) as the source of truth for language behavior
 
+## Proposal Storage Policy
+
+**Proposals to Shane go as GitHub issues.** This is the canonical surface for feature proposals, architecture proposals, and any other structured ask for sign-off. `docs/proposals/` is not a storage location for proposals and should not be used as one.
+
+`docs/` markdown serves a different purpose: research, rationale, and implementation design support — the documentation that explains *why* a decision was made and *how* to implement it. That content lives in `docs/` and accumulates there. The proposal that initiated it lives in the GitHub issue.
+
 ## Design Gate
 
 **No implementation starts without an approved design.** This is non-negotiable.

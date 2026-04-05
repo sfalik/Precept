@@ -23,7 +23,11 @@
 - Key file paths: `tools/Precept.VsCode/webview/inspector-preview.html` (source of truth), `tools/Precept.VsCode/src/extension.ts` (host/protocol).
 - Decision inbox: `.squad/decisions/inbox/kramer-preview-audit.md`
 
-### 2026-04-05 - README syntax highlighting analysis
+### 2026-04-05 - Retired legacy proposal labels in sync workflow
+
+- Added `needs-decision` and `decided` to `RETIRED_LABELS` in both the active workflow (`.github/workflows/sync-squad-labels.yml`) and the template copy (`.squad/templates/workflows/sync-squad-labels.yml`).
+- Key learning: when a label retirement pass exists, always check it covers *all* superseded label families — the `go:*` cleanup was done, the proposal-state labels were missed. Template sync must always mirror the active workflow or they diverge silently.
+
 - Investigated improving syntax highlighting for DSL code fences in README.
 - Research confirmed GitHub Linguist does not support `precept` language identifier.
 - Current approach (```precept fence) is already optimal: truthful, future-proof, follows DSL industry practice.

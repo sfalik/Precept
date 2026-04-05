@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 04: Focus / Spotlight — Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    /* ================================================================
+       CONCEPT 04 — FOCUS / SPOTLIGHT
+       ================================================================
+       Core idea: One thing at a time, large and clear. The current
+       state is THE main event — huge, center-screen. Context flows
+       radially outward: transitions fan out as paths, data is an
+       orbiting ring, rules are ambient indicators.
+
+       Minimal chrome. Maximum focus. Context-sensitive: what you see
+       shifts based on what just happened (fired event? show result.
+       editing? show form. exploring? show paths).
+
+       Product shape: focus-first, zen, context-adaptive.
+       Key job: "What is the one thing I need to know right now?"
+       ================================================================ */
+
+    body {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 0;
+      padding: 0;
+    }
+
+    /* — Minimal header — */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-title { font-size: 12px; font-weight: 600; color: var(--dim); }
+    .header-file { color: var(--muted); font-size: 11px; }
+
+    .mode-tabs {
+      display: flex;
+      gap: 2px;
+    }
+
+    .mode-tab {
+      font: inherit;
+      font-size: 10px;
+      padding: 3px 10px;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--dim);
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .mode-tab.active {
+      border-color: var(--indigo);
+      color: var(--indigo);
+      background: rgba(99, 102, 241, 0.08);
+    }
+
+    .mode-tab:hover:not(.active) {
+      color: var(--text);
+    }
+
+    /* — Main spotlight area — */
+    .spotlight {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+      overflow: hidden;
+      position: relative;
+      padding: 24px;
+    }
+
+    /* Ambient glow behind the state */
+    .spotlight::before {
+      content: '';
+      position: absolute;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(168, 152, 245, 0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Big state name */
+    .focal-state {
+      font-size: 56px;
+      font-weight: 700;
+      color: var(--violet);
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .focal-subtitle {
+      font-size: 12px;
+      color: var(--dim);
+      margin-bottom: 32px;
+      z-index: 1;
+    }
+
+    /* Paths radiating outward */
+    .paths-ring {
+      display: flex;
+      gap: 20px;
+      z-index: 1;
+      margin-bottom: 28px;
+    }
+
+    .path-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      min-width: 200px;
+      max-width: 260px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      cursor: pointer;
+      transition: border-color 150ms, background 150ms, transform 150ms;
+    }
+
+    .path-card:hover {
+      border-color: rgba(99, 102, 241, 0.35);
+      background: var(--card-hover);
+      transform: translateY(-2px);
+    }
+
+    .path-card.selected {
+      border-color: var(--indigo);
+      background: rgba(99, 102, 241, 0.06);
+    }
+
+    .path-event-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .path-event-name .icon { font-size: 12px; }
+
+    .path-outcome {
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .path-outcome.transition { color: var(--enabled); }
+    .path-outcome.no-transition { color: var(--enabled); opacity: 0.7; }
+    .path-outcome.rejected { color: var(--blocked); }
+
+    .path-dest {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      opacity: 0.6;
+    }
+
+    .path-preview {
+      font-size: 10px;
+      color: var(--dim);
+      line-height: 1.5;
+    }
+
+    /* Args inline inside path card */
+    .path-args {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .path-arg {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .path-arg label {
+      font-size: 8px;
+      color: var(--dusk);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .path-arg input {
+      width: 90px;
+      background: rgba(17, 17, 20, 0.6);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 10px;
+      padding: 3px 6px;
+      border-radius: 3px;
+    }
+
+    .path-arg input:focus {
+      outline: none;
+      border-color: var(--indigo);
+    }
+
+    .path-fire-btn {
+      align-self: flex-start;
+      font: inherit;
+      font-size: 10px;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid var(--enabled);
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.08);
+      margin-top: 4px;
+    }
+
+    .path-fire-btn:hover {
+      background: rgba(52, 211, 153, 0.16);
+    }
+
+    /* Data orbit — horizontal strip beneath the focal point */
+    .data-orbit {
+      display: flex;
+      gap: 24px;
+      z-index: 1;
+      margin-top: 4px;
+    }
+
+    .data-atom {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .data-atom .atom-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--slate-val);
+    }
+
+    .data-atom .atom-value.null { color: var(--muted); font-style: italic; font-size: 13px; }
+
+    .data-atom .atom-label {
+      font-size: 9px;
+      color: var(--dusk);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .data-atom .atom-type {
+      font-size: 8px;
+      color: var(--muted);
+    }
+
+    /* — Bottom bar — */
+    .bottom-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .invariant-strip {
+      display: flex;
+      gap: 12px;
+    }
+
+    .inv-ok { color: var(--enabled); }
+    .inv-violated { color: var(--blocked); }
+
+    .bottom-actions { display: flex; gap: 6px; }
+
+    .bottom-actions button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    .bottom-actions button:hover {
+      border-color: var(--indigo);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <div class="header">
+    <div class="header-left">
+      <span class="header-title">Subscription</span>
+      <span class="sep">·</span>
+      <span class="header-file">subscription.precept</span>
+    </div>
+    <div class="mode-tabs">
+      <button class="mode-tab active">Explore</button>
+      <button class="mode-tab">Edit</button>
+      <button class="mode-tab">History</button>
+    </div>
+  </div>
+
+  <!-- ===== SPOTLIGHT ===== -->
+  <div class="spotlight">
+
+    <!-- The state, front and center -->
+    <div class="focal-state">Active</div>
+    <div class="focal-subtitle">2 events available · 0 violations · step 2 of session</div>
+
+    <!-- Paths: where can we go from here? -->
+    <div class="paths-ring">
+
+      <!-- Activate path -->
+      <div class="path-card selected">
+        <div class="path-event-name">
+          <span class="icon">⚡</span> Activate
+        </div>
+        <div class="path-outcome no-transition">↻ stays in Active</div>
+        <div class="path-preview">
+          Updates MonthlyPrice with new value.<br/>
+          Assert: Price &gt; 0
+        </div>
+        <div class="path-args">
+          <div class="path-arg">
+            <label>Plan</label>
+            <input type="text" value="Enterprise" />
+          </div>
+          <div class="path-arg">
+            <label>Price</label>
+            <input type="text" value="149" />
+          </div>
+        </div>
+        <button class="path-fire-btn">▶ Fire</button>
+      </div>
+
+      <!-- Cancel path -->
+      <div class="path-card">
+        <div class="path-event-name">
+          <span class="icon">⚡</span> Cancel
+        </div>
+        <div class="path-outcome transition">→ Cancelled</div>
+        <div class="path-dest">Cancelled</div>
+        <div class="path-preview">
+          Terminal state. No events available after this.
+        </div>
+        <button class="path-fire-btn">▶ Fire</button>
+      </div>
+
+    </div>
+
+    <!-- Data values orbiting beneath -->
+    <div class="data-orbit">
+      <div class="data-atom">
+        <span class="atom-value">Professional</span>
+        <span class="atom-label">PlanName</span>
+        <span class="atom-type">string?</span>
+      </div>
+      <div class="data-atom">
+        <span class="atom-value">99</span>
+        <span class="atom-label">MonthlyPrice</span>
+        <span class="atom-type">number</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== BOTTOM BAR ===== -->
+  <div class="bottom-bar">
+    <div class="invariant-strip">
+      <span class="inv-ok">✓ MonthlyPrice ≥ 0</span>
+    </div>
+    <div style="color: var(--muted);">
+      Trial → Active → Active (now)
+    </div>
+    <div class="bottom-actions">
+      <button>Edit Data</button>
+      <button>Reset</button>
+    </div>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 02: Conversational REPL — Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    /* ================================================================
+       CONCEPT 02 — CONVERSATIONAL REPL
+       ================================================================
+       Core idea: The preview is a scrolling command log. You type
+       events, the system responds with structured results. No diagram
+       by default — everything is text-first, scannable, greppable,
+       and AI-agent-friendly.
+
+       A compact sidebar shows live state + data. The main pane is
+       the conversation.
+
+       Product shape: terminal/REPL-first, AI-native.
+       Key job: "Fire an event, see exactly what happened, keep going."
+       ================================================================ */
+
+    body {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      grid-template-rows: auto 1fr;
+      gap: 0;
+      padding: 0;
+    }
+
+    /* — Header (spans full width) — */
+    .header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-title { font-size: 13px; font-weight: 700; }
+    .header-file { color: var(--dusk); font-size: 11px; }
+
+    .header-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .header-actions button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .header-actions button:hover {
+      border-color: var(--indigo);
+    }
+
+    /* — Left sidebar: live state snapshot — */
+    .sidebar {
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-section {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-section:last-child {
+      border-bottom: none;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .sidebar-section h3 {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .live-state-display {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .state-big {
+      font-size: 20px;
+      color: var(--violet);
+      font-weight: 700;
+    }
+
+    .states-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    .states-list .st {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      color: var(--dim);
+    }
+
+    .states-list .st.current {
+      border-color: rgba(168, 152, 245, 0.40);
+      color: var(--violet);
+      background: rgba(168, 152, 245, 0.08);
+    }
+
+    /* Data list in sidebar */
+    .data-list {
+      list-style: none;
+    }
+
+    .data-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.3);
+      font-size: 12px;
+    }
+
+    .data-list li:last-child { border-bottom: none; }
+
+    .data-key { display: flex; flex-direction: column; gap: 1px; }
+
+    /* Rules in sidebar */
+    .rule-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      padding: 4px 0;
+    }
+
+    .rule-ok { color: var(--enabled); }
+    .rule-violated { color: var(--blocked); }
+
+    /* — Main pane: REPL conversation — */
+    .repl-pane {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .repl-log {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    /* Conversation entries */
+    .repl-entry {
+      border-radius: 6px;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .repl-entry.system {
+      color: var(--dim);
+      font-size: 11px;
+      padding: 4px 0;
+      border-left: 2px solid var(--border);
+      padding-left: 10px;
+    }
+
+    .repl-entry.command {
+      padding: 6px 10px;
+      background: rgba(17, 17, 20, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-top: 8px;
+    }
+
+    .repl-entry.command .prompt {
+      color: var(--indigo);
+      font-weight: 600;
+      margin-right: 6px;
+    }
+
+    .repl-entry.command .cmd-text {
+      color: var(--cyan);
+    }
+
+    .repl-entry.command .cmd-args {
+      color: var(--slate-val);
+      margin-left: 4px;
+    }
+
+    .repl-entry.result {
+      padding: 8px 12px;
+      margin-bottom: 4px;
+      border-left: 3px solid transparent;
+      background: var(--card);
+      border-radius: 0 6px 6px 0;
+    }
+
+    .repl-entry.result.success {
+      border-left-color: var(--enabled);
+    }
+
+    .repl-entry.result.rejected {
+      border-left-color: var(--blocked);
+    }
+
+    .repl-entry.result.no-change {
+      border-left-color: var(--enabled);
+      opacity: 0.85;
+    }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .result-header .glyph {
+      font-weight: 700;
+      font-size: 11px;
+    }
+
+    .result-header .glyph.ok { color: var(--enabled); }
+    .result-header .glyph.err { color: var(--blocked); }
+
+    .result-detail {
+      font-size: 11px;
+      color: var(--dim);
+      padding-left: 20px;
+    }
+
+    .result-detail .change-line {
+      display: flex;
+      gap: 6px;
+      padding: 2px 0;
+    }
+
+    .result-detail .change-label {
+      color: var(--muted);
+      min-width: 70px;
+    }
+
+    .result-detail .change-val {
+      color: var(--slate-val);
+    }
+
+    .result-detail .change-val.highlight {
+      color: var(--enabled);
+    }
+
+    /* Input bar */
+    .repl-input-bar {
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .repl-input-bar .prompt-symbol {
+      color: var(--indigo);
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .repl-input-bar input {
+      flex: 1;
+      background: rgba(17, 17, 20, 0.6);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 4px;
+    }
+
+    .repl-input-bar input:focus {
+      outline: none;
+      border-color: var(--indigo);
+    }
+
+    .repl-input-bar input::placeholder {
+      color: var(--muted);
+    }
+
+    .repl-input-bar button {
+      background: rgba(99, 102, 241, 0.12);
+      border: 1px solid rgba(99, 102, 241, 0.30);
+      color: var(--indigo);
+      font: inherit;
+      font-size: 11px;
+      padding: 5px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .repl-input-bar button:hover {
+      background: rgba(99, 102, 241, 0.20);
+    }
+
+    /* Quick-fire chips */
+    .quick-fire {
+      display: flex;
+      gap: 6px;
+      padding: 6px 16px;
+      border-top: 1px solid rgba(39, 39, 42, 0.4);
+      background: var(--panel);
+    }
+
+    .quick-fire .section-label {
+      align-self: center;
+      margin-right: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <div class="header">
+    <div class="header-left">
+      <span class="header-title">Precept REPL</span>
+      <span class="sep">·</span>
+      <span class="header-file">subscription.precept</span>
+    </div>
+    <div class="header-actions">
+      <button>Reset</button>
+      <button>Export Log</button>
+    </div>
+  </div>
+
+  <!-- ===== LEFT SIDEBAR ===== -->
+  <div class="sidebar">
+
+    <div class="sidebar-section">
+      <h3>Current State</h3>
+      <div class="live-state-display">
+        <span class="state-big">Active</span>
+      </div>
+      <div class="states-list">
+        <span class="st">Trial</span>
+        <span class="st current">Active</span>
+        <span class="st">Cancelled</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>Fields</h3>
+      <ul class="data-list">
+        <li>
+          <span class="data-key">
+            <span class="field-name">PlanName</span>
+            <span class="field-type">string?</span>
+          </span>
+          <span class="field-value">Professional</span>
+        </li>
+        <li>
+          <span class="data-key">
+            <span class="field-name">MonthlyPrice</span>
+            <span class="field-type">number</span>
+          </span>
+          <span class="field-value">99</span>
+        </li>
+      </ul>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>Invariants</h3>
+      <div class="rule-row rule-ok">✓ MonthlyPrice ≥ 0</div>
+    </div>
+
+  </div>
+
+  <!-- ===== MAIN: REPL LOG ===== -->
+  <div class="repl-pane">
+
+    <div class="repl-log">
+
+      <!-- System init -->
+      <div class="repl-entry system">
+        Loaded <strong>Subscription</strong> — initial state: Trial — 2 fields, 2 events, 1 invariant
+      </div>
+
+      <!-- Command 1 -->
+      <div class="repl-entry command">
+        <span class="prompt">❯</span>
+        <span class="cmd-text">fire Activate</span>
+        <span class="cmd-args">Plan="Professional" Price=29.99</span>
+      </div>
+      <div class="repl-entry result success">
+        <div class="result-header">
+          <span class="glyph ok">✓</span>
+          <span style="color: var(--enabled);">Transition</span>
+          <span class="sep">·</span>
+          <span style="color: var(--dim);">Trial → Active</span>
+        </div>
+        <div class="result-detail">
+          <div class="change-line">
+            <span class="change-label">PlanName</span>
+            <span class="change-val" style="color: var(--muted); text-decoration: line-through;">null</span>
+            <span style="color: var(--muted);">→</span>
+            <span class="change-val highlight">Professional</span>
+          </div>
+          <div class="change-line">
+            <span class="change-label">MonthlyPrice</span>
+            <span class="change-val" style="color: var(--muted); text-decoration: line-through;">0</span>
+            <span style="color: var(--muted);">→</span>
+            <span class="change-val highlight">29.99</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Command 2 -->
+      <div class="repl-entry command">
+        <span class="prompt">❯</span>
+        <span class="cmd-text">fire Activate</span>
+        <span class="cmd-args">Plan="Enterprise" Price=99</span>
+      </div>
+      <div class="repl-entry result no-change">
+        <div class="result-header">
+          <span class="glyph ok">✓</span>
+          <span style="color: var(--enabled);">No Transition</span>
+          <span class="sep">·</span>
+          <span style="color: var(--dim);">stayed in Active</span>
+        </div>
+        <div class="result-detail">
+          <div class="change-line">
+            <span class="change-label">MonthlyPrice</span>
+            <span class="change-val" style="color: var(--muted); text-decoration: line-through;">29.99</span>
+            <span style="color: var(--muted);">→</span>
+            <span class="change-val highlight">99</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Command 3: Cancel -->
+      <div class="repl-entry command" style="opacity: 0.4;">
+        <span class="prompt" style="color: var(--muted);">❯</span>
+        <span style="color: var(--muted);">type an event or use quick-fire below…</span>
+      </div>
+
+    </div>
+
+    <!-- Quick-fire chips -->
+    <div class="quick-fire">
+      <span class="section-label">Quick</span>
+      <span class="event-chip enabled">⚡ Activate</span>
+      <span class="event-chip enabled">⚡ Cancel</span>
+    </div>
+
+    <!-- Input bar -->
+    <div class="repl-input-bar">
+      <span class="prompt-symbol">❯</span>
+      <input type="text" placeholder='fire Cancel  or  fire Activate Plan="Gold" Price=199' />
+      <button>Fire</button>
+    </div>
+
+  </div>
+
+</body>
+</html>

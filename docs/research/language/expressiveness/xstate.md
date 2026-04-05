@@ -173,26 +173,11 @@ xstate supports hierarchical states (substates within states). Precept is strict
 
 ---
 
-## Feature Proposal
+## Related GitHub proposal issues
 
-### Proposal: Named guard declarations
+- **#8 — Named rule declarations**: the canonical proposal body and scope boundaries now live in GitHub.
 
-Allow authors to name frequently-used guard expressions for reuse across transition rows:
-
-```precept
-guard LoanEligible when DocumentsVerified && CreditScore >= 680 && AnnualIncome >= ExistingDebt * 2 && RequestedAmount < AnnualIncome / 2
-
-from UnderReview on Approve when LoanEligible && Approve.Amount <= RequestedAmount -> ...
-from UnderReview on Reconsider when LoanEligible -> ...
-```
-
-**Impact:** Eliminates long repeated `when` expressions in precepts with multi-condition eligibility gates. Most impactful when 3+ transition rows share a base condition.
-
-**Complexity:** Moderate. Named guards are a new declaration form. The type checker must resolve guard names in `when` expressions. Guard bodies may only reference fields (not event args), or the declaration form must optionally reference event args. The simplest version is field-only guards.
-
-**External precedent:** xstate named guards, Polly named policies, FluentValidation `RuleSet`.
-
-**Priority:** Medium. The loan-application sample already uses a 100+ character `when` clause. Any enterprise-scale precept will hit this pain point.
+This file stays focused on evidence: why xstate's named guards matter, where Precept is more verbose today, and what semantic boundaries should survive adaptation.
 
 ---
 

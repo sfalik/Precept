@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 01: Timeline Debugger — Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    /* ================================================================
+       CONCEPT 01 — TIMELINE DEBUGGER
+       ================================================================
+       Core idea: Time is the primary axis. A horizontal timeline of
+       events/state changes dominates the top. The user scrubs through
+       history to understand how they got to the current state.
+       Below the timeline: a split view of data diff (what changed)
+       and available next actions.
+
+       Product shape: debugger-first, history-centric.
+       Key job: "How did I get here? What changed at each step?"
+       ================================================================ */
+
+    body {
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    /* — Header bar — */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .header-file {
+      color: var(--dusk);
+      font-size: 11px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .header-actions button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .header-actions button:hover {
+      border-color: var(--indigo);
+      background: rgba(99, 102, 241, 0.08);
+    }
+
+    /* — Timeline strip — */
+    .timeline-strip {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px 16px;
+      overflow-x: auto;
+    }
+
+    .timeline-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .timeline {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      min-width: max-content;
+      padding: 4px 0;
+    }
+
+    .timeline-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: background 100ms;
+      position: relative;
+    }
+
+    .timeline-node:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .timeline-node.active {
+      background: rgba(168, 152, 245, 0.08);
+    }
+
+    .tn-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--panel);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      z-index: 1;
+    }
+
+    .tn-dot.state-initial { border-color: var(--violet); }
+    .tn-dot.state-initial::after {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--violet);
+    }
+
+    .tn-dot.state-transition { border-color: var(--enabled); }
+    .tn-dot.state-transition::after {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--enabled);
+    }
+
+    .tn-dot.state-current {
+      border-color: var(--violet);
+      background: var(--violet);
+      box-shadow: 0 0 0 3px rgba(168, 152, 245, 0.25);
+    }
+
+    .tn-dot.state-rejected { border-color: var(--blocked); }
+    .tn-dot.state-rejected::after {
+      content: '✗';
+      font-size: 8px;
+      color: var(--blocked);
+      line-height: 1;
+    }
+
+    .tn-event-name {
+      font-size: 10px;
+      color: var(--cyan);
+      white-space: nowrap;
+    }
+
+    .tn-state-name {
+      font-size: 9px;
+      color: var(--dim);
+      white-space: nowrap;
+    }
+
+    .timeline-edge {
+      width: 40px;
+      height: 2px;
+      background: var(--border);
+      flex-shrink: 0;
+      position: relative;
+      top: -12px;
+    }
+
+    .timeline-edge.success { background: var(--enabled); }
+    .timeline-edge.rejected { background: var(--blocked); opacity: 0.5; }
+
+    .tn-now-label {
+      position: absolute;
+      top: -14px;
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--violet);
+      font-weight: 700;
+    }
+
+    /* — Main content: split view — */
+    .main-split {
+      display: grid;
+      grid-template-columns: 1fr 1px 1fr;
+      gap: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .split-divider {
+      background: var(--border);
+    }
+
+    /* Left pane: State snapshot + data */
+    .pane {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .pane-header {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .pane-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    /* Data snapshot */
+    .snapshot-state {
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .snapshot-at {
+      font-size: 11px;
+      color: var(--dim);
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .data-table th {
+      text-align: left;
+      padding: 6px 10px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table td {
+      padding: 8px 10px;
+      font-size: 12px;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.4);
+      vertical-align: top;
+    }
+
+    .data-table .changed {
+      background: rgba(52, 211, 153, 0.06);
+    }
+
+    .data-table .changed .field-value {
+      color: var(--enabled);
+    }
+
+    .diff-arrow {
+      font-size: 10px;
+      color: var(--muted);
+      margin: 0 4px;
+    }
+
+    .diff-before {
+      color: var(--dim);
+      text-decoration: line-through;
+      font-size: 11px;
+    }
+
+    /* Right pane: Event detail / what-if */
+    .event-detail-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .event-detail-card h3 {
+      font-size: 12px;
+      color: var(--cyan);
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .event-detail-card .outcome {
+      font-size: 11px;
+      margin-bottom: 6px;
+    }
+
+    .event-detail-card .outcome.ok {
+      color: var(--enabled);
+    }
+
+    .event-detail-card .outcome.reject {
+      color: var(--blocked);
+    }
+
+    .event-detail-card .args-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .mini-arg {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .mini-arg label {
+      font-size: 9px;
+      color: var(--dusk);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .mini-arg input {
+      background: rgba(17, 17, 20, 0.6);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 3px;
+      width: 120px;
+    }
+
+    .mini-arg input:focus {
+      outline: none;
+      border-color: var(--indigo);
+    }
+
+    .fire-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font: inherit;
+      font-size: 11px;
+      padding: 5px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid var(--enabled);
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.08);
+      margin-top: 8px;
+    }
+
+    .fire-btn:hover {
+      background: rgba(52, 211, 153, 0.16);
+    }
+
+    .fire-btn.disabled {
+      border-color: var(--blocked);
+      color: var(--blocked);
+      background: rgba(251, 113, 133, 0.06);
+      cursor: not-allowed;
+    }
+
+    /* Rules strip */
+    .rules-strip {
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+
+    .rule-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .rule-ok { color: var(--enabled); }
+    .rule-violated { color: var(--blocked); }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <div class="header">
+    <div class="header-left">
+      <span class="header-title">Precept Preview</span>
+      <span class="sep">·</span>
+      <span class="header-file">subscription.precept</span>
+      <span class="sep">·</span>
+      <span class="state-pill"><span class="dot"></span> Active</span>
+    </div>
+    <div class="header-actions">
+      <button>Edit</button>
+      <button>Reset</button>
+    </div>
+  </div>
+
+  <!-- ===== TIMELINE ===== -->
+  <div class="timeline-strip">
+    <div class="timeline-label">Event History</div>
+    <div class="timeline">
+      <!-- Step 0: Initial -->
+      <div class="timeline-node">
+        <div class="tn-dot state-initial"></div>
+        <span class="tn-event-name" style="color: var(--dim);">init</span>
+        <span class="tn-state-name">Trial</span>
+      </div>
+
+      <div class="timeline-edge success"></div>
+
+      <!-- Step 1: Activate fired -->
+      <div class="timeline-node">
+        <div class="tn-dot state-transition"></div>
+        <span class="tn-event-name">Activate</span>
+        <span class="tn-state-name">Trial → Active</span>
+      </div>
+
+      <div class="timeline-edge success"></div>
+
+      <!-- Step 2: Activate again (no transition) -->
+      <div class="timeline-node active">
+        <div class="tn-now-label">NOW</div>
+        <div class="tn-dot state-current"></div>
+        <span class="tn-event-name">Activate</span>
+        <span class="tn-state-name">Active (no transition)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MAIN SPLIT ===== -->
+  <div class="main-split">
+
+    <!-- LEFT: Data Snapshot at selected timeline point -->
+    <div class="pane">
+      <div class="pane-header">
+        <span class="section-label">Data at Step 2</span>
+        <span class="snapshot-at">after Activate</span>
+      </div>
+      <div class="pane-body">
+        <div class="snapshot-state">
+          <span class="state-pill"><span class="dot"></span> Active</span>
+          <span style="font-size: 11px; color: var(--dim);">no state change</span>
+        </div>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Type</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="field-name">PlanName</span></td>
+              <td><span class="field-type">string?</span></td>
+              <td><span class="field-value">Professional</span></td>
+            </tr>
+            <tr class="changed">
+              <td><span class="field-name">MonthlyPrice</span></td>
+              <td><span class="field-type">number</span></td>
+              <td>
+                <span class="diff-before">29.99</span>
+                <span class="diff-arrow">→</span>
+                <span class="field-value" style="color: var(--enabled);">99</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="margin-top: 20px;">
+          <div class="section-label" style="margin-bottom: 8px;">What Changed</div>
+          <div style="background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-size: 11px;">
+            <div style="color: var(--enabled); margin-bottom: 4px;">
+              ✓ set MonthlyPrice = Activate.Price
+            </div>
+            <div style="color: var(--dim); font-size: 10px;">
+              → no transition (stayed in Active)
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="split-divider"></div>
+
+    <!-- RIGHT: Available events / what-if explorer -->
+    <div class="pane">
+      <div class="pane-header">
+        <span class="section-label">Available Events</span>
+        <span style="font-size: 10px; color: var(--dim);">from Active</span>
+      </div>
+      <div class="pane-body">
+
+        <!-- Activate event -->
+        <div class="event-detail-card">
+          <h3>
+            <span style="font-size: 10px;">⚡</span> Activate
+            <span style="font-size: 10px; color: var(--enabled); margin-left: auto;">● no transition</span>
+          </h3>
+          <div class="outcome ok">→ stays in Active, updates MonthlyPrice</div>
+          <div class="args-row">
+            <div class="mini-arg">
+              <label>Plan</label>
+              <input type="text" value="Enterprise" />
+            </div>
+            <div class="mini-arg">
+              <label>Price</label>
+              <input type="text" value="149" />
+            </div>
+          </div>
+          <button class="fire-btn">▶ Fire Activate</button>
+        </div>
+
+        <!-- Cancel event -->
+        <div class="event-detail-card">
+          <h3>
+            <span style="font-size: 10px;">⚡</span> Cancel
+            <span style="font-size: 10px; color: var(--enabled); margin-left: auto;">● transition</span>
+          </h3>
+          <div class="outcome ok">→ transition to Cancelled</div>
+          <button class="fire-btn">▶ Fire Cancel</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== RULES STRIP ===== -->
+  <div class="rules-strip">
+    <span class="section-label" style="margin-right: 4px;">Rules</span>
+    <span class="rule-item rule-ok">✓ MonthlyPrice ≥ 0</span>
+    <span class="sep">·</span>
+    <span class="rule-item rule-ok">✓ assert Price &gt; 0</span>
+  </div>
+
+</body>
+</html>

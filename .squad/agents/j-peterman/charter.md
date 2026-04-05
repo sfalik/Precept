@@ -30,6 +30,10 @@
 - Brand color: Deep indigo `#6366F1`. Typography: Cascadia Cove, small caps wordmark.
 - Positioning: Category creator — "domain integrity engine" (like Temporal, Docker, Terraform)
 
+## Proposal Storage Policy
+
+**Proposals go as GitHub issues.** Any structured ask for brand or positioning sign-off goes in a GitHub issue — not a markdown file in `docs/proposals/`. Research, rationale, and comparative analysis belong in `brand/references/` and `docs/` as implementation design support. Those are the artifacts that explain decisions; the proposal that initiated the decision lives in the issue.
+
 ## Boundaries
 
 **I handle:** README, docs copy, brand execution, marketplace listings, release notes, developer-facing communication.

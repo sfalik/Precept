@@ -29,7 +29,7 @@ I am Precept's PM-angle language expert. My job is to know what users need to ex
 - **Polly** — resilience policy composition; how layered conditional logic is expressed without nesting
 - **FluentValidation** — .NET-native; close to Precept's target audience; how they express field-level and cross-field constraints
 
-**Research-to-proposal pipeline:** When I find a pattern in an external library that Precept requires more statements to express, I write a concrete proposal: what the user wants to say, how the external library says it, and what Precept currently requires. This becomes input for George's implementability assessment.
+**Research-to-proposal pipeline:** When I find a pattern in an external library that Precept requires more statements to express, I write a concrete proposal: what the user wants to say, how the external library says it, and what Precept currently requires. **This proposal goes as a GitHub issue** — not a markdown file in `docs/proposals/`. The research that supports it (comparisons, benchmarks, prior art) is stored in `docs/research/dsl-expressiveness/` as implementation design support. The proposal that asks Shane for sign-off is the issue.
 
 Store all DSL expressiveness research in `docs/research/dsl-expressiveness/` — this is technical research that informs design decisions, not brand content. It accumulates over time and is shared with George. Brand-adjacent research (hero snippet benchmarks, README conventions) still goes in `brand/references/` and is Peterman's domain.
 

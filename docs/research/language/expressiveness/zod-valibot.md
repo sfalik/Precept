@@ -144,36 +144,12 @@ Precept's state-scoped `in <State> assert` is a more expressive version of Zod's
 
 ---
 
-## Feature Proposals
+## Related GitHub proposal issues
 
-### Proposal 1 (High Impact): Inline range constraints on field declarations
+- **#13 — Field-level range/basic constraints**: primary compactness proposal for the co-located simple-constraint pressure documented here.
+- **#10 — String `.length` accessor**: narrow expression-surface fix for the missing string-size checks highlighted above.
 
-Allow simple numeric constraints inline with the field declaration to eliminate boilerplate invariants for common guard patterns:
-
-```precept
-field Age as number min 0 max 150 default 0
-field Price as number min 0 default 0
-field Name as string nonempty nullable
-```
-
-These desugar to `invariant` statements at compile time. Benefit: removes 1–3 `invariant` lines per constrained field. A 5-field entity with range constraints saves ~10 statements.
-
-**External precedent:** Zod (`.min/.max`), FluentValidation (`.GreaterThan/.LessThan`), JSON Schema (`minimum/maximum`).
-
-**Complexity:** Moderate. Requires new keyword tokens (`min`, `max`, `nonempty`) or reuse of `>=`/`<=` inline syntax. Risk: may conflict with Precept's design principle that every statement begins with a keyword anchor. Inline constraints after the type would break this pattern. A sub-form like `field X as number default 0 where X >= 0 because "..."` is less disruptive.
-
-### Proposal 2 (Low-Medium Impact): String length accessor
-
-Add `.length` as a valid accessor on `string` fields in expression positions:
-
-```precept
-invariant Name.length >= 1 because "Name is required"
-invariant Name.length <= 100 because "Name cannot exceed 100 characters"
-```
-
-Currently, `.count` works on collections; `.length` on strings is missing. This is a small, low-risk extension of the expression language.
-
-**External precedent:** Zod (`.min(n)`), FluentValidation (`.Length(1, 100)`), JavaScript (`str.length`).
+The proposal bodies live in GitHub. This file remains the evidence base for why schema-style co-location feels attractive, where that conflicts with Precept's keyword-anchored design, and why state-scoped validation is still one of Precept's genuine advantages.
 
 ---
 

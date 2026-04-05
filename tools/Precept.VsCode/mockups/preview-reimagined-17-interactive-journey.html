@@ -1,0 +1,2764 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 17: Interactive Journey — Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    /* ================================================================
+       CONCEPT 17 — INTERACTIVE JOURNEY
+       ================================================================
+       Synthesis of Concept 14 (Contract Explorer) + 15 (Journey) + 16
+       (Navigator). This is the clickable prototype: fire real events,
+       see state transitions, watch history accumulate, track data
+       provenance — all in the browser.
+
+       Layout: Journey's Past→Present→Future temporal narrative with
+       Navigator's topology rail on the left. Click "Fire ▶" on any
+       available event to advance the simulation.
+
+       Sample: InsuranceClaim — full lifecycle from Draft to Paid/Denied.
+       ================================================================ */
+
+    body {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* — Header — */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    .header-file { color: var(--dusk); font-size: 11px; }
+
+    .header-breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      font-size: 10px;
+    }
+
+    .crumb {
+      padding: 2px 7px;
+      border-radius: 3px;
+      transition: all 200ms;
+    }
+
+    .crumb.visited {
+      color: var(--dusk);
+      background: rgba(144, 150, 166, 0.06);
+    }
+
+    .crumb.current {
+      color: var(--violet);
+      background: rgba(168, 152, 245, 0.10);
+      font-weight: 600;
+    }
+
+    .crumb-arrow {
+      color: var(--muted);
+      font-size: 8px;
+      margin: 0 2px;
+    }
+
+    .header-actions { display: flex; gap: 6px; }
+    .header-actions button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 10px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 120ms;
+    }
+    .header-actions button:hover { border-color: var(--indigo); color: var(--indigo); }
+
+    /* — Main layout: rail + scroll — */
+    .main-layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 56px 1fr 200px;
+      overflow: hidden;
+    }
+
+    /* — Left rail (topology) — */
+    .rail {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 0;
+      border-right: 1px solid var(--border);
+      background: var(--panel);
+      overflow-y: auto;
+      gap: 0;
+    }
+
+    .rail-node {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      font-weight: 700;
+      color: var(--dim);
+      flex-shrink: 0;
+      position: relative;
+      cursor: pointer;
+      transition: all 250ms;
+      background: var(--panel);
+    }
+
+    .rail-node:hover { border-color: var(--violet); color: var(--violet); }
+
+    .rail-node.visited {
+      border-color: var(--dusk);
+      color: var(--dusk);
+      background: rgba(144, 150, 166, 0.08);
+    }
+
+    .rail-node.current {
+      border-color: var(--violet);
+      color: var(--violet);
+      background: rgba(168, 152, 245, 0.12);
+      box-shadow: 0 0 12px rgba(168, 152, 245, 0.25);
+    }
+
+    .rail-node.initial::before {
+      content: '';
+      position: absolute;
+      top: -8px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--violet);
+    }
+
+    .rail-node.terminal {
+      border-style: double;
+      border-width: 3px;
+    }
+
+    .rail-node .step-num {
+      position: absolute;
+      top: -5px;
+      right: -7px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--panel);
+      border: 1px solid var(--dusk);
+      font-size: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--dusk);
+      opacity: 0;
+      transition: opacity 200ms;
+    }
+
+    .rail-node.visited .step-num,
+    .rail-node.current .step-num { opacity: 1; }
+
+    .rail-node.current .step-num {
+      border-color: var(--violet);
+      color: var(--violet);
+    }
+
+    .rail-edge {
+      width: 2px;
+      height: 24px;
+      background: var(--border);
+      flex-shrink: 0;
+      transition: background 300ms;
+    }
+
+    .rail-edge.traced { background: rgba(144, 150, 166, 0.35); }
+    .rail-edge.traced-current {
+      background: linear-gradient(to bottom, rgba(144, 150, 166, 0.35), rgba(168, 152, 245, 0.45));
+    }
+
+    /* — Journey scroll area — */
+    .journey-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      max-width: 750px;
+    }
+
+    /* — Section dividers — */
+    .section-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      margin-top: 6px;
+    }
+
+    .section-divider .label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .section-divider .label.past { color: var(--dusk); }
+    .section-divider .label.present { color: var(--violet); }
+    .section-divider .label.future { color: var(--cyan); }
+
+    .section-divider .line { flex: 1; height: 1px; background: var(--border); }
+    .section-divider .step-count { font-size: 9px; color: var(--muted); }
+
+    /* — Past trail — */
+    .past-trail {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin-bottom: 20px;
+      padding-left: 16px;
+      position: relative;
+    }
+
+    .past-trail::before {
+      content: '';
+      position: absolute;
+      left: 5px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: linear-gradient(to bottom, rgba(144, 150, 166, 0.15), rgba(168, 152, 245, 0.30));
+    }
+
+    .trail-step {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 8px 0;
+      position: relative;
+      animation: fadeSlideIn 300ms ease-out;
+    }
+
+    .trail-step + .trail-step {
+      border-top: 1px solid rgba(39, 39, 42, 0.3);
+    }
+
+    .step-marker {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid var(--dusk);
+      background: var(--bg);
+      margin-top: 3px;
+      margin-left: -16px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .step-marker.origin {
+      border-color: var(--dim);
+      background: var(--dim);
+    }
+
+    .step-content {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .step-headline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .step-state {
+      color: var(--violet);
+      font-weight: 600;
+      opacity: 0.7;
+    }
+
+    .step-event {
+      font-size: 10px;
+      color: var(--cyan);
+      padding: 1px 6px;
+      border: 1px solid rgba(48, 184, 232, 0.20);
+      border-radius: 3px;
+      background: rgba(48, 184, 232, 0.04);
+    }
+
+    .step-number {
+      font-size: 9px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .step-deltas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 10px;
+    }
+
+    .delta {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      color: var(--dim);
+    }
+
+    .delta .field { color: var(--slate); }
+    .delta .before {
+      text-decoration: line-through;
+      color: var(--muted);
+      font-size: 9px;
+    }
+    .delta .arrow { color: var(--muted); font-size: 8px; }
+    .delta .after { color: var(--enabled); }
+
+    /* — Present card — */
+    .present-card {
+      background: var(--card);
+      border: 1px solid rgba(168, 152, 245, 0.35);
+      border-radius: 12px;
+      padding: 24px;
+      position: relative;
+      margin-bottom: 24px;
+      animation: spotlightIn 400ms ease-out;
+    }
+
+    .present-card::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 12px;
+      pointer-events: none;
+      box-shadow: 0 0 30px rgba(168, 152, 245, 0.08), 0 0 60px rgba(168, 152, 245, 0.04);
+    }
+
+    .present-card.terminal-card {
+      border-color: rgba(113, 113, 122, 0.35);
+    }
+
+    .present-card.terminal-card::before {
+      box-shadow: 0 0 30px rgba(113, 113, 122, 0.06);
+    }
+
+    .present-header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+
+    .present-name {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--violet);
+      letter-spacing: -0.01em;
+    }
+
+    .present-badges { display: flex; gap: 6px; align-items: center; }
+
+    .p-badge {
+      font-size: 9px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .p-badge.current {
+      border: 1px solid rgba(168, 152, 245, 0.40);
+      color: var(--violet);
+      background: rgba(168, 152, 245, 0.10);
+    }
+
+    .p-badge.step {
+      border: 1px solid rgba(144, 150, 166, 0.25);
+      color: var(--dusk);
+      background: rgba(144, 150, 166, 0.06);
+    }
+
+    .p-badge.terminal {
+      border: 1px solid rgba(113, 113, 122, 0.30);
+      color: var(--dim);
+      background: rgba(113, 113, 122, 0.06);
+    }
+
+    .p-badge.edit {
+      border: 1px solid rgba(144, 150, 166, 0.30);
+      color: var(--dusk);
+      background: rgba(144, 150, 166, 0.06);
+    }
+
+    .present-subtitle {
+      font-size: 11px;
+      color: var(--dim);
+      margin-bottom: 16px;
+    }
+
+    /* Data grid */
+    .p-section { margin-top: 14px; }
+
+    .p-section-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .data-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px;
+    }
+
+    .datum {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 8px 10px;
+      background: rgba(17, 17, 20, 0.4);
+      border: 1px solid rgba(39, 39, 42, 0.5);
+      border-radius: 6px;
+      transition: all 300ms;
+    }
+
+    .datum.recently-changed {
+      border-color: rgba(52, 211, 153, 0.25);
+      background: rgba(52, 211, 153, 0.03);
+    }
+
+    .datum .d-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--slate-val);
+    }
+
+    .datum .d-value.null { color: var(--muted); font-style: italic; font-size: 12px; }
+    .datum .d-value.bool-true { color: var(--enabled); }
+    .datum .d-value.bool-false { color: var(--blocked); opacity: 0.6; }
+
+    .datum .d-label {
+      font-size: 9px;
+      color: var(--dusk);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .datum .d-type { font-size: 8px; color: var(--muted); }
+
+    .datum .d-provenance {
+      font-size: 8px;
+      color: var(--enabled);
+      opacity: 0.8;
+    }
+
+    .datum .d-collection {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .d-collection .coll-item {
+      font-size: 10px;
+      padding: 1px 6px;
+      background: rgba(99, 102, 241, 0.06);
+      border: 1px solid rgba(99, 102, 241, 0.15);
+      border-radius: 3px;
+      color: var(--slate-val);
+    }
+
+    .d-collection .coll-count {
+      font-size: 8px;
+      color: var(--dusk);
+      margin-left: 2px;
+    }
+
+    .d-collection .coll-empty {
+      font-size: 10px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    /* Edit toggle for FraudFlag in UnderReview */
+    .d-edit-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      padding: 2px 0;
+    }
+
+    .d-edit-toggle .toggle-track {
+      width: 28px;
+      height: 16px;
+      border-radius: 8px;
+      background: rgba(251, 113, 133, 0.15);
+      border: 1px solid rgba(251, 113, 133, 0.30);
+      position: relative;
+      transition: all 200ms;
+    }
+
+    .d-edit-toggle .toggle-track::after {
+      content: '';
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--blocked);
+      opacity: 0.5;
+      transition: all 200ms;
+    }
+
+    .d-edit-toggle.on .toggle-track {
+      background: rgba(52, 211, 153, 0.20);
+      border-color: rgba(52, 211, 153, 0.35);
+    }
+
+    .d-edit-toggle.on .toggle-track::after {
+      left: 14px;
+      background: var(--enabled);
+      opacity: 1;
+    }
+
+    .d-edit-label {
+      font-size: 8px;
+      color: var(--dusk);
+      border: 1px solid rgba(144, 150, 166, 0.25);
+      border-radius: 2px;
+      padding: 0 3px;
+    }
+
+    /* Rules strip */
+    .rules-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .rule-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      transition: all 200ms;
+    }
+
+    .rule-chip.ok {
+      border: 1px solid rgba(52, 211, 153, 0.25);
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.04);
+    }
+
+    .rule-chip.violated {
+      border: 1px solid rgba(251, 113, 133, 0.25);
+      color: var(--blocked);
+      background: rgba(251, 113, 133, 0.04);
+    }
+
+    .rule-chip .r-icon { font-size: 8px; }
+
+    /* — Future section — */
+    .future-events {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .future-group-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-top: 6px;
+      margin-bottom: 2px;
+    }
+
+    .event-card {
+      display: flex;
+      gap: 14px;
+      padding: 14px 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      transition: border-color 150ms, background 150ms, transform 150ms;
+      cursor: default;
+    }
+
+    .event-card.can-fire {
+      cursor: pointer;
+    }
+
+    .event-card.can-fire:hover {
+      border-color: rgba(48, 184, 232, 0.30);
+      background: var(--card-hover);
+      transform: translateX(2px);
+    }
+
+    .event-card.blocked-card {
+      opacity: 0.65;
+    }
+
+    .event-card.blocked-card:hover {
+      border-color: rgba(251, 113, 133, 0.15);
+    }
+
+    .ec-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .ec-icon.transition {
+      background: rgba(52, 211, 153, 0.10);
+      border: 1px solid rgba(52, 211, 153, 0.20);
+      color: var(--enabled);
+    }
+
+    .ec-icon.self-loop {
+      background: rgba(52, 211, 153, 0.06);
+      border: 1px dashed rgba(52, 211, 153, 0.20);
+      color: var(--enabled);
+    }
+
+    .ec-icon.blocked {
+      background: rgba(251, 113, 133, 0.06);
+      border: 1px solid rgba(251, 113, 133, 0.20);
+      color: var(--blocked);
+    }
+
+    .ec-body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+
+    .ec-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--cyan);
+    }
+
+    .ec-outcome {
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ec-outcome.transition { color: var(--enabled); }
+    .ec-outcome.no-transition { color: var(--enabled); opacity: 0.7; }
+    .ec-outcome.rejected { color: var(--blocked); }
+
+    .ec-guard { font-size: 10px; color: var(--dusk); }
+    .ec-mutations { font-size: 10px; color: var(--dim); line-height: 1.5; }
+    .ec-rejection-msg { font-size: 10px; color: var(--gold); font-style: italic; }
+
+    .ec-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      flex-wrap: wrap;
+    }
+
+    .ec-arg {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .ec-arg label {
+      font-size: 8px;
+      color: var(--dusk);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .ec-arg input, .ec-arg select {
+      width: 90px;
+      background: rgba(12, 12, 15, 0.6);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 10px;
+      padding: 3px 6px;
+      border-radius: 3px;
+    }
+
+    .ec-arg input:focus, .ec-arg select:focus {
+      outline: none;
+      border-color: var(--indigo);
+    }
+
+    .ec-fire-btn {
+      font: inherit;
+      font-size: 9px;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid var(--enabled);
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.08);
+      white-space: nowrap;
+      transition: all 150ms;
+    }
+
+    .ec-fire-btn:hover { background: rgba(52, 211, 153, 0.20); }
+
+    .ec-fire-btn.blocked {
+      border-color: var(--blocked);
+      color: var(--blocked);
+      background: rgba(251, 113, 133, 0.06);
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    /* — Terminal state message — */
+    .terminal-message {
+      text-align: center;
+      padding: 20px;
+      color: var(--dim);
+      font-size: 12px;
+    }
+
+    .terminal-message .tm-icon { font-size: 24px; margin-bottom: 8px; }
+    .terminal-message .tm-text { margin-top: 4px; }
+
+    /* — Also reachable — */
+    .also-reachable { margin-bottom: 20px; }
+
+    .reachable-list { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .reachable-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid rgba(39, 39, 42, 0.6);
+      color: var(--dim);
+      background: rgba(17, 17, 20, 0.3);
+    }
+
+    .reachable-chip .r-state { color: var(--violet); opacity: 0.5; font-weight: 600; }
+    .reachable-chip .r-via { color: var(--muted); font-size: 9px; }
+    .reachable-chip .r-terminal {
+      font-size: 8px;
+      color: var(--muted);
+      border: 1px solid rgba(113, 113, 122, 0.25);
+      border-radius: 2px;
+      padding: 0 3px;
+    }
+
+    /* — Bottom status bar — */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 16px;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+      color: var(--dim);
+      flex-shrink: 0;
+    }
+
+    .status-left { display: flex; gap: 12px; }
+    .status-ok { color: var(--enabled); }
+    .status-warn { color: var(--gold); }
+
+    /* — Toast notification — */
+    .toast {
+      position: fixed;
+      top: 50px;
+      right: 20px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: all 300ms ease;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast.transition-toast {
+      background: rgba(52, 211, 153, 0.15);
+      border: 1px solid rgba(52, 211, 153, 0.35);
+      color: var(--enabled);
+    }
+
+    .toast.no-transition-toast {
+      background: rgba(52, 211, 153, 0.10);
+      border: 1px solid rgba(52, 211, 153, 0.25);
+      color: var(--enabled);
+      opacity: 0.85;
+    }
+
+    .toast.rejected-toast {
+      background: rgba(251, 113, 133, 0.12);
+      border: 1px solid rgba(251, 113, 133, 0.30);
+      color: var(--blocked);
+    }
+
+    /* — Animations — */
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes spotlightIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 30px rgba(168, 152, 245, 0.08); }
+      50% { box-shadow: 0 0 40px rgba(168, 152, 245, 0.16); }
+    }
+
+    /* Flash animation on data change */
+    @keyframes dataFlash {
+      0% { background: rgba(52, 211, 153, 0.12); }
+      100% { background: rgba(52, 211, 153, 0.03); }
+    }
+
+    .datum.just-changed {
+      animation: dataFlash 800ms ease-out;
+    }
+
+    /* — No past state — */
+    .no-past {
+      text-align: center;
+      padding: 12px;
+      color: var(--muted);
+      font-size: 11px;
+      font-style: italic;
+    }
+
+    /* ================================================================
+       INTERACTIVE GUIDANCE — Coach marks, visual emphasis, hints
+       ================================================================ */
+
+    /* — Pulse ring on Fire ▶ buttons — */
+    .ec-fire-btn {
+      position: relative;
+      font-weight: 600;
+    }
+
+    .ec-fire-btn:not(.blocked)::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: 6px;
+      border: 1.5px solid var(--enabled);
+      opacity: 0;
+      animation: btnPulse 2.4s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes btnPulse {
+      0%, 100% { opacity: 0; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(1.06); }
+    }
+
+    /* — Suggested-next event card glow — */
+    .event-card.suggested-next {
+      border-color: rgba(48, 184, 232, 0.40) !important;
+      box-shadow: 0 0 18px rgba(48, 184, 232, 0.10), 0 0 0 1px rgba(48, 184, 232, 0.12);
+    }
+
+    .event-card.suggested-next .ec-fire-btn::after {
+      border-color: var(--cyan);
+      animation-duration: 1.8s;
+      opacity: 0.6;
+    }
+
+    .suggested-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--cyan);
+      background: rgba(48, 184, 232, 0.08);
+      border: 1px solid rgba(48, 184, 232, 0.20);
+      border-radius: 3px;
+      padding: 1px 6px;
+      margin-left: auto;
+      white-space: nowrap;
+      animation: badgeFadeIn 400ms ease-out;
+    }
+
+    @keyframes badgeFadeIn {
+      from { opacity: 0; transform: translateX(6px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    /* — Input field emphasis — */
+    .ec-arg input, .ec-arg select {
+      border-color: rgba(99, 102, 241, 0.25);
+      transition: border-color 150ms, box-shadow 150ms;
+    }
+
+    .ec-arg input::placeholder {
+      color: var(--muted);
+      font-style: italic;
+      opacity: 0.7;
+    }
+
+    .ec-arg input:focus, .ec-arg select:focus {
+      border-color: var(--indigo);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+    }
+
+    /* — Interactive cursor hints — */
+    .d-edit-toggle {
+      position: relative;
+    }
+
+    .d-edit-toggle::after {
+      content: '✎';
+      position: absolute;
+      right: -14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 9px;
+      color: var(--dusk);
+      opacity: 0;
+      transition: opacity 150ms;
+    }
+
+    .d-edit-toggle:hover::after {
+      opacity: 0.7;
+    }
+
+    /* — Undo/Reset button emphasis — */
+    .header-actions button {
+      position: relative;
+    }
+
+    .header-actions button:active {
+      transform: scale(0.96);
+    }
+
+    /* — Coach mark overlay — */
+    .coach-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      pointer-events: none;
+    }
+
+    .coach-spotlight {
+      position: absolute;
+      border-radius: 10px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+      pointer-events: none;
+      transition: all 400ms ease;
+      z-index: 201;
+    }
+
+    .coach-card {
+      position: absolute;
+      z-index: 202;
+      background: var(--panel);
+      border: 1px solid rgba(48, 184, 232, 0.40);
+      border-radius: 10px;
+      padding: 16px 20px;
+      max-width: 320px;
+      pointer-events: auto;
+      animation: coachIn 350ms ease-out;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    @keyframes coachIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .coach-card .coach-step-indicator {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .coach-card .coach-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background 200ms;
+    }
+
+    .coach-card .coach-dot.active {
+      background: var(--cyan);
+    }
+
+    .coach-card .coach-dot.done {
+      background: var(--enabled);
+    }
+
+    .coach-card .coach-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .coach-card .coach-body {
+      font-size: 11px;
+      color: var(--slate-val);
+      line-height: 1.55;
+      margin-bottom: 12px;
+    }
+
+    .coach-card .coach-body kbd {
+      display: inline-block;
+      font: inherit;
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: rgba(99, 102, 241, 0.10);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      color: var(--cyan);
+    }
+
+    .coach-card .coach-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .coach-card .coach-btn {
+      font: inherit;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 5px;
+      cursor: pointer;
+      border: none;
+      transition: all 120ms;
+    }
+
+    .coach-btn.primary {
+      background: rgba(48, 184, 232, 0.18);
+      color: var(--cyan);
+      border: 1px solid rgba(48, 184, 232, 0.35);
+    }
+
+    .coach-btn.primary:hover {
+      background: rgba(48, 184, 232, 0.28);
+    }
+
+    .coach-btn.secondary {
+      background: transparent;
+      color: var(--dim);
+      border: 1px solid var(--border);
+    }
+
+    .coach-btn.secondary:hover {
+      color: var(--text);
+      border-color: var(--muted);
+    }
+
+    .coach-skip {
+      font-size: 10px;
+      color: var(--muted);
+      cursor: pointer;
+      margin-left: auto;
+      transition: color 120ms;
+    }
+
+    .coach-skip:hover { color: var(--text); }
+
+    /* — Welcome banner (before first action) — */
+    .welcome-banner {
+      background: rgba(48, 184, 232, 0.05);
+      border: 1px solid rgba(48, 184, 232, 0.20);
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      animation: fadeSlideIn 400ms ease-out;
+    }
+
+    .welcome-banner .wb-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--cyan);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .welcome-banner .wb-body {
+      font-size: 11px;
+      color: var(--slate-val);
+      line-height: 1.6;
+    }
+
+    .welcome-banner .wb-body strong {
+      color: var(--text);
+    }
+
+    .welcome-banner .wb-journey {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+      margin-top: 8px;
+      font-size: 10px;
+    }
+
+    .wb-journey .wb-step {
+      padding: 2px 8px;
+      border-radius: 3px;
+      background: rgba(48, 184, 232, 0.06);
+      border: 1px solid rgba(48, 184, 232, 0.15);
+      color: var(--cyan);
+    }
+
+    .wb-journey .wb-step.current-hint {
+      background: rgba(48, 184, 232, 0.14);
+      border-color: rgba(48, 184, 232, 0.35);
+      font-weight: 600;
+    }
+
+    .wb-journey .wb-arrow {
+      color: var(--muted);
+      font-size: 8px;
+    }
+
+    .welcome-banner .wb-dismiss {
+      font: inherit;
+      font-size: 10px;
+      background: transparent;
+      border: 1px solid rgba(48, 184, 232, 0.25);
+      color: var(--cyan);
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: all 120ms;
+    }
+
+    .welcome-banner .wb-dismiss:hover {
+      background: rgba(48, 184, 232, 0.12);
+    }
+
+    /* — Step hint (after each step) — */
+    .step-hint {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      color: var(--dusk);
+      padding: 8px 14px;
+      background: rgba(48, 184, 232, 0.04);
+      border: 1px solid rgba(48, 184, 232, 0.12);
+      border-radius: 8px;
+      margin-bottom: 16px;
+      animation: fadeSlideIn 300ms ease-out;
+    }
+
+    .step-hint .hint-arrow {
+      color: var(--cyan);
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .step-hint strong {
+      color: var(--cyan);
+    }
+
+    .step-hint .hint-dismiss {
+      margin-left: auto;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 12px;
+      transition: color 120ms;
+    }
+
+    .step-hint .hint-dismiss:hover { color: var(--text); }
+
+    /* — Journey complete celebration — */
+    .journey-complete-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      background: rgba(52, 211, 153, 0.10);
+      border: 1px solid rgba(52, 211, 153, 0.30);
+      color: var(--enabled);
+      font-weight: 600;
+      animation: badgeFadeIn 400ms ease-out;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       RIGHT-RAIL STATE DIAGRAM
+       ═══════════════════════════════════════════════════════════════ */
+
+    .state-diagram-rail {
+      border-left: 1px solid var(--border);
+      background: var(--panel);
+      padding: 14px 4px 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sd-title {
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .state-diagram-rail svg {
+      width: 100%;
+      max-width: 192px;
+      height: auto;
+    }
+
+    .sd-progress {
+      font-size: 8px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* Nodes */
+    .sd-node {
+      fill: rgba(17, 17, 20, 0.4);
+      stroke: rgba(39, 39, 42, 0.7);
+      stroke-width: 1.5;
+      transition: fill 400ms ease, stroke 400ms ease;
+    }
+
+    .sd-node-visited {
+      fill: rgba(144, 150, 166, 0.06);
+      stroke: rgba(144, 150, 166, 0.45);
+    }
+
+    .sd-node-current {
+      fill: rgba(168, 152, 245, 0.14);
+      stroke: rgba(168, 152, 245, 0.9);
+      stroke-width: 2;
+    }
+
+    .sd-node-terminal {
+      stroke-dasharray: 4 2;
+    }
+
+    /* Glow ring behind current node */
+    .sd-glow {
+      fill: none;
+      stroke: rgba(168, 152, 245, 0.20);
+      stroke-width: 1.5;
+      animation: sdGlowPulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes sdGlowPulse {
+      0%, 100% { stroke-opacity: 0.15; }
+      50% { stroke-opacity: 0.55; }
+    }
+
+    .sd-initial-dot {
+      fill: rgba(168, 152, 245, 0.7);
+    }
+
+    /* Labels */
+    .sd-label {
+      fill: rgba(113, 113, 122, 0.7);
+      font-size: 8px;
+      text-anchor: middle;
+      font-family: inherit;
+      pointer-events: none;
+    }
+
+    .sd-label-visited { fill: rgba(144, 150, 166, 0.9); }
+
+    .sd-label-current {
+      fill: rgba(168, 152, 245, 1);
+      font-weight: 700;
+      font-size: 8.5px;
+    }
+
+    /* Edges */
+    .sd-edge {
+      stroke: rgba(39, 39, 42, 0.6);
+      stroke-width: 1;
+      transition: stroke 400ms ease;
+    }
+
+    .sd-edge-traced {
+      stroke: rgba(144, 150, 166, 0.4);
+      stroke-width: 1.5;
+    }
+
+    .sd-edge-active {
+      stroke: rgba(168, 152, 245, 0.7);
+      stroke-width: 2;
+      animation: sdEdgeFlash 900ms ease-out;
+    }
+
+    @keyframes sdEdgeFlash {
+      0% { stroke: rgba(52, 211, 153, 0.9); stroke-width: 3; }
+      100% { stroke: rgba(168, 152, 245, 0.7); stroke-width: 2; }
+    }
+
+    /* Arrow fills */
+    .sd-arrow {
+      fill: rgba(39, 39, 42, 0.5);
+      transition: fill 400ms ease;
+    }
+
+    .sd-arrow-traced { fill: rgba(144, 150, 166, 0.4); }
+
+    .sd-arrow-active {
+      fill: rgba(168, 152, 245, 0.7);
+      animation: sdArrowFlash 900ms ease-out;
+    }
+
+    @keyframes sdArrowFlash {
+      0% { fill: rgba(52, 211, 153, 0.9); }
+      100% { fill: rgba(168, 152, 245, 0.7); }
+    }
+
+    /* Edge labels */
+    .sd-edge-label {
+      fill: rgba(113, 113, 122, 0.4);
+      font-size: 6.5px;
+      text-anchor: middle;
+      font-family: inherit;
+      pointer-events: none;
+      transition: fill 300ms ease;
+    }
+
+    .sd-edge-label-traced { fill: rgba(144, 150, 166, 0.7); }
+    .sd-edge-label-active { fill: rgba(168, 152, 245, 0.9); }
+
+    /* Self-loop curves */
+    .sd-self-loop {
+      stroke: rgba(39, 39, 42, 0.35);
+      stroke-width: 1;
+      fill: none;
+      transition: stroke 300ms ease;
+    }
+
+    .sd-self-active {
+      stroke: rgba(52, 211, 153, 0.3);
+    }
+
+    .sd-self-flash {
+      stroke: rgba(52, 211, 153, 0.6);
+      stroke-width: 1.5;
+      animation: sdSelfFlash 800ms ease-out;
+    }
+
+    @keyframes sdSelfFlash {
+      0% { stroke: rgba(52, 211, 153, 0.9); stroke-width: 2.5; }
+      100% { stroke: rgba(52, 211, 153, 0.6); stroke-width: 1.5; }
+    }
+
+    .sd-self-label {
+      fill: rgba(113, 113, 122, 0.35);
+      font-size: 6px;
+      font-family: inherit;
+      pointer-events: none;
+    }
+
+    /* — Responsive — */
+    @media (max-width: 700px) {
+      .state-diagram-rail { display: none; }
+      .main-layout { grid-template-columns: 56px 1fr; }
+    }
+
+    @media (max-width: 500px) {
+      .main-layout { grid-template-columns: 1fr; }
+      .rail { display: none; }
+      .journey-scroll { padding: 12px; }
+      .present-name { font-size: 24px; }
+      .header-breadcrumb { display: none; }
+      .coach-card { max-width: 260px; padding: 12px 14px; }
+      .welcome-banner { padding: 12px 14px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Coach mark overlay (managed by JS) -->
+  <div id="coachOverlay" class="coach-overlay" style="display:none;"></div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <span class="concept-badge">17 · INTERACTIVE</span>
+      <span class="header-title">InsuranceClaim</span>
+      <span class="sep">·</span>
+      <span class="header-file">insurance-claim.precept</span>
+    </div>
+    <div id="breadcrumb" class="header-breadcrumb"></div>
+    <div class="header-actions">
+      <button onclick="resetSimulation()">↺ Reset</button>
+      <button onclick="undoStep()">← Undo</button>
+    </div>
+  </div>
+
+  <!-- Main layout -->
+  <div class="main-layout">
+    <!-- Left rail -->
+    <div id="rail" class="rail"></div>
+
+    <!-- Journey scroll -->
+    <div class="journey-scroll" id="journeyScroll">
+      <!-- Rendered by JavaScript -->
+    </div>
+
+    <!-- Right rail: animated state diagram -->
+    <div id="stateDiagram" class="state-diagram-rail"></div>
+  </div>
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <div class="status-left">
+      <span id="statusStep">Step 0</span>
+      <span class="sep">·</span>
+      <span id="statusInvariants" class="status-ok">✓ 3 invariants ok</span>
+      <span class="sep">·</span>
+      <span id="statusInfo">6 states · 7 events · 8 fields</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="cursor:pointer; color:var(--cyan); font-size:10px; opacity:0.7; transition:opacity 120ms;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'" onclick="startCoach()">🎓 Tour</span>
+      <span><span style="color: var(--indigo);">Click</span> <span>Fire ▶</span> on any event to advance</span>
+    </div>
+  </div>
+
+  <script>
+    // ================================================================
+    // INSURANCE CLAIM — Full state machine simulation
+    // ================================================================
+
+    const STATES = ['Draft', 'Submitted', 'UnderReview', 'Approved', 'Denied', 'Paid'];
+
+    const STATE_META = {
+      Draft:       { initial: true,  terminal: false },
+      Submitted:   { initial: false, terminal: false },
+      UnderReview: { initial: false, terminal: false },
+      Approved:    { initial: false, terminal: false },
+      Denied:      { initial: false, terminal: true  },
+      Paid:        { initial: false, terminal: true  },
+    };
+
+    const FIELD_DEFS = {
+      ClaimantName:        { type: 'string',  nullable: true,  default: null },
+      ClaimAmount:         { type: 'number',  nullable: false, default: 0 },
+      ApprovedAmount:      { type: 'number',  nullable: false, default: 0 },
+      AdjusterName:        { type: 'string',  nullable: true,  default: null },
+      DecisionNote:        { type: 'string',  nullable: true,  default: null },
+      PoliceReportRequired:{ type: 'boolean', nullable: false, default: false },
+      FraudFlag:           { type: 'boolean', nullable: false, default: false },
+      MissingDocuments:    { type: 'set<string>', nullable: false, default: [] },
+    };
+
+    const INVARIANTS = [
+      { expr: 'ClaimAmount >= 0', msg: 'Claim amounts cannot be negative',
+        check: d => d.ClaimAmount >= 0 },
+      { expr: 'ApprovedAmount >= 0', msg: 'Approved amounts cannot be negative',
+        check: d => d.ApprovedAmount >= 0 },
+      { expr: 'ApprovedAmount <= ClaimAmount', msg: 'Approved amounts cannot exceed the claim',
+        check: d => d.ApprovedAmount <= d.ClaimAmount },
+    ];
+
+    // Topology: which states connect to which via which events
+    const TOPOLOGY = {
+      Draft:       [{ event: 'Submit', target: 'Submitted' }],
+      Submitted:   [{ event: 'RequestDocument', target: null }, { event: 'AssignAdjuster', target: 'UnderReview' }],
+      UnderReview: [{ event: 'RequestDocument', target: null }, { event: 'ReceiveDocument', target: null },
+                    { event: 'Approve', target: 'Approved' }, { event: 'Deny', target: 'Denied' }],
+      Approved:    [{ event: 'PayClaim', target: 'Paid' }],
+      Denied:      [],
+      Paid:        [],
+    };
+
+    // Full transition definitions
+    function getAvailableEvents(state, data) {
+      const events = [];
+
+      if (state === 'Draft') {
+        events.push({
+          name: 'Submit',
+          args: [
+            { name: 'Claimant', type: 'string', placeholder: 'Jane Doe' },
+            { name: 'Amount', type: 'number', placeholder: '5000' },
+            { name: 'RequiresPoliceReport', type: 'boolean', default: false },
+          ],
+          rows: [{
+            guard: null,
+            outcome: 'transition',
+            target: 'Submitted',
+            mutations: ['ClaimantName = Claimant', 'ClaimAmount = Amount', 'PoliceReportRequired = RequiresPoliceReport'],
+            canFire: (args) => args.Claimant && args.Claimant !== '' && args.Amount > 0,
+            blockReason: (args) => !args.Claimant || args.Claimant === '' ? 'A claimant name is required' : 'Claim amounts must be positive',
+            apply: (d, args) => ({
+              ...d,
+              ClaimantName: args.Claimant,
+              ClaimAmount: Number(args.Amount),
+              PoliceReportRequired: !!args.RequiresPoliceReport,
+            }),
+          }],
+        });
+      }
+
+      if (state === 'Submitted') {
+        events.push({
+          name: 'RequestDocument',
+          args: [{ name: 'Name', type: 'string', placeholder: 'Police Report' }],
+          rows: [{
+            guard: null,
+            outcome: 'no-transition',
+            target: null,
+            mutations: ['add MissingDocuments Name'],
+            canFire: (args) => args.Name && args.Name !== '',
+            blockReason: () => 'A document name is required',
+            apply: (d, args) => ({
+              ...d,
+              MissingDocuments: [...new Set([...d.MissingDocuments, args.Name])],
+            }),
+          }],
+        });
+
+        events.push({
+          name: 'AssignAdjuster',
+          args: [{ name: 'Name', type: 'string', placeholder: 'Bob Smith' }],
+          rows: [{
+            guard: null,
+            outcome: 'transition',
+            target: 'UnderReview',
+            mutations: ['AdjusterName = Name'],
+            canFire: (args) => args.Name && args.Name !== '',
+            blockReason: () => 'An adjuster name is required',
+            apply: (d, args) => ({
+              ...d,
+              AdjusterName: args.Name,
+            }),
+          }],
+        });
+      }
+
+      if (state === 'UnderReview') {
+        events.push({
+          name: 'RequestDocument',
+          args: [{ name: 'Name', type: 'string', placeholder: 'Medical Records' }],
+          rows: [{
+            guard: null,
+            outcome: 'no-transition',
+            target: null,
+            mutations: ['add MissingDocuments Name'],
+            canFire: (args) => args.Name && args.Name !== '',
+            blockReason: () => 'A document name is required',
+            apply: (d, args) => ({
+              ...d,
+              MissingDocuments: [...new Set([...d.MissingDocuments, args.Name])],
+            }),
+          }],
+        });
+
+        events.push({
+          name: 'ReceiveDocument',
+          args: [{ name: 'Name', type: 'string', placeholder: 'Police Report' }],
+          rows: [
+            {
+              guard: 'MissingDocuments contains Name',
+              outcome: 'no-transition',
+              target: null,
+              mutations: ['remove MissingDocuments Name'],
+              canFire: (args, d) => args.Name && args.Name !== '' && d.MissingDocuments.includes(args.Name),
+              blockReason: (args, d) => {
+                if (!args.Name || args.Name === '') return 'A document name is required';
+                return 'That document is not currently outstanding';
+              },
+              apply: (d, args) => ({
+                ...d,
+                MissingDocuments: d.MissingDocuments.filter(x => x !== args.Name),
+              }),
+            },
+            {
+              guard: null,
+              outcome: 'rejected',
+              target: null,
+              mutations: [],
+              rejectMsg: 'That document is not currently outstanding',
+              canFire: () => false,
+              apply: (d) => d,
+            },
+          ],
+        });
+
+        events.push({
+          name: 'Approve',
+          args: [
+            { name: 'Amount', type: 'number', placeholder: '4500' },
+            { name: 'Note', type: 'string', placeholder: 'Approved after review', nullable: true },
+          ],
+          rows: [
+            {
+              guard: '(!PoliceReportRequired || MissingDocuments.count == 0) && Amount ≤ ClaimAmount',
+              outcome: 'transition',
+              target: 'Approved',
+              mutations: ['ApprovedAmount = Amount', 'DecisionNote = Note'],
+              canFire: (args, d) => {
+                const amt = Number(args.Amount);
+                return amt > 0 &&
+                  (!d.PoliceReportRequired || d.MissingDocuments.length === 0) &&
+                  amt <= d.ClaimAmount;
+              },
+              blockReason: (args, d) => {
+                const amt = Number(args.Amount);
+                if (!amt || amt <= 0) return 'Approved claim amounts must be positive';
+                if (d.PoliceReportRequired && d.MissingDocuments.length > 0)
+                  return 'Required documents must be complete before approval';
+                if (amt > d.ClaimAmount) return 'Approved amount cannot exceed claim amount';
+                return 'Guard failed';
+              },
+              apply: (d, args) => ({
+                ...d,
+                ApprovedAmount: Number(args.Amount),
+                DecisionNote: args.Note || null,
+              }),
+            },
+            {
+              guard: null,
+              outcome: 'rejected',
+              target: null,
+              mutations: [],
+              rejectMsg: 'Required documents must be complete before a claim can be approved',
+              canFire: () => false,
+              apply: (d) => d,
+            },
+          ],
+        });
+
+        events.push({
+          name: 'Deny',
+          args: [{ name: 'Note', type: 'string', placeholder: 'Insufficient evidence' }],
+          rows: [{
+            guard: null,
+            outcome: 'transition',
+            target: 'Denied',
+            mutations: ['DecisionNote = Note'],
+            canFire: (args) => args.Note && args.Note !== '',
+            blockReason: () => 'A denial note is required',
+            apply: (d, args) => ({
+              ...d,
+              DecisionNote: args.Note,
+            }),
+          }],
+        });
+      }
+
+      if (state === 'Approved') {
+        events.push({
+          name: 'PayClaim',
+          args: [],
+          rows: [{
+            guard: null,
+            outcome: 'transition',
+            target: 'Paid',
+            mutations: [],
+            canFire: () => true,
+            blockReason: () => '',
+            apply: (d) => d,
+          }],
+        });
+      }
+
+      return events;
+    }
+
+    // ================================================================
+    // SIMULATION STATE
+    // ================================================================
+
+    let sim = {
+      currentState: 'Draft',
+      data: getDefaultData(),
+      history: [],        // array of { stepNum, fromState, event, args, toState, deltas, dataSnapshot }
+      stepCount: 0,
+      visitedStates: new Set(['Draft']),
+      changedFields: new Set(),
+    };
+
+    function getDefaultData() {
+      return {
+        ClaimantName: null,
+        ClaimAmount: 0,
+        ApprovedAmount: 0,
+        AdjusterName: null,
+        DecisionNote: null,
+        PoliceReportRequired: false,
+        FraudFlag: false,
+        MissingDocuments: [],
+      };
+    }
+
+    function deepClone(obj) {
+      return JSON.parse(JSON.stringify(obj));
+    }
+
+    // ================================================================
+    // FIRE EVENT
+    // ================================================================
+
+    function fireEvent(eventName, rowIndex) {
+      const events = getAvailableEvents(sim.currentState, sim.data);
+      const evt = events.find(e => e.name === eventName);
+      if (!evt) return;
+
+      const row = evt.rows[rowIndex || 0];
+
+      // Gather args from inputs
+      const args = {};
+      evt.args.forEach(a => {
+        const el = document.getElementById(`arg-${eventName}-${a.name}`);
+        if (el) {
+          if (a.type === 'boolean') {
+            args[a.name] = el.checked || el.value === 'true';
+          } else if (a.type === 'number') {
+            args[a.name] = el.value ? Number(el.value) : 0;
+          } else {
+            args[a.name] = el.value || '';
+          }
+        } else {
+          args[a.name] = a.default !== undefined ? a.default : '';
+        }
+      });
+
+      // Check if fireable
+      if (!row.canFire(args, sim.data)) {
+        showToast(row.blockReason(args, sim.data), 'rejected');
+        return;
+      }
+
+      // Snapshot before
+      const prevData = deepClone(sim.data);
+      const prevState = sim.currentState;
+
+      // Apply mutations
+      sim.data = row.apply(deepClone(sim.data), args);
+
+      // Calculate deltas
+      const deltas = [];
+      for (const key of Object.keys(FIELD_DEFS)) {
+        const before = prevData[key];
+        const after = sim.data[key];
+        if (JSON.stringify(before) !== JSON.stringify(after)) {
+          deltas.push({ field: key, before, after });
+        }
+      }
+
+      // Record changed fields
+      sim.changedFields = new Set(deltas.map(d => d.field));
+
+      // Transition
+      const toState = row.target || sim.currentState;
+      sim.stepCount++;
+
+      // Record history
+      sim.history.push({
+        stepNum: sim.stepCount,
+        fromState: prevState,
+        event: eventName,
+        args: deepClone(args),
+        toState: toState,
+        outcome: row.outcome,
+        deltas: deltas,
+        dataSnapshot: deepClone(sim.data),
+      });
+
+      sim.currentState = toState;
+      sim.visitedStates.add(toState);
+
+      // Show toast
+      if (row.outcome === 'transition') {
+        showToast(`${eventName} → ${toState}`, 'transition');
+      } else {
+        showToast(`${eventName} ↻ stayed in ${sim.currentState}`, 'no-transition');
+      }
+
+      // Re-render
+      render();
+    }
+
+    function resetSimulation() {
+      sim = {
+        currentState: 'Draft',
+        data: getDefaultData(),
+        history: [],
+        stepCount: 0,
+        visitedStates: new Set(['Draft']),
+        changedFields: new Set(),
+      };
+      render();
+      showToast('Reset to Draft', 'transition');
+    }
+
+    function undoStep() {
+      if (sim.history.length === 0) return;
+
+      const lastStep = sim.history.pop();
+      sim.stepCount--;
+      sim.currentState = lastStep.fromState;
+
+      // Restore data from previous step or default
+      if (sim.history.length > 0) {
+        sim.data = deepClone(sim.history[sim.history.length - 1].dataSnapshot);
+      } else {
+        sim.data = getDefaultData();
+      }
+
+      // Rebuild visited states
+      sim.visitedStates = new Set(['Draft']);
+      sim.history.forEach(h => {
+        sim.visitedStates.add(h.fromState);
+        sim.visitedStates.add(h.toState);
+      });
+      sim.visitedStates.add(sim.currentState);
+
+      sim.changedFields = new Set();
+      render();
+      showToast(`Undid → back to ${sim.currentState}`, 'no-transition');
+    }
+
+    function toggleFraudFlag() {
+      if (sim.currentState !== 'UnderReview') return;
+      const prevVal = sim.data.FraudFlag;
+      sim.data.FraudFlag = !sim.data.FraudFlag;
+
+      sim.stepCount++;
+      sim.history.push({
+        stepNum: sim.stepCount,
+        fromState: sim.currentState,
+        event: '✎ edit FraudFlag',
+        args: {},
+        toState: sim.currentState,
+        outcome: 'no-transition',
+        deltas: [{ field: 'FraudFlag', before: prevVal, after: sim.data.FraudFlag }],
+        dataSnapshot: deepClone(sim.data),
+      });
+
+      sim.changedFields = new Set(['FraudFlag']);
+      render();
+      showToast(`FraudFlag → ${sim.data.FraudFlag}`, 'no-transition');
+    }
+
+    // ================================================================
+    // TOAST
+    // ================================================================
+
+    let toastTimer = null;
+
+    function showToast(message, type) {
+      const toast = document.getElementById('toast');
+      toast.className = `toast ${type}-toast show`;
+      toast.textContent = type === 'transition' ? `▶ ${message}` :
+                          type === 'rejected' ? `✕ ${message}` :
+                          `↻ ${message}`;
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2000);
+    }
+
+    // ================================================================
+    // RENDER
+    // ================================================================
+
+    function render() {
+      renderBreadcrumb();
+      renderRail();
+      renderJourney();
+      renderStateDiagram();
+      renderStatus();
+    }
+
+    // — Breadcrumb —
+    function renderBreadcrumb() {
+      const el = document.getElementById('breadcrumb');
+      const trail = ['Draft'];
+      sim.history.forEach(h => {
+        if (h.toState !== trail[trail.length - 1]) {
+          trail.push(h.toState);
+        }
+      });
+
+      el.innerHTML = trail.map((s, i) => {
+        const cls = s === sim.currentState ? 'crumb current' : 'crumb visited';
+        const arrow = i < trail.length - 1 ? '<span class="crumb-arrow">→</span>' : '';
+        return `<span class="${cls}">${s}</span>${arrow}`;
+      }).join('');
+    }
+
+    // — Rail —
+    function renderRail() {
+      const el = document.getElementById('rail');
+      let html = '';
+
+      // Build the visited-state path for edge coloring
+      const trail = [];
+      sim.history.forEach(h => {
+        if (h.toState !== h.fromState) {
+          trail.push({ from: h.fromState, to: h.toState });
+        }
+      });
+
+      STATES.forEach((state, i) => {
+        const isVisited = sim.visitedStates.has(state);
+        const isCurrent = state === sim.currentState;
+        const meta = STATE_META[state];
+
+        let cls = 'rail-node';
+        if (isCurrent) cls += ' current';
+        else if (isVisited) cls += ' visited';
+        if (meta.initial) cls += ' initial';
+        if (meta.terminal) cls += ' terminal';
+
+        // Find step number for this state
+        let stepNum = '';
+        if (isCurrent) {
+          stepNum = sim.stepCount;
+        } else if (isVisited) {
+          const lastVisit = [...sim.history].reverse().find(h => h.toState === state || h.fromState === state);
+          if (lastVisit) stepNum = lastVisit.stepNum;
+        }
+
+        html += `<div class="${cls}" title="${state}">
+          ${state.substring(0, 2)}
+          ${(isVisited || isCurrent) ? `<span class="step-num">${stepNum}</span>` : ''}
+        </div>`;
+
+        // Edge between states
+        if (i < STATES.length - 1) {
+          const nextState = STATES[i + 1];
+          const isTraced = trail.some(t =>
+            (t.from === state && t.to === nextState) ||
+            (t.from === nextState && t.to === state)
+          );
+          const isTracedCurrent = isTraced && (nextState === sim.currentState || state === sim.currentState);
+          let edgeCls = 'rail-edge';
+          if (isTracedCurrent) edgeCls += ' traced-current';
+          else if (isTraced) edgeCls += ' traced';
+          html += `<div class="${edgeCls}"></div>`;
+        }
+      });
+
+      el.innerHTML = html;
+    }
+
+    // — State Diagram (right rail) —
+    function renderStateDiagram() {
+      const el = document.getElementById('stateDiagram');
+      if (!el) return;
+
+      const nW = 78, nH = 22, nR = 11;
+
+      const nodes = [
+        { id: 'Draft',       x: 100, y: 30 },
+        { id: 'Submitted',   x: 100, y: 88 },
+        { id: 'UnderReview', x: 100, y: 152 },
+        { id: 'Approved',    x: 60,  y: 224 },
+        { id: 'Denied',      x: 154, y: 224 },
+        { id: 'Paid',        x: 60,  y: 290 },
+      ];
+
+      const edges = [
+        { from: 'Draft',       to: 'Submitted',   label: 'Submit' },
+        { from: 'Submitted',   to: 'UnderReview', label: 'Assign' },
+        { from: 'UnderReview', to: 'Approved',    label: 'Approve' },
+        { from: 'UnderReview', to: 'Denied',      label: 'Deny' },
+        { from: 'Approved',    to: 'Paid',        label: 'Pay' },
+      ];
+
+      const selfLoopStates = ['Submitted', 'UnderReview'];
+
+      const nMap = {};
+      nodes.forEach(n => nMap[n.id] = n);
+
+      // Animation context from last step
+      const lastStep = sim.history.length > 0 ? sim.history[sim.history.length - 1] : null;
+      const lastEdge = lastStep && lastStep.fromState !== lastStep.toState
+        ? { from: lastStep.fromState, to: lastStep.toState } : null;
+      const lastSelfLoop = lastStep && lastStep.fromState === lastStep.toState
+        ? lastStep.fromState : null;
+
+      // Arrowhead path helper
+      function arrow(x1, y1, x2, y2, s) {
+        const a = Math.atan2(y2 - y1, x2 - x1);
+        return `M${x2.toFixed(1)},${y2.toFixed(1)} ` +
+          `L${(x2 - s * Math.cos(a - 0.45)).toFixed(1)},${(y2 - s * Math.sin(a - 0.45)).toFixed(1)} ` +
+          `L${(x2 - s * Math.cos(a + 0.45)).toFixed(1)},${(y2 - s * Math.sin(a + 0.45)).toFixed(1)} Z`;
+      }
+
+      let svg = '<svg viewBox="0 0 200 318" xmlns="http://www.w3.org/2000/svg">';
+
+      // ── Edges ──
+      edges.forEach(e => {
+        const f = nMap[e.from], t = nMap[e.to];
+        const x1 = f.x, y1 = f.y + nH / 2;
+        const x2 = t.x, y2 = t.y - nH / 2;
+        const isTraced = sim.history.some(h => h.fromState === e.from && h.toState === e.to);
+        const isActive = lastEdge && lastEdge.from === e.from && lastEdge.to === e.to;
+
+        let lCls = 'sd-edge', aCls = 'sd-arrow', tCls = 'sd-edge-label';
+        if (isActive)      { lCls += ' sd-edge-active'; aCls += ' sd-arrow-active'; tCls += ' sd-edge-label-active'; }
+        else if (isTraced) { lCls += ' sd-edge-traced'; aCls += ' sd-arrow-traced'; tCls += ' sd-edge-label-traced'; }
+
+        svg += `<line class="${lCls}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+        svg += `<path class="${aCls}" d="${arrow(x1, y1, x2, y2, 5)}"/>`;
+
+        // Label at midpoint, offset to avoid overlap
+        let mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        if (e.from === 'UnderReview' && e.to === 'Approved') { mx -= 18; my -= 2; }
+        else if (e.from === 'UnderReview' && e.to === 'Denied') { mx += 18; my -= 2; }
+        else { mx += 16; }
+        svg += `<text class="${tCls}" x="${mx}" y="${my}">${e.label}</text>`;
+      });
+
+      // ── Self-loops ──
+      selfLoopStates.forEach(sid => {
+        const n = nMap[sid];
+        const rx = n.x + nW / 2 + 1;
+        const isFlash = lastSelfLoop === sid;
+        const isCurr = sim.currentState === sid;
+
+        let cls = 'sd-self-loop';
+        if (isFlash) cls += ' sd-self-flash';
+        else if (isCurr) cls += ' sd-self-active';
+
+        svg += `<path class="${cls}" d="M${rx},${n.y - 4} C${rx + 14},${n.y - 14} ${rx + 14},${n.y + 14} ${rx},${n.y + 4}"/>`;
+        svg += `<text class="sd-self-label" x="${rx + 12}" y="${n.y + 2}">↻</text>`;
+      });
+
+      // ── Nodes ──
+      nodes.forEach(n => {
+        const isCurrent = sim.currentState === n.id;
+        const isVisited = sim.visitedStates.has(n.id);
+        const meta = STATE_META[n.id];
+
+        if (isCurrent) {
+          svg += `<rect class="sd-glow" x="${n.x - nW / 2 - 4}" y="${n.y - nH / 2 - 4}" ` +
+            `width="${nW + 8}" height="${nH + 8}" rx="${nR + 3}"/>`;
+        }
+
+        let nCls = 'sd-node';
+        if (isCurrent) nCls += ' sd-node-current';
+        else if (isVisited) nCls += ' sd-node-visited';
+        if (meta.terminal) nCls += ' sd-node-terminal';
+
+        svg += `<rect class="${nCls}" x="${n.x - nW / 2}" y="${n.y - nH / 2}" ` +
+          `width="${nW}" height="${nH}" rx="${nR}"/>`;
+
+        let lCls = 'sd-label';
+        if (isCurrent) lCls += ' sd-label-current';
+        else if (isVisited) lCls += ' sd-label-visited';
+        svg += `<text class="${lCls}" x="${n.x}" y="${n.y + 3}">${n.id}</text>`;
+
+        if (meta.initial) {
+          svg += `<circle class="sd-initial-dot" cx="${n.x}" cy="${n.y - nH / 2 - 5}" r="2.5"/>`;
+        }
+      });
+
+      svg += '</svg>';
+
+      const visitedCount = sim.visitedStates.size;
+      el.innerHTML = `<div class="sd-title">State Flow</div>${svg}` +
+        `<div class="sd-progress">${visitedCount} of ${STATES.length} visited</div>`;
+    }
+
+    // — Journey —
+    function renderJourney() {
+      const el = document.getElementById('journeyScroll');
+      let html = '';
+
+      // ═══════════ WELCOME BANNER (before first action) ═══════════
+      if (sim.history.length === 0 && !guidanceState.welcomeDismissed) {
+        html += `<div class="welcome-banner">
+          <div class="wb-title">🗺️ Welcome to the Interactive Journey</div>
+          <div class="wb-body">
+            This is a <strong>playable simulation</strong> of the InsuranceClaim lifecycle.
+            Fill in event arguments below and click <strong>Fire ▶</strong> to advance.
+            Watch history accumulate, data change, and guards enforce business rules.
+          </div>
+          <div class="wb-journey">
+            <span class="wb-step current-hint">Submit</span>
+            <span class="wb-arrow">→</span>
+            <span class="wb-step">AssignAdjuster</span>
+            <span class="wb-arrow">→</span>
+            <span class="wb-step">RequestDocument</span>
+            <span class="wb-arrow">→</span>
+            <span class="wb-step">ReceiveDocument</span>
+            <span class="wb-arrow">→</span>
+            <span class="wb-step">Approve</span>
+            <span class="wb-arrow">→</span>
+            <span class="wb-step">PayClaim</span>
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 10px;">
+            <button class="wb-dismiss" onclick="dismissWelcome()">Got it — let me explore</button>
+            <button class="wb-dismiss" onclick="startCoach()" style="border-color: rgba(48, 184, 232, 0.35); color: var(--cyan);">
+              🎓 Take the tour
+            </button>
+          </div>
+        </div>`;
+      }
+
+      // ═══════════ STEP HINT (after each step, if not dismissed) ═══════════
+      if (sim.history.length > 0 && !guidanceState.hintsDismissed && !STATE_META[sim.currentState].terminal) {
+        const hintText = getStepHintText();
+        if (hintText) {
+          html += `<div class="step-hint">
+            <span class="hint-arrow">↓</span>
+            <span><strong>Suggested next:</strong> ${hintText}</span>
+            <span class="hint-dismiss" onclick="dismissHints()" title="Dismiss hints">✕</span>
+          </div>`;
+        }
+      }
+
+      // Journey complete badge at top when terminal
+      if (STATE_META[sim.currentState].terminal) {
+        html += `<div style="text-align:center; margin-bottom:16px;">
+          <span class="journey-complete-badge">✓ Journey complete in ${sim.stepCount} steps</span>
+        </div>`;
+      }
+
+      // ═══════════ PAST ═══════════
+      html += `<div class="section-divider">
+        <span class="label past">Past</span>
+        <div class="line"></div>
+        <span class="step-count">${sim.history.length} step${sim.history.length !== 1 ? 's' : ''}</span>
+      </div>`;
+
+      if (sim.history.length === 0) {
+        html += `<div class="no-past">No steps yet — fire an event to begin the journey</div>`;
+      } else {
+        html += '<div class="past-trail">';
+
+        // Origin marker
+        html += `<div class="trail-step">
+          <div class="step-marker origin"></div>
+          <div class="step-content">
+            <div class="step-headline">
+              <span class="step-number">#0</span>
+              <span class="step-state">Draft</span>
+              <span style="font-size: 10px; color: var(--dim);">initial state</span>
+            </div>
+          </div>
+        </div>`;
+
+        // Each step
+        sim.history.forEach(step => {
+          html += `<div class="trail-step">
+            <div class="step-marker"></div>
+            <div class="step-content">
+              <div class="step-headline">
+                <span class="step-number">#${step.stepNum}</span>
+                <span class="step-event">${step.event}${formatArgsCompact(step.args)}</span>
+                <span class="step-state">${step.toState}</span>
+                ${step.outcome === 'no-transition' ? '<span style="font-size:9px; color:var(--dim);">↻</span>' : ''}
+              </div>
+              ${step.deltas.length > 0 ? `<div class="step-deltas">
+                ${step.deltas.map(d => `<span class="delta">
+                  <span class="field">${d.field}</span>
+                  <span class="before">${formatValueCompact(d.before)}</span>
+                  <span class="arrow">→</span>
+                  <span class="after">${formatValueCompact(d.after)}</span>
+                </span>`).join('')}
+              </div>` : ''}
+            </div>
+          </div>`;
+        });
+
+        html += '</div>';
+      }
+
+      // ═══════════ PRESENT ═══════════
+      const isTerminal = STATE_META[sim.currentState].terminal;
+
+      html += `<div class="section-divider">
+        <span class="label present">Present</span>
+        <div class="line"></div>
+      </div>`;
+
+      html += `<div class="present-card${isTerminal ? ' terminal-card' : ''}" id="presentCard">`;
+
+      html += `<div class="present-header">
+        <span class="present-name">${sim.currentState}</span>
+        <div class="present-badges">
+          <span class="p-badge current">Current</span>
+          <span class="p-badge step">Step #${sim.stepCount}</span>
+          ${STATE_META[sim.currentState].initial ? '<span class="p-badge" style="border:1px solid rgba(168,152,245,0.30); color:var(--violet); background:rgba(168,152,245,0.06);">Initial</span>' : ''}
+          ${isTerminal ? '<span class="p-badge terminal">Terminal</span>' : ''}
+          ${sim.currentState === 'UnderReview' ? '<span class="p-badge edit">✎ FraudFlag editable</span>' : ''}
+        </div>
+      </div>`;
+
+      // Subtitle
+      if (isTerminal) {
+        html += `<div class="present-subtitle">This is a terminal state — no further transitions are possible.</div>`;
+      } else if (sim.currentState === 'Draft') {
+        html += `<div class="present-subtitle">Submit a claim to begin the lifecycle.</div>`;
+      } else if (sim.currentState === 'UnderReview') {
+        html += `<div class="present-subtitle">Under review by ${sim.data.AdjusterName || 'an adjuster'}. Documents may be requested or received.</div>`;
+      } else if (sim.currentState === 'Approved') {
+        html += `<div class="present-subtitle">Claim approved for $${sim.data.ApprovedAmount.toLocaleString()}. Ready for payment.</div>`;
+      } else {
+        html += `<div class="present-subtitle">Current entity state snapshot.</div>`;
+      }
+
+      // Data section
+      html += `<div class="p-section">
+        <div class="p-section-label">Data</div>
+        <div class="data-grid">`;
+
+      for (const [field, def] of Object.entries(FIELD_DEFS)) {
+        const val = sim.data[field];
+        const wasChanged = sim.changedFields.has(field);
+        const changedAt = getProvenanceStep(field);
+
+        if (def.type === 'set<string>') {
+          html += `<div class="datum${wasChanged ? ' recently-changed just-changed' : ''}" style="grid-column: span 2;">
+            <div class="d-label">${field} <span class="d-type">set&lt;string&gt;</span></div>
+            <div class="d-collection">
+              ${val.length > 0 ? val.map(v => `<span class="coll-item">${v}</span>`).join('') : '<span class="coll-empty">∅ empty</span>'}
+              <span class="coll-count">${val.length} item${val.length !== 1 ? 's' : ''}</span>
+            </div>
+            ${changedAt !== null ? `<div class="d-provenance">← modified at #${changedAt}</div>` : ''}
+          </div>`;
+        } else if (def.type === 'boolean' && field === 'FraudFlag' && sim.currentState === 'UnderReview') {
+          html += `<div class="datum${wasChanged ? ' recently-changed just-changed' : ''}">
+            <div class="d-label">${field} <span class="d-type">boolean</span></div>
+            <div class="d-edit-toggle ${val ? 'on' : ''}" onclick="toggleFraudFlag()">
+              <div class="toggle-track"></div>
+              <span style="font-size:11px; color:${val ? 'var(--enabled)' : 'var(--blocked)'}; opacity:${val ? '1' : '0.6'};">${val}</span>
+            </div>
+            <span class="d-edit-label">✎ editable</span>
+            ${changedAt !== null ? `<div class="d-provenance">← set at #${changedAt}</div>` : ''}
+          </div>`;
+        } else {
+          html += `<div class="datum${wasChanged ? ' recently-changed just-changed' : ''}">
+            <div class="d-label">${field} <span class="d-type">${def.type}${def.nullable ? '?' : ''}</span></div>
+            <div class="d-value ${val === null ? 'null' : ''} ${def.type === 'boolean' ? (val ? 'bool-true' : 'bool-false') : ''}">${formatValue(val, def.type)}</div>
+            ${changedAt !== null ? `<div class="d-provenance">← set at #${changedAt}</div>` : ''}
+          </div>`;
+        }
+      }
+
+      html += '</div></div>';
+
+      // Invariants
+      html += `<div class="p-section">
+        <div class="p-section-label">Invariants</div>
+        <div class="rules-strip">`;
+
+      INVARIANTS.forEach(inv => {
+        const ok = inv.check(sim.data);
+        html += `<div class="rule-chip ${ok ? 'ok' : 'violated'}">
+          <span class="r-icon">${ok ? '✓' : '✕'}</span>
+          ${inv.expr}
+        </div>`;
+      });
+
+      // State assert for Approved
+      if (sim.currentState === 'Approved') {
+        const assertOk = sim.data.ApprovedAmount > 0;
+        html += `<div class="rule-chip ${assertOk ? 'ok' : 'violated'}">
+          <span class="r-icon">${assertOk ? '✓' : '✕'}</span>
+          ApprovedAmount > 0 <span style="font-size:8px; color:var(--dusk); margin-left:4px;">(state assert)</span>
+        </div>`;
+      }
+
+      html += '</div></div>';
+
+      html += '</div>'; // close present-card
+
+      // ═══════════ FUTURE ═══════════
+      if (!isTerminal) {
+        html += `<div class="section-divider">
+          <span class="label future">Future</span>
+          <div class="line"></div>
+        </div>`;
+
+        const events = getAvailableEvents(sim.currentState, sim.data);
+        html += '<div class="future-events">';
+
+        // Group: transitions first, then self-loops, then always-rejected
+        const transitions = events.filter(e => e.rows[0].outcome === 'transition');
+        const selfLoops = events.filter(e => e.rows[0].outcome === 'no-transition');
+        const rejectOnly = events.filter(e => e.rows.length === 1 && e.rows[0].outcome === 'rejected');
+
+        if (transitions.length > 0) {
+          html += `<div class="future-group-label">▶ Transitions</div>`;
+          transitions.forEach(evt => { html += renderEventCard(evt); });
+        }
+
+        if (selfLoops.length > 0) {
+          html += `<div class="future-group-label">↻ Self-loops (no transition)</div>`;
+          selfLoops.forEach(evt => { html += renderEventCard(evt); });
+        }
+
+        if (rejectOnly.length > 0) {
+          html += `<div class="future-group-label">✕ Always rejected</div>`;
+          rejectOnly.forEach(evt => { html += renderEventCard(evt); });
+        }
+
+        html += '</div>';
+      } else {
+        // Terminal: show completion message
+        html += `<div class="terminal-message">
+          <div class="tm-icon">${sim.currentState === 'Paid' ? '💰' : '⛔'}</div>
+          <div class="tm-text">
+            ${sim.currentState === 'Paid'
+              ? `Claim paid out <strong>$${sim.data.ApprovedAmount.toLocaleString()}</strong> to <strong>${sim.data.ClaimantName}</strong>.`
+              : `Claim denied. ${sim.data.DecisionNote ? `"${sim.data.DecisionNote}"` : ''}`
+            }
+          </div>
+          <div style="margin-top:8px; font-size:11px; color:var(--muted);">
+            Journey complete in ${sim.stepCount} step${sim.stepCount !== 1 ? 's' : ''} through ${sim.visitedStates.size} states.
+          </div>
+        </div>`;
+      }
+
+      // Also reachable (topology hints for non-terminal states)
+      if (!isTerminal) {
+        const reachable = getReachableStates(sim.currentState);
+        if (reachable.length > 0) {
+          html += `<div class="also-reachable">
+            <div class="p-section-label" style="margin-bottom:8px;">Also reachable</div>
+            <div class="reachable-list">
+              ${reachable.map(r => `<span class="reachable-chip">
+                <span class="r-state">${r.state}</span>
+                <span class="r-via">via ${r.path.join(' → ')}</span>
+                ${STATE_META[r.state].terminal ? '<span class="r-terminal">terminal</span>' : ''}
+              </span>`).join('')}
+            </div>
+          </div>`;
+        }
+      }
+
+      el.innerHTML = html;
+
+      // Scroll to present section
+      setTimeout(() => {
+        const presentCard = document.getElementById('presentCard');
+        if (presentCard) {
+          presentCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    }
+
+    function renderEventCard(evt) {
+      const primaryRow = evt.rows[0];
+      const hasGuardedReject = evt.rows.length > 1 && evt.rows[evt.rows.length - 1].outcome === 'rejected';
+      const iconType = primaryRow.outcome === 'transition' ? 'transition' :
+                       primaryRow.outcome === 'no-transition' ? 'self-loop' : 'blocked';
+      const icon = primaryRow.outcome === 'transition' ? '→' :
+                   primaryRow.outcome === 'no-transition' ? '↻' : '✕';
+
+      // Determine if this is the suggested next event
+      const suggested = getSuggestedEvent();
+      const isSuggested = suggested && suggested.event === evt.name;
+      const suggestedClass = isSuggested ? ' suggested-next' : '';
+
+      let html = `<div class="event-card can-fire${suggestedClass}" ondblclick="fireEvent('${evt.name}')">
+        <div class="ec-icon ${iconType}">${icon}</div>
+        <div class="ec-body">
+          <div class="ec-name" style="display:flex; align-items:center; gap:8px;">
+            ${evt.name}
+            ${isSuggested ? '<span class="suggested-badge">▶ suggested next</span>' : ''}
+          </div>`;
+
+      // Outcome
+      if (primaryRow.outcome === 'transition') {
+        html += `<div class="ec-outcome transition">→ ${primaryRow.target}</div>`;
+      } else if (primaryRow.outcome === 'no-transition') {
+        html += `<div class="ec-outcome no-transition">↻ no transition (stays in ${sim.currentState})</div>`;
+      }
+
+      // Guard
+      if (primaryRow.guard) {
+        html += `<div class="ec-guard">when ${primaryRow.guard}</div>`;
+      }
+
+      // Mutations
+      if (primaryRow.mutations.length > 0) {
+        html += `<div class="ec-mutations">${primaryRow.mutations.join(' · ')}</div>`;
+      }
+
+      // Fallback reject warning
+      if (hasGuardedReject) {
+        html += `<div class="ec-rejection-msg">⚠ Falls back to: "${evt.rows[evt.rows.length - 1].rejectMsg}"</div>`;
+      }
+
+      // Args and fire button
+      html += '<div class="ec-actions">';
+
+      evt.args.forEach(arg => {
+        if (arg.type === 'boolean') {
+          html += `<div class="ec-arg">
+            <label>${arg.name}</label>
+            <select id="arg-${evt.name}-${arg.name}" style="width:60px;">
+              <option value="false">false</option>
+              <option value="true">true</option>
+            </select>
+          </div>`;
+        } else {
+          // For ReceiveDocument, suggest items from MissingDocuments
+          let suggestList = '';
+          if (evt.name === 'ReceiveDocument' && arg.name === 'Name' && sim.data.MissingDocuments.length > 0) {
+            suggestList = ` list="suggest-${evt.name}" `;
+          }
+          html += `<div class="ec-arg">
+            <label>${arg.name}</label>
+            <input id="arg-${evt.name}-${arg.name}" type="${arg.type === 'number' ? 'number' : 'text'}"
+              placeholder="${arg.placeholder || ''}" ${suggestList}/>
+          </div>`;
+        }
+      });
+
+      html += `<button class="ec-fire-btn" onclick="event.stopPropagation(); fireEvent('${evt.name}')">Fire ▶</button>`;
+      html += '</div>';
+
+      // Datalist for suggestions
+      if (evt.name === 'ReceiveDocument' && sim.data.MissingDocuments.length > 0) {
+        html += `<datalist id="suggest-ReceiveDocument">
+          ${sim.data.MissingDocuments.map(d => `<option value="${d}">`).join('')}
+        </datalist>`;
+      }
+
+      html += '</div></div>';
+      return html;
+    }
+
+    // — Status bar —
+    function renderStatus() {
+      document.getElementById('statusStep').textContent = `Step ${sim.stepCount}`;
+
+      const invOk = INVARIANTS.every(inv => inv.check(sim.data));
+      const invEl = document.getElementById('statusInvariants');
+      if (invOk) {
+        invEl.className = 'status-ok';
+        invEl.textContent = '✓ 3 invariants ok';
+      } else {
+        const failed = INVARIANTS.filter(inv => !inv.check(sim.data)).length;
+        invEl.className = 'status-warn';
+        invEl.textContent = `⚠ ${failed} invariant${failed > 1 ? 's' : ''} violated`;
+      }
+    }
+
+    // ================================================================
+    // HELPERS
+    // ================================================================
+
+    function formatValue(val, type) {
+      if (val === null || val === undefined) return 'null';
+      if (type === 'boolean') return String(val);
+      if (type === 'number') return typeof val === 'number' && val >= 1000 ? `$${val.toLocaleString()}` : String(val);
+      return String(val);
+    }
+
+    function formatValueCompact(val) {
+      if (val === null || val === undefined) return 'null';
+      if (Array.isArray(val)) {
+        if (val.length === 0) return '∅';
+        return `{${val.join(', ')}}`;
+      }
+      if (typeof val === 'number' && val >= 1000) return `$${val.toLocaleString()}`;
+      return String(val);
+    }
+
+    function formatArgsCompact(args) {
+      const entries = Object.entries(args).filter(([_, v]) => v !== '' && v !== undefined);
+      if (entries.length === 0) return '';
+      return `(${entries.map(([k, v]) => `${k}: ${typeof v === 'string' && v.length > 15 ? v.substring(0, 15) + '…' : v}`).join(', ')})`;
+    }
+
+    function getProvenanceStep(field) {
+      for (let i = sim.history.length - 1; i >= 0; i--) {
+        if (sim.history[i].deltas.some(d => d.field === field)) {
+          return sim.history[i].stepNum;
+        }
+      }
+      return null;
+    }
+
+    function getReachableStates(fromState) {
+      const reachable = [];
+      const visited = new Set([fromState]);
+      const queue = [{ state: fromState, path: [] }];
+
+      while (queue.length > 0) {
+        const { state, path } = queue.shift();
+        const edges = TOPOLOGY[state] || [];
+
+        for (const edge of edges) {
+          const target = edge.target;
+          if (!target || visited.has(target)) continue;
+          visited.add(target);
+          const newPath = [...path, edge.event];
+          if (target !== fromState) {
+            reachable.push({ state: target, path: newPath });
+          }
+          queue.push({ state: target, path: newPath });
+        }
+      }
+
+      // Filter out directly reachable states (those are in the Future section)
+      const directTargets = new Set((TOPOLOGY[fromState] || []).map(e => e.target).filter(Boolean));
+      return reachable.filter(r => !directTargets.has(r.state));
+    }
+
+    // ================================================================
+    // INTERACTIVE GUIDANCE SYSTEM
+    // ================================================================
+
+    // Suggested journey path — the "golden path" through the prototype
+    const SUGGESTED_JOURNEY = [
+      { state: 'Draft',       event: 'Submit',          hint: 'Fill in the claimant details and click <kbd>Fire ▶</kbd> to submit the claim.' },
+      { state: 'Submitted',   event: 'AssignAdjuster',  hint: 'Assign an adjuster to move the claim into review.' },
+      { state: 'UnderReview', event: 'RequestDocument',   hint: 'Request a missing document — try "Police Report".' },
+      { state: 'UnderReview', event: 'ReceiveDocument',   hint: 'Now receive the document you just requested.' },
+      { state: 'UnderReview', event: 'Approve',         hint: 'All documents received — approve the claim.' },
+      { state: 'Approved',    event: 'PayClaim',        hint: 'Final step — pay out the approved claim.' },
+    ];
+
+    let guidanceState = {
+      welcomeDismissed: false,
+      hintsDismissed: false,
+      coachActive: false,
+      coachStep: 0,
+    };
+
+    // Coach mark definitions — shown once when user clicks "Tour"
+    const COACH_STEPS = [
+      {
+        title: 'The Journey Layout',
+        body: 'The page flows <strong>Past → Present → Future</strong>. Your history builds at the top, the current state card sits in the middle, and available events wait below.',
+        target: () => document.querySelector('.section-divider .label.present'),
+        position: 'below',
+      },
+      {
+        title: 'Fire an Event',
+        body: 'Each event card shows what will happen. Fill in the argument fields, then click <kbd>Fire ▶</kbd> to advance the simulation.',
+        target: () => document.querySelector('.ec-fire-btn:not(.blocked)'),
+        position: 'above',
+      },
+      {
+        title: 'The Topology Rail',
+        body: 'The left rail shows all states in the machine. Visited states light up with step numbers so you can track your path.',
+        target: () => document.querySelector('.rail'),
+        position: 'right',
+      },
+      {
+        title: 'The State Diagram',
+        body: 'The right panel maps the full state machine. Nodes light up as you visit them and edges glow when traversed — a minimap for your journey.',
+        target: () => document.querySelector('.state-diagram-rail'),
+        position: 'left',
+      },
+      {
+        title: 'Undo & Reset',
+        body: '<kbd>← Undo</kbd> takes back one step. <kbd>↺ Reset</kbd> returns to the start. Experiment freely.',
+        target: () => document.querySelector('.header-actions'),
+        position: 'below',
+      },
+      {
+        title: 'Follow the Blue Hints',
+        body: 'Look for the <span style="color:var(--cyan);">suggested next</span> badge on event cards — it traces the recommended journey through the full lifecycle.',
+        target: () => document.querySelector('.event-card.suggested-next') || document.querySelector('.event-card.can-fire'),
+        position: 'above',
+      },
+    ];
+
+    function getSuggestedEvent() {
+      // Find where we are in the suggested journey
+      for (const step of SUGGESTED_JOURNEY) {
+        if (step.state === sim.currentState) {
+          // Check if this event is actually available
+          const events = getAvailableEvents(sim.currentState, sim.data);
+          if (events.some(e => e.name === step.event)) {
+            return step;
+          }
+        }
+      }
+      return null;
+    }
+
+    function getStepHintText() {
+      const suggested = getSuggestedEvent();
+      if (!suggested) return null;
+      return suggested.hint;
+    }
+
+    function getJourneyProgress() {
+      // How far along the suggested journey are we?
+      const stateIndex = SUGGESTED_JOURNEY.findIndex(s => s.state === sim.currentState);
+      if (stateIndex === -1) return { current: -1, total: SUGGESTED_JOURNEY.length };
+      return { current: stateIndex, total: SUGGESTED_JOURNEY.length };
+    }
+
+    // — Coach marks —
+
+    function startCoach() {
+      guidanceState.coachActive = true;
+      guidanceState.coachStep = 0;
+      guidanceState.welcomeDismissed = true;
+      renderCoachStep();
+    }
+
+    function nextCoach() {
+      guidanceState.coachStep++;
+      if (guidanceState.coachStep >= COACH_STEPS.length) {
+        dismissCoach();
+        return;
+      }
+      renderCoachStep();
+    }
+
+    function prevCoach() {
+      if (guidanceState.coachStep > 0) {
+        guidanceState.coachStep--;
+        renderCoachStep();
+      }
+    }
+
+    function dismissCoach() {
+      guidanceState.coachActive = false;
+      const overlay = document.getElementById('coachOverlay');
+      overlay.style.display = 'none';
+      overlay.innerHTML = '';
+    }
+
+    function renderCoachStep() {
+      const overlay = document.getElementById('coachOverlay');
+      const step = COACH_STEPS[guidanceState.coachStep];
+      const target = step.target();
+
+      if (!target) {
+        nextCoach();
+        return;
+      }
+
+      overlay.style.display = 'block';
+
+      const rect = target.getBoundingClientRect();
+      const pad = 8;
+
+      // Step indicators
+      const dots = COACH_STEPS.map((_, i) => {
+        const cls = i < guidanceState.coachStep ? 'coach-dot done' :
+                    i === guidanceState.coachStep ? 'coach-dot active' : 'coach-dot';
+        return `<div class="${cls}"></div>`;
+      }).join('');
+
+      // Position the card
+      let cardStyle = '';
+      if (step.position === 'below') {
+        cardStyle = `top: ${rect.bottom + 12}px; left: ${Math.max(16, rect.left)}px;`;
+      } else if (step.position === 'above') {
+        cardStyle = `bottom: ${window.innerHeight - rect.top + 12}px; left: ${Math.max(16, rect.left)}px;`;
+      } else if (step.position === 'right') {
+        cardStyle = `top: ${rect.top}px; left: ${rect.right + 12}px;`;
+      } else if (step.position === 'left') {
+        cardStyle = `top: ${rect.top}px; right: ${window.innerWidth - rect.left + 12}px;`;
+      }
+
+      const isLast = guidanceState.coachStep === COACH_STEPS.length - 1;
+      const isFirst = guidanceState.coachStep === 0;
+
+      overlay.innerHTML = `
+        <div class="coach-spotlight" style="
+          top: ${rect.top - pad}px;
+          left: ${rect.left - pad}px;
+          width: ${rect.width + pad * 2}px;
+          height: ${rect.height + pad * 2}px;
+        "></div>
+        <div class="coach-card" style="${cardStyle}">
+          <div class="coach-step-indicator">${dots}</div>
+          <div class="coach-title">${step.title}</div>
+          <div class="coach-body">${step.body}</div>
+          <div class="coach-actions">
+            ${!isFirst ? '<button class="coach-btn secondary" onclick="prevCoach()">← Back</button>' : ''}
+            <button class="coach-btn primary" onclick="${isLast ? 'dismissCoach()' : 'nextCoach()'}">
+              ${isLast ? 'Got it ✓' : 'Next →'}
+            </button>
+            <span class="coach-skip" onclick="dismissCoach()">Skip tour</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function dismissWelcome() {
+      guidanceState.welcomeDismissed = true;
+      render();
+    }
+
+    function dismissHints() {
+      guidanceState.hintsDismissed = true;
+      render();
+    }
+
+    // ================================================================
+    // INIT
+    // ================================================================
+
+    render();
+  </script>
+
+</body>
+</html>
