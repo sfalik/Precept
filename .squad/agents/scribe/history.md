@@ -1,3 +1,11 @@
+## 2026-04-05T02:32:19Z - README inline DSL cleanup recorded
+
+- Wrote orchestration and session logs for J. Peterman's README quick-example cleanup.
+- Merged 2 decision inbox item(s) into decisions.md, skipped 0 duplicate(s), and archived 0 decision entries older than 30 days.
+- Updated affected agent history for J. Peterman and cleared the processed inbox files.
+
+---
+
 ## 2026-04-04T23:02:57Z - Hero snippet pass recorded
 
 - Logged J. Peterman's canonical hero-snippet pass in orchestration and session logs.
@@ -39,4 +47,3 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 ## Recent Updates
 
 - Team initialized on 2026-04-04 with the full eight-agent Seinfeld cast across project domains.
-
