@@ -39,3 +39,10 @@
 - **Owner:** shane
 - **Universe:** Seinfeld
 - **Created:** 2026-04-04
+
+## Issue Source
+
+- **Provider:** GitHub
+- **Repository:** `sfalik/Precept`
+- **Connected:** 2026-04-05T19:00:10Z
+- **Filters:** Open issues and open pull requests
