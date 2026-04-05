@@ -19,13 +19,6 @@
 - Drafted 'docs/HowWeGotHere.md' to explain the branch journey and the decisions that survived into the current strategy.
 - Framed trunk consolidation as editorial curation rather than merge ritual, reinforcing the team's keep/defer/archive lens for the eventual cutover.
 
-## Learnings
+---
 
-### 2026-04-05 - Name both fluent shape and inspection affordances
-- Early-history prose is stronger when it records not just the API family but the actual interaction model: generic machine types, chained transition builders, optional action hooks, and inspection-style acceptance checks.
-
-### 2026-04-05 - API evolution belongs in the chronology
-- When a product moves from fluent interfaces to a builder surface and then to a DSL-centered runtime, that progression should appear inside the historical timeline, not as an orphan aside. It clarifies that the DSL was a strategic shift in authoring model, not just a syntax refresh.
-
-### 2026-04-05 - Early-history prose needs named artifacts
-- When expanding an early repository period, anchor the copy in concrete old surface details: API type names, method chains, README examples, and test shapes from the surviving snapshots. "Fluent syntax" is too vague on its own; `FiniteStateMachine<TState, TEvent>`, `WhenStateIs(...).AndEventIs(...)`, and later `CreateBuilder<TState>()` tell the reader what the product actually was.
+2026-04-05T03:20:00Z: Steinbrenner applied branch protection to main (pull requests required, force pushes/admin only, no branch deletion).
