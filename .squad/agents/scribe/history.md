@@ -80,4 +80,9 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 
 ## Recent Updates
 
+### 2026-04-05 - Elaine diagram-transitions mockup recorded
+- Logged Elaine's in-diagram transitions exploration and wrote the orchestration/session records.
+- Merged 5 preview-panel decision inbox item(s) into `.squad/decisions.md`, cleared `.squad/decisions/inbox/`, and archived 0 older decision entries.
+- Preserved the related Elaine/Kramer/Steinbrenner history updates already in flight; no `history.md` files crossed the summarization threshold.
+
 - Team initialized on 2026-04-04 with the full eight-agent Seinfeld cast across project domains.

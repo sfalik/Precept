@@ -5493,3 +5493,322 @@ Before finalizing onto trunk, explicitly decide:
 ## Practical effect
 
 The team should create a keep/defer/archive list before trunk consolidation, then land the chosen line deliberately with source-of-truth docs updated in the same pass.
+
+---
+
+# UX Decision: In-Diagram Transitions Exploration
+
+**Filed by:** Elaine (UX Designer)  
+**Date:** 2026-04-07  
+**Status:** Exploration — pending Shane review  
+**Artifact:** `tools/Precept.VsCode/mockups/preview-inspector-in-diagram-transitions-mockup.html`  
+**Comparison baseline:** `tools/Precept.VsCode/mockups/preview-inspector-redesign-mockup.html`
+
+---
+
+## What This Explores
+
+Moving the primary transition affordances (event buttons, inline args, fire action, outcomes, reject reasons) out of the bottom event dock and into edge-anchored panels on the diagram surface itself. The bottom dock is removed entirely; vertical space is reclaimed for the diagram.
+
+---
+
+## What Changed From The Dock Model
+
+| Aspect | Dock model (redesign mockup) | In-diagram model (this exploration) |
+|--------|------------------------------|-------------------------------------|
+| Event interaction surface | Bottom dock panel with flat list of event rows | Floating panels anchored to their SVG edges |
+| Vertical layout | Header + diagram/data + dock (three-part) | Header + diagram/data (two-part) |
+| Spatial context | Events listed by name; user must map to edges mentally | Events live where their edges are; spatial context is immediate |
+| Keyboard flow | Tab through flat list in dock | Tab through edge-anchored panels in diagram z-order |
+| Scalability at 5+ events | Dock scrolls vertically; stays usable | Panels start overlapping; requires collapse/expand management |
+| Screen reader story | Clean HTML list semantics | `role="region"` panels over SVG; harder to linearize |
+
+---
+
+## Tradeoffs
+
+### Gains
+
+1. **Spatial coherence.** Each event is visually connected to the edge it represents — source state, destination state, and transition direction are immediately visible without cross-referencing between the dock and the diagram.
+2. **Vertical real estate.** The dock typically consumes 25-30% of panel height. Removing it gives the diagram room to breathe, especially in short viewports.
+3. **Fewer cognitive zones.** The user scans one surface (diagram + panels) instead of two (diagram, then dock below).
+4. **Debugging context.** When tracing "why did this transition fire?" the args, outcome, and edge are all in one place.
+
+### Losses
+
+1. **Keyboard navigation regression.** The dock's flat list is inherently keyboard-friendly — a simple `aria-role="list"` with tab stops. Edge-anchored panels require spatial focus management that is harder to implement and test accessibly.
+2. **Overlap at scale.** With 5+ events from one state (common in real precepts like hiring pipelines or insurance claims), floating panels will overlap each other. The dock's vertical scroll handles this gracefully.
+3. **Arg entry ergonomics.** In the dock, arg fields are always visible and inline. In the diagram model, expanded panels compete for space with the diagram itself, and expanding one may obscure adjacent edges or state nodes.
+4. **Visual noise.** Always-expanded panels create a "dashboard" feeling rather than a focused diagram. Collapse-to-reveal adds interaction cost.
+
+### Open Questions
+
+- **Auto-expand vs click-to-reveal?** If panels auto-expand for all current-state events, dense diagrams become cluttered. If they require click, the user can't scan all events at a glance the way the dock allows.
+- **Panel positioning strategy.** For self-loops, panels can anchor above the node. For horizontal edges, they can anchor below. But complex topologies (multiple edges between the same pair, backward edges) create positioning conflicts.
+- **How does this interact with edit mode?** The dock cleanly separates event execution from field editing. In the diagram model, the data lane is the only non-diagram surface — does edit mode feel orphaned?
+
+---
+
+## Recommendation
+
+**This is worth exploring further but is not ready to replace the dock model.**
+
+The spatial-context gain is real and meaningful for debugging. But the keyboard/accessibility regression and the scalability concern at 5+ events are significant. A hybrid approach may be worth considering:
+
+- Keep the dock as the primary keyboard-accessible event list
+- Add edge-hover or edge-click highlighting that scrolls the dock to the relevant event
+- Or: use diagram edge labels as a *secondary* fire affordance (click edge → fires event) while keeping the dock as the canonical interaction surface
+
+I'd want Shane to look at both mockups side by side and judge whether the spatial gain outweighs the interaction density loss for real debugging work.
+
+---
+
+## Review Needed
+
+- **Shane:** Does this direction feel worth pursuing, or does the dock model serve debugging better?
+- **Peterman:** Brand compliance is identical (same palette, same font, same semantic colors). No brand review needed unless the layout direction changes.
+- **Frank:** If this direction moves forward, the SVG overlay / `foreignObject` positioning strategy would need architectural review.
+
+---
+
+# Inspector review refresh decision
+
+**Date:** 2026-04-05  
+**Author:** Elaine
+
+## Decision
+
+For PRD and redesign work, treat the inspector as a **combined preview surface**, not a standalone side panel. The baseline UX is a three-part shell:
+
+1. header shell
+2. diagram canvas with in-canvas data lane
+3. bottom event dock
+
+## Why
+
+- That is the shape implemented in `tools/Precept.VsCode/webview/inspector-preview.html`.
+- It matches the archived interaction contract in `docs/archive/InteractiveInspectorMockup.md` closely enough to count as the lived UX baseline.
+- The old `brand/inspector-panel-review.md` had become misleading because it audited mostly the data list and under-described the rest of the surface.
+
+## Consequences for the redesign
+
+- Do **not** write the PRD as if the task is only "reskin the inspector list."
+- Preserve the diagram/data/event-dock relationship unless Shane signs off on a structural change.
+- Evaluate accessibility improvements against the overlay model first; do not assume a table-first replacement without evidence.
+- Define AI-first requirements at the preview host contract level, not only as DOM helper functions.
+
+---
+
+# UX Decision: Preview/Inspector Redesign Mockup v1
+
+**Author:** Elaine (UX Designer)  
+**Date:** 2026-04-07  
+**Issue:** #7 — Create UX mockups for preview/inspector redesign  
+**Artifact:** `tools/Precept.VsCode/mockups/preview-inspector-redesign-mockup.html`
+
+---
+
+## What this decides
+
+The first concrete mockup for the preview/inspector redesign establishes the following UX patterns. These are design proposals — not locked until Shane signs off — but they should guide Peterman's brand review and Frank's architecture review.
+
+### 1. Current-state label in header chrome
+
+The current state now appears as an explicit **violet pill badge** in the header bar, alongside the file name and follow/lock mode. This satisfies PRD § 6.2: the current state is unambiguous even when the diagram is dense, and it's trivially extractable by AI agents.
+
+**Rationale:** The diagram already shows current state visually (violet stroke + fill). But for quick scanning, screenshots, and AI extraction, a textual label in the chrome is faster. The violet pill treatment matches the state's semantic color and reads as a status indicator, not navigation.
+
+### 2. Field type as secondary metadata
+
+Each field row now shows type information (`string · nullable`, `number · default 0`) as a second line below the field name, in `--slate-type: #9AA8B5` at 10px. This satisfies PRD § 6.5.
+
+**Rationale:** Field type is useful for debugging and AI comprehension but should not compete with the field name and value for visual weight. A muted secondary line gives the information without cluttering the scan path.
+
+### 3. Constraint message treatment: Gold, not Red
+
+Constraint explanation text (the `because` messages from invariants and assertions) uses **Gold `#FBBF24`** at 11px, per brand-spec § 2.3. This distinguishes constraint explanations from blocked/error signals (Rose).
+
+**Rationale:** The current implementation shares the same red for "this event is blocked" and "here's why the rule exists." Those are different cognitive tasks — one is a status signal, the other is an explanation. Gold separates them.
+
+### 4. State-rules badge
+
+An `⚡ 1 rule` badge appears in the data lane header when invariants are active. This replaces the prior orange badge with a gold-bordered badge that matches the constraint-message color family.
+
+### 5. Event outcome visibility
+
+Each event row now shows the outcome inline: `→ transition Cancelled` or `→ no transition · stays Active`. This makes the destination explicit without requiring diagram reading.
+
+### 6. Title change: "Precept Preview" not "State Diagram"
+
+The header title is now "Precept Preview" — this surface is not just a diagram, it's the integrated preview/inspector. The title should reflect the full product surface.
+
+### 7. Section labels for data lane and event dock
+
+Both zones have small uppercase labels ("INSTANCE DATA", "EVENTS · Active") that clarify the panel structure. The event dock label includes the current state name so the scope is explicit.
+
+### 8. Scenario switcher (mockup-only)
+
+The mockup includes a tab switcher to show both the Active state (two enabled events with args) and the Cancelled state (one blocked, one undefined event with reasons). This is a **mockup-only** affordance — the real implementation switches states through event execution, not tabs.
+
+---
+
+## What this does NOT decide
+
+- Edit mode layout (Save/Cancel flow, draft validation banners) — future mockup pass
+- Diagram visual restyling beyond structural color alignment — future mockup pass
+- AI-first contract format — needs Frank's architecture review
+- Responsive breakpoint behavior — needs testing in real webview
+
+---
+
+## Review needed
+
+- **Peterman:** Brand compliance review against § 1.4 + § 2.3. Especially: violet pill in header, gold constraint messages, emerald/rose event buttons.
+- **Frank:** Architecture fit for the current-state label pattern and event outcome display.
+- **Shane:** Design gate sign-off before Kramer implements anything.
+
+---
+
+# Preview/Inspector Panel Audit
+
+**Author:** Kramer (Tooling Dev)  
+**Date:** 2026-04-05  
+**For:** PRD authoring — Shane / coordinator
+
+---
+
+## 1. Current-State Implementation Summary
+
+The inspector/preview panel is a **fully functional, production-quality interactive surface** implemented as a VS Code webview in `tools/Precept.VsCode/webview/inspector-preview.html` (3,464 lines), driven by `tools/Precept.VsCode/src/extension.ts`.
+
+### What it does today:
+
+**Layout:**
+- Header: "State Diagram" title + source file name + preview mode indicator (Following/Locked) + Edit/Save/Cancel/Reset buttons
+- Main body: SVG state diagram (left, in a scrollable container) + in-canvas data lane (right, fixed-width column)
+- Bottom event dock: vertical event list for current-state events
+
+**State diagram:**
+- SVG drawn with smooth rounded-corner polyline paths (computed via layout payload from extension host)
+- Animated transition: runner dot travels at constant speed along the accepted path, with source collapse / destination arrival handoff
+- Edge/node emphasis model: hover highlights matching transitions, non-hovered transitions mute
+- Destination node colors reflect evaluated outcome (green/red)
+- Toast overlay in diagram on fire result (transient pill chip)
+
+**Event dock:**
+- Parallelogram-skewed event buttons (design evolution from mockup's round pills)
+- Microstatus glyphs: ✔ (enabled), ✖ (blocked), ∅ (undefined/disabled)
+- Inline arg inputs beside each event button (text, number, boolean toggle, nullable toggle)
+- Inline reason text for blocked/undefined events, dimmed when not selected, full-bright on hover/focus
+- Row-anchored result chip on fire (transient, green/red)
+- Keyboard nav: ArrowUp/Down cycles events, Enter fires selected event
+
+**Data panel (in-canvas right lane):**
+- `<ul>` list of field name / value pairs
+- Rule violation banner (orange, shown when active rule violations exist on the current state)
+- State-rules indicator badge (shows count of rule definitions scoped to the current state, with tooltip)
+- Draft validation banner (shown during edit mode when form-level errors exist)
+- Field-level rule icons (⚠ with tooltip for fields with rule definitions)
+- Edit mode: Enter/Save/Cancel workflow, per-field inline inputs (text/number/boolean/null toggle)
+- Live draft validation via `inspectUpdate` round-trip on debounced input change
+- Data toasts: `before → after` inline animation on successful fire
+- Null toggle for nullable fields
+
+**Extension host integration (extension.ts):**
+- Single webview panel (`preceptPreview`), singleton lifecycle
+- Follow-active-editor mode + preview lock toggle
+- postMessage protocol: `previewRequest/previewResponse` (snapshot, fire, reset, inspect, inspectUpdate, update, replay actions)
+- Layout computed server-side, delivered in snapshot payload
+
+---
+
+## 2. Biggest Gaps vs. Mockup + Brand Review
+
+### Gap 1: Color System — Still Not Migrated (HIGH)
+
+The `inspector-panel-review.md` identified this and it remains 100% unaddressed:
+
+| Element | Current | Brand Target | Status |
+|---|---|---|---|
+| State label (`.status`) | `--state: #6D7F9B` | Violet `#A898F5` | ❌ Not done |
+| Event names | `--event: #8573A8` | Cyan `#30B8E8` | ❌ Not done |
+| Enabled indicator | `--ok: #1FFF7A` (neon green) | `#34D399` (emerald) | ❌ Not done |
+| Blocked indicator | `--err: #FF2A57` | `#F87171` (rose) | ❌ Not done |
+| Constraint violation messages | `--err` red | Gold `#FBBF24` | ❌ Not done |
+| Field names | inherits white | Slate `#B0BEC5` | ❌ Not done |
+| Field values (read-only) | `--muted: #59657A` | Slate `#84929F` | ❌ Not done |
+
+**Brand spec reference:** `brand/visual-surfaces-draft.html § Inspector Panel`
+
+### Gap 2: Typography — Still Segoe UI (MEDIUM)
+
+Body font is still `"Segoe UI", Arial, sans-serif`. The brand spec calls for `"Cascadia Cove", "Cascadia Code", "Consolas", monospace` for field names/values (identifiers from `.precept` source). Review's Priority 2.
+
+### Gap 3: Header State Display — Removed (MEDIUM, NEW)
+
+The mockup showed `Current: Red` in the header as a `.status` labeled element. The current implementation removed this — the current state is only visible as the filled/highlighted node inside the SVG diagram. This is not a direct regression (the implementation is richer overall), but the PRD should make a deliberate call: is the current state surfaced in a text header label, in the diagram only, or both?
+
+### Gap 4: Field Types Not Displayed (LOW)
+
+The brand review's Priority 3 — field type info (e.g. `string`, `number`) is not shown next to field names. Not a blocker but useful for debugging type mismatches.
+
+### Gap 5: Inspector Review is Partially Stale (NEW)
+
+The `inspector-panel-review.md` was written at an earlier implementation snapshot. It **misses entirely**:
+- Rule violations banner (orange)
+- State-rules indicator badge
+- Draft validation banner
+- Edit mode (Edit/Save/Cancel with live draft inspection)
+- Null toggle for nullable fields
+- Field-level rule icons
+
+The color mismatch section of the review is still accurate. The "what was found" structural description is significantly incomplete. The PRD should use the implementation file itself as source of truth, not the review doc.
+
+### Gap 6: No JSON Export / `getInspectorState()` (LOW, AI-FIRST)
+
+The review recommended exposing a `getInspectorState()` function for AI consumption (structured `{ currentState, fields, violations }` JSON). Not implemented. The current surface is parseable via DOM but not programmatically exposed.
+
+### Gap 7: `SaveInstance` / `ReplayInstance` Commands (LOW, FUTURE)
+
+The archived design spec's command contract included `SaveInstance(path?)` and `ReplayInstance`. The extension has no save-instance flow. The `replay` action appears in the TypeScript `PreviewAction` type but its full behavior is unconfirmed. These were explicitly marked "future build" in the archived spec.
+
+---
+
+## 3. Source-of-Truth File Paths for PRD Author
+
+| Purpose | File |
+|---|---|
+| Full webview implementation | `tools/Precept.VsCode/webview/inspector-preview.html` |
+| Extension host (commands, panel lifecycle, message protocol) | `tools/Precept.VsCode/src/extension.ts` |
+| Mockup (original UX contract — still useful for interaction spec) | `tools/Precept.VsCode/mockups/interactive-inspector-mockup.html` |
+| Archived behavior spec | `docs/archive/InteractiveInspectorMockup.md` |
+| Brand review (color/typography gaps; partial feature coverage) | `brand/inspector-panel-review.md` |
+| Brand color/visual system reference | `brand/visual-surfaces-draft.html` |
+
+---
+
+## 4. Recommendation on `inspector-panel-review.md`
+
+**Refresh it.** The color/typography gap analysis is still accurate and should be kept. The structural "what was found" section needs a full update to reflect the current feature set (edit mode, rule violation banners, state-rules indicator, field icons, null toggles). The AI-first JSON export recommendation should be elevated to a clearer requirement. The review doc is valuable input but must not be used as a complete feature inventory — it predates the current feature set by a significant margin.
+
+---
+
+## Decision Needed
+
+Before PRD authoring proceeds, the following open questions should be resolved:
+
+1. **Color migration priority** — Is the brand color migration (all 7 gaps in Gap 1) a PRD requirement for the redesign, or a separate polish pass?
+2. **Current state in header** — Should the current state label be restored to the header, or is diagram-only sufficient?
+3. **JSON export** — Is `getInspectorState()` a PRD requirement (AI-first contract) or nice-to-have?
+4. **SaveInstance scope** — Is instance save/load in scope for this PRD or explicitly deferred?
+
+---
+
+# Preview panel redesign board blocked on GitHub project scopes
+
+- Requested outcome: create a GitHub project board for the preview panel redesign in the `sfalik` owner context for `sfalik/Precept`.
+- What I verified: the active `gh` auth can access the repo but only carries `gist`, `read:org`, `repo`, and `workflow` scopes.
+- Blocking fact: GitHub Projects v2 listing fails without `read:project`, and creation requires `project`, so the board cannot be created or verified visible from this session as-is.
+- Fallback check: the legacy repo-project REST endpoint for `sfalik/Precept` is not available here (`404`), so there is no classic-project escape hatch.
+- PM decision: treat the preview-panel board as blocked pending auth refresh, not as deferred product scope.
+- Unblock: refresh `gh` auth with `project,read:project`, then create `Preview Panel Redesign`, add a short description/readme, link `sfalik/Precept`, and confirm it appears in the owner's project list.

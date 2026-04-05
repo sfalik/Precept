@@ -25,3 +25,13 @@
 ---
 
 2026-04-05T03:20:00Z: Steinbrenner applied branch protection to main (pull requests required, force pushes/admin only, no branch deletion).
+
+## Learnings
+
+- 2026-04-05 — `brand/inspector-panel-review.md` stayed right about brand drift but had gone stale on surface scope. Current source of truth for inspector/preview UX is the combination of `brand/brand-spec.html § 2.3`, `tools/Precept.VsCode/webview/inspector-preview.html`, and `docs/archive/InteractiveInspectorMockup.md`.
+- 2026-04-05 — The preview surface is a combined shell, not a standalone inspector: header shell, diagram canvas with in-canvas data lane, and bottom event dock. PRD work should preserve that triad unless Shane approves a structural change.
+- 2026-04-07 — Created first redesign mockup at `tools/Precept.VsCode/mockups/preview-inspector-redesign-mockup.html` for issue #7. Key decisions: current-state violet pill in header chrome, field type as secondary metadata row, gold constraint messages (not red), event outcome text inline in dock rows, title changed to "Precept Preview." UX decision record at `.squad/decisions/inbox/elaine-issue-7-mockup.md`.
+- 2026-04-07 — Brand color mapping for inspector: States = Violet `#A898F5`, Events = Cyan `#30B8E8`, Enabled = Emerald `#34D399`, Blocked = Rose `#FB7185`, Constraint messages = Gold `#FBBF24`, Field names = Slate `#B0BEC5`, Field types = `#9AA8B5`, Field values = `#84929F`. All from brand-spec § 1.4 + § 2.3.
+- 2026-04-07 — The Subscription precept is the best mockup sample: 3 states, 2 events (one with args), invariant, assertion, reject, no-transition — covers every visual state the inspector needs to show.
+- 2026-04-07 — Created exploratory mockup at `tools/Precept.VsCode/mockups/preview-inspector-in-diagram-transitions-mockup.html` exploring in-diagram transitions (events as edge-anchored panels instead of bottom dock). Key tradeoffs: spatial context is genuinely better for debugging, but keyboard accessibility regresses and panels overlap at 5+ events. Decision record at `.squad/decisions/inbox/elaine-diagram-transitions-mockup.md`. Needs Shane review before proceeding.
+- 2026-04-07 — Mockup directory now has three files: `interactive-inspector-mockup.html` (historical), `preview-inspector-redesign-mockup.html` (issue #7 baseline), `preview-inspector-in-diagram-transitions-mockup.html` (this exploration). All use the same brand palette and Subscription sample data for comparability.
