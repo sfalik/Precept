@@ -207,6 +207,74 @@ Notes:
 
 ---
 
+## `when` Preconditions (Locked)
+
+`WhenOpt` in the grammar is an optional precondition on a `from ... on ...` row header:
+
+```
+from <State|any> on <Event> when <Guard> -> ...
+```
+
+### Semantics
+
+`when` expresses **conditional availability** — whether the row is applicable to the current instance at all — which is a different question from which branch fires inside an applicable row.
+
+- `when` == `false` → the row is skipped entirely. No mutations, no branch evaluation, no `reject` message. The outcome is `Unmatched`, which is distinct from `Rejected`.
+- `when` == `true` → the row body is entered and branch guards evaluate normally.
+
+**`when` vs `if`:**
+
+| | `when` | `if` |
+|---|---|---|
+| Position | Row header | Row body |
+| Controls | Whether the row is applicable | Which branch fires |
+| False result | `Unmatched` — event not available | Falls through to next `else if` or `else` |
+| Use for | Structural availability | Routing logic |
+
+Use `when` when the intent is "this action isn't meaningful right now." Use `if`/`else`/`reject` when the intent is "this action was attempted but failed."
+
+### Authoring patterns
+
+**Boolean flag — event only available under a condition:**
+
+```precept
+field IsVip as boolean default false
+field DiscountCode as string nullable
+
+from Active on ApplyDiscount when IsVip
+  -> set DiscountCode = ApplyDiscount.Code
+  -> no transition
+```
+
+When `IsVip` is `false`, `ApplyDiscount` is `Unmatched`. The branches never evaluate.
+
+**Structural ceiling — event exhausts its allowed uses:**
+
+```precept
+field ReopenCount as number default 0
+  invariant ReopenCount >= 0 because "Reopen count cannot be negative"
+
+from Resolved on Reopen when ReopenCount < 3
+  -> set ReopenCount = ReopenCount + 1
+  -> transition Reopened
+```
+
+Once `ReopenCount` reaches 3, `Reopen` becomes `Unmatched` for this instance — the option structurally ceases to exist, rather than being visible but rejectable.
+
+**Nullable precondition — nullable narrowing inside the row body:**
+
+When the `when` expression constrains a nullable field (e.g. `when OfficerName != null`), the language server narrows that field to non-nullable inside all branches of the row body. No redundant null check needed inside.
+
+### Scope restriction
+
+`when` expressions may only reference declared instance data fields and their properties. Event argument references (`EventName.ArgName`) in a `when` expression are a parse error. Arguments are not yet available when availability is evaluated — use `if` guards inside the body for argument-dependent routing.
+
+### Multiple rows for the same state+event
+
+When multiple rows target the same `(State, Event)` pair, rows are evaluated in declaration order. Each row's `when` guard is checked independently. The first row whose `when` evaluates to `true` (or which has no `when`) is entered. If all rows have `when` guards that evaluate to `false`, the outcome is `Unmatched`.
+
+---
+
 ## Identifiers, Keywords, and Strings
 
 - Identifiers are case-sensitive and compared ordinally.
@@ -256,6 +324,41 @@ Constraints:
 - Inner types are scalar only.
 - No nullable inner types.
 - No nested collections.
+
+### Collection semantics
+
+Collections are part of the DSL's deterministic behavior contract, not just a storage detail.
+
+- `set of <Scalar>` is sorted ascending and unique.
+- `queue of <Scalar>` is FIFO and preserves insertion order.
+- `stack of <Scalar>` is LIFO and preserves insertion order.
+- Collections default to empty when no explicit default is supplied.
+
+Mutation statements are explicit actions, not expressions:
+
+| Statement | Valid on | Behavior |
+|---|---|---|
+| `add <Collection> <Expr>` | `set of <Scalar>` | Inserts the value; duplicate adds are no-ops. |
+| `remove <Collection> <Expr>` | `set of <Scalar>` | Removes by value; removing a missing value is a no-op. |
+| `enqueue <Collection> <Expr>` | `queue of <Scalar>` | Appends to the back of the queue. |
+| `dequeue <Collection>` | `queue of <Scalar>` | Removes the front element; fails if empty. |
+| `dequeue <Collection> into <Field>` | `queue of <Scalar>` | Copies the front element into a scalar field, then removes it; fails if empty. |
+| `push <Collection> <Expr>` | `stack of <Scalar>` | Pushes onto the top of the stack. |
+| `pop <Collection>` | `stack of <Scalar>` | Removes the top element; fails if empty. |
+| `pop <Collection> into <Field>` | `stack of <Scalar>` | Copies the top element into a scalar field, then removes it; fails if empty. |
+| `clear <Collection>` | All collection kinds | Removes all elements; clearing an empty collection is a no-op. |
+
+Read operations use the existing expression grammar:
+
+- `<Collection>.count` is valid for all collection kinds.
+- `<Collection> contains <Expr>` is valid for all collection kinds.
+- `<Collection>.min` and `<Collection>.max` are valid only on `set of <Scalar>`.
+- `<Collection>.peek` is valid only on `queue of <Scalar>` and `stack of <Scalar>`.
+- Element-returning reads (`.min`, `.max`, `.peek`) fail on empty collections.
+
+Design rule: writes are lenient where they can be safely idempotent; reads that require an element are strict. This keeps authoring concise without hiding missing-data failures.
+
+`dequeue ... into ...` and `pop ... into ...` are statement-only forms. They are not valid inside expressions or `set` right-hand sides.
 
 ---
 
@@ -326,6 +429,56 @@ field MinAmount as number default 0
 field MaxAmount as number default 100
 invariant MaxAmount >= MinAmount because "MaxAmount must be >= MinAmount"
 ```
+
+### Nullability and narrowing (Locked)
+
+Appending `nullable` to a field or event argument declaration makes it nullable. The language server enforces that nullable values are never used directly in comparisons, arithmetic, string concatenation, or assignments that require a concrete type — the offending expression is flagged as a compile-time diagnostic. This prevents null from silently propagating to runtime.
+
+Authors must prove non-null before use. There are three standard patterns.
+
+**Pattern 1 — Inline `&&` (test and use in the same guard):**
+
+```precept
+from Active on Evaluate
+  -> if Score != null && Score >= 80
+       -> set RiskTier = "Low"
+       -> transition Approved
+     else
+       -> reject "Score unavailable or below threshold"
+```
+
+The right-hand side of `&&` is only reached when the left side is `true`. The language server narrows `Score` to non-nullable for `Score >= 80` and for any `set` expressions in that branch. Removing the `Score != null &&` prefix causes a diagnostic on `Score >= 80`.
+
+**Pattern 2 — Inline `||` (short-circuit the null case):**
+
+```precept
+from Active on Retry
+  -> if RetryCount == null || RetryCount > 0
+       -> transition Retry
+     else
+       -> reject "Retry limit reached"
+```
+
+The right-hand side of `||` is only reached when the left side is `false` (i.e. `RetryCount != null`). The language server narrows `RetryCount` to non-nullable for the `RetryCount > 0` comparison.
+
+**Pattern 3 — Early-exit null rejection, then use freely across all following branches:**
+
+```precept
+from Active on Retry
+  -> if RetryCount == null
+       -> reject "RetryCount unavailable"
+     else if RetryCount > 0
+       -> set Attempts = RetryCount
+       -> transition Active
+     else
+       -> reject "No retries remaining"
+```
+
+After the first branch rejects on `null`, the language server knows every subsequent `else if` and `else` is only reachable when `RetryCount` is non-null. Using `RetryCount` in `RetryCount > 0` or in `set Attempts = RetryCount` requires no additional null check. Forgetting the early-exit and going straight to `RetryCount > 0` produces the same diagnostic as Pattern 1 — the squiggle is the same signal either way.
+
+**`when` narrowing:** A `when` expression also narrows. `from Active on Fire when OfficerName != null` makes `OfficerName` non-nullable inside the entire row body. See the `when` Preconditions section.
+
+**Rules:** Rules inherit the same strict null model. A nullable field used in a rule expression without an explicit null guard is a compile-time error in the rule. See [docs/RulesDesign.md](RulesDesign.md#Nullable-Behaviour-in-Rules) for rule-specific examples.
 
 
 ---

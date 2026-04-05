@@ -301,10 +301,10 @@ public sealed record PreceptEditableFieldInfo(
     string FieldType,        // "string", "number", "set<string>", etc.
     bool IsNullable,
     object? CurrentValue,
-    ConstraintViolation? Violation = null)
+    string? Violation = null)
 ```
 
-Metadata for one editable field. `Violation` is populated only by `Inspect(instance, patch)` when a hypothetical patch fails a constraint.
+Metadata for one editable field. `Violation` is a human-readable message, populated only by `Inspect(instance, patch)` when a hypothetical patch fails a constraint.
 
 ### `UpdateResult`
 
