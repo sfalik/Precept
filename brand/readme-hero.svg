@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="310" viewBox="0 0 800 310">
+
+  <!-- Canvas -->
+  <rect width="800" height="310" rx="12" fill="#0c0c0f"/>
+  <rect x="0.5" y="0.5" width="799" height="309" rx="12" fill="none" stroke="#1e1b4b" stroke-width="1"/>
+
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="flow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#34D399"/>
+    </marker>
+  </defs>
+
+  <!-- Title: precept Subscription -->
+  <text x="40" y="46" font-family="'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace" font-size="15" font-weight="600">
+    <tspan fill="#818cf8">precept</tspan>
+    <tspan fill="#A898F5" dx="6">Subscription</tspan>
+  </text>
+
+  <!-- ═══ State flow row (y center = 125) ═══ -->
+
+  <!-- Trial (initial) — circle, thick border per §2.2 -->
+  <circle cx="105" cy="125" r="32" fill="none" stroke="#4338CA" stroke-width="2.5"/>
+  <circle cx="105" cy="112" r="2.5" fill="#6366f1"/>
+  <text x="105" y="133" text-anchor="middle" fill="#A898F5" font-family="'Cascadia Code','Consolas',monospace" font-size="13" font-weight="600">Trial</text>
+
+  <!-- Trial → Active edge -->
+  <line x1="139" y1="125" x2="272" y2="125" stroke="#34D399" stroke-width="1.5" marker-end="url(#flow)"/>
+  <text x="205" y="117" text-anchor="middle" fill="#30B8E8" font-family="'Cascadia Code','Consolas',monospace" font-size="11">Activate</text>
+
+  <!-- Active (intermediate) — rounded rect per §2.2 -->
+  <rect x="280" y="101" width="105" height="48" rx="8" fill="none" stroke="#4338CA" stroke-width="1.5"/>
+  <text x="332" y="130" text-anchor="middle" fill="#A898F5" font-family="'Cascadia Code','Consolas',monospace" font-size="13">Active</text>
+
+  <!-- Active self-loop (price update — same event, no transition) -->
+  <path d="M314,101 C314,70 350,70 350,101" fill="none" stroke="#34D399" stroke-width="1.2" marker-end="url(#flow)"/>
+  <text x="332" y="64" text-anchor="middle" fill="#30B8E8" font-family="'Cascadia Code','Consolas',monospace" font-size="10" opacity="0.7">Activate</text>
+
+  <!-- Active → Cancelled edge -->
+  <line x1="385" y1="125" x2="502" y2="125" stroke="#34D399" stroke-width="1.5" marker-end="url(#flow)"/>
+  <text x="444" y="117" text-anchor="middle" fill="#30B8E8" font-family="'Cascadia Code','Consolas',monospace" font-size="11">Cancel</text>
+
+  <!-- Cancelled (terminal) — double-border rect per §2.2 -->
+  <rect x="510" y="101" width="125" height="48" rx="8" fill="none" stroke="#6366F1" stroke-width="2"/>
+  <rect x="505" y="96" width="135" height="58" rx="10" fill="none" stroke="#6366F1" stroke-width="1" opacity="0.3"/>
+  <text x="572" y="130" text-anchor="middle" fill="#A898F5" font-family="'Cascadia Code','Consolas',monospace" font-size="13">Cancelled</text>
+
+  <!-- ═══ Rejection zone ═══ -->
+
+  <!-- Dashed rose line from Cancelled downward -->
+  <line x1="572" y1="154" x2="572" y2="208" stroke="#FB7185" stroke-width="1.5" stroke-dasharray="5 3"/>
+
+  <!-- Event label on rejected path -->
+  <text x="590" y="184" fill="#30B8E8" font-family="'Cascadia Code','Consolas',monospace" font-size="10" opacity="0.6">Activate</text>
+
+  <!-- Rejection stop — circled X -->
+  <circle cx="572" cy="220" r="12" fill="none" stroke="#FB7185" stroke-width="1.5" opacity="0.8"/>
+  <line x1="565" y1="213" x2="579" y2="227" stroke="#FB7185" stroke-width="1.5" opacity="0.8"/>
+  <line x1="579" y1="213" x2="565" y2="227" stroke="#FB7185" stroke-width="1.5" opacity="0.8"/>
+
+  <!-- Gold rejection message — the punchline -->
+  <text x="572" y="256" text-anchor="middle" fill="#FBBF24" font-family="'Cascadia Code','Consolas',monospace" font-size="11" opacity="0.85">"Cancelled subscriptions cannot be reactivated"</text>
+
+  <!-- Tagline -->
+  <text x="40" y="294" fill="#52525b" font-family="'Cascadia Code','Consolas',monospace" font-size="10">Invalid states are structurally impossible.</text>
+
+</svg>

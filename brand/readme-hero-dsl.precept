@@ -1,0 +1,21 @@
+precept Subscription
+
+field PlanName as string nullable
+field MonthlyPrice as number default 0
+
+invariant MonthlyPrice >= 0 because "Monthly price cannot be negative"
+
+state Trial initial, Active, Cancelled
+
+event Activate with Plan as string, Price as number
+on Activate assert Price > 0 because "Plan price must be positive"
+
+event Cancel
+
+from Trial on Activate when PlanName == null
+  -> set PlanName = Activate.Plan
+  -> set MonthlyPrice = Activate.Price
+  -> transition Active
+from Active on Activate -> set MonthlyPrice = Activate.Price -> no transition
+from Active on Cancel -> transition Cancelled
+from Cancelled on Activate -> reject "Cancelled subscriptions cannot be reactivated"

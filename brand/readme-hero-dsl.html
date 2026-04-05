@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Precept README Hero DSL</title>
+  <style>
+    :root {
+      --bg: #0c0c0f;
+      --fg: #e5e5e5;
+      --border: #2a2a2e;
+      --structure: #818cf8;
+      --state: #a898f5;
+      --event: #30b8e8;
+      --data: #b0bec5;
+      --message: #fbbf24;
+      --muted: #71717a;
+      --mono: "Cascadia Cove", "Cascadia Code", Consolas, monospace;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+    }
+
+    body {
+      display: inline-block;
+      font-family: var(--mono);
+    }
+
+    pre {
+      margin: 0;
+      padding: 16px;
+      background: var(--bg);
+      color: var(--fg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre;
+      overflow-x: auto;
+    }
+
+    .k { color: var(--structure); }
+    .s { color: var(--state); }
+    .e { color: var(--event); }
+    .d { color: var(--data); }
+    .m { color: var(--message); }
+    .n { color: var(--fg); }
+    .u { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <pre><code><span class="k">precept</span> <span class="n">Subscription</span>
+
+<span class="k">field</span> <span class="d">PlanName</span> <span class="k">as</span> <span class="n">string</span> <span class="k">nullable</span>
+<span class="k">field</span> <span class="d">MonthlyPrice</span> <span class="k">as</span> <span class="n">number</span> <span class="k">default</span> <span class="n">0</span>
+
+<span class="k">invariant</span> <span class="d">MonthlyPrice</span> <span class="n">&gt;= 0</span> <span class="k">because</span> <span class="m">"Monthly price cannot be negative"</span>
+
+<span class="k">state</span> <span class="s">Trial</span> <span class="k">initial</span><span class="n">,</span> <span class="s">Active</span><span class="n">,</span> <span class="s">Cancelled</span>
+
+<span class="k">event</span> <span class="e">Activate</span> <span class="k">with</span> <span class="d">Plan</span> <span class="k">as</span> <span class="n">string</span><span class="n">,</span> <span class="d">Price</span> <span class="k">as</span> <span class="n">number</span>
+<span class="k">on</span> <span class="e">Activate</span> <span class="k">assert</span> <span class="d">Price</span> <span class="n">&gt; 0</span> <span class="k">because</span> <span class="m">"Plan price must be positive"</span>
+
+<span class="k">event</span> <span class="e">Cancel</span>
+
+<span class="k">from</span> <span class="s">Trial</span> <span class="k">on</span> <span class="e">Activate</span> <span class="k">when</span> <span class="d">PlanName</span> <span class="n">== null</span>
+  <span class="n">-&gt;</span> <span class="k">set</span> <span class="d">PlanName</span> <span class="n">=</span> <span class="e">Activate</span><span class="n">.</span><span class="d">Plan</span>
+  <span class="n">-&gt;</span> <span class="k">set</span> <span class="d">MonthlyPrice</span> <span class="n">=</span> <span class="e">Activate</span><span class="n">.</span><span class="d">Price</span>
+  <span class="n">-&gt;</span> <span class="k">transition</span> <span class="s">Active</span>
+<span class="k">from</span> <span class="s">Active</span> <span class="k">on</span> <span class="e">Activate</span> <span class="n">-&gt;</span> <span class="k">set</span> <span class="d">MonthlyPrice</span> <span class="n">=</span> <span class="e">Activate</span><span class="n">.</span><span class="d">Price</span> <span class="n">-&gt;</span> <span class="k">no transition</span>
+<span class="k">from</span> <span class="s">Active</span> <span class="k">on</span> <span class="e">Cancel</span> <span class="n">-&gt;</span> <span class="k">transition</span> <span class="s">Cancelled</span>
+<span class="k">from</span> <span class="s">Cancelled</span> <span class="k">on</span> <span class="e">Activate</span> <span class="n">-&gt;</span> <span class="k">reject</span> <span class="m">"Cancelled subscriptions cannot be reactivated"</span></code></pre>
+</body>
+</html>
