@@ -4,6 +4,35 @@
 
 ## ACTIVE DECISIONS — Current Sprint
 
+### 2026-04-05T15:15:31Z: User directive — dsl-compactness label
+**By:** shane (via Copilot)  
+**Status:** Captured
+
+Use the dsl-compactness label as the categorization tag for the current language-improvement proposal issues.
+
+**Why:** User request — captured for team memory.
+
+---
+
+### Decision: Use dsl-compactness for language compactness proposals (2026-04-05)
+**Filed by:** Steinbrenner  
+**Status:** Applied
+
+Use the GitHub label dsl-compactness as the categorization tag for the current language improvement proposal issues focused on making the DSL more compact.
+
+**Applied to:**
+- #8 — Proposal: Named guard declarations
+- #9 — Proposal: Ternary expressions in set mutations
+- #10 — Proposal: String length accessor
+- #11 — Proposal: Event argument absorb shorthand
+- #12 — Proposal: Inline guarded fallback (else reject)
+- #13 — Proposal: Field-level range/basic constraints
+
+**Why:** These six issues form one coherent roadmap slice around reducing ceremony and improving expression density in the language, so a shared label gives PM, architecture, and implementation a stable theme tag across multiple rollout waves.
+
+---
+
+
 ### Decision: Gold Brand Mark Exception
 
 **Date:** 2026-04-04
@@ -6392,3 +6421,4 @@ Concept 11 is a solid addition to the exploration set. It's the most intuitive c
 
 - Mockup: `tools/Precept.VsCode/mockups/preview-reimagined-11-kanban-board.html`
 - Index (updated): `tools/Precept.VsCode/mockups/preview-reimagined-index.html`
+

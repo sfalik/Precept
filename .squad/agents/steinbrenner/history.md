@@ -6,6 +6,10 @@
 
 ## Recent Updates
 
+### 2026-04-05 - Compactness proposal label standardized on GitHub issues
+- Created the `dsl-compactness` repository label and applied it to language improvement proposal issues #8, #9, #10, #11, #12, and #13.
+- Verified the label now sits alongside `squad:frank` on all six proposals, giving the roadmap a durable compactness-focused slice across the language queue.
+
 ### 2026-04-05 - Proposal bodies expanded for issues #8-#10
 - Expanded GitHub issues #8, #9, and #10 into a shared proposal format covering motivation, Precept-today pain, hypothetical syntax, reference-language snippets, benefits, and open questions.
 - Reinforced the PM guardrail that hypothetical DSL examples in roadmap issues must be labeled as unimplemented behavior.
@@ -16,6 +20,7 @@
 
 ## Learnings
 
+- 2026-04-05: A shared proposal tag is worth locking early. `dsl-compactness` cleanly groups the six language-improvement issues (#8-#13) without overloading release or owner labels, so PM filtering can track one roadmap theme across multiple rollout waves. Relevant paths: `.squad/agents/steinbrenner/history.md`, `.squad/decisions.md`, `.squad/orchestration-log/2026-04-05T15-17-53Z-steinbrenner.md`.
 - 2026-04-05: Language proposal issues land better when they use one durable structure — problem, proposed feature, Precept today, proposed syntax, external reference code, benefits, open questions — and explicitly label hypothetical DSL as unimplemented. Pairing a current Precept snippet with concrete xstate/LINQ/Zod/FluentValidation examples makes review faster for PM and architecture. Relevant paths: `.squad/agents/steinbrenner/history.md`, `docs/research/dsl-expressiveness/README.md`, `docs/research/dsl-expressiveness/xstate.md`, `docs/research/dsl-expressiveness/linq.md`, `docs/research/dsl-expressiveness/zod-valibot.md`, `docs/research/dsl-expressiveness/fluent-validation.md`.
 - 2026-04-05: When the working tree has narrowed to one documentation artifact that explains branch lineage and consolidation risks, package it as a single freeze-point commit and treat that SHA—not the moving branch name—as the planning reference.
 - 2026-04-05: GitHub Projects v2 work for `sfalik/Precept` is blocked unless the active `gh` auth gains `project` and `read:project` scopes; repo-level `repo` scope is not enough for listing or creating project boards. Relevant paths: `.squad/agents/steinbrenner/history.md`, `.squad/decisions.md`, `.squad/identity/wisdom.md`, `.squad/identity/now.md`, `.squad/skills/`.
