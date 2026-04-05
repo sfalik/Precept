@@ -86,3 +86,7 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 - Preserved the related Elaine/Kramer/Steinbrenner history updates already in flight; no `history.md` files crossed the summarization threshold.
 
 - Team initialized on 2026-04-04 with the full eight-agent Seinfeld cast across project domains.
+
+### 2026-04-05 - Frank language proposal review recorded
+- Wrote orchestration and session logs for Frank's GitHub issue review across proposals #8-#13.
+- Merged 4 decision inbox item(s) into .squad/decisions.md, cleared .squad/decisions/inbox/, updated affected histories, and archived 0 older decision entries.

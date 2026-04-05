@@ -5812,3 +5812,415 @@ Before PRD authoring proceeds, the following open questions should be resolved:
 - Fallback check: the legacy repo-project REST endpoint for `sfalik/Precept` is not available here (`404`), so there is no classic-project escape hatch.
 - PM decision: treat the preview-panel board as blocked pending auth refresh, not as deferred product scope.
 - Unblock: refresh `gh` auth with `project,read:project`, then create `Preview Panel Redesign`, add a short description/readme, link `sfalik/Precept`, and confirm it appears in the owner's project list.
+
+---
+
+# UX Decision: Preview Reimagined — Phase 2 (Five More Directions)
+
+**Author:** Elaine (UX Designer)  
+**Date:** 2026-04-07  
+**Status:** EXPLORATION — awaiting Shane review  
+**Artifacts:** `tools/Precept.VsCode/mockups/preview-reimagined-index.html` (updated index with all ten)
+
+---
+
+## Context
+
+Shane loved the first five reimagined preview concepts and asked for five more to push diversity further — bringing the total to ten. These five explore interaction models the first batch didn't cover: comparison, governance, spatial canvas, scenario testing, and dense monitoring.
+
+---
+
+## The Five New Concepts
+
+### 06 — Dual-Pane Diff
+**File:** `preview-reimagined-06-dual-pane-diff.html`  
+**Metaphor:** Compare any two states side by side.
+
+Pick two states (or two history moments) and see what differs: events, data, rules. Like a code diff but for state-machine snapshots.
+
+**Strengths:**
+- Immediately answers "what changes between A and B?" with visual precision
+- Developers already think in diffs — this is a natural mental model
+- Useful for both debugging (compare before/after a transition) and design review
+- Could be a feature within any primary shape, not just standalone
+
+**Weaknesses:**
+- Only shows two points at a time — less useful for understanding the whole machine
+- With only 3 states and 2 fields, the Subscription sample underplays its value
+- More of a utility than a primary product shape
+- Selector UX needs careful thought for precepts with 10+ states
+
+---
+
+### 07 — Rule Pressure Map
+**File:** `preview-reimagined-07-rule-pressure-map.html`  
+**Metaphor:** Constraints as the organizing principle.
+
+Every rule/invariant/assertion is a tile with health status, pressure indicators, driving fields, and "what would violate this?" scenarios.
+
+**Strengths:**
+- Only view that inverts the usual state-first or event-first model
+- Uniquely answers "is my machine safe?" before asking "where am I?"
+- Pressure bars and violation scenarios give proactive governance
+- Scales beautifully with complex precepts that have many business rules
+
+**Weaknesses:**
+- Not useful for simple precepts with 1-2 rules (feels sparse)
+- Doesn't show state transitions or event outcomes directly
+- Novel concept — users may not immediately understand the pressure metaphor
+- Requires static analysis to detect "at risk" vs "passing" automatically
+
+---
+
+### 08 — Graph Canvas
+**File:** `preview-reimagined-08-graph-canvas.html`  
+**Metaphor:** The diagram IS the interface.
+
+A full-bleed, zoomable, pannable 2D canvas with interactive state nodes and event edge labels. Direct manipulation: click to enter, click to fire, drag to rearrange.
+
+**Strengths:**
+- Spatial understanding is immediate — you see the whole topology
+- Direct manipulation (click node to enter, click edge to fire) is deeply intuitive
+- Zoom/pan handles any size of precept, from 3 states to 30
+- Data overlay keeps field values accessible without cluttering the spatial view
+
+**Weaknesses:**
+- Auto-layout for complex precepts is a hard technical problem
+- Data and rules are secondary — float as overlays rather than being primary citizens
+- VS Code panel real estate is limited for a full canvas experience
+- Requires significant rendering infrastructure (SVG/Canvas library)
+
+---
+
+### 09 — Storyboard / Scenario Builder
+**File:** `preview-reimagined-09-storyboard-scenarios.html`  
+**Metaphor:** Build and replay named event sequences.
+
+A vertical storyboard where each step is a card showing event, args, outcome, and data snapshot. Save/name/replay scenarios. Coverage bar shows what paths you haven't tested yet.
+
+**Strengths:**
+- Only concept that treats the preview as a test harness
+- Coverage tracking ("2 of 4 transitions covered") is immediately useful for QA
+- Scenario library enables saving, sharing, and comparing paths
+- Natural complement to Timeline (01): Timeline shows what happened, Storyboard plans what to test
+- Saved scenarios could seed automated test suites
+
+**Weaknesses:**
+- Building scenarios step-by-step is slower than live fire-and-inspect
+- Scenario library needs persistence infrastructure
+- The storyboard view is vertical — long scenarios scroll extensively
+- Less useful for exploratory "just playing around" usage
+
+---
+
+### 10 — Dashboard / Control Room
+**File:** `preview-reimagined-10-dashboard-control-room.html`  
+**Metaphor:** All signals at once.
+
+Multiple independently useful widgets: state summary, event heatmap, field value sparklines, constraint health, and an activity feed. An instrument panel for complex precepts.
+
+**Strengths:**
+- Maximum information density — power users can see everything without drilling
+- Each widget is independently useful and could be mixed into other shapes
+- Heatmap is a compact version of the Decision Matrix (03) with less overhead
+- Sparklines show field value history — a visual dimension no other concept offers
+- Activity feed doubles as a history log
+
+**Weaknesses:**
+- Dense UIs can overwhelm new users — steep learning curve
+- Six widgets in a VS Code panel is ambitious for screen real estate
+- Subscription sample (3 states, 2 fields) is too small to fully demonstrate the value
+- Widget layout may need to be configurable — one size won't fit all precepts
+
+---
+
+## Updated Recommendation
+
+The original top picks hold: **01 (Timeline)** and **05 (Notebook)** remain the strongest primary shapes for their combination of debugger power and comprehensive coverage.
+
+Phase 2 adds one compelling new primary contender:
+
+**09 (Storyboard / Scenarios)** is the standout. It's the only concept that frames the preview as a testing and verification surface — not just observation. A **Timeline + Storyboard hybrid** (history for debugging, named scenarios for verification, coverage tracking for completeness) would be uniquely powerful and differentiated from any other VS Code extension.
+
+**07 (Rule Pressure Map)** introduces a genuinely novel lens worth pursuing as a secondary mode. For precepts with complex business rules, seeing constraints as the organizing principle rather than states is the fastest path to "is my machine correct?"
+
+**10 (Dashboard)** is the power-user play — strong for complex precepts, potentially overwhelming for simple ones. Worth prototyping as a "command center" mode.
+
+**06 (Dual-Pane Diff)** and **08 (Graph Canvas)** are strong utility concepts that could be features within whatever primary shape is chosen, rather than standalone product shapes.
+
+---
+
+## Design Space Summary (All 10)
+
+| # | Concept | Primary Lens | Unique Strength |
+|---|---------|-------------|-----------------|
+| 01 | Timeline Debugger | Time/history | "How did I get here?" |
+| 02 | Conversational REPL | Text/commands | AI-native, greppable |
+| 03 | Decision Matrix | Completeness | Full truth table at a glance |
+| 04 | Focus / Spotlight | Present moment | Maximum clarity, minimal UI |
+| 05 | Notebook / Report | Document/sections | Complete coverage, shareable |
+| 06 | Dual-Pane Diff | Comparison | Visual diff between any two states |
+| 07 | Rule Pressure Map | Governance/rules | Constraints-first, proactive safety |
+| 08 | Graph Canvas | Spatial/topology | The diagram IS the interface |
+| 09 | Storyboard / Scenarios | Testing/workflows | Build, save, replay, coverage |
+| 10 | Dashboard / Control Room | Multi-signal | Everything at once, data-dense |
+
+---
+
+## Review Needed
+
+- **Shane:** Across all ten — which resonated? Phase 2 standouts?
+- **Peterman:** Brand compliance check on 06–10. All use the locked palette, but new interaction patterns (diff markers, pressure bars, canvas, sparklines) should be reviewed.
+- **Frank:** Architecture implications — 09 needs scenario persistence, 07 needs static analysis for pressure scoring, 08 needs canvas rendering. Which are cheapest to prototype?
+
+---
+
+## Files Created / Updated
+
+| File | Description |
+|------|-------------|
+| `tools/Precept.VsCode/mockups/preview-reimagined-06-dual-pane-diff.html` | Concept 06 |
+| `tools/Precept.VsCode/mockups/preview-reimagined-07-rule-pressure-map.html` | Concept 07 |
+| `tools/Precept.VsCode/mockups/preview-reimagined-08-graph-canvas.html` | Concept 08 |
+| `tools/Precept.VsCode/mockups/preview-reimagined-09-storyboard-scenarios.html` | Concept 09 |
+| `tools/Precept.VsCode/mockups/preview-reimagined-10-dashboard-control-room.html` | Concept 10 |
+| `tools/Precept.VsCode/mockups/preview-reimagined-index.html` | Updated to include all ten + revised recommendation |
+
+All first-five mockups are preserved. Shared CSS unchanged.
+
+---
+
+# UX Decision: Preview Reimagined — Five Alternative Directions
+
+**Author:** Elaine (UX Designer)  
+**Date:** 2026-04-07  
+**Status:** EXPLORATION — awaiting Shane review  
+**Artifacts:** `tools/Precept.VsCode/mockups/preview-reimagined-index.html` (index linking all five)
+
+---
+
+## Context
+
+Shane asked me to think outside the box and reimagine what the preview could look like. The current preview surface (header + diagram + data lane + event dock) is functionally strong but architecturally fixed. This exploration asks: what if the core interaction model were fundamentally different?
+
+All five concepts serve the same core jobs:
+1. Understand the current state and what transitions are available
+2. Inspect current data and active rule pressure
+3. Try events and immediately understand outcomes
+4. Support real debugging work inside VS Code
+
+---
+
+## The Five Concepts
+
+### 01 — Timeline Debugger
+**File:** `preview-reimagined-01-timeline-debugger.html`  
+**Metaphor:** Time is the primary axis.
+
+A horizontal timeline of fired events dominates the top. Click any point to see state + data at that moment. Below: a split view of data diffs (what changed) and available next actions.
+
+**Strengths:**
+- Uniquely answers "how did I get here?" — no other concept does this
+- Data diffs at each step are immediately useful for debugging
+- Scrubbing through history is natural for complex multi-step workflows
+- Timeline is a visual debugger pattern developers already know
+
+**Weaknesses:**
+- History requires runtime tracking infrastructure the extension doesn't have yet
+- Timeline gets unwieldy for 20+ step sessions
+- Diagram is absent — spatial mental model is lost
+- Initial view (no history yet) is sparse
+
+---
+
+### 02 — Conversational REPL
+**File:** `preview-reimagined-02-conversational-repl.html`  
+**Metaphor:** Type events, read results.
+
+A scrolling command log replaces the diagram. State + data live in a compact sidebar. You type event commands and the system responds with structured outcome blocks.
+
+**Strengths:**
+- AI agents would consume this format natively — structured input/output
+- Text-first means everything is greppable, copiable, shareable
+- Builds on terminal/REPL familiarity developers already have
+- Conversation log is a natural audit trail
+
+**Weaknesses:**
+- No spatial overview — you lose the diagram's "where am I in the machine?" view
+- Scrolling log gets long; hard to see current state at a glance after 10+ actions
+- Typing event names + args is slower than clicking
+- Novel for VS Code panels — users expect visual content, not a terminal
+
+---
+
+### 03 — Decision Matrix
+**File:** `preview-reimagined-03-decision-matrix.html`  
+**Metaphor:** Every outcome in one table.
+
+State × Event truth table. Rows = states, columns = events, cells = outcomes. Click a cell to inspect detail in a side panel.
+
+**Strengths:**
+- Only view that shows the FULL contract at once — completeness at a glance
+- Immediately reveals undefined transitions, blocked paths, dead ends
+- Great for design review ("is this machine correct?")
+- Table structure is inherently accessible and AI-parseable
+
+**Weaknesses:**
+- Scales poorly for precepts with many states/events (10×10+ gets cramped)
+- Doesn't show "current state" as strongly — it's just a row highlight
+- Static feel — less useful for live debugging, more for contract review
+- Data and fields are secondary; not a data-first view
+
+---
+
+### 04 — Focus / Spotlight
+**File:** `preview-reimagined-04-focus-spotlight.html`  
+**Metaphor:** One thing at a time, large and clear.
+
+Current state name is massive, center-screen. Available transitions radiate outward as interactive cards. Data orbits beneath. Minimal chrome.
+
+**Strengths:**
+- Absolute clarity about current state — no ambiguity
+- Cards for each path provide rich context without clutter
+- Context-adaptive: the view can shift based on last action
+- Beautiful, zen-like — great for demos, presentations, first impressions
+
+**Weaknesses:**
+- Scales poorly: 5+ events would overflow the horizontal cards
+- No diagram, no history — only shows the present moment
+- Feels light on information density for power users
+- Data section is too compact for precepts with 10+ fields
+
+---
+
+### 05 — Notebook / Report
+**File:** `preview-reimagined-05-notebook-report.html`  
+**Metaphor:** A live, scrollable document.
+
+Vertical card-based sections: contract overview, current state, data, events, rules, mini diagram. Progressive disclosure via expand/collapse.
+
+**Strengths:**
+- Complete coverage of every aspect in one scrollable view
+- Progressive disclosure handles complexity well (collapse what you don't need)
+- Readable, shareable, potentially printable for review sessions
+- Card structure maps naturally to AI agent consumption (section by section)
+- Accommodates precepts of any size — just adds more cards
+
+**Weaknesses:**
+- Vertical scrolling means the diagram is "below the fold"
+- Less immediate than the current surface for quick fire/inspect loops
+- Can feel long and document-heavy for simple precepts
+- Card-based layout is common but not distinctive
+
+---
+
+## Recommendation
+
+**Deeper iteration:** Concepts **01 (Timeline Debugger)** and **05 (Notebook / Report)**.
+
+The Timeline gives debugger-grade "how did I get here?" power that no current design offers. The Notebook gives complete, readable coverage that works for understanding, sharing, and AI consumption. A hybrid — notebook structure with an embedded timeline and inline event execution — could be the strongest future direction.
+
+**Strong secondary:** Concept **03 (Decision Matrix)** as a mode/tab alongside whatever primary shape is chosen. The "show me everything" view is uniquely valuable for contract review and catches problems the other views miss.
+
+---
+
+## Review Needed
+
+- **Shane:** Which concepts resonate? Which feel right for the product?
+- **Peterman:** Brand compliance check on all five — all use the locked palette, but card layouts, typography hierarchy, and visual density vary.
+- **Frank:** Architecture implications — especially 01 (needs history tracking) and 02 (needs text input parsing). Which are cheapest to prototype?
+
+---
+
+## Files Created
+
+| File | Description |
+|------|-------------|
+| `tools/Precept.VsCode/mockups/preview-reimagined-index.html` | Index linking all five concepts |
+| `tools/Precept.VsCode/mockups/preview-reimagined-01-timeline-debugger.html` | Concept 01 |
+| `tools/Precept.VsCode/mockups/preview-reimagined-02-conversational-repl.html` | Concept 02 |
+| `tools/Precept.VsCode/mockups/preview-reimagined-03-decision-matrix.html` | Concept 03 |
+| `tools/Precept.VsCode/mockups/preview-reimagined-04-focus-spotlight.html` | Concept 04 |
+| `tools/Precept.VsCode/mockups/preview-reimagined-05-notebook-report.html` | Concept 05 |
+| `tools/Precept.VsCode/mockups/preview-reimagined-shared.css` | Shared brand-aligned styles |
+
+All existing mockups are preserved.
+
+---
+
+# Frank — language proposal review
+
+Date: 2026-04-05
+
+## Decision summary
+
+Reviewed issues `#8` through `#13` and added architectural comments directly on GitHub.
+
+## Recommended sequencing
+
+1. **First wave**
+   - `#10` String length accessor
+   - `#8` Named guard declarations
+2. **Second wave**
+   - `#9` Ternary expressions in `set` mutations
+   - `#11` Event argument absorb shorthand
+3. **Last wave / explicit architectural review required**
+   - `#12` Inline guarded fallback (`else reject`)
+   - `#13` Field-level range/basic constraints
+
+## Architectural conclusions
+
+- `#10` is the safest proposal: it extends the existing expression/member-access model and should be treated as the string analogue of collection `.count`.
+- `#8` is a good early declaration-form addition if scoped as reusable boolean symbols, not macros and not new control flow.
+- `#9` is acceptable if it remains strictly about value selection in `set` RHS positions; it must not become a disguised outcome-branching feature.
+- `#11` should be an explicit action keyword that desugars to ordered `set` operations. No hidden header inference; ambiguous mappings must fail closed.
+- `#12` must stay syntax sugar for an existing guarded-row-plus-reject-row pair. Do not let it widen into general inline branching.
+- `#13` is the highest-risk proposal because it pressures the DSL's keyword-anchored grammar. If no syntax preserves that discipline cleanly, the correct answer is to reject the feature.
+
+## Guardrails for later design work
+
+- Preserve **keyword-anchored flat statements** as a first-class design constraint.
+- Preserve **top-to-bottom first-match routing**; do not trade concision for a muddier control-flow model.
+- Favor **desugaring to existing semantic forms** where possible so runtime, MCP, diagnostics, and tooling stay aligned.
+- Keep proposals narrowly scoped. None of these should be allowed to smuggle in regex validation, hierarchical states, or generalized inline branching.
+
+---
+
+# Steinbrenner — Language Proposal Intake
+
+**Date:** 2026-04-05  
+**Requested by:** Shane
+
+## Framing
+
+Created GitHub Project v2 **Precept Language Improvements** and loaded the first six proposal issues there so the language roadmap has a single queue:
+
+- Project: https://github.com/users/sfalik/projects/2
+
+## Proposal set
+
+This six-issue bundle preserves the strongest remembered set from the DSL expressiveness research plus the hero-sample condensation pass:
+
+1. Direct expressiveness proposals already ranked in research:
+   - #8 — Proposal: Named guard declarations
+   - #9 — Proposal: Ternary expressions in set mutations
+   - #10 — Proposal: String length accessor
+2. Hero-condensation / verbosity reducers that repeatedly surfaced in corpus review:
+   - #11 — Proposal: Event argument absorb shorthand
+   - #12 — Proposal: Inline guarded fallback (`else reject`)
+   - #13 — Proposal: Field-level range/basic constraints
+
+## Caveat to carry forward
+
+Issue #13 is intentionally included even though it is the weakest of the six from a design-fit standpoint. The research explicitly flags field-inline constraints as being in tension with Precept's keyword-anchored statement model, so that issue should be treated as a proposal to evaluate carefully, not as a presumed roadmap commitment.
+
+## Sequencing note
+
+If we want a fast first pass on language value vs. implementation cost, the clean review order is:
+
+1. #8 Named guards
+2. #9 Ternary in `set`
+3. #10 String `.length`
+4. #11 Event absorb shorthand
+5. #12 Inline `else reject`
+6. #13 Field-level basic constraints (caveated)
