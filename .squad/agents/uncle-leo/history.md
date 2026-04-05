@@ -6,10 +6,6 @@
 
 ## Recent Updates
 
-### 2026-04-05 - Code review knowledge refresh
-- Recentered review work on factual correctness, hidden redundancy, and sample readability.
-- Key learning: the most common doc bug is a claim that sounds right but outruns the implementation.
-
-### 2026-04-05 - Full sample corpus review
-- Surveyed sample coverage and how the DSL expresses real business rules across the repository.
-- Key learning: canonical examples should teach the language by showing natural constraints, not by cramming features into contrived domains.
+### 2026-04-05 - Consolidation safety gate recorded
+- Rejected direct merge, force-repoint, blind squash, and docs-only cherry-pick for the unrelated-history return to trunk.
+- Confirmed the health checks were green at review time (dotnet build; dotnet test --no-build, 703/703) and approved only a freeze-and-curate cutover from a frozen SHA.

@@ -5037,3 +5037,441 @@ That is the real decision gate. Once those are approved, SVG execution becomes c
 
 - Removed the contract artifact links from `README.md` and kept the inline DSL block as the single quick-example reading path.
 - Left the standalone files in place, but stopped advertising them in the README so the hero section reads cleanly without sending readers away.
+
+
+---
+
+---
+
+# Decision Inbox Merge — 2026-04-05T02:54:36Z
+
+**Merged by:** Scribe
+**Source:** .squad/decisions/inbox/
+**Summary:** Team safe recommendation = freeze-and-curate cutover. Frank's force-promote recommendation remains logged as a dissenting architectural view and is currently blocked by reviewer rejection.
+**Merged:** 4
+**Skipped as duplicates:** 0
+
+---
+
+---
+
+# Decision: Trunk Consolidation Strategy — Force-Promote Feature to Main
+
+**Date:** 2026-04-09
+**Owner:** Frank (Lead/Architect)
+**Requested by:** Shane
+**Status:** Awaiting Shane sign-off
+**Supersedes:** `steinbrenner-consolidation-plan.md` (recommending rejection)
+
+---
+
+## Situation Analysis
+
+### Branch Topology
+
+| Branch | Commits | Root | Unique content vs `feature/language-redesign` |
+|--------|---------|------|-----------------------------------------------|
+| `main` | 2 | `a2b867f` (GitHub auto-init) | **Zero.** Placeholder README, superseded. |
+| `feature/language-redesign` | 276 | `550b708` (real project init) | **This IS the project.** Runtime, tooling, 666 tests, 20+ samples, docs, brand. |
+| `origin/master` | ancestor of feature | `550b708` | Zero. Fully contained. |
+| `diagram-layout-option-b` | ancestor of feature | `550b708` | Zero. Fully contained. |
+| `copilot/worktree-*` | ancestor of feature | `550b708` | Zero. Fully contained. |
+| `origin/diagram-layout-option-a` | 1 unique commit | `550b708` | 1 abandoned exploration commit. |
+| `origin/diagram-layout-option-c` | 1 unique commit | `550b708` | 1 abandoned exploration commit. |
+| All other `origin/*` branches | ancestors of feature | `550b708` | Zero. All fully contained. |
+
+### The Core Problem
+
+`main` and `feature/language-redesign` have **no merge base** — they descend from different root commits. `main` was created via GitHub's "Initialize repository" UI (`a2b867f`), while all real development started from a separate local init (`550b708`). The two histories never intersected.
+
+`main` contains exactly 2 commits: an auto-generated initial commit and a "concept readme" with placeholder badges and aspirational content. Every byte of that content has been superseded by the feature branch.
+
+### Current State
+
+- Working tree is **clean** (previously uncommitted doc changes were committed as `9436065`).
+- 17 commits on `feature/language-redesign` are not yet pushed to origin.
+- One sibling worktree exists at `Precept.worktrees/copilot-worktree-*` on branch `copilot/worktree-2026-03-28T05-06-33`. Its branch is fully contained in the feature branch.
+- No open PRs on the repository.
+
+---
+
+## Decision
+
+**Force-promote `feature/language-redesign` to `main`.** Do not merge, rebase, cherry-pick, or curate.
+
+### Rationale
+
+The "unrelated histories" framing makes this sound dangerous. It is not. Here is what is actually happening:
+
+1. `main` is a **dead placeholder** — 2 commits, zero unique content, zero test coverage, zero runtime code.
+2. `feature/language-redesign` **is the project** — 276 commits of coherent development history including the real initial commit, all implementation, all tests, all tooling.
+3. There is nothing to merge. There is nothing to transplant. There is nothing to curate. The placeholder must be replaced with the reality.
+
+A `--allow-unrelated-histories` merge would create a nonsensical merge commit joining an empty placeholder to 276 commits of real work. That is worse than force-push — it leaves a lie in the history.
+
+Steinbrenner's "curated re-landing" plan proposes creating a fresh branch off `main`, transplanting content in buckets, and committing curated chunks. This is an **outrageous** amount of work to preserve two placeholder commits that have zero value. It also introduces transplant risk (missed files, broken references, test failures from incomplete copies) for absolutely no gain.
+
+### What We Lose
+
+`main`'s 2-commit history (`a2b867f Initial commit` → `31a9f9e concept readme`). This is a GitHub auto-init plus a concept README. There is nothing here worth preserving. If sentimentality demands it, tag it first.
+
+### What We Gain
+
+- `main` becomes the single authoritative line with the project's real history.
+- Zero risk of transplant errors.
+- No multi-day curated landing operation.
+- Clean `git log main` showing the actual development story from `550b708 Initial commit` forward.
+
+---
+
+## Execution Sequence
+
+### Pre-flight (before any push)
+
+1. **Build passes.** `dotnet build` on `feature/language-redesign` must succeed.
+2. **All 666+ tests pass.** `dotnet test` must be green.
+3. **Push feature branch.** Push the 17 unpushed commits to `origin/feature/language-redesign` so they are backed up remotely before any destructive operation.
+
+### Execute
+
+4. **Tag the old main for provenance** (optional but cheap):
+   ```
+   git tag archive/old-main main
+   git push origin archive/old-main
+   ```
+
+5. **Force-update main locally:**
+   ```
+   git checkout main
+   git reset --hard feature/language-redesign
+   ```
+
+6. **Force-push main to origin:**
+   ```
+   git push origin main --force-with-lease
+   ```
+
+7. **Delete the feature branch** (it IS main now):
+   ```
+   git branch -d feature/language-redesign
+   git push origin --delete feature/language-redesign
+   ```
+
+### Cleanup
+
+8. **Remove sibling worktree:**
+   ```
+   git worktree remove <path-to-copilot-worktree> --force
+   git branch -D copilot/worktree-2026-03-28T05-06-33
+   ```
+
+9. **Archive and prune stale remote branches.** Tag any branch with unique commits first:
+   ```
+   git tag archive/diagram-option-a origin/diagram-layout-option-a
+   git tag archive/diagram-option-c origin/diagram-layout-option-c
+   git push origin archive/diagram-option-a archive/diagram-option-c
+   ```
+   Then delete all stale remote branches: `origin/master`, `origin/diagram-layout-option-*`, `origin/shane/*`, `origin/upgrade-to-NET10`, `origin/copilot/*`.
+
+10. **Set default branch on GitHub** to `main` if not already (it is — `origin/HEAD` → `origin/main`).
+
+11. **Verify final state:** `main` is the sole authoritative branch. `git log main` shows 276 commits from the real root. All tests pass. No dangling worktrees or ghost branches.
+
+---
+
+## What Must Happen Before Any Push to Main
+
+This is non-negotiable:
+
+1. ✅ Working tree clean (confirmed — `9436065` committed the last dirty files)
+2. ⬜ `dotnet build` passes on `feature/language-redesign`
+3. ⬜ `dotnet test` passes — all 666+ tests green
+4. ⬜ 17 unpushed commits pushed to `origin/feature/language-redesign` as backup
+5. ⬜ Shane explicitly approves this strategy
+
+---
+
+## Side Branch and Worktree Treatment
+
+| Asset | Action | Reason |
+|-------|--------|--------|
+| `diagram-layout-option-b` (local) | Tag as `archive/diagram-option-b`, then delete | Fully contained in feature; historical reference only |
+| `copilot/worktree-*` (local + worktree) | Remove worktree, delete branch | Fully contained; worktree is stale |
+| `origin/diagram-layout-option-a` | Tag as `archive/diagram-option-a`, then delete | 1 unique commit — abandoned exploration |
+| `origin/diagram-layout-option-c` | Tag as `archive/diagram-option-c`, then delete | 1 unique commit — abandoned exploration |
+| `origin/master` | Delete | Fully contained in feature; legacy default branch name |
+| `origin/shane/*` (3 branches) | Delete | All fully contained in feature |
+| `origin/upgrade-to-NET10` | Delete | Fully contained in feature |
+
+---
+
+## Rejection of Steinbrenner's "Curated Re-Landing" Plan
+
+Steinbrenner proposed transplanting content from `feature/language-redesign` to a fresh branch off `main` in curated buckets. I am rejecting this approach for the following reasons:
+
+1. **It preserves nothing of value.** `main`'s 2-commit history is a placeholder. Preserving it as the root of the curated branch adds no information.
+2. **It creates transplant risk.** Manually copying a 276-commit project across branch boundaries is error-prone. Files get missed, paths break, test configurations diverge.
+3. **It destroys real history.** The curated commits would replace 276 real commits with a synthetic reconstruction. The actual development story — who wrote what, when, and why — would be lost.
+4. **It costs days of work for zero architectural benefit.** The only beneficiary is a 2-commit placeholder that should never have existed.
+
+The only scenario where curated re-landing makes sense is when the feature branch contains work that should NOT go to trunk. I audited the full tree — there is no such content. The feature branch *is* the project.
+
+---
+
+## Definition of Done
+
+1. `main` points to the current tip of `feature/language-redesign` (commit `9436065` or later).
+2. `origin/main` is force-updated to match.
+3. `feature/language-redesign` branch is deleted (local and remote).
+4. All stale branches are archived (tagged) or deleted.
+5. Sibling worktree is removed.
+6. Build and tests pass on the new `main`.
+7. Shane can point to `main` as the sole authoritative line for all ongoing work.
+
+---
+
+---
+
+# Decision: Safe Return to Trunk from `feature/language-redesign`
+
+**Date:** 2026-04-05
+**Owner:** Steinbrenner
+**Requested by:** Shane
+
+## Situation
+
+- `main` and `feature/language-redesign` have no merge base. This is an unrelated-history problem, not a normal long-lived feature branch.
+- `main` is still the minimal trunk (`Initial commit` + `concept readme`).
+- `feature/language-redesign` is the live superset branch and already contains the work from:
+  - `diagram-layout-option-b`
+  - `copilot/worktree-2026-03-28T05-06-33`
+- The working tree is dirty before landing starts:
+  - `docs/PreceptLanguageDesign.md`
+  - `docs/RuntimeApiDesign.md`
+
+## Decision
+
+**Return to trunk by curated re-landing from a fresh branch created off `main`. Do not preserve the current branch history as the trunk history.**
+
+This branch line is too mixed for direct promotion:
+
+- unrelated history versus trunk
+- exploratory README / brand / squad / language-doc work layered together
+- uncommitted docs on top of the branch tip
+
+The safe path is to treat `feature/language-redesign` as a source tree, not as merge-ready history.
+
+## Recommended Landing Sequence
+
+1. **Freeze the source branch.** No new work lands on `feature/language-redesign` until the trunk-return sequence is complete.
+2. **Quarantine current uncommitted docs.** Stash `docs/PreceptLanguageDesign.md` and `docs/RuntimeApiDesign.md` together as a named WIP stash. Do not let those edits ride along invisibly into trunk work.
+3. **Inventory what actually deserves trunk.** Split the source tree into landing buckets before copying anything:
+   - product/runtime/tooling code and tests
+   - core docs that describe shipped behavior
+   - README / brand / squad process material
+4. **Create a fresh integration branch from `main`.** This is the only branch that should target trunk.
+5. **Transplant bucket 1 first: product/runtime/tooling.** Copy the implementation tree from `feature/language-redesign` into the integration branch and commit it in curated chunks that produce a coherent product baseline.
+6. **Validate baseline.** Build and run the existing test suite on the integration branch before any README/brand/process payload is added.
+7. **Transplant bucket 2 second: essential docs only.** Land docs that are required to describe the implementation now on trunk. Keep this separate from process/brand material.
+8. **Re-evaluate the stashed local docs.** Only reapply them if they still describe implemented behavior after the product baseline is on trunk. If they are speculative or partially aligned, split or discard them.
+9. **Transplant bucket 3 last and selectively: README / brand / squad.** Land only the pieces that support the current strategy and are intended to live on trunk. Do not bulk-copy every orchestration artifact by default.
+10. **Review trunk shape against strategy.** Confirm the resulting trunk contains the intended product baseline plus the current README/hero direction, with no leftover exploratory baggage.
+11. **Open one reviewed PR to trunk.** The PR should present curated commits, not the old branch graph.
+12. **After merge, clean up retired branches/worktrees.** Do cleanup only after trunk is green and the new trunk branch is authoritative.
+
+## What to Commit, Stash, Discard, or Split Before Trunk Work Begins
+
+### Stash immediately
+
+- `docs/PreceptLanguageDesign.md`
+- `docs/RuntimeApiDesign.md`
+
+Reason: these are local, unreviewed, and currently mixed into a planning problem. They must be evaluated after the integration branch exists.
+
+### Split during landing
+
+- **Implementation vs. docs** must be separate curated commits.
+- **README / brand / squad** must not be combined with runtime/tooling commits.
+- Any commit that mixes product behavior with process-history files should be broken apart.
+
+### Commit into trunk only if still justified
+
+- Product/runtime/tooling files that represent the real current strategy.
+- Documentation that matches implemented behavior.
+- README/brand assets that support the chosen hero and positioning and are intended to ship with trunk.
+
+### Discard or leave behind unless specifically needed
+
+- Pure orchestration exhaust, duplicated session logs, and temporary planning artifacts that do not add lasting trunk value.
+- Any local doc text from the stash that describes behavior not yet implemented or no longer strategically chosen.
+
+## Side Branch and Worktree Treatment
+
+### `diagram-layout-option-b`
+
+- Treat as **historical reference only** during trunk return.
+- It is already an ancestor of `feature/language-redesign`; nothing from it needs to be merged separately.
+- Keep it until trunk landing is complete, then retire it if no one still needs branch-local breadcrumbs.
+
+### `copilot/worktree-2026-03-28T05-06-33`
+
+- Treat the sibling worktree branch the same way: **freeze and preserve until trunk landing completes**, but do not merge it independently.
+- It is also already contained in `feature/language-redesign`.
+- After trunk is green, remove the worktree and delete the branch if no active task still depends on it.
+
+## History Strategy
+
+**Land as curated commits. Do not preserve the existing branch history on trunk.**
+
+Why:
+
+- There is no merge base with `main`.
+- The branch history mixes product work, brand exploration, squad process setup, and follow-on cleanups.
+- A curated sequence gives Shane a reviewable story: product baseline first, docs second, strategy-facing assets last.
+
+If historical provenance matters, preserve the old branch by tag or by leaving the branch in remote temporarily. Trunk should still receive the curated series.
+
+## Definition of Done
+
+We are back on trunk and finalized on the current strategy when all of the following are true:
+
+1. `main` contains the selected implementation baseline from `feature/language-redesign` through a reviewed PR from a fresh integration branch.
+2. The trunk history is a curated commit series, not an unrelated-history merge.
+3. The test/build baseline passes on the integration branch and again after merge.
+4. Every local pre-landing edit was resolved deliberately: committed as scoped work, left in a clearly named follow-up branch, or discarded.
+5. No side branch or sibling worktree remains as a hidden source of truth; either trunk supersedes them or they are explicitly retained as archived references.
+6. README / brand / docs on trunk reflect the current strategy actually chosen to ship now, not exploratory alternates.
+7. Shane can point to `main` as the sole authoritative line for ongoing work.
+
+---
+
+---
+
+# Uncle Leo - Consolidation Safety Review
+
+**Date:** 2026-04-05
+**Reviewer:** Uncle Leo
+**Subject:** return-to-main risk review for `feature/language-redesign`
+
+## What I reviewed
+
+- `main` at `31a9f9ed534c0290ac1340830b210b091ca37a35`
+- `feature/language-redesign` at `9436065c678aff1d93538129bf72b1e4d9d244eb`
+- branch topology, worktree state, recent history shape, `README.md`, `docs/PreceptLanguageDesign.md`, `.squad/decisions.md`
+- repository health checks: IDE diagnostics clean; `dotnet build` succeeded; `dotnet test --no-build` succeeded (703/703)
+
+## Observed facts that drive the review
+
+1. There is **no merge base** between `HEAD` and `main`.
+2. `main` is effectively a 2-commit concept branch; `feature/language-redesign` is a 275-commit product branch.
+3. `main` vs current `HEAD` is not a normal PR-sized change. It is roughly **600 files / 106k insertions** and introduces the actual repo structure (`src`, `tools`, `test`, `samples`, `.github`, `.copilot`, `.squad`, brand assets, etc.).
+4. The candidate branch **moved during review**: the snapshot started at `f302417...` and later advanced to `9436065...`. In a shared worktree, that means any trunk decision against the branch name alone is unsafe.
+5. Local `feature/language-redesign` is **17 commits ahead of `origin/feature/language-redesign`**.
+
+## 1. Biggest technical and process risks
+
+### Technical risks
+
+- **Topology risk:** unrelated histories mean a normal merge does not preserve a meaningful review trail from `main`.
+- **Blast-radius risk:** landing this branch touches product code, tests, tooling, docs, automation, squad/process files, and public brand assets in one shot.
+- **Contract drift risk:** `README.md`, `docs/PreceptLanguageDesign.md`, runtime API docs, language server behavior, and MCP-facing outputs are all trunk-visible contracts. A bad landing here breaks both humans and AI consumers.
+- **Automation risk:** `.github`, `.copilot`, and `.squad` are not passive content. Landing them changes workflow behavior, agent behavior, and repo operations.
+
+### Process risks
+
+- **Unstable approval surface:** the branch advanced while being reviewed.
+- **Mixed intent history:** code, docs, brand work, automation, and squad state are interleaved. That is terrible landing hygiene for trunk.
+- **Reviewability failure:** treating this as a merge instead of a repository cutover will hide the real decision: which parts of this branch are actually authorized to become trunk.
+
+## 2. What makes a direct merge or push unsafe
+
+### Reject: **Direct merge**
+**Why rejected:** no merge base, unrelated histories, and the resulting merge commit would pretend this was an incremental integration when it is actually a full replacement/import.
+
+### Reject: **Direct push / force-push `main` to the floating branch**
+**Why rejected:** the candidate moved during review, is ahead of origin by 17 local commits, and contains mixed product + process + documentation history. Replacing trunk from a mutable branch name is not a controlled landing.
+
+### Reject: **Blind squash of current HEAD onto `main`**
+**Why rejected:** it hides provenance for a 600-file import and prevents targeted rollback/review of code vs docs vs automation.
+
+### Reject: **Cherry-pick only the newest docs/README commits**
+**Why rejected:** those commits assume the rest of the product branch exists. Moving docs/public claims without the underlying product surface is guaranteed drift.
+
+## 3. Artifacts and branch states that need explicit review before trunk is touched
+
+1. **Frozen candidate SHA** - trunk work must target an exact commit, not `feature/language-redesign` as a moving ref.
+2. **Product tree import** - `src\`, `tools\`, `test\`, `samples\` need explicit sign-off as the real software payload.
+3. **Public contract docs** - `README.md`, `docs\PreceptLanguageDesign.md`, `docs\RuntimeApiDesign.md`, and MCP/language-server-facing docs must be checked against implementation.
+4. **Operational surfaces** - `.github\`, `.copilot\`, `.squad\`, `.gitattributes`, `.gitignore`, and any workflow/config additions need explicit authorization, not incidental landing.
+5. **Brand/public collateral** - `brand\` and related README hero assets should be reviewed as publication changes, not hidden inside a code cutover.
+6. **Branch/worktree state** - confirm no sibling worktree or local-only state is about to be invalidated by history surgery, and confirm the reviewed SHA still matches what is being promoted.
+
+## 4. Preserve history as-is, or curate it?
+
+**Verdict:** preserve the current branch history for archaeology, but **do not land trunk with this history as-is**.
+
+What should happen instead:
+
+- keep `feature/language-redesign` (and optionally tag the reviewed SHA) as the archival record
+- create a **curated integration branch** from `main`
+- transplant the approved tree onto that branch in deliberate, reviewable commits (for example: product/code, docs/contracts, automation/process)
+- only then update `main`
+
+That keeps the evidence without making trunk absorb every exploratory, orchestration, and checkpoint-era commit.
+
+## 5. Reviewer verdict on strategy patterns
+
+### Approve: **Freeze-and-curate cutover**
+Approved pattern:
+1. freeze the exact SHA
+2. create a fresh integration branch from `main`
+3. import only the explicitly approved tree/content
+4. review by artifact class (product, contracts, automation, brand/process)
+5. rerun build/tests on the curated branch
+6. update `main` from that curated branch
+
+### Reject: **Merge-as-if-normal PR**
+Rejected because the histories are unrelated and the scope is repository replacement, not incremental change.
+
+### Reject: **Force-repoint `main` to feature head**
+Rejected because the branch is mutable, locally ahead of origin, and not separated from process/automation payload.
+
+### Reject: **Ship current history intact to trunk**
+Rejected because the trunk history would inherit exploratory/squad/checkpoint noise and destroy review clarity.
+
+## Bottom line
+
+This branch can be the source of truth for a landing, but **not by direct merge and not by floating-ref force push**. Freeze the SHA, curate the landing, and treat trunk touch as a repository cutover with explicit artifact review gates.
+
+---
+
+---
+
+# Recommendation: Treat trunk consolidation as curation, not merge mechanics
+
+**Date:** 2026-04-05
+**By:** J. Peterman
+**Status:** Recommendation for review
+
+## Summary
+
+`feature/language-redesign` carries the actual product direction, while `main` remains a separate concept-readme lineage with no merge base to the current branch.
+
+That means trunk consolidation should be treated as a curation decision, not a routine merge operation.
+
+## Recommendation
+
+Before finalizing onto trunk, explicitly decide:
+
+1. whether trunk will be rebased around `feature/language-redesign` as the new root, or
+2. whether a selected subset of this branch will be re-landed onto `main`.
+
+## Why
+
+- The current branch contains the real language redesign, runtime/tooling work, MCP/AI surface, and the current public narrative.
+- `main` does not represent that work.
+- A normal merge frame would imply continuity that the repository history does not have.
+
+## Practical effect
+
+The team should create a keep/defer/archive list before trunk consolidation, then land the chosen line deliberately with source-of-truth docs updated in the same pass.
