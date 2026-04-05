@@ -1,6 +1,15 @@
 
 ---
 
+# Decision: README hero PNG fallback
+
+- **Context:** GitHub does not render the styled inline HTML contract block in `README.md` as intended.
+- **Decision:** Use `brand/readme-hero-dsl.png` as the GitHub-facing contract sample and keep a collapsed plain-text version immediately below for copyability.
+- **Why:** The PNG preserves the intended branded syntax presentation on GitHub, while the collapsed source keeps the sample useful to humans and AI agents without turning the section back into a long raw block.
+- **Files:** `README.md`, `brand/readme-hero-dsl.png`, `brand/readme-hero-dsl.precept`
+
+---
+
 # Decision: README Hero DSL PNG Rendering
 
 **Author:** Elaine (UX)  

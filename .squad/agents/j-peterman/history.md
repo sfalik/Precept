@@ -7,6 +7,11 @@
 
 ## Recent Updates
 
+### 2026-04-05 - README hero PNG fallback recorded
+- README.md now uses brand/readme-hero-dsl.png for the GitHub-facing contract sample, with a collapsed copyable DSL fallback.
+- .squad changes from Peterman logged and committed.
+- Key paths: README.md, brand/readme-hero-dsl.png, brand/readme-hero-dsl.precept.
+
 ### 2026-04-05 - Early product-shape expansion recorded
 - Expanded `docs/HowWeGotHere.md` with the original `FiniteStateMachine<TState, TEvent>` surface, nested `WhenStateIs(...).AndEventIs(...).TransitionTo(...)` authoring, and the later builder/inspection phase before the DSL shift.
 - Updated `repo-journey-summary` so future history passes ground thin early periods in named README, source, and test snapshots.
@@ -22,3 +27,10 @@
 ---
 
 2026-04-05T03:20:00Z: Steinbrenner applied branch protection to main (pull requests required, force pushes/admin only, no branch deletion).
+
+## Learnings
+
+### 2026-04-05 - README hero PNG fallback
+- `README.md` now uses `brand/readme-hero-dsl.png` for the GitHub-facing contract sample, with the source kept in a collapsed copyable block instead of styled inline HTML.
+- For branded DSL samples on GitHub, image-first presentation plus an intentional plaintext fallback is safer than relying on GitHub to preserve custom code styling.
+- Key paths: `README.md`, `brand/readme-hero-dsl.png`, `brand/readme-hero-dsl.precept`.
