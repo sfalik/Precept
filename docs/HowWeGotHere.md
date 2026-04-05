@@ -62,60 +62,19 @@ That work included:
 
 This phase produced a large amount of supporting material, but its practical result is narrower than its volume: Precept now presents itself as a category-creating tool with a disciplined visual language, an AI-aware README, and a stronger rule that docs must track implementation instead of aspiration.
 
-### 6. Where branch history left us
+## What Endured Through the Journey
 
-The unusual part is not just what was built. It is where it lives.
+In retrospect, several themes proved durable enough to outlast the repository's false starts, rewrites, and reframings:
 
-The current working line is `feature/language-redesign`, while `main` remains a separate two-commit concept-readme line. There is no merge base between `HEAD` and `main` or `origin/main`. In other words: the current strategy did not grow out of trunk in the ordinary way. It accumulated on a separate line that now carries nearly all of the real product work.
+1. **Precept as a domain integrity engine.** That language eventually held because it described the implemented runtime more faithfully than the older state-machine framing.
+2. **The redesigned DSL as the product's center of gravity.** The flat, keyword-anchored syntax; explicit nullability; state/data/rule unification; and deterministic inspect/fire/update model are the shape the project ultimately settled into.
+3. **Tooling as part of the product, not an accessory.** The language server, VS Code extension, MCP server, and Copilot/plugin work endured because the project kept converging on the idea that authoring and operation were inseparable from the runtime itself.
+4. **AI-first operation backed by actual tools.** The five MCP tools became one of the clearest signs of what survived the redesign: not just an AI-friendly story, but concrete surfaces an agent could use.
+5. **Surface-first documentation and brand governance.** Over time, the repository stopped treating docs and visual language as loose packaging and started treating them as part of the product surface that needed to stay in sync.
+6. **A compact, AI-readable README hero form.** Even as specific samples and hero status shifted, the enduring pattern was the same: the public face of Precept kept returning to a compact contract that could teach both human readers and agents how the product thinks.
 
-## What Is Actually Current / Worth Preserving
+## Last Updated
 
-These elements appear to have survived exploration and describe the real direction of the repository:
+2026-04-05
 
-1. **Precept as a domain integrity engine.** This framing is now repeated across README, brand decisions, and design docs, and it matches the implemented runtime model.
-2. **The redesigned DSL.** The flat, keyword-anchored syntax; explicit nullability; state/data/rule unification; and deterministic inspect/fire/update model are the center of gravity now.
-3. **Tooling as part of the product, not an accessory.** The language server, VS Code extension, MCP server, and Copilot/plugin work are not side quests. They are part of how Precept now explains itself.
-4. **AI-first operation backed by actual tools.** The five MCP tools and related plugin work are one of the clearest through-lines from the redesign into the current strategy.
-5. **Surface-first documentation and brand governance.** The repo has moved past generic brand notes. It now has explicit rules for how syntax, diagrams, inspector surfaces, and public docs should stay in sync.
-6. **A temporary but concrete README hero path.** The current README uses an inline contract plus companion hero artifacts. What seems preserved is the form: a compact, AI-readable contract in the public surface. What remains provisional is the final hero status and long-term sample choice.
-
-## What Remains Unresolved Before Trunk Consolidation
-
-Several things should be settled before this line is treated as trunk-ready.
-
-### 1. Consolidation strategy is unresolved
-
-Because there is no merge base with `main`, this is not a routine merge. Someone needs to decide whether trunk becomes:
-
-- a new root taken from `feature/language-redesign`, or
-- a curated re-landing of selected work onto `main`.
-
-Without that decision, "merge to trunk" is more slogan than plan.
-
-### 2. The working tree is not fully settled
-
-There are uncommitted edits in `docs\PreceptLanguageDesign.md`, and there is also a sibling worktree branch (`copilot/worktree-2026-03-28T05-06-33`). Before consolidation, the team should decide which line owns which remaining edits and what, if anything, still needs to be harvested from the sibling worktree.
-
-### 3. Some public-surface decisions are still explicitly temporary or pending
-
-The current README still marks the hero sample as temporary. The surrounding brand work is substantial, but the public surface itself has not yet claimed finality. That is acceptable during exploration; it should be made explicit before trunking whether the temporary hero ships as-is, graduates, or is replaced.
-
-### 4. Surface implementation and surface guidance are not fully closed
-
-The decision log and brand materials still point to pending or draft work around the inspector surface, CLI color behavior, and broader visual-surface integration. Those do not all have to block trunk, but they should be triaged deliberately rather than carried forward as ambient "later."
-
-### 5. Exploration material needs curation
-
-The branch contains a great deal of valuable research, proposals, deliberation records, and design-review material. Not all of it belongs on the critical path of trunk. Before consolidation, the team should separate:
-
-- implementation-facing source-of-truth docs;
-- active supporting references worth keeping nearby;
-- exploration artifacts that can remain archived without driving future decisions.
-
-## Recommendation
-
-1. **Treat trunk consolidation as a curation exercise, not a merge exercise.** Start with an explicit keep/drop/defer list.
-2. **Preserve the implemented center:** the redesigned DSL, runtime/tooling stack, AI tooling surface, and the current source-of-truth docs that describe them.
-3. **Resolve the branch-topology question before polishing copy.** The repo first needs to know what trunk is.
-4. **Keep the README honest.** If the hero remains temporary at consolidation time, say so. If it is promoted, remove the temporary framing everywhere in one pass.
-5. **Archive aggressively, but not blindly.** The exploration history is useful. It just should not be mistaken for the final operating manual.
+Append future milestones below this marker as the repository evolves.
