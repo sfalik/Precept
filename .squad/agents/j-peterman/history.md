@@ -7,6 +7,11 @@
 
 ## Recent Updates
 
+### 2026-04-05 - README hero PNG fallback recorded
+- README.md now uses brand/readme-hero-dsl.png for the GitHub-facing contract sample, with a collapsed copyable DSL fallback.
+- .squad changes from Peterman logged and committed.
+- Key paths: README.md, brand/readme-hero-dsl.png, brand/readme-hero-dsl.precept.
+
 ### 2026-04-05 - Early product-shape expansion recorded
 - Expanded `docs/HowWeGotHere.md` with the original `FiniteStateMachine<TState, TEvent>` surface, nested `WhenStateIs(...).AndEventIs(...).TransitionTo(...)` authoring, and the later builder/inspection phase before the DSL shift.
 - Updated `repo-journey-summary` so future history passes ground thin early periods in named README, source, and test snapshots.
@@ -19,13 +24,13 @@
 - Drafted 'docs/HowWeGotHere.md' to explain the branch journey and the decisions that survived into the current strategy.
 - Framed trunk consolidation as editorial curation rather than merge ritual, reinforcing the team's keep/defer/archive lens for the eventual cutover.
 
+---
+
+2026-04-05T03:20:00Z: Steinbrenner applied branch protection to main (pull requests required, force pushes/admin only, no branch deletion).
+
 ## Learnings
 
-### 2026-04-05 - Name both fluent shape and inspection affordances
-- Early-history prose is stronger when it records not just the API family but the actual interaction model: generic machine types, chained transition builders, optional action hooks, and inspection-style acceptance checks.
-
-### 2026-04-05 - API evolution belongs in the chronology
-- When a product moves from fluent interfaces to a builder surface and then to a DSL-centered runtime, that progression should appear inside the historical timeline, not as an orphan aside. It clarifies that the DSL was a strategic shift in authoring model, not just a syntax refresh.
-
-### 2026-04-05 - Early-history prose needs named artifacts
-- When expanding an early repository period, anchor the copy in concrete old surface details: API type names, method chains, README examples, and test shapes from the surviving snapshots. "Fluent syntax" is too vague on its own; `FiniteStateMachine<TState, TEvent>`, `WhenStateIs(...).AndEventIs(...)`, and later `CreateBuilder<TState>()` tell the reader what the product actually was.
+### 2026-04-05 - README hero PNG fallback
+- `README.md` now uses `brand/readme-hero-dsl.png` for the GitHub-facing contract sample, with the source kept in a collapsed copyable block instead of styled inline HTML.
+- For branded DSL samples on GitHub, image-first presentation plus an intentional plaintext fallback is safer than relying on GitHub to preserve custom code styling.
+- Key paths: `README.md`, `brand/readme-hero-dsl.png`, `brand/readme-hero-dsl.precept`.

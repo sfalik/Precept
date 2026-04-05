@@ -6,6 +6,16 @@
 
 ---
 
+2026-04-05T03:20:00Z: Steinbrenner applied branch protection to main (pull requests required, force pushes/admin only, no branch deletion).
+
+## 2026-04-05T00:06:16Z - README hero PNG fallback recorded
+
+- Wrote orchestration and session logs for J. Peterman's README hero PNG fallback and fallback DSL block.
+- Merged 1 decision inbox item into decisions.md, deduplicated as needed.
+- Updated affected agent histories and cleared the processed inbox file.
+
+---
+
 ## 2026-04-05T02:54:36Z - Trunk analysis recorded
 
 - Wrote orchestration and session logs for Frank, Steinbrenner, Uncle Leo, and J. Peterman.
