@@ -7,6 +7,9 @@
 
 ## Recent Updates
 
+### 2026-04-05 - Elaine delivered README hero draft for brand review
+- Elaine produced `brand/readme-hero.svg` and a review spec centered on the Subscription lifecycle hero concept.
+- Brand review now needs to resolve whether Rose is acceptable on the README hero surface and whether any extra supporting copy should sit between the hero and Quick Example.
 ### 2026-04-08 - Canonical hero snippet shifted from styled preview to reusable text contract
 - Reworked brand/brand-spec.html section 2.6 so it mirrors the live README hero verbatim, keeps the sample explicitly temporary, and defines reusable rules for README, VS Code Marketplace, NuGet, Claude Marketplace, and AI-facing contexts.
 - Corrected drift from the live README and removed the false implication that a standalone samples/Order.precept file already existed.
@@ -15,3 +18,9 @@
 ### 2026-04-08 - README copy polish pass completed
 - Tightened the hook, AI-native tooling sentence, unified-domain-integrity phrasing, and live-editor wording without reopening structure.
 - Key learning: once structure is locked, copy polish should remove redundant qualifiers and strengthen cadence without changing meaning.
+
+## Learnings
+
+- When a README hero graduates from a teaching sample to an SVG product surface, the approval ask should center on message, composition, and README hierarchy — not on raw vector execution details. Keep the practical code proof, but move it lower so the first screen sells the category before it teaches syntax.
+
+
