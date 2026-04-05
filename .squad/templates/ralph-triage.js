@@ -481,7 +481,7 @@ function issueHasLabel(issue, labelName) {
   });
 }
 
-function isUntriagedIssue(issue, memberLabels) {
+function needsTriage(issue, memberLabels) {
   if (issue.pull_request) return false;
   if (!issueHasLabel(issue, 'squad')) return false;
   return !memberLabels.some((label) => issueHasLabel(issue, label));
@@ -506,10 +506,10 @@ async function main() {
   const openSquadIssues = await fetchSquadIssues(owner, repo, token);
 
   const memberLabels = roster.map((member) => member.label);
-  const untriaged = openSquadIssues.filter((issue) => isUntriagedIssue(issue, memberLabels));
+  const triageQueue = openSquadIssues.filter((issue) => needsTriage(issue, memberLabels));
 
   const results = [];
-  for (const issue of untriaged) {
+  for (const issue of triageQueue) {
     const decision = triageIssue(
       {
         number: issue.number,

@@ -8,22 +8,53 @@ tools:
   - name: "view"
     description: "Read existing codebase, prior decisions, and team context before proposing changes"
     when: "Always read .squad/decisions.md, relevant PRDs, and current architecture docs before writing proposal"
-  - name: "create"
-    description: "Create proposal in docs/proposals/ with structured format"
-    when: "After gathering context, before any implementation work begins"
+  - name: "github"
+    description: "Create a GitHub issue containing the proposal using the structured format below"
+    when: "After gathering context, before any implementation work begins — the issue IS the proposal"
 ---
 
 ## Context
 
-Proposals create alignment before code is written. Cheaper to change a doc than refactor code. Use this pattern when:
+Proposals create alignment before code is written. Cheaper to change a proposal than refactor code. Use this pattern when:
 - Architecture shifts invalidate existing assumptions
 - Product direction changes require new foundation
 - Multiple waves/milestones will be affected by a decision
 - External dependencies (Copilot CLI, SDK APIs) change
 
+**Canonical proposal surface: GitHub issues.** Proposals are not markdown files in `docs/proposals/` — they are GitHub issues. The proposal body contains the structured content below. `docs/` markdown is for research, rationale, and implementation design support — not the proposal itself.
+
 ## Patterns
 
-### Proposal Structure (docs/proposals/)
+### Issue Workflow (Required)
+
+A proposal without proper placement is invisible. Apply these when opening the issue:
+
+**Title format:** `[Proposal] <short imperative description>`
+- ✅ `[Proposal] Named rule declarations`
+- ❌ `Named rules idea` (not findable, no signal)
+
+**Labels (required):**
+- `proposal` — marks it as a proposal, not a bug or task
+- Domain label (one required): `language`, `runtime`, `mcp`, `plugin`, `tooling`, or `docs`
+- Optional exception label: `deferred` when the proposal is intentionally parked
+
+**Project placement:** Add to the relevant project board column (`Backlog`, `Ready`, or `In Review`) based on its current lifecycle stage
+
+**Closing a proposal:**
+- Add a comment stating the decision and the rationale (1–3 sentences)
+- Leave labels taxonomy-only unless `deferred` still matters as an exception
+- If the decision creates a `.squad/decisions/` record, link it in the closing comment
+
+**Research corpus section (required when research exists):**
+```markdown
+## Research corpus consulted
+- `docs/research/language/expressiveness/expression-language-audit.md`
+- `docs/research/language/references/constraint-composition.md`
+```
+
+### Proposal Structure (GitHub Issue)
+
+Write the proposal as the issue body. Use the required sections as headings.
 
 **Required sections:**
 1. **Problem Statement** — Why current state is broken (specific, measurable evidence)
@@ -113,11 +144,11 @@ When a proposal invalidates existing wave structure:
 
 ## Examples
 
-**File references from interactive shell proposal:**
-- Full proposal: `docs/proposals/squad-interactive-shell.md`
+**Pattern demonstrated by the interactive shell proposal (now a reference, not a template for file storage):**
 - User directive: `.squad/decisions/inbox/copilot-directive-2026-02-21T202535Z.md`
 - Team decisions: `.squad/decisions.md`
 - Current architecture: `docs/architecture/module-map.md`, `docs/prd-23-release-readiness.md`
+- Proposal itself: GitHub issue (not `docs/proposals/squad-interactive-shell.md`)
 
 **Key patterns demonstrated:**
 1. Read user directive first (understand the "why")
@@ -142,6 +173,7 @@ When a proposal invalidates existing wave structure:
 - ❌ Missing decision ownership — always say "needs sign-off from X"
 - ❌ No backward compatibility plan — users don't care about your replatform
 - ❌ Hand-waving timelines ("a few weeks") — be specific (2-3 weeks, 1 engineer full-time)
+- ❌ Creating a markdown file in `docs/proposals/` — proposals live in GitHub issues, not the file system
 
 **Red flags in proposal reviews:**
 - "Users will love this" (citation needed)
