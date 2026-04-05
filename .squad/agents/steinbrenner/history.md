@@ -6,6 +6,14 @@
 
 ## Recent Updates
 
+### 2026-04-05 - Proposal #8 finalized around named rules
+- Synced the roadmap framing to rule <Name> when <BoolExpr>, locked the field-only/boolean-only boundaries, and recorded the issue rename to "Proposal: Named rule declarations."
+- PM proposal guidance now requires philosophy fit, non-goals, and the configuration-like readability check on future language work.
+
+### 2026-04-05 - Expressiveness proposal label locked for the next wave
+- Created the `dsl-expressiveness` repository label and applied it to the expression-focused proposal issues #8, #9, and #10.
+- Added `docs/research/dsl-expressiveness/expression-tracking-notes.md` so the team has one repo-local definition of what belongs under the tag and how it differs from `dsl-compactness`.
+
 ### 2026-04-05 - Compactness proposal label standardized on GitHub issues
 - Created the `dsl-compactness` repository label and applied it to language improvement proposal issues #8, #9, #10, #11, #12, and #13.
 - Verified the label now sits alongside `squad:frank` on all six proposals, giving the roadmap a durable compactness-focused slice across the language queue.
@@ -20,6 +28,8 @@
 
 ## Learnings
 
+- 2026-04-05: The durable philosophy screen for language proposals is: preserve domain integrity, deterministic inspectability, keyword-anchored flat statements, first-match routing, compile-time soundness, and AI legibility. Named guards pass only when they stay field-only, predicate-only, and explicitly avoid row-body abstraction or trivial one-clause aliases. Relevant paths: `README.md`, `docs/PreceptLanguageDesign.md`, `docs/research/dsl-expressiveness/README.md`, `docs/research/dsl-expressiveness/expression-feature-proposals.md`, `docs/research/dsl-expressiveness/expression-language-audit.md`, `.squad/decisions/inbox/steinbrenner-philosophy-pass.md`, `.squad/skills/dsl-philosophy-filter/SKILL.md`.
+- 2026-04-05: The clean PM split is `dsl-expressiveness` for capability-gap proposals and `dsl-compactness` for ceremony-reduction proposals. The research-backed first wave is #8 named guards, #9 ternary-in-`set`, and #10 string `.length`; shortcut features like `absorb` or inline fallback should not inherit the expressiveness tag by default. Relevant paths: `.squad/agents/steinbrenner/history.md`, `docs/research/dsl-expressiveness/README.md`, `docs/research/dsl-expressiveness/expression-tracking-notes.md`, `.squad/decisions/inbox/steinbrenner-dsl-expressiveness-tag.md`.
 - 2026-04-05: A shared proposal tag is worth locking early. `dsl-compactness` cleanly groups the six language-improvement issues (#8-#13) without overloading release or owner labels, so PM filtering can track one roadmap theme across multiple rollout waves. Relevant paths: `.squad/agents/steinbrenner/history.md`, `.squad/decisions.md`, `.squad/orchestration-log/2026-04-05T15-17-53Z-steinbrenner.md`.
 - 2026-04-05: Language proposal issues land better when they use one durable structure — problem, proposed feature, Precept today, proposed syntax, external reference code, benefits, open questions — and explicitly label hypothetical DSL as unimplemented. Pairing a current Precept snippet with concrete xstate/LINQ/Zod/FluentValidation examples makes review faster for PM and architecture. Relevant paths: `.squad/agents/steinbrenner/history.md`, `docs/research/dsl-expressiveness/README.md`, `docs/research/dsl-expressiveness/xstate.md`, `docs/research/dsl-expressiveness/linq.md`, `docs/research/dsl-expressiveness/zod-valibot.md`, `docs/research/dsl-expressiveness/fluent-validation.md`.
 - 2026-04-05: When the working tree has narrowed to one documentation artifact that explains branch lineage and consolidation risks, package it as a single freeze-point commit and treat that SHA—not the moving branch name—as the planning reference.

@@ -80,6 +80,9 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 
 ## Recent Updates
 
+### 2026-04-05T16-16-48Z - Rule proposal consolidation recorded
+- Wrote orchestration/session records for Frank, George, J. Peterman, and Steinbrenner; merged the inbox notes into .squad/decisions.md, cleared .squad/decisions/inbox/, and updated the affected histories.
+- Archived older decisions as needed; no agent history crossed the summarization threshold after this pass.
 ### 2026-04-05 - DSL compactness label rollout recorded
 - Wrote the Steinbrenner orchestration log and the dsl-compactness session log, merged the directive plus rollout records into .squad/decisions.md, and cleared .squad/decisions/inbox/.
 - Checked archive and summarization thresholds: 0 decision entries older than 30 days archived, and 0 history.md files required summarization.

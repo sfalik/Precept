@@ -4,8 +4,78 @@
 
 ## ACTIVE DECISIONS — Current Sprint
 
+---
+
+### 2026-04-05T16-16-48Z: User directive — philosophy/readability bar
+**By:** shane (via Copilot)
+**Status:** Captured
+
+Keep the language-review bar anchored to project philosophy and audience fit:
+- evaluate proposals against Precept's core goals, not isolated cleverness
+- keep non-programmer readability explicit in naming decisions
+- prefer wording and feature framing that read closer to configuration or scripting than to a general-purpose programming language
+
+**Why:** User request — captured for team memory.
+
+---
+
+### Decision: Expression roadmap framing for #8-#10 (2026-04-05)
+**Filed by:** Frank, George, and Steinbrenner
+**Status:** Research captured — awaiting Shane sign-off
+
+The current expressiveness roadmap is grounded in the runtime audit and proposal research:
+- docs/research/dsl-expressiveness/expression-language-audit.md records the concrete gaps
+- docs/research/dsl-expressiveness/expression-feature-proposals.md organizes the candidate features into rollout waves
+- dsl-expressiveness is the tracking label for the capability-gap proposals #8, #9, and #10
+
+**Current first-wave framing:** named rule declarations (#8), ternary expressions in set mutations (#9), and string .length (#10).
+
+**Gate:** No implementation begins until Shane approves the specific proposal/wave.
+
+---
+
+### Decision: Preview concepts deep analysis baseline (2026-04-05)
+**Filed by:** Elaine
+**Status:** Proposed — awaiting Shane review
+
+The preview-concept deep pass is now the baseline research record for preview UX work.
+
+**Key outcomes:**
+- Timeline + Notebook remain the primary recommendation
+- Decision Matrix, Storyboard, and Execution Trace are the strongest secondary concepts
+- Rule Pressure Map and Kanban remain mode-level ideas, not the default product shape
+- Concept 12 (Execution Trace / Pipeline Debugger) was added because it uniquely visualizes Precept's fire pipeline
+
+**Next constraints:** stress-test the concepts against more complex samples, expose collection/edit/outcome detail, and keep future mockups grounded in real runtime semantics.
+
+---
+
+### Decision: Proposal #8 finalized as named rule declarations (2026-04-05)
+**Filed by:** Scribe synthesis from Frank, George, J. Peterman, and Steinbrenner
+**Status:** Locked for proposal framing — implementation still requires Shane sign-off
+
+Proposal #8 is now framed as **named rule declarations**, not guards or predicates.
+
+**Winning syntax:** rule <Name> when <BoolExpr>
+
+**Allowed reuse:**
+- when
+- invariant
+- in / to / from <State> assert
+
+**Explicit exclusions (v1):**
+- on <Event> assert
+- set right-hand-side / computed-value aliasing
+- rule-to-rule composition
+
+**Why rule won:** it names a business concept without academic jargon, preserves Precept's English-ish/configuration-like readability, and fits the product's "one file, all rules" identity better than guard or predicate.
+
+**Repo sync:** issue #8 now tracks **Proposal: Named rule declarations**; the associated philosophy/readability notes and charter guidance were synchronized for Frank, George, Steinbrenner, and J. Peterman.
+
+---
+
 ### 2026-04-05T15:15:31Z: User directive — dsl-compactness label
-**By:** shane (via Copilot)  
+**By:** shane (via Copilot)
 **Status:** Captured
 
 Use the dsl-compactness label as the categorization tag for the current language-improvement proposal issues.
@@ -139,7 +209,7 @@ README already uses the correct approach: ` ```precept ` fence for DSL code samp
 ---
 
 ### Visual Surfaces Draft: Five UX Specifications (2026-04-04)
-**Filed by:** Elaine  
+**Filed by:** Elaine
 **Status:** DRAFT FOR REVIEW  
 **File:** `brand/visual-surfaces-draft.html`
 
@@ -167,7 +237,7 @@ Five surfaces drafted with UX descriptions covering purpose, visual concerns, co
 ---
 
 ### Inspector Panel Design Review: Brand Color Drift Found (2026-04-04)
-**Filed by:** Elaine  
+**Filed by:** Elaine
 **Status:** PENDING FIX  
 **File:** `brand/inspector-panel-review.md`
 
@@ -1207,7 +1277,7 @@ This decision record is the direct input for:
 
 # Palette Mapping Visual Unification
 
-**Filed by:** Elaine  
+**Filed by:** Elaine
 **Date:** 2026-04-04  
 **Status:** COMPLETE  
 **Scope:** `brand/brand-spec.html` — Sections 2.1 and 2.2
@@ -3549,7 +3619,7 @@ The previous draft had good content but felt dense. Each section competed for at
 
 # Decision: Shape-First README Pass — Elaine's Position
 
-**Filed by:** Elaine  
+**Filed by:** Elaine
 **Date:** 2026-04-08  
 **Status:** Recommendation — Pending Shane sign-off  
 **Context:** Shane asked whether Elaine should produce a form/shape skeleton before Peterman writes the README copy.
@@ -6421,4 +6491,3 @@ Concept 11 is a solid addition to the exploration set. It's the most intuitive c
 
 - Mockup: `tools/Precept.VsCode/mockups/preview-reimagined-11-kanban-board.html`
 - Index (updated): `tools/Precept.VsCode/mockups/preview-reimagined-index.html`
-

@@ -56,6 +56,20 @@ When making architectural decisions:
 
 This is not aspirational. Precept already ships MCP tools as first-class features. Every architectural decision must treat AI consumers as current, not future, users.
 
+## Philosophy Filter
+
+Before advancing a language or tooling proposal, explicitly check:
+
+- Does it preserve domain integrity rather than pushing enforcement later?
+- Does it keep the contract deterministic and inspectable?
+- Does it respect keyword-anchored, flat statements?
+- Does it preserve first-match routing and collect-all validation where those semantics matter?
+- Does it improve or at least preserve AI legibility?
+- Does it read more like configuration or scripting than a general-purpose programming language?
+- Does it increase power without hiding behavior?
+
+Compactness alone is not enough. I reject proposals that save lines by obscuring routing, weakening inspectability, or drifting away from Precept's English-ish readability.
+
 ## Model
 
 - **Preferred:** auto

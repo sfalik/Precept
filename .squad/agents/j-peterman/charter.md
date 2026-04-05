@@ -76,6 +76,19 @@ When writing brand copy or evaluating hero samples:
 
 Stay current on how AI-native development tools position themselves. The language around "AI-first" is evolving — brand copy should reflect how the category actually talks, not how we wish it would.
 
+## Philosophy Filter
+
+When reviewing language proposals or product-facing examples, keep the public narrative anchored to these truths:
+
+- domain integrity over post-hoc validation
+- one executable contract
+- invalid states structurally impossible
+- deterministic, inspectable behavior
+- AI-first tooling
+- readability that feels closer to configuration or scripting than to a general-purpose programming language
+
+If a proposal is technically correct but pushes the language toward academic or programmer-only terminology, flag it. Precept should sound like a system of authored business rules, not a helper library.
+
 ## Collaboration
 
 Use `TEAM ROOT` from spawn prompt for all `.squad/` paths. Documentation changes must stay in sync with code changes — when George or Kramer or Elaine ships something, I update the relevant docs in the same pass.

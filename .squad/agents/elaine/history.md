@@ -51,4 +51,22 @@
 - 2026-04-07 — Phase 3: Created Concept 11 (Kanban Board) at `tools/Precept.VsCode/mockups/preview-reimagined-11-kanban-board.html`. States as columns, entity as a movable card, transitions as connectors with guard labels, ghost cards for history. Index updated to 11 concepts. Best suited for simple-to-moderate linear lifecycles (3–5 states). Scales poorly past 6 states or with many bidirectional transitions. Decision record at `.squad/decisions/inbox/elaine-kanban-preview-concept.md`.
 - 2026-04-07 — Kanban concept's unique UX contribution: spatial position answers "where am I?" faster than any other concept. Guard conditions on connectors make the constraint surface visible without drilling in. Ghost cards give history without a timeline. Terminal states (empty columns, no outgoing arrows) are self-documenting.
 - 2026-04-07 — Mockup directory now has 16 files: 3 original + 11 reimagined concepts + 1 index + 1 shared CSS.
+- 2026-05-02 — Subscription is no longer the best mockup sample for *scaling* evaluation. InsuranceClaim (6 states, 7 events, set collection, 12 rules, guarded reject rows with compound expressions) is the minimum-complexity sample that tests all visual dimensions.
+- 2026-05-02 — The fire pipeline's 6 stages (event asserts → row selection → exit actions → row mutations → entry actions → validation) is the most important invisible structure in the preview. No concept visualizes it; Concept 12 (Execution Trace) fills this gap.
+- 2026-05-02 — Observable's reactive-cell pattern directly maps to Precept's hypothetical-patch inspect API: change a data field → all event outcomes re-evaluate. This should be the core interaction pattern for the Notebook concept.
+- 2026-05-02 — DMN decision-table editors (Camunda, Trisotech) validate the Decision Matrix concept but show that multi-guard cells need sub-table rendering and hit-policy indicators — not just a single outcome badge.
+- 2026-05-02 — VS Code webview constraint: sidebar panel width (300–600px) breaks Matrix, Dashboard, and Kanban concepts. Only Timeline (vertical-list fallback), Notebook (single-column cards), and REPL (text reflow) work at sidebar width. Responsive layout is a hard design requirement, not a nice-to-have.
+- 2026-05-02 — Collection rendering is a shared-component design problem. Sets need `{ item, item }` with count badge; queues need `[ front → back ]` with peek indicator; stacks need `[ top | ... | bottom ]` with top indicator. 11/21 samples use collections.
+
+### 2026-05-02 — Preview Concepts Deep Analysis Pass
+
+- Conducted research-backed deep pass across all 11 existing preview concepts. Grounded analysis in full language surface (21 samples, 6 outcome kinds, 6 pipeline stages, 3 collection types, structured violation model) and external research (XState/Stately, Redux DevTools, DMN decision table editors, Observable notebooks, Elm debugger, VS Code webview patterns).
+- Key finding: all mockups use the simplest sample (Subscription: 3 states, 2 events, 0 collections) — they've never been stress-tested against real complexity. Insurance-claim (6 states, 7 events, set collections) or hiring-pipeline (7 states, 12 transition rows) would expose scaling issues in Matrix, Dashboard, Kanban, and Focus/Spotlight.
+- Key finding: critical DSL features invisible in all mockups: collection mutations, entry/exit actions, 3 of 6 outcome kinds, structured violation detail, edit declarations, fire pipeline internals.
+- Introduced Concept 12: Execution Trace / Pipeline Debugger — the only concept visualizing the 6-stage fire pipeline's internal stages. Uniquely Precept-specific; shows *why* an event was rejected (which pipeline stage, which expression, which field).
+- Updated tier ranking: Tier 1 (primary) = Timeline + Notebook; Tier 2 (strong secondary) = Decision Matrix + Storyboard + Execution Trace; Tier 3 (modes) = Rule Pressure Map + Kanban; Tier 4 (features) = Dual-Pane Diff + Graph Canvas + Dashboard; Tier 5 (situational) = REPL + Focus/Spotlight.
+- Created `tools/Precept.VsCode/mockups/preview-concepts-deep-analysis.md` — comprehensive research document with concept-by-concept analysis, external references, scaling assessments, and cross-cutting issues.
+- Updated concept index to 12 concepts with deeper descriptions, tier tags, and revised recommendations.
+- Decision record at `.squad/decisions/inbox/elaine-preview-concepts-deep-pass.md`.
+- Mockup directory now has 17 files: 3 original + 11 reimagined concepts + 1 index + 1 shared CSS + 1 deep analysis doc.
 
