@@ -1,0 +1,149 @@
+/* ================================================================
+   Shared CSS — Precept Preview Reimagined Explorations
+   Brand-aligned palette from brand-spec.html § 1.4 + § 2.3
+   ================================================================ */
+
+:root {
+  color-scheme: dark;
+
+  /* — Surface backgrounds — */
+  --bg:           #0c0c0f;
+  --panel:        #18181b;
+  --surface:      #1e1b2e;
+  --canvas:       #111114;
+  --card:         #141416;
+  --card-hover:   #1a1a1e;
+
+  /* — Brand § 1.4: Core Semantic Families — */
+  --indigo:       #6366F1;
+  --violet:       #A898F5;
+  --cyan:         #30B8E8;
+  --slate:        #B0BEC5;
+  --slate-type:   #9AA8B5;
+  --slate-val:    #84929F;
+  --gold:         #FBBF24;
+  --dusk:         #9096A6;
+
+  /* — Brand § 1.4: Signal Colors — */
+  --enabled:      #34D399;
+  --warning:      #FCD34D;
+  --blocked:      #FB7185;
+
+  /* — Chrome — */
+  --border:       #27272a;
+  --border-subtle:#1e1b4b;
+  --text:         #e5e5e5;
+  --muted:        #52525b;
+  --dim:          #71717a;
+
+  /* — Brand font — */
+  --mono:         'Cascadia Cove', 'Cascadia Code', Consolas, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font: 13px/1.5 var(--mono);
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Shared utility classes */
+.concept-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--indigo);
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.20);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.state-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--violet);
+  font-weight: 600;
+  border: 1px solid rgba(168, 152, 245, 0.25);
+  border-radius: 4px;
+  padding: 2px 8px;
+  background: rgba(168, 152, 245, 0.08);
+}
+
+.state-pill .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--violet);
+}
+
+.event-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 120ms ease;
+  background: rgba(24, 24, 27, 0.8);
+}
+
+.event-chip.enabled {
+  border-color: var(--enabled);
+  color: var(--enabled);
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.event-chip.enabled:hover {
+  background: rgba(52, 211, 153, 0.16);
+}
+
+.event-chip.blocked {
+  border-color: var(--blocked);
+  color: var(--blocked);
+  background: rgba(251, 113, 133, 0.08);
+  cursor: not-allowed;
+}
+
+.event-chip.no-transition {
+  border-color: var(--enabled);
+  color: var(--enabled);
+  background: rgba(52, 211, 153, 0.05);
+  opacity: 0.78;
+}
+
+.field-name  { color: var(--slate); font-weight: 400; }
+.field-type  { color: var(--slate-type); font-size: 10px; opacity: 0.75; }
+.field-value { color: var(--slate-val); }
+.field-null  { color: var(--muted); font-style: italic; }
+
+.section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.gold-msg {
+  color: var(--gold);
+  font-size: 11px;
+}
+
+.sep { color: var(--muted); font-weight: 300; }
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }

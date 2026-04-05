@@ -24,6 +24,12 @@
 | Scribe | Session Logger | `.squad/agents/scribe/charter.md` | 🟢 Active |
 | Ralph | Work Monitor | — | 🔄 Monitor |
 
+## Human Members
+
+| Name | Role | Badge | Status | Notes |
+|------|------|-------|--------|-------|
+| Shane | Reviewer | 👤 Human | 🟢 Active | Final human review/sign-off when the team explicitly routes work for review. |
+
 ## Project Context
 
 - **Project:** Precept — a domain integrity engine for .NET. Binds entity state, data, and business rules into a single executable contract via a declarative DSL. Makes invalid states structurally impossible.

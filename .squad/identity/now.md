@@ -1,9 +1,13 @@
 ---
-updated_at: 2026-04-04T04:06:33.491Z
-focus_area: Initial setup
-active_issues: []
+updated_at: 2026-04-05T18:08:00Z
+focus_area: Workflow closeout
+active_issues:
+  - "GitHub workflow migration closeout"
+  - "Trunk consolidation prep"
 ---
 
 # What We're Focused On
 
-Getting started. Updated by coordinator at session start.
+Closing out the workflow migration end-to-end: finish the repo-side label retirement and
+separate the governance/trunk path from the preview/mockup lane before touching live
+GitHub projects, labels, and proposal issues.

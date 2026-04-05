@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 10: Dashboard / Control Room — Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    /* ================================================================
+       CONCEPT 10 — DASHBOARD / CONTROL ROOM
+       ================================================================
+       Core idea: A data-dense, multi-widget dashboard that shows
+       everything at once: mini state diagram, event heatmap, field
+       value gauges, constraint health indicators, and a live activity
+       feed. Think: mission control for a state machine.
+
+       Each widget is independently useful. Together they give a
+       comprehensive "instrument panel" view of the precept. Best for
+       complex precepts with many fields, events, and states where
+       you need the big picture without scrolling.
+
+       Product shape: dashboard-first, monitoring-oriented.
+       Key job: "Give me all the signals at once — I'll decide what to
+       drill into."
+       ================================================================ */
+
+    body {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    /* — Header — */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-title { font-size: 13px; font-weight: 700; }
+    .header-file { color: var(--dusk); font-size: 11px; }
+
+    .header-right { display: flex; align-items: center; gap: 10px; }
+
+    .header-actions { display: flex; gap: 6px; }
+    .header-actions button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .header-actions button:hover { border-color: var(--indigo); }
+
+    /* — Dashboard grid — */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1fr 1fr 280px;
+      grid-template-rows: auto 1fr;
+      gap: 1px;
+      background: var(--border);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .widget {
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .widget-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .widget-header h3 {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .widget-header .widget-action {
+      font-size: 10px;
+      color: var(--indigo);
+      cursor: pointer;
+    }
+
+    .widget-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+    }
+
+    /* ---- Widget: State summary (top-left) ---- */
+    .state-summary {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .current-state-hero {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .state-circle {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 3px solid var(--violet);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--violet);
+      background: rgba(168, 152, 245, 0.06);
+      flex-shrink: 0;
+    }
+
+    .state-info { display: flex; flex-direction: column; gap: 2px; }
+    .state-info .big { font-size: 18px; font-weight: 700; color: var(--violet); }
+    .state-info .sub { font-size: 10px; color: var(--dim); }
+
+    .mini-states {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .mini-state {
+      font-size: 10px;
+      padding: 3px 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--dim);
+      position: relative;
+    }
+
+    .mini-state.current {
+      border-color: rgba(168, 152, 245, 0.40);
+      color: var(--violet);
+      background: rgba(168, 152, 245, 0.08);
+    }
+
+    .mini-state.initial::before {
+      content: '●';
+      font-size: 6px;
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      color: var(--violet);
+    }
+
+    /* ---- Widget: Event heatmap (top-center) ---- */
+    .event-heatmap {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .heatmap-grid {
+      display: grid;
+      grid-template-columns: 90px repeat(2, 1fr);
+      gap: 2px;
+      font-size: 11px;
+    }
+
+    .hm-corner {
+      padding: 6px 8px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+    }
+
+    .hm-col-header {
+      text-align: center;
+      padding: 6px 8px;
+      color: var(--cyan);
+      font-weight: 600;
+      font-size: 10px;
+    }
+
+    .hm-row-header {
+      padding: 6px 8px;
+      color: var(--violet);
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .hm-row-header.current { font-weight: 700; }
+
+    .hm-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      cursor: pointer;
+      transition: transform 80ms;
+    }
+
+    .hm-cell:hover { transform: scale(1.05); }
+
+    .hm-cell.transition {
+      background: rgba(52, 211, 153, 0.15);
+      color: var(--enabled);
+      font-weight: 600;
+    }
+
+    .hm-cell.no-transition {
+      background: rgba(52, 211, 153, 0.08);
+      color: var(--enabled);
+      opacity: 0.7;
+    }
+
+    .hm-cell.rejected {
+      background: rgba(251, 113, 133, 0.12);
+      color: var(--blocked);
+    }
+
+    .hm-cell.undefined {
+      background: rgba(39, 39, 42, 0.3);
+      color: var(--muted);
+    }
+
+    /* ---- Widget: Activity feed (right column, spans both rows) ---- */
+    .activity-feed {
+      grid-column: 3;
+      grid-row: 1 / -1;
+    }
+
+    .feed-entry {
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.3);
+      font-size: 11px;
+    }
+
+    .feed-entry:last-child { border-bottom: none; }
+
+    .feed-time {
+      font-size: 9px;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+
+    .feed-event {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 3px;
+    }
+
+    .feed-event .ev-name { color: var(--cyan); font-weight: 600; }
+    .feed-event .ev-result { font-size: 10px; }
+    .feed-event .ev-result.ok { color: var(--enabled); }
+    .feed-event .ev-result.rej { color: var(--blocked); }
+
+    .feed-changes {
+      padding-left: 16px;
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .feed-changes .change { padding: 1px 0; }
+    .feed-changes .change .val { color: var(--slate-val); }
+    .feed-changes .change .highlight { color: var(--enabled); }
+
+    /* ---- Widget: Data gauges (bottom-left) ---- */
+    .data-gauges {
+      grid-column: 1;
+      grid-row: 2;
+    }
+
+    .gauge-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.3);
+    }
+
+    .gauge-row:last-child { border-bottom: none; }
+
+    .gauge-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .gauge-info .name { font-size: 12px; }
+    .gauge-info .type-badge { font-size: 9px; color: var(--muted); }
+
+    .gauge-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--slate-val);
+      text-align: right;
+    }
+
+    .gauge-value.null-val {
+      color: var(--muted);
+      font-size: 13px;
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    .gauge-sparkline {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 20px;
+    }
+
+    .spark-bar {
+      width: 6px;
+      border-radius: 1px;
+      background: rgba(99, 102, 241, 0.35);
+    }
+
+    .spark-bar.current { background: var(--indigo); }
+
+    /* ---- Widget: Constraint health (bottom-center) ---- */
+    .constraint-health {
+      grid-column: 2;
+      grid-row: 2;
+    }
+
+    .health-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.3);
+    }
+
+    .health-row:last-child { border-bottom: none; }
+
+    .health-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .health-indicator.green { background: var(--enabled); box-shadow: 0 0 6px rgba(52, 211, 153, 0.3); }
+    .health-indicator.yellow { background: var(--gold); box-shadow: 0 0 6px rgba(251, 191, 36, 0.3); }
+    .health-indicator.red { background: var(--blocked); box-shadow: 0 0 6px rgba(251, 113, 133, 0.3); }
+
+    .health-details {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .health-details .expr { font-size: 12px; color: var(--text); }
+    .health-details .msg { font-size: 10px; color: var(--gold); }
+    .health-details .kind { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .health-value {
+      font-size: 11px;
+      color: var(--dim);
+      text-align: right;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <div class="header">
+    <div class="header-left">
+      <span class="header-title">Precept Dashboard</span>
+      <span class="sep">·</span>
+      <span class="header-file">subscription.precept</span>
+      <span class="sep">·</span>
+      <span class="state-pill"><span class="dot"></span> Active</span>
+      <span class="sep">·</span>
+      <span class="concept-badge">Concept 10</span>
+    </div>
+    <div class="header-right">
+      <div class="header-actions">
+        <button>Reset</button>
+        <button>Edit Data</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== DASHBOARD GRID ===== -->
+  <div class="dashboard">
+
+    <!-- ---- STATE SUMMARY (top-left) ---- -->
+    <div class="widget state-summary">
+      <div class="widget-header">
+        <h3><span style="color: var(--violet);">●</span> Current State</h3>
+      </div>
+      <div class="widget-body">
+        <div class="current-state-hero">
+          <div class="state-circle">A</div>
+          <div class="state-info">
+            <span class="big">Active</span>
+            <span class="sub">2 events available · step 2</span>
+          </div>
+        </div>
+        <div class="mini-states">
+          <span class="mini-state initial">Trial</span>
+          <span class="mini-state current">Active</span>
+          <span class="mini-state">Cancelled</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- EVENT HEATMAP (top-center) ---- -->
+    <div class="widget event-heatmap">
+      <div class="widget-header">
+        <h3><span style="color: var(--cyan);">⚡</span> Event × State</h3>
+        <span class="widget-action">click cell to fire →</span>
+      </div>
+      <div class="widget-body">
+        <div class="heatmap-grid">
+          <!-- Header row -->
+          <div class="hm-corner">State ╲ Event</div>
+          <div class="hm-col-header">Activate</div>
+          <div class="hm-col-header">Cancel</div>
+
+          <!-- Trial row -->
+          <div class="hm-row-header">Trial</div>
+          <div class="hm-cell transition">→ Active</div>
+          <div class="hm-cell undefined">—</div>
+
+          <!-- Active row (current) -->
+          <div class="hm-row-header current">● Active</div>
+          <div class="hm-cell no-transition">↻ self</div>
+          <div class="hm-cell transition">→ Cncld</div>
+
+          <!-- Cancelled row -->
+          <div class="hm-row-header">Cancelled</div>
+          <div class="hm-cell rejected">✗</div>
+          <div class="hm-cell undefined">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- ACTIVITY FEED (right, spanning both rows) ---- -->
+    <div class="widget activity-feed">
+      <div class="widget-header">
+        <h3>Activity</h3>
+        <span class="widget-action">clear</span>
+      </div>
+      <div class="widget-body">
+
+        <div class="feed-entry">
+          <div class="feed-time">step 2 · just now</div>
+          <div class="feed-event">
+            <span class="ev-name">Activate</span>
+            <span class="ev-result ok">✓ no transition</span>
+          </div>
+          <div class="feed-changes">
+            <div class="change">MonthlyPrice: <span class="val">29.99</span> → <span class="highlight">99</span></div>
+          </div>
+        </div>
+
+        <div class="feed-entry">
+          <div class="feed-time">step 1</div>
+          <div class="feed-event">
+            <span class="ev-name">Activate</span>
+            <span class="ev-result ok">✓ Trial → Active</span>
+          </div>
+          <div class="feed-changes">
+            <div class="change">PlanName: <span class="val">null</span> → <span class="highlight">Professional</span></div>
+            <div class="change">MonthlyPrice: <span class="val">0</span> → <span class="highlight">29.99</span></div>
+          </div>
+        </div>
+
+        <div class="feed-entry">
+          <div class="feed-time">step 0 · init</div>
+          <div class="feed-event">
+            <span style="color: var(--violet); font-weight: 600;">⊙ Initial</span>
+            <span class="ev-result ok">→ Trial</span>
+          </div>
+          <div class="feed-changes">
+            <div class="change">PlanName: <span class="val">null</span></div>
+            <div class="change">MonthlyPrice: <span class="val">0</span></div>
+          </div>
+        </div>
+
+        <div style="margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--border);">
+          <div style="font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Quick Fire</div>
+          <div style="display: flex; gap: 6px;">
+            <span class="event-chip enabled">⚡ Activate</span>
+            <span class="event-chip enabled">⚡ Cancel</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ---- DATA GAUGES (bottom-left) ---- -->
+    <div class="widget data-gauges">
+      <div class="widget-header">
+        <h3><span style="color: var(--slate);">☰</span> Field Values</h3>
+      </div>
+      <div class="widget-body">
+        <div class="gauge-row">
+          <div class="gauge-info">
+            <span class="name field-name">PlanName</span>
+            <span class="type-badge">string?</span>
+          </div>
+          <div class="gauge-sparkline">
+            <div class="spark-bar" style="height: 0px;"></div>
+            <div class="spark-bar" style="height: 14px;"></div>
+            <div class="spark-bar current" style="height: 14px;"></div>
+          </div>
+          <div class="gauge-value" style="font-size: 14px;">Professional</div>
+        </div>
+        <div class="gauge-row">
+          <div class="gauge-info">
+            <span class="name field-name">MonthlyPrice</span>
+            <span class="type-badge">number</span>
+          </div>
+          <div class="gauge-sparkline">
+            <div class="spark-bar" style="height: 2px;"></div>
+            <div class="spark-bar" style="height: 8px;"></div>
+            <div class="spark-bar current" style="height: 18px;"></div>
+          </div>
+          <div class="gauge-value">99</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- CONSTRAINT HEALTH (bottom-center) ---- -->
+    <div class="widget constraint-health">
+      <div class="widget-header">
+        <h3><span style="color: var(--gold);">⚖</span> Constraint Health</h3>
+      </div>
+      <div class="widget-body">
+        <div class="health-row">
+          <span class="health-indicator green"></span>
+          <div class="health-details">
+            <span class="expr">MonthlyPrice ≥ 0</span>
+            <span class="msg">"Monthly price cannot be negative"</span>
+            <span class="kind">invariant · always active</span>
+          </div>
+          <span class="health-value">99 ≥ 0 ✓</span>
+        </div>
+        <div class="health-row">
+          <span class="health-indicator yellow"></span>
+          <div class="health-details">
+            <span class="expr">on Activate: Price &gt; 0</span>
+            <span class="msg">"Plan price must be positive"</span>
+            <span class="kind">assertion · per-event guard</span>
+          </div>
+          <span class="health-value">arg-dependent</span>
+        </div>
+        <div class="health-row">
+          <span class="health-indicator green"></span>
+          <div class="health-details">
+            <span class="expr">from Cancelled: reject Activate</span>
+            <span class="msg">"Cannot reactivate"</span>
+            <span class="kind">rejection · state-scoped</span>
+          </div>
+          <span class="health-value">N/A (Active)</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

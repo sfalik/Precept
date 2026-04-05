@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 11: Kanban Board — Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    /* ================================================================
+       CONCEPT 11 — KANBAN BOARD
+       ================================================================
+       Core idea: States are columns. The entity is a card that lives
+       in its current state's column. Transitions are the connectors
+       between columns — visualized as actionable arrows you can fire.
+       You see the entire lifecycle as a left-to-right flow.
+
+       Unlike the Decision Matrix (every outcome in a table) or the
+       Dashboard (all signals at once), this is about FLOW: where is
+       the entity now, where can it go, what guards each lane change?
+
+       The kanban metaphor naturally shows:
+       - Lifecycle progression (columns left → right)
+       - Current position (which column holds the card)
+       - Available moves (transition arrows between columns)
+       - Terminal states (columns with no outgoing transitions)
+       - Guard conditions (gates on the transition arrows)
+
+       AI agents parse this naturally: "entity at column Active,
+       transitions available to Cancelled via Cancel event."
+
+       Product shape: flow-first, lifecycle-centric.
+       Key job: "Where is my entity in its lifecycle, and what moves
+       are available from here?"
+       ================================================================ */
+
+    body {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    /* — Header — */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-title { font-size: 13px; font-weight: 700; }
+    .header-file { color: var(--dusk); font-size: 11px; }
+
+    .header-actions { display: flex; gap: 6px; }
+    .header-actions button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .header-actions button:hover { border-color: var(--indigo); }
+
+    /* — Board — */
+    .board {
+      display: flex;
+      gap: 0;
+      min-height: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 20px 16px;
+    }
+
+    /* — Lane (column) — */
+    .lane {
+      flex: 1;
+      min-width: 200px;
+      max-width: 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+    }
+
+    .lane-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: 8px 8px 0 0;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-bottom: none;
+    }
+
+    .lane-header h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--violet);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .lane-header .lane-tag {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    .lane-tag.initial {
+      color: var(--violet);
+      background: rgba(168, 152, 245, 0.10);
+      border: 1px solid rgba(168, 152, 245, 0.25);
+    }
+
+    .lane-tag.current {
+      color: var(--indigo);
+      background: rgba(99, 102, 241, 0.10);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+    }
+
+    .lane-tag.terminal {
+      color: var(--blocked);
+      background: rgba(251, 113, 133, 0.08);
+      border: 1px solid rgba(251, 113, 133, 0.20);
+    }
+
+    .lane-body {
+      flex: 1;
+      background: rgba(20, 20, 22, 0.6);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      padding: 12px 10px;
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .lane.active-lane .lane-header {
+      border-color: rgba(99, 102, 241, 0.30);
+      background: rgba(99, 102, 241, 0.06);
+    }
+
+    .lane.active-lane .lane-body {
+      border-color: rgba(99, 102, 241, 0.30);
+      background: rgba(99, 102, 241, 0.02);
+    }
+
+    .lane-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      font-size: 11px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    /* — Transition connector between lanes — */
+    .lane-connector {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 80px;
+      flex-shrink: 0;
+      gap: 8px;
+      padding: 40px 0;
+    }
+
+    .connector-arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      padding: 8px 6px;
+      border-radius: 6px;
+      transition: background 100ms;
+    }
+
+    .connector-arrow:hover {
+      background: rgba(52, 211, 153, 0.06);
+    }
+
+    .connector-arrow.blocked:hover {
+      background: rgba(251, 113, 133, 0.04);
+    }
+
+    .connector-line {
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+
+    .connector-line .line {
+      width: 28px;
+      height: 2px;
+      background: var(--enabled);
+    }
+
+    .connector-line .arrow-head {
+      width: 0;
+      height: 0;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 7px solid var(--enabled);
+    }
+
+    .connector-arrow.blocked .connector-line .line {
+      background: var(--blocked);
+      opacity: 0.5;
+    }
+
+    .connector-arrow.blocked .connector-line .arrow-head {
+      border-left-color: var(--blocked);
+      opacity: 0.5;
+    }
+
+    .connector-event-name {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--cyan);
+      white-space: nowrap;
+    }
+
+    .connector-guard {
+      font-size: 9px;
+      color: var(--gold);
+      white-space: nowrap;
+      max-width: 70px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: center;
+    }
+
+    .connector-arrow.blocked .connector-event-name {
+      color: var(--blocked);
+      text-decoration: line-through;
+      opacity: 0.7;
+    }
+
+    .connector-fire-hint {
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--enabled);
+      opacity: 0;
+      transition: opacity 100ms;
+    }
+
+    .connector-arrow:hover .connector-fire-hint {
+      opacity: 1;
+    }
+
+    .connector-arrow.blocked .connector-fire-hint {
+      display: none;
+    }
+
+    /* Self-loop connector */
+    .self-loop {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      cursor: pointer;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px dashed rgba(52, 211, 153, 0.25);
+      background: rgba(52, 211, 153, 0.02);
+      transition: background 100ms, border-color 100ms;
+      margin-top: 8px;
+    }
+
+    .self-loop:hover {
+      background: rgba(52, 211, 153, 0.06);
+      border-color: rgba(52, 211, 153, 0.40);
+    }
+
+    .self-loop-icon {
+      font-size: 14px;
+      color: var(--enabled);
+      opacity: 0.6;
+    }
+
+    .self-loop-label {
+      font-size: 10px;
+      color: var(--cyan);
+      font-weight: 600;
+    }
+
+    .self-loop-desc {
+      font-size: 9px;
+      color: var(--dim);
+    }
+
+    /* — Entity card (the "kanban card") — */
+    .entity-card {
+      background: var(--card);
+      border: 1px solid rgba(99, 102, 241, 0.30);
+      border-radius: 8px;
+      padding: 0;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    .entity-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: rgba(99, 102, 241, 0.06);
+      border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+    }
+
+    .entity-card-header .entity-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .entity-card-header .entity-state {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--indigo);
+    }
+
+    .entity-card-body {
+      padding: 10px 12px;
+    }
+
+    .entity-field-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.3);
+    }
+
+    .entity-field-row:last-child {
+      border-bottom: none;
+    }
+
+    .entity-field-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .entity-card-footer {
+      padding: 8px 12px;
+      border-top: 1px solid rgba(39, 39, 42, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .rule-status {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+    }
+
+    .rule-status.passing { color: var(--enabled); }
+    .rule-status.failing { color: var(--blocked); }
+    .rule-status .rule-label { color: var(--dim); }
+
+    .entity-card-step {
+      padding: 6px 12px;
+      background: rgba(168, 152, 245, 0.04);
+      border-top: 1px solid rgba(39, 39, 42, 0.3);
+      font-size: 10px;
+      color: var(--dim);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .step-num {
+      font-weight: 700;
+      color: var(--violet);
+    }
+
+    /* — Ghost card (entity's previous position) — */
+    .ghost-card {
+      background: transparent;
+      border: 1px dashed rgba(168, 152, 245, 0.15);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0.5;
+    }
+
+    .ghost-card .ghost-label {
+      font-size: 10px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .ghost-card .ghost-step {
+      font-size: 9px;
+      color: var(--violet);
+      opacity: 0.6;
+    }
+
+    /* — Flow metrics bar — */
+    .flow-bar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+      color: var(--dim);
+      flex-shrink: 0;
+    }
+
+    .flow-metric {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .flow-metric .metric-val {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .flow-metric .metric-label {
+      color: var(--muted);
+    }
+
+    .flow-path {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+    }
+
+    .flow-path .fp-state {
+      color: var(--violet);
+      font-weight: 500;
+    }
+
+    .flow-path .fp-state.current {
+      font-weight: 700;
+      color: var(--indigo);
+    }
+
+    .flow-path .fp-arrow {
+      color: var(--muted);
+      font-size: 9px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <div class="header">
+    <div class="header-left">
+      <span class="header-title">Precept Board</span>
+      <span class="sep">·</span>
+      <span class="header-file">subscription.precept</span>
+      <span class="sep">·</span>
+      <span class="state-pill"><span class="dot"></span> Active</span>
+      <span class="sep">·</span>
+      <span class="concept-badge">Concept 11</span>
+    </div>
+    <div class="header-actions">
+      <button>Edit Data</button>
+      <button>Reset</button>
+    </div>
+  </div>
+
+  <!-- ===== KANBAN BOARD ===== -->
+  <div class="board">
+
+    <!-- ──── LANE: Trial ──── -->
+    <div class="lane">
+      <div class="lane-header">
+        <h2>
+          <span style="font-size: 8px;">●</span>
+          Trial
+        </h2>
+        <span class="lane-tag initial">initial</span>
+      </div>
+      <div class="lane-body">
+        <!-- Ghost: entity was here at step 0 -->
+        <div class="ghost-card">
+          <span class="ghost-step">step 0</span>
+          <span class="ghost-label">was here → moved via Activate</span>
+        </div>
+        <div class="lane-empty"></div>
+      </div>
+    </div>
+
+    <!-- ──── CONNECTOR: Trial → Active ──── -->
+    <div class="lane-connector">
+      <div class="connector-arrow">
+        <span class="connector-event-name">Activate</span>
+        <div class="connector-line">
+          <div class="line"></div>
+          <div class="arrow-head"></div>
+        </div>
+        <span class="connector-guard">Price &gt; 0</span>
+        <span class="connector-fire-hint">▶ fire</span>
+      </div>
+    </div>
+
+    <!-- ──── LANE: Active (current) ──── -->
+    <div class="lane active-lane">
+      <div class="lane-header">
+        <h2>
+          <span style="font-size: 8px; color: var(--indigo);">◆</span>
+          Active
+        </h2>
+        <span class="lane-tag current">current</span>
+      </div>
+      <div class="lane-body">
+
+        <!-- THE entity card — lives in its current state column -->
+        <div class="entity-card">
+          <div class="entity-card-header">
+            <span class="entity-name">Subscription</span>
+            <span class="entity-state">Active</span>
+          </div>
+          <div class="entity-card-body">
+            <div class="entity-field-row">
+              <div class="entity-field-left">
+                <span class="field-name">PlanName</span>
+                <span class="field-type">string?</span>
+              </div>
+              <span class="field-value">Professional</span>
+            </div>
+            <div class="entity-field-row">
+              <div class="entity-field-left">
+                <span class="field-name">MonthlyPrice</span>
+                <span class="field-type">number</span>
+              </div>
+              <span class="field-value">99</span>
+            </div>
+          </div>
+          <div class="entity-card-footer">
+            <div class="rule-status passing">
+              <span>✓</span>
+              <span class="rule-label">MonthlyPrice ≥ 0</span>
+            </div>
+            <div class="rule-status passing">
+              <span>✓</span>
+              <span class="rule-label">assert Price &gt; 0</span>
+            </div>
+          </div>
+          <div class="entity-card-step">
+            <span class="step-num">Step 2</span>
+            <span>Activate fired · no state change · MonthlyPrice updated</span>
+          </div>
+        </div>
+
+        <!-- Self-loop: Activate stays in Active -->
+        <div class="self-loop">
+          <span class="self-loop-icon">↻</span>
+          <span class="self-loop-label">Activate</span>
+          <span class="self-loop-desc">stays here, updates data</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ──── CONNECTOR: Active → Cancelled ──── -->
+    <div class="lane-connector">
+      <div class="connector-arrow">
+        <span class="connector-event-name">Cancel</span>
+        <div class="connector-line">
+          <div class="line"></div>
+          <div class="arrow-head"></div>
+        </div>
+        <span class="connector-fire-hint">▶ fire</span>
+      </div>
+
+      <!-- Reverse: Cancelled → Active (blocked) -->
+      <div class="connector-arrow blocked" style="margin-top: 12px;">
+        <span class="connector-event-name">Activate</span>
+        <div class="connector-line" style="transform: scaleX(-1);">
+          <div class="line"></div>
+          <div class="arrow-head"></div>
+        </div>
+        <span class="connector-guard" style="color: var(--blocked);">✗ rejected</span>
+      </div>
+    </div>
+
+    <!-- ──── LANE: Cancelled ──── -->
+    <div class="lane">
+      <div class="lane-header">
+        <h2>
+          <span style="font-size: 8px;">○</span>
+          Cancelled
+        </h2>
+        <span class="lane-tag terminal">terminal</span>
+      </div>
+      <div class="lane-body">
+        <div class="lane-empty">no entity here</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== FLOW METRICS BAR ===== -->
+  <div class="flow-bar">
+    <span class="section-label" style="margin-right: 4px;">Flow</span>
+    <div class="flow-path">
+      <span class="fp-state">Trial</span>
+      <span class="fp-arrow">→</span>
+      <span class="fp-state current">Active</span>
+      <span class="fp-arrow">→</span>
+      <span class="fp-state" style="opacity: 0.4;">Cancelled</span>
+    </div>
+    <span class="sep">·</span>
+    <div class="flow-metric">
+      <span class="metric-label">Position:</span>
+      <span class="metric-val">2 of 3</span>
+    </div>
+    <span class="sep">·</span>
+    <div class="flow-metric">
+      <span class="metric-label">Steps taken:</span>
+      <span class="metric-val">2</span>
+    </div>
+    <span class="sep">·</span>
+    <div class="flow-metric">
+      <span class="metric-label">Available moves:</span>
+      <span class="metric-val" style="color: var(--enabled);">2</span>
+      <span class="metric-label">(Activate ↻, Cancel →)</span>
+    </div>
+    <span class="sep">·</span>
+    <div class="flow-metric">
+      <span class="metric-label">Rules:</span>
+      <span class="metric-val" style="color: var(--enabled);">2 ✓</span>
+    </div>
+  </div>
+
+</body>
+</html>

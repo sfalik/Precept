@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 03: Decision Matrix — Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    /* ================================================================
+       CONCEPT 03 — DECISION MATRIX
+       ================================================================
+       Core idea: Show the ENTIRE state machine as a truth table.
+       Rows = states, Columns = events, Cells = outcomes.
+       One glance shows every possible path. Click a cell to expand
+       detail. Data panel slides in from the right.
+
+       Product shape: table-first, completeness-oriented.
+       Key job: "Show me every possible outcome in one view."
+       ================================================================ */
+
+    body {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 0;
+      padding: 0;
+    }
+
+    /* — Header — */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-title { font-size: 13px; font-weight: 700; }
+    .header-file { color: var(--dusk); font-size: 11px; }
+
+    .header-actions { display: flex; gap: 6px; }
+    .header-actions button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .header-actions button:hover { border-color: var(--indigo); }
+
+    /* — Main area: matrix + detail — */
+    .main-area {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* Matrix pane */
+    .matrix-pane {
+      overflow: auto;
+      padding: 20px 24px;
+    }
+
+    .matrix-intro {
+      font-size: 11px;
+      color: var(--dim);
+      margin-bottom: 16px;
+    }
+
+    /* The decision matrix table */
+    .matrix {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .matrix th {
+      text-align: center;
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      border-bottom: 2px solid var(--border);
+    }
+
+    .matrix th.event-col {
+      color: var(--cyan);
+    }
+
+    .matrix th.corner {
+      text-align: left;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .matrix td {
+      padding: 0;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.4);
+      vertical-align: middle;
+    }
+
+    .matrix .state-row-header {
+      padding: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--violet);
+      position: relative;
+    }
+
+    .matrix .state-row-header.current::before {
+      content: '●';
+      position: absolute;
+      left: 2px;
+      color: var(--violet);
+      font-size: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    /* Outcome cells */
+    .cell {
+      padding: 10px 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: background 100ms;
+      border-left: 1px solid rgba(39, 39, 42, 0.3);
+      min-height: 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .cell:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .cell.selected {
+      background: rgba(99, 102, 241, 0.08);
+      box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.30);
+    }
+
+    .cell .outcome-icon {
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .cell .outcome-label {
+      font-size: 10px;
+      font-weight: 500;
+    }
+
+    .cell .outcome-dest {
+      font-size: 9px;
+      color: var(--dim);
+    }
+
+    /* Outcome types */
+    .cell.transition .outcome-icon { color: var(--enabled); }
+    .cell.transition .outcome-label { color: var(--enabled); }
+
+    .cell.no-transition .outcome-icon { color: var(--enabled); opacity: 0.65; }
+    .cell.no-transition .outcome-label { color: var(--enabled); opacity: 0.65; }
+
+    .cell.rejected .outcome-icon { color: var(--blocked); }
+    .cell.rejected .outcome-label { color: var(--blocked); }
+
+    .cell.undefined .outcome-icon { color: var(--muted); }
+    .cell.undefined .outcome-label { color: var(--muted); }
+
+    /* Legend */
+    .matrix-legend {
+      display: flex;
+      gap: 16px;
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--dim);
+    }
+
+    /* — Detail panel (right) — */
+    .detail-panel {
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .detail-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .detail-header h3 {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .detail-header .detail-sub {
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .detail-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+    }
+
+    .detail-section {
+      margin-bottom: 16px;
+    }
+
+    .detail-section h4 {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .detail-outcome-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+
+    .detail-outcome-badge.transition {
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.08);
+      border: 1px solid rgba(52, 211, 153, 0.25);
+    }
+
+    .detail-outcome-badge.rejected {
+      color: var(--blocked);
+      background: rgba(251, 113, 133, 0.08);
+      border: 1px solid rgba(251, 113, 133, 0.25);
+    }
+
+    /* Step list */
+    .step-list {
+      list-style: none;
+      font-size: 11px;
+    }
+
+    .step-list li {
+      padding: 4px 0;
+      padding-left: 14px;
+      position: relative;
+      color: var(--slate-val);
+    }
+
+    .step-list li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: var(--muted);
+    }
+
+    .step-list li.transition-step { color: var(--enabled); }
+    .step-list li.transition-step::before { color: var(--enabled); }
+
+    /* Inline args in detail */
+    .detail-args {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .detail-arg-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .detail-arg-row label {
+      font-size: 10px;
+      color: var(--dusk);
+      min-width: 50px;
+    }
+
+    .detail-arg-row input {
+      flex: 1;
+      background: rgba(17, 17, 20, 0.6);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 3px;
+    }
+
+    .detail-arg-row input:focus {
+      outline: none;
+      border-color: var(--indigo);
+    }
+
+    .fire-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font: inherit;
+      font-size: 11px;
+      padding: 5px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid var(--enabled);
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.08);
+      margin-top: 8px;
+    }
+
+    .fire-btn:hover { background: rgba(52, 211, 153, 0.16); }
+
+    /* Data section in detail */
+    .data-rows { list-style: none; }
+    .data-rows li {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.3);
+      font-size: 12px;
+    }
+    .data-rows li:last-child { border-bottom: none; }
+
+    /* — Footer — */
+    .footer {
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      padding: 6px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <div class="header">
+    <div class="header-left">
+      <span class="header-title">Precept Preview</span>
+      <span class="sep">·</span>
+      <span class="header-file">subscription.precept</span>
+      <span class="sep">·</span>
+      <span class="state-pill"><span class="dot"></span> Active</span>
+    </div>
+    <div class="header-actions">
+      <button>Edit Data</button>
+      <button>Reset</button>
+    </div>
+  </div>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main-area">
+
+    <!-- LEFT: Decision Matrix -->
+    <div class="matrix-pane">
+      <div class="matrix-intro">
+        Click any cell to inspect the outcome. <strong style="color: var(--violet);">●</strong> = current state.
+      </div>
+
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th class="corner" style="width: 130px;">State ╲ Event</th>
+            <th class="event-col">Activate</th>
+            <th class="event-col">Cancel</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Trial -->
+          <tr>
+            <td class="state-row-header">Trial</td>
+            <td>
+              <div class="cell transition">
+                <span class="outcome-icon">→</span>
+                <span class="outcome-label">Transition</span>
+                <span class="outcome-dest">→ Active</span>
+              </div>
+            </td>
+            <td>
+              <div class="cell undefined">
+                <span class="outcome-icon">—</span>
+                <span class="outcome-label">Undefined</span>
+              </div>
+            </td>
+          </tr>
+          <!-- Active (current) -->
+          <tr>
+            <td class="state-row-header current">Active</td>
+            <td>
+              <div class="cell no-transition selected">
+                <span class="outcome-icon">↻</span>
+                <span class="outcome-label">No Transition</span>
+                <span class="outcome-dest">stays Active</span>
+              </div>
+            </td>
+            <td>
+              <div class="cell transition">
+                <span class="outcome-icon">→</span>
+                <span class="outcome-label">Transition</span>
+                <span class="outcome-dest">→ Cancelled</span>
+              </div>
+            </td>
+          </tr>
+          <!-- Cancelled -->
+          <tr>
+            <td class="state-row-header">Cancelled</td>
+            <td>
+              <div class="cell rejected">
+                <span class="outcome-icon">✗</span>
+                <span class="outcome-label">Rejected</span>
+                <span class="outcome-dest">cannot reactivate</span>
+              </div>
+            </td>
+            <td>
+              <div class="cell undefined">
+                <span class="outcome-icon">—</span>
+                <span class="outcome-label">Undefined</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="matrix-legend">
+        <span class="legend-item"><span style="color: var(--enabled);">→</span> Transition</span>
+        <span class="legend-item"><span style="color: var(--enabled); opacity: 0.65;">↻</span> No Transition</span>
+        <span class="legend-item"><span style="color: var(--blocked);">✗</span> Rejected</span>
+        <span class="legend-item"><span style="color: var(--muted);">—</span> Undefined</span>
+      </div>
+    </div>
+
+    <!-- RIGHT: Detail Panel -->
+    <div class="detail-panel">
+      <div class="detail-header">
+        <h3>Active × Activate</h3>
+        <span class="detail-sub">selected cell detail</span>
+      </div>
+      <div class="detail-body">
+
+        <div class="detail-section">
+          <h4>Outcome</h4>
+          <div class="detail-outcome-badge transition">
+            ↻ No Transition — stays in Active
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <h4>Steps</h4>
+          <ul class="step-list">
+            <li>assert Price &gt; 0 <span style="color: var(--gold);">(Plan price must be positive)</span></li>
+            <li>set MonthlyPrice = Activate.Price</li>
+            <li class="transition-step">no transition</li>
+          </ul>
+        </div>
+
+        <div class="detail-section">
+          <h4>Event Arguments</h4>
+          <div class="detail-args">
+            <div class="detail-arg-row">
+              <label>Plan</label>
+              <input type="text" value="Enterprise" />
+            </div>
+            <div class="detail-arg-row">
+              <label>Price</label>
+              <input type="text" value="99" />
+            </div>
+          </div>
+          <button class="fire-btn">▶ Fire</button>
+        </div>
+
+        <div class="detail-section">
+          <h4>Current Data</h4>
+          <ul class="data-rows">
+            <li>
+              <span class="field-name">PlanName <span class="field-type">string?</span></span>
+              <span class="field-value">Professional</span>
+            </li>
+            <li>
+              <span class="field-name">MonthlyPrice <span class="field-type">number</span></span>
+              <span class="field-value">99</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="detail-section">
+          <h4>Invariants</h4>
+          <div style="font-size: 11px; color: var(--enabled);">
+            ✓ MonthlyPrice ≥ 0
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== FOOTER ===== -->
+  <div class="footer">
+    <span class="section-label">Precept</span>
+    <span class="sep">·</span>
+    <span style="color: var(--dim);">3 states · 2 events · 4 transitions · 1 invariant</span>
+  </div>
+
+</body>
+</html>

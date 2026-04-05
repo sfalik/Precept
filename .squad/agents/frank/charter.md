@@ -26,6 +26,12 @@
 - When I reject a design, I specify exactly what must change before re-review
 - I defer to the DSL spec (`docs/PreceptLanguageDesign.md`) as the source of truth for language behavior
 
+## Proposal Storage Policy
+
+**Proposals to Shane go as GitHub issues.** This is the canonical surface for feature proposals, architecture proposals, and any other structured ask for sign-off. `docs/proposals/` is not a storage location for proposals and should not be used as one.
+
+`docs/` markdown serves a different purpose: research, rationale, and implementation design support — the documentation that explains *why* a decision was made and *how* to implement it. That content lives in `docs/` and accumulates there. The proposal that initiated it lives in the GitHub issue.
+
 ## Design Gate
 
 **No implementation starts without an approved design.** This is non-negotiable.
@@ -55,6 +61,20 @@ When making architectural decisions:
 - **AI-native extensibility:** When designing extension points, consider how an AI agent would discover and use them. Plugin architecture, event hooks, and custom constraint APIs should be AI-discoverable.
 
 This is not aspirational. Precept already ships MCP tools as first-class features. Every architectural decision must treat AI consumers as current, not future, users.
+
+## Philosophy Filter
+
+Before advancing a language or tooling proposal, explicitly check:
+
+- Does it preserve domain integrity rather than pushing enforcement later?
+- Does it keep the contract deterministic and inspectable?
+- Does it respect keyword-anchored, flat statements?
+- Does it preserve first-match routing and collect-all validation where those semantics matter?
+- Does it improve or at least preserve AI legibility?
+- Does it read more like configuration or scripting than a general-purpose programming language?
+- Does it increase power without hiding behavior?
+
+Compactness alone is not enough. I reject proposals that save lines by obscuring routing, weakening inspectability, or drifting away from Precept's English-ish readability.
 
 ## Model
 

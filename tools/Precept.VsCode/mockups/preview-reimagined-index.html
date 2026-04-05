@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Preview Reimagined — Concept Index (17 Concepts)</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    body {
+      overflow-y: auto;
+      padding: 32px;
+      max-width: 860px;
+      margin: 0 auto;
+      height: auto;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: var(--dim);
+      margin-bottom: 32px;
+    }
+
+    .intro {
+      font-size: 13px;
+      color: var(--slate-val);
+      line-height: 1.7;
+      margin-bottom: 28px;
+      max-width: 640px;
+    }
+
+    .concept-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .concept-card {
+      display: grid;
+      grid-template-columns: 48px 1fr auto;
+      gap: 16px;
+      align-items: start;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      text-decoration: none;
+      transition: border-color 150ms, background 150ms, transform 150ms;
+    }
+
+    .concept-card:hover {
+      border-color: rgba(99, 102, 241, 0.35);
+      background: var(--card-hover);
+      transform: translateY(-1px);
+    }
+
+    .concept-num {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--indigo);
+      line-height: 1;
+      text-align: center;
+      opacity: 0.6;
+    }
+
+    .concept-body h2 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .concept-body .metaphor {
+      font-size: 11px;
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 6px;
+    }
+
+    .concept-body p {
+      font-size: 12px;
+      color: var(--slate-val);
+      line-height: 1.6;
+    }
+
+    .concept-tag {
+      display: inline-block;
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      color: var(--dim);
+      white-space: nowrap;
+      margin-top: 4px;
+    }
+
+    .concept-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--indigo);
+      text-decoration: none;
+      padding: 4px 10px;
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      border-radius: 4px;
+      white-space: nowrap;
+      transition: background 100ms;
+      align-self: center;
+    }
+
+    .concept-link:hover {
+      background: rgba(99, 102, 241, 0.12);
+    }
+
+    .recommendation {
+      margin-top: 32px;
+      padding: 16px 20px;
+      background: rgba(99, 102, 241, 0.05);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+    }
+
+    .recommendation h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--indigo);
+      margin-bottom: 8px;
+    }
+
+    .recommendation p {
+      font-size: 12px;
+      color: var(--slate-val);
+      line-height: 1.7;
+    }
+
+    .recommendation strong {
+      color: var(--text);
+    }
+
+    .footer-note {
+      margin-top: 28px;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Preview Reimagined</h1>
+  <div class="subtitle">Seventeen concepts across eight phases · Elaine · UX Exploration</div>
+
+  <div class="intro">
+    Seventeen product shapes explored for the Precept preview panel. <strong>Concept 17 (Interactive Journey)</strong> is the new playable prototype — click "Fire ▶" to walk through the full InsuranceClaim lifecycle, watch history accumulate, and see data change in real time. <strong>Concept 14 (Contract Explorer)</strong> remains the leading static design. <strong>15 (Journey) + 16 (Navigator)</strong> informed the interactive synthesis. See <a href="preview-concepts-deep-analysis.md" style="color: var(--indigo);">deep analysis</a> for grounded research.
+  </div>
+
+  <!-- ═══ INTERACTIVE PROTOTYPE ═══ -->
+  <div style="margin-bottom: 28px; padding: 20px; background: rgba(52, 211, 153, 0.06); border: 2px solid rgba(52, 211, 153, 0.35); border-radius: 12px;">
+    <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--enabled); font-weight: 600; margin-bottom: 8px;">🎮 Interactive Prototype — Click to Play</div>
+    <a class="concept-card" href="preview-reimagined-17-interactive-journey.html" style="border-color: var(--enabled); margin: 0;">
+      <div class="concept-num" style="opacity: 1; color: var(--enabled);">17</div>
+      <div class="concept-body">
+        <div class="metaphor">Interactive Journey</div>
+        <h2>Clickable Simulation — Fire Events, Watch History Grow</h2>
+        <p>The first fully interactive mockup with <strong>built-in guided tour</strong>. Synthesizes <strong>Journey (15)</strong> temporal narrative with <strong>Navigator (16)</strong> topology rail and <strong>Contract Explorer (14)</strong> feature depth. Open it in a browser — a welcome banner greets first-time users and a 6-step coach tour highlights every interactive surface. Clickable controls pulse with visual emphasis, and a <strong>"suggested next"</strong> badge traces the golden path through the lifecycle. A <strong>right-rail state diagram</strong> animates alongside your journey — nodes glow when visited and edges flash on transitions. Fire events, watch history accumulate, try invalid inputs to see guard rejections, undo steps, and reset to start over.</p>
+        <span class="concept-tag" style="border-color: var(--enabled); color: var(--enabled);">🎮 interactive</span>
+        <span class="concept-tag">synthesis: 14+15+16</span>
+        <span class="concept-tag" style="border-color: rgba(48, 184, 232, 0.30); color: #30B8E8;">🎓 guided tour</span>
+        <span class="concept-tag">full lifecycle</span>
+        <span class="concept-tag">undo/reset</span>
+        <span class="concept-tag" style="border-color: rgba(168,152,245,0.30); color: #A898F5;">state diagram</span>
+      </div>
+      <span class="concept-link" style="border-color: var(--enabled); color: var(--enabled);">Play →</span>
+    </a>
+    <div style="margin-top: 10px; font-size: 11px; color: var(--slate-val); line-height: 1.6;">
+      <strong style="color: var(--text);">First time?</strong> Click <strong style="color: #30B8E8;">🎓 Take the tour</strong> in the welcome banner — it walks you through the layout, controls, and interaction model in 6 quick steps. Or follow the blue <strong style="color: #30B8E8;">▶ suggested next</strong> badges to trace the golden path: Submit → AssignAdjuster → RequestDocument → ReceiveDocument → Approve → PayClaim. Try invalid inputs (approve more than the claim amount, receive a non-requested document) to see guard rejections.
+    </div>
+  </div>
+
+  <!-- ═══ LEADING DIRECTION ═══ -->
+  <div style="margin-bottom: 28px; padding: 20px; background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 12px;">
+    <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--indigo); font-weight: 600; margin-bottom: 8px;">⭐ Leading Direction</div>
+    <a class="concept-card" href="preview-reimagined-14-contract-explorer.html" style="border-color: var(--indigo); margin: 0;">
+      <div class="concept-num" style="opacity: 1;">14</div>
+      <div class="concept-body">
+        <div class="metaphor">Contract Explorer</div>
+        <h2>Flow Cards + Pipeline Trace + Edit-in-Place</h2>
+        <p>Refines Concept 13 into a shipping-candidate shape. State cards scroll vertically with transition edges between them. The current state gets spotlight treatment (data grid, event dock, rule chips). <strong>New:</strong> (1) Inline Execution Trace — expand any event to see all 6 fire-pipeline stages with expression evaluation and guard matching. (2) Structured violation detail with source-kind badges, expression text, and target-field links. (3) Edit-in-place with toggle for editable fields. (4) What-if bar — hypothetically change a field and see all events re-evaluate. (5) All 6 outcome kinds with distinct badges (Transition, NoTransition, Rejected, ConstraintFailure, Undefined, Unmatched). (6) Mode tabs (Flow / Matrix / Notebook) in the header. Uses InsuranceClaim sample at full complexity.</p>
+        <span class="concept-tag">⭐ recommended</span>
+        <span class="concept-tag">shipping candidate</span>
+        <span class="concept-tag">pipeline trace</span>
+        <span class="concept-tag">edit-in-place</span>
+      </div>
+      <span class="concept-link">Open →</span>
+    </a>
+    <div style="margin-top: 10px; font-size: 11px; color: var(--slate-val); line-height: 1.6;">
+      <strong style="color: var(--text);">Why this direction:</strong> Flow Cards' state-centric organization answers the developer's primary question — "I'm in state X, what can I do?" — in place. The inline pipeline trace (from Concept 12) uniquely answers "why was this event rejected?" at the expression level. The what-if bar enables exploratory debugging without committing changes. Mode tabs acknowledge that Matrix and Notebook serve different jobs (completeness review, full report) and can coexist as switchable views.
+    </div>
+  </div>
+
+  <!-- ═══ PREDECESSOR ═══ -->
+  <div style="margin-bottom: 24px;">
+    <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--dim); font-weight: 600; margin-bottom: 8px;">Predecessor</div>
+    <a class="concept-card" href="preview-reimagined-13-flow-cards.html">
+      <div class="concept-num">13</div>
+      <div class="concept-body">
+        <div class="metaphor">Flow Cards</div>
+        <h2>The Concept 14 Predecessor — State Cards Without Pipeline Trace</h2>
+        <p>The first recombination: Focus/Spotlight's large-card aesthetic applied to the entire lifecycle as a scrollable flow. Validated the layout at InsuranceClaim complexity. Concept 14 builds on this by adding inline pipeline trace, edit mode, structured violations, what-if, and all 6 outcome kinds.</p>
+        <span class="concept-tag">predecessor</span>
+        <span class="concept-tag">flow-first</span>
+      </div>
+      <span class="concept-link">Open →</span>
+    </a>
+  </div>
+
+  <!-- ═══ STRONG SECONDARY MODES ═══ -->
+  <div style="margin-bottom: 12px; padding: 6px 0; border-top: 1px solid var(--border);">
+    <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--indigo); font-weight: 600;">Strong secondary modes — could ship as tabs alongside Flow</span>
+  </div>
+
+  <div class="concept-grid">
+
+    <!-- 05 — Notebook (strong secondary: full report mode) -->
+    <a class="concept-card" href="preview-reimagined-05-notebook-report.html">
+      <div class="concept-num">05</div>
+      <div class="concept-body">
+        <div class="metaphor">Notebook / Report</div>
+        <h2>A Live, Scrollable Document</h2>
+        <p>A vertical card-based document where each section covers one aspect: contract overview, current state, data fields (including collections with count badges), events with outcome previews, rules with structured violations. Reactive: change a field value in the data card, and all event outcome cards instantly re-evaluate. The best-scaling concept — cards scroll, sections collapse, content is linear. Works at sidebar (400px) and editor-tab (1000px) widths. <strong>Role in Contract Explorer direction:</strong> Notebook is the "full report" tab alongside Flow — best for "give me a complete view of this precept's contract" where facet-based organization wins.</p>
+        <span class="concept-tag">⭐ secondary mode</span>
+        <span class="concept-tag">document-first</span>
+        <span class="concept-tag">full-report</span>
+      </div>
+      <span class="concept-link">Open →</span>
+    </a>
+
+    <!-- 03 — Decision Matrix (strong secondary: completeness) -->
+    <a class="concept-card" href="preview-reimagined-03-decision-matrix.html">
+      <div class="concept-num">03</div>
+      <div class="concept-body">
+        <div class="metaphor">Decision Matrix</div>
+        <h2>Every Outcome in One Table</h2>
+        <p>The entire state machine as a truth table: rows = states, columns = events, cells = outcomes. The only concept showing the complete contract at compile time — no runtime state needed. One glance shows every possible path, including undefined gaps and unmatched states. Maps to the DMN decision-table pattern. <strong>Role in Contract Explorer direction:</strong> Matrix is the "completeness review" tab — answers "is there a hole in my machine?" by scanning for gray cells.</p>
+        <span class="concept-tag">⭐ secondary mode</span>
+        <span class="concept-tag">table-first</span>
+        <span class="concept-tag">completeness</span>
+      </div>
+      <span class="concept-link">Open →</span>
+    </a>
+
+    <!-- 09 — Storyboard (strong secondary: test harness) -->
+    <a class="concept-card" href="preview-reimagined-09-storyboard-scenarios.html">
+      <div class="concept-num">09</div>
+      <div class="concept-body">
+        <div class="metaphor">Storyboard / Scenarios</div>
+        <h2>Build and Replay Complete Workflows</h2>
+        <p>Build event sequences step-by-step, save named scenarios ("Happy Path", "Edge: Rejected from Cancelled"), replay them, and see coverage gaps. The only concept framing the preview as a verification tool. Precept's deterministic semantics make scenarios perfectly reproducible. <strong>Role in Contract Explorer direction:</strong> Storyboard could be a future mode for deliberate test-path construction with coverage tracking.</p>
+        <span class="concept-tag">⭐ tier-2 future</span>
+        <span class="concept-tag">scenario-first</span>
+        <span class="concept-tag">coverage</span>
+      </div>
+      <span class="concept-link">Open →</span>
+    </a>
+
+  </div>
+
+  <!-- ═══ EXPLORATION ARCHIVE ═══ -->
+  <div style="margin: 24px 0 12px; padding: 6px 0; border-top: 1px solid var(--border);">
+    <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--dim); font-weight: 600;">Exploration archive — ideas that informed the leading direction</span>
+  </div>
+
+  <div class="concept-grid">
+
+    <!-- 01 -->
+    <a class="concept-card" href="preview-reimagined-01-timeline-debugger.html">
+      <div class="concept-num">01</div>
+      <div class="concept-body">
+        <div class="metaphor">Timeline Debugger</div>
+        <h2>History is the Primary Axis</h2>
+        <p>Redux DevTools-style action timeline + state diff. Strongest for production-UI or as a secondary mode, since manual simulation in dev preview rarely builds deep history.</p>
+        <span class="concept-tag">production-ui</span>
+        <span class="concept-tag">history-centric</span>
+      </div>
+      <span class="concept-link">Open →</span>
+    </a>
+
+    <!-- 02 -->
+    <a class="concept-card" href="preview-reimagined-02-conversational-repl.html">
+      <div class="concept-num">02</div>
+      <div class="concept-body">
+        <div class="metaphor">Conversational REPL</div>
+        <h2>Type Events, Read Results</h2>
+        <p>Scrolling command log mapping 1:1 to MCP tools. Most AI-agent-native concept. Best for power users and agent-primary workflows.</p>
+        <span class="concept-tag">REPL-first</span>
+        <span class="concept-tag">AI-native</span>
+      </div>
+      <span class="concept-link">Open →</span>
+    </a>
+
+    <!-- 04 -->
+    <a class="concept-card" href="preview-reimagined-04-focus-spotlight.html">
+      <div class="concept-num">04</div>
+      <div class="concept-body">
+        <div class="metaphor">Focus / Spotlight</div>
+        <h2>One Thing at a Time, Large and Clear</h2>
+        <p>Current state fills the screen. Highest signal-to-noise for a single state but hides the rest of the machine. Its large-card aesthetic lives on in Concepts 13 and 14.</p>
+        <span class="concept-tag">focus-first</span>
+        <span class="concept-tag">ancestor of 14</span>
+      </div>
+      <span class="concept-link">Open →</span>
+    </a>
+
+    <!-- 06 -->
+    <a class="concept-card" href="preview-reimagined-06-dual-pane-diff.html">
+      <div class="concept-num">06</div>
+      <div class="concept-body">
+        <div class="metaphor">Dual-Pane Diff</div>
+        <h2>Compare Any Two States Side by Side</h2>
+        <p>Best as a feature within Timeline or Storyboard, not standalone.</p>
+        <span class="concept-tag">feature</span>
+        <span class="concept-tag">diff-first</span>
+      </div>
+      <span class="concept-link">Open →</span>
+    </a>
+
+    <!-- 07 -->
+    <a class="concept-card" href="preview-reimagined-07-rule-pressure-map.html">
+      <div class="concept-num">07</div>
+      <div class="concept-body">
+        <div class="metaphor">Rule Pressure Map</div>
+        <h2>Constraints as the Primary Lens</h2>
+        <p>Novel constraint-first organizing principle. Strongest for complex precepts with many business rules. Could be a future mode for governance-oriented review.</p>
+        <span class="concept-tag">mode</span>
+        <span class="concept-tag">constraint-centric</span>
+      </div>
+      <span class="concept-link">Open →</span>
+    </a>
+
+    <!-- 08 -->
+    <a class="concept-card" href="preview-reimagined-08-graph-canvas.html">
+      <div class="concept-num">08</div>
+      <div class="concept-body">
+        <div class="metaphor">Graph Canvas</div>
+        <h2>The Diagram IS the Entire Interface</h2>
+        <p>Full-bleed zoomable canvas. Best as an enhanced version of the current diagram, not a full-preview replacement.</p>
+        <span class="concept-tag">feature</span>
+        <span class="concept-tag">spatial-first</span>
+      </div>
+      <span class="concept-link">Open →</span>
+    </a>
+
+    <!-- 10 -->
+    <a class="concept-card" href="preview-reimagined-10-dashboard-control-room.html">
+      <div class="concept-num">10</div>
+      <div class="concept-body">
+        <div class="metaphor">Dashboard / Control Room</div>
+        <h2>All Signals at Once</h2>
+        <p>Multi-widget dashboard. Maximum density but breaks at sidebar width. Better as a compact summary widget than standalone.</p>
+        <span class="concept-tag">feature</span>
+        <span class="concept-tag">data-dense</span>
+      </div>
+      <span class="concept-link">Open →</span>
+    </a>
+
+    <!-- 11 -->
+    <a class="concept-card" href="preview-reimagined-11-kanban-board.html">
+      <div class="concept-num">11</div>
+      <div class="concept-body">
+        <div class="metaphor">Kanban Board</div>
+        <h2>States as Columns, Entity as a Card</h2>
+        <p>Spatial lifecycle clarity for simple linear precepts. Struggles at 7+ states. The flow metaphor evolved into Flow Cards (13) and Contract Explorer (14).</p>
+        <span class="concept-tag">mode</span>
+        <span class="concept-tag">ancestor of 14</span>
+      </div>
+      <span class="concept-link">Open →</span>
+    </a>
+
+    <!-- 12 — Execution Trace (now integrated into 14) -->
+    <div class="concept-card" style="cursor: default;">
+      <div class="concept-num">12</div>
+      <div class="concept-body">
+        <div class="metaphor">Execution Trace / Pipeline Debugger</div>
+        <h2>See Inside a Single Event Fire</h2>
+        <p>The 6-stage fire pipeline visualized as a vertical trace. Uniquely Precept-specific — shows why an event was rejected at the expression level. <strong>Now integrated into Concept 14</strong> as an inline expandable panel on each event row.</p>
+        <span class="concept-tag">integrated into 14</span>
+        <span class="concept-tag">pipeline-first</span>
+        <span class="concept-tag">self-teaching</span>
+      </div>
+      <span class="concept-tag" style="align-self: center; border-color: var(--enabled); color: var(--enabled);">✓ Integrated</span>
+    </div>
+
+    <!-- 15 — Journey (history+inspection hybrid) -->
+    <a class="concept-card" href="preview-reimagined-15-journey.html" style="border-color: rgba(99, 102, 241, 0.25);">
+      <div class="concept-num">15</div>
+      <div class="concept-body">
+        <div class="metaphor">Journey</div>
+        <h2>Past → Present → Future as a Temporal Narrative</h2>
+        <p>The preview reads top-to-bottom as a three-act story. <strong>Past:</strong> a compact trail of steps taken — each shows the event fired, the state entered, and key data deltas (field before→after). <strong>Present:</strong> the current state as hero card with full data, rules, violations, and "recently changed" markers connecting values to the step that set them. <strong>Future:</strong> available events as action cards grouped by outcome type (transitions, self-loops, blocked). Closes with an "also reachable" topology hint. Works with even 1–3 steps of history — exactly what manual simulation produces. Unlike Timeline (01), this isn't a scrubbing debugger; it's a narrative grounding the developer in their simulation path. Unlike Flow Cards (13), it organizes by <em>time</em>, not <em>topology</em>.</p>
+        <span class="concept-tag">⭐ new</span>
+        <span class="concept-tag">history+inspection</span>
+        <span class="concept-tag">temporal-narrative</span>
+        <span class="concept-tag">present-focused</span>
+      </div>
+      <span class="concept-link">Open →</span>
+    </a>
+
+    <!-- 16 — Navigator (history threaded through topology) -->
+    <a class="concept-card" href="preview-reimagined-16-navigator.html" style="border-color: rgba(99, 102, 241, 0.25);">
+      <div class="concept-num">16</div>
+      <div class="concept-body">
+        <div class="metaphor">Navigator</div>
+        <h2>Flow Cards with Memory — Topology + History</h2>
+        <p>Takes Concept 13's whole-topology state-card layout and threads history through it. States divide into three visual layers: <strong>Visited</strong> cards glow warm with step numbers, the event that exited them, and mini data-delta strips. <strong>Current</strong> gets full spotlight with "← set at #N" provenance on changed fields. <strong>Unvisited</strong> cards dim but still show event hints of what's ahead. The left rail shows the traced path — visited nodes filled, connecting edges highlighted, step badges on each node. Transition edges between cards distinguish "traced" (already taken, warm tones) from "available" (not yet taken, cooler). The key UX question Navigator answers: "where have I been in this machine, and what's left to explore?" Could be a mode toggle on Contract Explorer (14).</p>
+        <span class="concept-tag">⭐ new</span>
+        <span class="concept-tag">history+inspection</span>
+        <span class="concept-tag">topology-aware</span>
+        <span class="concept-tag">flow-cards-evolution</span>
+      </div>
+      <span class="concept-link">Open →</span>
+    </a>
+
+  </div>
+
+  <div class="footer-note">
+    All 17 concepts use the locked brand palette from brand-spec.html § 1.4 + § 2.3 · InsuranceClaim sample data (concepts 13–17) · Subscription sample data (concepts 01–12) · Cascadia Cove monospace · Dark theme only.
+    <br/>Deep analysis: <a href="preview-concepts-deep-analysis.md" style="color: var(--indigo);">preview-concepts-deep-analysis.md</a> — research-backed tradeoffs, scaling assessments, and cross-cutting issues.
+    <br/>All existing mockup files are preserved. Explorations are additive.
+  </div>
+
+</body>
+</html>

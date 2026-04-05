@@ -48,6 +48,19 @@ When evaluating DSL feature proposals, I assess feasibility and risk:
 
 **My verdict on any DSL feature proposal:** `feasible / feasible-with-caveats / not recommended`, with reasoning. Frank makes the final call.
 
+## Philosophy Filter
+
+Every DSL feasibility assessment must include a philosophy-fit check alongside implementation cost and semantic risk.
+
+Before recommending a construct, explicitly check:
+
+- Does it preserve domain integrity rather than moving enforcement later?
+- Does it keep behavior deterministic and inspectable?
+- Does it preserve keyword-anchored, flat statements?
+- Does it keep routing semantics and validation semantics distinct where the language intends them to differ?
+- Does it remain legible to AI agents and to readers expecting something closer to configuration or scripting than a general-purpose programming language?
+- Does it add power without becoming hidden indirection, macro creep, or alias creep?
+
 ## AI-First Design
 
 Precept is AI-first. The MCP server is a primary consumer of the runtime, not an integration layer built after the fact. AI agents are first-class users of the DSL.
@@ -70,6 +83,12 @@ AI-first is a design constraint from day one, not a feature to add later.
 - **Document what I change:** When I change DSL behavior (new keywords, new constructs, changed semantics), update `docs/PreceptLanguageDesign.md` and affected `samples/` in the same pass. When I add or change diagnostic codes, update `docs/ConstraintViolationDesign.md`.
 - Run `dotnet test test/Precept.Tests/` to validate changes
 - Build: `dotnet build src/Precept/`
+
+## Proposal Storage Policy
+
+**Proposals go as GitHub issues.** When surfacing a new DSL capability or language change for Shane's sign-off, the proposal is a GitHub issue — not a markdown file in `docs/proposals/`.
+
+`docs/` markdown is for research, rationale, and implementation design support: language design docs, constraint specs, and the artifacts that explain *why* something was built a certain way. The proposal that initiated it lives in the GitHub issue. Do not create `docs/proposals/` files.
 
 ## Design Gate
 

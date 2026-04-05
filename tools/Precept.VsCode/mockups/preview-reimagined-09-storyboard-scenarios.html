@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 09: Storyboard / Scenarios — Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    /* ================================================================
+       CONCEPT 09 — STORYBOARD / SCENARIO BUILDER
+       ================================================================
+       Core idea: Build complete event sequences (scenarios) step by
+       step, then replay/save/compare them. Each step is a visual card
+       showing the event fired, args provided, outcome, and state
+       snapshot at that moment.
+
+       Unlike the Timeline (concept 01) which is history-focused
+       ("what happened"), this is future-focused: you deliberately
+       build paths through the machine to test workflows end-to-end.
+
+       A scenario library lets you save named paths, compare different
+       routes through the same precept, and spot coverage gaps.
+
+       Product shape: scenario-first, test-oriented.
+       Key job: "Build and verify complete workflows through my machine."
+       ================================================================ */
+
+    body {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      grid-template-columns: 240px 1fr;
+      gap: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    /* — Header — */
+    .header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-title { font-size: 13px; font-weight: 700; }
+    .header-file { color: var(--dusk); font-size: 11px; }
+
+    .header-actions { display: flex; gap: 6px; }
+    .header-actions button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .header-actions button:hover { border-color: var(--indigo); }
+
+    .save-btn {
+      background: rgba(99, 102, 241, 0.12) !important;
+      border-color: rgba(99, 102, 241, 0.30) !important;
+      color: var(--indigo) !important;
+    }
+    .save-btn:hover { background: rgba(99, 102, 241, 0.20) !important; }
+
+    /* — Left sidebar: Scenario library — */
+    .scenario-sidebar {
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sidebar-header h3 {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .new-scenario-btn {
+      font: inherit;
+      font-size: 10px;
+      padding: 2px 8px;
+      border: 1px solid var(--indigo);
+      border-radius: 3px;
+      background: rgba(99, 102, 241, 0.08);
+      color: var(--indigo);
+      cursor: pointer;
+    }
+    .new-scenario-btn:hover { background: rgba(99, 102, 241, 0.16); }
+
+    .scenario-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 0;
+    }
+
+    .scenario-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 8px 14px;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: background 100ms;
+    }
+
+    .scenario-item:hover { background: rgba(255, 255, 255, 0.02); }
+
+    .scenario-item.active {
+      background: rgba(99, 102, 241, 0.06);
+      border-left-color: var(--indigo);
+    }
+
+    .scenario-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .scenario-meta {
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .scenario-path {
+      font-size: 9px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .scenario-coverage {
+      display: flex;
+      gap: 4px;
+      margin-top: 2px;
+    }
+
+    .coverage-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+    }
+
+    .coverage-dot.visited { background: var(--enabled); opacity: 0.7; }
+    .coverage-dot.unvisited { background: var(--border); }
+
+    /* — Main: Storyboard cards — */
+    .storyboard-main {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .storyboard-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+    }
+
+    .storyboard-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .storyboard-sub {
+      font-size: 11px;
+      color: var(--dim);
+      margin-bottom: 20px;
+    }
+
+    /* Step cards */
+    .step-card {
+      display: grid;
+      grid-template-columns: 40px 1fr;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+
+    /* Vertical connector line */
+    .step-rail {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .step-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--bg);
+      z-index: 1;
+    }
+
+    .step-dot.init { background: var(--violet); }
+    .step-dot.ok { background: var(--enabled); }
+    .step-dot.current { background: var(--indigo); box-shadow: 0 0 8px rgba(99, 102, 241, 0.3); }
+
+    .step-line {
+      width: 2px;
+      flex: 1;
+      background: var(--border);
+      min-height: 8px;
+    }
+
+    .step-line.success { background: var(--enabled); opacity: 0.4; }
+
+    /* Step content */
+    .step-content {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 4px;
+    }
+
+    .step-content.current {
+      border-color: rgba(99, 102, 241, 0.30);
+      background: rgba(99, 102, 241, 0.03);
+    }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .step-event-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--cyan);
+    }
+
+    .step-event-name.init {
+      color: var(--violet);
+    }
+
+    .step-outcome-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 3px;
+    }
+
+    .step-outcome-badge.transition {
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.08);
+      border: 1px solid rgba(52, 211, 153, 0.20);
+    }
+
+    .step-outcome-badge.no-transition {
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.05);
+      border: 1px solid rgba(52, 211, 153, 0.15);
+      opacity: 0.78;
+    }
+
+    .step-state-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      margin-bottom: 6px;
+    }
+
+    .step-from { color: var(--dim); }
+    .step-arrow { color: var(--muted); }
+    .step-to { color: var(--violet); font-weight: 600; }
+
+    .step-data-snapshot {
+      display: flex;
+      gap: 16px;
+      font-size: 11px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(39, 39, 42, 0.3);
+    }
+
+    .step-field {
+      display: flex;
+      gap: 4px;
+    }
+
+    /* "Add next step" button area */
+    .add-step {
+      margin-top: 8px;
+      margin-left: 52px;
+      padding: 16px;
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 150ms, background 150ms;
+    }
+
+    .add-step:hover {
+      border-color: rgba(99, 102, 241, 0.30);
+      background: rgba(99, 102, 241, 0.03);
+    }
+
+    .add-step-label {
+      font-size: 12px;
+      color: var(--dim);
+      margin-bottom: 8px;
+    }
+
+    .add-step-options {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    /* Coverage bar at bottom */
+    .coverage-bar {
+      padding: 8px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 10px;
+      color: var(--dim);
+      flex-shrink: 0;
+    }
+
+    .coverage-stat {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .coverage-stat .num { color: var(--text); font-weight: 600; }
+    .coverage-stat .of { color: var(--muted); }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <div class="header">
+    <div class="header-left">
+      <span class="header-title">Scenario Builder</span>
+      <span class="sep">·</span>
+      <span class="header-file">subscription.precept</span>
+      <span class="sep">·</span>
+      <span class="concept-badge">Concept 09</span>
+    </div>
+    <div class="header-actions">
+      <button class="save-btn">💾 Save Scenario</button>
+      <button>Reset</button>
+      <button>Replay</button>
+    </div>
+  </div>
+
+  <!-- ===== LEFT: Scenario Library ===== -->
+  <div class="scenario-sidebar">
+    <div class="sidebar-header">
+      <h3>Scenarios</h3>
+      <button class="new-scenario-btn">+ New</button>
+    </div>
+    <div class="scenario-list">
+
+      <div class="scenario-item active">
+        <span class="scenario-name">Happy Path: Activate</span>
+        <span class="scenario-meta">3 steps · Active</span>
+        <span class="scenario-path">Trial → Active → Active</span>
+        <div class="scenario-coverage">
+          <span class="coverage-dot visited" title="Trial"></span>
+          <span class="coverage-dot visited" title="Active"></span>
+          <span class="coverage-dot unvisited" title="Cancelled"></span>
+        </div>
+      </div>
+
+      <div class="scenario-item">
+        <span class="scenario-name">Full Lifecycle</span>
+        <span class="scenario-meta">3 steps · Cancelled</span>
+        <span class="scenario-path">Trial → Active → Cancelled</span>
+        <div class="scenario-coverage">
+          <span class="coverage-dot visited"></span>
+          <span class="coverage-dot visited"></span>
+          <span class="coverage-dot visited"></span>
+        </div>
+      </div>
+
+      <div class="scenario-item">
+        <span class="scenario-name">Edge: Reactivation Attempt</span>
+        <span class="scenario-meta">4 steps · Cancelled</span>
+        <span class="scenario-path">Trial → Active → Cancelled → ✗</span>
+        <div class="scenario-coverage">
+          <span class="coverage-dot visited"></span>
+          <span class="coverage-dot visited"></span>
+          <span class="coverage-dot visited"></span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== MAIN: Storyboard ===== -->
+  <div class="storyboard-main">
+    <div class="storyboard-scroll">
+
+      <div class="storyboard-title">Happy Path: Activate</div>
+      <div class="storyboard-sub">Tests the standard activation flow with plan upgrade</div>
+
+      <!-- Step 0: Initial -->
+      <div class="step-card">
+        <div class="step-rail">
+          <div class="step-dot init">0</div>
+          <div class="step-line success"></div>
+        </div>
+        <div class="step-content">
+          <div class="step-header">
+            <span class="step-event-name init">⊙ Initial State</span>
+          </div>
+          <div class="step-state-row">
+            <span class="step-to">Trial</span>
+          </div>
+          <div class="step-data-snapshot">
+            <div class="step-field">
+              <span class="field-name">PlanName</span>
+              <span class="field-null">null</span>
+            </div>
+            <div class="step-field">
+              <span class="field-name">MonthlyPrice</span>
+              <span class="field-value">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 1: Activate (transition) -->
+      <div class="step-card">
+        <div class="step-rail">
+          <div class="step-dot ok">1</div>
+          <div class="step-line success"></div>
+        </div>
+        <div class="step-content">
+          <div class="step-header">
+            <span class="step-event-name">⚡ Activate</span>
+            <span class="step-outcome-badge transition">→ Transition</span>
+          </div>
+          <div class="step-state-row">
+            <span class="step-from">Trial</span>
+            <span class="step-arrow">→</span>
+            <span class="step-to">Active</span>
+          </div>
+          <div style="font-size: 10px; color: var(--dim); margin-bottom: 6px;">
+            Args: Plan=<span class="field-value">Professional</span>, Price=<span class="field-value">29.99</span>
+          </div>
+          <div class="step-data-snapshot">
+            <div class="step-field">
+              <span class="field-name">PlanName</span>
+              <span class="field-value">Professional</span>
+            </div>
+            <div class="step-field">
+              <span class="field-name">MonthlyPrice</span>
+              <span class="field-value">29.99</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Activate again (no transition) -->
+      <div class="step-card">
+        <div class="step-rail">
+          <div class="step-dot current">2</div>
+          <div class="step-line"></div>
+        </div>
+        <div class="step-content current">
+          <div class="step-header">
+            <span class="step-event-name">⚡ Activate</span>
+            <span class="step-outcome-badge no-transition">↻ No Transition</span>
+          </div>
+          <div class="step-state-row">
+            <span class="step-from">Active</span>
+            <span class="step-arrow">→</span>
+            <span class="step-to">Active</span>
+            <span style="font-size: 10px; color: var(--dim);">(no state change)</span>
+          </div>
+          <div style="font-size: 10px; color: var(--dim); margin-bottom: 6px;">
+            Args: Plan=<span class="field-value">Enterprise</span>, Price=<span class="field-value">99</span>
+          </div>
+          <div class="step-data-snapshot">
+            <div class="step-field">
+              <span class="field-name">PlanName</span>
+              <span class="field-value">Professional</span>
+            </div>
+            <div class="step-field">
+              <span class="field-name">MonthlyPrice</span>
+              <span class="field-value" style="color: var(--enabled);">99</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add next step -->
+      <div class="add-step">
+        <div class="add-step-label">Add next step to this scenario</div>
+        <div class="add-step-options">
+          <span class="event-chip enabled">⚡ Activate</span>
+          <span class="event-chip enabled">⚡ Cancel</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Coverage bar -->
+    <div class="coverage-bar">
+      <span class="coverage-stat">States visited: <span class="num">2</span> <span class="of">/ 3</span></span>
+      <span class="sep">·</span>
+      <span class="coverage-stat">Events fired: <span class="num">1</span> <span class="of">/ 2</span></span>
+      <span class="sep">·</span>
+      <span class="coverage-stat">Transitions covered: <span class="num">2</span> <span class="of">/ 4</span></span>
+      <span class="sep">·</span>
+      <span style="color: var(--gold);">Missing: Cancel from Active, Activate from Cancelled</span>
+    </div>
+  </div>
+
+</body>
+</html>

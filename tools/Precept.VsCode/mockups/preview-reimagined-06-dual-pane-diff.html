@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 06: Dual-Pane Diff — Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    /* ================================================================
+       CONCEPT 06 — DUAL-PANE DIFF
+       ================================================================
+       Core idea: Compare any two states side by side. The primary
+       interaction is selecting two "moments" — either two named states,
+       or two points in history — and immediately seeing what differs:
+       which events are available in each, what data values change,
+       which rules pass or fail differently.
+
+       Like a code diff, but for state-machine snapshots.
+
+       Product shape: comparison-first, diff-oriented.
+       Key job: "What's actually different between state A and state B?"
+       ================================================================ */
+
+    body {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      gap: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    /* — Header — */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-title { font-size: 13px; font-weight: 700; }
+    .header-file { color: var(--dusk); font-size: 11px; }
+
+    .header-actions { display: flex; gap: 6px; }
+    .header-actions button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .header-actions button:hover { border-color: var(--indigo); }
+
+    /* — Selector bar: pick two states to compare — */
+    .selector-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .selector-side {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .selector-side.left { justify-content: flex-end; }
+    .selector-side.right { justify-content: flex-start; }
+
+    .selector-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      font-weight: 600;
+    }
+
+    .selector-label.a { color: var(--cyan); }
+    .selector-label.b { color: var(--violet); }
+
+    .selector-dropdown {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      min-width: 140px;
+      appearance: none;
+    }
+
+    .selector-dropdown:focus { outline: none; border-color: var(--indigo); }
+
+    .selector-dropdown.a { border-color: rgba(48, 184, 232, 0.35); }
+    .selector-dropdown.b { border-color: rgba(168, 152, 245, 0.35); }
+
+    .vs-badge {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      padding: 3px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      flex-shrink: 0;
+    }
+
+    .swap-btn {
+      font: inherit;
+      font-size: 11px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--dim);
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .swap-btn:hover { border-color: var(--indigo); color: var(--text); }
+
+    /* — Dual pane — */
+    .dual-pane {
+      display: grid;
+      grid-template-columns: 1fr 1px 1fr;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .pane-divider { background: var(--border); }
+
+    .pane {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .pane-label {
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .pane-label.a { background: rgba(48, 184, 232, 0.04); }
+    .pane-label.b { background: rgba(168, 152, 245, 0.04); }
+
+    .pane-state-name {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .pane-state-name.a { color: var(--cyan); }
+    .pane-state-name.b { color: var(--violet); }
+
+    .pane-sub { font-size: 10px; color: var(--dim); }
+
+    .pane-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+    }
+
+    /* Sections inside panes */
+    .diff-section {
+      margin-bottom: 18px;
+    }
+
+    .diff-section h3 {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .diff-section h3 .diff-count {
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    .diff-count.changed {
+      background: rgba(52, 211, 153, 0.12);
+      color: var(--enabled);
+    }
+
+    .diff-count.same {
+      background: rgba(82, 82, 91, 0.25);
+      color: var(--dim);
+    }
+
+    /* Data rows */
+    .diff-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 6px 10px;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.3);
+      font-size: 12px;
+      border-radius: 4px;
+      margin-bottom: 2px;
+    }
+
+    .diff-row:last-child { border-bottom: none; }
+
+    .diff-row.same { opacity: 0.5; }
+
+    .diff-row.changed {
+      background: rgba(52, 211, 153, 0.04);
+      border-left: 2px solid var(--enabled);
+      padding-left: 8px;
+    }
+
+    .diff-row.only-here {
+      background: rgba(99, 102, 241, 0.04);
+      border-left: 2px solid var(--indigo);
+      padding-left: 8px;
+    }
+
+    .diff-row.absent {
+      background: rgba(251, 113, 133, 0.04);
+      border-left: 2px solid var(--blocked);
+      padding-left: 8px;
+      opacity: 0.5;
+    }
+
+    /* Event diff rows */
+    .event-diff-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.3);
+      font-size: 12px;
+      border-radius: 4px;
+      margin-bottom: 2px;
+    }
+
+    .event-diff-row .ev-name { color: var(--cyan); font-weight: 600; }
+
+    .event-diff-row .ev-outcome {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 3px;
+    }
+
+    .ev-outcome.transition {
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.08);
+      border: 1px solid rgba(52, 211, 153, 0.20);
+    }
+
+    .ev-outcome.no-transition {
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.05);
+      border: 1px solid rgba(52, 211, 153, 0.15);
+      opacity: 0.78;
+    }
+
+    .ev-outcome.rejected {
+      color: var(--blocked);
+      background: rgba(251, 113, 133, 0.06);
+      border: 1px solid rgba(251, 113, 133, 0.20);
+    }
+
+    .ev-outcome.undefined {
+      color: var(--muted);
+      background: rgba(82, 82, 91, 0.10);
+      border: 1px solid rgba(82, 82, 91, 0.20);
+    }
+
+    .ev-dest { font-size: 10px; color: var(--dim); }
+
+    /* Rule diff rows */
+    .rule-diff-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.3);
+      margin-bottom: 2px;
+    }
+
+    .rule-diff-row .rule-glyph { font-weight: 700; flex-shrink: 0; }
+    .rule-diff-row .rule-glyph.ok { color: var(--enabled); }
+    .rule-diff-row .rule-glyph.violated { color: var(--blocked); }
+    .rule-diff-row .rule-text { color: var(--slate-val); }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <div class="header">
+    <div class="header-left">
+      <span class="header-title">Precept Diff</span>
+      <span class="sep">·</span>
+      <span class="header-file">subscription.precept</span>
+      <span class="sep">·</span>
+      <span class="concept-badge">Concept 06</span>
+    </div>
+    <div class="header-actions">
+      <button>Reset</button>
+    </div>
+  </div>
+
+  <!-- ===== STATE SELECTOR BAR ===== -->
+  <div class="selector-bar">
+    <div class="selector-side left">
+      <span class="selector-label a">Side A</span>
+      <select class="selector-dropdown a">
+        <option selected>Trial</option>
+        <option>Active</option>
+        <option>Cancelled</option>
+      </select>
+    </div>
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <span class="vs-badge">VS</span>
+      <button class="swap-btn">⇄</button>
+    </div>
+    <div class="selector-side right">
+      <select class="selector-dropdown b">
+        <option>Trial</option>
+        <option selected>Active</option>
+        <option>Cancelled</option>
+      </select>
+      <span class="selector-label b">Side B</span>
+    </div>
+  </div>
+
+  <!-- ===== DUAL PANE ===== -->
+  <div class="dual-pane">
+
+    <!-- LEFT: Trial -->
+    <div class="pane">
+      <div class="pane-label a">
+        <span class="pane-state-name a">Trial</span>
+        <span class="pane-sub">initial state</span>
+      </div>
+      <div class="pane-body">
+
+        <!-- Events -->
+        <div class="diff-section">
+          <h3>Events <span class="diff-count changed">1 differs</span></h3>
+          <div class="event-diff-row">
+            <span class="ev-name">Activate</span>
+            <span class="ev-outcome transition">→ Transition</span>
+            <span class="ev-dest">→ Active</span>
+          </div>
+          <div class="event-diff-row" style="opacity: 0.4;">
+            <span class="ev-name" style="color: var(--dim);">Cancel</span>
+            <span class="ev-outcome undefined">— Undefined</span>
+          </div>
+        </div>
+
+        <!-- Data -->
+        <div class="diff-section">
+          <h3>Data <span class="diff-count changed">2 differ</span></h3>
+          <div class="diff-row changed">
+            <span>
+              <span class="field-name">PlanName</span>
+              <span class="field-type">string?</span>
+            </span>
+            <span class="field-null">null</span>
+          </div>
+          <div class="diff-row changed">
+            <span>
+              <span class="field-name">MonthlyPrice</span>
+              <span class="field-type">number</span>
+            </span>
+            <span class="field-value">0</span>
+          </div>
+        </div>
+
+        <!-- Rules -->
+        <div class="diff-section">
+          <h3>Rules <span class="diff-count same">same</span></h3>
+          <div class="rule-diff-row">
+            <span class="rule-glyph ok">✓</span>
+            <span class="rule-text">MonthlyPrice ≥ 0</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="pane-divider"></div>
+
+    <!-- RIGHT: Active -->
+    <div class="pane">
+      <div class="pane-label b">
+        <span class="pane-state-name b">Active</span>
+        <span class="pane-sub">current state</span>
+      </div>
+      <div class="pane-body">
+
+        <!-- Events -->
+        <div class="diff-section">
+          <h3>Events <span class="diff-count changed">1 differs</span></h3>
+          <div class="event-diff-row">
+            <span class="ev-name">Activate</span>
+            <span class="ev-outcome no-transition">↻ No Transition</span>
+            <span class="ev-dest">stays Active</span>
+          </div>
+          <div class="event-diff-row">
+            <span class="ev-name">Cancel</span>
+            <span class="ev-outcome transition">→ Transition</span>
+            <span class="ev-dest">→ Cancelled</span>
+          </div>
+        </div>
+
+        <!-- Data -->
+        <div class="diff-section">
+          <h3>Data <span class="diff-count changed">2 differ</span></h3>
+          <div class="diff-row changed">
+            <span>
+              <span class="field-name">PlanName</span>
+              <span class="field-type">string?</span>
+            </span>
+            <span class="field-value">Professional</span>
+          </div>
+          <div class="diff-row changed">
+            <span>
+              <span class="field-name">MonthlyPrice</span>
+              <span class="field-type">number</span>
+            </span>
+            <span class="field-value">99</span>
+          </div>
+        </div>
+
+        <!-- Rules -->
+        <div class="diff-section">
+          <h3>Rules <span class="diff-count same">same</span></h3>
+          <div class="rule-diff-row">
+            <span class="rule-glyph ok">✓</span>
+            <span class="rule-text">MonthlyPrice ≥ 0</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

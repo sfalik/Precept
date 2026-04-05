@@ -158,41 +158,13 @@ But `in <State>` is about a **named state** — you can't use an arbitrary boole
 
 ---
 
-## Feature Proposals
+## Related GitHub proposal issues
 
-### Proposal 1 (High Impact): Field-value conditional invariants
+- **#14 — Conditional invariants (`when` on `invariant`)**: primary proposal for the field-conditional validation gap documented here.
+- **#10 — String `.length` accessor**: related vocabulary gap for the missing length checks FluentValidation treats as table stakes.
+- **#13 — Field-level range/basic constraints**: adjacent compactness proposal for the co-located simple-validator pressure called out in this comparison.
 
-Add `when` as an optional condition prefix on `invariant`:
-
-```precept
-invariant when HasDiscount DiscountAmount > 0 because "Discount requires a positive amount"
-invariant when HasDiscount DiscountCode != "" because "Discount requires a valid code"
-```
-
-Or, to match the `When` block pattern with multiple rules sharing one condition:
-
-```precept
-# No explicit block syntax — individual conditional invariants are sufficient
-invariant DiscountAmount > 0 when HasDiscount because "Discount requires a positive amount"
-invariant DiscountCode != "" when HasDiscount because "Discount requires a valid code"
-```
-
-**Impact:** Eliminates the workaround of creating artificial states for boolean-field conditions. Enables conditional validation for entities with a "is this feature enabled?" flag.
-
-**Complexity:** Moderate. The `when` guard already exists on transition rows; applying it to `invariant` is a natural extension of the same grammar. Type checker must validate that the `when` condition references only field names, not event args.
-
-**External precedent:** FluentValidation `.When()`, xstate guards, Zod `.refine()` with conditional logic.
-
-### Proposal 2 (Medium Impact): String length accessor
-
-As noted in the Zod research, add `.length` on `string` fields:
-
-```precept
-invariant Name.length >= 1 because "Name is required"
-invariant Name.length <= 100 because "Name too long"
-```
-
-Low risk, high utility. Mirrors `.count` on collections.
+The proposal bodies now live in GitHub. This file stays focused on market comparison: where FluentValidation still feels denser, where Precept is actually richer, and which gaps are vocabulary gaps versus model gaps.
 
 ---
 

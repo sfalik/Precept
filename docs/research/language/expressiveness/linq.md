@@ -150,42 +150,12 @@ LINQ builds a query plan before executing. Precept evaluates transitions at fire
 
 ---
 
-## Feature Proposals
+## Related GitHub proposal issues
 
-### Proposal (High Impact): Conditional outcome in `->` chain
+- **#9 — Ternary expressions in `set` mutations**: preferred low-risk answer when only values differ inside an otherwise shared pipeline.
+- **#18 — Conditional outcome in `->` chain**: records and rejects the broader branching-outcome direction that this comparison surfaced.
 
-Allow the outcome (`transition`, `no transition`, `reject`) to be conditional:
-
-```precept
-from InterviewLoop on RecordInterviewFeedback when PendingInterviewers contains RecordInterviewFeedback.Interviewer
-    -> remove PendingInterviewers RecordInterviewFeedback.Interviewer
-    -> set FeedbackCount = FeedbackCount + 1
-    -> transition Decision when PendingInterviewers.count == 0
-    -> no transition
-```
-
-Semantics: the first outcome whose `when` condition is true fires; if none match, the next `->` row is evaluated as a fallback.
-
-**Alternative syntax — ternary transition:**
-
-```precept
--> transition Decision if PendingInterviewers.count == 0 else no transition
-```
-
-**Impact:** High. Eliminates the most common row-duplication pattern in the sample library — "same mutations, different outcome based on post-mutation state." Searching the samples, this pattern appears in: hiring-pipeline (2 rows), trafficlight (multiple), subscription (1 row).
-
-**Complexity:** High. The `->` chain semantics change from strictly-linear to potentially-branching. The runtime must handle evaluating post-mutation field state within the chain (post-`remove` count). Type checker must validate `when` condition scope within the chain.
-
-**Risk:** This meaningfully increases language complexity and potentially undermines the "read top to bottom, first match wins" mental model. Consider carefully before adopting.
-
-**Simpler alternative:** Allow ternary expressions in `set` only (not in outcomes). This is lower risk:
-
-```precept
-# Ternary in set — safe, type-checkable, no outcome branching
--> set Status = Submit.IsUrgent ? "Priority" : "Standard"
-```
-
-Ternary in `set` would reduce verbosity for value-branch mutations without touching the outcome routing model.
+The proposal bodies now live in GitHub. This file stays focused on the evidence: where LINQ's projection model explains the authoring pressure, and why Precept should separate value selection from outcome routing.
 
 ---
 

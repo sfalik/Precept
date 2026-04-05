@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 08: Graph Canvas — Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    /* ================================================================
+       CONCEPT 08 — GRAPH CANVAS
+       ================================================================
+       Core idea: The diagram IS the entire interface. Not a companion
+       widget tucked into a panel — the full-bleed, zoomable, pannable
+       canvas where states are large interactive nodes and events are
+       rich edge labels with inline controls.
+
+       Click a node to "enter" it and see its available events.
+       Click an edge to inspect and fire the event.
+       Data floats as an anchored overlay you can toggle.
+
+       Think: Miro/FigJam for state machines, but purpose-built.
+
+       Product shape: spatial-first, direct-manipulation.
+       Key job: "See the whole machine and interact with it spatially."
+       ================================================================ */
+
+    body {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    /* — Minimal toolbar header — */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 12px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .toolbar-left { display: flex; align-items: center; gap: 8px; }
+    .toolbar-title { font-size: 12px; font-weight: 600; color: var(--dim); }
+    .toolbar-file { color: var(--muted); font-size: 10px; }
+
+    .toolbar-center { display: flex; align-items: center; gap: 4px; }
+
+    .zoom-btn {
+      font: inherit;
+      font-size: 13px;
+      width: 26px;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .zoom-btn:hover { border-color: var(--indigo); }
+
+    .zoom-level {
+      font-size: 10px;
+      color: var(--dim);
+      min-width: 36px;
+      text-align: center;
+    }
+
+    .toolbar-right { display: flex; align-items: center; gap: 6px; }
+
+    .toggle-btn {
+      font: inherit;
+      font-size: 10px;
+      padding: 3px 10px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: transparent;
+      color: var(--dim);
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .toggle-btn.active {
+      border-color: var(--indigo);
+      color: var(--indigo);
+      background: rgba(99, 102, 241, 0.08);
+    }
+
+    .toggle-btn:hover:not(.active) { color: var(--text); }
+
+    /* — Canvas — */
+    .canvas {
+      background: var(--canvas);
+      position: relative;
+      overflow: hidden;
+      cursor: grab;
+    }
+
+    .canvas:active { cursor: grabbing; }
+
+    /* Grid dots background */
+    .canvas::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(39, 39, 42, 0.4) 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+    }
+
+    /* State nodes */
+    .node {
+      position: absolute;
+      border-radius: 12px;
+      padding: 20px 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: transform 150ms, box-shadow 200ms;
+      min-width: 140px;
+    }
+
+    .node:hover { transform: scale(1.03); }
+
+    .node.inactive {
+      background: var(--card);
+      border: 2px solid var(--border);
+    }
+
+    .node.current {
+      background: rgba(168, 152, 245, 0.08);
+      border: 2px solid var(--violet);
+      box-shadow: 0 0 20px rgba(168, 152, 245, 0.12);
+    }
+
+    .node.terminal {
+      background: var(--card);
+      border: 2px dashed var(--border);
+    }
+
+    .node-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--violet);
+    }
+
+    .node.inactive .node-name { opacity: 0.6; }
+
+    .node-meta {
+      font-size: 9px;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .node-events-count {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .initial-marker {
+      position: absolute;
+      top: -8px;
+      left: -8px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--violet);
+      border: 2px solid var(--bg);
+    }
+
+    /* Edge labels (event handles) */
+    .edge-label {
+      position: absolute;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transition: border-color 150ms, background 150ms, transform 150ms;
+      z-index: 2;
+    }
+
+    .edge-label:hover {
+      border-color: rgba(48, 184, 232, 0.40);
+      background: var(--card-hover);
+      transform: scale(1.05);
+    }
+
+    .edge-label.selected {
+      border-color: var(--cyan);
+      background: rgba(48, 184, 232, 0.06);
+    }
+
+    .edge-event-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--cyan);
+    }
+
+    .edge-outcome {
+      font-size: 9px;
+    }
+
+    .edge-outcome.transition { color: var(--enabled); }
+    .edge-outcome.no-transition { color: var(--enabled); opacity: 0.7; }
+    .edge-outcome.rejected { color: var(--blocked); }
+
+    .edge-fire-btn {
+      font: inherit;
+      font-size: 9px;
+      padding: 2px 10px;
+      border: 1px solid var(--enabled);
+      border-radius: 3px;
+      background: rgba(52, 211, 153, 0.08);
+      color: var(--enabled);
+      cursor: pointer;
+      margin-top: 2px;
+    }
+
+    .edge-fire-btn:hover { background: rgba(52, 211, 153, 0.16); }
+
+    .edge-fire-btn.blocked {
+      border-color: var(--blocked);
+      color: var(--blocked);
+      background: rgba(251, 113, 133, 0.06);
+      cursor: not-allowed;
+    }
+
+    /* SVG connection lines */
+    .connections {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Data overlay panel */
+    .data-overlay {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      background: rgba(20, 20, 22, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      min-width: 220px;
+      backdrop-filter: blur(8px);
+      z-index: 5;
+    }
+
+    .data-overlay h3 {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .data-overlay-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 4px 0;
+      font-size: 12px;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.3);
+    }
+
+    .data-overlay-row:last-child { border-bottom: none; }
+
+    /* Rules strip at bottom-right of overlay */
+    .rules-mini {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+    }
+
+    .rules-mini .rule-ok { color: var(--enabled); }
+
+    /* — Status bar — */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 12px;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .status-bar-left { display: flex; gap: 12px; }
+    .status-bar-right { display: flex; gap: 8px; }
+  </style>
+</head>
+<body>
+
+  <!-- ===== TOOLBAR ===== -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <span class="toolbar-title">Subscription</span>
+      <span class="sep">·</span>
+      <span class="toolbar-file">subscription.precept</span>
+      <span class="sep">·</span>
+      <span class="concept-badge">Concept 08</span>
+    </div>
+    <div class="toolbar-center">
+      <button class="zoom-btn">−</button>
+      <span class="zoom-level">100%</span>
+      <button class="zoom-btn">+</button>
+      <button class="zoom-btn" style="font-size: 10px;">⊞</button>
+    </div>
+    <div class="toolbar-right">
+      <button class="toggle-btn active">Data</button>
+      <button class="toggle-btn">Rules</button>
+      <button class="toggle-btn">Minimap</button>
+    </div>
+  </div>
+
+  <!-- ===== CANVAS ===== -->
+  <div class="canvas">
+
+    <!-- SVG connection lines -->
+    <svg class="connections" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+      <!-- Trial → Active -->
+      <line x1="200" y1="200" x2="400" y2="200" stroke="#34D399" stroke-width="1.5" stroke-dasharray="6,4"/>
+      <polygon points="395,196 405,200 395,204" fill="#34D399"/>
+
+      <!-- Active → Active (self-loop) -->
+      <path d="M430,155 C430,80 520,80 520,155" fill="none" stroke="#34D399" stroke-width="1" stroke-dasharray="4,3"/>
+      <polygon points="517,160 523,150 513,150" fill="#34D399"/>
+
+      <!-- Active → Cancelled -->
+      <line x1="560" y1="200" x2="700" y2="330" stroke="#34D399" stroke-width="1.5" stroke-dasharray="6,4"/>
+      <polygon points="694,326 704,334 698,322" fill="#34D399"/>
+
+      <!-- Cancelled ✗ Activate -->
+      <line x1="720" y1="330" x2="550" y2="180" stroke="#FB7185" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>
+    </svg>
+
+    <!-- Nodes -->
+    <div class="node inactive" style="left: 80px; top: 160px;">
+      <span class="initial-marker"></span>
+      <span class="node-name">Trial</span>
+      <span class="node-meta">initial</span>
+      <span class="node-events-count">1 event</span>
+    </div>
+
+    <div class="node current" style="left: 380px; top: 155px;">
+      <span class="node-name">Active</span>
+      <span class="node-meta">current</span>
+      <span class="node-events-count">2 events</span>
+    </div>
+
+    <div class="node terminal" style="left: 660px; top: 310px;">
+      <span class="node-name">Cancelled</span>
+      <span class="node-meta">terminal</span>
+      <span class="node-events-count">0 events</span>
+    </div>
+
+    <!-- Edge labels: interactive event handles -->
+    <div class="edge-label" style="left: 260px; top: 170px;">
+      <span class="edge-event-name">Activate</span>
+      <span class="edge-outcome transition">→ Active</span>
+      <button class="edge-fire-btn">▶ Fire</button>
+    </div>
+
+    <div class="edge-label selected" style="left: 440px; top: 68px;">
+      <span class="edge-event-name">Activate</span>
+      <span class="edge-outcome no-transition">↻ self</span>
+      <button class="edge-fire-btn">▶ Fire</button>
+    </div>
+
+    <div class="edge-label" style="left: 600px; top: 258px;">
+      <span class="edge-event-name">Cancel</span>
+      <span class="edge-outcome transition">→ Cancelled</span>
+      <button class="edge-fire-btn">▶ Fire</button>
+    </div>
+
+    <div class="edge-label" style="left: 590px; top: 170px; opacity: 0.45;">
+      <span class="edge-event-name" style="color: var(--blocked);">Activate</span>
+      <span class="edge-outcome rejected">✗ rejected</span>
+      <button class="edge-fire-btn blocked">blocked</button>
+    </div>
+
+    <!-- Data overlay -->
+    <div class="data-overlay">
+      <h3>Data · Active</h3>
+      <div class="data-overlay-row">
+        <span>
+          <span class="field-name">PlanName</span>
+          <span class="field-type">string?</span>
+        </span>
+        <span class="field-value">Professional</span>
+      </div>
+      <div class="data-overlay-row">
+        <span>
+          <span class="field-name">MonthlyPrice</span>
+          <span class="field-type">number</span>
+        </span>
+        <span class="field-value">99</span>
+      </div>
+      <div class="rules-mini">
+        <span class="rule-ok">✓ MonthlyPrice ≥ 0</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== STATUS BAR ===== -->
+  <div class="status-bar">
+    <div class="status-bar-left">
+      <span>3 states · 2 events · 4 transitions</span>
+      <span>·</span>
+      <span style="color: var(--violet);">● Active</span>
+    </div>
+    <div class="status-bar-right">
+      <span>Click node to enter · Click edge to fire · Drag to pan · Scroll to zoom</span>
+    </div>
+  </div>
+
+</body>
+</html>

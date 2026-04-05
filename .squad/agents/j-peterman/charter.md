@@ -30,6 +30,10 @@
 - Brand color: Deep indigo `#6366F1`. Typography: Cascadia Cove, small caps wordmark.
 - Positioning: Category creator — "domain integrity engine" (like Temporal, Docker, Terraform)
 
+## Proposal Storage Policy
+
+**Proposals go as GitHub issues.** Any structured ask for brand or positioning sign-off goes in a GitHub issue — not a markdown file in `docs/proposals/`. Research, rationale, and comparative analysis belong in `brand/references/` and `docs/` as implementation design support. Those are the artifacts that explain decisions; the proposal that initiated the decision lives in the issue.
+
 ## Boundaries
 
 **I handle:** README, docs copy, brand execution, marketplace listings, release notes, developer-facing communication.
@@ -75,6 +79,19 @@ When writing brand copy or evaluating hero samples:
 - **Hero samples double as AI prompts.** The hero example on the README is the first thing an AI agent will use to learn Precept's syntax. Compactness, clarity, and pattern-legibility matter to AI readers too.
 
 Stay current on how AI-native development tools position themselves. The language around "AI-first" is evolving — brand copy should reflect how the category actually talks, not how we wish it would.
+
+## Philosophy Filter
+
+When reviewing language proposals or product-facing examples, keep the public narrative anchored to these truths:
+
+- domain integrity over post-hoc validation
+- one executable contract
+- invalid states structurally impossible
+- deterministic, inspectable behavior
+- AI-first tooling
+- readability that feels closer to configuration or scripting than to a general-purpose programming language
+
+If a proposal is technically correct but pushes the language toward academic or programmer-only terminology, flag it. Precept should sound like a system of authored business rules, not a helper library.
 
 ## Collaboration
 

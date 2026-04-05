@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 07: Rule Pressure Map — Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    /* ================================================================
+       CONCEPT 07 — RULE PRESSURE MAP
+       ================================================================
+       Core idea: Constraints and business rules are the primary lens.
+       Instead of "which state am I in?", the organizing question is
+       "which rules are holding, which are under pressure, and what
+       would break them?"
+
+       Every rule/invariant/assertion is a tile. Each tile shows its
+       current status, which events touch it, and what data drives it.
+       Events are shown through the lens of their rule impact.
+
+       Product shape: governance-first, constraint-centric.
+       Key job: "Are my business rules safe? What could violate them?"
+       ================================================================ */
+
+    body {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    /* — Header — */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-title { font-size: 13px; font-weight: 700; }
+    .header-file { color: var(--dusk); font-size: 11px; }
+
+    .header-right { display: flex; align-items: center; gap: 12px; }
+
+    .health-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 4px;
+    }
+
+    .health-badge.ok {
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.08);
+      border: 1px solid rgba(52, 211, 153, 0.20);
+    }
+
+    .health-badge.warning {
+      color: var(--gold);
+      background: rgba(251, 191, 36, 0.08);
+      border: 1px solid rgba(251, 191, 36, 0.20);
+    }
+
+    .header-actions { display: flex; gap: 6px; }
+    .header-actions button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .header-actions button:hover { border-color: var(--indigo); }
+
+    /* — Main layout — */
+    .main-layout {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* Left: Rule tiles */
+    .rules-canvas {
+      overflow-y: auto;
+      padding: 20px 24px;
+    }
+
+    .rules-canvas-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .rules-canvas-header h2 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .filter-tabs {
+      display: flex;
+      gap: 2px;
+    }
+
+    .filter-tab {
+      font: inherit;
+      font-size: 10px;
+      padding: 3px 10px;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--dim);
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .filter-tab.active {
+      border-color: var(--indigo);
+      color: var(--indigo);
+      background: rgba(99, 102, 241, 0.08);
+    }
+
+    .filter-tab:hover:not(.active) { color: var(--text); }
+
+    /* Rule tiles */
+    .rule-tiles {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .rule-tile {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+      cursor: pointer;
+      transition: border-color 150ms, background 150ms;
+    }
+
+    .rule-tile:hover {
+      border-color: rgba(99, 102, 241, 0.30);
+      background: var(--card-hover);
+    }
+
+    .rule-tile.selected {
+      border-color: var(--indigo);
+      background: rgba(99, 102, 241, 0.04);
+    }
+
+    .rule-tile-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .rule-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .rule-status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .rule-status-dot.passing { background: var(--enabled); box-shadow: 0 0 6px rgba(52, 211, 153, 0.3); }
+    .rule-status-dot.at-risk { background: var(--gold); box-shadow: 0 0 6px rgba(251, 191, 36, 0.3); }
+    .rule-status-dot.violated { background: var(--blocked); box-shadow: 0 0 6px rgba(251, 113, 133, 0.3); }
+
+    .rule-status-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    .rule-status-label.passing { color: var(--enabled); }
+    .rule-status-label.at-risk { color: var(--gold); }
+    .rule-status-label.violated { color: var(--blocked); }
+
+    .rule-kind {
+      font-size: 9px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .rule-expression {
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+
+    .rule-message {
+      font-size: 11px;
+      color: var(--gold);
+      margin-bottom: 10px;
+    }
+
+    .rule-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .rule-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .rule-meta-item .accent { color: var(--cyan); }
+
+    /* Pressure indicator — visual bar */
+    .pressure-bar {
+      margin-top: 10px;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(39, 39, 42, 0.6);
+      overflow: hidden;
+    }
+
+    .pressure-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 300ms ease;
+    }
+
+    .pressure-fill.safe { background: var(--enabled); width: 90%; }
+    .pressure-fill.caution { background: var(--gold); width: 50%; }
+    .pressure-fill.danger { background: var(--blocked); width: 15%; }
+
+    /* Right: Impact detail panel */
+    .impact-panel {
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .impact-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .impact-header h3 {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .impact-header .impact-sub {
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .impact-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+    }
+
+    .impact-section {
+      margin-bottom: 18px;
+    }
+
+    .impact-section h4 {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    /* Driving fields */
+    .driving-field {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.3);
+      font-size: 12px;
+    }
+
+    .driving-field:last-child { border-bottom: none; }
+
+    .field-current-val {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 1px;
+    }
+
+    .field-threshold {
+      font-size: 9px;
+      color: var(--muted);
+    }
+
+    /* Events that touch this rule */
+    .touching-event {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      margin-bottom: 4px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 11px;
+    }
+
+    .touching-event .ev-name { color: var(--cyan); font-weight: 600; }
+    .touching-event .ev-impact { font-size: 10px; color: var(--dim); }
+
+    .danger-scenario {
+      background: rgba(251, 113, 133, 0.04);
+      border: 1px solid rgba(251, 113, 133, 0.15);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 11px;
+    }
+
+    .danger-scenario .label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--blocked);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .danger-scenario .scenario-text {
+      color: var(--slate-val);
+      line-height: 1.5;
+    }
+
+    .danger-scenario code {
+      color: var(--blocked);
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <div class="header">
+    <div class="header-left">
+      <span class="header-title">Rule Pressure</span>
+      <span class="sep">·</span>
+      <span class="header-file">subscription.precept</span>
+      <span class="sep">·</span>
+      <span class="state-pill"><span class="dot"></span> Active</span>
+      <span class="sep">·</span>
+      <span class="concept-badge">Concept 07</span>
+    </div>
+    <div class="header-right">
+      <span class="health-badge ok">✓ All rules passing</span>
+      <div class="header-actions">
+        <button>Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main-layout">
+
+    <!-- LEFT: Rule tiles -->
+    <div class="rules-canvas">
+      <div class="rules-canvas-header">
+        <h2>Business Rules</h2>
+        <div class="filter-tabs">
+          <button class="filter-tab active">All</button>
+          <button class="filter-tab">Invariants</button>
+          <button class="filter-tab">Assertions</button>
+          <button class="filter-tab">Rejections</button>
+        </div>
+      </div>
+
+      <div class="rule-tiles">
+
+        <!-- Rule 1: Invariant -->
+        <div class="rule-tile selected">
+          <div class="rule-tile-top">
+            <div class="rule-status">
+              <span class="rule-status-dot passing"></span>
+              <span class="rule-status-label passing">Passing</span>
+            </div>
+            <span class="rule-kind">invariant</span>
+          </div>
+          <div class="rule-expression">MonthlyPrice ≥ 0</div>
+          <div class="rule-message">"Monthly price cannot be negative"</div>
+          <div class="rule-meta">
+            <span class="rule-meta-item">Drives: <span class="accent">MonthlyPrice</span></span>
+            <span class="rule-meta-item">Touched by: <span class="accent">Activate</span></span>
+            <span class="rule-meta-item">Current: 99 (safe margin: +99)</span>
+          </div>
+          <div class="pressure-bar">
+            <div class="pressure-fill safe"></div>
+          </div>
+        </div>
+
+        <!-- Rule 2: Assertion -->
+        <div class="rule-tile">
+          <div class="rule-tile-top">
+            <div class="rule-status">
+              <span class="rule-status-dot at-risk"></span>
+              <span class="rule-status-label at-risk">Guarded</span>
+            </div>
+            <span class="rule-kind">assertion</span>
+          </div>
+          <div class="rule-expression">on Activate: Price &gt; 0</div>
+          <div class="rule-message">"Plan price must be positive"</div>
+          <div class="rule-meta">
+            <span class="rule-meta-item">Scope: <span class="accent">Activate</span> event only</span>
+            <span class="rule-meta-item">Arg-dependent: <span class="accent">Price</span></span>
+          </div>
+          <div class="pressure-bar">
+            <div class="pressure-fill caution"></div>
+          </div>
+        </div>
+
+        <!-- Rule 3: Rejection -->
+        <div class="rule-tile">
+          <div class="rule-tile-top">
+            <div class="rule-status">
+              <span class="rule-status-dot passing"></span>
+              <span class="rule-status-label passing">Passing</span>
+            </div>
+            <span class="rule-kind">rejection</span>
+          </div>
+          <div class="rule-expression">from Cancelled: reject Activate</div>
+          <div class="rule-message">"Cannot reactivate a cancelled subscription"</div>
+          <div class="rule-meta">
+            <span class="rule-meta-item">Scope: <span class="accent">Cancelled</span> state</span>
+            <span class="rule-meta-item">N/A from current state</span>
+          </div>
+          <div class="pressure-bar">
+            <div class="pressure-fill safe"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- RIGHT: Impact detail panel -->
+    <div class="impact-panel">
+      <div class="impact-header">
+        <h3>MonthlyPrice ≥ 0</h3>
+        <span class="impact-sub">invariant · always active</span>
+      </div>
+      <div class="impact-body">
+
+        <div class="impact-section">
+          <h4>Driving Fields</h4>
+          <div class="driving-field">
+            <span>
+              <span class="field-name">MonthlyPrice</span>
+              <span class="field-type">number</span>
+            </span>
+            <span class="field-current-val">
+              <span class="field-value">99</span>
+              <span class="field-threshold">threshold: 0</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="impact-section">
+          <h4>Events That Touch This Rule</h4>
+          <div class="touching-event">
+            <span class="ev-name">⚡ Activate</span>
+            <span class="ev-impact">sets MonthlyPrice = Activate.Price</span>
+          </div>
+        </div>
+
+        <div class="impact-section">
+          <h4>Violation Scenario</h4>
+          <div class="danger-scenario">
+            <div class="label">⚠ Would violate if:</div>
+            <div class="scenario-text">
+              <code>fire Activate Plan="Free" Price=-1</code><br/>
+              sets MonthlyPrice = -1, which fails MonthlyPrice ≥ 0
+            </div>
+          </div>
+        </div>
+
+        <div class="impact-section">
+          <h4>History</h4>
+          <div style="font-size: 11px; color: var(--dim); line-height: 1.6;">
+            <div>Step 0: 0 ✓ (initial)</div>
+            <div>Step 1: 29.99 ✓ (Activate)</div>
+            <div>Step 2: 99 ✓ (Activate)</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

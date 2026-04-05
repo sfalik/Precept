@@ -131,28 +131,12 @@ The `transition Submitted` and all other shared mutations must be written in bot
 
 ---
 
-## Feature Proposal
+## Related GitHub proposal issues
 
-### Proposal: Ternary expressions in `set` mutations
+- **#9 — Ternary expressions in `set` mutations**: primary proposal for the branching-value pressure this comparison exposes.
+- **#8 — Named rule declarations**: secondary evidence from Polly's named pipeline registration pattern.
 
-Allow conditional value selection in `set` assignments:
-
-```precept
-from Draft on Submit
-    -> set Status = Submit.IsUrgent ? "Priority" : "Normal"
-    -> set Fee = Submit.IsMember ? 0 : 25
-    -> transition Submitted
-```
-
-This eliminates duplicate transition rows where the only difference is a single field's value based on a condition.
-
-**Impact:** High. Many real precepts have "same outcome, different mutation value based on a field" rows. Without ternary, every such branching doubles the row count.
-
-**External precedent:** Every programming language (C#, TypeScript, Python). Even SQL has `CASE WHEN`. LINQ `.Select(x => condition ? a : b)` is the most direct parallel.
-
-**Complexity:** Low-moderate. The expression language already supports boolean expressions with comparisons; adding a ternary operator is a natural extension. The type checker must ensure the ternary arms have compatible types.
-
-**Risk:** Ternary expressions can obscure intent if overused. Recommend limiting to `set` positions only (not in `when` guards). Long nested ternaries should still use separate transition rows.
+The proposal bodies live in GitHub. This file remains the structural comparison: what Polly teaches about naming, linear pipelines, and why conditional value selection is the safer answer than branching outcomes inside `->`.
 
 ---
 

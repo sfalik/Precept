@@ -1,0 +1,995 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 13: Flow Cards — Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    /* ================================================================
+       CONCEPT 13 — FLOW CARDS
+       ================================================================
+       Core idea: The large-card aesthetic from Concept 04 (Focus /
+       Spotlight) — generous spacing, big state names, clear data —
+       applied to the ENTIRE precept lifecycle as a scrollable flow.
+
+       Each state is a large card. Cards connect via transition edges
+       that carry event names, guard summaries, and fire buttons.
+       The current state's card gets spotlight treatment (glow, size).
+       Other states are present but deemphasized.
+
+       A compact rail diagram runs along the left edge, giving spatial
+       context at a glance. The main column shows the full-detail
+       cards in lifecycle order.
+
+       Vertical layout chosen over horizontal for VS Code sidebar
+       compatibility (works at 400px–1200px).
+
+       Product shape: whole-flow, card-first, diagram-hybrid.
+       Key job: "Show me the entire machine AND let me act from here."
+       ================================================================ */
+
+    body {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* — Header — */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    .header-file { color: var(--dusk); font-size: 11px; }
+
+    .header-actions { display: flex; gap: 6px; }
+    .header-actions button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 10px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .header-actions button:hover { border-color: var(--indigo); }
+    .header-actions button.active {
+      border-color: var(--indigo);
+      color: var(--indigo);
+      background: rgba(99, 102, 241, 0.08);
+    }
+
+    /* — Main layout: rail + cards — */
+    .flow-container {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 54px 1fr;
+      overflow: hidden;
+    }
+
+    /* — Left rail: mini diagram — */
+    .rail {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 0;
+      border-right: 1px solid var(--border);
+      background: var(--panel);
+      overflow-y: auto;
+      gap: 0;
+    }
+
+    .rail-node {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--dim);
+      flex-shrink: 0;
+      position: relative;
+      cursor: pointer;
+      transition: all 150ms;
+      background: var(--panel);
+    }
+
+    .rail-node:hover {
+      border-color: var(--violet);
+      color: var(--violet);
+    }
+
+    .rail-node.current {
+      border-color: var(--violet);
+      color: var(--violet);
+      background: rgba(168, 152, 245, 0.12);
+      box-shadow: 0 0 12px rgba(168, 152, 245, 0.2);
+    }
+
+    .rail-node.initial::before {
+      content: '';
+      position: absolute;
+      top: -8px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--violet);
+    }
+
+    .rail-node.terminal {
+      border-style: double;
+      border-width: 3px;
+    }
+
+    .rail-edge {
+      width: 2px;
+      height: 32px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .rail-edge.active {
+      background: var(--violet);
+      opacity: 0.4;
+    }
+
+    /* — Card column — */
+    .card-column {
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    /* — Transition edge between cards — */
+    .transition-edge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0 8px 20px;
+      position: relative;
+    }
+
+    .transition-edge::before {
+      content: '';
+      position: absolute;
+      left: 33px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, var(--enabled), var(--enabled));
+      opacity: 0.25;
+    }
+
+    .edge-arrow {
+      width: 14px;
+      height: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--enabled);
+      font-size: 10px;
+      flex-shrink: 0;
+      z-index: 1;
+    }
+
+    .edge-events {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      z-index: 1;
+    }
+
+    .edge-event {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      border: 1px solid rgba(52, 211, 153, 0.25);
+      color: var(--cyan);
+      background: rgba(52, 211, 153, 0.04);
+      cursor: default;
+    }
+
+    .edge-event .ev-icon { color: var(--enabled); font-size: 8px; }
+
+    .edge-event .guard {
+      font-size: 9px;
+      color: var(--dusk);
+      margin-left: 4px;
+    }
+
+    /* Self-loop edges (shown inline on a card) */
+    .self-loop-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(39, 39, 42, 0.5);
+    }
+
+    .self-loop-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      border: 1px dashed rgba(52, 211, 153, 0.30);
+      color: var(--cyan);
+      background: rgba(52, 211, 153, 0.03);
+    }
+
+    .self-loop-chip .loop-icon {
+      color: var(--enabled);
+      font-size: 9px;
+    }
+
+    /* — State cards — */
+    .state-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      position: relative;
+      transition: border-color 200ms, background 200ms;
+    }
+
+    .state-card:hover {
+      border-color: rgba(168, 152, 245, 0.20);
+    }
+
+    .state-card.current {
+      border-color: rgba(168, 152, 245, 0.35);
+      background: rgba(168, 152, 245, 0.03);
+    }
+
+    .state-card.current::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 12px;
+      pointer-events: none;
+      box-shadow: 0 0 30px rgba(168, 152, 245, 0.08), 0 0 60px rgba(168, 152, 245, 0.04);
+    }
+
+    /* State card header */
+    .sc-header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+
+    .sc-name {
+      font-weight: 700;
+      color: var(--violet);
+      letter-spacing: -0.01em;
+    }
+
+    .state-card.current .sc-name { font-size: 36px; }
+    .state-card:not(.current) .sc-name { font-size: 22px; opacity: 0.7; }
+
+    .sc-badges {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .sc-badge {
+      font-size: 9px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .sc-badge.initial-badge {
+      border: 1px solid rgba(168, 152, 245, 0.30);
+      color: var(--violet);
+      background: rgba(168, 152, 245, 0.06);
+    }
+
+    .sc-badge.terminal-badge {
+      border: 1px solid rgba(113, 113, 122, 0.30);
+      color: var(--dim);
+      background: rgba(113, 113, 122, 0.06);
+    }
+
+    .sc-badge.current-badge {
+      border: 1px solid rgba(168, 152, 245, 0.40);
+      color: var(--violet);
+      background: rgba(168, 152, 245, 0.10);
+    }
+
+    .sc-badge.edit-badge {
+      border: 1px solid rgba(144, 150, 166, 0.30);
+      color: var(--dusk);
+      background: rgba(144, 150, 166, 0.06);
+    }
+
+    .sc-subtitle {
+      font-size: 11px;
+      color: var(--dim);
+      margin-bottom: 16px;
+    }
+
+    /* State card sections */
+    .sc-section {
+      margin-top: 14px;
+    }
+
+    .sc-section-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    /* Data inside current-state card */
+    .sc-data-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    .sc-datum {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 8px 10px;
+      background: rgba(17, 17, 20, 0.4);
+      border: 1px solid rgba(39, 39, 42, 0.5);
+      border-radius: 6px;
+    }
+
+    .sc-datum .d-value {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--slate-val);
+    }
+
+    .sc-datum .d-value.null { color: var(--muted); font-style: italic; font-size: 12px; }
+
+    .sc-datum .d-label {
+      font-size: 9px;
+      color: var(--dusk);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .sc-datum .d-type {
+      font-size: 8px;
+      color: var(--muted);
+    }
+
+    .sc-datum .d-edit {
+      font-size: 8px;
+      color: var(--dusk);
+      border: 1px solid rgba(144, 150, 166, 0.25);
+      border-radius: 2px;
+      padding: 0 3px;
+      align-self: flex-start;
+      margin-top: 2px;
+    }
+
+    /* Collection field rendering */
+    .sc-datum .d-collection {
+      font-size: 11px;
+      color: var(--slate-val);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .d-collection .coll-item {
+      font-size: 10px;
+      padding: 1px 6px;
+      background: rgba(99, 102, 241, 0.06);
+      border: 1px solid rgba(99, 102, 241, 0.15);
+      border-radius: 3px;
+      color: var(--slate-val);
+    }
+
+    .d-collection .coll-empty {
+      font-size: 10px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .d-collection .coll-count {
+      font-size: 8px;
+      color: var(--dusk);
+      margin-left: 2px;
+    }
+
+    /* Events on current state card */
+    .sc-events {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .sc-event-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      background: rgba(17, 17, 20, 0.3);
+      border: 1px solid rgba(39, 39, 42, 0.5);
+      border-radius: 8px;
+      transition: border-color 150ms, background 150ms;
+    }
+
+    .sc-event-row:hover {
+      border-color: rgba(48, 184, 232, 0.25);
+      background: rgba(17, 17, 20, 0.5);
+    }
+
+    .sc-event-row .ev-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--cyan);
+      white-space: nowrap;
+    }
+
+    .sc-event-row .ev-detail {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .ev-outcome-line {
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ev-outcome-line.transition { color: var(--enabled); }
+    .ev-outcome-line.no-transition { color: var(--enabled); opacity: 0.7; }
+    .ev-outcome-line.rejected { color: var(--blocked); }
+    .ev-outcome-line.undefined { color: var(--muted); }
+
+    .ev-guard {
+      font-size: 10px;
+      color: var(--dusk);
+      padding-left: 2px;
+    }
+
+    .ev-mutations {
+      font-size: 10px;
+      color: var(--dim);
+      line-height: 1.5;
+    }
+
+    .ev-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .ev-arg-inline {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .ev-arg-inline label {
+      font-size: 8px;
+      color: var(--dusk);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .ev-arg-inline input {
+      width: 80px;
+      background: rgba(12, 12, 15, 0.6);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 10px;
+      padding: 3px 6px;
+      border-radius: 3px;
+    }
+
+    .ev-arg-inline input:focus {
+      outline: none;
+      border-color: var(--indigo);
+    }
+
+    .ev-fire-btn {
+      font: inherit;
+      font-size: 9px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid var(--enabled);
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.08);
+      white-space: nowrap;
+    }
+
+    .ev-fire-btn:hover { background: rgba(52, 211, 153, 0.16); }
+
+    .ev-fire-btn.blocked {
+      border-color: var(--blocked);
+      color: var(--blocked);
+      background: rgba(251, 113, 133, 0.06);
+      cursor: not-allowed;
+    }
+
+    /* Rules strip on current-state card */
+    .sc-rules {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .rule-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      padding: 3px 10px;
+      border-radius: 4px;
+    }
+
+    .rule-chip.ok {
+      border: 1px solid rgba(52, 211, 153, 0.25);
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.04);
+    }
+
+    .rule-chip.violated {
+      border: 1px solid rgba(251, 113, 133, 0.25);
+      color: var(--blocked);
+      background: rgba(251, 113, 133, 0.04);
+    }
+
+    .rule-chip .r-icon { font-size: 8px; }
+
+    /* Non-current state card: compact */
+    .state-card:not(.current) .sc-section { display: none; }
+    .state-card:not(.current) .sc-subtitle { margin-bottom: 0; }
+
+    .state-card.expanded:not(.current) .sc-section { display: block; }
+
+    .sc-expand-hint {
+      font-size: 9px;
+      color: var(--muted);
+      cursor: pointer;
+      margin-top: 4px;
+      display: none;
+    }
+
+    .state-card:not(.current):not(.expanded) .sc-expand-hint { display: block; }
+    .state-card.current .sc-expand-hint { display: none; }
+
+    /* — Bottom status bar — */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 16px;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+      color: var(--dim);
+      flex-shrink: 0;
+    }
+
+    .status-left { display: flex; gap: 12px; }
+    .status-ok { color: var(--enabled); }
+    .status-warn { color: var(--gold); }
+
+    /* — Responsive: narrow sidebar — */
+    @media (max-width: 500px) {
+      .flow-container { grid-template-columns: 1fr; }
+      .rail { display: none; }
+      .card-column { padding: 12px 12px; }
+      .state-card { padding: 14px 16px; }
+      .sc-data-grid { grid-template-columns: 1fr; }
+      .state-card.current .sc-name { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <div class="header">
+    <div class="header-left">
+      <span class="header-title">InsuranceClaim</span>
+      <span class="sep">·</span>
+      <span class="header-file">insurance-claim.precept</span>
+    </div>
+    <div class="header-actions">
+      <button class="active">Flow</button>
+      <button>Diagram</button>
+      <button>Edit Data</button>
+      <button>Reset</button>
+    </div>
+  </div>
+
+  <!-- ===== MAIN: RAIL + CARDS ===== -->
+  <div class="flow-container">
+
+    <!-- Left rail: compact state diagram -->
+    <div class="rail">
+      <div class="rail-node initial" title="Draft (initial)">D</div>
+      <div class="rail-edge"></div>
+      <div class="rail-node" title="Submitted">S</div>
+      <div class="rail-edge active"></div>
+      <div class="rail-node current" title="UnderReview (current)">U</div>
+      <div class="rail-edge"></div>
+      <div class="rail-node" title="Approved">A</div>
+      <div class="rail-edge"></div>
+      <div class="rail-node terminal" title="Paid (terminal)">P</div>
+      <div class="rail-edge" style="height: 16px;"></div>
+      <div class="rail-node terminal" title="Denied (terminal)">X</div>
+    </div>
+
+    <!-- Right: card flow -->
+    <div class="card-column">
+
+      <!-- ═══════════ STATE: Draft ═══════════ -->
+      <div class="state-card">
+        <div class="sc-header">
+          <span class="sc-name">Draft</span>
+          <div class="sc-badges">
+            <span class="sc-badge initial-badge">initial</span>
+          </div>
+        </div>
+        <div class="sc-subtitle">Starting state · 1 event available</div>
+        <span class="sc-expand-hint">▸ expand</span>
+
+        <div class="sc-section">
+          <div class="sc-section-label">Available events</div>
+          <div class="sc-events">
+            <div class="sc-event-row">
+              <span class="ev-name">Submit</span>
+              <div class="ev-detail">
+                <div class="ev-outcome-line transition">→ Submitted</div>
+                <div class="ev-mutations">
+                  set ClaimantName, ClaimAmount, PoliceReportRequired
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edge: Draft → Submitted -->
+      <div class="transition-edge">
+        <span class="edge-arrow">↓</span>
+        <div class="edge-events">
+          <span class="edge-event">
+            <span class="ev-icon">▸</span>
+            Submit
+          </span>
+        </div>
+      </div>
+
+      <!-- ═══════════ STATE: Submitted ═══════════ -->
+      <div class="state-card">
+        <div class="sc-header">
+          <span class="sc-name">Submitted</span>
+        </div>
+        <div class="sc-subtitle">2 events available · document collection phase</div>
+        <span class="sc-expand-hint">▸ expand</span>
+
+        <div class="sc-section">
+          <div class="sc-section-label">Available events</div>
+          <div class="sc-events">
+            <div class="sc-event-row">
+              <span class="ev-name">AssignAdjuster</span>
+              <div class="ev-detail">
+                <div class="ev-outcome-line transition">→ UnderReview</div>
+                <div class="ev-mutations">set AdjusterName</div>
+              </div>
+            </div>
+            <div class="sc-event-row">
+              <span class="ev-name">RequestDocument</span>
+              <div class="ev-detail">
+                <div class="ev-outcome-line no-transition">↻ stays in Submitted</div>
+                <div class="ev-mutations">add MissingDocuments</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edge: Submitted → UnderReview -->
+      <div class="transition-edge">
+        <span class="edge-arrow">↓</span>
+        <div class="edge-events">
+          <span class="edge-event">
+            <span class="ev-icon">▸</span>
+            AssignAdjuster
+          </span>
+        </div>
+      </div>
+
+      <!-- ═══════════ STATE: UnderReview (CURRENT) ═══════════ -->
+      <div class="state-card current">
+        <div class="sc-header">
+          <span class="sc-name">UnderReview</span>
+          <div class="sc-badges">
+            <span class="sc-badge current-badge">● current</span>
+            <span class="sc-badge edit-badge">edit FraudFlag</span>
+          </div>
+        </div>
+        <div class="sc-subtitle">5 events available · 1 editable field · 0 violations</div>
+
+        <!-- Data snapshot -->
+        <div class="sc-section">
+          <div class="sc-section-label">Data</div>
+          <div class="sc-data-grid">
+            <div class="sc-datum">
+              <span class="d-value">Jane Doe</span>
+              <span class="d-label">ClaimantName</span>
+              <span class="d-type">string?</span>
+            </div>
+            <div class="sc-datum">
+              <span class="d-value">4500</span>
+              <span class="d-label">ClaimAmount</span>
+              <span class="d-type">number</span>
+            </div>
+            <div class="sc-datum">
+              <span class="d-value">0</span>
+              <span class="d-label">ApprovedAmount</span>
+              <span class="d-type">number</span>
+            </div>
+            <div class="sc-datum">
+              <span class="d-value">M. Smith</span>
+              <span class="d-label">AdjusterName</span>
+              <span class="d-type">string?</span>
+            </div>
+            <div class="sc-datum">
+              <span class="d-value null">null</span>
+              <span class="d-label">DecisionNote</span>
+              <span class="d-type">string?</span>
+            </div>
+            <div class="sc-datum">
+              <span class="d-value">true</span>
+              <span class="d-label">PoliceReportRequired</span>
+              <span class="d-type">boolean</span>
+            </div>
+            <div class="sc-datum">
+              <span class="d-value">false</span>
+              <span class="d-label">FraudFlag</span>
+              <span class="d-type">boolean</span>
+              <span class="d-edit">editable</span>
+            </div>
+            <div class="sc-datum" style="grid-column: 1 / -1;">
+              <div class="d-collection">
+                <span class="coll-item">Tax Return</span>
+                <span class="coll-count">(1 item)</span>
+              </div>
+              <span class="d-label">MissingDocuments</span>
+              <span class="d-type">set&lt;string&gt;</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Events with full interaction -->
+        <div class="sc-section">
+          <div class="sc-section-label">Events from UnderReview</div>
+          <div class="sc-events">
+
+            <!-- Approve — guarded, two rows -->
+            <div class="sc-event-row">
+              <span class="ev-name">Approve</span>
+              <div class="ev-detail">
+                <div class="ev-outcome-line rejected">✗ Rejected</div>
+                <div class="ev-guard">guard: (!PoliceReportRequired || MissingDocuments.count == 0) && Amount ≤ ClaimAmount</div>
+                <div class="ev-mutations" style="color: var(--blocked);">
+                  "Required documents must be complete before a claim can be approved"
+                </div>
+                <div class="ev-actions">
+                  <div class="ev-arg-inline">
+                    <label>Amount</label>
+                    <input type="text" value="3500" />
+                  </div>
+                  <div class="ev-arg-inline">
+                    <label>Note</label>
+                    <input type="text" value="" placeholder="optional" />
+                  </div>
+                  <button class="ev-fire-btn blocked">✗ Blocked</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Deny -->
+            <div class="sc-event-row">
+              <span class="ev-name">Deny</span>
+              <div class="ev-detail">
+                <div class="ev-outcome-line transition">→ Denied</div>
+                <div class="ev-mutations">set DecisionNote = Deny.Note</div>
+                <div class="ev-actions">
+                  <div class="ev-arg-inline">
+                    <label>Note</label>
+                    <input type="text" value="Insufficient evidence" />
+                  </div>
+                  <button class="ev-fire-btn">▶ Fire</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- RequestDocument — self-loop -->
+            <div class="sc-event-row">
+              <span class="ev-name">RequestDocument</span>
+              <div class="ev-detail">
+                <div class="ev-outcome-line no-transition">↻ stays in UnderReview</div>
+                <div class="ev-mutations">add MissingDocuments</div>
+                <div class="ev-actions">
+                  <div class="ev-arg-inline">
+                    <label>Name</label>
+                    <input type="text" value="Police Report" />
+                  </div>
+                  <button class="ev-fire-btn">▶ Fire</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ReceiveDocument — guarded, two rows -->
+            <div class="sc-event-row">
+              <span class="ev-name">ReceiveDocument</span>
+              <div class="ev-detail">
+                <div class="ev-outcome-line no-transition">↻ stays in UnderReview</div>
+                <div class="ev-guard">when MissingDocuments contains Name</div>
+                <div class="ev-mutations">remove MissingDocuments</div>
+                <div class="ev-actions">
+                  <div class="ev-arg-inline">
+                    <label>Name</label>
+                    <input type="text" value="Tax Return" />
+                  </div>
+                  <button class="ev-fire-btn">▶ Fire</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Self-loop summary strip -->
+          <div class="self-loop-strip">
+            <span class="self-loop-chip"><span class="loop-icon">↻</span> RequestDocument (add docs)</span>
+            <span class="self-loop-chip"><span class="loop-icon">↻</span> ReceiveDocument (remove docs)</span>
+          </div>
+        </div>
+
+        <!-- Rules on current state -->
+        <div class="sc-section">
+          <div class="sc-section-label">Active rules</div>
+          <div class="sc-rules">
+            <span class="rule-chip ok"><span class="r-icon">✓</span> ClaimAmount ≥ 0</span>
+            <span class="rule-chip ok"><span class="r-icon">✓</span> ApprovedAmount ≥ 0</span>
+            <span class="rule-chip ok"><span class="r-icon">✓</span> Approved ≤ Claim</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edge: UnderReview → Approved -->
+      <div class="transition-edge">
+        <span class="edge-arrow">↓</span>
+        <div class="edge-events">
+          <span class="edge-event">
+            <span class="ev-icon">▸</span>
+            Approve
+            <span class="guard">when docs complete &amp; amount ≤ claim</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- ═══════════ STATE: Approved ═══════════ -->
+      <div class="state-card">
+        <div class="sc-header">
+          <span class="sc-name">Approved</span>
+        </div>
+        <div class="sc-subtitle">
+          1 event available · assert: ApprovedAmount &gt; 0
+        </div>
+        <span class="sc-expand-hint">▸ expand</span>
+
+        <div class="sc-section">
+          <div class="sc-section-label">State assertion</div>
+          <div class="sc-rules">
+            <span class="rule-chip ok"><span class="r-icon">✓</span> ApprovedAmount &gt; 0</span>
+          </div>
+        </div>
+
+        <div class="sc-section">
+          <div class="sc-section-label">Available events</div>
+          <div class="sc-events">
+            <div class="sc-event-row">
+              <span class="ev-name">PayClaim</span>
+              <div class="ev-detail">
+                <div class="ev-outcome-line transition">→ Paid</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edge: Approved → Paid -->
+      <div class="transition-edge">
+        <span class="edge-arrow">↓</span>
+        <div class="edge-events">
+          <span class="edge-event">
+            <span class="ev-icon">▸</span>
+            PayClaim
+          </span>
+        </div>
+      </div>
+
+      <!-- ═══════════ STATE: Paid ═══════════ -->
+      <div class="state-card">
+        <div class="sc-header">
+          <span class="sc-name">Paid</span>
+          <div class="sc-badges">
+            <span class="sc-badge terminal-badge">terminal</span>
+          </div>
+        </div>
+        <div class="sc-subtitle">No events available · end of lifecycle</div>
+      </div>
+
+      <!-- Spacer, then branch: UnderReview → Denied -->
+      <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed rgba(39, 39, 42, 0.6);">
+        <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); font-weight: 600; margin-bottom: 10px; padding-left: 20px;">
+          Branch: UnderReview → Denied
+        </div>
+      </div>
+
+      <!-- ═══════════ STATE: Denied ═══════════ -->
+      <div class="state-card">
+        <div class="sc-header">
+          <span class="sc-name">Denied</span>
+          <div class="sc-badges">
+            <span class="sc-badge terminal-badge">terminal</span>
+          </div>
+        </div>
+        <div class="sc-subtitle">No events available · end of lifecycle</div>
+      </div>
+
+      <!-- Bottom padding -->
+      <div style="height: 40px;"></div>
+
+    </div>
+  </div>
+
+  <!-- ===== STATUS BAR ===== -->
+  <div class="status-bar">
+    <div class="status-left">
+      <span class="status-ok">✓ 3 invariants passing</span>
+      <span>·</span>
+      <span>6 states · 7 events · 8 fields (1 collection)</span>
+    </div>
+    <span style="color: var(--muted);">
+      Draft → Submitted → UnderReview (now)
+    </span>
+  </div>
+
+</body>
+</html>
