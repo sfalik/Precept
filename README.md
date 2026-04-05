@@ -17,29 +17,37 @@
 
 **The Contract**
 
-Here’s the DSL inline so the full rule set is visible at a glance.
+GitHub cannot render the styled DSL treatment faithfully, so the README uses the rendered contract and keeps the source copyable below.
 
-<pre style="background:#0c0c0f; color:#e5e5e5; border:1px solid #27272a; border-radius:6px; padding:16px; overflow-x:auto; font-family:'Cascadia Cove','Cascadia Code',Consolas,monospace; font-size:13px; line-height:1.6;"><code><span style="color:#4338CA; font-weight:700;">precept</span> Subscription
+![Rendered Precept Subscription contract](brand/readme-hero-dsl.png)
 
-<span style="color:#4338CA; font-weight:700;">field</span> <span style="color:#B0BEC5;">PlanName</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
-<span style="color:#4338CA; font-weight:700;">field</span> <span style="color:#B0BEC5;">MonthlyPrice</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;">0</span>
+<details>
+<summary>Copyable DSL</summary>
 
-<span style="color:#4338CA; font-weight:700;">invariant</span> <span style="color:#B0BEC5;">MonthlyPrice</span> &gt;= <span style="color:#84929F;">0</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Monthly price cannot be negative"</span>
+```text
+precept Subscription
 
-<span style="color:#4338CA; font-weight:700;">state</span> <span style="color:#A898F5;">Trial</span> <span style="color:#6366F1;">initial</span>, <span style="color:#A898F5;">Active</span>, <span style="color:#A898F5;">Cancelled</span>
+field PlanName as string nullable
+field MonthlyPrice as number default 0
 
-<span style="color:#4338CA; font-weight:700;">event</span> <span style="color:#30B8E8;">Activate</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Plan</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span>, <span style="color:#B0BEC5;">Price</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span>
-<span style="color:#4338CA; font-weight:700;">on</span> <span style="color:#30B8E8;">Activate</span> <span style="color:#4338CA; font-weight:700;">assert</span> <span style="color:#B0BEC5;">Price</span> &gt; <span style="color:#84929F;">0</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Plan price must be positive"</span>
+invariant MonthlyPrice >= 0 because "Monthly price cannot be negative"
 
-<span style="color:#4338CA; font-weight:700;">event</span> <span style="color:#30B8E8;">Cancel</span>
+state Trial initial, Active, Cancelled
 
-<span style="color:#4338CA; font-weight:700;">from</span> <span style="color:#A898F5;">Trial</span> <span style="color:#4338CA; font-weight:700;">on</span> <span style="color:#30B8E8;">Activate</span> <span style="color:#4338CA; font-weight:700;">when</span> <span style="color:#B0BEC5;">PlanName</span> == <span style="color:#84929F;">null</span>
-  -&gt; <span style="color:#4338CA; font-weight:700;">set</span> <span style="color:#B0BEC5;">PlanName</span> = <span style="color:#30B8E8;">Activate</span>.<span style="color:#B0BEC5;">Plan</span>
-  -&gt; <span style="color:#4338CA; font-weight:700;">set</span> <span style="color:#B0BEC5;">MonthlyPrice</span> = <span style="color:#30B8E8;">Activate</span>.<span style="color:#B0BEC5;">Price</span>
-  -&gt; <span style="color:#4338CA; font-weight:700;">transition</span> <span style="color:#A898F5;">Active</span>
-<span style="color:#4338CA; font-weight:700;">from</span> <span style="color:#A898F5;">Active</span> <span style="color:#4338CA; font-weight:700;">on</span> <span style="color:#30B8E8;">Activate</span> -&gt; <span style="color:#4338CA; font-weight:700;">set</span> <span style="color:#B0BEC5;">MonthlyPrice</span> = <span style="color:#30B8E8;">Activate</span>.<span style="color:#B0BEC5;">Price</span> -&gt; <span style="color:#4338CA; font-weight:700;">no</span> <span style="color:#4338CA; font-weight:700;">transition</span>
-<span style="color:#4338CA; font-weight:700;">from</span> <span style="color:#A898F5;">Active</span> <span style="color:#4338CA; font-weight:700;">on</span> <span style="color:#30B8E8;">Cancel</span> -&gt; <span style="color:#4338CA; font-weight:700;">transition</span> <span style="color:#A898F5;">Cancelled</span>
-<span style="color:#4338CA; font-weight:700;">from</span> <span style="color:#A898F5;">Cancelled</span> <span style="color:#4338CA; font-weight:700;">on</span> <span style="color:#30B8E8;">Activate</span> -&gt; <span style="color:#4338CA; font-weight:700;">reject</span> <span style="color:#FBBF24;">"Cancelled subscriptions cannot be reactivated"</span></code></pre>
+event Activate with Plan as string, Price as number
+on Activate assert Price > 0 because "Plan price must be positive"
+
+event Cancel
+
+from Trial on Activate when PlanName == null
+  -> set PlanName = Activate.Plan
+  -> set MonthlyPrice = Activate.Price
+  -> transition Active
+from Active on Activate -> set MonthlyPrice = Activate.Price -> no transition
+from Active on Cancel -> transition Cancelled
+from Cancelled on Activate -> reject "Cancelled subscriptions cannot be reactivated"
+```
+</details>
 
 **The Execution**
 
