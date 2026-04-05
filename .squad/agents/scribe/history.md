@@ -80,6 +80,10 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 
 ## Recent Updates
 
+### 2026-04-05 - Proposal expansion consolidation recorded
+- Wrote orchestration/session logs for Steinbrenner and Frank, merged 3 inbox records into .squad/decisions.md, cleared .squad/decisions/inbox/, and updated the affected agent histories.
+- Decisions archive unchanged (0 entries older than 30 days), and no history.md file crossed the summarization threshold.
+
 ### 2026-04-05 - Elaine diagram-transitions mockup recorded
 - Logged Elaine's in-diagram transitions exploration and wrote the orchestration/session records.
 - Merged 5 preview-panel decision inbox item(s) into `.squad/decisions.md`, cleared `.squad/decisions/inbox/`, and archived 0 older decision entries.
@@ -90,3 +94,4 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 ### 2026-04-05 - Frank language proposal review recorded
 - Wrote orchestration and session logs for Frank's GitHub issue review across proposals #8-#13.
 - Merged 4 decision inbox item(s) into .squad/decisions.md, cleared .squad/decisions/inbox/, updated affected histories, and archived 0 older decision entries.
+

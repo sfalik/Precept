@@ -7,6 +7,10 @@
 
 ## Recent Updates
 
+### 2026-04-05 - Kanban concept decision merged into squad record
+- Moved Concept 11's kanban-board preview decision from .squad/decisions/inbox/elaine-kanban-preview-concept.md into .squad/decisions.md during the proposal-expansion consolidation pass.
+- Preserved the core recommendation: use kanban as a complementary lifecycle-overview mode for simpler linear precepts, not as a replacement for Timeline, Storyboard, or Notebook views.
+
 - Team update (2026-04-04T23:02:22Z): Hero snippet source of truth now lives in brand/brand-spec.html section 2.6, mirrors the README verbatim, stays TEMPORARY, and treats plaintext reuse as canonical across README, VS Code Marketplace, NuGet, Claude Marketplace, and AI contexts. Decision by J. Peterman.
 
 ### 2026-04-07 - README Form/Shape Pass Applied
@@ -44,3 +48,7 @@
 - 2026-04-07 — Concept 07 (Rule Pressure Map) introduces a genuinely novel organizing principle: constraints first, states second. Worth pursuing as a secondary mode for complex precepts with many business rules.
 - 2026-04-07 — Concept 06 (Dual-Pane Diff) and 08 (Graph Canvas) are strong utility patterns that could be features within any primary shape rather than standalone directions.
 - 2026-04-07 — Mockup directory now has 15 files: 3 original + 10 reimagined concepts + 1 index + 1 shared CSS. All existing mockups preserved. Decision record at `.squad/decisions/inbox/elaine-preview-reimagined-directions-phase-2.md`.
+- 2026-04-07 — Phase 3: Created Concept 11 (Kanban Board) at `tools/Precept.VsCode/mockups/preview-reimagined-11-kanban-board.html`. States as columns, entity as a movable card, transitions as connectors with guard labels, ghost cards for history. Index updated to 11 concepts. Best suited for simple-to-moderate linear lifecycles (3–5 states). Scales poorly past 6 states or with many bidirectional transitions. Decision record at `.squad/decisions/inbox/elaine-kanban-preview-concept.md`.
+- 2026-04-07 — Kanban concept's unique UX contribution: spatial position answers "where am I?" faster than any other concept. Guard conditions on connectors make the constraint surface visible without drilling in. Ghost cards give history without a timeline. Terminal states (empty columns, no outgoing arrows) are self-documenting.
+- 2026-04-07 — Mockup directory now has 16 files: 3 original + 11 reimagined concepts + 1 index + 1 shared CSS.
+

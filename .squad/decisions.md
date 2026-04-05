@@ -6224,3 +6224,171 @@ If we want a fast first pass on language value vs. implementation cost, the clea
 4. #11 Event absorb shorthand
 5. #12 Inline `else reject`
 6. #13 Field-level basic constraints (caveated)
+
+---
+
+---
+
+# Decision Inbox Merge — 2026-04-05T15:10:06Z
+
+Merged from `.squad/decisions/inbox/`.
+
+- Appended: 3
+- Skipped as duplicates: 0
+- Files: steinbrenner-expand-language-proposals.md, frank-expand-language-proposals.md, elaine-kanban-preview-concept.md
+
+---
+
+# Steinbrenner — expand language proposal issue bodies
+
+**Date:** 2026-04-05  
+**Requested by:** Shane
+
+## Decision
+
+Standardize the main bodies of language proposal issues `#8`, `#9`, and `#10` around one comparison-friendly format:
+
+1. Problem / motivation
+2. Proposed feature
+3. Precept today / pain point example
+4. Proposed Precept syntax example
+5. Reference example(s) from research
+6. Benefits
+7. Open questions / risks
+
+## Why
+
+The original issue bodies were good stubs, but they were too thin for architecture review and sequencing. These proposals are easier to evaluate when each issue shows:
+
+- what authors struggle with today,
+- what the proposed syntax would look like,
+- how similar pressure is handled in a known reference system,
+- and what risks must stay in scope.
+
+## Guardrail
+
+All proposed DSL snippets in issue bodies must be labeled as hypothetical / not implemented today so the roadmap does not read like shipped behavior.
+
+---
+
+# Decision Record: Language Proposal Issues #11, #12, #13 — Body Expansion
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-04-05  
+**Status:** Documented — no implementation authorized
+
+---
+
+## What Was Done
+
+Expanded the body of GitHub issues #11, #12, and #13 from acceptance-criteria placeholders into full proposal writeups. Each issue now contains:
+
+- A "pain today" section with 2–3 concrete Precept examples drawn from real sample files
+- Proposed syntax with before/after comparison
+- Reference-language code examples (xstate, Polly, Zod, FluentValidation)
+- Architectural cautions specific to each proposal's risk profile
+- A scoping recommendation with explicit wave placement
+
+---
+
+## Wave Placement Reaffirmed
+
+| Issue | Proposal | Wave | Risk |
+|-------|----------|------|------|
+| #11 | `absorb Event` shorthand | Last | Medium — name-matching semantics, maintenance hazard |
+| #12 | `else reject` inline fallback | Second-to-last | Medium-high — first-match semantics pressure, multi-guard interaction undefined |
+| #13 | Field-level range constraints | Last | High — keyword-anchor principle conflict (Shape A) or new keyword sprawl (Shape B) |
+
+---
+
+## Key Architectural Positions
+
+### #11 — `absorb`
+- `absorb` must be event-scoped (`absorb Submit`, not bare `absorb`). Bare absorb is unsafe in multi-event precepts.
+- Explicit `set` always wins over `absorb` for the same field. This is the precedence rule.
+- Language server must warn when `absorb EventName` maps zero fields. Silent zero-match is a maintenance hazard.
+
+### #12 — `else reject`
+- Scope is deliberately narrow: `else reject` only; not `else transition`, not `else set`.
+- Only one `else reject` permitted per event+state pair. Multi-guard scenarios must use standalone fallback rows.
+- The "what fires if both guards fail in a multi-else-reject scenario" question must be resolved in a design document before implementation. The safest answer: error at compile time.
+
+### #13 — Field-level constraints
+- Shape A (`field Amount as number default 0 min 0`) violates the keyword-anchor principle. The research README already rejected this shape. Adopting it requires an explicit decision to accept the violation.
+- Shape B (`constrain Amount min 0`) preserves the principle but creates two constraint pathways. Clear documentation of when to use `constrain` vs `invariant` is required.
+- Neither shape is implementation-ready. This is a recorded gap. Shane must choose a shape before any code is written.
+
+---
+
+## No Implementation Authorized
+
+These issues are in research/proposal state. No implementation agent should begin work on any of these features until:
+1. A formal design document exists for the chosen approach
+2. Shane has explicitly signed off
+
+This record is informational — it documents the architectural positions taken in the issue bodies.
+
+---
+
+# UX Decision: Kanban Board Preview Concept (Concept 11)
+
+**Author:** Elaine (UX Designer)
+**Date:** 2026-04-07
+**Status:** Proposed — awaiting Shane review
+**Scope:** Preview reimagined exploration, Phase 3
+
+## Context
+
+Shane asked for a kanban board concept to add to the preview exploration set (Concepts 01–10). The design space already covered debugger-first (Timeline), document-first (Notebook), table-first (Decision Matrix), test-first (Storyboard), governance-first (Rule Pressure Map), dashboard-first (Control Room), spatial-first (Graph Canvas), and others.
+
+## What Makes Kanban Genuinely Distinct
+
+The kanban metaphor's organizing principle is **flow through lifecycle stages**. No other concept in the set uses this lens:
+
+- **States are columns**, arranged left to right in lifecycle order
+- **The entity is a card** that physically lives in its current state's column
+- **Transitions are connectors between columns**, with guard conditions and event names visible on the arrows
+- **Ghost cards** show where the entity was previously, giving history context without a separate timeline
+- **Terminal states** are columns with no outgoing connectors — visually obvious
+- **Self-loops** (events that don't change state) appear as a loop indicator inside the current column
+
+This is different from:
+- **Timeline (01):** Time-first, horizontal history. Kanban is position-first, spatial.
+- **Decision Matrix (03):** Complete enumeration in a table. Kanban shows only the flow paths.
+- **Graph Canvas (08):** Free-form spatial diagram. Kanban is structured left-to-right columns.
+- **Storyboard (09):** Linear step sequence. Kanban shows all states simultaneously.
+- **Dashboard (10):** Multi-widget overview. Kanban is a single cohesive metaphor.
+
+## Key UX Rationale
+
+1. **"Where am I?" is answered instantly.** The entity card's column position tells you the current state without reading any text. This is the fastest answer to the most common question.
+
+2. **AI-parseable by design.** An AI agent can express the preview state as "entity at column Active, transitions available: Activate (self-loop), Cancel (→ Cancelled)." The spatial-positional model maps cleanly to text descriptions.
+
+3. **Guard conditions on connectors, not buried in event detail.** The constraint surface is visible in the transition arrows themselves — you see what guards each lane change without drilling into an event card.
+
+4. **Ghost cards give history without a separate timeline.** Previous positions are visible as dashed outlines in earlier columns, preserving the "how did I get here?" context without a dedicated history axis.
+
+5. **Terminal states are visually obvious.** An empty column with no outgoing connectors reads as a dead end. No label needed — the structure communicates it.
+
+6. **Self-loops stay local.** Events that don't change state (like Activate from Active) appear as a dashed loop inside the column, not as a transition connector. This keeps the flow arrows clean.
+
+## Limitations and Honest Tradeoffs
+
+- **Scales poorly past ~6 states.** Columns get narrow or require horizontal scrolling. For complex precepts with many states, this becomes a kanban board with too many columns — the spatial advantage diminishes.
+- **Non-linear lifecycles are awkward.** If a precept has many bidirectional transitions (A↔B↔C), the left-to-right flow metaphor breaks down. The concept works best for roughly linear or funnel-shaped lifecycles.
+- **Data density is lower than Dashboard or Decision Matrix.** The entity card shows fields and rules, but there's only one card on the board at a time. You trade density for clarity.
+- **Event arguments aren't surfaced directly.** Unlike the Notebook or Timeline concepts that show inline arg inputs, the kanban connector arrows are too compact for arg entry. You'd need a click-to-expand pattern for events with arguments.
+
+## Recommendation
+
+Concept 11 is a solid addition to the exploration set. It's the most intuitive concept for simple-to-moderate lifecycles (3–5 states, roughly linear flow) — which describes the majority of real-world precepts.
+
+**Best used as:** A primary view for simpler precepts, or a "lifecycle overview" mode alongside Timeline (for debugging) and Storyboard (for testing) in a multi-mode preview.
+
+**Not a replacement for:** Timeline (debugging), Storyboard (testing), or Dashboard (monitoring complex machines). Those solve different jobs.
+
+## Files
+
+- Mockup: `tools/Precept.VsCode/mockups/preview-reimagined-11-kanban-board.html`
+- Index (updated): `tools/Precept.VsCode/mockups/preview-reimagined-index.html`
