@@ -7,6 +7,10 @@
 
 ## Recent Updates
 
+### 2026-04-05 - Early product-shape expansion recorded
+- Expanded `docs/HowWeGotHere.md` with the original `FiniteStateMachine<TState, TEvent>` surface, nested `WhenStateIs(...).AndEventIs(...).TransitionTo(...)` authoring, and the later builder/inspection phase before the DSL shift.
+- Updated `repo-journey-summary` so future history passes ground thin early periods in named README, source, and test snapshots.
+
 ### 2026-04-05 - API evolution clarification recorded
 - Revised `docs/HowWeGotHere.md` so the chronology explicitly traces the fluent-interface experiments, builder API phase, and current DSL-centered runtime.
 - Captured the clarification as a documentation-only correction so future readers do not infer a direct jump to the DSL.
@@ -17,5 +21,11 @@
 
 ## Learnings
 
+### 2026-04-05 - Name both fluent shape and inspection affordances
+- Early-history prose is stronger when it records not just the API family but the actual interaction model: generic machine types, chained transition builders, optional action hooks, and inspection-style acceptance checks.
+
 ### 2026-04-05 - API evolution belongs in the chronology
 - When a product moves from fluent interfaces to a builder surface and then to a DSL-centered runtime, that progression should appear inside the historical timeline, not as an orphan aside. It clarifies that the DSL was a strategic shift in authoring model, not just a syntax refresh.
+
+### 2026-04-05 - Early-history prose needs named artifacts
+- When expanding an early repository period, anchor the copy in concrete old surface details: API type names, method chains, README examples, and test shapes from the surviving snapshots. "Fluent syntax" is too vague on its own; `FiniteStateMachine<TState, TEvent>`, `WhenStateIs(...).AndEventIs(...)`, and later `CreateBuilder<TState>()` tell the reader what the product actually was.

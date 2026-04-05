@@ -43,6 +43,16 @@ For the "what survived" section, trust current source-of-truth files over explor
 
 If a decision log says something is settled but the public surface still calls it temporary, report the public surface honestly.
 
+### 2a. Ground early periods in named snapshots
+
+When the early period is thin or quiet, do not pad it with broad labels alone. Pull at least one concrete old snapshot from each of these, when available:
+
+- a README example,
+- a representative source file,
+- a representative test.
+
+Then name the actual surface that existed: type names, method chains, builder steps, or CLI commands. This keeps the chronology factual and lets you explain what survived versus what was replaced.
+
 ### 3. Treat unresolved items as pre-consolidation gates
 
 Look for unresolveds in three places:
