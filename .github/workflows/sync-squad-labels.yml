@@ -67,11 +67,10 @@ jobs:
             const MEMBER_COLOR = '9B8FCC';
             const COPILOT_COLOR = '10b981';
 
-            // Define go: and release: labels (static)
-            const GO_LABELS = [
-              { name: 'go:yes', color: '0E8A16', description: 'Ready to implement' },
-              { name: 'go:no', color: 'B60205', description: 'Not pursuing' },
-              { name: 'go:needs-research', color: 'FBCA04', description: 'Needs investigation' }
+            // Define exception and release labels (static)
+            const EXCEPTION_LABELS = [
+              { name: 'blocked', color: 'B60205', description: 'Work cannot advance until a blocker clears' },
+              { name: 'deferred', color: '6B46C1', description: 'Intentionally parked for a later time' }
             ];
 
             const RELEASE_LABELS = [
@@ -125,12 +124,14 @@ jobs:
               });
             }
 
-            // Add go:, release:, type:, priority:, and high-signal labels
-            labels.push(...GO_LABELS);
+            // Add exception, release:, type:, priority:, and high-signal labels
+            labels.push(...EXCEPTION_LABELS);
             labels.push(...RELEASE_LABELS);
             labels.push(...TYPE_LABELS);
             labels.push(...PRIORITY_LABELS);
             labels.push(...SIGNAL_LABELS);
+
+            const RETIRED_LABELS = ['go:yes', 'go:no', 'go:needs-research', 'squad:untriaged', 'needs-decision', 'decided'];
 
             // Sync labels (create or update)
             for (const label of labels) {
@@ -161,6 +162,21 @@ jobs:
                   });
                   core.info(`Created label: ${label.name}`);
                 } else {
+                  throw err;
+                }
+              }
+            }
+
+            for (const labelName of RETIRED_LABELS) {
+              try {
+                await github.rest.issues.deleteLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: labelName
+                });
+                core.info(`Deleted retired label: ${labelName}`);
+              } catch (err) {
+                if (err.status !== 404) {
                   throw err;
                 }
               }
