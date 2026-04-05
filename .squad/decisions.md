@@ -71,6 +71,24 @@ README already uses the correct approach: ` ```precept ` fence for DSL code samp
 
 ---
 
+### Decision: How We Got Here API Evolution Clarification (2026-04-05)
+**Filed by:** J. Peterman  
+**Status:** COMPLETE
+
+`docs/HowWeGotHere.md` now states the product's authoring progression explicitly inside the chronology:
+
+1. early fluent-interface experiments,
+2. later public builder-pattern API,
+3. current DSL-centric direction.
+
+**Why:**
+- Prevents the repo history from reading like a direct jump from an older state-machine library to the current DSL.
+- Clarifies that the major shift was a change in authoring model, not just an implementation refresh.
+
+**Scope:** Documentation correction only. No runtime or API behavior changed.
+
+---
+
 ### Brand-Spec Restructure: Surface-First Organization (2026-04-04)
 **Filed by:** J. Peterman  
 **Status:** COMPLETE  

@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-04-05T02:59:27Z - API evolution clarification recorded
+
+- Wrote orchestration and session logs for J. Peterman's `docs/HowWeGotHere.md` chronology clarification.
+- Merged 1 decision inbox item into decisions.md, skipped 0 duplicate(s), and archived 0 decision entries older than 30 days.
+- Updated the affected agent histories and cleared the processed inbox file.
+
+---
+
 ## 2026-04-05T02:32:19Z - README inline DSL cleanup recorded
 
 - Wrote orchestration and session logs for J. Peterman's README quick-example cleanup.
