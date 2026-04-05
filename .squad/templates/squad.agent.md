@@ -1145,7 +1145,7 @@ gh pr list --state open --draft --json number,title,author,labels,checks --limit
 | **No work found** | All clear | Report: "📋 Board is clear. Ralph is idling." Suggest `npx @bradygaster/squad-cli watch` for persistent polling. |
 
 **Step 3 — Act on highest-priority item:**
-- Process one category at a time, highest priority first (untriaged > assigned > CI failures > review feedback > approved PRs)
+- Process one category at a time, highest priority first (triage-needed backlog > assigned > CI failures > review feedback > approved PRs)
 - Spawn agents as needed, collect results
 - **⚡ CRITICAL: After results are collected, DO NOT stop. DO NOT wait for user input. IMMEDIATELY go back to Step 1 and scan again.** This is a loop — Ralph keeps cycling until the board is clear or the user says "idle". Each cycle is one "round".
 - If multiple items exist in the same category, process them in parallel (spawn multiple agents)
@@ -1174,7 +1174,7 @@ npx @bradygaster/squad-cli watch --interval 30      # polls every 30 minutes
 ```
 
 This runs as a standalone local process (not inside Copilot) that:
-- Checks GitHub every N minutes for untriaged squad work
+- Checks GitHub every N minutes for backlog squad work that still needs triage
 - Auto-triages issues based on team roles and keywords
 - Assigns @copilot to `squad:copilot` issues (if auto-assign is enabled)
 - Runs until Ctrl+C
@@ -1205,7 +1205,7 @@ When Ralph reports status, use this format:
 📊 Board Status:
   🔴 Untriaged:    2 issues need triage
   🟡 In Progress:  3 issues assigned, 1 draft PR
-  🟢 Ready:        1 PR approved, awaiting merge
+  🟢 In Review:    1 PR awaiting feedback or merge
   ✅ Done:         5 issues closed this session
 
 Next action: Triaging #42 — "Fix auth endpoint timeout"

@@ -29,7 +29,7 @@ How to decide who handles what.
 1. When a GitHub issue gets the `squad` label, the **Lead** triages it — analyzing content, assigning the right `squad:{member}` label, and commenting with triage notes.
 2. When a `squad:{member}` label is applied, that member picks up the issue in their next session.
 3. Members can reassign by removing their label and adding another member's label.
-4. The `squad` label is the "inbox" — untriaged issues waiting for Lead review.
+4. The `squad` label marks the shared backlog entry point — issues waiting for Lead triage and board placement.
 
 ## Rules
 

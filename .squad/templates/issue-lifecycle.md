@@ -31,22 +31,18 @@ Each platform tracks issue lifecycle differently. Squad normalizes these into a 
 
 | GitHub State | GitHub API Fields | Squad Board State |
 |--------------|-------------------|-------------------|
-| Open, no assignee | `state: open`, `assignee: null` | `untriaged` |
-| Open, assigned, no branch | `state: open`, `assignee: @user`, no linked PR | `assigned` |
-| Open, branch exists | `state: open`, linked branch exists | `inProgress` |
-| Open, PR opened | `state: open`, PR exists, `reviewDecision: null` | `needsReview` |
-| Open, PR approved | `state: open`, PR `reviewDecision: APPROVED` | `readyToMerge` |
-| Open, changes requested | `state: open`, PR `reviewDecision: CHANGES_REQUESTED` | `changesRequested` |
-| Open, CI failure | `state: open`, PR `statusCheckRollup: FAILURE` | `ciFailure` |
-| Closed | `state: closed` | `done` |
+| Open, not yet triaged | `state: open`, `squad` label only, no `squad:{member}` label | `Backlog` |
+| Open, owner assigned, no branch yet | `state: open`, `squad:{member}` present, no linked PR | `Ready` |
+| Open, branch exists or active implementation underway | `state: open`, linked branch exists | `In Progress` |
+| Open, PR exists or active review/decision is underway | `state: open`, PR exists | `In Review` |
+| Closed | `state: closed` | `Done` |
 
 **Issue labels used by Squad:**
 - `squad` — Issue is in Squad backlog
 - `squad:{member}` — Assigned to specific agent
-- `squad:untriaged` — Needs triage
-- `go:needs-research` — Needs investigation before implementation
 - `priority:p{N}` — Priority level (0=critical, 1=high, 2=medium, 3=low)
-- `next-up` — Queued for next agent pickup
+- `blocked` — Work cannot advance until an external blocker clears
+- `deferred` — Work is intentionally parked outside the current active plan
 
 **Branch naming convention:**
 ```
@@ -58,13 +54,12 @@ Example: `squad/42-fix-login-validation`
 
 | ADO State | Squad Board State |
 |-----------|-------------------|
-| New | `untriaged` |
-| Active, no branch | `assigned` |
-| Active, branch exists | `inProgress` |
-| Active, PR opened | `needsReview` |
-| Active, PR approved | `readyToMerge` |
-| Resolved | `done` |
-| Closed | `done` |
+| New | `Backlog` |
+| Active, no branch | `Ready` |
+| Active, branch exists | `In Progress` |
+| Active, PR opened | `In Review` |
+| Resolved | `Done` |
+| Closed | `Done` |
 
 **Work item tags used by Squad:**
 - `squad` — Work item is in Squad backlog
@@ -82,10 +77,11 @@ Planner does not have native Git integration. Squad uses Planner for task tracki
 
 | Planner Status | Squad Board State |
 |----------------|-------------------|
-| Not Started | `untriaged` |
-| In Progress, no PR | `inProgress` |
-| In Progress, PR opened | `needsReview` |
-| Completed | `done` |
+| Not Started | `Backlog` |
+| Ready to start | `Ready` |
+| In Progress, no PR | `In Progress` |
+| In Progress, PR opened | `In Review` |
+| Completed | `Done` |
 
 **Planner→Git workflow:**
 1. Task created in Planner bucket
@@ -98,12 +94,12 @@ Planner does not have native Git integration. Squad uses Planner for task tracki
 
 ### 1. Issue Assignment (Triage)
 
-**Trigger:** Ralph detects an untriaged issue or user manually assigns work.
+**Trigger:** Ralph detects a backlog issue that still needs triage, or the user manually assigns work.
 
 **Actions:**
 1. Read `.squad/routing.md` to determine which agent should handle the issue
 2. Apply `squad:{member}` label (GitHub) or tag (ADO)
-3. Transition issue to `assigned` state
+3. Transition the board status to `Backlog` or `Ready`, depending on whether the issue is actionable immediately
 4. Optionally spawn agent immediately if issue is high-priority
 
 **Issue read command:**
@@ -122,7 +118,7 @@ az boards work-item show --id {id} --output json
 **Actions:**
 1. Ensure working on latest base branch (usually `main` or `dev`)
 2. Create feature branch using Squad naming convention
-3. Transition issue to `inProgress` state
+3. Transition issue to `In Progress`
 
 **Branch creation commands:**
 
@@ -174,7 +170,7 @@ git push -u origin squad/{issue-number}-{slug}
 1. Open PR from feature branch to base branch
 2. Reference issue in PR description
 3. Apply labels if needed
-4. Transition issue to `needsReview` state
+4. Transition issue to `In Review`
 
 **PR creation commands:**
 
@@ -218,9 +214,9 @@ Working as {member} ({role})
 ### 5. PR Review & Updates
 
 **Review states:**
-- **Approved** → `readyToMerge`
-- **Changes requested** → `changesRequested`
-- **CI failure** → `ciFailure`
+- **Approved** → stays `In Review` until merged
+- **Changes requested** → stays `In Review` while revisions are in flight
+- **CI failure** → stays `In Review`; use `blocked` only when a non-routine blocker needs explicit tracking
 
 **When changes are requested:**
 1. Agent addresses feedback
@@ -265,7 +261,7 @@ az repos pr update --id {pr-id} --status completed --delete-source-branch true
 **Post-merge actions:**
 1. Issue automatically closes (if "Closes #{number}" is in PR description)
 2. Feature branch is deleted
-3. Squad board state transitions to `done`
+3. Squad board state transitions to `Done`
 4. Worktree cleanup (if worktree was used — #525)
 
 ### 7. Cleanup
@@ -323,11 +319,11 @@ When spawning an agent to work on an issue, include this context block:
 
 Ralph (the work monitor) continuously checks issue and PR state:
 
-1. **Triage:** Detects untriaged issues, assigns `squad:{member}` labels
-2. **Spawn:** Launches agents for assigned issues
-3. **Monitor:** Tracks PR state transitions (needsReview → changesRequested → readyToMerge)
+1. **Triage:** Detects backlog issues that still need triage, assigns `squad:{member}` labels
+2. **Spawn:** Launches agents for `Ready` issues
+3. **Monitor:** Tracks board flow (`Backlog -> Ready -> In Progress -> In Review -> Done`)
 4. **Merge:** Automatically merges approved PRs
-5. **Cleanup:** Marks issues as done when PRs merge
+5. **Cleanup:** Marks issues as `Done` when PRs merge
 
 **Ralph's work-check cycle:**
 ```
@@ -366,21 +362,21 @@ If the issue was assigned to a squad member and they authored the PR:
 
 ### Pattern 1: Quick Fix (Single Agent, No Review)
 ```
-Issue created → Assigned to agent → Branch created → Code fixed → 
+Issue created → Backlog triage → Ready → Branch created → Code fixed →
 PR opened → CI passes → Auto-merged → Issue closed
 ```
 
 ### Pattern 2: Feature Development (Human Review)
 ```
-Issue created → Assigned to agent → Branch created → Feature implemented → 
+Issue created → Backlog triage → Ready → Branch created → Feature implemented →
 PR opened → Human reviews → Changes requested → Agent fixes → 
 Re-reviewed → Approved → Merged → Issue closed
 ```
 
 ### Pattern 3: Research-Then-Implement
 ```
-Issue created → Labeled `go:needs-research` → Research agent spawned → 
-Research documented → Research PR merged → Implementation issue created → 
+Issue created → Backlog triage → Research tracked in Backlog/In Review as needed →
+Research documented → Research PR merged → Implementation issue created →
 Implementation agent spawned → Feature built → PR merged
 ```
 
