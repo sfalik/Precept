@@ -38,14 +38,16 @@ npm run watch          # Watch mode
 npm run loop:local     # Package + install locally (also a VS Code task)
 ```
 
-**VS Code tasks** (Run Task menu): `build`, `extension: install`, `extension: uninstall`, `plugin: enable`, `plugin: disable`.
+**VS Code tasks** (Run Task menu): `build`, `extension: install`, `extension: uninstall`, `plugin: sync payload`.
 
 ## Development Workflow
 
 - **Runtime / language server changes** → edit `src/Precept/` or `tools/Precept.LanguageServer/` → run Build task → extension auto-detects new build, no reload needed.
 - **Extension UI / grammar / TypeScript** → edit `tools/Precept.VsCode/` → run `extension: install` task → reload window.
-- **MCP server** → edit `tools/Precept.Mcp/` → reload window → rebuild happens lazily on next tool invocation.
-- **Plugin (agents/skills markdown)** → edit `tools/Precept.Plugin/` → reload window → changes appear immediately.
+- **MCP server** → edit `tools/Precept.Mcp/` → keep the workspace-owned `.vscode/mcp.json` `servers.precept` entry pointed at `tools/scripts/start-precept-mcp.js` → reload window → rebuild happens lazily on next tool invocation from source.
+- **Plugin (agents/skills markdown)** → edit workspace-native copies in `.github/agents/` and `.github/skills/` → reload window → changes appear immediately. Run `plugin: sync payload` only when updating the shipped plugin payload under `tools/Precept.Plugin/` for explicit validation.
+
+Keep `tools/Precept.Plugin/.mcp.json` in shipped `dotnet tool run precept-mcp` form. That plugin file uses its own `mcpServers` payload schema. Use `.vscode/mcp.json` for repo-local MCP development with the VS Code `servers` schema, `.github/agents/` and `.github/skills/` as the workspace-native customization source, and treat plugin/distribution-shaped validation as explicit validation, not the default inner loop.
 
 ## Use the MCP Tools First
 

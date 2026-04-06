@@ -122,13 +122,20 @@ dotnet build            # Build everything
 dotnet test             # Run all tests
 ```
 
+First-time local setup in a new clone:
+
+1. Run task `build`.
+2. Run task `extension: install`, then reload the window.
+
+If you previously used an older local plugin-registration flow, remove any stale `chat.pluginLocations` entry that points at `tools/Precept.Plugin/`. The current local model uses workspace-native `.github/agents/`, `.github/skills/`, and `.vscode/mcp.json` instead.
+
 | What you changed | Command | Reload? |
 |------------------|---------|---------|
 | C# runtime or language server | `Ctrl+Shift+B` | No |
 | TypeScript, webview, or syntax | Task: `extension: install` | Yes |
-| Agent or skill markdown | Reload Window | Yes |
+| Agent or skill markdown in `.github/agents/` or `.github/skills/` | Reload Window | Yes |
 
-See [Contributing Guide](CONTRIBUTING.md) for full workflow details.
+See [ArtifactOperatingModelDesign.md](docs/ArtifactOperatingModelDesign.md) for the local-vs-distribution operating model, worktree rules, the workspace `.vscode/mcp.json` `servers` schema, and the plugin payload sync boundary.
 
 ---
 

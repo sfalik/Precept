@@ -15,6 +15,16 @@ $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 $extensionRoot = Resolve-Path (Join-Path $scriptDirectory "..")
 Set-Location $extensionRoot
 
+$nodeModulesPath = Join-Path $extensionRoot "node_modules"
+$typescriptCliPath = Join-Path $nodeModulesPath ".bin\tsc.cmd"
+if (-not (Test-Path $typescriptCliPath)) {
+    Write-Host "Extension dependencies missing; running npm install..."
+    npm install
+    if ($LASTEXITCODE -ne 0) {
+        throw "npm install failed with exit code $LASTEXITCODE"
+    }
+}
+
 npm run package:local
 if ($LASTEXITCODE -ne 0) {
     throw "Packaging failed with exit code $LASTEXITCODE"

@@ -444,20 +444,20 @@ Use this prompt to execute the redesign phase in a new Copilot Chat session:
 - [x] Create `.vscode/mcp.json` with the dev launcher script override (`tools/scripts/start-precept-mcp.js`) — overrides the plugin's MCP config during development for lazy build + shadow copy
 - [x] Move the MCP launcher script from `tools/Precept.VsCode/scripts/start-precept-mcp.js` to `tools/scripts/start-precept-mcp.js`
 - [x] Remove the `Precept Dev` entry from `.vscode/mcp.json` (the plugin now provides the MCP server)
-- [x] Create `tools/scripts/toggle-plugin.js` — reads/writes `chat.pluginLocations` in `.vscode/settings.json` *(already implemented)*
-- [x] Add `plugin: enable` and `plugin: disable` tasks to `.vscode/tasks.json` *(already implemented)*
+- [x] Create `tools/scripts/toggle-plugin.js` — reads/writes `chat.pluginLocations` in `.vscode/settings.json` *(later superseded by workspace-native `.github/agents/` and `.github/skills/` plus `plugin: sync payload` for worktree-neutral local development)*
+- [x] Add `plugin: enable` and `plugin: disable` tasks to `.vscode/tasks.json` *(later superseded by `plugin: sync payload` for explicit plugin payload validation)*
 - [x] Rename existing extension tasks: `extension: loop local install` → `extension: install`, `extension: loop local uninstall` → `extension: uninstall` *(already implemented)*
 - [x] Remove the `extension: watch` task (unused in the local install loop) *(already implemented)*
-- [x] Test locally using `chat.pluginLocations` setting pointing to the plugin directory
+- [x] Test locally using `chat.pluginLocations` setting pointing to the plugin directory *(historical path; superseded by workspace-native `.github/` customizations for local development)*
 - [x] Verify Copilot lists all 5 precept tools from the plugin's MCP server
 - [ ] Test with at least 2 sample files per tool
 
 ### Checkpoint
 
-- Plugin loads without errors when registered via `chat.pluginLocations`
+- Plugin loads without errors when registered via `chat.pluginLocations` *(historical path; superseded by workspace-native `.github/` customizations for local development)*
 - Copilot lists 5 precept tools from the plugin's MCP server
 - `precept_compile`, `precept_inspect`, `precept_fire`, `precept_update` produce correct results
-- Dev tasks (`extension: install`, `extension: uninstall`, `plugin: enable`, `plugin: disable`) work correctly
+- Dev tasks (`extension: install`, `extension: uninstall`) work correctly; the original plugin enable/disable tasks were later superseded by `plugin: sync payload`
 - `Precept Dev` entry no longer present in `.vscode/mcp.json`
 
 ### Phase 7 implementation prompt
@@ -470,7 +470,7 @@ Use this prompt to execute Phase 7 in a new Copilot Chat session:
 >
 > Create the plugin directory structure under `tools/Precept.Plugin/`, add `plugin.json` at the plugin root, add the dev `.mcp.json` using `${CLAUDE_PLUGIN_ROOT}` path expansion, move the MCP launcher to `tools/scripts/start-precept-mcp.js`, and remove the `Precept Dev` entry from `.vscode/mcp.json` (the plugin replaces it).
 >
-> Keep the existing completed task changes intact (`toggle-plugin.js`, renamed extension tasks, plugin enable/disable tasks). Only add the remaining missing structure and verify local loading.
+> Keep the existing completed task changes intact (historical note: `toggle-plugin.js` and plugin enable/disable tasks were later superseded by workspace-native `.github/` customizations plus `plugin: sync payload`). Only add the remaining missing structure and verify local loading.
 >
 > End with local verification that Copilot lists the Precept tools from the plugin MCP server.
 
@@ -613,7 +613,7 @@ Use this prompt to execute Phase 9 in a new Copilot Chat session:
 | `tools/Precept.Plugin/skills/precept-debugging/SKILL.md` | **New** — debugging workflow skill | 8 |
 | `tools/Precept.Plugin/README.md` | **New** — plugin documentation | 8 |
 | `tools/scripts/start-precept-mcp.js` | **Move** from `tools/Precept.VsCode/scripts/` | 7 |
-| `tools/scripts/toggle-plugin.js` | **New** — toggle `chat.pluginLocations` in workspace settings | 7 |
+| `tools/scripts/toggle-plugin.js` | **New** — toggle `chat.pluginLocations` in workspace settings *(later removed when local development moved to workspace-native `.github/` customizations)* | 7 |
 | `.vscode/tasks.json` | **Edit** — rename extension tasks, remove watch, add plugin tasks | 7 |
 | `.vscode/mcp.json` | **Edit** — update launcher path; remove in Phase 9 | 7, 9 |
 | `Precept.slnx` | **Edit** — add `Precept.Mcp` project | 0 |
