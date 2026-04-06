@@ -4,13 +4,15 @@ Date: 2026-03-05
 
 This document captures the surface syntax and semantics for the Precept DSL — a parser/tooling-friendly grammar that does **not** rely on indentation/offside rules. The language described here is fully implemented and is the current DSL.
 
+The current surface was shaped in part around the March 2026 move to a Superpower-based parser. Flat, keyword-led statements and whitespace-insensitive structure were chosen deliberately so the grammar maps cleanly to a token-stream/combinator parser and the tooling built on the same token stream, without indentation-sensitive or end-marker-heavy workaround logic.
+
 Legacy documentation (`docs/archive/DesignNotes-legacy.md`, `docs/archive/README-legacy.md`) describes the earlier regex/imperative parser and is archived.
 
 ---
 
 ## Goals
 
-- **No indentation-based structure**: blocks/attachments must be explicit and line-oriented.
+- **No indentation-based structure**: blocks/attachments must be explicit and line-oriented. This is a language-design choice, not just a formatting preference: the grammar is intentionally compatible with a straightforward Superpower parser without offside-rule handling.
 - **Tooling-friendly**: keyword-anchored statements, deterministic parse, predictable IntelliSense.
 - **Keyword-anchored flat statements**: every statement begins with a recognizable keyword — no section headers, no indentation. The parser and language server rely on keyword anchoring alone.
 - **Explicit nullability**: use `nullable` rather than punctuation-based null markers.
@@ -36,7 +38,7 @@ These principles have driven every syntax and semantics decision:
 
 8. **Sound, compile-time-first static analysis.** Compile-time checking is a product feature, not an implementation detail. The DSL should reject real semantic mistakes early, but never guess. If the checker can't prove a contradiction, it assumes satisfiable. Exotic or data-dependent cases get a pass; the inspector catches the rest via simulation.
 
-9. **Tooling drives syntax.** IntelliSense, diagnostics, and preview are first-class design constraints. Keyword anchoring enables predictable suggestions. The language server uses semantic ordering to prioritize completions based on what has already been declared. Syntax choices that degrade the tooling experience are rejected even if they're more concise.
+9. **Tooling drives syntax.** IntelliSense, diagnostics, and preview are first-class design constraints. Keyword anchoring enables predictable suggestions. The language server uses semantic ordering to prioritize completions based on what has already been declared. The grammar is also intentionally kept friendly to the Superpower token/combinator parser that underpins the runtime and tooling: syntax that would require indentation-aware parsing or workaround-heavy block balancing is rejected even if it is more concise.
 
 10. **Consistent prepositions.** `from`, `to`, `in`, `on` carry the same meaning everywhere they appear. `from` = leaving a state. `to` = entering a state. `in` = while in a state. `on` = when an event fires. The token after the identifier (`assert`, `->`, `on`, body keywords) determines the kind of statement — the preposition's meaning never changes.
 
