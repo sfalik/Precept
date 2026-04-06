@@ -62,16 +62,18 @@ The real issue: constraints with `!IsPremium` define the default as the negation
 
 Root insight: Boolean fields for categorical data are the anti-pattern, not the syntax. A "premium" flag is a category, not a boolean. Issue #25 proposes choice types (`choice of Premium | Standard`) to eliminate this class of negation entirely.
 
-### Resolution: `when`/`unless` Guards on Invariants
+### Resolution: `when` Guards on Invariants (with `when not` for negation)
 
 **Approved syntax:**
 
 ```precept
 invariant Amount > 0 when IsPremium because "..."
-invariant Amount > 100 unless IsPremium because "..."
+invariant Amount > 100 when not IsPremium because "..."
 ```
 
-`when` is the structural guard (consistent with transition row guards). `unless` is syntactic sugar for `when not`. **New keyword: `not`** (replacing `!`). Replaces `!` for fluent readability: `when not IsPremium` reads better than `when !IsPremium`.
+`when` is the structural guard (consistent with transition row guards). Negative conditions use `when not` — there is no separate `unless` keyword. **New keyword: `not`** (replacing `!`). Replaces `!` for fluent readability: `when not IsPremium` reads better than `when !IsPremium`.
+
+**Why not `unless`?** The precedent survey (7-to-3 against) showed most comparable systems avoid a dedicated negation keyword. `unless` breaks down on compound conditions (De Morgan confusion with `unless A and B`), and Precept's one-canonical-form principle means `when not` is the single unambiguous way to express negative guards.
 
 ### Modeling Guidance
 
@@ -81,7 +83,7 @@ Boolean fields for categorical distinctions should use choice types (#25). The c
 
 | System | Conditional Constraint Pattern | Notes |
 |---|---|---|
-| FluentValidation | `When(condition)` / `Unless(condition)` | Flagship pattern. Positive only. |
+| FluentValidation | `When(condition)` / `Unless(condition)` | Flagship `When` pattern. `Unless` rarely used in practice. |
 | Drools | `when` in rule head | Structural guard. Flat rows. |
 | Cedar (AWS) | `when` guards on policy | Positive framing. |
 | DMN | Positive rows only | No negation. Alternatives via row selection. |
@@ -138,7 +140,7 @@ The design doc (around line 226) contains a `when` vs `if` comparison table show
 |---|---|---|
 | #9 | `if...then...else` value expression | Open — proposal revised |
 | #12 | Declined — semantic dual-meaning of `else` | Closed |
-| #14 | `when`/`unless` guards on invariants and edit declarations | Open — proposal revised |
+| #14 | `when` guards on invariants and edit declarations | Open — proposal revised, `unless` dropped |
 | #25 | Choice type eliminates boolean negation at modeling level | Open |
 | #31 | Replace `!` with `not` keyword (language-wide) | Open — split from #14 |
 | #8 | Named rules — future composability for grouped constraints | Open |
