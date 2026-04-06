@@ -159,6 +159,17 @@ The MCP server tools in `tools/Precept.Mcp/Tools/` are thin wrappers around core
 
 Before writing or editing any `.precept` file or any DSL snippet, read at least one representative sample file from `samples/` to confirm current syntax conventions. Do not rely on memory or inference — read first, then write.
 
+## Proposal Philosophy Capture (Non-Negotiable)
+
+Language proposals (GitHub issues) must include the design philosophy and rationale — not just the syntax and acceptance criteria. When a proposal is revised or a new feature is decided through design discussion:
+
+1. **Capture the reasoning in `docs/research/`** — research evidence, precedent surveys, dead ends explored, and why alternatives were rejected. This is the durable record that explains *why*.
+2. **Reference research from the proposal issue** — the issue body should link to the research file(s) that ground its decisions.
+3. **Update the issue map** in `docs/research/language/README.md` — connect each proposal to its research starting points.
+4. **Design doc updates happen at implementation time** — `docs/PreceptLanguageDesign.md` tracks what EXISTS in the runtime. Proposals describe what's PLANNED. The design doc is updated in the same PR that implements the feature, not before.
+
+This ensures philosophy and rationale survive across sessions and make their way back into the design doc when features ship.
+
 ## Design Option Responses
 
 When providing design-option responses, include concrete usage examples to illustrate the implementation and clarify the context of the options presented.

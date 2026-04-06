@@ -219,21 +219,14 @@ from <State|any> on <Event> when <Guard> -> ...
 
 ### Semantics
 
-`when` expresses **conditional availability** — whether the row is applicable to the current instance at all — which is a different question from which branch fires inside an applicable row.
+`when` expresses **conditional availability** — whether the row is applicable to the current instance at all. This is distinct from rejection, which is an explicit outcome for an applicable row.
 
-- `when` == `false` → the row is skipped entirely. No mutations, no branch evaluation, no `reject` message. The outcome is `Unmatched`, which is distinct from `Rejected`.
-- `when` == `true` → the row body is entered and branch guards evaluate normally.
+- `when` == `false` → the row is skipped entirely. No mutations, no rejection message. The outcome is `Unmatched`, which is distinct from `Rejected`.
+- `when` == `true` → the row body is entered and actions execute.
 
-**`when` vs `if`:**
+**`when` is the only conditional routing mechanism in the DSL.** Precept uses flat rows with `when` guards and first-match evaluation instead of nested branching. When multiple outcomes are needed for the same `(State, Event)` pair, write multiple rows — each with its own `when` guard — and let first-match routing select the appropriate one.
 
-| | `when` | `if` |
-|---|---|---|
-| Position | Row header | Row body |
-| Controls | Whether the row is applicable | Which branch fires |
-| False result | `Unmatched` — event not available | Falls through to next `else if` or `else` |
-| Use for | Structural availability | Routing logic |
-
-Use `when` when the intent is "this action isn't meaningful right now." Use `if`/`else`/`reject` when the intent is "this action was attempted but failed."
+Use `when` when the intent is "this action isn't meaningful right now." Use `reject` in a catch-all row (without `when`) when the intent is "this action was attempted but the conditions for success were not met."
 
 ### Authoring patterns
 
@@ -265,11 +258,11 @@ Once `ReopenCount` reaches 3, `Reopen` becomes `Unmatched` for this instance —
 
 **Nullable precondition — nullable narrowing inside the row body:**
 
-When the `when` expression constrains a nullable field (e.g. `when OfficerName != null`), the language server narrows that field to non-nullable inside all branches of the row body. No redundant null check needed inside.
+When the `when` expression constrains a nullable field (e.g. `when OfficerName != null`), the language server narrows that field to non-nullable inside all statements of the row body. No redundant null check needed inside.
 
 ### Scope restriction
 
-`when` expressions may only reference declared instance data fields and their properties. Event argument references (`EventName.ArgName`) in a `when` expression are a parse error. Arguments are not yet available when availability is evaluated — use `if` guards inside the body for argument-dependent routing.
+`when` expressions may only reference declared instance data fields and their properties. Event argument references (`EventName.ArgName`) in a `when` expression are a parse error. Arguments are not yet available when availability is evaluated — use additional rows with argument-dependent `when` guards for argument-dependent routing.
 
 ### Multiple rows for the same state+event
 
