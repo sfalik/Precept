@@ -950,6 +950,11 @@
       flex-shrink: 0;
       border-radius: 12px;
       background: rgba(18, 18, 23, 0.3);
+
+      .present-marker-h,
+      .future-state-card-h {
+        gap: 6px;
+      }
       text-align: center;
       transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
     }
@@ -1003,13 +1008,18 @@
     }
 
     .past-card.edit-card {
-      border-color: rgba(99, 102, 241, 0.28);
-      background: rgba(22, 23, 35, 0.82);
+        border-color: rgba(252, 211, 77, 0.24);
+        background:
+          linear-gradient(180deg, rgba(252, 211, 77, 0.07) 0%, rgba(252, 211, 77, 0.02) 34%, rgba(18, 19, 24, 0) 100%),
+          rgba(22, 23, 29, 0.84);
+        box-shadow: inset 0 1px 0 rgba(252, 211, 77, 0.10), inset 3px 0 0 rgba(252, 211, 77, 0.14);
     }
 
     .past-card.edit-card:hover {
-      border-color: rgba(99, 102, 241, 0.42);
-      background: rgba(24, 26, 40, 0.88);
+        border-color: rgba(252, 211, 77, 0.36);
+        background:
+          linear-gradient(180deg, rgba(252, 211, 77, 0.10) 0%, rgba(252, 211, 77, 0.03) 38%, rgba(18, 19, 24, 0) 100%),
+          rgba(24, 26, 32, 0.9);
     }
 
     .pc-event {
@@ -1020,7 +1030,7 @@
     }
 
     .past-card.edit-card .pc-event {
-      color: var(--indigo);
+      color: var(--cyan);
     }
 
     .pc-outcome {
@@ -1109,14 +1119,6 @@
       box-shadow: none;
     }
 
-    .pm-h-eyebrow {
-      font-size: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: var(--muted);
-      font-weight: 700;
-    }
-
     .pm-h-state-name,
     .future-state-name-h {
       font-size: 12px;
@@ -1129,8 +1131,7 @@
       gap: 8px;
     }
 
-    .pm-h-footer,
-    .future-state-sources-h {
+    .pm-h-footer {
       font-size: 8px;
       color: var(--dusk);
       line-height: 1.35;
@@ -2587,9 +2588,7 @@
       }
 
       const presentStateClasses = getTimelineStateClassNames(sim.currentState, { isCurrent: true, includeTerminalLegacy: true });
-      const presentStateLabel = getTimelineStateSemanticLabel(sim.currentState, true);
       html += `<div class="present-marker-h ${presentStateClasses}" data-state="${sim.currentState}" onmouseenter="setHoverState('${sim.currentState}')" onmouseleave="clearHoverState()">
-        <div class="pm-h-eyebrow">${presentStateLabel}</div>
         <div class="pm-h-state-name">${sim.currentState}</div>
         ${sim.stepCount === 0 ? '' : `<div class="pm-h-footer">${sim.stepCount} committed step${sim.stepCount === 1 ? '' : 's'}</div>`}
       </div>`;
@@ -2614,12 +2613,10 @@
           transitionEvents.forEach(evt => {
             const target = evt.rows[0].target;
             const targetStateClasses = getTimelineStateClassNames(target);
-            const targetStateLabel = getTimelineStateSemanticLabel(target, false);
             html += `<div class="future-transition-lane-h">`;
             html += renderSlimEventCardH(evt);
             html += `<div class="h-connector future-to-state"></div>`;
             html += `<div class="future-state-card-h ${targetStateClasses}" data-state="${target}" onmouseenter="setHoverState('${target}')" onmouseleave="clearHoverState()">`;
-            html += `<div class="future-state-sources-h">${targetStateLabel}</div>`;
             html += `<div class="future-state-name-h">${target}</div>`;
             html += `</div>`;
             html += `</div>`;
@@ -2641,16 +2638,6 @@
         meta.terminal ? 'state-terminal' : '',
         includeTerminalLegacy && meta.terminal ? 'terminal-state' : ''
       ].filter(Boolean).join(' ');
-    }
-
-    function getTimelineStateSemanticLabel(state, isCurrent = false) {
-      const meta = STATE_META[state] || { initial: false, terminal: false };
-      if (isCurrent && meta.initial) return 'Current initial state';
-      if (isCurrent && meta.terminal) return 'Current terminal state';
-      if (isCurrent) return 'Current state';
-      if (meta.initial) return 'Initial state';
-      if (meta.terminal) return 'Terminal state';
-      return 'State';
     }
 
     function renderSlimEventCardH(evt) {

@@ -24,7 +24,6 @@
   .callout { padding: 14px 18px; background: #1e1b4b; border: 1px solid #312e81; border-radius: 8px; font-size: 13px; color: #c7d2fe; margin: 16px 0; }
 
   table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 12px 0; }
-  th { text-align: left; padding: 8px 10px; color: #71717a; font-weight: 500; border-bottom: 1px solid #27272a; }
   td { padding: 8px 10px; color: #a1a1aa; border-bottom: 1px solid #1e1b4b; }
 
   .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: middle; margin-right: 6px; }
@@ -33,7 +32,6 @@
   .badge .value { padding: 3px 7px; color: #fff; }
 
   .syntax-block {
-    font-family: var(--brand-mono);
     font-size: 13px;
     line-height: 1.8;
     background: #0c0c0f;
@@ -47,28 +45,21 @@
   .do-dont { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .do-col { background: #0c1a0c; border: 1px solid #14532d; border-radius: 8px; padding: 16px; }
   .dont-col { background: #1a0c0c; border: 1px solid #7f1d1d; border-radius: 8px; padding: 16px; }
-  .do-col h4 { color: #34d399; font-size: 12px; margin-bottom: 10px; }
   .dont-col h4 { color: #fb7185; font-size: 12px; margin-bottom: 10px; }
   .do-col li, .dont-col li { font-size: 12px; line-height: 1.8; margin-left: 16px; }
   .do-col li { color: #86efac; }
   .dont-col li { color: #fda4af; }
 
-  .palette-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 16px 0; }
   .palette-card { border-radius: 8px; padding: 14px; text-align: center; }
   .palette-card .hex { font-size: 11px; opacity: 0.8; margin-top: 4px; }
   .palette-card .role { font-size: 10px; margin-top: 6px; opacity: 0.6; }
 
-  /* Exploration-format palette card (mirrors color-exploration.html) */
   .pc-card { width: 320px; background: #141414; border: 1px solid #222; border-radius: 12px; overflow: hidden; margin: 16px 0; }
   .pc-card h2 { font-size: 16px; font-weight: 600; padding: 20px 20px 4px; color: #e5e5e5; margin: 0; text-transform: none; letter-spacing: normal; border: none; }
   .pc-hex { font-size: 13px; color: #888; padding: 0 20px 16px; font-family: ui-monospace, monospace; }
-  .pc-swatch-bar { height: 64px; }
-  .pc-swatch-gradient { height: 32px; display: flex; }
   .pc-swatch-gradient div { flex: 1; }
   .pc-context-block { padding: 16px 20px; border-top: 1px solid #1e1e1e; }
   .pc-context-block h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #666; margin: 0 0 10px; font-weight: 600; border: none; padding: 0; }
-  .pc-syntax { font-family: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace; font-size: 12px; line-height: 1.7; background: #0d0d0d; border-radius: 6px; padding: 12px 14px; margin: 8px 0; white-space: pre; overflow-x: auto; }
-  .pc-diagram { margin: 8px 0; }
   .pc-diagram svg { width: 100%; display: block; }
   .pc-icon-row { display: flex; align-items: center; gap: 16px; }
 
@@ -77,7 +68,6 @@
   .pc-palette-header { background: #6366F1; padding: 20px 24px; }
   .pc-palette-header h2 { font-size: 18px; font-weight: 700; color: #fff; margin: 0; text-transform: none; letter-spacing: normal; border: none; }
   .pc-palette-header p { font-size: 13px; color: rgba(255,255,255,0.7); margin: 4px 0 0; }
-  .pc-palette-body { padding: 24px; }
   .pc-palette-group { margin-bottom: 24px; }
   .pc-palette-group:last-child { margin-bottom: 0; }
   .pc-palette-group h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #71717A; margin: 0 0 12px; font-weight: 600; border: none; padding: 0; }
@@ -87,28 +77,18 @@
   .pc-palette-swatch .swatch-info { font-size: 12px; }
   .pc-palette-swatch .swatch-role { font-weight: 600; }
   .pc-palette-swatch .swatch-hex { font-family: ui-monospace, monospace; font-size: 11px; color: #71717A; margin-top: 2px; }
-  .pc-palette-note { background: #18181b; border: 1px solid #27272A; border-radius: 8px; padding: 12px 16px; margin-top: 20px; font-size: 12px; color: #A1A1AA; display: flex; align-items: center; gap: 12px; }
   .pc-palette-note .swatch-block { width: 28px; height: 28px; border-radius: 4px; flex-shrink: 0; }
-
-  .lockup { display: flex; align-items: center; gap: 16px; margin: 16px 0; }
-
-  .status-chip { display: inline-block; background: #14532d; color: #34d399; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; letter-spacing: 0.5px; margin-left: 8px; vertical-align: middle; }
-  [style*="Inconsolata"] { font-family: var(--brand-mono) !important; }
   svg text { font-family: var(--brand-mono); }
 
-  /* ═══════════════════════════════════════════════════════════════════════════
+  /* ========================================================================
      Surface Palette Mapping (.spm-*) — Unified treatment for §2.1, §2.2
      Echoes the polished sf-palette structure from §1.4
-     ═══════════════════════════════════════════════════════════════════════════ */
+     ======================================================================== */
   .spm-surface { background: #0c0c0f; border: 1px solid #27272a; border-radius: 12px; overflow: hidden; margin: 24px 0; }
   .spm-header { padding: 18px 0; border-bottom: 1px solid #1e1b4b; }
   .spm-header h3 { font-size: 14px; font-weight: 700; margin: 0; text-transform: none; letter-spacing: normal; border: none; padding: 0; display: flex; align-items: center; gap: 10px; }
-  .spm-header p { font-size: 11px; color: #71717a; margin: 6px 0 0; line-height: 1.5; }
   .spm-header .spm-hue { font-size: 11px; font-weight: 400; color: #52525b; font-family: ui-monospace, monospace; }
   .spm-body { padding: 0; }
-  .spm-row { display: grid; grid-template-columns: 56px 1fr; gap: 16px; align-items: start; padding: 14px 24px; border-bottom: 1px solid rgba(30, 27, 75, 0.5); }
-  .spm-row:last-child { border-bottom: none; }
-  .spm-swatch { width: 56px; height: 38px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08); flex-shrink: 0; }
   .spm-info { display: flex; flex-direction: column; gap: 2px; }
   .spm-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .spm-name { font-size: 13px; font-weight: 600; }
@@ -140,12 +120,14 @@
   .spm-table-header h4 .spm-dot { width: 8px; height: 8px; border-radius: 50%; }
 
   /* Shape tiles for diagram lifecycle */
-  .spm-shapes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
-  .spm-shape-tile { background: #0f0f12; border: 1px solid #1e1b4b; border-radius: 10px; padding: 16px 12px; text-align: center; }
-  .spm-shape-icon { width: 44px; height: 44px; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; }
+  .spm-shapes { display: grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap: 16px; margin: 20px 0; }
+  .spm-shape-tile { background: #0f0f12; border: 1px solid #1e1b4b; border-radius: 10px; padding: 20px 16px; text-align: center; }
+  .spm-shape-icon { width: 92px; height: 92px; margin: 0 auto 14px; display: flex; align-items: center; justify-content: center; }
   .spm-shape-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
   .spm-shape-meta { font-size: 10px; color: #71717a; margin-bottom: 2px; }
   .spm-shape-desc { font-size: 10px; color: #52525b; }
+  .origin-inline-lockup { display: inline-flex; align-items: center; justify-content: center; gap: 10px; white-space: nowrap; }
+  .origin-inline-dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
 </style>
 </head>
 <body>
@@ -154,7 +136,7 @@
 <!-- HEADER                                                                 -->
 <!-- ===================================================================== -->
 <h1>Precept</h1>
-<p class="subtitle">Brand Specification — Surfaces & Identity &nbsp;·&nbsp; Last updated: 2026-04-04</p>
+<p class="subtitle">Brand Specification — Surfaces & Identity &nbsp;·&nbsp; Last updated: 2026-04-06</p>
 
 <!-- STRUCTURE
      1. Brand Identity
@@ -301,7 +283,7 @@
         <line x1="20" y1="20" x2="44" y2="20" stroke="#818cf8" stroke-width="1.5"/>
         <line x1="20" y1="27" x2="40" y2="27" stroke="#71717a" stroke-width="1" opacity="0.5"/>
         <line x1="20" y1="33" x2="42" y2="33" stroke="#FBBF24" stroke-width="1" opacity="0.85"/>
-        <circle cx="24" cy="44" r="4" fill="none" stroke="#4338CA" stroke-width="1.5"/>
+        <rect x="20" y="40" width="8" height="8" rx="3" fill="none" stroke="#4338CA" stroke-width="1.5"/>
         <circle cx="24" cy="44" r="1.5" fill="#6366f1"/>
         <line x1="28" y1="44" x2="34" y2="44" stroke="#34D399" stroke-width="1.2"/>
         <path d="M33.5,42.5 L36,44 L33.5,45.5" fill="#34D399"/>
@@ -343,13 +325,13 @@
     <div style="text-align:center;">
       <svg width="64" height="64" viewBox="0 0 64 64">
         <rect width="64" height="64" rx="12" fill="#1e1b4b"/>
-        <circle cx="18" cy="32" r="8" fill="none" stroke="#4338CA" stroke-width="2.5"/>
+        <rect x="10" y="24" width="16" height="16" rx="4" fill="none" stroke="#4338CA" stroke-width="2.5"/>
         <circle cx="18" cy="32" r="3" fill="#6366f1"/>
         <line x1="26" y1="32" x2="38" y2="32" stroke="#34D399" stroke-width="1.5"/>
         <path d="M37,29.5 L42,32 L37,34.5" fill="#34D399"/>
         <rect x="40" y="24" width="16" height="16" rx="4" fill="none" stroke="#4338CA" stroke-width="1.5"/>
       </svg>
-      <div style="font-size:11px;color:#52525b;margin-top:6px;">State + transition</div>
+      <div style="font-size:11px;color:#52525b;margin-top:6px;">State + transition (equal square cards)</div>
     </div>
     <div style="text-align:center;">
       <svg width="64" height="64" viewBox="0 0 64 64">
@@ -371,13 +353,13 @@
         <line x1="20" y1="27" x2="40" y2="27" stroke="#71717a" stroke-width="1" opacity="0.5"/>
         <!-- Gold: the remembered rule — judicious, because "…" lives here -->
         <line x1="20" y1="33" x2="34" y2="33" stroke="#FBBF24" stroke-width="1.5" opacity="0.9"/>
-        <circle cx="24" cy="44" r="4" fill="none" stroke="#4338CA" stroke-width="1.5"/>
+        <rect x="20" y="40" width="8" height="8" rx="3" fill="none" stroke="#4338CA" stroke-width="1.5"/>
         <circle cx="24" cy="44" r="1.5" fill="#6366f1"/>
         <line x1="28" y1="44" x2="34" y2="44" stroke="#34D399" stroke-width="1.2"/>
         <path d="M33.5,42.5 L36,44 L33.5,45.5" fill="#34D399"/>
         <rect x="36" y="40" width="8" height="8" rx="2" fill="none" stroke="#4338CA" stroke-width="1.5"/>
       </svg>
-      <div style="font-size:11px;color:#52525b;margin-top:6px;">Tablet + state machine</div>
+      <div style="font-size:11px;color:#52525b;margin-top:6px;">Tablet + state machine (equal square cards)</div>
     </div>
 
     <!-- Color key -->
@@ -391,7 +373,7 @@
     </div>
   </div>
 
-  <p style="margin-top:16px;">The three marks share one palette and one conceptual language. Each surfaces a different aspect of Precept: the state machine, the written rule, and the two ideas combined. The combined form is the primary mark. The transition arrow is Emerald in all marks that carry one — Emerald reads as allowed flow, not generic accent. Gold is used judiciously: the <code>because</code> line encoding the human-readable rule appears in both the tablet and combined marks, a deliberate signal of the remembered truth at the heart of every precept. It earns its place precisely because it is never decorative.</p>
+  <p style="margin-top:16px;">The three marks share one palette and one conceptual language. Each surfaces a different aspect of Precept: the state machine, the written rule, and the two ideas combined. The combined form is the primary mark. In every state-bearing mark, the canonical outer silhouette is the rounded state card; the small internal dot remains as the origin cue and centers within the state shape whenever it appears without a label. In the brand mark, the two state shapes are the same size and square-shaped, rendered as equal rounded cards rather than mismatched or elongated forms. The mark never uses a circular outer state silhouette. Labeled product surfaces may shift the dot left into a single-line dot + label lockup, but standalone icon forms keep the dot centered. The transition arrow is Emerald in all marks that carry one — Emerald reads as allowed flow, not generic accent. Gold is used judiciously: the <code>because</code> line encoding the human-readable rule appears in both the tablet and combined marks, a deliberate signal of the remembered truth at the heart of every precept. It earns its place precisely because it is never decorative.</p>
 
   <div class="callout" style="margin-top:16px;">
     <strong>Note:</strong> The icon prototyping loop in <code>brand/icon-prototyping-loop/</code> continues to explore icon variations. This section locks the <em>conceptual form</em> and <em>color mapping</em> of the brand mark. Final icon rendering (corner radii, stroke weights, optical sizing) may refine through the prototyping loop without changing the locked form.
@@ -927,20 +909,20 @@
   <p style="margin-bottom:12px;">State diagrams apply the five semantic families and three semantic signal colors (Emerald, Amber, Rose for verdict overlay) from § 1.4. For syntax-specific color application, see § 2.1. The diagram relies primarily on shape and edge styling, with italic reserved for constrained labels. Any non-semantic tones used here are local surface neutrals for the canvas, legend, or open current-state treatment; they do not expand the general system.</p>
 
   <div class="callout" style="margin-bottom:16px;">
-    <strong>No lifecycle tints:</strong> States are not tinted by role (initial/intermediate/terminal). Shape carries that signal. All state nodes use locked indigo for borders and violet for state names.
+    <strong>Single canonical silhouette:</strong> States are not tinted by role (initial/intermediate/terminal). The rounded state card is the base silhouette everywhere in the diagram. Origin keeps a small internal dot that centers when it stands alone; if the state name shares the card, the dot shifts left into a single-line dot + label row with both elements vertically centered and never wrapping. Terminal keeps an outer echo border. All state nodes use locked indigo for borders and violet for state names. Brand-mark adaptations inherit that rounded-card silhouette; in the mark itself, the paired state shapes normalize to equal-size square cards so the icon stays compact and balanced.
   </div>
 
   <!-- State lifecycle shapes — unified tile treatment -->
   <div class="spm-shapes">
     <div class="spm-shape-tile">
       <div class="spm-shape-icon">
-        <div style="width:40px; height:40px; border-radius:50%; border:3px solid #6366F1; display:flex; align-items:center; justify-content:center;">
-          <span style="color:#6366F1; font-size:11px; font-weight:700;">●</span>
+        <div style="width:40px; height:40px; border-radius:10px; border:3px solid #6366F1; display:flex; align-items:center; justify-content:center; position:relative;">
+          <span style="width:7px; height:7px; border-radius:50%; background:#6366F1;"></span>
         </div>
       </div>
       <div class="spm-shape-name" style="color:#6366F1;">Initial</div>
-      <div class="spm-shape-meta">Shape: Circle</div>
-      <div class="spm-shape-desc">Entry point</div>
+      <div class="spm-shape-meta">Shape: Rounded card + centered origin dot</div>
+      <div class="spm-shape-desc">Canonical origin card when no label shares the box</div>
     </div>
     <div class="spm-shape-tile">
       <div class="spm-shape-icon">
@@ -949,7 +931,7 @@
         </div>
       </div>
       <div class="spm-shape-name" style="color:#6366F1;">Intermediate</div>
-      <div class="spm-shape-meta">Shape: Rounded rect</div>
+      <div class="spm-shape-meta">Shape: Rounded card</div>
       <div class="spm-shape-desc">In-progress</div>
     </div>
     <div class="spm-shape-tile">
@@ -959,7 +941,7 @@
         </div>
       </div>
       <div class="spm-shape-name" style="color:#6366F1;">Terminal</div>
-      <div class="spm-shape-meta">Shape: Double-border</div>
+      <div class="spm-shape-meta">Shape: Rounded card + outer echo</div>
       <div class="spm-shape-desc">Endpoint</div>
     </div>
     <div class="spm-shape-tile" style="background:#0c0c0f;">
@@ -976,8 +958,9 @@
     <rect width="520" height="140" fill="#0c0c0f" rx="8"/>
 
     <!-- Draft (origin) -->
-    <circle cx="60" cy="70" r="26" fill="none" stroke="#4338CA" stroke-width="2.5"/>
-    <text x="60" y="74" text-anchor="middle" fill="#A898F5" font-size="11" font-family="Cascadia Cove,monospace" font-weight="600">Draft</text>
+    <rect x="28" y="44" width="78" height="52" rx="12" fill="none" stroke="#4338CA" stroke-width="2.5"/>
+    <circle cx="46" cy="70" r="4" fill="#4338CA"/>
+    <text x="58" y="74" text-anchor="start" fill="#A898F5" font-size="11" font-family="Cascadia Cove,monospace" font-weight="600">Draft</text>
 
     <!-- UnderReview -->
     <rect x="170" y="46" width="90" height="48" rx="6" fill="none" stroke="#4338CA" stroke-width="1.5"/>
@@ -997,8 +980,8 @@
     <defs>
       <marker id="aFlow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7" fill="#34D399"/></marker>
     </defs>
-    <line x1="86" y1="70" x2="166" y2="70" stroke="#34D399" stroke-width="1.2" marker-end="url(#aFlow)"/>
-    <text x="126" y="62" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Cascadia Cove,monospace">Submit</text>
+    <line x1="106" y1="70" x2="166" y2="70" stroke="#34D399" stroke-width="1.2" marker-end="url(#aFlow)"/>
+    <text x="136" y="62" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Cascadia Cove,monospace">Submit</text>
 
     <line x1="260" y1="56" x2="346" y2="40" stroke="#34D399" stroke-width="1.2" opacity="0.6" marker-end="url(#aFlow)"/>
     <text x="303" y="40" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Cascadia Cove,monospace">Approve</text>
@@ -1008,7 +991,8 @@
 
     <!-- Legend -->
     <g transform="translate(20, 128)">
-      <circle cx="6" cy="0" r="4" fill="none" stroke="#4338CA" stroke-width="2"/>
+      <rect x="2" y="-4" width="8" height="8" rx="3" fill="none" stroke="#4338CA" stroke-width="2"/>
+      <circle cx="6" cy="0" r="1.5" fill="#4338CA"/>
       <text x="14" y="4" fill="#52525b" font-size="8" font-family="Cascadia Cove,monospace">Initial</text>
       <rect x="60" y="-4" width="8" height="8" rx="2" fill="none" stroke="#4338CA" stroke-width="1.5"/>
       <text x="72" y="4" fill="#52525b" font-size="8" font-family="Cascadia Cove,monospace">Intermediate</text>
@@ -1023,12 +1007,12 @@
   </svg>
 
   <h3>State lifecycle roles</h3>
-  <p style="margin-bottom:12px;">Three structural roles determined at compile time. All states use locked indigo border <code>#6366F1</code> and violet state names <code>#A898F5</code>. Shape encodes role:</p>
+  <p style="margin-bottom:12px;">Three structural roles determined at compile time. All states use the rounded card as the canonical outer silhouette, with locked indigo border <code>#6366F1</code> and violet state names <code>#A898F5</code>. Origin adds an internal dot; the dot centers when it stands alone, and shifts into a one-line dot + label row when the card also names the state. Terminal adds an outer echo border:</p>
   <table>
     <tr><th>Role</th><th>Shape</th><th>Detection</th></tr>
-    <tr><td>Initial</td><td>Circle (origin node)</td><td>Declared with <code>initial</code> modifier</td></tr>
-    <tr><td>Intermediate</td><td>Rounded rectangle</td><td>Has both inbound and outbound transitions</td></tr>
-    <tr><td>Terminal</td><td>Double-border rectangle</td><td>No outbound transitions</td></tr>
+    <tr><td>Initial</td><td>Rounded card with centered internal origin dot, or a single-line dot + label row when the card is labeled</td><td>Declared with <code>initial</code> modifier</td></tr>
+    <tr><td>Intermediate</td><td>Rounded card</td><td>Has both inbound and outbound transitions</td></tr>
+    <tr><td>Terminal</td><td>Rounded card with outer echo border</td><td>No outbound transitions</td></tr>
   </table>
 
   <div class="callout" style="margin-top:16px;">
@@ -1308,274 +1292,300 @@
 
 <div class="card">
   <h3>Purpose</h3>
-  <p>Horizontal event timeline in the VS Code preview panel. Reads left-to-right as a chronological record: origin → past events → current state → available future events → reachable target states. The timeline is the primary narrative surface — it tells the story of how an instance arrived at its current state and what can happen next.</p>
-
-  <h3>Layout model</h3>
-  <p style="margin-bottom:8px;">A single horizontal scrolling track. Cards are connected by thin gradient connectors. The track auto-scrolls rightward as events fire so the present state and future options are always visible. Vertical stacking is used only within the future zone (multiple event cards and target state cards can stack).</p>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li><strong>Flow direction:</strong> Left → right. Past compresses, present anchors, future expands.</li>
-    <li><strong>Connectors:</strong> 2px horizontal gradient lines between cards. Color shifts from neutral → violet (past-to-present) → cyan (present-to-future) to signal temporal zone change.</li>
-    <li><strong>Card height:</strong> Uniform <code>--tl-card-height</code> (80px default) across all card types. This locks vertical alignment and keeps connectors straight.</li>
-    <li><strong>Typography baseline:</strong> All card titles use 11px / font-weight 600 / line-height 1. Left-aligned within the card. This is non-negotiable — title inconsistency breaks the horizontal rhythm.</li>
-    <li><strong>Density rule:</strong> Timeline cards are compact by default. Prefer one-line titles, one short tag row, one primary effect line, and at most one supporting line before inputs.</li>
-  </ul>
-
-  <h3>Card taxonomy</h3>
-  <p style="margin-bottom:12px;">Six card types arranged across three temporal zones. Shape, border, and color encode both zone and structural role.</p>
-  <div class="callout" style="margin-bottom:16px;">
-    <strong>Card grammar:</strong>
-    <p style="margin:8px 0 0; line-height:1.7;">Every timeline card uses the same internal anatomy in the same order: <strong>header row</strong>, <strong>tag row</strong>, <strong>body row</strong>, and an <strong>optional footer row</strong>. Titles always start at the same left edge. Tags always live on their own row. The compact default is one title line, one tag row, one effect line, and one optional supporting line.</p>
-  </div>
-
-  <!-- Canonical card specimens -->
-  <div class="spm-shapes" style="grid-template-columns: repeat(2, minmax(0, 1fr)); gap:16px;">
-    <!-- Origin -->
-    <div class="spm-shape-tile" style="text-align:left; padding:16px;">
-      <div style="min-height:92px; border-radius:10px; border:2px solid rgba(67,56,202,0.50); background:#0f0f12; padding:10px; display:flex; flex-direction:column; gap:6px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; min-height:16px; gap:8px;">
-          <div style="display:flex; align-items:center; gap:6px;"><span style="color:#4338CA; font-size:12px; font-weight:700; line-height:1;">●</span><span style="color:#A898F5; font-size:11px; font-weight:600; line-height:1;">Draft</span></div>
-          <span style="visibility:hidden; font-size:8px; padding:2px 8px;">&nbsp;</span>
-        </div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px; min-height:14px; align-items:flex-start;">
-          <span style="border:1px solid rgba(168,152,245,0.35); background:rgba(168,152,245,0.08); color:#A898F5; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">origin</span>
-        </div>
-        <div style="display:flex; flex-direction:column; gap:3px; min-height:24px; justify-content:flex-start;">
-          <div style="color:#71717a; font-size:8px; line-height:1.3;">Entry point for this instance.</div>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#A898F5; margin-top:10px; text-align:center;">Origin</div>
-      <div class="spm-shape-meta" style="text-align:center;">Past zone · entry point</div>
-      <div class="spm-shape-desc" style="text-align:center;">Header, tag row, two-line body</div>
-    </div>
-    <!-- Past Event -->
-    <div class="spm-shape-tile" style="text-align:left; padding:16px;">
-      <div style="min-height:92px; border-radius:10px; border:1px solid rgba(39,39,42,0.5); background:#0f0f12; padding:10px; display:flex; flex-direction:column; gap:6px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; min-height:16px; gap:8px;">
-          <div style="display:flex; align-items:center; gap:6px;"><span style="color:#30B8E8; font-size:12px; font-weight:700; line-height:1;">▸</span><span style="color:#30B8E8; font-size:11px; font-weight:600; line-height:1;">Submit</span></div>
-          <span style="visibility:hidden; font-size:8px; padding:2px 8px;">&nbsp;</span>
-        </div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px; min-height:14px; align-items:flex-start;">
-          <span style="border:1px solid rgba(113,113,122,0.20); background:rgba(113,113,122,0.08); color:#a1a1aa; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">step 3</span>
-        </div>
-        <div style="display:flex; flex-direction:column; gap:3px; min-height:24px; justify-content:flex-start;">
-          <div style="color:#34D399; font-size:10px; line-height:1.25;">→ <span style="color:#A898F5; font-weight:600;">Open</span></div>
-          <div style="color:#71717a; font-size:8px; line-height:1.3;"><span style="color:#B0BEC5;">RequesterName</span> = <span style="color:#34D399;">&quot;Mina&quot;</span></div>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#30B8E8; margin-top:10px; text-align:center;">Past Event</div>
-      <div class="spm-shape-meta" style="text-align:center;">Past zone · completed event</div>
-      <div class="spm-shape-desc" style="text-align:center;">Same skeleton, event coloring</div>
-    </div>
-    <!-- Past Edit -->
-    <div class="spm-shape-tile" style="text-align:left; padding:16px;">
-      <div style="min-height:92px; border-radius:10px; border:1px solid rgba(176,190,197,0.25); background:#0f0f12; padding:10px; display:flex; flex-direction:column; gap:6px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; min-height:16px; gap:8px;">
-          <div style="display:flex; align-items:center; gap:6px;"><span style="color:#B0BEC5; font-size:12px; font-weight:700; line-height:1;">✎</span><span style="color:#B0BEC5; font-size:11px; font-weight:600; line-height:1;">edit Location</span></div>
-          <span style="visibility:hidden; font-size:8px; padding:2px 8px;">&nbsp;</span>
-        </div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px; min-height:14px; align-items:flex-start;">
-          <span style="border:1px solid rgba(113,113,122,0.20); background:rgba(113,113,122,0.08); color:#a1a1aa; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">step 4</span>
-          <span style="border:1px solid rgba(176,190,197,0.18); background:rgba(176,190,197,0.08); color:#B0BEC5; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">data</span>
-        </div>
-        <div style="display:flex; flex-direction:column; gap:3px; min-height:24px; justify-content:flex-start;">
-          <div style="color:#34D399; font-size:10px; line-height:1.25;">↻ <span style="color:#A898F5; font-weight:600;">Open</span></div>
-          <div style="color:#71717a; font-size:8px; line-height:1.3;"><span style="color:#B0BEC5;">Location</span> = <span style="color:#34D399;">&quot;South Hall&quot;</span></div>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#B0BEC5; margin-top:10px; text-align:center;">Past Edit</div>
-      <div class="spm-shape-meta" style="text-align:center;">Past zone · data mutation</div>
-      <div class="spm-shape-desc" style="text-align:center;">Same skeleton, edit coloring</div>
-    </div>
-    <!-- Present State -->
-    <div class="spm-shape-tile" style="text-align:left; padding:16px;">
-      <div style="min-height:92px; border-radius:12px; border:1.5px solid rgba(168,152,245,0.40); background:#0f0f12; box-shadow:0 0 20px rgba(168,152,245,0.08); padding:10px; display:flex; flex-direction:column; gap:6px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; min-height:16px; gap:8px;">
-          <div style="display:flex; align-items:center; gap:6px;"><span style="color:#A898F5; font-size:12px; font-weight:700; line-height:1;">◎</span><span style="color:#A898F5; font-size:11px; font-weight:600; line-height:1;">Open</span></div>
-          <span style="visibility:hidden; font-size:8px; padding:2px 8px;">&nbsp;</span>
-        </div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px; min-height:14px; align-items:flex-start;">
-          <span style="border:1px solid rgba(168,152,245,0.35); background:rgba(168,152,245,0.08); color:#A898F5; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">current</span>
-          <span style="border:1px solid rgba(113,113,122,0.20); background:rgba(113,113,122,0.08); color:#a1a1aa; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">step 4</span>
-          <span style="border:1px solid rgba(99,102,241,0.25); background:rgba(99,102,241,0.08); color:#6366F1; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">editable</span>
-        </div>
-        <div style="display:flex; flex-direction:column; gap:3px; min-height:24px; justify-content:flex-start;">
-          <div style="color:#71717a; font-size:8px; line-height:1.3;">Submitted and awaiting assignment.</div>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#A898F5; margin-top:10px; text-align:center;">Present State</div>
-      <div class="spm-shape-meta" style="text-align:center;">Present zone · "you are here"</div>
-      <div class="spm-shape-desc" style="text-align:center;">Shared skeleton, state emphasis</div>
-    </div>
-    <!-- Future Event -->
-    <div class="spm-shape-tile" style="text-align:left; padding:16px;">
-      <div style="min-height:92px; border-radius:14px; border:1px solid rgba(48,184,232,0.20); background:#0f0f12; padding:10px; display:flex; flex-direction:column; gap:6px;">
-        <div style="display:flex; align-items:center; justify-content:flex-start; min-height:16px; gap:8px;">
-          <span style="display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(48,184,232,0.35); color:#30B8E8; border-radius:5px; font-size:10px; font-weight:600; padding:3px 9px;"><span style="font-size:11px; font-weight:700; line-height:1;">▸</span><span>Assign</span></span>
-        </div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px; min-height:14px; align-items:flex-start;">
-          <span style="border:1px solid rgba(52,211,153,0.20); background:rgba(52,211,153,0.08); color:#34D399; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">enabled</span>
-        </div>
-        <div style="display:flex; flex-direction:column; gap:3px; min-height:24px; justify-content:flex-start;">
-          <div style="color:#71717a; font-size:8px; line-height:1.3;">to <span style="color:#A898F5; font-weight:600;">Scheduled</span></div>
-          <div style="color:#9096A6; font-size:8px; line-height:1.3;">Requires AssignedTechnician</div>
-        </div>
-        <div style="display:flex; align-items:center; gap:4px; min-height:18px;"><span style="color:#9096A6; font-size:7px; text-transform:uppercase; letter-spacing:0.4px;">tech</span><span style="background:rgba(12,12,15,0.7); border:1px solid rgba(99,102,241,0.25); color:#e5e5e5; border-radius:3px; font-size:9px; padding:2px 6px;">avery</span></div>
-      </div>
-      <div class="spm-shape-name" style="color:#30B8E8; margin-top:10px; text-align:center;">Future Event</div>
-      <div class="spm-shape-meta" style="text-align:center;">Future zone · fireable action</div>
-      <div class="spm-shape-desc" style="text-align:center;">CTA-first button, tags, effect, args</div>
-    </div>
-    <!-- Future State -->
-    <div class="spm-shape-tile" style="text-align:left; padding:16px;">
-      <div style="min-height:92px; border-radius:10px; border:1.5px solid rgba(67,56,202,0.30); background:#0f0f12; padding:10px; display:flex; flex-direction:column; gap:6px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; min-height:16px; gap:8px;">
-          <div style="display:flex; align-items:center; gap:6px;"><span style="color:#A898F5; font-size:12px; font-weight:700; line-height:1;">□</span><span style="color:#A898F5; font-size:11px; font-weight:600; line-height:1;">Scheduled</span></div>
-          <span style="visibility:hidden; font-size:8px; padding:2px 8px;">&nbsp;</span>
-        </div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px; min-height:14px; align-items:flex-start;">
-          <span style="visibility:hidden; border-radius:3px; font-size:7px; padding:1px 5px;">&nbsp;</span>
-        </div>
-        <div style="display:flex; flex-direction:column; gap:3px; min-height:24px; justify-content:flex-start;">
-          <div style="color:#71717a; font-size:8px; line-height:1.3;">Technician assigned.</div>
-          <div style="color:#52525b; font-size:8px; line-height:1.3;">via <span style="color:#30B8E8;">Assign</span></div>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#A898F5; margin-top:10px; text-align:center;">Future State</div>
-      <div class="spm-shape-meta" style="text-align:center;">Future zone · reachable target</div>
-      <div class="spm-shape-desc" style="text-align:center;">Same skeleton, quieter state body</div>
-    </div>
-  </div>
-
-  <h3>Card details</h3>
-
-  <p style="margin-bottom:12px;">The table below describes each card as a variant of the same grammar. Differences are limited to shell treatment, tag set, and whether the card needs a footer row.</p>
-
-  <table>
-    <tr><th>Card</th><th>Zone</th><th>Shell</th><th>Header row</th><th>Tag row</th><th>Body / footer</th></tr>
-    <tr>
-      <td>Origin</td>
-      <td>Past</td>
-      <td>Rounded rect, 10px radius, 2px indigo border</td>
-      <td>Icon + title: <code>● Draft</code>. No right-side control.</td>
-      <td><code>origin</code> only.</td>
-      <td>One short descriptor. No footer.</td>
-    </tr>
-    <tr>
-      <td>Past Event</td>
-      <td>Past</td>
-      <td>Rounded rect, 10px radius, neutral border</td>
-      <td>Icon + title: <code>▸ Submit</code>. No right-side control.</td>
-      <td><code>step N</code> only.</td>
-      <td>Primary line: outcome. Secondary line: compact delta summary. No footer.</td>
-    </tr>
-    <tr>
-      <td>Past Edit</td>
-      <td>Past</td>
-      <td>Rounded rect, 10px radius, slate-tinted border</td>
-      <td>Icon + title: <code>✎ edit Location</code>. No right-side control.</td>
-      <td><code>step N</code>, optional <code>data</code>.</td>
-      <td>Primary line: self-loop/current-state result. Secondary line: field delta. No footer.</td>
-    </tr>
-    <tr>
-      <td>Present State</td>
-      <td>Present</td>
-      <td>Rounded rect, 12px radius, violet-accented border, optional glow</td>
-      <td>Icon + title: <code>◎ Open</code>. No right-side control.</td>
-      <td><code>current</code>, <code>step N</code>, optional <code>terminal</code>, optional <code>editable</code>.</td>
-      <td>One concise state description line. No footer.</td>
-    </tr>
-    <tr>
-      <td>Future Event</td>
-      <td>Future</td>
-      <td>Pill, 14px radius, cyan border</td>
-      <td>Primary CTA only: event-name button such as <code>Assign</code> with leading icon. No duplicated title row.</td>
-      <td><code>enabled</code> or <code>blocked</code>, plus optional <code>self-loop</code> or <code>conditional</code>.</td>
-      <td>Body: effect line plus one short requirement line. Footer: compact arguments or small controls.</td>
-    </tr>
-    <tr>
-      <td>Future State</td>
-      <td>Future</td>
-      <td>Rounded rect, 10px radius, indigo border</td>
-      <td>Icon + title: <code>□ Scheduled</code>. No right-side control.</td>
-      <td>Usually empty; optional <code>terminal</code> only when applicable.</td>
-      <td>Body: one-line subtitle + <code>via EventName</code>. No footer.</td>
-    </tr>
-  </table>
-
-  <h3>Terminal state treatment</h3>
-  <p style="margin-bottom:8px;">Terminal states use double-border treatment consistent with § 2.2 state diagram shapes:</p>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li><strong>Present state card (terminal):</strong> <code>box-shadow: inset 0 0 0 2px var(--card), inset 0 0 0 3px rgba(99,102,241,0.30)</code> — creates visual double-border ring</li>
-    <li><strong>Future state card (terminal target):</strong> Same inset box-shadow treatment</li>
-    <li><strong>Terminal message:</strong> When the current state is terminal, the future zone shows a terminal message (<code>✓</code> for completion states, <code>⊘</code> for cancellation) instead of event cards</li>
-  </ul>
-
-  <div class="callout" style="margin-top:16px; background:#1a1a0f; border-color:#3d3d00;">
-    <strong style="color:#FCD34D;">⚠ Open decision — initial state shape:</strong>
-    <p style="margin:8px 0 0; line-height:1.7;">The § 2.2 state diagram uses a circle for the initial state node. This works at small SVG scale but looks poor as a timeline card because card content (name, badges, description) doesn't fit well in a circular container. The timeline should differentiate the initial state through border treatment rather than shape change. Proposals under consideration:</p>
-    <ul style="margin:8px 0 0 16px; line-height:1.8;">
-      <li><strong>Option A:</strong> Heavier border (2.5px) matching the SVG initial node's heavier stroke weight, plus an indigo dot inherited from the SVG's inner dot. Same rounded rect as intermediate.</li>
-      <li><strong>Option B:</strong> Bold 3px left-border accent stripe in deeper indigo <code>#4338CA</code>, suggesting "entry point" directionally while keeping rectangular shape.</li>
-      <li><strong>Option C:</strong> Same rounded rect with a subtle indigo fill tint (8–12% opacity), visually distinguishing it from intermediate states without shape change.</li>
-    </ul>
-    <p style="margin:8px 0 0;">Whichever option is chosen, the origin card in the past zone should use the same treatment. The § 2.2 SVG diagram retains the circle — this decision affects only the timeline card surface.</p>
-  </div>
-
-  <h3>Event lifecycle types on cards</h3>
-  <p style="margin-bottom:12px;">The § 2.2 event lifecycle classification (transition / conditional / stationary) maps onto timeline cards as follows. All future event cards use the same pill shape (<code>border-radius: 14px</code>) and locked cyan <code>#30B8E8</code>. The event name appears once, on the primary CTA button. Differentiation is through tags, effect text, and input requirements, not shape:</p>
-  <table>
-    <tr><th>Lifecycle type</th><th>Card signals</th><th>Interaction</th></tr>
-    <tr>
-      <td>Transition</td>
-      <td>Event-name CTA, <code>.tag-enabled</code> badge, effect line naming the target state</td>
-      <td>Clickable — the event-name button executes the transition</td>
-    </tr>
-    <tr>
-      <td>Conditional</td>
-      <td>Event-name CTA, guard summary, <code>.tag-enabled</code> or <code>.tag-blocked</code> badge based on guard evaluation, rejection message (gold) if blocked</td>
-      <td>Clickable if enabled, visually dimmed (<code>opacity: 0.60</code>) if all guards fail</td>
-    </tr>
-    <tr>
-      <td>Stationary</td>
-      <td>Event-name CTA, <code>.tag-neutral</code> "self-loop" badge, effect line showing it stays in the same state</td>
-      <td>Clickable — fires but produces no state transition, only field mutations</td>
-    </tr>
-  </table>
-
-  <h3>Tag system</h3>
-  <p style="margin-bottom:8px;">Timeline cards use a unified tag system shared across all three preview surfaces. Tags are 7px uppercase, 600 weight, 3px radius, <code>letter-spacing: 0.5px</code>. Semantic variants:</p>
-  <table>
-    <tr><th>Tag class</th><th>Color</th><th>Usage</th></tr>
-    <tr><td><code>.tag-violet</code></td><td>Violet <code>#A898F5</code></td><td>"current", "origin" — state identity</td></tr>
-    <tr><td><code>.tag-neutral</code></td><td>Zinc <code>#a1a1aa</code></td><td>Step numbers, "self-loop" — informational</td></tr>
-    <tr><td><code>.tag-dim</code></td><td>Dark zinc <code>#52525b</code></td><td>"terminal" — de-emphasized metadata</td></tr>
-    <tr><td><code>.tag-cyan</code></td><td>Cyan <code>#30B8E8</code></td><td>Event-related badges</td></tr>
-    <tr><td><code>.tag-indigo</code></td><td>Indigo <code>#6366F1</code></td><td>"✎ editable" — structural capability</td></tr>
-    <tr><td><code>.tag-enabled</code></td><td>Emerald <code>#34D399</code></td><td>"enabled" — guard passed (verdict)</td></tr>
-    <tr><td><code>.tag-blocked</code></td><td>Rose <code>#FB7185</code></td><td>"blocked" — guard failed (verdict)</td></tr>
-    <tr><td><code>.tag-gold</code></td><td>Gold <code>#FBBF24</code></td><td>Rule-related badges</td></tr>
-    <tr><td><code>.tag-slate</code></td><td>Slate <code>#B0BEC5</code></td><td>Data/field-related badges</td></tr>
-  </table>
+  <p>Horizontal event timeline in the VS Code preview panel. It reads left-to-right as a simple progression: origin, committed history, current state, then next possible actions. The timeline is the clearest answer to two questions: how did this instance get here, and what can happen next?</p>
 
   <h3>Color application</h3>
-  <p style="margin-bottom:8px;">The timeline applies the five semantic families from § 1.4:</p>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li><strong>Violet <code>#A898F5</code>:</strong> State names (origin card, present marker, future state cards, outcome references in past cards)</li>
-    <li><strong>Cyan <code>#30B8E8</code>:</strong> Event names in past event cards and the primary event-name CTA in future event cards</li>
-    <li><strong>Slate <code>#B0BEC5</code>:</strong> Edit operation names in past edit cards, field names in delta summaries</li>
-    <li><strong>Indigo <code>#6366F1</code>:</strong> Structural borders on origin and future state cards, "editable" badges</li>
-    <li><strong>Gold <code>#FBBF24</code>:</strong> Rejection messages on blocked events</li>
-    <li><strong>Emerald <code>#34D399</code>:</strong> Transition outcomes in past cards, "enabled" guard badges</li>
-    <li><strong>Rose <code>#FB7185</code>:</strong> "blocked" guard badges</li>
-  </ul>
+  <p style="margin-bottom:12px;">Concept 28 locks the timeline around one quiet card family. Geometry and position do most of the work; color names the semantic role already established elsewhere in the system. Indigo frames structural state cards, violet marks the active state-reading anchor, cyan names events and controls, emerald and rose stay reserved for runtime verdicts, and gold is limited to edit history.</p>
 
-  <h3>Accessibility notes</h3>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li>Guard status uses both color (emerald/rose) and text ("enabled"/"blocked") — colorblind-safe</li>
-    <li>Past edit cards differentiated from past event cards by both color (slate vs cyan) and symbol (✎ prefix) — dual signal</li>
-    <li>Terminal states use both double-border treatment and a "terminal" tag — shape + text redundancy</li>
-    <li>Auto-scroll on event fire keeps the present state and future zone visible without manual scrolling</li>
-  </ul>
+  <div class="callout" style="margin-bottom:16px;">
+    <strong>Authoritative rule:</strong>
+    <p style="margin:8px 0 0; line-height:1.7;">The timeline is not an audit table. Show only the minimum needed to read sequence and act: one origin card, compact past cards, one present anchor, and future action lanes that expose the next real choices. If a detail does not explain history, current position, or next action, it belongs in the data panel.</p>
+  </div>
+
+  <div class="spm-shapes">
+    <div class="spm-shape-tile">
+      <div class="spm-shape-icon">
+        <div style="width:108px; height:76px; border-radius:12px; border:2px solid #4338CA; background:rgba(18,18,23,0.3); display:flex; align-items:center; justify-content:center; padding:0 16px; color:#4338CA;">
+          <span class="origin-inline-lockup">
+            <span class="origin-inline-dot"></span>
+            <span style="color:#A898F5; font-size:12px; font-weight:700;">Draft</span>
+          </span>
+        </div>
+      </div>
+      <div class="spm-shape-name" style="color:#4338CA;">Origin</div>
+      <div class="spm-shape-meta">2px indigo frame</div>
+      <div class="spm-shape-desc">Single-line dot + label state card</div>
+    </div>
+    <div class="spm-shape-tile">
+      <div class="spm-shape-icon">
+        <div style="width:92px; height:76px; border-radius:10px; border:1px solid #27272a; background:rgba(18,18,22,0.78); display:flex; flex-direction:column; align-items:flex-start; justify-content:center; padding:10px; gap:4px; text-align:left;">
+          <span style="color:#30B8E8; font-size:11px; font-weight:700;">Submit</span>
+          <span style="color:#34D399; font-size:9px;">transition to Open</span>
+        </div>
+      </div>
+      <div class="spm-shape-name" style="color:#30B8E8;">Past Event</div>
+      <div class="spm-shape-meta">10px quiet card</div>
+      <div class="spm-shape-desc">Compact history specimen</div>
+    </div>
+    <div class="spm-shape-tile">
+      <div class="spm-shape-icon">
+        <div style="width:88px; height:76px; border-radius:12px; border:2px solid #A898F5; background:rgba(30,27,75,0.25); display:flex; align-items:center; justify-content:center; box-shadow:0 0 16px rgba(168,152,245,0.08);">
+          <span style="color:#A898F5; font-size:12px; font-weight:700;">Open</span>
+        </div>
+      </div>
+      <div class="spm-shape-name" style="color:#A898F5;">Present</div>
+      <div class="spm-shape-meta">2px violet anchor</div>
+      <div class="spm-shape-desc">Current-state emphasis only</div>
+    </div>
+    <div class="spm-shape-tile">
+      <div class="spm-shape-icon">
+        <div style="width:104px; height:76px; border-radius:10px; border:1px solid rgba(39,39,42,0.72); background:rgba(18,22,27,0.76); display:flex; flex-direction:column; align-items:flex-start; justify-content:center; padding:10px; gap:4px; text-align:left;">
+          <span style="color:#30B8E8; font-size:11px; font-weight:700;">Assign</span>
+          <span style="color:#9096A6; font-size:9px;">inline fields + CTA</span>
+        </div>
+      </div>
+      <div class="spm-shape-name" style="color:#30B8E8;">Future Event</div>
+      <div class="spm-shape-meta">Action card</div>
+      <div class="spm-shape-desc">Form-first card grammar</div>
+    </div>
+  </div>
+
+  <svg width="100%" height="294" viewBox="0 0 1120 294" style="margin:8px 0;">
+    <rect width="1120" height="294" fill="#0c0c0f" rx="10"/>
+
+    <text x="26" y="28" fill="#52525b" font-size="9" font-weight="700" letter-spacing="1.2">TIMELINE</text>
+
+    <rect x="26" y="72" width="164" height="76" rx="12" fill="rgba(18,18,23,0.3)" stroke="#4338CA" stroke-width="2"/>
+    <circle cx="54" cy="110" r="4" fill="#4338CA"/>
+    <text x="66" y="114" text-anchor="start" fill="#A898F5" font-size="12" font-weight="700">Draft</text>
+    <text x="102" y="123" text-anchor="middle" fill="#9096A6" font-size="8">origin state</text>
+
+    <rect x="218" y="94" width="32" height="2" rx="1" fill="#A898F5" opacity="0.45"/>
+
+    <rect x="250" y="34" width="182" height="132" rx="10" fill="#121216" stroke="#27272a" stroke-width="1"/>
+    <text x="266" y="57" fill="#30B8E8" font-size="12" font-weight="700">Submit</text>
+    <text x="266" y="77" fill="#34D399" font-size="10">transition to <tspan fill="#A898F5" font-weight="700">Open</tspan></text>
+    <text x="266" y="102" fill="#71717A" font-size="9">RequesterName <tspan fill="#B0BEC5">Jane Doe</tspan></text>
+    <text x="266" y="120" fill="#71717A" font-size="9">Location <tspan fill="#34D399">Building A</tspan></text>
+    <text x="266" y="138" fill="#71717A" font-size="9">IssueSummary <tspan fill="#84929F">HVAC not cooling</tspan></text>
+
+    <rect x="460" y="94" width="40" height="2" rx="1" fill="#A898F5" opacity="0.55"/>
+
+    <rect x="500" y="72" width="160" height="76" rx="12" fill="#1e1b4b" fill-opacity="0.7" stroke="#A898F5" stroke-width="2"/>
+    <rect x="499" y="71" width="162" height="78" rx="13" fill="none" stroke="#A898F5" stroke-opacity="0.18"/>
+    <text x="580" y="102" text-anchor="middle" fill="#A898F5" font-size="12" font-weight="700">Open</text>
+    <text x="580" y="123" text-anchor="middle" fill="#9096A6" font-size="8">current state · step 3</text>
+
+    <rect x="688" y="94" width="40" height="2" rx="1" fill="#30B8E8" opacity="0.35"/>
+
+    <rect x="728" y="34" width="246" height="132" rx="10" fill="#12161b" stroke="#27272a" stroke-width="1"/>
+    <text x="746" y="57" fill="#30B8E8" font-size="12" font-weight="700">Assign</text>
+    <text x="746" y="74" fill="#9096A6" font-size="9">Technician + Estimate</text>
+    <rect x="746" y="90" width="164" height="22" rx="5" fill="#0c0c0f" stroke="#363640"/>
+    <text x="758" y="104" fill="#52525b" font-size="9">Bob Smith</text>
+    <rect x="746" y="120" width="78" height="22" rx="5" fill="#0c0c0f" stroke="#363640"/>
+    <text x="758" y="134" fill="#52525b" font-size="9">4</text>
+    <rect x="858" y="120" width="88" height="22" rx="5" fill="rgba(48,184,232,0.08)" stroke="rgba(48,184,232,0.30)"/>
+    <text x="902" y="134" text-anchor="middle" fill="#30B8E8" font-size="9" font-weight="700">Fire Assign</text>
+
+    <rect x="728" y="184" width="246" height="40" rx="8" fill="rgba(31,18,24,0.58)" stroke="rgba(251,113,133,0.32)"/>
+    <text x="746" y="208" fill="#FB7185" font-size="9" font-weight="700">StartWork</text>
+    <text x="834" y="208" fill="#9096A6" font-size="8">blocked until parts are approved</text>
+
+    <rect x="992" y="94" width="30" height="2" rx="1" fill="#4338CA" opacity="0.35"/>
+    <rect x="1022" y="72" width="84" height="76" rx="12" fill="rgba(18,18,23,0.3)" stroke="#6366F1" stroke-width="1.5"/>
+    <text x="1064" y="102" text-anchor="middle" fill="#A898F5" font-size="12" font-weight="700">Scheduled</text>
+    <text x="1064" y="123" text-anchor="middle" fill="#9096A6" font-size="8">target state</text>
+
+    <rect x="26" y="246" width="220" height="18" rx="6" fill="rgba(17,17,20,0.52)" stroke="rgba(144,150,166,0.20)" stroke-dasharray="3 2"/>
+    <text x="136" y="258" text-anchor="middle" fill="#71717A" font-size="8">past stays single-row; only future stacks and pairs with targets</text>
+  </svg>
+
+  <h3>Timeline role grammar</h3>
+  <p style="margin-bottom:12px;">Concept 28 uses a fixed set of specimens. Meaning comes from left-to-right placement first, then card role, then runtime accent.</p>
+  <table>
+    <tr><th>Role</th><th>Specimen form</th><th>Locked behavior</th></tr>
+    <tr><td>Origin state</td><td>12px-radius state card, 76px tall, 2px indigo border, one-line dot + label row, vertically centered, no wrap</td><td>Appears once at the far left. Widen the card as needed so the dot precedes the label on a single line. No alternate origin silhouette is permitted.</td></tr>
+    <tr><td>Past event</td><td>10px-radius compact event card, narrow width, left-aligned copy, neutral frame</td><td>Used for committed history only. Show the event name first, then one outcome or one delta.</td></tr>
+    <tr><td>Present marker</td><td>12px-radius state card, 2px violet border, subtle violet fill, optional soft glow</td><td>The current state is the single visual anchor between history and future.</td></tr>
+    <tr><td>Future event</td><td>10px-radius wider action card with summary, inline fields, and one fire row</td><td>Used for both transition and no-transition events. The event card remains the primary actor.</td></tr>
+    <tr><td>Future target state</td><td>12px-radius quiet state card, 76px tall, light indigo border</td><td>Appears only when the event transitions. It always shares the same lane as its event card.</td></tr>
+    <tr><td>Blocked future event</td><td>Same future-event geometry with rose border/background reduction and disabled controls</td><td>Blocked is a state, not a new shape. Keep the event visible and readable.</td></tr>
+    <tr><td>Terminal message</td><td>Quiet dashed message block replacing the future stack</td><td>Used only when no future events remain. Do not render placeholder cards.</td></tr>
+  </table>
+
+  <div class="callout" style="margin-top:16px;">
+    <strong>Connector rule:</strong>
+    <p style="margin:8px 0 0; line-height:1.7;">Connectors are straight 2px bars only. Past-to-present leans violet, present-to-future hands off toward cyan, and event-to-target leans from cyan into indigo. No elbows, arrows, loops, or decorative branching appear inside the timeline track.</p>
+  </div>
+
+  <h3>Timeline color mapping</h3>
+
+  <div class="sf-palette">
+    <div class="sf-header" style="background: linear-gradient(135deg, #30B8E8 0%, #4338CA 100%);">
+      <h3>Static Timeline Grammar</h3>
+      <p>These are the persistent timeline colors in Concept 28. They describe structure, event language, and supporting neutrals before runtime verdicts are applied.</p>
+    </div>
+    <div class="sf-body">
+      <div class="sf-group">
+        <div class="sf-group-label">State Structure</div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, #4338CA 0%, #3730a3 100%);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#4338CA;">Origin frame + dot</span>
+            <span class="sf-hex">#4338CA</span>
+            <span class="sf-lane">Indigo · Structural starting-state signal on the origin card and initial-state dot treatment</span>
+            <span class="sf-surfaces">Origin card, initial target-state marker</span>
+          </div>
+        </div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, #6366F1 0%, #4f46e5 100%);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#6366F1;">Quiet state border</span>
+            <span class="sf-hex">#6366F1</span>
+            <span class="sf-lane">Indigo · Structural future-state framing and terminal double-border family</span>
+            <span class="sf-surfaces">Future target states, terminal overlays</span>
+          </div>
+        </div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, #A898F5 0%, #8b5cf6 100%);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#A898F5;">Current-state anchor</span>
+            <span class="sf-hex">#A898F5</span>
+            <span class="sf-lane">Violet · Active state-reading family for present border, state names, and present-side connectors</span>
+            <span class="sf-surfaces">Present card, all state labels, connector handoff</span>
+          </div>
+        </div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(30,27,75,0.75) 0%, rgba(49,46,129,0.95) 100%); border: 1px solid rgba(168,152,245,0.24);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#c7ccff;">Present fill tint</span>
+            <span class="sf-hex">#1e1b4b @ 25%</span>
+            <span class="sf-lane">Local surface tint · scoped only to the present marker so the anchor reads before any verdict accent</span>
+            <span class="sf-surfaces">Current-state card background</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sf-group">
+        <div class="sf-group-label">Event Language</div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, #30B8E8 0%, #0ea5e9 100%);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#30B8E8;">Event names + fire controls</span>
+            <span class="sf-hex">#30B8E8</span>
+            <span class="sf-lane">Cyan · Verb/action family for past events, future events, buttons, and event-to-state handoff</span>
+            <span class="sf-surfaces">Event titles, button text, future event emphasis</span>
+          </div>
+        </div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, #B0BEC5 0%, #90a4ae 100%);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#B0BEC5;">Field labels in deltas</span>
+            <span class="sf-hex">#B0BEC5</span>
+            <span class="sf-lane">Slate · Data identity in history deltas and future inline form labels</span>
+            <span class="sf-surfaces">Delta field names, inline argument labels</span>
+          </div>
+        </div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, #84929F 0%, #64748b 100%);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#84929F;">Outcome + helper copy</span>
+            <span class="sf-hex">#84929F</span>
+            <span class="sf-lane">Slate value · Supporting summaries inside past and future cards</span>
+            <span class="sf-surfaces">Outcome lines, field summaries, helper text</span>
+          </div>
+        </div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, #9096A6 0%, #71717A 100%);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#9096A6;">Quiet connectors + captions</span>
+            <span class="sf-hex">#9096A6 / #71717A</span>
+            <span class="sf-lane">Local neutrals · Receding track structure and secondary explanatory copy</span>
+            <span class="sf-surfaces">Connector fades, captions, terminal message copy</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sf-group">
+        <div class="sf-group-label">History Accent</div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(252,211,77,0.16) 0%, rgba(252,211,77,0.04) 100%); border: 1px solid rgba(252,211,77,0.28);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#FCD34D;">Edit-history wash</span>
+            <span class="sf-hex">#FCD34D / #FBBF24</span>
+            <span class="sf-lane">Gold · Reserved warm accent for edit cards only, never the default event family</span>
+            <span class="sf-surfaces">Past edit cards and limited warnings</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sf-palette">
+    <div class="sf-header" style="background: linear-gradient(135deg, #34D399 0%, #FB7185 100%);">
+      <h3>Runtime Timeline Signals</h3>
+      <p>Verdict colors do not create new silhouettes. They overlay the fixed card grammar to explain whether a transition can fire and what just happened.</p>
+    </div>
+    <div class="sf-body">
+      <div class="sf-group">
+        <div class="sf-group-label">Positive / Blocked</div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, #34D399 0%, #10b981 100%);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#34D399;">Enabled outcome</span>
+            <span class="sf-hex">#34D399</span>
+            <span class="sf-lane">Emerald · Successful transition result, positive delta, and guard-pass chip</span>
+            <span class="sf-surfaces">Past outcome lines, ready chips, positive values</span>
+          </div>
+        </div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(251,113,133,0.16) 0%, rgba(67,24,39,0.72) 100%); border: 1px solid rgba(251,113,133,0.30);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#FB7185;">Blocked event state</span>
+            <span class="sf-hex">#FB7185</span>
+            <span class="sf-lane">Rose · Blocked border, disabled control, failing guard chip, and reject reason emphasis</span>
+            <span class="sf-surfaces">Blocked future cards, blocked buttons, fail chips</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sf-group">
+        <div class="sf-group-label">Terminal / Empty Future</div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(99,102,241,0.04) 100%); border: 1px solid rgba(99,102,241,0.24);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#6366F1;">Terminal double-border</span>
+            <span class="sf-hex">#6366F1 + 30% outer ring</span>
+            <span class="sf-lane">Indigo · Same terminal signal as the state diagram; used on present or reachable terminal states</span>
+            <span class="sf-surfaces">Terminal present card, terminal target state</span>
+          </div>
+        </div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(17,17,20,0.82) 0%, rgba(17,17,20,0.56) 100%); border: 1px dashed rgba(144,150,166,0.20);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#71717A;">Terminal message block</span>
+            <span class="sf-hex">#71717A / dashed neutral frame</span>
+            <span class="sf-lane">Local neutral · Quiet replacement for the entire future stack when no actions remain</span>
+            <span class="sf-surfaces">Terminal or no-future message</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 </div>
 
@@ -1589,105 +1599,280 @@
   <h3>Purpose</h3>
   <p>The field inspector surface in the VS Code preview panel. Displays all precept fields in a responsive grid, supports direct editing of fields declared editable (via <code>in State edit Field</code>), and shows constraint status (invariants and state assertions) in a bottom strip. The data panel is where abstract data declarations become concrete runtime values.</p>
 
-  <h3>Layout model</h3>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li><strong>Header bar:</strong> "Data" title, field count + current state name, edit/save/cancel actions. Dirty badge pulses gold when unsaved changes exist.</li>
-    <li><strong>Field grid:</strong> <code>grid-template-columns: repeat(auto-fill, minmax(260px, 1fr))</code> — fields reflow to fill available width. Each field is a self-contained card.</li>
-    <li><strong>Constraints strip:</strong> Bottom section separated by a border. Groups invariants and state-specific assertions. Always visible regardless of edit state.</li>
-  </ul>
+  <h3>Color application</h3>
+  <p style="margin-bottom:12px;">Concept 28 locks the data panel around slate-first field units. Slate carries the identity hierarchy of name, type, and value; indigo signals edit capability and focus; gold marks unsaved draft work and human-readable rule copy; emerald and rose are reserved for runtime truth signals such as changed data, booleans, and passing or failing constraints.</p>
 
-  <h3>Field card states</h3>
-  <p style="margin-bottom:12px;">Each field renders as a small card with four visual states determined by runtime context. Border color and background tint encode the state:</p>
+  <div class="callout" style="margin-bottom:16px;">
+    <strong>Authoritative rule:</strong>
+    <p style="margin:8px 0 0; line-height:1.7;">The data panel is a readable field surface first, not a form-builder skin. Every unit should preserve the same anatomy: label row, control/readout, one supporting note line, and optional validation grouping beneath. Runtime states alter tint and border, but they do not break the unit grammar.</p>
+  </div>
+
+  <div class="spm-shapes">
+    <div class="spm-shape-tile">
+      <div class="spm-shape-icon">
+        <div style="width:96px; height:76px; border-radius:8px; border:1px solid rgba(39,39,42,0.54); background:rgba(14,14,18,0.42); display:flex; flex-direction:column; align-items:flex-start; justify-content:center; padding:10px; gap:4px; text-align:left;">
+          <span style="color:#d6deea; font-size:9px; font-weight:700;">Location</span>
+          <span style="color:#84929F; font-size:10px; font-weight:600;">Building A</span>
+        </div>
+      </div>
+      <div class="spm-shape-name" style="color:#B0BEC5;">Readout Unit</div>
+      <div class="spm-shape-meta">Slate-first card</div>
+      <div class="spm-shape-desc">Default field anatomy</div>
+    </div>
+    <div class="spm-shape-tile">
+      <div class="spm-shape-icon">
+        <div style="width:96px; height:76px; border-radius:8px; background:rgba(25,25,38,0.16); box-shadow:inset 0 0 0 1px rgba(99,102,241,0.22); display:flex; align-items:center; justify-content:center;">
+          <div style="width:64px; height:24px; border-radius:5px; border:1px solid #6366F1; background:rgba(12,12,15,0.78);"></div>
+        </div>
+      </div>
+      <div class="spm-shape-name" style="color:#6366F1;">Editing</div>
+      <div class="spm-shape-meta">Indigo capability signal</div>
+      <div class="spm-shape-desc">Focused input state</div>
+    </div>
+    <div class="spm-shape-tile">
+      <div class="spm-shape-icon">
+        <div style="width:96px; height:76px; border-radius:8px; background:rgba(14,14,18,0.42); box-shadow:inset 0 0 0 1px rgba(251,191,36,0.32); display:flex; align-items:center; justify-content:center;">
+          <span style="color:#FBBF24; font-size:11px; font-weight:700;">dirty</span>
+        </div>
+      </div>
+      <div class="spm-shape-name" style="color:#FBBF24;">Dirty</div>
+      <div class="spm-shape-meta">Unsaved draft state</div>
+      <div class="spm-shape-desc">Header and unit echo</div>
+    </div>
+    <div class="spm-shape-tile">
+      <div class="spm-shape-icon">
+        <div style="width:96px; height:76px; border-radius:8px; background:rgba(32,19,24,0.14); box-shadow:inset 0 0 0 1px rgba(251,113,133,0.42); display:flex; align-items:center; justify-content:center;">
+          <span style="color:#FB7185; font-size:14px; font-weight:700;">!</span>
+        </div>
+      </div>
+      <div class="spm-shape-name" style="color:#FB7185;">Issue</div>
+      <div class="spm-shape-meta">Rose error state</div>
+      <div class="spm-shape-desc">Constraint or field issue</div>
+    </div>
+  </div>
+
+  <svg width="100%" height="320" viewBox="0 0 960 320" style="margin:8px 0;">
+    <rect width="960" height="320" fill="#0c0c0f" rx="10"/>
+
+    <text x="26" y="28" fill="#52525b" font-size="9" font-weight="700" letter-spacing="1.2">DATA</text>
+    <text x="26" y="46" fill="#71717A" font-size="10">10 fields · state Open</text>
+    <rect x="132" y="34" width="76" height="18" rx="4" fill="rgba(251,191,36,0.08)" stroke="rgba(251,191,36,0.18)"/>
+    <text x="170" y="46" text-anchor="middle" fill="#FBBF24" font-size="8" font-weight="700">2 unsaved</text>
+    <rect x="650" y="30" width="54" height="22" rx="5" fill="rgba(99,102,241,0.06)" stroke="rgba(99,102,241,0.28)"/>
+    <text x="677" y="44" text-anchor="middle" fill="#6366F1" font-size="9" font-weight="700">Edit</text>
+    <rect x="710" y="30" width="54" height="22" rx="5" fill="rgba(52,211,153,0.08)" stroke="rgba(52,211,153,0.32)"/>
+    <text x="737" y="44" text-anchor="middle" fill="#34D399" font-size="9" font-weight="700">Save</text>
+
+    <rect x="26" y="78" width="280" height="84" rx="8" fill="rgba(14,14,18,0.42)" stroke="rgba(39,39,42,0.54)"/>
+    <text x="38" y="88" fill="#d6deea" font-size="9" font-weight="700">RequesterName</text>
+    <text x="263" y="88" fill="#9096A6" font-size="8">string</text>
+    <rect x="38" y="102" width="256" height="34" rx="5" fill="rgba(12,12,15,0.58)" stroke="rgba(54,54,64,0.72)"/>
+    <text x="50" y="123" fill="#84929F" font-size="11" font-weight="600">Jane Doe</text>
+    <text x="38" y="150" fill="#71717A" font-size="8">read-only field</text>
+
+    <rect x="338" y="78" width="280" height="84" rx="8" fill="rgba(25,25,38,0.16)"/>
+    <rect x="338" y="78" width="280" height="84" rx="8" fill="none" stroke="rgba(99,102,241,0.22)"/>
+    <rect x="338" y="78" width="280" height="84" rx="8" fill="none" stroke="rgba(251,191,36,0.32)"/>
+    <text x="350" y="88" fill="#d6deea" font-size="9" font-weight="700">Location</text>
+    <text x="575" y="88" fill="#9096A6" font-size="8">string</text>
+    <rect x="350" y="102" width="256" height="34" rx="5" fill="rgba(12,12,15,0.78)" stroke="#6366F1"/>
+    <text x="362" y="123" fill="#84929F" font-size="11">Building A, Room 204</text>
+    <text x="350" y="150" fill="#FBBF24" font-size="8">dirty draft value</text>
+
+    <rect x="650" y="78" width="284" height="84" rx="8" fill="rgba(32,19,24,0.14)"/>
+    <rect x="650" y="78" width="284" height="84" rx="8" fill="none" stroke="rgba(251,113,133,0.42)"/>
+    <text x="664" y="88" fill="#d6deea" font-size="9" font-weight="700">Urgent</text>
+    <text x="888" y="88" fill="#9096A6" font-size="8">boolean</text>
+    <rect x="664" y="104" width="40" height="20" rx="10" fill="rgba(251,113,133,0.15)" stroke="rgba(251,113,133,0.28)"/>
+    <circle cx="676" cy="114" r="6" fill="#FB7185" fill-opacity="0.7"/>
+    <text x="718" y="118" fill="#FB7185" fill-opacity="0.7" font-size="11" font-weight="700">false</text>
+    <text x="664" y="150" fill="#f7b4c0" font-size="8">must be true before scheduling</text>
+
+    <rect x="26" y="190" width="908" height="94" rx="8" fill="rgba(14,14,18,0.42)" stroke="rgba(39,39,42,0.46)"/>
+    <text x="40" y="212" fill="#52525b" font-size="9" font-weight="700" letter-spacing="0.85">VALIDATION</text>
+    <text x="40" y="236" fill="#84929F" font-size="10">✓ Estimated hours cannot be negative</text>
+    <rect x="226" y="226" width="92" height="18" rx="9" fill="rgba(176,190,197,0.08)" stroke="rgba(176,190,197,0.16)"/>
+    <text x="272" y="238" text-anchor="middle" fill="#B0BEC5" font-size="8">EstimatedHours</text>
+    <text x="40" y="262" fill="#FBBF24" font-size="10">✕ Scheduled work must have an assigned technician</text>
+    <rect x="302" y="252" width="108" height="18" rx="9" fill="rgba(176,190,197,0.08)" stroke="rgba(176,190,197,0.16)"/>
+    <text x="356" y="264" text-anchor="middle" fill="#B0BEC5" font-size="8">AssignedTechnician</text>
+  </svg>
+
+  <h3>Field-unit grammar</h3>
+  <p style="margin-bottom:12px;">Every field unit in Concept 28 preserves the same compact anatomy. Runtime states tint that unit; they do not replace it.</p>
   <table>
-    <tr><th>State</th><th>Border</th><th>Background</th><th>Trigger</th></tr>
-    <tr>
-      <td>Default</td>
-      <td>1px <code>#27272a</code> at 50%</td>
-      <td><code>#111114</code> at 40%</td>
-      <td>Normal field display</td>
-    </tr>
-    <tr>
-      <td>Recently changed</td>
-      <td>Emerald <code>#34D399</code> at 30%</td>
-      <td>Emerald at 4%</td>
-      <td>Field was mutated by the last event fire — flash animation (800ms)</td>
-    </tr>
-    <tr>
-      <td>Editable</td>
-      <td>Indigo <code>#6366F1</code> at 25%</td>
-      <td>Default</td>
-      <td>Field is declared editable in this state but editing not yet started</td>
-    </tr>
-    <tr>
-      <td>Editing</td>
-      <td>Indigo <code>#6366F1</code> at 45%</td>
-      <td>Indigo at 4% + 1px ring</td>
-      <td>Edit mode active, field is accepting input</td>
-    </tr>
-    <tr>
-      <td>Dirty</td>
-      <td>Gold <code>#FBBF24</code> at 35%</td>
-      <td>Gold at 4%</td>
-      <td>Field value has been changed but not yet saved</td>
-    </tr>
+    <tr><th>Unit</th><th>Specimen form</th><th>Locked behavior</th></tr>
+    <tr><td>Header row</td><td>9px-11px microcopy with strong label, muted type, optional mode pill or dirty note nearby</td><td>Panel title and count stay small so field values remain primary.</td></tr>
+    <tr><td>Field card</td><td>8px radius, quiet neutral body, bottom-emphasis divider, one label row, one control/readout row, one note line</td><td>Used for all fields, whether read-only, editable, changed, or invalid.</td></tr>
+    <tr><td>Readout</td><td>5px-radius inset surface with slate value text, italic muted nulls</td><td>Default non-editing state for all fields.</td></tr>
+    <tr><td>Input / select</td><td>Same inset geometry as the readout, with indigo focus border and 2px focus halo</td><td>Editing preserves layout; controls do not resize the card or shift adjacent units.</td></tr>
+    <tr><td>Boolean toggle</td><td>34x18 track with on/off thumb and matching text label</td><td>Uses both color and text state; emerald for true, rose for false.</td></tr>
+    <tr><td>Validation group</td><td>Quiet boxed strip with uppercase title, icon-led rule lines, and pill targets</td><td>Always visible beneath the field grid. Invariants and state assertions share the same specimen language.</td></tr>
   </table>
 
-  <h3>Field value rendering</h3>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li><strong>String/number values:</strong> Slate <code>#84929F</code>, 13px, font-weight 600</li>
-    <li><strong>Null values:</strong> <code>null</code> in italic, muted color, 11px, font-weight 400</li>
-    <li><strong>Boolean true:</strong> Emerald <code>#34D399</code></li>
-    <li><strong>Boolean false:</strong> Rose <code>#FB7185</code> at 60% opacity</li>
-    <li><strong>Editable booleans:</strong> Toggle switch — emerald track when on, rose track when off, with label</li>
-    <li><strong>Editable strings:</strong> Text input with indigo border, dark ground-plane background, 0 ring on focus</li>
-  </ul>
+  <h3>Data-panel color mapping</h3>
 
-  <h3>Constraint display</h3>
-  <p style="margin-bottom:8px;">Two constraint groups, always visible in the bottom strip:</p>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li><strong>Invariants:</strong> Precept-wide constraints. Each shows ✓ (emerald) or ✕ (rose) icon + gold message text + slate field target badges</li>
-    <li><strong>State assertions:</strong> Constraints scoped to the current state. Same icon + color treatment as invariants, grouped under the state name</li>
-    <li><strong>Target badges:</strong> Small slate-bordered tags naming the fields the constraint references — lets the developer trace which fields affect which rules</li>
-  </ul>
+  <div class="sf-palette">
+    <div class="sf-header" style="background: linear-gradient(135deg, #B0BEC5 0%, #6366F1 100%);">
+      <h3>Field Units</h3>
+      <p>These are the persistent tokens that make the data panel legible before any editing or validation state is layered on top.</p>
+    </div>
+    <div class="sf-body">
+      <div class="sf-group">
+        <div class="sf-group-label">Panel Structure + Identity</div>
 
-  <h3>Edit workflow</h3>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li><strong>Entry:</strong> "✎ Edit" button appears when current state has editable fields. Clicking enters edit mode.</li>
-    <li><strong>In-flight:</strong> Only editable fields show inputs/toggles. Non-editable fields remain read-only. Dirty badge in header shows unsaved count. Field cards transition to "dirty" state on change.</li>
-    <li><strong>Save:</strong> Commits changes through the <code>edit</code> pipeline (same as <code>precept_update</code>). Constraints are re-evaluated. A past edit card appears in the timeline.</li>
-    <li><strong>Cancel:</strong> Reverts all draft changes. Fields return to pre-edit values.</li>
-    <li><strong>Focus preservation:</strong> Typing in an edit input must NOT trigger full re-render. The data panel uses lightweight DOM patching (dirty badge, class toggles) to avoid stealing focus from the active input.</li>
-  </ul>
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, #B0BEC5 0%, #90a4ae 100%);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#B0BEC5;">Field names</span>
+            <span class="sf-hex">#B0BEC5</span>
+            <span class="sf-lane">Slate · Primary data identity color for labels and target pills</span>
+            <span class="sf-surfaces">Field labels, validation targets</span>
+          </div>
+        </div>
 
-  <h3>Color application</h3>
-  <p style="margin-bottom:8px;">The data panel uses primarily the Slate family for field display, with semantic colors for state signals:</p>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li><strong>Slate <code>#B0BEC5</code>:</strong> Field names — primary data identity color</li>
-    <li><strong>Slate <code>#9AA8B5</code>:</strong> Field types — secondary, de-emphasized</li>
-    <li><strong>Slate <code>#84929F</code>:</strong> Field values — data values sit between name and type in the slate hierarchy</li>
-    <li><strong>Indigo <code>#6366F1</code>:</strong> Edit affordances — borders, badges, focus rings. Signals structural capability ("this field can be edited here")</li>
-    <li><strong>Gold <code>#FBBF24</code>:</strong> Dirty state indicators (unsaved changes), invariant/assertion message text</li>
-    <li><strong>Emerald <code>#34D399</code>:</strong> Recently changed flash, boolean true, constraint passing</li>
-    <li><strong>Rose <code>#FB7185</code>:</strong> Boolean false, constraint violation, cancel affordance hover</li>
-  </ul>
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, #9AA8B5 0%, #7c8b99 100%);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#9AA8B5;">Field types</span>
+            <span class="sf-hex">#9AA8B5</span>
+            <span class="sf-lane">Slate type · Secondary metadata for the field kind</span>
+            <span class="sf-surfaces">Type labels, subtle metadata</span>
+          </div>
+        </div>
 
-  <h3>Typography application</h3>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li><strong>Panel title:</strong> 10px, uppercase, 1.2px letter-spacing, muted — matches timeline label style</li>
-    <li><strong>Field names:</strong> 11px, font-weight 500, slate</li>
-    <li><strong>Field types:</strong> 9px, slate-type, 70% opacity</li>
-    <li><strong>Field values:</strong> 13px, font-weight 600 — values are the most important content, so they're the largest element</li>
-    <li><strong>Constraint messages:</strong> 10px, gold — human-readable rule text earns gold per § 1.4</li>
-    <li><strong>Edit inputs:</strong> 11px, monospace, inheriting font family for consistent appearance</li>
-  </ul>
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, #84929F 0%, #64748b 100%);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#84929F;">Field values</span>
+            <span class="sf-hex">#84929F</span>
+            <span class="sf-lane">Slate value · Largest data text in the panel so the current value remains the visual priority</span>
+            <span class="sf-surfaces">Readouts, informational notes, validation-ok copy</span>
+          </div>
+        </div>
 
-  <h3>Accessibility notes</h3>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li>Boolean values use color + text ("true"/"false") — colorblind-safe</li>
-    <li>Constraint violations use icon (✕) + color (rose) + text (gold message) — triple signal</li>
-    <li>Edit mode uses border color change + ring + badge — the affordance is visible without relying solely on color</li>
-    <li>Toggle switches show both track color change and text label state</li>
-  </ul>
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, #52525b 0%, #71717A 100%);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#9096A6;">Muted support copy</span>
+            <span class="sf-hex">#52525b / #71717A / #9096A6</span>
+            <span class="sf-lane">Local neutrals · Header title, counts, note lines, null values, and receding hints</span>
+            <span class="sf-surfaces">Panel title, subcopy, helper notes, null readouts</span>
+          </div>
+        </div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(12,12,15,0.82) 0%, rgba(12,12,15,0.58) 100%); border: 1px solid rgba(54,54,64,0.72);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#e5e5e5;">Inset readout / input surface</span>
+            <span class="sf-hex">#0c0c0f + #363640 border</span>
+            <span class="sf-lane">Local neutral control surface shared by readouts, inputs, and selects</span>
+            <span class="sf-surfaces">Field readouts, text inputs, select controls</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sf-group">
+        <div class="sf-group-label">Edit Capability</div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, #6366F1 0%, #4f46e5 100%);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#6366F1;">Edit affordance</span>
+            <span class="sf-hex">#6366F1</span>
+            <span class="sf-lane">Indigo · Capability and focus signal for mode pill, edit button, active field frame, and focus ring</span>
+            <span class="sf-surfaces">Edit button, editing pill, focused input, editing field unit</span>
+          </div>
+        </div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(99,102,241,0.10) 0%, rgba(99,102,241,0.02) 100%); border: 1px solid rgba(99,102,241,0.28);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#818cf8;">Editing surface tint</span>
+            <span class="sf-hex">#6366F1 @ 10%-22%</span>
+            <span class="sf-lane">Local indigo tint · Applied to editing mode background and active field shells</span>
+            <span class="sf-surfaces">Editing panel background, active field card</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sf-palette">
+    <div class="sf-header" style="background: linear-gradient(135deg, #FBBF24 0%, #FB7185 100%);">
+      <h3>Runtime States + Validation</h3>
+      <p>These tokens are layered on the fixed field-unit grammar to show draft work, changed data, boolean truth, and constraint status.</p>
+    </div>
+    <div class="sf-body">
+      <div class="sf-group">
+        <div class="sf-group-label">Field States</div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(16,29,24,0.32) 0%, rgba(16,29,24,0.12) 100%); border: 1px solid rgba(52,211,153,0.32);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#34D399;">Recently changed</span>
+            <span class="sf-hex">#34D399</span>
+            <span class="sf-lane">Emerald · Short-lived flash state for fields mutated by the last fire</span>
+            <span class="sf-surfaces">Changed field shell, true booleans, save button</span>
+          </div>
+        </div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(251,191,36,0.18) 0%, rgba(251,191,36,0.04) 100%); border: 1px solid rgba(251,191,36,0.32);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#FBBF24;">Dirty draft</span>
+            <span class="sf-hex">#FBBF24</span>
+            <span class="sf-lane">Gold · Unsaved field edits and human-readable issue lines</span>
+            <span class="sf-surfaces">Dirty note, dirty field shell, validation issue text</span>
+          </div>
+        </div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(32,19,24,0.24) 0%, rgba(32,19,24,0.08) 100%); border: 1px solid rgba(251,113,133,0.42);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#FB7185;">Issue state</span>
+            <span class="sf-hex">#FB7185</span>
+            <span class="sf-lane">Rose · Invalid field frame, failing toggle state, cancel hover, and issue notes</span>
+            <span class="sf-surfaces">Problem field shell, false booleans, issue note text</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sf-group">
+        <div class="sf-group-label">Validation Strip</div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(14,14,18,0.64) 0%, rgba(14,14,18,0.42) 100%); border: 1px solid rgba(39,39,42,0.46);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#71717A;">Validation group shell</span>
+            <span class="sf-hex">#27272a / #0e0e12</span>
+            <span class="sf-lane">Local neutral · Quiet container that keeps invariants and state assertions always visible</span>
+            <span class="sf-surfaces">Validation strip, rule grouping shells</span>
+          </div>
+        </div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, #34D399 0%, #10b981 100%);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#34D399;">Passing truth signal</span>
+            <span class="sf-hex">#34D399</span>
+            <span class="sf-lane">Emerald · Positive validation icons and true-state controls</span>
+            <span class="sf-surfaces">Valid rule icon, true toggle track, save action</span>
+          </div>
+        </div>
+
+        <div class="sf-row">
+          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(176,190,197,0.18) 0%, rgba(176,190,197,0.06) 100%); border: 1px solid rgba(176,190,197,0.16);"></div>
+          <div class="sf-info">
+            <span class="sf-name" style="color:#B0BEC5;">Target pills</span>
+            <span class="sf-hex">#B0BEC5</span>
+            <span class="sf-lane">Slate · Named field references attached to each rule so the developer can trace impact quickly</span>
+            <span class="sf-surfaces">Constraint target badges</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 </div>
 
