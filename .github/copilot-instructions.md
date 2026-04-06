@@ -76,10 +76,20 @@ When making any code, interface, test, or behavior change, keep documentation in
 ### Source of Truth
 
 - `README.md` — public project narrative and usage guide. Must track real implementation: update API names, behavioral semantics, examples, and feature claims on every meaningful change. Never leave aspirational claims as if implemented.
-- `docs/` — canonical design decision records.
+- `docs/` — canonical technical design decision records, architecture notes, implementation plans, and research.
+- `design/brand/` — canonical source for brand identity, philosophy, brand spec, and brand-level semantic meaning.
+- `design/system/` — canonical source for reusable product-facing visual-system guidance and surface specs.
 - Legacy files (`README-legacy.md`, `docs/DesignNotes-legacy.md`) — archived, do not update.
 
 Keep updates focused and factual. If uncertain whether a claim is implemented, verify from code/tests first.
+
+### Design Asset Boundaries
+
+- Use `design/brand/` for identity and brand meaning.
+- Use `design/system/` for reusable visual-system rules and surface specs.
+- Use `docs/` for explanatory and technical documentation.
+- Durable design prototypes belong in `design/prototypes/`.
+- Hot, code-near prototypes may temporarily live near their owning tool surface, but should be promoted into `design/prototypes/` once they become durable design references.
 
 ## Syntax Highlighting Grammar Sync (Non-Negotiable)
 
