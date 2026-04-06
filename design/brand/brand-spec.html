@@ -2,2189 +2,1069 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Precept Brand Specification — Surfaces & Identity</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Precept Brand Spec</title>
 <style>
-  :root { --brand-mono: 'Cascadia Cove', 'Cascadia Code', Consolas, monospace; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #09090b; color: #e5e5e5; font-family: var(--brand-mono); padding: 40px 48px; max-width: 1200px; }
-  h1 { font-size: 32px; font-weight: 700; font-variant: small-caps; letter-spacing: 0.12em; color: #fff; margin-bottom: 4px; }
-  .subtitle { color: #71717a; font-size: 14px; margin-bottom: 48px; }
-  h2 { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #27272a; }
-  h3 { font-size: 14px; font-weight: 700; color: #a1a1aa; margin: 20px 0 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-  p, li { font-size: 13px; line-height: 1.7; color: #a1a1aa; }
-  a { color: #818cf8; }
-  code { background: #18181b; border: 1px solid #27272a; border-radius: 3px; padding: 1px 5px; font-size: 12px; color: #e5e5e5; }
-
-  .section { margin-bottom: 56px; }
-  .section-divider { height: 1px; background: linear-gradient(90deg, #6366f1 0%, #27272a 40%, transparent 100%); margin: 56px 0; }
-
-  .card { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 24px; margin: 16px 0; }
-  .callout { padding: 14px 18px; background: #1e1b4b; border: 1px solid #312e81; border-radius: 8px; font-size: 13px; color: #c7d2fe; margin: 16px 0; }
-
-  table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 12px 0; }
-  td { padding: 8px 10px; color: #a1a1aa; border-bottom: 1px solid #1e1b4b; }
-
-  .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: middle; margin-right: 6px; }
-  .badge { display: inline-flex; border-radius: 4px; font-size: 11px; font-weight: 600; overflow: hidden; margin-right: 6px; }
-  .badge .label { padding: 3px 7px; background: #27272a; color: #a1a1aa; }
-  .badge .value { padding: 3px 7px; color: #fff; }
-
-  .syntax-block {
-    font-size: 13px;
-    line-height: 1.8;
-    background: #0c0c0f;
-    border-radius: 8px;
-    padding: 20px 24px;
-    border: 1px solid #1e1b4b;
-    white-space: pre;
-    overflow-x: auto;
+  :root {
+    --bg: #0c0c0f;
+    --bg-elevated: rgba(18, 19, 26, 0.82);
+    --bg-soft: rgba(22, 24, 34, 0.68);
+    --line: rgba(129, 140, 248, 0.22);
+    --line-strong: rgba(129, 140, 248, 0.45);
+    --text: #f3f4fb;
+    --muted: #a5adbf;
+    --soft: #6f778a;
+    --structure: #6366f1;
+    --structure-deep: #4338ca;
+    --state: #a898f5;
+    --event: #30b8e8;
+    --data: #b0bec5;
+    --data-soft: #84929f;
+    --gold: #fbbf24;
+    --emerald: #34d399;
+    --amber: #fde047;
+    --rose: #f87171;
+    --shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+    --mono: "Cascadia Cove", "Cascadia Code", Consolas, monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   }
 
-  .do-dont { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .do-col { background: #0c1a0c; border: 1px solid #14532d; border-radius: 8px; padding: 16px; }
-  .dont-col { background: #1a0c0c; border: 1px solid #7f1d1d; border-radius: 8px; padding: 16px; }
-  .dont-col h4 { color: #fb7185; font-size: 12px; margin-bottom: 10px; }
-  .do-col li, .dont-col li { font-size: 12px; line-height: 1.8; margin-left: 16px; }
-  .do-col li { color: #86efac; }
-  .dont-col li { color: #fda4af; }
+  * {
+    box-sizing: border-box;
+  }
 
-  .palette-card { border-radius: 8px; padding: 14px; text-align: center; }
-  .palette-card .hex { font-size: 11px; opacity: 0.8; margin-top: 4px; }
-  .palette-card .role { font-size: 10px; margin-top: 6px; opacity: 0.6; }
+  html {
+    scroll-behavior: smooth;
+  }
 
-  .pc-card { width: 320px; background: #141414; border: 1px solid #222; border-radius: 12px; overflow: hidden; margin: 16px 0; }
-  .pc-card h2 { font-size: 16px; font-weight: 600; padding: 20px 20px 4px; color: #e5e5e5; margin: 0; text-transform: none; letter-spacing: normal; border: none; }
-  .pc-hex { font-size: 13px; color: #888; padding: 0 20px 16px; font-family: ui-monospace, monospace; }
-  .pc-swatch-gradient div { flex: 1; }
-  .pc-context-block { padding: 16px 20px; border-top: 1px solid #1e1e1e; }
-  .pc-context-block h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #666; margin: 0 0 10px; font-weight: 600; border: none; padding: 0; }
-  .pc-diagram svg { width: 100%; display: block; }
-  .pc-icon-row { display: flex; align-items: center; gap: 16px; }
+  body {
+    margin: 0;
+    color: var(--text);
+    font-family: var(--serif);
+    background:
+      radial-gradient(circle at top left, rgba(99, 102, 241, 0.20), transparent 34%),
+      radial-gradient(circle at 82% 12%, rgba(48, 184, 232, 0.12), transparent 24%),
+      radial-gradient(circle at 50% 120%, rgba(251, 191, 36, 0.10), transparent 24%),
+      linear-gradient(180deg, #08090d 0%, #0c0c0f 42%, #090a10 100%);
+    min-height: 100vh;
+  }
 
-  /* 5+3 Palette System Card */
-  .pc-palette { background: #141414; border: 1px solid #27272A; border-radius: 12px; overflow: hidden; margin: 24px 0; }
-  .pc-palette-header { background: #6366F1; padding: 20px 24px; }
-  .pc-palette-header h2 { font-size: 18px; font-weight: 700; color: #fff; margin: 0; text-transform: none; letter-spacing: normal; border: none; }
-  .pc-palette-header p { font-size: 13px; color: rgba(255,255,255,0.7); margin: 4px 0 0; }
-  .pc-palette-group { margin-bottom: 24px; }
-  .pc-palette-group:last-child { margin-bottom: 0; }
-  .pc-palette-group h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #71717A; margin: 0 0 12px; font-weight: 600; border: none; padding: 0; }
-  .pc-palette-row { display: flex; gap: 16px; flex-wrap: wrap; }
-  .pc-palette-swatch { display: flex; align-items: center; gap: 10px; min-width: 180px; }
-  .pc-palette-swatch .swatch-block { width: 48px; height: 32px; border-radius: 6px; flex-shrink: 0; }
-  .pc-palette-swatch .swatch-info { font-size: 12px; }
-  .pc-palette-swatch .swatch-role { font-weight: 600; }
-  .pc-palette-swatch .swatch-hex { font-family: ui-monospace, monospace; font-size: 11px; color: #71717A; margin-top: 2px; }
-  .pc-palette-note .swatch-block { width: 28px; height: 28px; border-radius: 4px; flex-shrink: 0; }
-  svg text { font-family: var(--brand-mono); }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 72px 72px;
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.7), transparent 88%);
+  }
 
-  /* ========================================================================
-     Surface Palette Mapping (.spm-*) — Unified treatment for §2.1, §2.2
-     Echoes the polished sf-palette structure from §1.4
-     ======================================================================== */
-  .spm-surface { background: #0c0c0f; border: 1px solid #27272a; border-radius: 12px; overflow: hidden; margin: 24px 0; }
-  .spm-header { padding: 18px 0; border-bottom: 1px solid #1e1b4b; }
-  .spm-header h3 { font-size: 14px; font-weight: 700; margin: 0; text-transform: none; letter-spacing: normal; border: none; padding: 0; display: flex; align-items: center; gap: 10px; }
-  .spm-header .spm-hue { font-size: 11px; font-weight: 400; color: #52525b; font-family: ui-monospace, monospace; }
-  .spm-body { padding: 0; }
-  .spm-info { display: flex; flex-direction: column; gap: 2px; }
-  .spm-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-  .spm-name { font-size: 13px; font-weight: 600; }
-  .spm-hex { font-family: ui-monospace, monospace; font-size: 11px; color: #71717a; background: #18181b; padding: 2px 8px; border-radius: 4px; }
-  .spm-weight { font-size: 10px; color: #52525b; background: #1e1b4b; padding: 2px 6px; border-radius: 3px; }
-  .spm-desc { font-size: 11px; color: #71717a; line-height: 1.5; margin-top: 2px; }
-  .spm-tokens { font-size: 10px; color: #52525b; margin-top: 4px; font-family: ui-monospace, monospace; }
-  .spm-group { padding: 16px 24px; border-bottom: 1px solid #1e1b4b; }
-  .spm-group:last-child { border-bottom: none; }
-  .spm-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #52525b; margin-bottom: 12px; font-weight: 600; }
-  .spm-grid { display: grid; gap: 0; }
-  .spm-grid-2 { grid-template-columns: 1fr 1fr; }
-  .spm-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
-  .spm-grid > .spm-row { padding: 12px 0; }
-  .spm-grid > .spm-row:first-child { padding-top: 0; }
+  a {
+    color: inherit;
+  }
 
-  /* Diagram mapping table — refined treatment for §2.2 */
-  .spm-table { width: 100%; border-collapse: collapse; margin: 0; }
-  .spm-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #52525b; font-weight: 600; padding: 12px 16px; text-align: left; border-bottom: 1px solid #1e1b4b; background: #0f0f12; }
-  .spm-table td { padding: 12px 16px; font-size: 12px; color: #a1a1aa; border-bottom: 1px solid rgba(30, 27, 75, 0.4); vertical-align: middle; }
-  .spm-table tr:last-child td { border-bottom: none; }
-  .spm-table .spm-cell-element { font-weight: 500; color: #e5e5e5; }
-  .spm-table .spm-cell-color { display: flex; align-items: center; gap: 8px; }
-  .spm-table .spm-mini-swatch { width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
-  .spm-table code { background: #18181b; border: 1px solid #27272a; border-radius: 3px; padding: 2px 6px; font-size: 11px; }
-  .spm-table-section { background: #0c0c0f; border: 1px solid #27272a; border-radius: 10px; overflow: hidden; margin: 16px 0; }
-  .spm-table-header { padding: 14px 20px; border-bottom: 1px solid #1e1b4b; }
-  .spm-table-header h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #71717a; font-weight: 600; margin: 0; display: flex; align-items: center; gap: 8px; }
-  .spm-table-header h4 .spm-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .page {
+    width: min(1240px, calc(100vw - 48px));
+    margin: 0 auto;
+    padding: 32px 0 72px;
+    position: relative;
+  }
 
-  /* Shape tiles for diagram lifecycle */
-  .spm-shapes { display: grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap: 16px; margin: 20px 0; }
-  .spm-shape-tile { background: #0f0f12; border: 1px solid #1e1b4b; border-radius: 10px; padding: 20px 16px; text-align: center; }
-  .spm-shape-icon { width: 92px; height: 92px; margin: 0 auto 14px; display: flex; align-items: center; justify-content: center; }
-  .spm-shape-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-  .spm-shape-meta { font-size: 10px; color: #71717a; margin-bottom: 2px; }
-  .spm-shape-desc { font-size: 10px; color: #52525b; }
-  .origin-inline-lockup { display: inline-flex; align-items: center; justify-content: center; gap: 10px; white-space: nowrap; }
-  .origin-inline-dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
-</style>
+  .masthead,
+  .panel,
+  .quote-band,
+  .boundary {
+    backdrop-filter: blur(16px);
+  }
+
+  .masthead {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 28px;
+    background:
+      linear-gradient(135deg, rgba(16, 18, 29, 0.96), rgba(13, 14, 20, 0.86)),
+      linear-gradient(180deg, rgba(99, 102, 241, 0.10), transparent 60%);
+    box-shadow: var(--shadow);
+    padding: 28px;
+  }
+
+  .masthead::after {
+    content: "";
+    position: absolute;
+    inset: auto -6% -18% auto;
+    width: 420px;
+    height: 420px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.24), transparent 68%);
+    pointer-events: none;
+  }
+
+  .eyebrow,
+  .kicker,
+  .mini-label,
+  .family-label,
+  .boundary-label,
+  .spec-label {
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .eyebrow {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 30px;
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.88fr);
+    gap: 28px;
+    align-items: stretch;
+  }
+
+  .title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .wordmark-line {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+
+  .wordmark {
+    font-family: var(--mono);
+    font-size: clamp(34px, 8vw, 76px);
+    line-height: 0.92;
+    font-weight: 700;
+    font-variant: small-caps;
+    letter-spacing: 0.11em;
+    margin: 0;
+    color: #fbfbfe;
+    text-shadow: 0 0 24px rgba(99, 102, 241, 0.24);
+  }
+
+  .mark-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(251, 191, 36, 0.25);
+    background: rgba(251, 191, 36, 0.08);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: #f7e0a2;
+  }
+
+  .mark-chip svg {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+  }
+
+  .positioning {
+    max-width: 14ch;
+    font-size: clamp(42px, 6vw, 80px);
+    line-height: 0.96;
+    margin: 0;
+    color: #ffffff;
+    letter-spacing: -0.03em;
+  }
+
+  .lede {
+    max-width: 62ch;
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.6;
+    color: #d5dae5;
+  }
+
+  .lede strong {
+    color: #ffffff;
+    font-weight: 600;
+  }
+
+  .support-row {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .support-pill {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .hero-card {
+    position: relative;
+    border-radius: 24px;
+    border: 1px solid var(--line);
+    background:
+      linear-gradient(180deg, rgba(14, 16, 25, 0.96), rgba(10, 11, 17, 0.92));
+    padding: 22px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .hero-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.12), transparent 48%);
+    pointer-events: none;
+  }
+
+  .hero-card .kicker {
+    margin-bottom: 14px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .code-frame {
+    position: relative;
+    z-index: 1;
+    border-radius: 18px;
+    border: 1px solid rgba(99, 102, 241, 0.18);
+    background: rgba(8, 9, 14, 0.94);
+    padding: 18px;
+    overflow: hidden;
+  }
+
+  .code-toolbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--soft);
+  }
+
+  .dots {
+    display: inline-flex;
+    gap: 6px;
+  }
+
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.16);
+  }
+
+  pre {
+    margin: 0;
+    overflow: auto;
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.8;
+    color: #dfe5f0;
+  }
+
+  .tok-structure { color: var(--structure); font-weight: 700; }
+  .tok-grammar { color: #98a3ff; }
+  .tok-state { color: var(--state); }
+  .tok-event { color: var(--event); }
+  .tok-data { color: var(--data); }
+  .tok-value { color: var(--data-soft); }
+  .tok-rule { color: var(--gold); }
+  .tok-note { color: #9096a6; font-style: italic; }
+  .tok-italic { font-style: italic; }
+
+  .legend-grid {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .legend-item {
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .legend-item strong {
+    display: block;
+    font-family: var(--mono);
+    font-size: 12px;
+    margin-bottom: 5px;
+  }
+
+  .legend-item span {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  section {
+    margin-top: 34px;
+  }
+
+  .section-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+    gap: 20px;
+    align-items: end;
+    margin-bottom: 18px;
+  }
+
+  .section-head h2 {
+    margin: 0;
+    font-size: clamp(30px, 4vw, 48px);
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+  }
+
+  .section-head p,
+  .section-copy {
+    margin: 0;
+    color: var(--muted);
+    font-size: 17px;
+    line-height: 1.7;
+  }
+
+  .section-copy strong {
+    color: #ffffff;
+    font-weight: 600;
+  }
+
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    background: linear-gradient(180deg, var(--bg-elevated), rgba(11, 12, 18, 0.9));
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .panel-inner {
+    padding: 28px;
+  }
+
+  .principles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .principle {
+    padding: 18px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .principle h3,
+  .family-card h3,
+  .mark-card h3,
+  .type-card h3,
+  .rule-card h3,
+  .boundary-card h3 {
+    margin: 0 0 10px;
+    font-family: var(--mono);
+    font-size: 15px;
+    line-height: 1.4;
+    color: #ffffff;
+  }
+
+  .principle p,
+  .family-card p,
+  .mark-card p,
+  .type-card p,
+  .rule-card p,
+  .boundary-card p,
+  .measure p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  .quote-band {
+    margin-top: 18px;
+    padding: 24px 28px;
+    border-radius: 24px;
+    border: 1px solid rgba(251, 191, 36, 0.18);
+    background:
+      linear-gradient(180deg, rgba(251, 191, 36, 0.08), rgba(251, 191, 36, 0.02)),
+      rgba(15, 15, 20, 0.92);
+    box-shadow: var(--shadow);
+  }
+
+  .quote-band p {
+    margin: 0;
+    font-size: 24px;
+    line-height: 1.6;
+    color: #f4e8bc;
+  }
+
+  .quote-band p strong {
+    color: #fff7d6;
+  }
+
+  .mark-grid,
+  .type-grid,
+  .boundary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .mark-card,
+  .type-card,
+  .boundary-card,
+  .rule-card {
+    padding: 22px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .mark-diagram {
+    height: 160px;
+    margin-bottom: 16px;
+    display: grid;
+    place-items: center;
+    border-radius: 16px;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.20), transparent 56%),
+      rgba(5, 7, 12, 0.8);
+    border: 1px solid rgba(99, 102, 241, 0.14);
+  }
+
+  .mark-diagram svg {
+    width: min(100%, 240px);
+    height: auto;
+  }
+
+  .family-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .family-card {
+    padding: 18px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
+    min-height: 220px;
+  }
+
+  .swatch {
+    width: 100%;
+    height: 58px;
+    border-radius: 14px;
+    margin-bottom: 14px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  }
+
+  .swatch-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: baseline;
+    margin-bottom: 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--soft);
+  }
+
+  .family-card ul,
+  .rule-card ul,
+  .type-card ul,
+  .boundary-card ul {
+    margin: 14px 0 0;
+    padding-left: 18px;
+    color: var(--muted);
+  }
+
+  .family-card li,
+  .rule-card li,
+  .type-card li,
+  .boundary-card li {
+    margin: 0 0 10px;
+    line-height: 1.6;
+  }
+
+  .type-grid {
+    margin-top: 16px;
+  }
+
+  .type-sample {
+    margin-top: 14px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(6, 8, 13, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-family: var(--mono);
+    overflow: auto;
+  }
+
+  .type-sample .big {
+    display: block;
+    font-size: 28px;
+    line-height: 1.1;
+    color: #ffffff;
+  }
+
+  .type-sample .small {
+    display: block;
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .rule-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: 16px;
+  }
+
+  .rule-stack {
+    display: grid;
+    gap: 16px;
+  }
+
+  .measure-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 16px;
+  }
+
+  .measure {
+    padding: 16px 18px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .measure strong {
+    display: block;
+    margin-bottom: 8px;
+    font-family: var(--mono);
+    font-size: 22px;
+    color: #ffffff;
+  }
+
+  .boundary {
+    margin-top: 18px;
+    border-radius: 28px;
+    border: 1px solid rgba(99, 102, 241, 0.18);
+    background:
+      linear-gradient(180deg, rgba(12, 14, 21, 0.96), rgba(9, 10, 16, 0.9));
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .boundary-head {
+    padding: 24px 28px 0;
+  }
+
+  .boundary-grid {
+    padding: 22px 28px 28px;
+  }
+
+  .boundary-card.brand {
+    border-color: rgba(251, 191, 36, 0.18);
+    background: linear-gradient(180deg, rgba(251, 191, 36, 0.06), rgba(255, 255, 255, 0.03));
+  }
+
+  .boundary-card.system {
+    border-color: rgba(48, 184, 232, 0.18);
+    background: linear-gradient(180deg, rgba(48, 184, 232, 0.06), rgba(255, 255, 255, 0.03));
+  }
+
+  .boundary-card.split {
+    border-color: rgba(168, 152, 245, 0.18);
+    background: linear-gradient(180deg, rgba(168, 152, 245, 0.06), rgba(255, 255, 255, 0.03));
+  }
+
+  .footer-note {
+    margin-top: 18px;
+    text-align: center;
+    color: var(--soft);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  @media (max-width: 1100px) {
+    .hero-grid,
+    .section-head,
+    .rule-grid,
+    .family-grid,
+    .principles,
+    .mark-grid,
+    .type-grid,
+    .boundary-grid,
+    .measure-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .legend-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .page {
+      width: min(100vw - 28px, 1240px);
+      padding: 16px 0 52px;
+    }
+
+    .masthead,
+    .panel-inner,
+    .boundary-head,
+    .boundary-grid,
+    .quote-band {
+      padding-left: 18px;
+      padding-right: 18px;
+    }
+
+    .legend-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .wordmark-line {
+      align-items: flex-start;
+    }
+
+    .positioning {
+      max-width: none;
+    }
+  }
+  </style>
 </head>
 <body>
+  <div class="page">
+    <header class="masthead" id="top">
+      <div class="eyebrow">
+        <span>Precept / Brand Identity / Canonical Meaning</span>
+        <span>Updated 2026-04-06</span>
+      </div>
 
-<!-- ===================================================================== -->
-<!-- HEADER                                                                 -->
-<!-- ===================================================================== -->
-<h1>Precept</h1>
-<p class="subtitle">Brand Specification — Surfaces & Identity &nbsp;·&nbsp; Last updated: 2026-04-06</p>
+      <div class="hero-grid">
+        <div class="title-block">
+          <div class="wordmark-line">
+            <h1 class="wordmark">PRECEPT</h1>
+            <div class="mark-chip">
+              <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+                <rect x="8" y="8" width="48" height="48" rx="14" stroke="#6366F1" stroke-width="3"/>
+                <rect x="18" y="18" width="18" height="18" rx="6" stroke="#A898F5" stroke-width="3"/>
+                <circle cx="27" cy="27" r="4" fill="#FBBF24"/>
+                <rect x="28" y="28" width="18" height="18" rx="6" stroke="#A898F5" stroke-width="3"/>
+                <path d="M31 27H41" stroke="#34D399" stroke-width="3" stroke-linecap="round"/>
+                <path d="M37 23L41 27L37 31" stroke="#34D399" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Combined mark is primary
+            </div>
+          </div>
 
-<!-- STRUCTURE
-     1. Brand Identity
-     2. Visual Surfaces
-     3. Research & Explorations
--->
+          <p class="positioning">A domain integrity engine for .NET.</p>
+          <p class="lede"><strong>Precept is a single declarative contract that binds state, data, and business rules into an engine where invalid states are structurally impossible.</strong> The identity teaches a new category first. The AI-native story is real, but it arrives as supporting proof, not opening posture.</p>
 
-<!-- ===================================================================== -->
-<!-- SECTION 1: BRAND IDENTITY                                             -->
-<!-- ===================================================================== -->
-<div class="section">
-<h2 style="font-size: 24px; margin-bottom: 24px; color: #6366F1;">1. Brand Identity</h2>
+          <div class="support-row">
+            <div class="support-pill">Category creator, not category borrower</div>
+            <div class="support-pill">The .precept file is the hero image</div>
+            <div class="support-pill">Meaning before decoration</div>
+          </div>
+        </div>
 
-<!-- 1.1 Positioning & Narrative -->
-<div class="section">
-<h2>1.1 Positioning &amp; Narrative <span class="status-chip">LOCKED</span></h2>
+        <aside class="hero-card" aria-label="Canonical DSL hero">
+          <div class="kicker">Primary visual truth</div>
+          <div class="code-frame">
+            <div class="code-toolbar">
+              <div class="dots" aria-hidden="true">
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
+              </div>
+              <span>subscription-cancellation-retention.precept</span>
+            </div>
+            <pre><span class="tok-structure">precept</span> <span class="tok-data">SubscriptionCancellation</span>
 
-<div class="card">
-  <h3>Primary frame</h3>
-  <p style="color:#fff; font-size:15px; font-weight:600; margin:8px 0;">Category creation — "domain integrity engine"</p>
-  <p>No competitor occupies this frame. Precept defines the category, then becomes synonymous with it. Same pattern as Temporal ("durable execution"), Docker ("containerization"), Terraform ("infrastructure as code").</p>
+<span class="tok-structure">state</span> <span class="tok-state tok-italic">Active</span>
+<span class="tok-structure">state</span> <span class="tok-state">RetentionOffered</span>
+<span class="tok-structure">state</span> <span class="tok-state">Cancelled</span>
 
-  <h3>Secondary frame</h3>
-  <p style="color:#fff; font-size:15px; font-weight:600; margin:8px 0;">AI-native — "the contract AI can reason about"</p>
-  <p>Deterministic semantics + structured tool APIs make Precept uniquely suited for AI authoring and validation. This is the "why now" signal, not the primary identity.</p>
+<span class="tok-structure">field</span> <span class="tok-data tok-italic">tenureMonths</span> <span class="tok-grammar">as</span> <span class="tok-data">number</span>
+<span class="tok-structure">field</span> <span class="tok-data">acceptedOffer</span> <span class="tok-grammar">as</span> <span class="tok-data">boolean</span> <span class="tok-grammar">=</span> <span class="tok-value">false</span>
 
-  <h3>Single-sentence positioning</h3>
-  <div class="callout" style="font-style:italic;">
-    "Precept is a domain integrity engine for .NET — a single declarative contract that binds state, data, and business rules into an engine where invalid states are structurally impossible."
+<span class="tok-structure">event</span> <span class="tok-event">OfferRetention</span>
+<span class="tok-structure">event</span> <span class="tok-event tok-italic">Cancel</span>
+
+<span class="tok-structure">from</span> <span class="tok-state tok-italic">Active</span> <span class="tok-structure">on</span> <span class="tok-event">OfferRetention</span>
+  <span class="tok-structure">when</span> <span class="tok-data tok-italic">tenureMonths</span> <span class="tok-grammar">&gt;=</span> <span class="tok-value">12</span>
+  <span class="tok-structure">transition</span> <span class="tok-grammar">-&gt;</span> <span class="tok-state">RetentionOffered</span>
+
+<span class="tok-structure">from</span> <span class="tok-state">RetentionOffered</span> <span class="tok-structure">on</span> <span class="tok-event tok-italic">Cancel</span>
+  <span class="tok-structure">reject</span> <span class="tok-rule">"Active retention offer must be resolved first."</span>
+
+<span class="tok-note"># Rules are visible before they are broken.</span></pre>
+          </div>
+
+          <div class="legend-grid">
+            <div class="legend-item">
+              <strong style="color: var(--structure);">Structure</strong>
+              <span>Grammar and control belong to indigo. It is the brand anchor because Precept is governed, not improvised.</span>
+            </div>
+            <div class="legend-item">
+              <strong style="color: var(--state);">States and events</strong>
+              <span>Violet names where you are. Cyan names what can happen. The split is categorical, not decorative.</span>
+            </div>
+            <div class="legend-item">
+              <strong style="color: var(--gold);">Rule language</strong>
+              <span>Gold is reserved for the human-readable interruption: the rule line that explains why.</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </header>
+
+    <section id="frame">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Identity frame</div>
+          <h2>Teach the category before you sell the tool.</h2>
+        </div>
+        <p>The brand spec defines what Precept is, what its visual language means, and why the category reads as exact rather than theatrical.</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-inner">
+          <div class="principles">
+            <article class="principle">
+              <h3>The name is not incidental.</h3>
+              <p>A precept is a strict rule of action. The product treats business constraints as precepts, so the name already contains the worldview. The spec should make that legible, not explain it away.</p>
+            </article>
+            <article class="principle">
+              <h3>Why now is supporting copy.</h3>
+              <p>The AI-native story matters because deterministic semantics and inspectable tooling make the contract machine-readable. It does not outrank the core category claim.</p>
+            </article>
+            <article class="principle">
+              <h3>Beauty follows proof.</h3>
+              <p>Precept should look exact, visible, and sound. It should never look vague, generic, or decorative-for-its-own-sake.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+
+      <div class="quote-band">
+        <p><strong>Canonical positioning:</strong> Precept is a domain integrity engine for .NET - a single declarative contract that binds state, data, and business rules into an engine where invalid states are structurally impossible.</p>
+      </div>
+    </section>
+
+    <section id="mark-logic">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Mark logic</div>
+          <h2>The mark should feel governed even in silhouette.</h2>
+        </div>
+        <p class="section-copy">The iconography is not a generic badge. It combines <strong>tablet form</strong>, <strong>state-machine form</strong>, and <strong>allowed flow</strong> into one governed emblem. The combined form is primary.</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-inner">
+          <div class="mark-grid">
+            <article class="mark-card">
+              <div class="mark-diagram">
+                <svg viewBox="0 0 220 160" fill="none" aria-hidden="true">
+                  <rect x="44" y="20" width="132" height="120" rx="24" stroke="#6366F1" stroke-width="4"/>
+                  <line x1="68" y1="54" x2="152" y2="54" stroke="#FBBF24" stroke-width="4" stroke-linecap="round"/>
+                  <line x1="68" y1="76" x2="130" y2="76" stroke="#9AA8B5" stroke-width="4" stroke-linecap="round"/>
+                  <line x1="68" y1="98" x2="144" y2="98" stroke="#9AA8B5" stroke-width="4" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <h3>Tablet / precept form</h3>
+              <p>The tablet establishes rule-as-object. Gold appears sparingly here because it signifies the remembered human-readable rule, not a general accent habit.</p>
+            </article>
+
+            <article class="mark-card">
+              <div class="mark-diagram">
+                <svg viewBox="0 0 220 160" fill="none" aria-hidden="true">
+                  <rect x="34" y="40" width="54" height="54" rx="16" stroke="#A898F5" stroke-width="4"/>
+                  <circle cx="61" cy="67" r="7" fill="#6366F1"/>
+                  <rect x="132" y="66" width="54" height="54" rx="16" stroke="#A898F5" stroke-width="4"/>
+                  <path d="M88 67H132" stroke="#34D399" stroke-width="4" stroke-linecap="round"/>
+                  <path d="M122 57L132 67L122 77" stroke="#34D399" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <h3>State-machine form</h3>
+              <p>Equal rounded cards, centered origin dot, and emerald flow convey allowed transition. It reads as governed motion rather than process doodling.</p>
+            </article>
+
+            <article class="mark-card">
+              <div class="mark-diagram">
+                <svg viewBox="0 0 220 160" fill="none" aria-hidden="true">
+                  <rect x="32" y="20" width="156" height="120" rx="26" stroke="#6366F1" stroke-width="4"/>
+                  <rect x="52" y="46" width="42" height="42" rx="12" stroke="#A898F5" stroke-width="4"/>
+                  <circle cx="73" cy="67" r="6" fill="#FBBF24"/>
+                  <rect x="128" y="72" width="42" height="42" rx="12" stroke="#A898F5" stroke-width="4"/>
+                  <path d="M94 67H128" stroke="#34D399" stroke-width="4" stroke-linecap="round"/>
+                  <path d="M118 57L128 67L118 77" stroke="#34D399" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                  <line x1="52" y1="104" x2="112" y2="104" stroke="#9AA8B5" stroke-width="4" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <h3>Combined form</h3>
+              <p>The tablet gives the form its law. The states and emerald arrow give it executable flow. This is the core icon logic because Precept is both rule and runtime.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="semantic-meaning">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Canonical semantic meaning</div>
+          <h2>Every lane means one thing.</h2>
+        </div>
+        <p class="section-copy">Brand owns the semantic lanes and their rationale. The system doc operationalizes them across surfaces, but it does not get to rename what they mean.</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-inner">
+          <div class="family-grid">
+            <article class="family-card">
+              <div class="swatch" style="background: linear-gradient(135deg, #4338ca, #6366f1);"></div>
+              <div class="swatch-meta"><span class="family-label">Structure</span><span>#4338CA -> #6366F1</span></div>
+              <h3>Grammar, control, and executable structure</h3>
+              <p>Indigo is the structural brand anchor. It carries declaration, control, connectors, and the formal edge of the language.</p>
+              <ul>
+                <li>Behavior-driving keywords are heavier.</li>
+                <li>Grammar words and operators stay in the same family.</li>
+                <li>Structure is the system's spine, not a surface accent.</li>
+              </ul>
+            </article>
+
+            <article class="family-card">
+              <div class="swatch" style="background: linear-gradient(135deg, #8e7cf0, #a898f5);"></div>
+              <div class="swatch-meta"><span class="family-label">States</span><span>#A898F5</span></div>
+              <h3>Where the entity is</h3>
+              <p>Violet names state as condition, not mood. Shape communicates lifecycle; hue communicates that the thing is a state.</p>
+              <ul>
+                <li>No lifecycle rainbow in the brand language.</li>
+                <li>Constraint pressure appears through italic, not extra hue.</li>
+                <li>Equal state shapes matter as much as color.</li>
+              </ul>
+            </article>
+
+            <article class="family-card">
+              <div class="swatch" style="background: linear-gradient(135deg, #22a6db, #30b8e8);"></div>
+              <div class="swatch-meta"><span class="family-label">Events</span><span>#30B8E8</span></div>
+              <h3>What can happen</h3>
+              <p>Cyan names action and change. It signals event identity without impersonating success or warning status.</p>
+              <ul>
+                <li>Events stay distinct from states everywhere.</li>
+                <li>Runtime verdict colors never replace event meaning.</li>
+                <li>Italic can add rule pressure without creating a new family.</li>
+              </ul>
+            </article>
+
+            <article class="family-card">
+              <div class="swatch" style="background: linear-gradient(135deg, #84929f, #b0bec5);"></div>
+              <div class="swatch-meta"><span class="family-label">Data</span><span>#B0BEC5 / #84929F</span></div>
+              <h3>What the system knows</h3>
+              <p>Bright slate carries names, types, and values. It is factual, quiet, and subordinate to structure, states, and events.</p>
+              <ul>
+                <li>Names, types, and values may vary tonally.</li>
+                <li>The family itself does not change.</li>
+                <li>Data should read as information, not flair.</li>
+              </ul>
+            </article>
+
+            <article class="family-card">
+              <div class="swatch" style="background: linear-gradient(135deg, #d7a61c, #fbbf24);"></div>
+              <div class="swatch-meta"><span class="family-label">Rule language</span><span>#FBBF24</span></div>
+              <h3>The human-readable interruption</h3>
+              <p>Gold is earned, sparse, and tied to the explanatory rule line. It is not a headline color, border habit, or general accent token.</p>
+              <ul>
+                <li>Gold belongs to because and reject message content.</li>
+                <li>It may appear in the tablet or combined mark if it still reads as rule memory.</li>
+                <li>It should always feel like meaning entering the frame.</li>
+              </ul>
+            </article>
+          </div>
+
+          <div class="measure-grid">
+            <div class="measure">
+              <strong style="color: var(--emerald);">Enabled</strong>
+              <p>Emerald is runtime allowance, not authoring-time syntax.</p>
+            </div>
+            <div class="measure">
+              <strong style="color: var(--rose);">Blocked</strong>
+              <p>Rose is runtime denial and constraint failure, never general emphasis.</p>
+            </div>
+            <div class="measure">
+              <strong style="color: var(--amber);">Warning</strong>
+              <p>Amber is unmatched or cautionary runtime state, not narrative warmth.</p>
+            </div>
+            <div class="measure">
+              <strong>Italic</strong>
+              <p>Constraint pressure is expressed by typography before new hue invention.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="typography">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Typography intent</div>
+          <h2>The code should feel like it grows out of the wordmark.</h2>
+        </div>
+        <p class="section-copy">Cascadia Cove with Cascadia Code fallback is the typographic anchor. The wordmark carries defined-term authority; the code carries executable proof.</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-inner">
+          <div class="type-grid">
+            <article class="type-card">
+              <div class="mini-label">Wordmark rule</div>
+              <h3>700 weight, small caps, tracked spacing</h3>
+              <p>The wordmark should read like a named principle. Small caps gives it the posture of a defined term, not a startup badge.</p>
+              <div class="type-sample">
+                <span class="big" style="font-variant: small-caps; letter-spacing: 0.10em;">PRECEPT</span>
+                <span class="small">Cascadia Cove 700, small caps, 0.1em tracking</span>
+              </div>
+            </article>
+
+            <article class="type-card">
+              <div class="mini-label">Code rule</div>
+              <h3>Same family, normal case, working weight range</h3>
+              <p>Code stays in the same family so the system feels native to the editor. The brand does not jump to a different typographic voice when it starts proving itself.</p>
+              <div class="type-sample">
+                <span class="big" style="font-size: 22px; letter-spacing: 0; font-variant: normal;"><span class="tok-structure">precept</span> <span class="tok-data">LoanApplication</span></span>
+                <span class="small">Cascadia Cove 400-700, normal case</span>
+              </div>
+            </article>
+
+            <article class="type-card">
+              <div class="mini-label">Voice rule</div>
+              <h3>Authoritative with warmth</h3>
+              <p>The prose states facts. It does not hype. Contractions are fine. Dry wit is welcome only when the fact remains intact.</p>
+              <ul>
+                <li>Lead with what Precept is.</li>
+                <li>Explain when clarification adds truth.</li>
+                <li>Never substitute mood for specificity.</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="brand-rules">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Brand-side rationale</div>
+          <h2>The visual system matters because the compiler already knows what each thing is.</h2>
+        </div>
+        <p class="section-copy">Precept's aesthetic is grounded in semantics. The colors and typographic signals feel inevitable because they follow the structure of the DSL rather than decorating it after the fact.</p>
+      </div>
+
+      <div class="rule-grid">
+        <div class="rule-stack">
+          <article class="rule-card">
+            <h3>What this spec owns</h3>
+            <ul>
+              <li>Identity, philosophy, and category frame.</li>
+              <li>Canonical semantic meaning for structure, states, events, data, rules, and runtime verdicts.</li>
+              <li>Mark logic, wordmark posture, and typographic intent.</li>
+              <li>Why the semantic system belongs to Precept as a brand.</li>
+            </ul>
+          </article>
+          <article class="rule-card">
+            <h3>What this spec does not own</h3>
+            <ul>
+              <li>Spacing scales, grids, component recipes, or elevation systems.</li>
+              <li>Surface-specific muted variants, token aliases, or implementation state maps.</li>
+              <li>Inspector, editor, diagnostics, or preview layout mechanics.</li>
+              <li>Accessibility execution details, responsive behavior, or interaction-state recipes.</li>
+            </ul>
+          </article>
+        </div>
+
+        <article class="rule-card">
+          <h3>Brand stance in one sentence</h3>
+          <p>Precept should look like a system where the rules already exist and the interface is simply exposing them clearly.</p>
+          <div class="type-sample" style="margin-top: 18px;">
+            <span class="small" style="margin-top: 0; margin-bottom: 8px;">Operational handoff</span>
+            <span style="display: block; font-family: var(--serif); color: #d5dae5; font-size: 18px; line-height: 1.7;">If the question is <em>what does indigo mean?</em>, it belongs here. If the question is <em>how does that meaning show up in the preview shell, the diagram canvas, and the event dock?</em>, it belongs in the semantic visual system.</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="boundary">
+      <div class="boundary">
+        <div class="boundary-head">
+          <div class="boundary-label">Ownership boundary</div>
+          <h2 style="margin: 10px 0 0; font-size: clamp(30px, 4vw, 48px); line-height: 1.02; letter-spacing: -0.03em;">Brand meaning and reusable system guidance should feel like a pair, not a merger.</h2>
+        </div>
+
+        <div class="boundary-grid">
+          <article class="boundary-card brand">
+            <h3>Brand spec</h3>
+            <p>Defines the category, the promise, the mark logic, the typographic posture, and the semantic lanes that make Precept recognizably itself.</p>
+            <ul>
+              <li>Identity and narrative archetype</li>
+              <li>Canonical meaning of the color families</li>
+              <li>Wordmark and brand mark logic</li>
+            </ul>
+          </article>
+
+          <article class="boundary-card system">
+            <h3>Semantic visual system</h3>
+            <p>Defines how the same meanings are operationalized across syntax, diagrams, inspectors, previews, diagnostics, and future product surfaces.</p>
+            <ul>
+              <li>Reading order across surfaces</li>
+              <li>Primitives and overlays</li>
+              <li>Cross-surface invariants</li>
+            </ul>
+          </article>
+
+          <article class="boundary-card split">
+            <h3>Shared standard</h3>
+            <p>The pair should always agree on what the system means. They should differ in purpose, density, and level of operational detail.</p>
+            <ul>
+              <li>Meaning first, execution second</li>
+              <li>No duplicate ownership of surface mechanics</li>
+              <li>No erosion of the semantic lanes</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <p class="footer-note">Brand authority lives here. Reusable surface behavior lives in design/system/foundations/semantic-visual-system.html.</p>
   </div>
-</div>
-
-<div class="card">
-  <h3>Narrative archetype</h3>
-  <p style="color:#fff; font-size:15px; font-weight:600; margin-bottom:8px;">Category Creator: "This is a new kind of thing."</p>
-  <p>Like Temporal's "durable execution" or Tailwind's "utility-first CSS." Requires category education but earns the strongest position.</p>
-
-  <h3>README narrative arc</h3>
-  <ol style="margin:8px 0 0 20px;">
-    <li>One sentence: what it is <span style="color:#52525b;">(resolution)</span></li>
-    <li>One sentence: why it's different <span style="color:#52525b;">(implicit conflict)</span></li>
-    <li>One code sample <span style="color:#52525b;">(proof)</span></li>
-    <li>Feature list or badge row <span style="color:#52525b;">(comprehensiveness signal)</span></li>
-  </ol>
-
-  <div class="callout" style="margin-top:16px;">
-    The name "Precept" carries narrative weight — it means "a strict rule of action." The name IS the story.
-  </div>
-</div>
-</div>
-
-<div class="section-divider"></div>
-
-<!-- 1.2 Voice & Tone -->
-<div class="section">
-<h2>1.2 Voice &amp; Tone <span class="status-chip" style="background:#1e3a5f; color:#60a5fa;">REVISED</span></h2>
-
-<div class="card">
-  <p style="color:#fff; font-size:15px; font-weight:600; margin-bottom:12px;">Authoritative with warmth.</p>
-
-  <table>
-    <tr><th>Dimension</th><th>Setting</th></tr>
-    <tr><td>Formal ↔ Casual</td><td>Slightly casual. Contractions fine. Occasional explanatory asides.</td></tr>
-    <tr><td>Serious ↔ Funny</td><td>Dry wit welcome. Never forced. Precision finds the humor in the truth.</td></tr>
-    <tr><td>Respectful ↔ Irreverent</td><td>Respectful.</td></tr>
-    <tr><td>Matter-of-fact ↔ Enthusiastic</td><td>Matter-of-fact with clarifying asides.</td></tr>
-  </table>
-
-  <p style="margin-top:12px;">The voice states facts. It doesn't hedge. It doesn't oversell. It finds the wit in precision. When something matters, it says why — and the clarity itself can be the humor.</p>
-  <p style="margin-top:4px;"><strong style="color:#e5e5e5;">Models:</strong> Serilog's professionalism + MediatR's economy + Workflow Core's clarifying warmth.</p>
-</div>
-
-<div class="do-dont">
-  <div class="do-col">
-    <h4>✓ Do</h4>
-    <ul>
-      <li>"Precept compiles business rules into an engine."</li>
-      <li>"Invalid states are structurally impossible."</li>
-      <li>"Think: scattered validation across six services — Precept puts it in one file."</li>
-      <li>"Same definition + same data = same outcome."</li>
-      <li>"One file. Every rule."</li>
-      <li>"If you've been writing the same validation in four services, Precept has questions."</li>
-      <li>"Turns out business rules don't change just because you moved them to a different service."</li>
-    </ul>
-  </div>
-  <div class="dont-col">
-    <h4>✗ Don't</h4>
-    <ul>
-      <li>"Precept supercharges your business logic!"</li>
-      <li>"Say goodbye to bugs forever!"</li>
-      <li>"Imagine a world where..."</li>
-      <li>"Precept guarantees 100% reliability!"</li>
-      <li>"All your rules in one convenient place!"</li>
-    </ul>
-  </div>
-</div>
-</div>
-
-<div class="section-divider"></div>
-
-<!-- 1.3 Wordmark & Mark -->
-<div class="section">
-<h2>1.3 Wordmark &amp; Brand Mark <span class="status-chip">LOCKED</span></h2>
-
-<div class="card">
-  <h3>Brand font</h3>
-  <p style="color:#fff; font-weight:600; margin:4px 0;">Cascadia Cove</p>
-  <p>Monospace from the Cascadia family, used with Cascadia Code fallback. Editor-native, crisp, and suited to both wordmark and code.</p>
-
-  <h3>Wordmark</h3>
-  <div style="margin:12px 0 20px;">
-    <div style="font-family:var(--brand-mono); font-size:48px; font-weight:700; font-variant:small-caps; letter-spacing:0.1em; color:#fff;">Precept</div>
-    <div style="font-size:11px; color:#52525b; margin-top:4px;">Cascadia Cove 700 · font-variant: small-caps · letter-spacing: 0.1em</div>
-  </div>
-
-  <p style="font-size:12px; color:#71717a; margin-top:-6px;">Source note: some archived snippets elsewhere in the brand folder still carry literal Inconsolata declarations, but active brand surfaces normalize to the shared Cascadia Cove <code>--brand-mono</code> stack.</p>
-
-  <h3>Weight range</h3>
-  <div style="display:flex; flex-direction:column; gap:8px; margin:8px 0;">
-    <div style="display:flex; align-items:baseline; gap:20px;">
-      <span style="font-size:32px; font-weight:400; color:#fff;">Precept</span>
-      <span style="color:#52525b; font-size:11px;">400 Regular — body text, inline references</span>
-    </div>
-    <div style="display:flex; align-items:baseline; gap:20px;">
-      <span style="font-size:32px; font-weight:600; color:#fff;">Precept</span>
-      <span style="color:#52525b; font-size:11px;">600 SemiBold — code blocks, emphasis</span>
-    </div>
-    <div style="display:flex; align-items:baseline; gap:20px;">
-      <span style="font-size:32px; font-weight:700; color:#fff;">Precept</span>
-      <span style="color:#52525b; font-size:11px;">700 Bold — wordmark, headings</span>
-    </div>
-    <div style="display:flex; align-items:baseline; gap:20px;">
-      <span style="font-size:32px; font-weight:900; color:#fff;">Precept</span>
-      <span style="color:#52525b; font-size:11px;">900 Black — hero display (optional)</span>
-    </div>
-  </div>
-
-  <h3>Wordmark in context</h3>
-  <div style="background:#0c0c0f; border-radius:8px; padding:24px; border:1px solid #1e1b4b; margin:8px 0;">
-    <div class="lockup">
-      <svg width="40" height="40" viewBox="0 0 64 64">
-        <rect width="64" height="64" rx="12" fill="#1e1b4b"/>
-        <rect x="14" y="10" width="36" height="44" rx="3" fill="none" stroke="#6366f1" stroke-width="1.5"/>
-        <line x1="20" y1="20" x2="44" y2="20" stroke="#818cf8" stroke-width="1.5"/>
-        <line x1="20" y1="27" x2="40" y2="27" stroke="#71717a" stroke-width="1" opacity="0.5"/>
-        <line x1="20" y1="33" x2="42" y2="33" stroke="#FBBF24" stroke-width="1" opacity="0.85"/>
-        <rect x="20" y="40" width="8" height="8" rx="3" fill="none" stroke="#4338CA" stroke-width="1.5"/>
-        <circle cx="24" cy="44" r="1.5" fill="#6366f1"/>
-        <line x1="28" y1="44" x2="34" y2="44" stroke="#34D399" stroke-width="1.2"/>
-        <path d="M33.5,42.5 L36,44 L33.5,45.5" fill="#34D399"/>
-        <rect x="36" y="40" width="8" height="8" rx="2" fill="none" stroke="#4338CA" stroke-width="1.5"/>
-      </svg>
-      <div>
-        <div style="font-size:24px; font-weight:700; font-variant:small-caps; letter-spacing:0.1em; color:#fff;">Precept</div>
-        <div style="font-size:12px; color:#71717a; margin-top:2px;">A domain integrity engine for .NET</div>
-      </div>
-    </div>
-
-    <div style="margin-top:16px; display:flex; align-items:center; gap:12px;">
-      <span style="font-size:18px; font-weight:700; font-variant:small-caps; letter-spacing:0.1em; color:#fff;">Precept</span>
-      <span class="badge"><span class="label">nuget</span><span class="value" style="background:#4338ca;">v1.0.0</span></span>
-      <span class="badge"><span class="label">.NET</span><span class="value" style="background:#334155;">8.0+</span></span>
-      <span class="badge"><span class="label">license</span><span class="value" style="background:#334155;">MIT</span></span>
-    </div>
-  </div>
-
-  <h3>Code font</h3>
-  <p>Same typeface family. The code grows out of the wordmark.</p>
-  <div style="display:flex; gap:32px; align-items:baseline; margin:8px 0;">
-    <div>
-      <div style="font-size:20px; font-weight:700; font-variant:small-caps; letter-spacing:0.1em; color:#fff;">Precept</div>
-      <div style="font-size:10px; color:#52525b;">Wordmark: 700, small-caps, 0.1em</div>
-    </div>
-    <div>
-      <div style="font-size:13px; font-weight:400; color:#818cf8;">precept LoanApplication</div>
-      <div style="font-size:10px; color:#52525b;">Code: 400, normal case</div>
-    </div>
-  </div>
-</div>
-
-<div class="card">
-  <h3>Brand mark — three forms</h3>
-  <p style="margin-bottom:16px;">Three marks, one visual language. Diagram, code, combined.</p>
-
-  <div style="display:flex; gap:32px; align-items:flex-start; flex-wrap:wrap; margin-bottom:20px;">
-    <div style="text-align:center;">
-      <svg width="64" height="64" viewBox="0 0 64 64">
-        <rect width="64" height="64" rx="12" fill="#1e1b4b"/>
-        <rect x="10" y="24" width="16" height="16" rx="4" fill="none" stroke="#4338CA" stroke-width="2.5"/>
-        <circle cx="18" cy="32" r="3" fill="#6366f1"/>
-        <line x1="26" y1="32" x2="38" y2="32" stroke="#34D399" stroke-width="1.5"/>
-        <path d="M37,29.5 L42,32 L37,34.5" fill="#34D399"/>
-        <rect x="40" y="24" width="16" height="16" rx="4" fill="none" stroke="#4338CA" stroke-width="1.5"/>
-      </svg>
-      <div style="font-size:11px;color:#52525b;margin-top:6px;">State + transition (equal square cards)</div>
-    </div>
-    <div style="text-align:center;">
-      <svg width="64" height="64" viewBox="0 0 64 64">
-        <rect width="64" height="64" rx="12" fill="#1e1b4b"/>
-        <rect x="16" y="12" width="32" height="40" rx="3" fill="none" stroke="#6366f1" stroke-width="2"/>
-        <line x1="22" y1="22" x2="42" y2="22" stroke="#818cf8" stroke-width="1.5"/>
-        <line x1="22" y1="29" x2="38" y2="29" stroke="#71717a" stroke-width="1.5" opacity="0.6"/>
-        <line x1="22" y1="36" x2="40" y2="36" stroke="#71717a" stroke-width="1.5" opacity="0.6"/>
-        <!-- Gold: judicious rule signal — the because "…" carried even in the tablet form -->
-        <line x1="22" y1="43" x2="34" y2="43" stroke="#FBBF24" stroke-width="1.5" opacity="0.85"/>
-      </svg>
-      <div style="font-size:11px;color:#52525b;margin-top:6px;">Tablet / precept</div>
-    </div>
-    <div style="text-align:center;">
-      <svg width="64" height="64" viewBox="0 0 64 64">
-        <rect width="64" height="64" rx="12" fill="#1e1b4b"/>
-        <rect x="14" y="10" width="36" height="44" rx="3" fill="none" stroke="#6366f1" stroke-width="1.5"/>
-        <line x1="20" y1="20" x2="44" y2="20" stroke="#818cf8" stroke-width="1.5"/>
-        <line x1="20" y1="27" x2="40" y2="27" stroke="#71717a" stroke-width="1" opacity="0.5"/>
-        <!-- Gold: the remembered rule — judicious, because "…" lives here -->
-        <line x1="20" y1="33" x2="34" y2="33" stroke="#FBBF24" stroke-width="1.5" opacity="0.9"/>
-        <rect x="20" y="40" width="8" height="8" rx="3" fill="none" stroke="#4338CA" stroke-width="1.5"/>
-        <circle cx="24" cy="44" r="1.5" fill="#6366f1"/>
-        <line x1="28" y1="44" x2="34" y2="44" stroke="#34D399" stroke-width="1.2"/>
-        <path d="M33.5,42.5 L36,44 L33.5,45.5" fill="#34D399"/>
-        <rect x="36" y="40" width="8" height="8" rx="2" fill="none" stroke="#4338CA" stroke-width="1.5"/>
-      </svg>
-      <div style="font-size:11px;color:#52525b;margin-top:6px;">Tablet + state machine (equal square cards)</div>
-    </div>
-
-    <!-- Color key -->
-    <div style="font-size:12px; line-height:2.0; margin-left:12px;">
-      <div><span class="swatch" style="background:#4338CA;"></span><span style="color:#4338CA; font-weight:600;">Semantic #4338CA</span></div>
-      <div><span class="swatch" style="background:#6366F1;"></span><span style="color:#6366F1; font-weight:600;">Grammar #6366F1</span></div>
-      <div><span class="swatch" style="background:#818CF8;"></span><span style="color:#818CF8; font-weight:600;">Accent #818CF8</span></div>
-      <div><span class="swatch" style="background:#1E1B4B;"></span><span style="color:#71717a; font-weight:600;">Ground #1E1B4B</span></div>
-      <div><span class="swatch" style="background:#34D399;"></span><span style="color:#34D399; font-weight:600;">Transition #34D399</span></div>
-      <div><span class="swatch" style="background:#FBBF24;"></span><span style="color:#FBBF24; font-weight:600;">Rule #FBBF24</span> <span style="color:#52525b; font-size:11px;">(judicious — tablet &amp; combined)</span></div>
-    </div>
-  </div>
-
-  <p style="margin-top:16px;">The three marks share one palette and one conceptual language. Each surfaces a different aspect of Precept: the state machine, the written rule, and the two ideas combined. The combined form is the primary mark. In every state-bearing mark, the canonical outer silhouette is the rounded state card; the small internal dot remains as the origin cue and centers within the state shape whenever it appears without a label. In the brand mark, the two state shapes are the same size and square-shaped, rendered as equal rounded cards rather than mismatched or elongated forms. The mark never uses a circular outer state silhouette. Labeled product surfaces may shift the dot left into a single-line dot + label lockup, but standalone icon forms keep the dot centered. The transition arrow is Emerald in all marks that carry one — Emerald reads as allowed flow, not generic accent. Gold is used judiciously: the <code>because</code> line encoding the human-readable rule appears in both the tablet and combined marks, a deliberate signal of the remembered truth at the heart of every precept. It earns its place precisely because it is never decorative.</p>
-
-  <div class="callout" style="margin-top:16px;">
-    <strong>Note:</strong> The icon prototyping loop in <code>brand/icon-prototyping-loop/</code> continues to explore icon variations. This section locks the <em>conceptual form</em> and <em>color mapping</em> of the brand mark. Final icon rendering (corner radii, stroke weights, optical sizing) may refine through the prototyping loop without changing the locked form.
-  </div>
-</div>
-</div>
-
-<div class="section-divider"></div>
-
-<!-- 1.4 Color System -->
-<div class="section">
-<h2>1.4 Color System <span class="status-chip">LOCKED</span></h2>
-
-<p>The Precept color system is one semantic system used across docs, UI, website, README, and product surfaces: <strong>five semantic families plus three semantic signal colors</strong>. <strong>Indigo</strong> anchors the system as the structural lane. <strong>Violet</strong> marks states, <strong>Cyan</strong> marks events, <strong>Bright Slate</strong> marks data, and <strong>Gold</strong> marks human-readable rule messages. <strong>Emerald</strong>, <strong>Amber</strong>, and <strong>Rose</strong> are reserved for shared signal meaning across surfaces. Background <code>#0c0c0f</code>. Surface sections may define local tonal variants for clarity, but those variants do not expand the general system.</p>
-
-<div class="callout">
-  <strong>Locked design</strong>
-  <p style="margin:8px 0 0; line-height:1.7;">The semantic lanes are fixed. Surfaces may adapt shade, weight, geometry, or opacity locally, but they keep the same meanings. § 2.1 defines syntax-specific tonal variants. § 2.2 defines diagram-specific application. Neither section adds new top-level families.</p>
-</div>
-
-<div class="callout">
-  <strong>Semantic color as brand</strong>
-  <p style="margin:8px 0 0; line-height:1.7;">Precept uses color to say what the system means. Indigo carries the load-bearing frame; violet separates state from cyan action; bright slate keeps data factual; gold isolates human-language rule text; and Emerald, Amber, and Rose are reserved for shared signal meaning such as allowed/do/success, caution/attention, and blocked/don't/error. Meaning comes first. Aesthetics follow.</p>
-</div>
-
-<!-- Semantic Family Reference — styled as cohesive palette card -->
-<style>
-  .sf-palette { background: #0c0c0f; border: 1px solid #27272a; border-radius: 12px; overflow: hidden; margin: 16px 0; }
-  .sf-header { background: linear-gradient(135deg, #6366F1 0%, #4338ca 100%); padding: 20px 24px; }
-  .sf-header h3 { font-size: 16px; font-weight: 700; color: #fff; margin: 0; text-transform: none; letter-spacing: normal; border: none; padding: 0; }
-  .sf-header p { font-size: 12px; color: rgba(255,255,255,0.7); margin: 6px 0 0; line-height: 1.5; }
-  .sf-body { padding: 0; }
-  .sf-group { padding: 20px 24px; border-bottom: 1px solid #1e1b4b; }
-  .sf-group:last-child { border-bottom: none; }
-  .sf-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #52525b; margin-bottom: 16px; font-weight: 600; }
-  .sf-row { display: grid; grid-template-columns: 56px 1fr; gap: 16px; align-items: start; padding: 10px 0; }
-  .sf-row + .sf-row { border-top: 1px solid rgba(39, 39, 42, 0.5); }
-  .sf-swatch { width: 56px; height: 40px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1); }
-  .sf-info { display: grid; grid-template-columns: 120px 90px 1fr 180px; gap: 12px; align-items: baseline; }
-  .sf-name { font-size: 13px; font-weight: 600; }
-  .sf-hex { font-family: ui-monospace, monospace; font-size: 11px; color: #71717a; background: #18181b; padding: 2px 8px; border-radius: 4px; }
-  .sf-lane { font-size: 11px; color: #a1a1aa; }
-  .sf-surfaces { font-size: 10px; color: #52525b; text-align: right; }
-  @media (max-width: 800px) {
-    .sf-info { grid-template-columns: 1fr; gap: 4px; }
-    .sf-surfaces { text-align: left; }
-  }
-</style>
-
-<div class="sf-palette">
-  <div class="sf-header">
-    <h3>Semantic Family Reference</h3>
-    <p>The general semantic system for docs, UI, website, README illustrations, and product surfaces. Any lighter or darker shades used later are local surface variants, not additional top-level colors.</p>
-  </div>
-  <div class="sf-body">
-    <!-- Core Semantic Families -->
-    <div class="sf-group">
-      <div class="sf-group-label">Core Semantic Families</div>
-      
-      <div class="sf-row">
-        <div class="sf-swatch" style="background: linear-gradient(135deg, #34D399 0%, #10b981 100%);"></div>
-        <div class="sf-info">
-          <span class="sf-name" style="color:#818cf8;">Indigo</span>
-          <span class="sf-hex">#6366F1</span>
-          <span class="sf-lane">Structure, grammar, and flow — the system's visual spine</span>
-          <span class="sf-surfaces">Docs · UI · Syntax · Diagram · Inspector</span>
-        </div>
-      </div>
-      
-      <div class="sf-row">
-        <div class="sf-swatch" style="background: linear-gradient(135deg, #A898F5 0%, #8b5cf6 100%);"></div>
-        <div class="sf-info">
-          <span class="sf-name" style="color:#A898F5;">Violet</span>
-          <span class="sf-hex">#A898F5</span>
-          <span class="sf-lane">State machine nouns — where you are</span>
-          <span class="sf-surfaces">Syntax · Diagram · Inspector</span>
-        </div>
-      </div>
-      
-      <div class="sf-row">
-        <div class="sf-swatch" style="background: linear-gradient(135deg, #30B8E8 0%, #0ea5e9 100%);"></div>
-        <div class="sf-info">
-          <span class="sf-name" style="color:#30B8E8;">Cyan</span>
-          <span class="sf-hex">#30B8E8</span>
-          <span class="sf-lane">Transition verbs — what happens</span>
-          <span class="sf-surfaces">Syntax · Diagram · Inspector</span>
-        </div>
-      </div>
-      
-      <div class="sf-row">
-        <div class="sf-swatch" style="background: linear-gradient(135deg, #B0BEC5 0%, #90a4ae 100%);"></div>
-        <div class="sf-info">
-          <span class="sf-name" style="color:#B0BEC5;">Bright Slate</span>
-          <span class="sf-hex">#B0BEC5</span>
-          <span class="sf-lane">Fields, types, values — what the system knows</span>
-          <span class="sf-surfaces">Syntax · Inspector</span>
-        </div>
-      </div>
-      
-      <div class="sf-row">
-        <div class="sf-swatch" style="background: linear-gradient(135deg, #FBBF24 0%, #f59e0b 100%);"></div>
-        <div class="sf-info">
-          <span class="sf-name" style="color:#FBBF24;">Gold</span>
-          <span class="sf-hex">#FBBF24</span>
-          <span class="sf-lane">Human-readable rule text. Primary use: syntax. Judicious exception: a sparse accent in the tablet and combined brand marks — the <code>because</code> line, the remembered rule.</span>
-          <span class="sf-surfaces">Syntax · Code examples · Brand mark (tablet &amp; combined icons)</span>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Signal Colors -->
-    <div class="sf-group">
-      <div class="sf-group-label">Signal Colors</div>
-      
-      <div class="sf-row">
-        <div class="sf-swatch" style="background: linear-gradient(135deg, #34D399 0%, #10b981 100%);"></div>
-        <div class="sf-info">
-          <span class="sf-name" style="color:#34D399;">Emerald</span>
-          <span class="sf-hex">#34D399</span>
-          <span class="sf-lane">Allowed, do, success</span>
-          <span class="sf-surfaces">Inspector · Diagram · Status UI · Badges</span>
-        </div>
-      </div>
-      
-      <div class="sf-row">
-        <div class="sf-swatch" style="background: linear-gradient(135deg, #FCD34D 0%, #eab308 100%);"></div>
-        <div class="sf-info">
-          <span class="sf-name" style="color:#FCD34D;">Amber</span>
-          <span class="sf-hex">#FCD34D</span>
-          <span class="sf-lane">Caution, warning, attention</span>
-          <span class="sf-surfaces">Inspector · Diagram · Status UI · Badges</span>
-        </div>
-      </div>
-      
-      <div class="sf-row">
-        <div class="sf-swatch" style="background: linear-gradient(135deg, #FB7185 0%, #f43f5e 100%);"></div>
-        <div class="sf-info">
-          <span class="sf-name" style="color:#FB7185;">Rose</span>
-          <span class="sf-hex">#FB7185</span>
-          <span class="sf-lane">Blocked, don't, error</span>
-          <span class="sf-surfaces">Inspector · Diagram · Diagnostics · Product UI</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- 1.4.1 Cross-Surface Color Application -->
-<div class="section" style="margin-top: 48px;">
-<h2>1.4.1 Cross-Surface Color Application <span class="status-chip">LOCKED</span></h2>
-
-<p>§ 1.4 defines the semantic lanes. This subsection records only the shared application rules that hold across docs, UI, website, README, diagrams, and inspector surfaces. Surface sections own any local tonal variants.</p>
-
-<div class="card">
-  <h3>Shared application rules</h3>
-  <table>
-    <tr><th style="width:180px;">Rule</th><th>Guidance</th></tr>
-    <tr>
-      <td>Keep the lanes stable</td>
-      <td>Indigo = structure, Violet = states, Cyan = events, Bright Slate = data, Gold = human-readable rule text. Do not remap those meanings per surface. <em>Judicious exception:</em> Gold appears as a sparse accent in the tablet and combined brand marks, where it stands for the remembered rule — not as general UI emphasis.</td>
-    </tr>
-    <tr>
-      <td>Reserve signal colors for shared signals</td>
-      <td>Emerald, Amber, and Rose communicate allowed/do/success, caution/attention, and blocked/don't/error across docs, UI, website, README, diagnostics, badges, and product surfaces. They are never syntax-highlighting colors.</td>
-    </tr>
-    <tr>
-      <td>Treat tonal shifts as local</td>
-      <td>If a surface needs a tint, outline, secondary shade, or muted treatment for clarity, define it inside that surface section. Do not promote it into the global semantic system.</td>
-    </tr>
-    <tr>
-      <td>Use neutrals as scaffolding</td>
-      <td>Background, border, and text neutrals support contrast and layout. They are support colors, not semantic lanes.</td>
-    </tr>
-  </table>
-</div>
-
-<div class="card">
-  <h3>README & Markdown Application</h3>
-  <p style="margin-bottom: 16px;">GitHub Markdown strips custom CSS. Brand color identity comes through these specific channels:</p>
-
-  <table>
-    <tr><th style="width:180px;">Surface Element</th><th style="width:180px;">Color Treatment</th><th>Implementation</th></tr>
-    <tr>
-      <td>Wordmark / logo</td>
-      <td>Indigo <code>#6366F1</code></td>
-      <td>SVG wordmark rendered as image. The indigo is baked into the asset — GitHub can't strip it.</td>
-    </tr>
-    <tr>
-      <td>Primary badges (version, install)</td>
-      <td>Indigo <code>#6366F1</code></td>
-      <td>shields.io <code>color=6366F1</code> parameter. Indigo is the README's strongest color signal.</td>
-    </tr>
-    <tr>
-      <td>Secondary badges (.NET, license)</td>
-      <td>Neutral border <code>#27272A</code> + secondary text <code>#A1A1AA</code></td>
-      <td>shields.io <code>color=27272A&amp;labelColor=27272A</code>. Neutral badges support the indigo primary lane instead of competing with it.</td>
-    </tr>
-    <tr>
-      <td>CI / status badges</td>
-      <td>Emerald <code>#34D399</code> (passing) · Amber <code>#FCD34D</code> (pending / preview)</td>
-      <td>shields.io uses GitHub Actions status colors by default — override with <code>color=34D399</code> or <code>color=FCD34D</code> when needed.</td>
-    </tr>
-    <tr>
-      <td>Section headings (H2)</td>
-      <td>Default GitHub rendering</td>
-      <td>Markdown headings render in GitHub's native text color. Brand identity is carried by the wordmark, badge row, and code sample rather than forced heading overrides.</td>
-    </tr>
-    <tr>
-      <td>Hero code block</td>
-      <td>GitHub's syntax theme</td>
-      <td>Use <code>```precept</code> language fence. GitHub renders with its own theme — Precept identity comes through the DSL's structure and rhythm, not exact token colors.</td>
-    </tr>
-    <tr>
-      <td>Feature checkmarks (✅)</td>
-      <td>Emerald <code>#34D399</code> intent</td>
-      <td>Unicode ✅ renders in GitHub's emoji color. Emerald aligns with the success lane — no override needed.</td>
-    </tr>
-    <tr>
-      <td>Beta / preview callouts</td>
-      <td>Amber <code>#FCD34D</code> intent</td>
-      <td>Use ⚠️ emoji + text for inline warnings. For shields.io badges: <code>color=FCD34D</code>.</td>
-    </tr>
-    <tr>
-      <td>Failure / blocked states</td>
-      <td>Do not use Rose in README marketing surfaces</td>
-      <td>Rose belongs to product/runtime status. README and docs can describe failure states in prose, but they should not brand a marketing surface around blocked/error color.</td>
-    </tr>
-  </table>
-</div>
-
-<div class="callout">
-  <strong>The README color contract</strong>
-  <p style="margin:8px 0 0; line-height:1.7;">In a GitHub Markdown context, Precept's brand identity comes through three channels: (1) the SVG wordmark baked in brand indigo <code>#6366F1</code>, (2) the shields.io badge row using <code>#6366F1</code> as the primary badge color, and (3) the <code>.precept</code> hero code block whose keyword rhythm is recognizable even in GitHub's default syntax theme. Everything else — headings, prose, tables — renders in GitHub's native styles. The brand is unmistakable without fighting the platform.</p>
-</div>
-
-</div>
-
-</div>
-
-<div class="section-divider"></div>
-
-<!-- 1.5 Typography -->
-<div class="section">
-<h2>1.5 Typography <span class="status-chip">LOCKED</span></h2>
-<!-- Typography content already in section 1.3 Wordmark. This is a placeholder for potential future expansion. -->
-</div>
-
-</div>
-
-<div class="section-divider"></div>
-
-<!-- ===================================================================== -->
-<!-- SECTION 2: VISUAL SURFACES                                            -->
-<!-- ===================================================================== -->
-<div class="section">
-<h2 style="font-size: 24px; margin-bottom: 24px; color: #6366F1;">2. Visual Surfaces</h2>
-
-<!-- 2.1 Syntax Editor -->
-<div class="section">
-<h2>2.1 Syntax Editor <span class="status-chip">LOCKED</span></h2>
-
-<div class="card">
-  <h3>Purpose</h3>
-  <p>The <code>.precept</code> file in VS Code. Primary visual surface where developers author domain contracts. Dark mode, 8-shade semantic color system with constraint-aware italic signaling.</p>
-
-  <h3>Color application</h3>
-  <p>The syntax editor applies the semantic families from Brand Identity § 1.4 through a surface-specific 8-shade token system. The extra shades below exist only for syntax legibility inside the Indigo and Bright Slate families; they do not add new top-level colors. Italic indicates constraint pressure. Emerald, Amber, and Rose are reserved for runtime verdict surfaces (inspector, diagrams, diagnostics).</p>
-</div>
-
-<!-- Syntax Token Color System — unified palette mapping cards -->
-<div class="spm-surface">
-  <div class="spm-group">
-    <div class="spm-group-label">Core Semantic Tokens</div>
-    
-    <!-- Structure · Indigo -->
-    <div class="spm-header" style="border-bottom: 1px solid rgba(99, 102, 241, 0.2); background: linear-gradient(90deg, rgba(99, 102, 241, 0.08) 0%, transparent 100%);">
-      <h3 style="color:#818cf8;">Structure · Indigo <span class="spm-hue">239–245°</span></h3>
-      <p>Two shades split DSL control from DSL grammar. Bold marks behavior; normal weight carries connective tissue.</p>
-    </div>
-    <div class="spm-grid spm-grid-2" style="padding: 16px 0;">
-      <div class="spm-row">
-        <div class="spm-swatch" style="background: linear-gradient(135deg, #4338CA 0%, #3730a3 100%);"></div>
-        <div class="spm-info">
-          <div class="spm-title">
-            <span class="spm-name" style="color:#4338CA;">Semantic</span>
-            <span class="spm-hex">#4338CA</span>
-            <span class="spm-weight">bold</span>
-          </div>
-          <div class="spm-tokens">precept, field, state, event, invariant, from, on, in, set, transition, assert, reject, when</div>
-        </div>
-      </div>
-      <div class="spm-row">
-        <div class="spm-swatch" style="background: linear-gradient(135deg, #34D399 0%, #10b981 100%);"></div>
-        <div class="spm-info">
-          <div class="spm-title">
-            <span class="spm-name" style="color:#6366F1;">Grammar</span>
-            <span class="spm-hex">#6366F1</span>
-            <span class="spm-weight">normal</span>
-          </div>
-          <div class="spm-tokens">as, with, default, nullable, any, of, into, because, operators, punctuation, ->, =</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- States · Violet -->
-    <div class="spm-header" style="border-bottom: 1px solid rgba(168, 152, 245, 0.2); border-top: 1px solid #1e1b4b; background: linear-gradient(90deg, rgba(168, 152, 245, 0.08) 0%, transparent 100%);">
-      <h3 style="color:#A898F5;">States · Violet <span class="spm-hue">260°</span></h3>
-      <p>Nouns — where you are. One violet for all states. Italic signals constraint participation.</p>
-    </div>
-    <div class="spm-grid" style="padding: 16px 0;">
-      <div class="spm-row">
-        <div class="spm-swatch" style="background: linear-gradient(135deg, #A898F5 0%, #8b5cf6 100%);"></div>
-        <div class="spm-info">
-          <div class="spm-title">
-            <span class="spm-name" style="color:#A898F5;">State</span>
-            <span class="spm-hex">#A898F5</span>
-            <span class="spm-weight">normal / <em>italic</em></span>
-          </div>
-          <div class="spm-desc">One hue for all states · normal by default, italic when constrained</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Events · Cyan -->
-    <div class="spm-header" style="border-bottom: 1px solid rgba(48, 184, 232, 0.2); border-top: 1px solid #1e1b4b; background: linear-gradient(90deg, rgba(48, 184, 232, 0.08) 0%, transparent 100%);">
-      <h3 style="color:#30B8E8;">Events · Cyan <span class="spm-hue">195°</span></h3>
-      <p>Verbs — what happens. One cyan for all events. Italic signals assert-based validation.</p>
-    </div>
-    <div class="spm-grid" style="padding: 16px 0;">
-      <div class="spm-row">
-        <div class="spm-swatch" style="background: linear-gradient(135deg, #30B8E8 0%, #0ea5e9 100%);"></div>
-        <div class="spm-info">
-          <div class="spm-title">
-            <span class="spm-name" style="color:#30B8E8;">Event</span>
-            <span class="spm-hex">#30B8E8</span>
-            <span class="spm-weight">normal / <em>italic</em></span>
-          </div>
-          <div class="spm-desc">One hue for all events · normal by default, italic when constrained</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Data · Bright Slate -->
-    <div class="spm-header" style="border-bottom: 1px solid rgba(176, 190, 197, 0.2); border-top: 1px solid #1e1b4b; background: linear-gradient(90deg, rgba(176, 190, 197, 0.08) 0%, transparent 100%);">
-      <h3 style="color:#B0BEC5;">Data · Bright Slate <span class="spm-hue">215°</span></h3>
-      <p>Variables — what you know. Three shades split names, types, and values. Only guarded names use italic.</p>
-    </div>
-    <div class="spm-grid spm-grid-3" style="padding: 16px 0;">
-      <div class="spm-row">
-        <div class="spm-swatch" style="background: linear-gradient(135deg, #B0BEC5 0%, #90a4ae 100%);"></div>
-        <div class="spm-info">
-          <div class="spm-title">
-            <span class="spm-name" style="color:#B0BEC5;">Names</span>
-            <span class="spm-hex">#B0BEC5</span>
-          </div>
-          <div class="spm-desc">normal / <em>italic if guarded</em></div>
-          <div class="spm-tokens">field names, arg names</div>
-        </div>
-      </div>
-      <div class="spm-row">
-        <div class="spm-swatch" style="background: linear-gradient(135deg, #9AA8B5 0%, #78909c 100%);"></div>
-        <div class="spm-info">
-          <div class="spm-title">
-            <span class="spm-name" style="color:#9AA8B5;">Types</span>
-            <span class="spm-hex">#9AA8B5</span>
-          </div>
-          <div class="spm-desc">normal</div>
-          <div class="spm-tokens">string, number, boolean, set, queue, stack</div>
-        </div>
-      </div>
-      <div class="spm-row">
-        <div class="spm-swatch" style="background: linear-gradient(135deg, #84929F 0%, #607d8b 100%);"></div>
-        <div class="spm-info">
-          <div class="spm-title">
-            <span class="spm-name" style="color:#84929F;">Values</span>
-            <span class="spm-hex">#84929F</span>
-          </div>
-          <div class="spm-desc">normal</div>
-          <div class="spm-tokens">true, false, null, literals</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Rules · Gold -->
-    <div class="spm-header" style="border-bottom: 1px solid rgba(251, 191, 36, 0.2); border-top: 1px solid #1e1b4b; background: linear-gradient(90deg, rgba(251, 191, 36, 0.08) 0%, transparent 100%);">
-      <h3 style="color:#FBBF24;">Rules · Gold <span class="spm-hue">45°</span></h3>
-      <p>Human-readable rule messages. The message is the visual interrupt. Primary use: syntax accent (<code>because</code> / <code>reject</code> string content). Judicious exception: a sparse accent in the tablet and combined brand marks, where it encodes the remembered rule at the heart of the system. Never a general UI color, never a badge, never a border.</p>
-    </div>
-    <div class="spm-grid" style="padding: 16px 0;">
-      <div class="spm-row">
-        <div class="spm-swatch" style="background: linear-gradient(135deg, #FBBF24 0%, #f59e0b 100%);"></div>
-        <div class="spm-info">
-          <div class="spm-title">
-            <span class="spm-name" style="color:#FBBF24;">Messages</span>
-            <span class="spm-hex">#FBBF24</span>
-            <span class="spm-weight">normal</span>
-          </div>
-          <div class="spm-tokens">because / reject string content</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="spm-group">
-    <div class="spm-group-label">Support Tokens</div>
-
-    <!-- Comments -->
-    <div class="spm-header" style="border-bottom: 1px solid rgba(144, 150, 166, 0.2); background: linear-gradient(90deg, rgba(144, 150, 166, 0.06) 0%, transparent 100%);">
-      <h3 style="color:#9096A6;">Comments · Editorial</h3>
-      <p>Visible but excluded from executable semantic lanes. Dusk indigo reads as annotation, not code.</p>
-    </div>
-    <div class="spm-grid" style="padding: 16px 0;">
-      <div class="spm-row">
-        <div class="spm-swatch" style="background: linear-gradient(135deg, #9096A6 0%, #6b7280 100%);"></div>
-        <div class="spm-info">
-          <div class="spm-title">
-            <span class="spm-name" style="color:#9096A6; font-style:italic;">Comment</span>
-            <span class="spm-hex">#9096A6</span>
-            <span class="spm-weight">italic</span>
-          </div>
-          <div class="spm-tokens"># comments only — outside the 8 semantic shades</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Reserved · Verdict Colors — sf-palette family treatment -->
-  <div class="sf-group" style="background: rgba(39, 39, 42, 0.3);">
-    <div class="sf-group-label">Reserved · Verdict Colors</div>
-    <p style="font-size: 11px; color: #71717a; margin-bottom: 16px; line-height: 1.5;">Emerald, Amber, and Rose are reserved by the syntax editor for runtime verdict surfaces only — inspector, diagrams, diagnostics.</p>
-
-    <div class="sf-row">
-      <div class="sf-swatch" style="background: linear-gradient(135deg, #34D399 0%, #10b981 100%);"></div>
-      <div class="sf-info">
-        <span class="sf-name" style="color:#34D399;">Success</span>
-        <span class="sf-hex">#34D399</span>
-        <span class="sf-lane">enabled, valid, success</span>
-        <span class="sf-surfaces">Inspector · Diagram · Status</span>
-      </div>
-    </div>
-
-    <div class="sf-row">
-      <div class="sf-swatch" style="background: linear-gradient(135deg, #FCD34D 0%, #eab308 100%);"></div>
-      <div class="sf-info">
-        <span class="sf-name" style="color:#FCD34D;">Warning</span>
-        <span class="sf-hex">#FCD34D</span>
-        <span class="sf-lane">unmatched, warning</span>
-        <span class="sf-surfaces">Inspector · Diagram · Status</span>
-      </div>
-    </div>
-
-    <div class="sf-row">
-      <div class="sf-swatch" style="background: linear-gradient(135deg, #FB7185 0%, #f43f5e 100%);"></div>
-      <div class="sf-info">
-        <span class="sf-name" style="color:#FB7185;">Error</span>
-        <span class="sf-hex">#FB7185</span>
-        <span class="sf-lane">blocked, rejected, violated</span>
-        <span class="sf-surfaces">Inspector · Diagram · Diagnostics</span>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Hue map -->
-<div class="callout">
-  <strong>Hue map (°):</strong>
-  <div style="font-family:var(--brand-mono); font-size:11px; margin-top:6px; color:#a1a1aa;">
-    45° Gold —<span style="color:#52525b;">150°</span>— 195° Cyan —<span style="color:#52525b;">20°</span>— 215° Slate —<span style="color:#52525b;">24°</span>— 239° Indigo —<span style="color:#52525b;">21°</span>— 260° Violet
-  </div>
-  <div style="font-size:10px; color:#52525b; margin-top:4px;">Within the cool cluster, hue carries category while typography carries constraint pressure.</div>
-</div>
-
-<div class="card">
-  <h3>Live example</h3>
-  <div class="syntax-block"><span style="color:#4338CA;font-weight:700;">precept</span> <span style="color:#B0BEC5;">LoanApplication</span>
-
-<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;">ApplicantName</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span> <span style="color:#6366F1;">nullable</span>
-<span style="color:#4338CA;font-weight:700;">field</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">number</span> <span style="color:#6366F1;">default</span> <span style="color:#84929F;">0</span>
-
-<span style="color:#4338CA;font-weight:700;">invariant</span> <span style="color:#B0BEC5;font-style:italic;">RequestedAmount</span> <span style="color:#6366F1;">&gt;=</span> <span style="color:#84929F;">0</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Amount cannot be negative"</span>
-
-<span style="color:#4338CA;font-weight:700;">state</span> <span style="color:#A898F5;">Draft</span> <span style="color:#6366F1;">initial</span>
-<span style="color:#4338CA;font-weight:700;">state</span> <span style="color:#A898F5;">UnderReview</span>
-<span style="color:#4338CA;font-weight:700;">state</span> <span style="color:#A898F5;font-style:italic;">Approved</span>
-<span style="color:#4338CA;font-weight:700;">state</span> <span style="color:#A898F5;">Declined</span>
-
-<span style="color:#4338CA;font-weight:700;">event</span> <span style="color:#30B8E8;font-style:italic;">Submit</span> <span style="color:#6366F1;">with</span> <span style="color:#B0BEC5;">Applicant</span> <span style="color:#6366F1;">as</span> <span style="color:#9AA8B5;">string</span>
-<span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">Submit</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">Applicant</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">""</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Name required"</span>
-
-<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;">Draft</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;font-style:italic;">Submit</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">set</span> <span style="color:#B0BEC5;">ApplicantName</span> <span style="color:#6366F1;">=</span> <span style="color:#30B8E8;font-style:italic;">Submit</span><span style="color:#6366F1;">.</span><span style="color:#B0BEC5;">Applicant</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">transition</span> <span style="color:#A898F5;">UnderReview</span>
-
-<span style="color:#4338CA;font-weight:700;">in</span> <span style="color:#A898F5;font-style:italic;">Approved</span> <span style="color:#4338CA;font-weight:700;">assert</span> <span style="color:#B0BEC5;">ApplicantName</span> <span style="color:#6366F1;">!=</span> <span style="color:#84929F;">null</span> <span style="color:#6366F1;">because</span> <span style="color:#FBBF24;">"Approved loans must have an applicant"</span>
-
-<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;">Approve</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">transition</span> <span style="color:#A898F5;font-style:italic;">Approved</span>
-
-<span style="color:#4338CA;font-weight:700;">from</span> <span style="color:#A898F5;">UnderReview</span> <span style="color:#4338CA;font-weight:700;">on</span> <span style="color:#30B8E8;">Decline</span>
-  <span style="color:#6366F1;font-weight:700;">-&gt;</span> <span style="color:#4338CA;font-weight:700;">transition</span> <span style="color:#A898F5;">Declined</span></div>
-
-  <h3>Constraint signaling</h3>
-  <p style="margin-bottom:12px;">Constraint visibility is typography-driven rather than hue-driven. One hue per category; italic signals constraint pressure:</p>
-  <table>
-    <tr><th>Category</th><th>Base</th><th>Constrained</th><th>Meaning</th></tr>
-    <tr><td style="color:#A898F5;">States</td><td><span style="color:#A898F5;">#A898F5</span></td><td><span style="color:#A898F5; font-style:italic;">#A898F5 italic</span></td><td>Participates in <code>in/to/from X assert</code></td></tr>
-    <tr><td style="color:#30B8E8;">Events</td><td><span style="color:#30B8E8;">#30B8E8</span></td><td><span style="color:#30B8E8; font-style:italic;">#30B8E8 italic</span></td><td>Has <code>on X assert</code></td></tr>
-    <tr><td style="color:#B0BEC5;">Data names</td><td><span style="color:#B0BEC5;">#B0BEC5</span></td><td><span style="color:#B0BEC5; font-style:italic;">#B0BEC5 italic</span></td><td>Referenced by an <code>invariant</code></td></tr>
-  </table>
-
-  <h3>Diagnostics</h3>
-  <p style="margin-bottom:12px;">PRECEPT codes in indigo. Error bodies in rose. Warnings in amber.</p>
-  <div style="background:#0c0c0f; border-radius:6px; padding:16px; border:1px solid #1e1b4b; font-size:12px; line-height:2;">
-    <div><span style="color:#6366F1;">PRECEPT001</span> <span style="color:#FB7185;">error</span>: Unreachable state <span style="color:#94a3b8;">Archived</span> — no transitions lead here</div>
-    <div><span style="color:#6366F1;">PRECEPT054</span> <span style="color:#FCD34D;">warning</span>: Dead-end state <span style="color:#94a3b8;">Approved</span> — no outgoing transitions</div>
-    <div style="margin-top:8px; color:#334155;">──────────────────────────────────────</div>
-    <div style="color:#64748b; margin-top:4px;">2 diagnostics (<span style="color:#FB7185;">1 error</span>, <span style="color:#FCD34D;">1 warning</span>)</div>
-  </div>
-</div>
-</div>
-
-<div class="section-divider"></div>
-
-<!-- 2.2 State Diagram -->
-<div class="section">
-<h2>2.2 State Diagram <span class="status-chip">LOCKED</span></h2>
-
-<div class="card">
-  <h3>Purpose</h3>
-  <p>The VS Code preview panel state diagram. Renders the precept as a diagrammatic finite-state automaton using the same semantic families defined in § 1.4. Shape carries origin/final structure; hue carries category.</p>
-
-  <h3>Color application</h3>
-  <p style="margin-bottom:12px;">State diagrams apply the five semantic families and three semantic signal colors (Emerald, Amber, Rose for verdict overlay) from § 1.4. For syntax-specific color application, see § 2.1. The diagram relies primarily on shape and edge styling, with italic reserved for constrained labels. Any non-semantic tones used here are local surface neutrals for the canvas, legend, or open current-state treatment; they do not expand the general system.</p>
-
-  <div class="callout" style="margin-bottom:16px;">
-    <strong>Single canonical silhouette:</strong> States are not tinted by role (initial/intermediate/terminal). The rounded state card is the base silhouette everywhere in the diagram. Origin keeps a small internal dot that centers when it stands alone; if the state name shares the card, the dot shifts left into a single-line dot + label row with both elements vertically centered and never wrapping. Terminal keeps an outer echo border. All state nodes use locked indigo for borders and violet for state names. Brand-mark adaptations inherit that rounded-card silhouette; in the mark itself, the paired state shapes normalize to equal-size square cards so the icon stays compact and balanced.
-  </div>
-
-  <!-- State lifecycle shapes — unified tile treatment -->
-  <div class="spm-shapes">
-    <div class="spm-shape-tile">
-      <div class="spm-shape-icon">
-        <div style="width:40px; height:40px; border-radius:10px; border:3px solid #6366F1; display:flex; align-items:center; justify-content:center; position:relative;">
-          <span style="width:7px; height:7px; border-radius:50%; background:#6366F1;"></span>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#6366F1;">Initial</div>
-      <div class="spm-shape-meta">Shape: Rounded card + centered origin dot</div>
-      <div class="spm-shape-desc">Canonical origin card when no label shares the box</div>
-    </div>
-    <div class="spm-shape-tile">
-      <div class="spm-shape-icon">
-        <div style="width:40px; height:40px; border-radius:8px; border:2px solid #6366F1; display:flex; align-items:center; justify-content:center;">
-          <span style="color:#6366F1; font-size:11px; font-weight:700;">□</span>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#6366F1;">Intermediate</div>
-      <div class="spm-shape-meta">Shape: Rounded card</div>
-      <div class="spm-shape-desc">In-progress</div>
-    </div>
-    <div class="spm-shape-tile">
-      <div class="spm-shape-icon">
-        <div style="width:40px; height:40px; border-radius:8px; border:3px double #6366F1; display:flex; align-items:center; justify-content:center;">
-          <span style="color:#6366F1; font-size:11px; font-weight:700;">■</span>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#6366F1;">Terminal</div>
-      <div class="spm-shape-meta">Shape: Rounded card + outer echo</div>
-      <div class="spm-shape-desc">Endpoint</div>
-    </div>
-    <div class="spm-shape-tile" style="background:#0c0c0f;">
-      <div class="spm-shape-icon">
-        <span style="color:#34D399; font-size:20px;">→</span>
-      </div>
-      <div class="spm-shape-name" style="color:#34D399;">Flow</div>
-      <div class="spm-shape-meta">Edge arrow</div>
-      <div class="spm-shape-desc">Emerald transition</div>
-    </div>
-  </div>
-
-  <svg width="100%" height="140" viewBox="0 0 520 140" style="margin:8px 0;">
-    <rect width="520" height="140" fill="#0c0c0f" rx="8"/>
-
-    <!-- Draft (origin) -->
-    <rect x="28" y="44" width="78" height="52" rx="12" fill="none" stroke="#4338CA" stroke-width="2.5"/>
-    <circle cx="46" cy="70" r="4" fill="#4338CA"/>
-    <text x="58" y="74" text-anchor="start" fill="#A898F5" font-size="11" font-family="Cascadia Cove,monospace" font-weight="600">Draft</text>
-
-    <!-- UnderReview -->
-    <rect x="170" y="46" width="90" height="48" rx="6" fill="none" stroke="#4338CA" stroke-width="1.5"/>
-    <text x="215" y="74" text-anchor="middle" fill="#A898F5" font-size="10" font-family="Cascadia Cove,monospace">UnderReview</text>
-
-    <!-- Approved (final) -->
-    <rect x="350" y="20" width="80" height="38" rx="6" fill="none" stroke="#6366F1" stroke-width="2"/>
-    <rect x="346" y="16" width="88" height="46" rx="8" fill="none" stroke="#6366F1" stroke-width="1" opacity="0.3"/>
-    <text x="390" y="43" text-anchor="middle" fill="#A898F5" font-size="10" font-family="Cascadia Cove,monospace" font-style="italic">Approved</text>
-
-    <!-- Declined (final) -->
-    <rect x="350" y="82" width="80" height="38" rx="6" fill="none" stroke="#6366F1" stroke-width="2"/>
-    <rect x="346" y="78" width="88" height="46" rx="8" fill="none" stroke="#6366F1" stroke-width="1" opacity="0.3"/>
-    <text x="390" y="105" text-anchor="middle" fill="#A898F5" font-size="10" font-family="Cascadia Cove,monospace">Declined</text>
-
-    <!-- Edges -->
-    <defs>
-      <marker id="aFlow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7" fill="#34D399"/></marker>
-    </defs>
-    <line x1="106" y1="70" x2="166" y2="70" stroke="#34D399" stroke-width="1.2" marker-end="url(#aFlow)"/>
-    <text x="136" y="62" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Cascadia Cove,monospace">Submit</text>
-
-    <line x1="260" y1="56" x2="346" y2="40" stroke="#34D399" stroke-width="1.2" opacity="0.6" marker-end="url(#aFlow)"/>
-    <text x="303" y="40" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Cascadia Cove,monospace">Approve</text>
-
-    <line x1="260" y1="82" x2="346" y2="100" stroke="#34D399" stroke-width="1.2" opacity="0.6" marker-end="url(#aFlow)"/>
-    <text x="303" y="100" text-anchor="middle" fill="#30B8E8" font-size="9" font-family="Cascadia Cove,monospace">Decline</text>
-
-    <!-- Legend -->
-    <g transform="translate(20, 128)">
-      <rect x="2" y="-4" width="8" height="8" rx="3" fill="none" stroke="#4338CA" stroke-width="2"/>
-      <circle cx="6" cy="0" r="1.5" fill="#4338CA"/>
-      <text x="14" y="4" fill="#52525b" font-size="8" font-family="Cascadia Cove,monospace">Initial</text>
-      <rect x="60" y="-4" width="8" height="8" rx="2" fill="none" stroke="#4338CA" stroke-width="1.5"/>
-      <text x="72" y="4" fill="#52525b" font-size="8" font-family="Cascadia Cove,monospace">Intermediate</text>
-      <rect x="165" y="-4" width="8" height="8" rx="2" fill="none" stroke="#6366F1" stroke-width="1.5"/>
-      <rect x="163" y="-6" width="12" height="12" rx="3" fill="none" stroke="#6366F1" stroke-width="0.75" opacity="0.3"/>
-      <text x="179" y="4" fill="#52525b" font-size="8" font-family="Cascadia Cove,monospace">Terminal</text>
-      <line x1="290" y1="0" x2="304" y2="0" stroke="#34D399" stroke-width="1.2"/>
-      <text x="308" y="4" fill="#52525b" font-size="8" font-family="Cascadia Cove,monospace">Flow</text>
-      <line x1="380" y1="0" x2="394" y2="0" stroke="#FB7185" stroke-width="1.5" stroke-dasharray="3 2"/>
-      <text x="398" y="4" fill="#52525b" font-size="8" font-family="Cascadia Cove,monospace">Blocked</text>
-    </g>
-  </svg>
-
-  <h3>State lifecycle roles</h3>
-  <p style="margin-bottom:12px;">Three structural roles determined at compile time. All states use the rounded card as the canonical outer silhouette, with locked indigo border <code>#6366F1</code> and violet state names <code>#A898F5</code>. Origin adds an internal dot; the dot centers when it stands alone, and shifts into a one-line dot + label row when the card also names the state. Terminal adds an outer echo border:</p>
-  <table>
-    <tr><th>Role</th><th>Shape</th><th>Detection</th></tr>
-    <tr><td>Initial</td><td>Rounded card with centered internal origin dot, or a single-line dot + label row when the card is labeled</td><td>Declared with <code>initial</code> modifier</td></tr>
-    <tr><td>Intermediate</td><td>Rounded card</td><td>Has both inbound and outbound transitions</td></tr>
-    <tr><td>Terminal</td><td>Rounded card with outer echo border</td><td>No outbound transitions</td></tr>
-  </table>
-
-  <div class="callout" style="margin-top:16px;">
-    <strong>Protocol gap — TODO:</strong> <code>PreceptPreviewSnapshot</code> does not currently expose <code>InitialState</code>. Initial state highlighting in diagrams depends on adding this field to the protocol.
-  </div>
-
-  <h3>Event lifecycle types</h3>
-  <p style="margin-bottom:12px;">Three event types determined at compile time by analyzing transition rows. All events use locked cyan <code>#30B8E8</code>. Differentiation is achieved through edge styling (solid, dashed, self-loop):</p>
-  <table>
-    <tr><th>Type</th><th>Detection</th><th>Diagram form</th></tr>
-    <tr><td>Transition</td><td>All transition rows include a <code>transition</code> action</td><td>Solid edge arrow</td></tr>
-    <tr><td>Conditional</td><td>Event has guards/assertions — may transition or reject</td><td>Guard-annotated edge (dashed)</td></tr>
-    <tr><td>Stationary</td><td>No transition rows produce state change — only <code>set</code> actions</td><td>Self-loop arrow</td></tr>
-  </table>
-
-  <h3>Diagram color mapping</h3>
-
-  <!-- Static elements — sf-palette family treatment -->
-  <div class="sf-palette">
-    <div class="sf-header" style="background: linear-gradient(135deg, #6366F1 0%, #4338ca 100%);">
-      <h3>Static Elements · Compile-Time</h3>
-      <p>Every semantic diagram element maps back to the § 1.4 system. Canvas and legend tones are local surface variants, not new semantic lanes.</p>
-    </div>
-    <div class="sf-body">
-      <!-- Structure Elements -->
-      <div class="sf-group">
-        <div class="sf-group-label">Structure · Indigo</div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #0c0c0f 0%, #0c0c0f 100%); border: 1px solid #27272a;"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#71717a;">Canvas background</span>
-            <span class="sf-hex">#0c0c0f</span>
-            <span class="sf-lane">Local neutral · Dark ground plane for all diagram content</span>
-            <span class="sf-surfaces"></span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #4338CA 0%, #3730a3 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#4338CA;">Initial node border</span>
-            <span class="sf-hex">#4338CA</span>
-            <span class="sf-lane">Indigo · Semantic — 2.5px solid, heavier stroke signals structural importance</span>
-            <span class="sf-surfaces"></span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #4338CA 0%, #3730a3 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#4338CA;">Intermediate node border</span>
-            <span class="sf-hex">#4338CA</span>
-            <span class="sf-lane">Indigo · Semantic — 1.5px solid, standard stroke</span>
-            <span class="sf-surfaces"></span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #34D399 0%, #10b981 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#6366F1;">Terminal node border</span>
-            <span class="sf-hex">#6366F1</span>
-            <span class="sf-lane">Indigo · Grammar — inner 2px solid + outer 1px at 30% opacity (double-border)</span>
-            <span class="sf-surfaces"></span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: transparent; border: 1px dashed #27272a;"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#52525b;">Node fill</span>
-            <span class="sf-hex">transparent</span>
-            <span class="sf-lane">Nodes are outlined, not filled — background shows through</span>
-            <span class="sf-surfaces"></span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Transition Elements -->
-      <div class="sf-group">
-        <div class="sf-group-label">Transitions · Grammar</div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #34D399 0%, #10b981 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#34D399;">Transition edge (line)</span>
-            <span class="sf-hex">#34D399</span>
-            <span class="sf-lane">Emerald · Transition — 1.5px solid, flow direction carries the allowed-transition signal</span>
-            <span class="sf-surfaces"></span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #34D399 0%, #10b981 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#34D399;">Transition edge (arrowhead)</span>
-            <span class="sf-hex">#34D399</span>
-            <span class="sf-lane">Emerald · Transition — filled marker, matches line color</span>
-            <span class="sf-surfaces"></span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Labels & Text -->
-      <div class="sf-group">
-        <div class="sf-group-label">Labels & Text</div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #A898F5 0%, #8b5cf6 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#A898F5;">State name text</span>
-            <span class="sf-hex">#A898F5</span>
-            <span class="sf-lane">States · Violet — 600 weight; italic when state is constrained (matches syntax)</span>
-            <span class="sf-surfaces"></span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #30B8E8 0%, #0ea5e9 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#30B8E8;">Event label (on edge)</span>
-            <span class="sf-hex">#30B8E8</span>
-            <span class="sf-lane">Events · Cyan — normal weight, labels are the verbs naming the transition</span>
-            <span class="sf-surfaces"></span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #B0BEC5 0%, #90a4ae 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#B0BEC5;">Guard/condition annotation</span>
-            <span class="sf-hex">#B0BEC5</span>
-            <span class="sf-lane">Data · Names — normal weight, smaller, guard text references data fields</span>
-            <span class="sf-surfaces"></span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #71717A 0%, #52525b 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#71717A;">Legend text</span>
-            <span class="sf-hex">#71717A</span>
-            <span class="sf-lane">Local neutral — de-emphasized support text, not a semantic lane</span>
-            <span class="sf-surfaces"></span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <h3>Runtime verdict overlay</h3>
-  <p style="margin-bottom:12px;">When paired with an active inspector instance, the diagram shows runtime status using verdict colors. These overlay the structural colors for edges originating from the current state. Verdict colors are defined in Brand Identity § 1.4. For inspector-panel verdict usage, see § 2.5.</p>
-
-  <!-- Runtime verdict — sf-palette family treatment -->
-  <div class="sf-palette">
-    <div class="sf-header" style="background: linear-gradient(135deg, #34D399 0%, #FB7185 100%);">
-      <h3>Runtime Verdict Overlay</h3>
-      <p>Verdict colors overlay structural indigo when showing runtime status from the inspector. Scoped to diagram surface; runtime-only.</p>
-    </div>
-    <div class="sf-body">
-      <!-- Current State -->
-      <div class="sf-group">
-        <div class="sf-group-label">Current State</div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#818cf8;">Current state node</span>
-            <span class="sf-hex" style="opacity:0.6;"><em>open</em></span>
-            <span class="sf-lane">Instance is in this state — fill overlay + border weight increase</span>
-            <span class="sf-surfaces">Open local tint</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Verdict Colors -->
-      <div class="sf-group">
-        <div class="sf-group-label">Transition Verdict</div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #34D399 0%, #10b981 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#34D399;">Enabled transition edge</span>
-            <span class="sf-hex">#34D399</span>
-            <span class="sf-lane">Firing this event would succeed — 1.5px solid, replaces structural indigo</span>
-            <span class="sf-surfaces">Verdict · Success</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #FB7185 0%, #f43f5e 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#FB7185;">Blocked transition edge</span>
-            <span class="sf-hex">#FB7185</span>
-            <span class="sf-lane">Firing this event would be rejected — 1.5px dashed</span>
-            <span class="sf-surfaces">Verdict · Error</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #FCD34D 0%, #eab308 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#FCD34D;">Warning transition edge</span>
-            <span class="sf-hex">#FCD34D</span>
-            <span class="sf-lane">Event has unmatched guards or partial match — 1.5px dotted</span>
-            <span class="sf-surfaces">Verdict · Warning</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #71717A 0%, #52525b 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#71717A;">Muted edge (non-current)</span>
-            <span class="sf-hex">#71717A</span>
-            <span class="sf-lane">Edges from states other than current — de-emphasized support stroke</span>
-            <span class="sf-surfaces">Local neutral</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Labels -->
-      <div class="sf-group">
-        <div class="sf-group-label">Event Labels</div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #34D399 0%, #10b981 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#34D399;">Enabled event label</span>
-            <span class="sf-hex">#34D399</span>
-            <span class="sf-lane">Label on an enabled transition — inherits verdict color when interactive</span>
-            <span class="sf-surfaces">Verdict · Success</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #FB7185 0%, #f43f5e 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#FB7185;">Blocked event label</span>
-            <span class="sf-hex">#FB7185</span>
-            <span class="sf-lane">Label on a blocked transition — inherits verdict color when interactive</span>
-            <span class="sf-surfaces">Verdict · Error</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="callout" style="margin-top:16px; background:#1a1a0f; border-color:#3d3d00;">
-    <strong style="color:#FCD34D;">⚠ Open decision — current state indicator:</strong>
-    <p style="margin:8px 0 0; line-height:1.7;">How the "you are here" state is shown is pending Shane sign-off. Two proposals under consideration:</p>
-    <ul style="margin:8px 0 0 16px; line-height:1.8;">
-      <li><strong>Option A (Elaine):</strong> Fill tint — <code>#1e1b4b</code> at 20–30% opacity. Immediately scannable, works at small sizes, uses an existing palette value.</li>
-      <li><strong>Option B (Frank):</strong> Fill tint — <code>#4338CA</code> at 10–15% opacity. Uses Structure · Semantic indigo, creating a direct visual link to the structural family.</li>
-    </ul>
-    <p style="margin:8px 0 0;">Both proposals use a fill tint; the specific shade is the open question. The shape tiles and SVG example above do not yet show this treatment.</p>
-  </div>
-
-  <div class="callout" style="margin-top:12px;">
-    <strong>Semantic signals (compile-time — derived from static analysis):</strong>
-    <ul style="margin:8px 0 0 16px; line-height:1.8;">
-      <li><strong>Constrained state:</strong> State name text — italic (same rule as syntax highlighting)</li>
-      <li><strong>Constrained event:</strong> Event label text — italic (same rule as syntax highlighting)</li>
-      <li><strong>Terminal state (no outbound transitions):</strong> Double-border rectangle — already specified in lifecycle roles above</li>
-      <li><strong>Orphaned state (unreachable):</strong> Entire node at 40–50% opacity — visually de-emphasized</li>
-      <li><strong>Stationary event (self-loop):</strong> Self-loop edge returning to the same node</li>
-    </ul>
-  </div>
-</div>
-</div>
-
-<div class="section-divider"></div>
-
-<!-- 2.3 Timeline -->
-<div class="section">
-<h2>2.3 Timeline <span class="status-chip" style="background:#1e3a5f; color:#60a5fa;">DRAFT</span></h2>
-
-<div class="card">
-  <h3>Purpose</h3>
-  <p>Horizontal event timeline in the VS Code preview panel. It reads left-to-right as a simple progression: origin, committed history, current state, then next possible actions. The timeline is the clearest answer to two questions: how did this instance get here, and what can happen next?</p>
-
-  <h3>Color application</h3>
-  <p style="margin-bottom:12px;">Concept 28 locks the timeline around one quiet card family. Geometry and position do most of the work; color names the semantic role already established elsewhere in the system. Indigo frames structural state cards, violet marks the active state-reading anchor, cyan names events and controls, emerald and rose stay reserved for runtime verdicts, and gold is limited to edit history.</p>
-
-  <div class="callout" style="margin-bottom:16px;">
-    <strong>Authoritative rule:</strong>
-    <p style="margin:8px 0 0; line-height:1.7;">The timeline is not an audit table. Show only the minimum needed to read sequence and act: one origin card, compact past cards, one present anchor, and future action lanes that expose the next real choices. If a detail does not explain history, current position, or next action, it belongs in the data panel.</p>
-  </div>
-
-  <div class="spm-shapes">
-    <div class="spm-shape-tile">
-      <div class="spm-shape-icon">
-        <div style="width:108px; height:76px; border-radius:12px; border:2px solid #4338CA; background:rgba(18,18,23,0.3); display:flex; align-items:center; justify-content:center; padding:0 16px; color:#4338CA;">
-          <span class="origin-inline-lockup">
-            <span class="origin-inline-dot"></span>
-            <span style="color:#A898F5; font-size:12px; font-weight:700;">Draft</span>
-          </span>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#4338CA;">Origin</div>
-      <div class="spm-shape-meta">2px indigo frame</div>
-      <div class="spm-shape-desc">Single-line dot + label state card</div>
-    </div>
-    <div class="spm-shape-tile">
-      <div class="spm-shape-icon">
-        <div style="width:92px; height:76px; border-radius:10px; border:1px solid #27272a; background:rgba(18,18,22,0.78); display:flex; flex-direction:column; align-items:flex-start; justify-content:center; padding:10px; gap:4px; text-align:left;">
-          <span style="color:#30B8E8; font-size:11px; font-weight:700;">Submit</span>
-          <span style="color:#34D399; font-size:9px;">transition to Open</span>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#30B8E8;">Past Event</div>
-      <div class="spm-shape-meta">10px quiet card</div>
-      <div class="spm-shape-desc">Compact history specimen</div>
-    </div>
-    <div class="spm-shape-tile">
-      <div class="spm-shape-icon">
-        <div style="width:88px; height:76px; border-radius:12px; border:2px solid #A898F5; background:rgba(30,27,75,0.25); display:flex; align-items:center; justify-content:center; box-shadow:0 0 16px rgba(168,152,245,0.08);">
-          <span style="color:#A898F5; font-size:12px; font-weight:700;">Open</span>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#A898F5;">Present</div>
-      <div class="spm-shape-meta">2px violet anchor</div>
-      <div class="spm-shape-desc">Current-state emphasis only</div>
-    </div>
-    <div class="spm-shape-tile">
-      <div class="spm-shape-icon">
-        <div style="width:104px; height:76px; border-radius:10px; border:1px solid rgba(39,39,42,0.72); background:rgba(18,22,27,0.76); display:flex; flex-direction:column; align-items:flex-start; justify-content:center; padding:10px; gap:4px; text-align:left;">
-          <span style="color:#30B8E8; font-size:11px; font-weight:700;">Assign</span>
-          <span style="color:#9096A6; font-size:9px;">inline fields + CTA</span>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#30B8E8;">Future Event</div>
-      <div class="spm-shape-meta">Action card</div>
-      <div class="spm-shape-desc">Form-first card grammar</div>
-    </div>
-  </div>
-
-  <svg width="100%" height="294" viewBox="0 0 1120 294" style="margin:8px 0;">
-    <rect width="1120" height="294" fill="#0c0c0f" rx="10"/>
-
-    <text x="26" y="28" fill="#52525b" font-size="9" font-weight="700" letter-spacing="1.2">TIMELINE</text>
-
-    <rect x="26" y="72" width="164" height="76" rx="12" fill="rgba(18,18,23,0.3)" stroke="#4338CA" stroke-width="2"/>
-    <circle cx="54" cy="110" r="4" fill="#4338CA"/>
-    <text x="66" y="114" text-anchor="start" fill="#A898F5" font-size="12" font-weight="700">Draft</text>
-    <text x="102" y="123" text-anchor="middle" fill="#9096A6" font-size="8">origin state</text>
-
-    <rect x="218" y="94" width="32" height="2" rx="1" fill="#A898F5" opacity="0.45"/>
-
-    <rect x="250" y="34" width="182" height="132" rx="10" fill="#121216" stroke="#27272a" stroke-width="1"/>
-    <text x="266" y="57" fill="#30B8E8" font-size="12" font-weight="700">Submit</text>
-    <text x="266" y="77" fill="#34D399" font-size="10">transition to <tspan fill="#A898F5" font-weight="700">Open</tspan></text>
-    <text x="266" y="102" fill="#71717A" font-size="9">RequesterName <tspan fill="#B0BEC5">Jane Doe</tspan></text>
-    <text x="266" y="120" fill="#71717A" font-size="9">Location <tspan fill="#34D399">Building A</tspan></text>
-    <text x="266" y="138" fill="#71717A" font-size="9">IssueSummary <tspan fill="#84929F">HVAC not cooling</tspan></text>
-
-    <rect x="460" y="94" width="40" height="2" rx="1" fill="#A898F5" opacity="0.55"/>
-
-    <rect x="500" y="72" width="160" height="76" rx="12" fill="#1e1b4b" fill-opacity="0.7" stroke="#A898F5" stroke-width="2"/>
-    <rect x="499" y="71" width="162" height="78" rx="13" fill="none" stroke="#A898F5" stroke-opacity="0.18"/>
-    <text x="580" y="102" text-anchor="middle" fill="#A898F5" font-size="12" font-weight="700">Open</text>
-    <text x="580" y="123" text-anchor="middle" fill="#9096A6" font-size="8">current state · step 3</text>
-
-    <rect x="688" y="94" width="40" height="2" rx="1" fill="#30B8E8" opacity="0.35"/>
-
-    <rect x="728" y="34" width="246" height="132" rx="10" fill="#12161b" stroke="#27272a" stroke-width="1"/>
-    <text x="746" y="57" fill="#30B8E8" font-size="12" font-weight="700">Assign</text>
-    <text x="746" y="74" fill="#9096A6" font-size="9">Technician + Estimate</text>
-    <rect x="746" y="90" width="164" height="22" rx="5" fill="#0c0c0f" stroke="#363640"/>
-    <text x="758" y="104" fill="#52525b" font-size="9">Bob Smith</text>
-    <rect x="746" y="120" width="78" height="22" rx="5" fill="#0c0c0f" stroke="#363640"/>
-    <text x="758" y="134" fill="#52525b" font-size="9">4</text>
-    <rect x="858" y="120" width="88" height="22" rx="5" fill="rgba(48,184,232,0.08)" stroke="rgba(48,184,232,0.30)"/>
-    <text x="902" y="134" text-anchor="middle" fill="#30B8E8" font-size="9" font-weight="700">Fire Assign</text>
-
-    <rect x="728" y="184" width="246" height="40" rx="8" fill="rgba(31,18,24,0.58)" stroke="rgba(251,113,133,0.32)"/>
-    <text x="746" y="208" fill="#FB7185" font-size="9" font-weight="700">StartWork</text>
-    <text x="834" y="208" fill="#9096A6" font-size="8">blocked until parts are approved</text>
-
-    <rect x="992" y="94" width="30" height="2" rx="1" fill="#4338CA" opacity="0.35"/>
-    <rect x="1022" y="72" width="84" height="76" rx="12" fill="rgba(18,18,23,0.3)" stroke="#6366F1" stroke-width="1.5"/>
-    <text x="1064" y="102" text-anchor="middle" fill="#A898F5" font-size="12" font-weight="700">Scheduled</text>
-    <text x="1064" y="123" text-anchor="middle" fill="#9096A6" font-size="8">target state</text>
-
-    <rect x="26" y="246" width="220" height="18" rx="6" fill="rgba(17,17,20,0.52)" stroke="rgba(144,150,166,0.20)" stroke-dasharray="3 2"/>
-    <text x="136" y="258" text-anchor="middle" fill="#71717A" font-size="8">past stays single-row; only future stacks and pairs with targets</text>
-  </svg>
-
-  <h3>Timeline role grammar</h3>
-  <p style="margin-bottom:12px;">Concept 28 uses a fixed set of specimens. Meaning comes from left-to-right placement first, then card role, then runtime accent.</p>
-  <table>
-    <tr><th>Role</th><th>Specimen form</th><th>Locked behavior</th></tr>
-    <tr><td>Origin state</td><td>12px-radius state card, 76px tall, 2px indigo border, one-line dot + label row, vertically centered, no wrap</td><td>Appears once at the far left. Widen the card as needed so the dot precedes the label on a single line. No alternate origin silhouette is permitted.</td></tr>
-    <tr><td>Past event</td><td>10px-radius compact event card, narrow width, left-aligned copy, neutral frame</td><td>Used for committed history only. Show the event name first, then one outcome or one delta.</td></tr>
-    <tr><td>Present marker</td><td>12px-radius state card, 2px violet border, subtle violet fill, optional soft glow</td><td>The current state is the single visual anchor between history and future.</td></tr>
-    <tr><td>Future event</td><td>10px-radius wider action card with summary, inline fields, and one fire row</td><td>Used for both transition and no-transition events. The event card remains the primary actor.</td></tr>
-    <tr><td>Future target state</td><td>12px-radius quiet state card, 76px tall, light indigo border</td><td>Appears only when the event transitions. It always shares the same lane as its event card.</td></tr>
-    <tr><td>Blocked future event</td><td>Same future-event geometry with rose border/background reduction and disabled controls</td><td>Blocked is a state, not a new shape. Keep the event visible and readable.</td></tr>
-    <tr><td>Terminal message</td><td>Quiet dashed message block replacing the future stack</td><td>Used only when no future events remain. Do not render placeholder cards.</td></tr>
-  </table>
-
-  <div class="callout" style="margin-top:16px;">
-    <strong>Connector rule:</strong>
-    <p style="margin:8px 0 0; line-height:1.7;">Connectors are straight 2px bars only. Past-to-present leans violet, present-to-future hands off toward cyan, and event-to-target leans from cyan into indigo. No elbows, arrows, loops, or decorative branching appear inside the timeline track.</p>
-  </div>
-
-  <h3>Timeline color mapping</h3>
-
-  <div class="sf-palette">
-    <div class="sf-header" style="background: linear-gradient(135deg, #30B8E8 0%, #4338CA 100%);">
-      <h3>Static Timeline Grammar</h3>
-      <p>These are the persistent timeline colors in Concept 28. They describe structure, event language, and supporting neutrals before runtime verdicts are applied.</p>
-    </div>
-    <div class="sf-body">
-      <div class="sf-group">
-        <div class="sf-group-label">State Structure</div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #4338CA 0%, #3730a3 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#4338CA;">Origin frame + dot</span>
-            <span class="sf-hex">#4338CA</span>
-            <span class="sf-lane">Indigo · Structural starting-state signal on the origin card and initial-state dot treatment</span>
-            <span class="sf-surfaces">Origin card, initial target-state marker</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #6366F1 0%, #4f46e5 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#6366F1;">Quiet state border</span>
-            <span class="sf-hex">#6366F1</span>
-            <span class="sf-lane">Indigo · Structural future-state framing and terminal double-border family</span>
-            <span class="sf-surfaces">Future target states, terminal overlays</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #A898F5 0%, #8b5cf6 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#A898F5;">Current-state anchor</span>
-            <span class="sf-hex">#A898F5</span>
-            <span class="sf-lane">Violet · Active state-reading family for present border, state names, and present-side connectors</span>
-            <span class="sf-surfaces">Present card, all state labels, connector handoff</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(30,27,75,0.75) 0%, rgba(49,46,129,0.95) 100%); border: 1px solid rgba(168,152,245,0.24);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#c7ccff;">Present fill tint</span>
-            <span class="sf-hex">#1e1b4b @ 25%</span>
-            <span class="sf-lane">Local surface tint · scoped only to the present marker so the anchor reads before any verdict accent</span>
-            <span class="sf-surfaces">Current-state card background</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="sf-group">
-        <div class="sf-group-label">Event Language</div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #30B8E8 0%, #0ea5e9 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#30B8E8;">Event names + fire controls</span>
-            <span class="sf-hex">#30B8E8</span>
-            <span class="sf-lane">Cyan · Verb/action family for past events, future events, buttons, and event-to-state handoff</span>
-            <span class="sf-surfaces">Event titles, button text, future event emphasis</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #B0BEC5 0%, #90a4ae 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#B0BEC5;">Field labels in deltas</span>
-            <span class="sf-hex">#B0BEC5</span>
-            <span class="sf-lane">Slate · Data identity in history deltas and future inline form labels</span>
-            <span class="sf-surfaces">Delta field names, inline argument labels</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #84929F 0%, #64748b 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#84929F;">Outcome + helper copy</span>
-            <span class="sf-hex">#84929F</span>
-            <span class="sf-lane">Slate value · Supporting summaries inside past and future cards</span>
-            <span class="sf-surfaces">Outcome lines, field summaries, helper text</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #9096A6 0%, #71717A 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#9096A6;">Quiet connectors + captions</span>
-            <span class="sf-hex">#9096A6 / #71717A</span>
-            <span class="sf-lane">Local neutrals · Receding track structure and secondary explanatory copy</span>
-            <span class="sf-surfaces">Connector fades, captions, terminal message copy</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="sf-group">
-        <div class="sf-group-label">History Accent</div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(252,211,77,0.16) 0%, rgba(252,211,77,0.04) 100%); border: 1px solid rgba(252,211,77,0.28);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#FCD34D;">Edit-history wash</span>
-            <span class="sf-hex">#FCD34D / #FBBF24</span>
-            <span class="sf-lane">Gold · Reserved warm accent for edit cards only, never the default event family</span>
-            <span class="sf-surfaces">Past edit cards and limited warnings</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="sf-palette">
-    <div class="sf-header" style="background: linear-gradient(135deg, #34D399 0%, #FB7185 100%);">
-      <h3>Runtime Timeline Signals</h3>
-      <p>Verdict colors do not create new silhouettes. They overlay the fixed card grammar to explain whether a transition can fire and what just happened.</p>
-    </div>
-    <div class="sf-body">
-      <div class="sf-group">
-        <div class="sf-group-label">Positive / Blocked</div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #34D399 0%, #10b981 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#34D399;">Enabled outcome</span>
-            <span class="sf-hex">#34D399</span>
-            <span class="sf-lane">Emerald · Successful transition result, positive delta, and guard-pass chip</span>
-            <span class="sf-surfaces">Past outcome lines, ready chips, positive values</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(251,113,133,0.16) 0%, rgba(67,24,39,0.72) 100%); border: 1px solid rgba(251,113,133,0.30);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#FB7185;">Blocked event state</span>
-            <span class="sf-hex">#FB7185</span>
-            <span class="sf-lane">Rose · Blocked border, disabled control, failing guard chip, and reject reason emphasis</span>
-            <span class="sf-surfaces">Blocked future cards, blocked buttons, fail chips</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="sf-group">
-        <div class="sf-group-label">Terminal / Empty Future</div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(99,102,241,0.04) 100%); border: 1px solid rgba(99,102,241,0.24);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#6366F1;">Terminal double-border</span>
-            <span class="sf-hex">#6366F1 + 30% outer ring</span>
-            <span class="sf-lane">Indigo · Same terminal signal as the state diagram; used on present or reachable terminal states</span>
-            <span class="sf-surfaces">Terminal present card, terminal target state</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(17,17,20,0.82) 0%, rgba(17,17,20,0.56) 100%); border: 1px dashed rgba(144,150,166,0.20);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#71717A;">Terminal message block</span>
-            <span class="sf-hex">#71717A / dashed neutral frame</span>
-            <span class="sf-lane">Local neutral · Quiet replacement for the entire future stack when no actions remain</span>
-            <span class="sf-surfaces">Terminal or no-future message</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-</div>
-
-<div class="section-divider"></div>
-
-<!-- 2.4 Data Panel -->
-<div class="section">
-<h2>2.4 Data Panel <span class="status-chip" style="background:#1e3a5f; color:#60a5fa;">DRAFT</span></h2>
-
-<div class="card">
-  <h3>Purpose</h3>
-  <p>The field inspector surface in the VS Code preview panel. Displays all precept fields in a responsive grid, supports direct editing of fields declared editable (via <code>in State edit Field</code>), and shows constraint status (invariants and state assertions) in a bottom strip. The data panel is where abstract data declarations become concrete runtime values.</p>
-
-  <h3>Color application</h3>
-  <p style="margin-bottom:12px;">Concept 28 locks the data panel around slate-first field units. Slate carries the identity hierarchy of name, type, and value; indigo signals edit capability and focus; gold marks unsaved draft work and human-readable rule copy; emerald and rose are reserved for runtime truth signals such as changed data, booleans, and passing or failing constraints.</p>
-
-  <div class="callout" style="margin-bottom:16px;">
-    <strong>Authoritative rule:</strong>
-    <p style="margin:8px 0 0; line-height:1.7;">The data panel is a readable field surface first, not a form-builder skin. Every unit should preserve the same anatomy: label row, control/readout, one supporting note line, and optional validation grouping beneath. Runtime states alter tint and border, but they do not break the unit grammar.</p>
-  </div>
-
-  <div class="spm-shapes">
-    <div class="spm-shape-tile">
-      <div class="spm-shape-icon">
-        <div style="width:96px; height:76px; border-radius:8px; border:1px solid rgba(39,39,42,0.54); background:rgba(14,14,18,0.42); display:flex; flex-direction:column; align-items:flex-start; justify-content:center; padding:10px; gap:4px; text-align:left;">
-          <span style="color:#d6deea; font-size:9px; font-weight:700;">Location</span>
-          <span style="color:#84929F; font-size:10px; font-weight:600;">Building A</span>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#B0BEC5;">Readout Unit</div>
-      <div class="spm-shape-meta">Slate-first card</div>
-      <div class="spm-shape-desc">Default field anatomy</div>
-    </div>
-    <div class="spm-shape-tile">
-      <div class="spm-shape-icon">
-        <div style="width:96px; height:76px; border-radius:8px; background:rgba(25,25,38,0.16); box-shadow:inset 0 0 0 1px rgba(99,102,241,0.22); display:flex; align-items:center; justify-content:center;">
-          <div style="width:64px; height:24px; border-radius:5px; border:1px solid #6366F1; background:rgba(12,12,15,0.78);"></div>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#6366F1;">Editing</div>
-      <div class="spm-shape-meta">Indigo capability signal</div>
-      <div class="spm-shape-desc">Focused input state</div>
-    </div>
-    <div class="spm-shape-tile">
-      <div class="spm-shape-icon">
-        <div style="width:96px; height:76px; border-radius:8px; background:rgba(14,14,18,0.42); box-shadow:inset 0 0 0 1px rgba(251,191,36,0.32); display:flex; align-items:center; justify-content:center;">
-          <span style="color:#FBBF24; font-size:11px; font-weight:700;">dirty</span>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#FBBF24;">Dirty</div>
-      <div class="spm-shape-meta">Unsaved draft state</div>
-      <div class="spm-shape-desc">Header and unit echo</div>
-    </div>
-    <div class="spm-shape-tile">
-      <div class="spm-shape-icon">
-        <div style="width:96px; height:76px; border-radius:8px; background:rgba(32,19,24,0.14); box-shadow:inset 0 0 0 1px rgba(251,113,133,0.42); display:flex; align-items:center; justify-content:center;">
-          <span style="color:#FB7185; font-size:14px; font-weight:700;">!</span>
-        </div>
-      </div>
-      <div class="spm-shape-name" style="color:#FB7185;">Issue</div>
-      <div class="spm-shape-meta">Rose error state</div>
-      <div class="spm-shape-desc">Constraint or field issue</div>
-    </div>
-  </div>
-
-  <svg width="100%" height="320" viewBox="0 0 960 320" style="margin:8px 0;">
-    <rect width="960" height="320" fill="#0c0c0f" rx="10"/>
-
-    <text x="26" y="28" fill="#52525b" font-size="9" font-weight="700" letter-spacing="1.2">DATA</text>
-    <text x="26" y="46" fill="#71717A" font-size="10">10 fields · state Open</text>
-    <rect x="132" y="34" width="76" height="18" rx="4" fill="rgba(251,191,36,0.08)" stroke="rgba(251,191,36,0.18)"/>
-    <text x="170" y="46" text-anchor="middle" fill="#FBBF24" font-size="8" font-weight="700">2 unsaved</text>
-    <rect x="650" y="30" width="54" height="22" rx="5" fill="rgba(99,102,241,0.06)" stroke="rgba(99,102,241,0.28)"/>
-    <text x="677" y="44" text-anchor="middle" fill="#6366F1" font-size="9" font-weight="700">Edit</text>
-    <rect x="710" y="30" width="54" height="22" rx="5" fill="rgba(52,211,153,0.08)" stroke="rgba(52,211,153,0.32)"/>
-    <text x="737" y="44" text-anchor="middle" fill="#34D399" font-size="9" font-weight="700">Save</text>
-
-    <rect x="26" y="78" width="280" height="84" rx="8" fill="rgba(14,14,18,0.42)" stroke="rgba(39,39,42,0.54)"/>
-    <text x="38" y="88" fill="#d6deea" font-size="9" font-weight="700">RequesterName</text>
-    <text x="263" y="88" fill="#9096A6" font-size="8">string</text>
-    <rect x="38" y="102" width="256" height="34" rx="5" fill="rgba(12,12,15,0.58)" stroke="rgba(54,54,64,0.72)"/>
-    <text x="50" y="123" fill="#84929F" font-size="11" font-weight="600">Jane Doe</text>
-    <text x="38" y="150" fill="#71717A" font-size="8">read-only field</text>
-
-    <rect x="338" y="78" width="280" height="84" rx="8" fill="rgba(25,25,38,0.16)"/>
-    <rect x="338" y="78" width="280" height="84" rx="8" fill="none" stroke="rgba(99,102,241,0.22)"/>
-    <rect x="338" y="78" width="280" height="84" rx="8" fill="none" stroke="rgba(251,191,36,0.32)"/>
-    <text x="350" y="88" fill="#d6deea" font-size="9" font-weight="700">Location</text>
-    <text x="575" y="88" fill="#9096A6" font-size="8">string</text>
-    <rect x="350" y="102" width="256" height="34" rx="5" fill="rgba(12,12,15,0.78)" stroke="#6366F1"/>
-    <text x="362" y="123" fill="#84929F" font-size="11">Building A, Room 204</text>
-    <text x="350" y="150" fill="#FBBF24" font-size="8">dirty draft value</text>
-
-    <rect x="650" y="78" width="284" height="84" rx="8" fill="rgba(32,19,24,0.14)"/>
-    <rect x="650" y="78" width="284" height="84" rx="8" fill="none" stroke="rgba(251,113,133,0.42)"/>
-    <text x="664" y="88" fill="#d6deea" font-size="9" font-weight="700">Urgent</text>
-    <text x="888" y="88" fill="#9096A6" font-size="8">boolean</text>
-    <rect x="664" y="104" width="40" height="20" rx="10" fill="rgba(251,113,133,0.15)" stroke="rgba(251,113,133,0.28)"/>
-    <circle cx="676" cy="114" r="6" fill="#FB7185" fill-opacity="0.7"/>
-    <text x="718" y="118" fill="#FB7185" fill-opacity="0.7" font-size="11" font-weight="700">false</text>
-    <text x="664" y="150" fill="#f7b4c0" font-size="8">must be true before scheduling</text>
-
-    <rect x="26" y="190" width="908" height="94" rx="8" fill="rgba(14,14,18,0.42)" stroke="rgba(39,39,42,0.46)"/>
-    <text x="40" y="212" fill="#52525b" font-size="9" font-weight="700" letter-spacing="0.85">VALIDATION</text>
-    <text x="40" y="236" fill="#84929F" font-size="10">✓ Estimated hours cannot be negative</text>
-    <rect x="226" y="226" width="92" height="18" rx="9" fill="rgba(176,190,197,0.08)" stroke="rgba(176,190,197,0.16)"/>
-    <text x="272" y="238" text-anchor="middle" fill="#B0BEC5" font-size="8">EstimatedHours</text>
-    <text x="40" y="262" fill="#FBBF24" font-size="10">✕ Scheduled work must have an assigned technician</text>
-    <rect x="302" y="252" width="108" height="18" rx="9" fill="rgba(176,190,197,0.08)" stroke="rgba(176,190,197,0.16)"/>
-    <text x="356" y="264" text-anchor="middle" fill="#B0BEC5" font-size="8">AssignedTechnician</text>
-  </svg>
-
-  <h3>Field-unit grammar</h3>
-  <p style="margin-bottom:12px;">Every field unit in Concept 28 preserves the same compact anatomy. Runtime states tint that unit; they do not replace it.</p>
-  <table>
-    <tr><th>Unit</th><th>Specimen form</th><th>Locked behavior</th></tr>
-    <tr><td>Header row</td><td>9px-11px microcopy with strong label, muted type, optional mode pill or dirty note nearby</td><td>Panel title and count stay small so field values remain primary.</td></tr>
-    <tr><td>Field card</td><td>8px radius, quiet neutral body, bottom-emphasis divider, one label row, one control/readout row, one note line</td><td>Used for all fields, whether read-only, editable, changed, or invalid.</td></tr>
-    <tr><td>Readout</td><td>5px-radius inset surface with slate value text, italic muted nulls</td><td>Default non-editing state for all fields.</td></tr>
-    <tr><td>Input / select</td><td>Same inset geometry as the readout, with indigo focus border and 2px focus halo</td><td>Editing preserves layout; controls do not resize the card or shift adjacent units.</td></tr>
-    <tr><td>Boolean toggle</td><td>34x18 track with on/off thumb and matching text label</td><td>Uses both color and text state; emerald for true, rose for false.</td></tr>
-    <tr><td>Validation group</td><td>Quiet boxed strip with uppercase title, icon-led rule lines, and pill targets</td><td>Always visible beneath the field grid. Invariants and state assertions share the same specimen language.</td></tr>
-  </table>
-
-  <h3>Data-panel color mapping</h3>
-
-  <div class="sf-palette">
-    <div class="sf-header" style="background: linear-gradient(135deg, #B0BEC5 0%, #6366F1 100%);">
-      <h3>Field Units</h3>
-      <p>These are the persistent tokens that make the data panel legible before any editing or validation state is layered on top.</p>
-    </div>
-    <div class="sf-body">
-      <div class="sf-group">
-        <div class="sf-group-label">Panel Structure + Identity</div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #B0BEC5 0%, #90a4ae 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#B0BEC5;">Field names</span>
-            <span class="sf-hex">#B0BEC5</span>
-            <span class="sf-lane">Slate · Primary data identity color for labels and target pills</span>
-            <span class="sf-surfaces">Field labels, validation targets</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #9AA8B5 0%, #7c8b99 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#9AA8B5;">Field types</span>
-            <span class="sf-hex">#9AA8B5</span>
-            <span class="sf-lane">Slate type · Secondary metadata for the field kind</span>
-            <span class="sf-surfaces">Type labels, subtle metadata</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #84929F 0%, #64748b 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#84929F;">Field values</span>
-            <span class="sf-hex">#84929F</span>
-            <span class="sf-lane">Slate value · Largest data text in the panel so the current value remains the visual priority</span>
-            <span class="sf-surfaces">Readouts, informational notes, validation-ok copy</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #52525b 0%, #71717A 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#9096A6;">Muted support copy</span>
-            <span class="sf-hex">#52525b / #71717A / #9096A6</span>
-            <span class="sf-lane">Local neutrals · Header title, counts, note lines, null values, and receding hints</span>
-            <span class="sf-surfaces">Panel title, subcopy, helper notes, null readouts</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(12,12,15,0.82) 0%, rgba(12,12,15,0.58) 100%); border: 1px solid rgba(54,54,64,0.72);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#e5e5e5;">Inset readout / input surface</span>
-            <span class="sf-hex">#0c0c0f + #363640 border</span>
-            <span class="sf-lane">Local neutral control surface shared by readouts, inputs, and selects</span>
-            <span class="sf-surfaces">Field readouts, text inputs, select controls</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="sf-group">
-        <div class="sf-group-label">Edit Capability</div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #6366F1 0%, #4f46e5 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#6366F1;">Edit affordance</span>
-            <span class="sf-hex">#6366F1</span>
-            <span class="sf-lane">Indigo · Capability and focus signal for mode pill, edit button, active field frame, and focus ring</span>
-            <span class="sf-surfaces">Edit button, editing pill, focused input, editing field unit</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(99,102,241,0.10) 0%, rgba(99,102,241,0.02) 100%); border: 1px solid rgba(99,102,241,0.28);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#818cf8;">Editing surface tint</span>
-            <span class="sf-hex">#6366F1 @ 10%-22%</span>
-            <span class="sf-lane">Local indigo tint · Applied to editing mode background and active field shells</span>
-            <span class="sf-surfaces">Editing panel background, active field card</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="sf-palette">
-    <div class="sf-header" style="background: linear-gradient(135deg, #FBBF24 0%, #FB7185 100%);">
-      <h3>Runtime States + Validation</h3>
-      <p>These tokens are layered on the fixed field-unit grammar to show draft work, changed data, boolean truth, and constraint status.</p>
-    </div>
-    <div class="sf-body">
-      <div class="sf-group">
-        <div class="sf-group-label">Field States</div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(16,29,24,0.32) 0%, rgba(16,29,24,0.12) 100%); border: 1px solid rgba(52,211,153,0.32);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#34D399;">Recently changed</span>
-            <span class="sf-hex">#34D399</span>
-            <span class="sf-lane">Emerald · Short-lived flash state for fields mutated by the last fire</span>
-            <span class="sf-surfaces">Changed field shell, true booleans, save button</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(251,191,36,0.18) 0%, rgba(251,191,36,0.04) 100%); border: 1px solid rgba(251,191,36,0.32);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#FBBF24;">Dirty draft</span>
-            <span class="sf-hex">#FBBF24</span>
-            <span class="sf-lane">Gold · Unsaved field edits and human-readable issue lines</span>
-            <span class="sf-surfaces">Dirty note, dirty field shell, validation issue text</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(32,19,24,0.24) 0%, rgba(32,19,24,0.08) 100%); border: 1px solid rgba(251,113,133,0.42);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#FB7185;">Issue state</span>
-            <span class="sf-hex">#FB7185</span>
-            <span class="sf-lane">Rose · Invalid field frame, failing toggle state, cancel hover, and issue notes</span>
-            <span class="sf-surfaces">Problem field shell, false booleans, issue note text</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="sf-group">
-        <div class="sf-group-label">Validation Strip</div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(14,14,18,0.64) 0%, rgba(14,14,18,0.42) 100%); border: 1px solid rgba(39,39,42,0.46);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#71717A;">Validation group shell</span>
-            <span class="sf-hex">#27272a / #0e0e12</span>
-            <span class="sf-lane">Local neutral · Quiet container that keeps invariants and state assertions always visible</span>
-            <span class="sf-surfaces">Validation strip, rule grouping shells</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, #34D399 0%, #10b981 100%);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#34D399;">Passing truth signal</span>
-            <span class="sf-hex">#34D399</span>
-            <span class="sf-lane">Emerald · Positive validation icons and true-state controls</span>
-            <span class="sf-surfaces">Valid rule icon, true toggle track, save action</span>
-          </div>
-        </div>
-
-        <div class="sf-row">
-          <div class="sf-swatch" style="background: linear-gradient(135deg, rgba(176,190,197,0.18) 0%, rgba(176,190,197,0.06) 100%); border: 1px solid rgba(176,190,197,0.16);"></div>
-          <div class="sf-info">
-            <span class="sf-name" style="color:#B0BEC5;">Target pills</span>
-            <span class="sf-hex">#B0BEC5</span>
-            <span class="sf-lane">Slate · Named field references attached to each rule so the developer can trace impact quickly</span>
-            <span class="sf-surfaces">Constraint target badges</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-</div>
-
-<div class="section-divider"></div>
-
-<!-- 2.5 Inspector Panel -->
-<div class="section">
-<h2>2.5 Inspector Panel <span class="status-chip">LOCKED</span></h2>
-
-<div class="card">
-  <h3>Purpose</h3>
-  <p>Runtime verdict surface. The data/field inspector in the preview webview, showing live instance state during event firing. Developers inspect field values, constraint violations, and the effect of transitions. The panel is where data becomes concrete — where abstract rules meet runtime reality.</p>
-
-  <h3>Primary visual concerns</h3>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li>Field visibility and hierarchy — which fields are set, which are null/default, which are guarded by invariants</li>
-    <li>Constraint feedback — if a field violates an invariant, the violation must be obvious without requiring text parsing</li>
-    <li>Event argument preview — when firing an event, the panel shows what arguments are available and their values</li>
-    <li>State transition clarity — before and after state, with visual indication of which fields changed</li>
-  </ul>
-
-  <h3>Color application</h3>
-  <p style="margin-bottom:8px;">Inspector uses the data and verdict color systems:</p>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li><strong>Field names:</strong> Slate <code>#B0BEC5</code>, normal or italic if guarded by invariant. Same as syntax highlighting so the reader recognizes the field</li>
-    <li><strong>Field types:</strong> Slate <code>#9AA8B5</code>. Type info is secondary to the name and value</li>
-    <li><strong>Field values:</strong> Slate <code>#84929F</code> for normal values, or verdict colors if a constraint is violated</li>
-    <li><strong>Current state label:</strong> Violet <code>#A898F5</code> — matches syntax highlighting and diagram state naming</li>
-    <li><strong>Constraint violation indicators:</strong> Blocked <code>#FB7185</code> for rejected events or invariant violations. Verdict colors signal runtime constraint feedback</li>
-    <li><strong>Enabled indicators:</strong> Enabled <code>#34D399</code> for valid state, successful transitions, or non-violated fields</li>
-    <li><strong>Read-only field indicators:</strong> Dusk indigo <code>#9096A6</code> or a neutral shade for fields not declared editable in the current state via <code>in State edit Field</code></li>
-  </ul>
-
-  <h3>Typography application</h3>
-  <p style="margin-bottom:8px;">Cascadia Cove monospace, 12–13px for field names and values:</p>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li><strong>Field name:</strong> Normal weight, 12px, left-aligned. Field names that are invariant-guarded can be italic</li>
-    <li><strong>Field value:</strong> 12px, monospace to match code appearance. Wider line-height (1.6–1.8) for readability in a tabular layout</li>
-    <li><strong>Constraint message:</strong> 11px, gold <code>#FBBF24</code> text below the violated field. Message text is the human explanation, so it earns color emphasis and smaller size to distinguish from data values</li>
-  </ul>
-
-  <h3>Accessibility notes</h3>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li>Color + icon redundancy: Constraint violations use both color (Blocked rose) and an icon (✗ or warning symbol). A color-blind developer still sees the symbol</li>
-    <li>Table structure: If inspector data is rendered as a table (field name | type | value), use proper <code>&lt;th&gt;</code> headers and <code>&lt;tr&gt;/&lt;td&gt;</code> semantics so screen readers announce the structure</li>
-    <li>Formal accessibility audit (color-blind simulation, screen reader testing) is a backlog item</li>
-  </ul>
-
-  <h3>AI-first note</h3>
-  <p>The inspector panel is JSON-serializable state data. An AI agent reading the inspector output needs to understand: current state, current field values, which constraints are violated, and what the next transition would do. Structured layout with consistent field ordering and color-coded constraint feedback means the agent can parse violations without string matching on error text. The inspector is both a human debugging tool and an API contract for AI tools.</p>
-</div>
-</div>
-
-<div class="section-divider"></div>
-
-<!-- 2.6 Docs Site -->
-<div class="section">
-<h2>2.6 Docs <span class="status-chip">LOCKED</span></h2>
-
-<div class="card">
-  <h3>Purpose</h3>
-  <p>Internal documentation artifacts (design docs, tutorials, reference material). These are team-facing documents, not a public-facing documentation site. Where developers learn Precept concepts, read language design docs, explore sample files, and navigate API reference.</p>
-
-  <h3>Primary visual concerns</h3>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li>Hierarchy and scanability — tutorials, reference, samples, and theory must be visually stratified so a developer finds what they need instantly</li>
-    <li>Code sample rendering — <code>.precept</code> files embedded in docs must use the same syntax highlighting colors as the editor, so readers feel continuity</li>
-    <li>Conceptual callouts — "this is a precept" (small caps), "this is a pattern" (styled differently from narrative prose)</li>
-  </ul>
-
-  <h3>Color application</h3>
-  <p style="margin-bottom:8px;">Docs maintain the dark-mode semantic palette but may introduce additional neutral/gray shades for navigation, backgrounds, and UI chrome:</p>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li><strong>Code blocks embedded in prose:</strong> Use the full syntax highlighting palette — indigo for structure, violet for states, cyan for events, slate for data, gold for messages. Readers see the same colors as in their editor</li>
-    <li><strong>Brand color accents:</strong> Navigation, headings, and link highlights use deep indigo <code>#6366F1</code>. This keeps the brand color family visible throughout the docs without overwhelming</li>
-    <li><strong>Callout boxes:</strong> Locked brand decisions, conceptual definitions, and "Precept principle" statements may use subtle indigo background (current practice in brand-spec.html callout style)</li>
-    <li><strong>Verdict colors in diagrams and reference tables:</strong> If diagrams are embedded in docs, use the same color system as the preview webview (§2.2)</li>
-    <li><strong>Neutral grays for structure:</strong> Navigation backgrounds, borders, table headers, and dividers use the muted palette (<code>#27272a</code>, <code>#18181b</code>, <code>#0c0c0f</code>) to avoid competition with semantic colors</li>
-  </ul>
-
-  <h3>Typography application</h3>
-  <p style="margin-bottom:8px;">Cascadia Cove for code, primary brand font for headings and UI:</p>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li><strong>Page headings (H1):</strong> Cascadia Cove 700, small caps, 0.1em letter-spacing — same wordmark treatment as README and brand-spec</li>
-    <li><strong>Section headings (H2, H3):</strong> Cascadia Cove 600–700, normal case. Hierarchy through size and weight, not typeface</li>
-    <li><strong>Prose:</strong> System font stack or Cascadia Cove 400, 14–16px line-height 1.6–1.8. Readable for long-form content</li>
-    <li><strong>Code samples:</strong> Cascadia Cove 400, 12–13px with 1.8 line-height. Syntax highlighting colors applied</li>
-  </ul>
-
-  <h3>Accessibility notes</h3>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li>Heading hierarchy: H1 → H2 → H3, no skips. Screen readers rely on hierarchy to navigate long docs</li>
-    <li>Code sample alt text or captions: Embedded <code>.precept</code> samples should have a descriptive caption or nearby prose explaining the concept they demonstrate</li>
-    <li>Light theme: Not planned. Docs are dark-mode-only, matching the editor experience. Light theme support is a backlog item.</li>
-  </ul>
-
-  <h3>AI-first note</h3>
-  <p>The docs are where AI agents gather context before writing Precept. Claude agents reading the tutorial section learn syntax and patterns. Reference docs with clear structure (headings, code blocks in <code>&lt;pre&gt;</code>, definition lists) are easier for agents to parse. Embedded <code>.precept</code> samples double as training data — the agent can read a sample and a caption and learn a pattern. Docs design matters as much for AI comprehension as human comprehension.</p>
-</div>
-</div>
-
-<div class="section-divider"></div>
-
-<!-- 2.7 CLI / Terminal -->
-<div class="section">
-<h2>2.7 CLI / Terminal <span class="status-chip">ASPIRATIONAL</span></h2>
-
-<div class="callout" style="margin-bottom:16px; background:#3F3F46; border-left:4px solid #FCD34D;">
-  <strong>⚠️ CLI surface is planned; not yet implemented.</strong> A standalone <code>precept</code> CLI tool does not currently exist. PRECEPT diagnostic codes (PRECEPT001–PRECEPT054) are surfaced in VS Code's Problems panel via the language server, not in terminal output. <code>dotnet build</code> uses standard MSBuild formatting. This section defines a design contract for a future CLI tool.
-</div>
-
-<div class="card">
-  <h3>Purpose</h3>
-  <p>Command-line output, build logs, diagnostic messages, and error reporting for a future <code>precept</code> CLI tool. When implemented, developers would see this surface when running diagnostics, validation, or compilation from the terminal. This is where the brand system meets terminal constraints.</p>
-
-  <h3>Primary visual concerns</h3>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li>Error signal clarity — a developer must instantly see "this is an error" without reading prose</li>
-    <li>Terminal color support — many terminals support 256-color or true color; output must be legible in both dark and light terminal themes</li>
-    <li>Structured output — diagnostic messages, file paths, line numbers, and error text must separate visually even in monospace</li>
-    <li>No ambiguity with success/failure — the verdict colors (emerald/rose/amber) must be reserved for actual success/failure signals, not decorative accents</li>
-  </ul>
-
-  <h3>Color application</h3>
-  <p style="margin-bottom:8px;">CLI output uses verdict colors strategically and sparingly:</p>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li><strong>Success messages:</strong> Enabled <code>#34D399</code> — "Build succeeded" or "✓ All checks passed"</li>
-    <li><strong>Error messages:</strong> Blocked <code>#FB7185</code> — "Error: Invalid syntax at line 12" or "✗ Constraint violated"</li>
-    <li><strong>Warnings:</strong> Warning <code>#FCD34D</code> — "Warning: Event 'Activate' has no guard; all paths succeed"</li>
-    <li><strong>Neutral output (file paths, context info):</strong> Default terminal color (no color applied). The terminal's default foreground color is most readable across theme variations</li>
-    <li><strong>Emphasis (bold text):</strong> File names, identifiers, and code elements can use bold or backtick quoting to stand out. Avoid color for emphasis on the CLI</li>
-    <li><strong>No structural indigo on CLI.</strong> Deep indigo <code>#6366F1</code> does not render well on light terminal themes and may be illegible. Reserved for UI only</li>
-  </ul>
-
-  <h3>Typography application</h3>
-  <p style="margin-bottom:8px;">Monospace rendering, standard terminal fonts:</p>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li><strong>Error/warning headers:</strong> Bold + verdict color, e.g., <code>✗ ERROR:</code> (bold rose) followed by the message</li>
-    <li><strong>File path and line number:</strong> Normal weight, default color, e.g., <code>file.precept:12:5:</code> (no color formatting)</li>
-    <li><strong>Diagnostic message:</strong> Normal weight, default color. If a message quotes code, use backticks: <code>`FieldName`</code> or double-quotes: <code>"message text"</code></li>
-    <li><strong>Suggestion or hint:</strong> Dim/muted color if the terminal supports it; otherwise, normal color with a → prefix</li>
-  </ul>
-
-  <h3>Accessibility notes</h3>
-  <ul style="margin-left: 16px; color: #a1a1aa;">
-    <li>Color + symbol redundancy: Errors use both color (rose) and a symbol (✗). Warnings use both color (amber) and a symbol (⚠ or ⚡). A developer with red/green color blindness still sees the symbol</li>
-    <li>Light terminal compatibility: Verdict colors (<code>#34D399</code>, <code>#FB7185</code>, <code>#FCD34D</code>) are calibrated for dark backgrounds. For light terminals, either detect theme and swap to darker shades, or remove color and rely on symbols only</li>
-    <li>CLI color audit: Current CLI tool color application needs an audit pass to ensure consistency with these principles. This is a backlog item.</li>
-  </ul>
-
-  <h3>AI-first note</h3>
-  <p>CLI output is often captured by AI tools and parsed as structured data. If a future CLI tool provides JSON output, that would be machine-readable; human-readable error messages should be parseable too. Consistent error formatting (error symbol + colon + error code + message) means an AI agent can regex-parse failures. Color codes in terminal output can be captured or stripped by tools, so color should never be the only signal — symbol and text structure matter more.</p>
-</div>
-</div>
-
-</div>
-
-</div>
-
-<div class="section-divider"></div>
-
-<!-- 2.6 Canonical Hero Snippet -->
-<div class="section">
-<h2>2.8 Canonical Hero Snippet <span class="status-chip">TEMPORARY</span></h2>
-
-<div class="callout" style="margin-bottom:16px; background:#1e2a3a; border-left:4px solid #818cf8;">
-  <strong>Status note:</strong> This section captures the current README "Quick Example" as the reusable hero artifact for README, VS Code Marketplace, NuGet, Claude Marketplace, and AI-facing contexts. The current temporary live hero is the top-rated Subscription Billing candidate from the visual language exploration. It remains <span class="status-chip">TEMPORARY</span> until the final hero decision confirms whether this domain stays or is replaced.
-</div>
-
-<div class="card">
-  <h3>What this section locks</h3>
-  <p>This section locks two things: the exact text of the current hero sample and the rules for reusing it without drift. The live README remains the public surface; this is the brand-facing copy-and-guidance reference that keeps other surfaces in step with it.</p>
-
-  <h3>Canonical text to reuse</h3>
-  <p style="margin-bottom:8px; margin-top:12px;"><strong>The Contract (DSL)</strong> — 21 lines. Copy verbatim when a surface uses the DSL block. Preserve the blank lines and the indented transition steps; they are part of the pattern legibility.</p>
-  <pre style="background:#0c0c0f; color:#e5e5e5; font-family:var(--brand-mono), monospace; font-size:13px; line-height:1.6; padding:16px; border-radius:4px; border:1px solid #2a2a2e; overflow-x:auto; margin:0;"><code>precept Subscription
-
-field PlanName as string nullable
-field MonthlyPrice as number default 0
-
-invariant MonthlyPrice &gt;= 0 because "Monthly price cannot be negative"
-
-state Trial initial, Active, Cancelled
-
-event Activate with Plan as string, Price as number
-on Activate assert Price &gt; 0 because "Plan price must be positive"
-
-event Cancel
-
-from Trial on Activate when PlanName == null
-  -&gt; set PlanName = Activate.Plan
-  -&gt; set MonthlyPrice = Activate.Price
-  -&gt; transition Active
-from Active on Activate -&gt; set MonthlyPrice = Activate.Price -&gt; no transition
-from Active on Cancel -&gt; transition Cancelled
-from Cancelled on Activate -&gt; reject "Cancelled subscriptions cannot be reactivated"</code></pre>
-
-  <p style="margin-bottom:8px; margin-top:12px;"><strong>The Execution (C#)</strong> — pair with the DSL block on surfaces that have room for both. Copy verbatim, including the closing comment line.</p>
-  <pre style="background:#0c0c0f; color:#e5e5e5; font-family:var(--brand-mono), monospace; font-size:13px; line-height:1.6; padding:16px; border-radius:4px; border:1px solid #2a2a2e; overflow-x:auto; margin:0;"><code>var def = PreceptParser.Parse(dslText);
-var eng = PreceptCompiler.Compile(def);
-var inst = eng.CreateInstance(state, data);
-var result = eng.Fire(inst, "Activate", args);
-// result.IsSuccess, result.UpdatedInstance</code></pre>
-
-  <h3>Cross-surface usage guidance</h3>
-  <table style="width:100%; border-collapse:collapse; margin-top:12px;">
-    <thead>
-      <tr>
-        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #27272a; color:#e5e5e5;">Surface</th>
-        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #27272a; color:#e5e5e5;">Use</th>
-        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #27272a; color:#e5e5e5;">Guidance</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td style="padding:10px 12px; border-bottom:1px solid #27272a; color:#e5e5e5;"><strong>README.md</strong></td>
-        <td style="padding:10px 12px; border-bottom:1px solid #27272a; color:#a1a1aa;">Use both blocks under <code>## Quick Example</code>.</td>
-        <td style="padding:10px 12px; border-bottom:1px solid #27272a; color:#a1a1aa;">Keep the bold labels <strong>The Contract</strong> and <strong>The Execution</strong>. Render the DSL inline with README-safe HTML (<code>pre</code>/<code>code</code> plus inline <code>span</code> styles) so VS Code markdown preview shows the contract directly. If a renderer strips styles, the raw text still has to read cleanly.</td>
-      </tr>
-      <tr>
-        <td style="padding:10px 12px; border-bottom:1px solid #27272a; color:#e5e5e5;"><strong>VS Code Marketplace</strong></td>
-        <td style="padding:10px 12px; border-bottom:1px solid #27272a; color:#a1a1aa;">Prefer the DSL block only.</td>
-        <td style="padding:10px 12px; border-bottom:1px solid #27272a; color:#a1a1aa;">If space is tight, link to the README rather than editing the snippet. Keep the existing line breaks and wording.</td>
-      </tr>
-      <tr>
-        <td style="padding:10px 12px; border-bottom:1px solid #27272a; color:#e5e5e5;"><strong>NuGet</strong></td>
-        <td style="padding:10px 12px; border-bottom:1px solid #27272a; color:#a1a1aa;">Use the DSL block only, in plain text or fenced markdown if the surface allows it.</td>
-        <td style="padding:10px 12px; border-bottom:1px solid #27272a; color:#a1a1aa;">Do not make color claims. Clarity comes from the raw text, indentation, and keyword order.</td>
-      </tr>
-      <tr>
-        <td style="padding:10px 12px; border-bottom:1px solid #27272a; color:#e5e5e5;"><strong>Claude Marketplace</strong></td>
-        <td style="padding:10px 12px; border-bottom:1px solid #27272a; color:#a1a1aa;">Use both blocks as fenced code with language tags.</td>
-        <td style="padding:10px 12px; border-bottom:1px solid #27272a; color:#a1a1aa;">The pair tells the full story: define the contract, then execute it. Raw text matters more than visual treatment.</td>
-      </tr>
-      <tr>
-        <td style="padding:10px 12px; color:#e5e5e5;"><strong>AI prompt context</strong></td>
-        <td style="padding:10px 12px; color:#a1a1aa;">Use raw DSL alone or both blocks as plaintext.</td>
-        <td style="padding:10px 12px; color:#a1a1aa;">Never compress away the blank lines that separate declaration groups. Pattern shape is part of comprehension.</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <h3>Constraints that travel with the snippet</h3>
-  <ul style="margin-left:16px; color:#a1a1aa; line-height:1.8;">
-    <li><strong>Temporary means temporary.</strong> Refer to this as the current hero sample or temporary canonical hero. Do not present Subscription Billing as permanently locked brand domain content.</li>
-    <li><strong>Preserve exact text.</strong> Do not rename fields, states, events, or messages per surface. Rewrap surrounding copy, not the snippet.</li>
-    <li><strong>Structural cadence is part of the design.</strong> Keep the 21-line shape, including the blank lines and the three indented activation steps. Those breaks are part of why the sample scans cleanly.</li>
-    <li><strong>Plaintext first.</strong> The snippet must make sense with no color at all. Syntax color can enhance presentation on some surfaces, but the underlying readable text remains the canonical layer.</li>
-    <li><strong>Update in one pass.</strong> If the hero sample or runtime API surface changes, update <code>README.md</code>, this section, and the team decision log together.</li>
-  </ul>
-
-  <h3>When to refresh this sample</h3>
-  <ul style="margin-left:16px; color:#a1a1aa; line-height:1.8;">
-    <li><strong>Usability review:</strong> Replace it if user testing shows a different first domain teaches the language faster.</li>
-    <li><strong>Language or API drift:</strong> Replace or revise it if the DSL or runtime API changes make the sample inaccurate.</li>
-    <li><strong>Source-of-truth upgrade:</strong> Revisit this section if the team creates a dedicated hero sample file and explicitly promotes it to the raw source.</li>
-    <li><strong>Not for novelty:</strong> Do not refresh it to look smarter, denser, or more dramatic. The sample exists to teach the pattern cleanly.</li>
-  </ul>
-
-  <h3>Source references</h3>
-  <ul style="margin-left:16px; color:#a1a1aa; line-height:1.8;">
-    <li><strong>Live public surface:</strong> <code>README.md</code> §Quick Example</li>
-    <li><strong>Brand reuse reference:</strong> this section in <code>brand/brand-spec.html</code></li>
-    <li><strong>Companion render artifacts:</strong> <code>brand/readme-hero-dsl.html</code>, <code>brand/readme-hero-dsl.precept</code>, and <code>brand/readme-hero.svg</code></li>
-    <li><strong>Current reality:</strong> there is no standalone <code>samples/</code> file for this temporary hero yet. Do not invent one in brand or marketplace copy.</li>
-  </ul>
-</div>
-</div>
-
-</div>
-
-<div class="section-divider"></div>
-
-<!-- ===================================================================== -->
-<!-- SECTION 3: RESEARCH & EXPLORATIONS                                    -->
-<!-- ===================================================================== -->
-<div class="section">
-<h2 style="font-size: 24px; margin-bottom: 24px; color: #6366F1;">3. Research &amp; Explorations</h2>
-
-<div class="card">
-  <h3>Living section</h3>
-  <p>This section documents brand research, design system references, and active explorations. Files are living — updated as new research emerges.</p>
-
-  <h3>Research & Reference</h3>
-  <ul style="margin: 8px 0 16px 20px; line-height: 1.8;">
-    <li><strong><a href="references/brand-spec-structure-research.md">brand-spec-structure-research.md</a></strong> — Surface-first organizing precedent from 13 design systems (GitHub, IBM, Material, VS Code, Vercel, Atlassian, Stripe, Tailwind, Linear, Raycast). Documents why Precept's visual-surfaces-first structure is grounded in real design practice. <em>Status: Complete; filed 2026-07.</em></li>
-  </ul>
-
-  <h3>Active explorations</h3>
-  <p style="margin-bottom: 12px;">Files in <code>brand/explorations/</code>:</p>
-  <ul style="margin: 8px 0 16px 20px; line-height: 1.8;">
-    <li><strong><a href="explorations/color-exploration.html">color-exploration.html</a></strong> — Six color candidate cards (Teal, Amber, Indigo, Monochrome, Slate, Amber+Slate combo) with palette swatches, gradient strips, and contextual mockups. Indigo candidate evolved into locked palette.</li>
-    <li><strong><a href="explorations/semantic-color-exploration.html">semantic-color-exploration.html</a></strong> — 8-shade semantic palette explorations with syntax highlighting mockups. Documents the evolution toward constraint-aware italic signaling.</li>
-    <li><strong><a href="explorations/typography-exploration.html">typography-exploration.html</a></strong> — Cascadia Cove wordmark treatments, weight scales, and small-caps rationale. Reference for typography conventions.</li>
-    <li><strong><a href="explorations/alternative-palette-exploration.html">alternative-palette-exploration.html</a></strong> — Archived candidate palettes. Reference only; superseded by locked system.</li>
-    <li><strong><a href="explorations/visual-language-exploration.html">visual-language-exploration.html</a></strong> — Hero example gallery, rubric scoring, and brand principle visualizations.</li>
-  </ul>
-
-  <div class="callout">
-    <strong>Note:</strong> Explorations files contain working drafts, candidate concepts, and archived decisions. They are preserved as reference material. Locked decisions (marked <span class="status-chip">LOCKED</span> in this spec) supersede any exploration content.
-  </div>
-</div>
-</div>
-
-</div>
-
-<div class="section-divider"></div>
-
-<!-- ===================================================================== -->
-<!-- FOOTER                                                                -->
-<!-- ===================================================================== -->
-
-
 </body>
 </html>

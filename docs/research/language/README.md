@@ -30,7 +30,7 @@ This folder now follows a strict split:
 | `#11` | Event argument absorb shorthand | `expressiveness/internal-verbosity-analysis.md`, `references/expression-compactness.md` |
 | `#12` | Inline guarded fallback (`else reject`) | `expressiveness/internal-verbosity-analysis.md`, `references/expression-compactness.md` |
 | `#13` | Field-level range/basic constraints | `expressiveness/zod-valibot.md`, `expressiveness/README.md`, `references/constraint-composition.md` |
-| `#14` | Conditional invariants (`when` on `invariant`) | `expressiveness/fluent-validation.md`, `references/constraint-composition.md` |
+| `#14` | Conditional invariants and edit eligibility (`when` guards on declarations) | `expressiveness/fluent-validation.md`, `references/constraint-composition.md`, `expressiveness/conditional-logic-strategy.md` |
 | `#15` | String `.contains()` membership test | `expressiveness/expression-language-audit.md`, `references/expression-evaluation.md` |
 | `#16` | Numeric built-in functions (`min`, `max`, `abs`, `round`) | `expressiveness/expression-language-audit.md`, `references/expression-evaluation.md` |
 | `#17` | Computed / derived fields | `expressiveness/expression-language-audit.md`, `references/expression-evaluation.md` |

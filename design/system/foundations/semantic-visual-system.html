@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Precept Semantic Visual System</title>
+<style>
+  :root {
+    --bg: #0c0c0f;
+    --panel: rgba(16, 18, 26, 0.9);
+    --panel-soft: rgba(20, 22, 31, 0.72);
+    --line: rgba(129, 140, 248, 0.18);
+    --line-strong: rgba(129, 140, 248, 0.38);
+    --text: #eef2ff;
+    --muted: #a9b1c4;
+    --soft: #737c90;
+    --structure: #6366f1;
+    --structure-deep: #4338ca;
+    --state: #a898f5;
+    --event: #30b8e8;
+    --data-name: #b0bec5;
+    --data-type: #9aa8b5;
+    --data-value: #84929f;
+    --gold: #fbbf24;
+    --emerald: #34d399;
+    --rose: #f87171;
+    --amber: #fde047;
+    --mono: "Cascadia Cove", "Cascadia Code", Consolas, monospace;
+    --sans: "Aptos", "Segoe UI", system-ui, sans-serif;
+    --shadow: 0 26px 90px rgba(0, 0, 0, 0.40);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    color: var(--text);
+    font-family: var(--sans);
+    background:
+      radial-gradient(circle at 10% 0%, rgba(99, 102, 241, 0.22), transparent 28%),
+      radial-gradient(circle at 92% 8%, rgba(48, 184, 232, 0.10), transparent 22%),
+      linear-gradient(180deg, #090a0f 0%, #0c0c0f 100%);
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.75), transparent 90%);
+  }
+
+  .page {
+    width: min(1260px, calc(100vw - 48px));
+    margin: 0 auto;
+    padding: 28px 0 72px;
+    position: relative;
+  }
+
+  .hero,
+  .surface-matrix,
+  .footer-boundary,
+  .panel {
+    backdrop-filter: blur(14px);
+  }
+
+  .hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: 28px;
+    border: 1px solid var(--line);
+    background:
+      linear-gradient(180deg, rgba(14, 15, 24, 0.96), rgba(10, 11, 18, 0.92));
+    box-shadow: var(--shadow);
+    padding: 26px;
+  }
+
+  .hero::after {
+    content: "";
+    position: absolute;
+    right: -120px;
+    top: -100px;
+    width: 380px;
+    height: 380px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.24), transparent 70%);
+    pointer-events: none;
+  }
+
+  .eyebrow,
+  .mini,
+  .surface-key,
+  .spec-label {
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .eyebrow {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .hero-copy h1,
+  .section-head h2,
+  .footer-boundary h2 {
+    margin: 0;
+    font-family: var(--mono);
+    letter-spacing: -0.03em;
+    line-height: 0.98;
+  }
+
+  .hero-copy h1 {
+    font-size: clamp(34px, 6vw, 72px);
+  }
+
+  .hero-copy p,
+  .section-head p,
+  .foundation-card p,
+  .reading-card p,
+  .surface-panel p,
+  .footer-boundary p,
+  .note-card p,
+  .overlay-card p,
+  .invariant-card p,
+  .primitive-card p,
+  .spec-card p {
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .hero-copy p {
+    max-width: 64ch;
+    font-size: 18px;
+    margin: 18px 0 0;
+  }
+
+  .hero-copy strong,
+  .section-head strong,
+  .foundation-card strong,
+  .reading-card strong,
+  .surface-panel strong,
+  .footer-boundary strong,
+  .note-card strong,
+  .overlay-card strong,
+  .invariant-card strong,
+  .primitive-card strong,
+  .spec-card strong {
+    color: #ffffff;
+  }
+
+  .primitive-card h3,
+  .overlay-card h3,
+  .invariant-card h3,
+  .surface-panel h3,
+  .foundation-card h3,
+  .reading-card h3,
+  .spec-card h3,
+  .note-card h3 {
+    margin: 0 0 8px;
+    font-family: var(--mono);
+    font-size: 15px;
+    color: #ffffff;
+  }
+
+  .rail-item p {
+    margin: 0;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  section {
+    margin-top: 34px;
+  }
+
+  .section-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+    gap: 18px;
+    align-items: end;
+    margin-bottom: 18px;
+  }
+
+  .section-head h2 {
+    font-size: clamp(28px, 4vw, 46px);
+  }
+
+  .panel {
+    border-radius: 24px;
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--panel), rgba(10, 11, 17, 0.92));
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .panel-inner {
+    padding: 26px;
+  }
+
+  .foundations {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .foundation-card,
+  .reading-card,
+  .primitive-card,
+  .overlay-card,
+  .invariant-card,
+  .surface-panel,
+  .spec-card,
+  .note-card {
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
+    padding: 18px;
+  }
+
+  .metric {
+    display: inline-flex;
+    margin-bottom: 10px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 11px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--muted);
+  }
+
+  .primitive-grid,
+  .overlay-grid,
+  .invariant-grid,
+  .spec-grid {
+    display: grid;
+    gap: 14px;
+  }
+
+  .primitive-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .primitive-diagram,
+  .overlay-visual,
+  .surface-visual,
+  .spec-visual {
+    margin-bottom: 14px;
+    min-height: 120px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    background:
+      linear-gradient(180deg, rgba(8, 9, 14, 0.96), rgba(10, 12, 19, 0.88));
+    padding: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .primitive-diagram svg,
+  .overlay-visual svg,
+  .surface-visual svg,
+  .spec-visual svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .overlay-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .surface-matrix {
+    border-radius: 24px;
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--panel), rgba(10, 11, 17, 0.92));
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .contract-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: 14px;
+  }
+
+  .contract-card {
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
+    padding: 18px;
+  }
+
+  .contract-card p,
+  .contract-card li,
+  .rule-list li,
+  .checklist-list li {
+    color: var(--muted);
+    line-height: 1.65;
+  }
+
+  .contract-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .rule-list,
+  .checklist-list {
+    margin: 14px 0 0;
+    padding-left: 18px;
+  }
+
+  .rule-list li + li,
+  .checklist-list li + li {
+    margin-top: 10px;
+  }
+
+  .surface-head {
+    display: grid;
+    grid-template-columns: minmax(200px, 240px) repeat(4, minmax(0, 1fr));
+    gap: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .surface-head div,
+  .surface-row > div {
+    padding: 16px;
+  }
+
+  .surface-head div {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+  }
+
+  .surface-row {
+    display: grid;
+    grid-template-columns: minmax(200px, 240px) repeat(4, minmax(0, 1fr));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .surface-row:last-child {
+    border-bottom: 0;
+  }
+
+  .surface-key {
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .surface-row h3 {
+    margin: 0 0 8px;
+    font-family: var(--mono);
+    font-size: 14px;
+  }
+
+  .surface-row p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .surface-chip {
+    display: inline-flex;
+    margin-top: 10px;
+    padding: 5px 8px;
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--soft);
+  }
+
+  .invariant-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .footer-boundary {
+    margin-top: 22px;
+    border-radius: 24px;
+    border: 1px solid rgba(48, 184, 232, 0.16);
+    background:
+      linear-gradient(180deg, rgba(12, 15, 22, 0.96), rgba(9, 10, 16, 0.9));
+    box-shadow: var(--shadow);
+    padding: 24px;
+  }
+
+  .footer-boundary h2 {
+    font-size: clamp(28px, 4vw, 44px);
+    margin-bottom: 14px;
+  }
+
+  .spec-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 18px;
+  }
+
+  .footnote {
+    margin-top: 18px;
+    text-align: center;
+    color: var(--soft);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  @media (max-width: 1150px) {
+    .hero-grid,
+    .section-head,
+    .contract-shell,
+    .contract-grid,
+    .foundations,
+    .reading-grid,
+    .primitive-grid,
+    .overlay-grid,
+    .invariant-grid,
+    .spec-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .surface-head,
+    .surface-row {
+      grid-template-columns: 1fr;
+    }
+
+    .surface-head div:first-child {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .surface-row > div {
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+    }
+  }
+
+  @media (max-width: 720px) {
+    .page {
+      width: min(100vw - 28px, 1260px);
+      padding: 16px 0 52px;
+    }
+
+    .hero,
+    .panel-inner,
+    .footer-boundary {
+      padding-left: 18px;
+      padding-right: 18px;
+    }
+
+    .eyebrow {
+      flex-direction: column;
+    }
+
+  }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero" id="top">
+      <div class="eyebrow">
+        <span>Precept / System Foundations / Shared Visual Grammar</span>
+        <span>Updated 2026-04-06</span>
+      </div>
+
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <div class="spec-label">Canonical system-side output</div>
+          <h1>Semantic Visual System</h1>
+          <p><strong>This document owns the reusable visual grammar that product surfaces inherit.</strong> It does not redefine brand meaning. It operationalizes it: which signals are carried by shape or typography, how overlays behave, and which invariants stay stable from syntax to diagram to preview.</p>
+        </div>
+      </div>
+    </header>
+
+    <section id="foundations">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Foundation rules</div>
+          <h2>One system, several carriers.</h2>
+        </div>
+        <p>The same meaning appears differently on different surfaces. The system cares about the meaning staying stable while the carrier adapts.</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-inner">
+          <div class="foundations">
+            <article class="foundation-card">
+              <span class="metric">Family stability</span>
+              <h3>Semantic lanes do not move.</h3>
+              <p>The inherited structure, state, event, data, and rule-language families remain fixed across surfaces. Local tonal variants are allowed; family reassignment is not.</p>
+            </article>
+            <article class="foundation-card">
+              <span class="metric">Carrier discipline</span>
+              <h3>Shape outranks tint for lifecycle.</h3>
+              <p>Origin, finality, and edge behavior should be expressed structurally before color is asked to do the work. This prevents diagram drift into rainbow state maps.</p>
+            </article>
+            <article class="foundation-card">
+              <span class="metric">Constraint pressure</span>
+              <h3>Typography is the second semantic channel.</h3>
+              <p>Italic communicates rule pressure for constrained states, constrained events, and invariant-guarded names. The system does not create a new color family for that pressure.</p>
+            </article>
+            <article class="foundation-card">
+              <span class="metric">Runtime separation</span>
+              <h3>Verdicts remain overlays.</h3>
+              <p>Emerald, rose, and amber only appear when the runtime is telling you what happened or what would happen. They are not authoring-time identities.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="primitives">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Primitives</div>
+          <h2>These are the reusable visual parts.</h2>
+        </div>
+        <p>Primitives are not components. They are the semantic pieces surfaces compose into their own layouts and workflows.</p>
+      </div>
+
+      <div class="primitive-grid">
+        <article class="primitive-card panel">
+          <div class="panel-inner">
+            <div class="primitive-diagram">
+              <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
+                <rect x="18" y="18" width="284" height="84" rx="18" stroke="#6366F1" stroke-width="3"/>
+                <line x1="46" y1="42" x2="164" y2="42" stroke="#4338CA" stroke-width="5" stroke-linecap="round"/>
+                <line x1="46" y1="66" x2="206" y2="66" stroke="#98A3FF" stroke-width="4" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>Structural frame</h3>
+            <p>The indigo frame defines context: code block, diagram cluster, overlay shell, or diagnostics group. It tells the user where the governed information starts and stops.</p>
+          </div>
+        </article>
+
+        <article class="primitive-card panel">
+          <div class="panel-inner">
+            <div class="primitive-diagram">
+              <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
+                <rect x="34" y="34" width="70" height="52" rx="16" stroke="#A898F5" stroke-width="3"/>
+                <rect x="216" y="34" width="70" height="52" rx="16" stroke="#30B8E8" stroke-width="3"/>
+                <line x1="104" y1="60" x2="216" y2="60" stroke="#6366F1" stroke-width="3" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>Actor pairing</h3>
+            <p>States and events stay visually distinct even when adjacent. The system should never make a user infer whether a label is a condition or an action from wording alone.</p>
+          </div>
+        </article>
+
+        <article class="primitive-card panel">
+          <div class="panel-inner">
+            <div class="primitive-diagram">
+              <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
+                <rect x="24" y="24" width="272" height="72" rx="18" stroke="#1E293B" stroke-width="2"/>
+                <line x1="52" y1="46" x2="128" y2="46" stroke="#B0BEC5" stroke-width="4" stroke-linecap="round"/>
+                <line x1="52" y1="70" x2="116" y2="70" stroke="#9AA8B5" stroke-width="4" stroke-linecap="round"/>
+                <line x1="182" y1="46" x2="246" y2="46" stroke="#84929F" stroke-width="4" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>Data stack</h3>
+            <p>Data can have tonal variation within the bright slate family, but it should still read as one factual lane. Names, types, and values may separate; the family does not.</p>
+          </div>
+        </article>
+
+        <article class="primitive-card panel">
+          <div class="panel-inner">
+            <div class="primitive-diagram">
+              <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
+                <rect x="26" y="34" width="268" height="52" rx="16" fill="rgba(251,191,36,0.08)" stroke="#FBBF24" stroke-opacity="0.35" stroke-width="2"/>
+                <line x1="54" y1="60" x2="264" y2="60" stroke="#FBBF24" stroke-width="4" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>Rule message interrupt</h3>
+            <p>Gold enters the interface as an explanation the human should notice. It is an interrupt, not a running style. If too much is gold, nothing reads as rule meaning anymore.</p>
+          </div>
+        </article>
+
+        <article class="primitive-card panel">
+          <div class="panel-inner">
+            <div class="primitive-diagram">
+              <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
+                <text x="40" y="70" fill="#A898F5" font-family="Cascadia Code, Consolas, monospace" font-size="36" font-style="italic">Active</text>
+              </svg>
+            </div>
+            <h3>Constraint pressure</h3>
+            <p>Italic is the shared pressure signal. It should look intentional, not accidental. Surfaces may apply it differently, but they should preserve the meaning: this thing is under rule attention.</p>
+          </div>
+        </article>
+
+        <article class="primitive-card panel">
+          <div class="panel-inner">
+            <div class="primitive-diagram">
+              <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
+                <rect x="34" y="26" width="68" height="68" rx="18" stroke="#A898F5" stroke-width="3"/>
+                <circle cx="68" cy="60" r="7" fill="#6366F1"/>
+                <rect x="216" y="26" width="68" height="68" rx="18" stroke="#A898F5" stroke-width="3"/>
+                <path d="M102 60H216" stroke="#34D399" stroke-width="4" stroke-linecap="round"/>
+                <path d="M204 48L216 60L204 72" stroke="#34D399" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <h3>Allowed flow</h3>
+            <p>Emerald flow appears when the interface is speaking about a runtime allowance or executable path. It should never be mistaken for general navigation chrome.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="overlays">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Overlay grammar</div>
+          <h2>Status appears as a layer, not a replacement.</h2>
+        </div>
+        <p>Overlays annotate existing semantic content. They should never erase the thing they are annotating.</p>
+      </div>
+
+      <div class="overlay-grid">
+        <article class="overlay-card panel">
+          <div class="panel-inner">
+            <div class="overlay-visual">
+              <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
+                <rect x="34" y="28" width="92" height="64" rx="18" stroke="#A898F5" stroke-width="3"/>
+                <rect x="194" y="28" width="92" height="64" rx="18" stroke="#A898F5" stroke-width="3"/>
+                <path d="M126 60H194" stroke="#34D399" stroke-width="4" stroke-linecap="round"/>
+                <path d="M182 48L194 60L182 72" stroke="#34D399" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <h3>Enabled overlay</h3>
+            <p>Emerald can tint an edge, row accent, badge, or prospective outcome label. The state and event identities beneath it remain violet and cyan.</p>
+          </div>
+        </article>
+
+        <article class="overlay-card panel">
+          <div class="panel-inner">
+            <div class="overlay-visual">
+              <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
+                <rect x="34" y="28" width="92" height="64" rx="18" stroke="#A898F5" stroke-width="3"/>
+                <rect x="194" y="28" width="92" height="64" rx="18" stroke="#A898F5" stroke-width="3"/>
+                <path d="M126 60H194" stroke="#F87171" stroke-width="4" stroke-linecap="round" stroke-dasharray="8 8"/>
+                <line x1="150" y1="34" x2="170" y2="86" stroke="#F87171" stroke-width="4"/>
+              </svg>
+            </div>
+            <h3>Blocked overlay</h3>
+            <p>Rose means the path or action is structurally denied in the current runtime context. Use enough geometry or iconography that the blocked state is not color-only.</p>
+          </div>
+        </article>
+
+        <article class="overlay-card panel">
+          <div class="panel-inner">
+            <div class="overlay-visual">
+              <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
+                <rect x="26" y="34" width="268" height="52" rx="16" fill="rgba(253,224,71,0.10)" stroke="#FDE047" stroke-opacity="0.35" stroke-width="2"/>
+                <circle cx="58" cy="60" r="8" fill="#FDE047"/>
+                <line x1="84" y1="60" x2="244" y2="60" stroke="#FDE047" stroke-width="4" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>Warning overlay</h3>
+            <p>Amber marks unmatched, cautionary, or attention-worthy runtime output. It should read as a diagnostic pause, not as semantic content from the DSL itself.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="surface-matrix">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Surface translation</div>
+          <h2>Same meaning, different carrier.</h2>
+        </div>
+        <p>The matrix below is the current application guidance for major Precept surfaces. It shows how the semantic system translates across those surfaces without changing what the user is being told.</p>
+      </div>
+
+      <div class="surface-matrix">
+        <div class="surface-head">
+          <div>Surface</div>
+          <div>Structure</div>
+          <div>Actors</div>
+          <div>Data and rules</div>
+          <div>Verdicts</div>
+        </div>
+
+        <div class="surface-row">
+          <div>
+            <span class="surface-key">Syntax editor</span>
+            <h3>Authoring-time code surface</h3>
+            <p>The most literal semantic carrier. Everything starts here.</p>
+          </div>
+          <div>
+            <p>Indigo declarations, connectors, and operators establish executable grammar.</p>
+            <span class="surface-chip">Text + weight</span>
+          </div>
+          <div>
+            <p>States stay violet, events stay cyan, and italic adds constraint pressure where needed.</p>
+            <span class="surface-chip">Hue + italic</span>
+          </div>
+          <div>
+            <p>Bright slate handles names, types, and values. Gold is reserved for because and reject messages.</p>
+            <span class="surface-chip">Tone + interruption</span>
+          </div>
+          <div>
+            <p>None. Verdict colors are withheld from authoring-time syntax.</p>
+            <span class="surface-chip">No runtime overlay</span>
+          </div>
+        </div>
+
+        <div class="surface-row">
+          <div>
+            <span class="surface-key">State diagram</span>
+            <h3>Topology and path surface</h3>
+            <p>The graph should show structure before outcomes.</p>
+          </div>
+          <div>
+            <p>Indigo frames, rails, and neutral graph scaffolding stabilize the canvas.</p>
+            <span class="surface-chip">Frame + edge</span>
+          </div>
+          <div>
+            <p>Violet state labels and cyan event labels persist. Initial and final state are primarily shape distinctions.</p>
+            <span class="surface-chip">Shape + label</span>
+          </div>
+          <div>
+            <p>Data is secondary here. Gold should appear only in explicit explanatory callouts, not routine node decoration.</p>
+            <span class="surface-chip">Sparse annotation</span>
+          </div>
+          <div>
+            <p>Verdicts may tint edges, halos, badges, or path emphasis, but they sit on top of the underlying graph semantics.</p>
+            <span class="surface-chip">Overlay layer</span>
+          </div>
+        </div>
+
+        <div class="surface-row">
+          <div>
+            <span class="surface-key">Preview / inspector</span>
+            <h3>Runtime decision surface</h3>
+            <p>The user needs current condition, legal actions, and factual payload in one view.</p>
+          </div>
+          <div>
+            <p>Indigo defines the shell, section boundaries, and decision frame. The current state should be explicit, not implied by color alone.</p>
+            <span class="surface-chip">Shell + hierarchy</span>
+          </div>
+          <div>
+            <p>Violet still identifies state context and cyan still identifies event rows. They should not collapse into generic list styling.</p>
+            <span class="surface-chip">List identity</span>
+          </div>
+          <div>
+            <p>Bright slate organizes field names, types, and values. Gold surfaces rule banners, row explanations, and causal messages.</p>
+            <span class="surface-chip">Lane + banner</span>
+          </div>
+          <div>
+            <p>Enabled, blocked, and warning verdicts annotate rows, banners, and transition previews with non-color redundancy.</p>
+            <span class="surface-chip">Badge + message</span>
+          </div>
+        </div>
+
+        <div class="surface-row">
+          <div>
+            <span class="surface-key">Diagnostics and docs</span>
+            <h3>Explanatory surfaces</h3>
+            <p>These surfaces turn semantic structure into prose and evidence.</p>
+          </div>
+          <div>
+            <p>Indigo still frames scope and references the language's formal skeleton.</p>
+            <span class="surface-chip">Editorial frame</span>
+          </div>
+          <div>
+            <p>States and events can appear as inline chips, code tokens, or diagram legends while preserving family identity.</p>
+            <span class="surface-chip">Inline tokens</span>
+          </div>
+          <div>
+            <p>Bright slate handles factual examples. Gold should remain purposeful, usually for quoted rules or explanatory payloads.</p>
+            <span class="surface-chip">Quoted rule language</span>
+          </div>
+          <div>
+            <p>Verdicts only appear when describing or showing runtime outcomes, not as general note styling.</p>
+            <span class="surface-chip">Outcome evidence</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="invariants">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Minimum required rules</div>
+          <h2>These rules are mandatory on every current and future surface.</h2>
+        </div>
+        <p>These are compliance requirements, not optional style notes. A surface is incomplete until these minimum rules are true.</p>
+      </div>
+
+      <div class="invariant-grid">
+        <article class="invariant-card panel">
+          <div class="panel-inner">
+            <h3>Preserve semantic identity</h3>
+            <p>A surface may mute or intensify a family locally, but it may not swap actor families, demote rule language into generic chrome, or treat verdict colors as authoring identity.</p>
+          </div>
+        </article>
+
+        <article class="invariant-card panel">
+          <div class="panel-inner">
+            <h3>Never ship color-only verdicts</h3>
+            <p>Allowed, blocked, and warning states must use at least one non-hue carrier such as iconography, line pattern, label text, badge shape, or row position. Blocked must remain legible without hue perception.</p>
+          </div>
+        </article>
+
+        <article class="invariant-card panel">
+          <div class="panel-inner">
+            <h3>Make current condition explicit</h3>
+            <p>The current state, event availability, and runtime outcome must be named in text somewhere on the surface. Users should not need to infer the active condition from framing or tint alone.</p>
+          </div>
+        </article>
+
+        <article class="invariant-card panel">
+          <div class="panel-inner">
+            <h3>Surface the reason when the runtime knows it</h3>
+            <p>If the system knows why an action is blocked, unmatched, or exceptional, the surface must expose that cause as readable copy. Gold remains the preferred explanatory carrier when rule language is shown.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="application-notes">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Inheritance checklist</div>
+          <h2>Future surface work should start from this checklist.</h2>
+        </div>
+        <p>This is the concise compliance split for future surface work: what must stay stable, what may adapt, and what each surface must still define locally.</p>
+      </div>
+
+      <div class="spec-grid">
+        <article class="spec-card panel">
+          <div class="panel-inner">
+            <div class="spec-visual">
+              <svg viewBox="0 0 320 140" fill="none" aria-hidden="true">
+                <rect x="18" y="20" width="284" height="100" rx="20" stroke="#6366F1" stroke-width="3"/>
+                <line x1="42" y1="48" x2="130" y2="48" stroke="#4338CA" stroke-width="4" stroke-linecap="round"/>
+                <line x1="42" y1="72" x2="150" y2="72" stroke="#A898F5" stroke-width="4" stroke-linecap="round"/>
+                <line x1="42" y1="96" x2="186" y2="96" stroke="#30B8E8" stroke-width="4" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>Must preserve</h3>
+            <ul class="checklist-list">
+              <li>Semantic family identity for structure, state, event, data, rule language, and runtime verdict overlays.</li>
+              <li>Minimum redundancy rules for blocked, warning, and allowed runtime states.</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="spec-card panel">
+          <div class="panel-inner">
+            <div class="spec-visual">
+              <svg viewBox="0 0 320 140" fill="none" aria-hidden="true">
+                <rect x="26" y="28" width="268" height="84" rx="18" fill="rgba(255,255,255,0.02)" stroke="#1F2937" stroke-width="2"/>
+                <rect x="46" y="48" width="92" height="44" rx="12" stroke="#A898F5" stroke-width="3"/>
+                <rect x="182" y="48" width="92" height="44" rx="12" stroke="#30B8E8" stroke-width="3"/>
+              </svg>
+            </div>
+            <h3>May adapt</h3>
+            <ul class="checklist-list">
+              <li>Carrier medium: shape, weight, chip form, row styling, overlay badge, legend, or pattern.</li>
+              <li>Layout, density, motion, and information grouping for the local workflow.</li>
+              <li>Local tonal tuning within a semantic family when contrast and recognition stay intact.</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="spec-card panel">
+          <div class="panel-inner">
+            <div class="spec-visual">
+              <svg viewBox="0 0 320 140" fill="none" aria-hidden="true">
+                <rect x="26" y="34" width="268" height="72" rx="18" fill="rgba(251,191,36,0.08)" stroke="#FBBF24" stroke-opacity="0.35" stroke-width="2"/>
+                <line x1="54" y1="70" x2="266" y2="70" stroke="#FBBF24" stroke-width="4" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>Must define locally</h3>
+            <ul class="checklist-list">
+              <li>Exact layout, interaction model, and density rules for that surface.</li>
+              <li>Focus, selection, hover, and keyboard behavior that do not collide with semantic cues.</li>
+              <li>Any surface-specific affordances, motion, or help text needed to make the inherited contract usable in context.</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="boundary-note">
+      <div class="footer-boundary">
+        <div class="eyebrow">Boundary note</div>
+        <h2>The system operationalizes brand meaning. It does not renegotiate it.</h2>
+        <p><strong>Use the brand spec when the question is identity, category, semantic meaning, mark logic, or typography intent.</strong> Use this document when the question is how inherited meaning shows up consistently across product surfaces and current surface applications.</p>
+
+        <div class="spec-grid">
+          <article class="note-card">
+            <h3>Belongs in brand</h3>
+            <p>Any change to inherited semantic family meaning, identity rationale, mark logic, tone of voice, or typography intent.</p>
+          </article>
+          <article class="note-card">
+            <h3>Belongs here</h3>
+            <p>Carrier rules, overlay behavior, current surface translation guidance, and the compliance rules future surface work must preserve.</p>
+          </article>
+          <article class="note-card">
+            <h3>Belongs in a surface spec</h3>
+            <p>Exact inspector layout, event-row density, diagram interaction states, keyboard models, motion timing, or other behavior unique to a single surface once the split is needed again.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <p class="footnote">System authority for carriers and current surface translation lives here. Brand meaning lives in design/brand/brand-spec.html.</p>
+  </div>
+</body>
+</html>
