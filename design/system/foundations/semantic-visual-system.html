@@ -146,12 +146,13 @@
   .primitive-card p,
   .spec-card p {
     color: var(--muted);
-    line-height: 1.7;
+      font-size: 15px;
+      line-height: 1.62;
   }
 
   .hero-copy p {
     max-width: 64ch;
-    font-size: 18px;
+      font-size: 17px;
     margin: 18px 0 0;
   }
 
@@ -202,7 +203,11 @@
   }
 
   .section-head h2 {
-    font-size: clamp(28px, 4vw, 46px);
+    font-size: clamp(24px, 3vw, 34px);
+  }
+
+  .section-head p {
+    max-width: 34ch;
   }
 
   .panel {
@@ -214,7 +219,7 @@
   }
 
   .panel-inner {
-    padding: 26px;
+    padding: 22px;
   }
 
   .foundations {
@@ -234,7 +239,7 @@
     border-radius: 18px;
     border: 1px solid rgba(255, 255, 255, 0.06);
     background: rgba(255, 255, 255, 0.03);
-    padding: 18px;
+    padding: 16px;
   }
 
   .metric {
@@ -314,7 +319,8 @@
   .rule-list li,
   .checklist-list li {
     color: var(--muted);
-    line-height: 1.65;
+    font-size: 14px;
+    line-height: 1.58;
   }
 
   .contract-grid {
@@ -410,7 +416,7 @@
   }
 
   .footer-boundary h2 {
-    font-size: clamp(28px, 4vw, 44px);
+    font-size: clamp(24px, 3vw, 32px);
     margin-bottom: 14px;
   }
 
@@ -487,7 +493,7 @@
         <div class="hero-copy">
           <div class="spec-label">Canonical system-side output</div>
           <h1>Semantic Visual System</h1>
-          <p><strong>This document owns the reusable visual grammar that product surfaces inherit.</strong> It does not redefine brand meaning. It operationalizes it: which signals are carried by shape or typography, how overlays behave, and which invariants stay stable from syntax to diagram to preview.</p>
+            <p><strong>The semantic visual system defines how Precept means things on screen.</strong> It gives states, events, data, overlays, and runtime feedback a consistent visual language so the same signal reads the same way across operational surfaces like authoring, diagrams, and preview, and across explanatory surfaces like docs, README examples, and the public website. The result is faster recognition, lower cognitive load, a cleaner distinction between operational behavior and editorial explanation, and a more beautiful, more unmistakably Precept presence across every surface. People should be able to move across contexts without relearning the signal set while still feeling the product's brand confidence and craft.</p>
         </div>
       </div>
     </header>
@@ -498,7 +504,7 @@
           <div class="eyebrow">Foundation rules</div>
           <h2>One system, several carriers.</h2>
         </div>
-        <p>The same meaning appears differently on different surfaces. The system cares about the meaning staying stable while the carrier adapts.</p>
+        <p>A surface is the user-facing context; a carrier is the visual form that meaning takes inside it. The system keeps meaning stable across operational and editorial surfaces while allowing each carrier to adapt appropriately.</p>
       </div>
 
       <div class="panel">
@@ -687,7 +693,7 @@
           <div class="eyebrow">Surface translation</div>
           <h2>Same meaning, different carrier.</h2>
         </div>
-        <p>The matrix below is the current application guidance for major Precept surfaces. It shows how the semantic system translates across those surfaces without changing what the user is being told.</p>
+        <p>The matrix below is the current application guidance for major Precept surfaces, including operational product surfaces and explanatory editorial ones. It shows which carrier each surface uses to express the same semantic system without changing what the user is being told.</p>
       </div>
 
       <div class="surface-matrix">
@@ -773,9 +779,9 @@
 
         <div class="surface-row">
           <div>
-            <span class="surface-key">Diagnostics and docs</span>
+            <span class="surface-key">Docs, README, website, diagnostics</span>
             <h3>Explanatory surfaces</h3>
-            <p>These surfaces turn semantic structure into prose and evidence.</p>
+            <p>These surfaces turn semantic structure into prose, examples, and evidence for public and internal readers.</p>
           </div>
           <div>
             <p>Indigo still frames scope and references the language's formal skeleton.</p>
