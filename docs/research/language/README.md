@@ -25,16 +25,18 @@ This folder now follows a strict split:
 | Issue | Focus | Research starting points |
 |---|---|---|
 | `#8` | Named rule declarations | `expressiveness/xstate.md`, `expressiveness/polly.md`, `expressiveness/fluent-validation.md`, `expressiveness/expression-language-audit.md` |
-| `#9` | Ternary expressions in `set` mutations | `expressiveness/linq.md`, `expressiveness/polly.md`, `expressiveness/expression-language-audit.md` |
+| `#9` | Conditional expressions (`if...then...else`) | `expressiveness/conditional-logic-strategy.md`, `references/conditional-invariant-survey.md`, `expressiveness/linq.md`, `expressiveness/expression-language-audit.md` |
 | `#10` | String `.length` accessor | `expressiveness/zod-valibot.md`, `expressiveness/fluent-validation.md`, `expressiveness/expression-language-audit.md`, `references/expression-evaluation.md` |
 | `#11` | Event argument absorb shorthand | `expressiveness/internal-verbosity-analysis.md`, `references/expression-compactness.md` |
-| `#12` | Inline guarded fallback (`else reject`) | `expressiveness/internal-verbosity-analysis.md`, `references/expression-compactness.md` |
+| `#12` | Inline guarded fallback (`else reject`) — **closed** | `expressiveness/conditional-logic-strategy.md`, `expressiveness/internal-verbosity-analysis.md`, `references/expression-compactness.md` |
 | `#13` | Field-level range/basic constraints | `expressiveness/zod-valibot.md`, `expressiveness/README.md`, `references/constraint-composition.md` |
-| `#14` | Conditional invariants (`when` on `invariant`) | `expressiveness/fluent-validation.md`, `references/constraint-composition.md` |
+| `#14` | Conditional invariants (`when`/`unless` guards + `not` keyword) | `expressiveness/conditional-logic-strategy.md`, `references/conditional-invariant-survey.md`, `expressiveness/fluent-validation.md`, `references/constraint-composition.md` |
 | `#15` | String `.contains()` membership test | `expressiveness/expression-language-audit.md`, `references/expression-evaluation.md` |
 | `#16` | Numeric built-in functions (`min`, `max`, `abs`, `round`) | `expressiveness/expression-language-audit.md`, `references/expression-evaluation.md` |
 | `#17` | Computed / derived fields | `expressiveness/expression-language-audit.md`, `references/expression-evaluation.md` |
 | `#18` | Conditional outcome in `->` chain (rejected) | `expressiveness/linq.md`, `expressiveness/expression-language-audit.md` |
+| `#25` | Type system expansion (choice and date types) | `references/type-system-survey.md`, `expressiveness/expression-language-audit.md` |
+| `#31` | Replace `!` with `not` keyword for logical negation | `expressiveness/conditional-logic-strategy.md`, `references/conditional-invariant-survey.md` |
 
 ## Rule of engagement
 

@@ -76,10 +76,20 @@ When making any code, interface, test, or behavior change, keep documentation in
 ### Source of Truth
 
 - `README.md` — public project narrative and usage guide. Must track real implementation: update API names, behavioral semantics, examples, and feature claims on every meaningful change. Never leave aspirational claims as if implemented.
-- `docs/` — canonical design decision records.
+- `docs/` — canonical technical design decision records, architecture notes, implementation plans, and research.
+- `design/brand/` — canonical source for brand identity, philosophy, brand spec, and brand-level semantic meaning.
+- `design/system/` — canonical source for reusable product-facing visual-system guidance and surface specs.
 - Legacy files (`README-legacy.md`, `docs/DesignNotes-legacy.md`) — archived, do not update.
 
 Keep updates focused and factual. If uncertain whether a claim is implemented, verify from code/tests first.
+
+### Design Asset Boundaries
+
+- Use `design/brand/` for identity and brand meaning.
+- Use `design/system/` for reusable visual-system rules and surface specs.
+- Use `docs/` for explanatory and technical documentation.
+- Durable design prototypes belong in `design/prototypes/`.
+- Hot, code-near prototypes may temporarily live near their owning tool surface, but should be promoted into `design/prototypes/` once they become durable design references.
 
 ## Syntax Highlighting Grammar Sync (Non-Negotiable)
 
@@ -148,6 +158,17 @@ The MCP server tools in `tools/Precept.Mcp/Tools/` are thin wrappers around core
 ## DSL Authoring (Non-Negotiable)
 
 Before writing or editing any `.precept` file or any DSL snippet, read at least one representative sample file from `samples/` to confirm current syntax conventions. Do not rely on memory or inference — read first, then write.
+
+## Proposal Philosophy Capture (Non-Negotiable)
+
+Language proposals (GitHub issues) must include the design philosophy and rationale — not just the syntax and acceptance criteria. When a proposal is revised or a new feature is decided through design discussion:
+
+1. **Capture the reasoning in `docs/research/`** — research evidence, precedent surveys, dead ends explored, and why alternatives were rejected. This is the durable record that explains *why*.
+2. **Reference research from the proposal issue** — the issue body should link to the research file(s) that ground its decisions.
+3. **Update the issue map** in `docs/research/language/README.md` — connect each proposal to its research starting points.
+4. **Design doc updates happen at implementation time** — `docs/PreceptLanguageDesign.md` tracks what EXISTS in the runtime. Proposals describe what's PLANNED. The design doc is updated in the same PR that implements the feature, not before.
+
+This ensures philosophy and rationale survive across sessions and make their way back into the design doc when features ship.
 
 ## Design Option Responses
 
