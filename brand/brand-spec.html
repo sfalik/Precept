@@ -1181,7 +1181,7 @@
   </div>
 
   <h3>Runtime verdict overlay</h3>
-  <p style="margin-bottom:12px;">When paired with an active inspector instance, the diagram shows runtime status using verdict colors. These overlay the structural colors for edges originating from the current state. Verdict colors are defined in Brand Identity § 1.4. For inspector-panel verdict usage, see § 2.3.</p>
+  <p style="margin-bottom:12px;">When paired with an active inspector instance, the diagram shows runtime status using verdict colors. These overlay the structural colors for edges originating from the current state. Verdict colors are defined in Brand Identity § 1.4. For inspector-panel verdict usage, see § 2.5.</p>
 
   <!-- Runtime verdict — sf-palette family treatment -->
   <div class="sf-palette">
@@ -1302,9 +1302,400 @@
 
 <div class="section-divider"></div>
 
-<!-- 2.3 Inspector Panel -->
+<!-- 2.3 Timeline -->
 <div class="section">
-<h2>2.3 Inspector Panel <span class="status-chip">LOCKED</span></h2>
+<h2>2.3 Timeline <span class="status-chip" style="background:#1e3a5f; color:#60a5fa;">DRAFT</span></h2>
+
+<div class="card">
+  <h3>Purpose</h3>
+  <p>Horizontal event timeline in the VS Code preview panel. Reads left-to-right as a chronological record: origin → past events → current state → available future events → reachable target states. The timeline is the primary narrative surface — it tells the story of how an instance arrived at its current state and what can happen next.</p>
+
+  <h3>Layout model</h3>
+  <p style="margin-bottom:8px;">A single horizontal scrolling track. Cards are connected by thin gradient connectors. The track auto-scrolls rightward as events fire so the present state and future options are always visible. Vertical stacking is used only within the future zone (multiple event cards and target state cards can stack).</p>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li><strong>Flow direction:</strong> Left → right. Past compresses, present anchors, future expands.</li>
+    <li><strong>Connectors:</strong> 2px horizontal gradient lines between cards. Color shifts from neutral → violet (past-to-present) → cyan (present-to-future) to signal temporal zone change.</li>
+    <li><strong>Card height:</strong> Uniform <code>--tl-card-height</code> (80px default) across all card types. This locks vertical alignment and keeps connectors straight.</li>
+    <li><strong>Typography baseline:</strong> All card titles use 11px / font-weight 600 / line-height 1. Left-aligned within the card. This is non-negotiable — title inconsistency breaks the horizontal rhythm.</li>
+    <li><strong>Density rule:</strong> Timeline cards are compact by default. Prefer one-line titles, one short tag row, one primary effect line, and at most one supporting line before inputs.</li>
+  </ul>
+
+  <h3>Card taxonomy</h3>
+  <p style="margin-bottom:12px;">Six card types arranged across three temporal zones. Shape, border, and color encode both zone and structural role.</p>
+  <div class="callout" style="margin-bottom:16px;">
+    <strong>Card grammar:</strong>
+    <p style="margin:8px 0 0; line-height:1.7;">Every timeline card uses the same internal anatomy in the same order: <strong>header row</strong>, <strong>tag row</strong>, <strong>body row</strong>, and an <strong>optional footer row</strong>. Titles always start at the same left edge. Tags always live on their own row. The compact default is one title line, one tag row, one effect line, and one optional supporting line.</p>
+  </div>
+
+  <!-- Canonical card specimens -->
+  <div class="spm-shapes" style="grid-template-columns: repeat(2, minmax(0, 1fr)); gap:16px;">
+    <!-- Origin -->
+    <div class="spm-shape-tile" style="text-align:left; padding:16px;">
+      <div style="min-height:92px; border-radius:10px; border:2px solid rgba(67,56,202,0.50); background:#0f0f12; padding:10px; display:flex; flex-direction:column; gap:6px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; min-height:16px; gap:8px;">
+          <div style="display:flex; align-items:center; gap:6px;"><span style="color:#4338CA; font-size:12px; font-weight:700; line-height:1;">●</span><span style="color:#A898F5; font-size:11px; font-weight:600; line-height:1;">Draft</span></div>
+          <span style="visibility:hidden; font-size:8px; padding:2px 8px;">&nbsp;</span>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:4px; min-height:14px; align-items:flex-start;">
+          <span style="border:1px solid rgba(168,152,245,0.35); background:rgba(168,152,245,0.08); color:#A898F5; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">origin</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:3px; min-height:24px; justify-content:flex-start;">
+          <div style="color:#71717a; font-size:8px; line-height:1.3;">Entry point for this instance.</div>
+        </div>
+      </div>
+      <div class="spm-shape-name" style="color:#A898F5; margin-top:10px; text-align:center;">Origin</div>
+      <div class="spm-shape-meta" style="text-align:center;">Past zone · entry point</div>
+      <div class="spm-shape-desc" style="text-align:center;">Header, tag row, two-line body</div>
+    </div>
+    <!-- Past Event -->
+    <div class="spm-shape-tile" style="text-align:left; padding:16px;">
+      <div style="min-height:92px; border-radius:10px; border:1px solid rgba(39,39,42,0.5); background:#0f0f12; padding:10px; display:flex; flex-direction:column; gap:6px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; min-height:16px; gap:8px;">
+          <div style="display:flex; align-items:center; gap:6px;"><span style="color:#30B8E8; font-size:12px; font-weight:700; line-height:1;">▸</span><span style="color:#30B8E8; font-size:11px; font-weight:600; line-height:1;">Submit</span></div>
+          <span style="visibility:hidden; font-size:8px; padding:2px 8px;">&nbsp;</span>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:4px; min-height:14px; align-items:flex-start;">
+          <span style="border:1px solid rgba(113,113,122,0.20); background:rgba(113,113,122,0.08); color:#a1a1aa; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">step 3</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:3px; min-height:24px; justify-content:flex-start;">
+          <div style="color:#34D399; font-size:10px; line-height:1.25;">→ <span style="color:#A898F5; font-weight:600;">Open</span></div>
+          <div style="color:#71717a; font-size:8px; line-height:1.3;"><span style="color:#B0BEC5;">RequesterName</span> = <span style="color:#34D399;">&quot;Mina&quot;</span></div>
+        </div>
+      </div>
+      <div class="spm-shape-name" style="color:#30B8E8; margin-top:10px; text-align:center;">Past Event</div>
+      <div class="spm-shape-meta" style="text-align:center;">Past zone · completed event</div>
+      <div class="spm-shape-desc" style="text-align:center;">Same skeleton, event coloring</div>
+    </div>
+    <!-- Past Edit -->
+    <div class="spm-shape-tile" style="text-align:left; padding:16px;">
+      <div style="min-height:92px; border-radius:10px; border:1px solid rgba(176,190,197,0.25); background:#0f0f12; padding:10px; display:flex; flex-direction:column; gap:6px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; min-height:16px; gap:8px;">
+          <div style="display:flex; align-items:center; gap:6px;"><span style="color:#B0BEC5; font-size:12px; font-weight:700; line-height:1;">✎</span><span style="color:#B0BEC5; font-size:11px; font-weight:600; line-height:1;">edit Location</span></div>
+          <span style="visibility:hidden; font-size:8px; padding:2px 8px;">&nbsp;</span>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:4px; min-height:14px; align-items:flex-start;">
+          <span style="border:1px solid rgba(113,113,122,0.20); background:rgba(113,113,122,0.08); color:#a1a1aa; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">step 4</span>
+          <span style="border:1px solid rgba(176,190,197,0.18); background:rgba(176,190,197,0.08); color:#B0BEC5; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">data</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:3px; min-height:24px; justify-content:flex-start;">
+          <div style="color:#34D399; font-size:10px; line-height:1.25;">↻ <span style="color:#A898F5; font-weight:600;">Open</span></div>
+          <div style="color:#71717a; font-size:8px; line-height:1.3;"><span style="color:#B0BEC5;">Location</span> = <span style="color:#34D399;">&quot;South Hall&quot;</span></div>
+        </div>
+      </div>
+      <div class="spm-shape-name" style="color:#B0BEC5; margin-top:10px; text-align:center;">Past Edit</div>
+      <div class="spm-shape-meta" style="text-align:center;">Past zone · data mutation</div>
+      <div class="spm-shape-desc" style="text-align:center;">Same skeleton, edit coloring</div>
+    </div>
+    <!-- Present State -->
+    <div class="spm-shape-tile" style="text-align:left; padding:16px;">
+      <div style="min-height:92px; border-radius:12px; border:1.5px solid rgba(168,152,245,0.40); background:#0f0f12; box-shadow:0 0 20px rgba(168,152,245,0.08); padding:10px; display:flex; flex-direction:column; gap:6px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; min-height:16px; gap:8px;">
+          <div style="display:flex; align-items:center; gap:6px;"><span style="color:#A898F5; font-size:12px; font-weight:700; line-height:1;">◎</span><span style="color:#A898F5; font-size:11px; font-weight:600; line-height:1;">Open</span></div>
+          <span style="visibility:hidden; font-size:8px; padding:2px 8px;">&nbsp;</span>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:4px; min-height:14px; align-items:flex-start;">
+          <span style="border:1px solid rgba(168,152,245,0.35); background:rgba(168,152,245,0.08); color:#A898F5; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">current</span>
+          <span style="border:1px solid rgba(113,113,122,0.20); background:rgba(113,113,122,0.08); color:#a1a1aa; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">step 4</span>
+          <span style="border:1px solid rgba(99,102,241,0.25); background:rgba(99,102,241,0.08); color:#6366F1; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">editable</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:3px; min-height:24px; justify-content:flex-start;">
+          <div style="color:#71717a; font-size:8px; line-height:1.3;">Submitted and awaiting assignment.</div>
+        </div>
+      </div>
+      <div class="spm-shape-name" style="color:#A898F5; margin-top:10px; text-align:center;">Present State</div>
+      <div class="spm-shape-meta" style="text-align:center;">Present zone · "you are here"</div>
+      <div class="spm-shape-desc" style="text-align:center;">Shared skeleton, state emphasis</div>
+    </div>
+    <!-- Future Event -->
+    <div class="spm-shape-tile" style="text-align:left; padding:16px;">
+      <div style="min-height:92px; border-radius:14px; border:1px solid rgba(48,184,232,0.20); background:#0f0f12; padding:10px; display:flex; flex-direction:column; gap:6px;">
+        <div style="display:flex; align-items:center; justify-content:flex-start; min-height:16px; gap:8px;">
+          <span style="display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(48,184,232,0.35); color:#30B8E8; border-radius:5px; font-size:10px; font-weight:600; padding:3px 9px;"><span style="font-size:11px; font-weight:700; line-height:1;">▸</span><span>Assign</span></span>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:4px; min-height:14px; align-items:flex-start;">
+          <span style="border:1px solid rgba(52,211,153,0.20); background:rgba(52,211,153,0.08); color:#34D399; border-radius:3px; font-size:7px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:1px 5px;">enabled</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:3px; min-height:24px; justify-content:flex-start;">
+          <div style="color:#71717a; font-size:8px; line-height:1.3;">to <span style="color:#A898F5; font-weight:600;">Scheduled</span></div>
+          <div style="color:#9096A6; font-size:8px; line-height:1.3;">Requires AssignedTechnician</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:4px; min-height:18px;"><span style="color:#9096A6; font-size:7px; text-transform:uppercase; letter-spacing:0.4px;">tech</span><span style="background:rgba(12,12,15,0.7); border:1px solid rgba(99,102,241,0.25); color:#e5e5e5; border-radius:3px; font-size:9px; padding:2px 6px;">avery</span></div>
+      </div>
+      <div class="spm-shape-name" style="color:#30B8E8; margin-top:10px; text-align:center;">Future Event</div>
+      <div class="spm-shape-meta" style="text-align:center;">Future zone · fireable action</div>
+      <div class="spm-shape-desc" style="text-align:center;">CTA-first button, tags, effect, args</div>
+    </div>
+    <!-- Future State -->
+    <div class="spm-shape-tile" style="text-align:left; padding:16px;">
+      <div style="min-height:92px; border-radius:10px; border:1.5px solid rgba(67,56,202,0.30); background:#0f0f12; padding:10px; display:flex; flex-direction:column; gap:6px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; min-height:16px; gap:8px;">
+          <div style="display:flex; align-items:center; gap:6px;"><span style="color:#A898F5; font-size:12px; font-weight:700; line-height:1;">□</span><span style="color:#A898F5; font-size:11px; font-weight:600; line-height:1;">Scheduled</span></div>
+          <span style="visibility:hidden; font-size:8px; padding:2px 8px;">&nbsp;</span>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:4px; min-height:14px; align-items:flex-start;">
+          <span style="visibility:hidden; border-radius:3px; font-size:7px; padding:1px 5px;">&nbsp;</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:3px; min-height:24px; justify-content:flex-start;">
+          <div style="color:#71717a; font-size:8px; line-height:1.3;">Technician assigned.</div>
+          <div style="color:#52525b; font-size:8px; line-height:1.3;">via <span style="color:#30B8E8;">Assign</span></div>
+        </div>
+      </div>
+      <div class="spm-shape-name" style="color:#A898F5; margin-top:10px; text-align:center;">Future State</div>
+      <div class="spm-shape-meta" style="text-align:center;">Future zone · reachable target</div>
+      <div class="spm-shape-desc" style="text-align:center;">Same skeleton, quieter state body</div>
+    </div>
+  </div>
+
+  <h3>Card details</h3>
+
+  <p style="margin-bottom:12px;">The table below describes each card as a variant of the same grammar. Differences are limited to shell treatment, tag set, and whether the card needs a footer row.</p>
+
+  <table>
+    <tr><th>Card</th><th>Zone</th><th>Shell</th><th>Header row</th><th>Tag row</th><th>Body / footer</th></tr>
+    <tr>
+      <td>Origin</td>
+      <td>Past</td>
+      <td>Rounded rect, 10px radius, 2px indigo border</td>
+      <td>Icon + title: <code>● Draft</code>. No right-side control.</td>
+      <td><code>origin</code> only.</td>
+      <td>One short descriptor. No footer.</td>
+    </tr>
+    <tr>
+      <td>Past Event</td>
+      <td>Past</td>
+      <td>Rounded rect, 10px radius, neutral border</td>
+      <td>Icon + title: <code>▸ Submit</code>. No right-side control.</td>
+      <td><code>step N</code> only.</td>
+      <td>Primary line: outcome. Secondary line: compact delta summary. No footer.</td>
+    </tr>
+    <tr>
+      <td>Past Edit</td>
+      <td>Past</td>
+      <td>Rounded rect, 10px radius, slate-tinted border</td>
+      <td>Icon + title: <code>✎ edit Location</code>. No right-side control.</td>
+      <td><code>step N</code>, optional <code>data</code>.</td>
+      <td>Primary line: self-loop/current-state result. Secondary line: field delta. No footer.</td>
+    </tr>
+    <tr>
+      <td>Present State</td>
+      <td>Present</td>
+      <td>Rounded rect, 12px radius, violet-accented border, optional glow</td>
+      <td>Icon + title: <code>◎ Open</code>. No right-side control.</td>
+      <td><code>current</code>, <code>step N</code>, optional <code>terminal</code>, optional <code>editable</code>.</td>
+      <td>One concise state description line. No footer.</td>
+    </tr>
+    <tr>
+      <td>Future Event</td>
+      <td>Future</td>
+      <td>Pill, 14px radius, cyan border</td>
+      <td>Primary CTA only: event-name button such as <code>Assign</code> with leading icon. No duplicated title row.</td>
+      <td><code>enabled</code> or <code>blocked</code>, plus optional <code>self-loop</code> or <code>conditional</code>.</td>
+      <td>Body: effect line plus one short requirement line. Footer: compact arguments or small controls.</td>
+    </tr>
+    <tr>
+      <td>Future State</td>
+      <td>Future</td>
+      <td>Rounded rect, 10px radius, indigo border</td>
+      <td>Icon + title: <code>□ Scheduled</code>. No right-side control.</td>
+      <td>Usually empty; optional <code>terminal</code> only when applicable.</td>
+      <td>Body: one-line subtitle + <code>via EventName</code>. No footer.</td>
+    </tr>
+  </table>
+
+  <h3>Terminal state treatment</h3>
+  <p style="margin-bottom:8px;">Terminal states use double-border treatment consistent with § 2.2 state diagram shapes:</p>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li><strong>Present state card (terminal):</strong> <code>box-shadow: inset 0 0 0 2px var(--card), inset 0 0 0 3px rgba(99,102,241,0.30)</code> — creates visual double-border ring</li>
+    <li><strong>Future state card (terminal target):</strong> Same inset box-shadow treatment</li>
+    <li><strong>Terminal message:</strong> When the current state is terminal, the future zone shows a terminal message (<code>✓</code> for completion states, <code>⊘</code> for cancellation) instead of event cards</li>
+  </ul>
+
+  <div class="callout" style="margin-top:16px; background:#1a1a0f; border-color:#3d3d00;">
+    <strong style="color:#FCD34D;">⚠ Open decision — initial state shape:</strong>
+    <p style="margin:8px 0 0; line-height:1.7;">The § 2.2 state diagram uses a circle for the initial state node. This works at small SVG scale but looks poor as a timeline card because card content (name, badges, description) doesn't fit well in a circular container. The timeline should differentiate the initial state through border treatment rather than shape change. Proposals under consideration:</p>
+    <ul style="margin:8px 0 0 16px; line-height:1.8;">
+      <li><strong>Option A:</strong> Heavier border (2.5px) matching the SVG initial node's heavier stroke weight, plus an indigo dot inherited from the SVG's inner dot. Same rounded rect as intermediate.</li>
+      <li><strong>Option B:</strong> Bold 3px left-border accent stripe in deeper indigo <code>#4338CA</code>, suggesting "entry point" directionally while keeping rectangular shape.</li>
+      <li><strong>Option C:</strong> Same rounded rect with a subtle indigo fill tint (8–12% opacity), visually distinguishing it from intermediate states without shape change.</li>
+    </ul>
+    <p style="margin:8px 0 0;">Whichever option is chosen, the origin card in the past zone should use the same treatment. The § 2.2 SVG diagram retains the circle — this decision affects only the timeline card surface.</p>
+  </div>
+
+  <h3>Event lifecycle types on cards</h3>
+  <p style="margin-bottom:12px;">The § 2.2 event lifecycle classification (transition / conditional / stationary) maps onto timeline cards as follows. All future event cards use the same pill shape (<code>border-radius: 14px</code>) and locked cyan <code>#30B8E8</code>. The event name appears once, on the primary CTA button. Differentiation is through tags, effect text, and input requirements, not shape:</p>
+  <table>
+    <tr><th>Lifecycle type</th><th>Card signals</th><th>Interaction</th></tr>
+    <tr>
+      <td>Transition</td>
+      <td>Event-name CTA, <code>.tag-enabled</code> badge, effect line naming the target state</td>
+      <td>Clickable — the event-name button executes the transition</td>
+    </tr>
+    <tr>
+      <td>Conditional</td>
+      <td>Event-name CTA, guard summary, <code>.tag-enabled</code> or <code>.tag-blocked</code> badge based on guard evaluation, rejection message (gold) if blocked</td>
+      <td>Clickable if enabled, visually dimmed (<code>opacity: 0.60</code>) if all guards fail</td>
+    </tr>
+    <tr>
+      <td>Stationary</td>
+      <td>Event-name CTA, <code>.tag-neutral</code> "self-loop" badge, effect line showing it stays in the same state</td>
+      <td>Clickable — fires but produces no state transition, only field mutations</td>
+    </tr>
+  </table>
+
+  <h3>Tag system</h3>
+  <p style="margin-bottom:8px;">Timeline cards use a unified tag system shared across all three preview surfaces. Tags are 7px uppercase, 600 weight, 3px radius, <code>letter-spacing: 0.5px</code>. Semantic variants:</p>
+  <table>
+    <tr><th>Tag class</th><th>Color</th><th>Usage</th></tr>
+    <tr><td><code>.tag-violet</code></td><td>Violet <code>#A898F5</code></td><td>"current", "origin" — state identity</td></tr>
+    <tr><td><code>.tag-neutral</code></td><td>Zinc <code>#a1a1aa</code></td><td>Step numbers, "self-loop" — informational</td></tr>
+    <tr><td><code>.tag-dim</code></td><td>Dark zinc <code>#52525b</code></td><td>"terminal" — de-emphasized metadata</td></tr>
+    <tr><td><code>.tag-cyan</code></td><td>Cyan <code>#30B8E8</code></td><td>Event-related badges</td></tr>
+    <tr><td><code>.tag-indigo</code></td><td>Indigo <code>#6366F1</code></td><td>"✎ editable" — structural capability</td></tr>
+    <tr><td><code>.tag-enabled</code></td><td>Emerald <code>#34D399</code></td><td>"enabled" — guard passed (verdict)</td></tr>
+    <tr><td><code>.tag-blocked</code></td><td>Rose <code>#FB7185</code></td><td>"blocked" — guard failed (verdict)</td></tr>
+    <tr><td><code>.tag-gold</code></td><td>Gold <code>#FBBF24</code></td><td>Rule-related badges</td></tr>
+    <tr><td><code>.tag-slate</code></td><td>Slate <code>#B0BEC5</code></td><td>Data/field-related badges</td></tr>
+  </table>
+
+  <h3>Color application</h3>
+  <p style="margin-bottom:8px;">The timeline applies the five semantic families from § 1.4:</p>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li><strong>Violet <code>#A898F5</code>:</strong> State names (origin card, present marker, future state cards, outcome references in past cards)</li>
+    <li><strong>Cyan <code>#30B8E8</code>:</strong> Event names in past event cards and the primary event-name CTA in future event cards</li>
+    <li><strong>Slate <code>#B0BEC5</code>:</strong> Edit operation names in past edit cards, field names in delta summaries</li>
+    <li><strong>Indigo <code>#6366F1</code>:</strong> Structural borders on origin and future state cards, "editable" badges</li>
+    <li><strong>Gold <code>#FBBF24</code>:</strong> Rejection messages on blocked events</li>
+    <li><strong>Emerald <code>#34D399</code>:</strong> Transition outcomes in past cards, "enabled" guard badges</li>
+    <li><strong>Rose <code>#FB7185</code>:</strong> "blocked" guard badges</li>
+  </ul>
+
+  <h3>Accessibility notes</h3>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li>Guard status uses both color (emerald/rose) and text ("enabled"/"blocked") — colorblind-safe</li>
+    <li>Past edit cards differentiated from past event cards by both color (slate vs cyan) and symbol (✎ prefix) — dual signal</li>
+    <li>Terminal states use both double-border treatment and a "terminal" tag — shape + text redundancy</li>
+    <li>Auto-scroll on event fire keeps the present state and future zone visible without manual scrolling</li>
+  </ul>
+</div>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- 2.4 Data Panel -->
+<div class="section">
+<h2>2.4 Data Panel <span class="status-chip" style="background:#1e3a5f; color:#60a5fa;">DRAFT</span></h2>
+
+<div class="card">
+  <h3>Purpose</h3>
+  <p>The field inspector surface in the VS Code preview panel. Displays all precept fields in a responsive grid, supports direct editing of fields declared editable (via <code>in State edit Field</code>), and shows constraint status (invariants and state assertions) in a bottom strip. The data panel is where abstract data declarations become concrete runtime values.</p>
+
+  <h3>Layout model</h3>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li><strong>Header bar:</strong> "Data" title, field count + current state name, edit/save/cancel actions. Dirty badge pulses gold when unsaved changes exist.</li>
+    <li><strong>Field grid:</strong> <code>grid-template-columns: repeat(auto-fill, minmax(260px, 1fr))</code> — fields reflow to fill available width. Each field is a self-contained card.</li>
+    <li><strong>Constraints strip:</strong> Bottom section separated by a border. Groups invariants and state-specific assertions. Always visible regardless of edit state.</li>
+  </ul>
+
+  <h3>Field card states</h3>
+  <p style="margin-bottom:12px;">Each field renders as a small card with four visual states determined by runtime context. Border color and background tint encode the state:</p>
+  <table>
+    <tr><th>State</th><th>Border</th><th>Background</th><th>Trigger</th></tr>
+    <tr>
+      <td>Default</td>
+      <td>1px <code>#27272a</code> at 50%</td>
+      <td><code>#111114</code> at 40%</td>
+      <td>Normal field display</td>
+    </tr>
+    <tr>
+      <td>Recently changed</td>
+      <td>Emerald <code>#34D399</code> at 30%</td>
+      <td>Emerald at 4%</td>
+      <td>Field was mutated by the last event fire — flash animation (800ms)</td>
+    </tr>
+    <tr>
+      <td>Editable</td>
+      <td>Indigo <code>#6366F1</code> at 25%</td>
+      <td>Default</td>
+      <td>Field is declared editable in this state but editing not yet started</td>
+    </tr>
+    <tr>
+      <td>Editing</td>
+      <td>Indigo <code>#6366F1</code> at 45%</td>
+      <td>Indigo at 4% + 1px ring</td>
+      <td>Edit mode active, field is accepting input</td>
+    </tr>
+    <tr>
+      <td>Dirty</td>
+      <td>Gold <code>#FBBF24</code> at 35%</td>
+      <td>Gold at 4%</td>
+      <td>Field value has been changed but not yet saved</td>
+    </tr>
+  </table>
+
+  <h3>Field value rendering</h3>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li><strong>String/number values:</strong> Slate <code>#84929F</code>, 13px, font-weight 600</li>
+    <li><strong>Null values:</strong> <code>null</code> in italic, muted color, 11px, font-weight 400</li>
+    <li><strong>Boolean true:</strong> Emerald <code>#34D399</code></li>
+    <li><strong>Boolean false:</strong> Rose <code>#FB7185</code> at 60% opacity</li>
+    <li><strong>Editable booleans:</strong> Toggle switch — emerald track when on, rose track when off, with label</li>
+    <li><strong>Editable strings:</strong> Text input with indigo border, dark ground-plane background, 0 ring on focus</li>
+  </ul>
+
+  <h3>Constraint display</h3>
+  <p style="margin-bottom:8px;">Two constraint groups, always visible in the bottom strip:</p>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li><strong>Invariants:</strong> Precept-wide constraints. Each shows ✓ (emerald) or ✕ (rose) icon + gold message text + slate field target badges</li>
+    <li><strong>State assertions:</strong> Constraints scoped to the current state. Same icon + color treatment as invariants, grouped under the state name</li>
+    <li><strong>Target badges:</strong> Small slate-bordered tags naming the fields the constraint references — lets the developer trace which fields affect which rules</li>
+  </ul>
+
+  <h3>Edit workflow</h3>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li><strong>Entry:</strong> "✎ Edit" button appears when current state has editable fields. Clicking enters edit mode.</li>
+    <li><strong>In-flight:</strong> Only editable fields show inputs/toggles. Non-editable fields remain read-only. Dirty badge in header shows unsaved count. Field cards transition to "dirty" state on change.</li>
+    <li><strong>Save:</strong> Commits changes through the <code>edit</code> pipeline (same as <code>precept_update</code>). Constraints are re-evaluated. A past edit card appears in the timeline.</li>
+    <li><strong>Cancel:</strong> Reverts all draft changes. Fields return to pre-edit values.</li>
+    <li><strong>Focus preservation:</strong> Typing in an edit input must NOT trigger full re-render. The data panel uses lightweight DOM patching (dirty badge, class toggles) to avoid stealing focus from the active input.</li>
+  </ul>
+
+  <h3>Color application</h3>
+  <p style="margin-bottom:8px;">The data panel uses primarily the Slate family for field display, with semantic colors for state signals:</p>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li><strong>Slate <code>#B0BEC5</code>:</strong> Field names — primary data identity color</li>
+    <li><strong>Slate <code>#9AA8B5</code>:</strong> Field types — secondary, de-emphasized</li>
+    <li><strong>Slate <code>#84929F</code>:</strong> Field values — data values sit between name and type in the slate hierarchy</li>
+    <li><strong>Indigo <code>#6366F1</code>:</strong> Edit affordances — borders, badges, focus rings. Signals structural capability ("this field can be edited here")</li>
+    <li><strong>Gold <code>#FBBF24</code>:</strong> Dirty state indicators (unsaved changes), invariant/assertion message text</li>
+    <li><strong>Emerald <code>#34D399</code>:</strong> Recently changed flash, boolean true, constraint passing</li>
+    <li><strong>Rose <code>#FB7185</code>:</strong> Boolean false, constraint violation, cancel affordance hover</li>
+  </ul>
+
+  <h3>Typography application</h3>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li><strong>Panel title:</strong> 10px, uppercase, 1.2px letter-spacing, muted — matches timeline label style</li>
+    <li><strong>Field names:</strong> 11px, font-weight 500, slate</li>
+    <li><strong>Field types:</strong> 9px, slate-type, 70% opacity</li>
+    <li><strong>Field values:</strong> 13px, font-weight 600 — values are the most important content, so they're the largest element</li>
+    <li><strong>Constraint messages:</strong> 10px, gold — human-readable rule text earns gold per § 1.4</li>
+    <li><strong>Edit inputs:</strong> 11px, monospace, inheriting font family for consistent appearance</li>
+  </ul>
+
+  <h3>Accessibility notes</h3>
+  <ul style="margin-left: 16px; color: #a1a1aa;">
+    <li>Boolean values use color + text ("true"/"false") — colorblind-safe</li>
+    <li>Constraint violations use icon (✕) + color (rose) + text (gold message) — triple signal</li>
+    <li>Edit mode uses border color change + ring + badge — the affordance is visible without relying solely on color</li>
+    <li>Toggle switches show both track color change and text label state</li>
+  </ul>
+</div>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- 2.5 Inspector Panel -->
+<div class="section">
+<h2>2.5 Inspector Panel <span class="status-chip">LOCKED</span></h2>
 
 <div class="card">
   <h3>Purpose</h3>
@@ -1352,9 +1743,9 @@
 
 <div class="section-divider"></div>
 
-<!-- 2.4 Docs Site -->
+<!-- 2.6 Docs Site -->
 <div class="section">
-<h2>2.4 Docs <span class="status-chip">LOCKED</span></h2>
+<h2>2.6 Docs <span class="status-chip">LOCKED</span></h2>
 
 <div class="card">
   <h3>Purpose</h3>
@@ -1400,9 +1791,9 @@
 
 <div class="section-divider"></div>
 
-<!-- 2.5 CLI / Terminal -->
+<!-- 2.7 CLI / Terminal -->
 <div class="section">
-<h2>2.5 CLI / Terminal <span class="status-chip">ASPIRATIONAL</span></h2>
+<h2>2.7 CLI / Terminal <span class="status-chip">ASPIRATIONAL</span></h2>
 
 <div class="callout" style="margin-bottom:16px; background:#3F3F46; border-left:4px solid #FCD34D;">
   <strong>⚠️ CLI surface is planned; not yet implemented.</strong> A standalone <code>precept</code> CLI tool does not currently exist. PRECEPT diagnostic codes (PRECEPT001–PRECEPT054) are surfaced in VS Code's Problems panel via the language server, not in terminal output. <code>dotnet build</code> uses standard MSBuild formatting. This section defines a design contract for a future CLI tool.
@@ -1460,7 +1851,7 @@
 
 <!-- 2.6 Canonical Hero Snippet -->
 <div class="section">
-<h2>2.6 Canonical Hero Snippet <span class="status-chip">TEMPORARY</span></h2>
+<h2>2.8 Canonical Hero Snippet <span class="status-chip">TEMPORARY</span></h2>
 
 <div class="callout" style="margin-bottom:16px; background:#1e2a3a; border-left:4px solid #818cf8;">
   <strong>Status note:</strong> This section captures the current README "Quick Example" as the reusable hero artifact for README, VS Code Marketplace, NuGet, Claude Marketplace, and AI-facing contexts. The current temporary live hero is the top-rated Subscription Billing candidate from the visual language exploration. It remains <span class="status-chip">TEMPORARY</span> until the final hero decision confirms whether this domain stays or is replaced.

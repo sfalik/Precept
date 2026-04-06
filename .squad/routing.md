@@ -7,6 +7,7 @@ How to decide who handles what.
 | Work Type | Route To | Examples |
 |-----------|----------|----------|
 | Architecture, design decisions, cross-cutting concerns | Frank | API surface changes, breaking changes, architectural proposals |
+| Language design, grammar evolution, new DSL constructs, Superpower parser strategy | Frank | New keywords, syntax proposals, grammar philosophy, parser-combinator feasibility, `PreceptLanguageDesign.md` updates |
 | DSL engine: parser, type checker, evaluator, compiler, runtime | George | Tokenizer bugs, type inference, state machine logic, constraint evaluation |
 | VS Code extension, language server, LSP, TypeScript, TextMate grammar | Kramer | Completions, hover, semantic tokens, syntax highlighting, preview webview |
 | MCP server, Copilot plugin, AI integration, agent/skills content | Newman | MCP tool DTOs, plugin prompts, skill files, AI-native features |
@@ -42,3 +43,4 @@ How to decide who handles what.
 6. **Anticipate downstream work.** If a feature is being built, spawn the tester to write test cases from requirements simultaneously.
 7. **Issue-labeled work** — when a `squad:{member}` label is applied to an issue, route to that member. The Lead handles all `squad` (base label) triage.
 8. **Human review routing** — when Shane is requested as reviewer, present the review item to him and wait for his verdict instead of spawning an agent.
+9. **Coordinator never writes domain content.** If the work involves writing or rewriting a proposal, design doc, code artifact, research document, or any domain-specific content, it MUST be spawned to the appropriate agent. The coordinator routes and synthesizes — it does not author. This applies even when the task feels small or the coordinator "already knows the answer."

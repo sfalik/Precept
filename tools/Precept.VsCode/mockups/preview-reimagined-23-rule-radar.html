@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 23: Rule Radar - Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <script src="preview-reimagined-maintenance-work-order.js"></script>
+  <style>
+    body { display: flex; flex-direction: column; background: radial-gradient(circle at center, rgba(48, 184, 232, 0.08), transparent 28%), #09090c; }
+    .header, .toolbar { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+    .header { background: rgba(12, 12, 15, 0.95); }
+    .toolbar { background: rgba(17, 17, 20, 0.92); }
+    .header-left, .toolbar-left, .toolbar-actions { display: flex; align-items: center; gap: 10px; }
+    .header-title { font-size: 13px; font-weight: 700; }
+    .header-file, .toolbar-copy { font-size: 11px; color: var(--slate-val); }
+    button, input { font: inherit; }
+    button { appearance: none; border: 1px solid var(--border); background: transparent; color: var(--text); padding: 4px 10px; border-radius: 5px; cursor: pointer; }
+    button:hover { border-color: rgba(99, 102, 241, 0.45); background: rgba(99, 102, 241, 0.10); }
+    .shell { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px 1fr 320px; grid-template-rows: 1fr auto; gap: 12px; padding: 12px; }
+    .panel { min-width: 0; min-height: 0; border: 1px solid rgba(39, 39, 42, 0.88); border-radius: 16px; background: linear-gradient(180deg, rgba(18, 18, 22, 0.96), rgba(12, 12, 15, 0.98)); overflow: auto; }
+    .panel-head { padding: 16px; border-bottom: 1px solid rgba(39, 39, 42, 0.86); }
+    .panel-kicker { font-size: 10px; text-transform: uppercase; letter-spacing: 1.3px; color: var(--cyan); }
+    .panel-title { font-size: 14px; font-weight: 700; margin-top: 5px; }
+    .panel-copy { font-size: 11px; color: var(--slate-val); line-height: 1.6; margin-top: 5px; }
+    .ledger { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+    .ledger-card { padding: 12px; border-radius: 12px; border: 1px solid rgba(39, 39, 42, 0.80); background: rgba(17, 17, 20, 0.84); }
+    .ledger-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+    .ledger-value { font-size: 13px; font-weight: 700; margin-top: 4px; }
+    .ledger-meta { font-size: 10px; color: var(--slate-val); margin-top: 3px; }
+    .radar-panel { grid-column: 2; grid-row: 1; padding: 18px; display: flex; align-items: center; justify-content: center; }
+    .radar-shell { position: relative; width: min(72vh, 720px); aspect-ratio: 1; border-radius: 50%; border: 1px solid rgba(99, 102, 241, 0.20); background: radial-gradient(circle at center, rgba(99, 102, 241, 0.14), rgba(12, 12, 15, 0.94) 62%); }
+    .radar-ring { position: absolute; inset: 14% 14%; border-radius: 50%; border: 1px solid rgba(39, 39, 42, 0.85); }
+    .radar-ring.mid { inset: 26% 26%; }
+    .radar-core { position: absolute; inset: 36% 36%; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; background: rgba(17, 17, 20, 0.94); border: 1px solid rgba(168, 152, 245, 0.34); text-align: center; padding: 16px; }
+    .radar-core .core-state { font-size: 20px; font-weight: 700; }
+    .radar-core .core-copy { font-size: 11px; color: var(--slate-val); line-height: 1.6; margin-top: 6px; }
+    .rule-blip { position: absolute; width: 180px; padding: 12px; border-radius: 14px; border: 1px solid rgba(39, 39, 42, 0.84); background: rgba(16, 16, 20, 0.92); }
+    .rule-blip.ok { border-color: rgba(52, 211, 153, 0.34); }
+    .rule-blip.blocked { border-color: rgba(251, 113, 133, 0.32); }
+    .rule-name { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+    .rule-expr { font-size: 11px; color: var(--text); margin-top: 6px; }
+    .rule-detail { font-size: 10px; color: var(--slate-val); line-height: 1.6; margin-top: 5px; }
+    .actions { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+    .action-card { padding: 12px; border-radius: 12px; border: 1px solid rgba(39, 39, 42, 0.82); background: rgba(22, 22, 26, 0.86); }
+    .action-card.selected { border-color: rgba(99, 102, 241, 0.44); background: rgba(99, 102, 241, 0.08); }
+    .action-name { font-size: 13px; font-weight: 700; }
+    .action-copy { font-size: 11px; color: var(--slate-val); line-height: 1.6; margin-top: 5px; }
+    .action-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; }
+    .state-strip { grid-column: 1 / span 3; display: flex; gap: 8px; flex-wrap: wrap; padding: 0 4px; }
+    .state-node { padding: 7px 10px; border-radius: 999px; border: 1px solid rgba(39, 39, 42, 0.82); color: var(--slate-val); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+    .state-node.current { border-color: rgba(168, 152, 245, 0.42); color: var(--violet); }
+    .state-node.visited:not(.current) { border-color: rgba(48, 184, 232, 0.24); color: var(--cyan); }
+    @media (max-width: 1180px) { .shell { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; } .radar-panel, .state-strip { grid-column: auto; grid-row: auto; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <span class="concept-badge">23 - RULE RADAR</span>
+      <span class="header-title">MaintenanceWorkOrder</span>
+      <span class="sep">.</span>
+      <span class="header-file">maintenance-work-order.precept</span>
+    </div>
+    <div class="toolbar-actions">
+      <button id="undoBtn">Undo</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <div>
+        <div class="panel-kicker">Guard-first layout</div>
+        <div class="header-title">Make the governing rules the first thing the eye sees before the command is fired.</div>
+      </div>
+    </div>
+    <div class="toolbar-copy">The center is not the state diagram. The center is the rule tension around the current decision.</div>
+  </div>
+
+  <div class="shell">
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-kicker">Data ledger</div>
+        <div class="panel-title">Inputs that move the radar</div>
+        <div class="panel-copy">Only two quick edits are exposed because they are the ones that actually move the live guard picture.</div>
+      </div>
+      <div id="ledger" class="ledger"></div>
+    </section>
+
+    <section class="panel radar-panel">
+      <div id="radar" class="radar-shell"></div>
+    </section>
+
+    <aside class="panel">
+      <div class="panel-head">
+        <div class="panel-kicker">Command rack</div>
+        <div class="panel-title">Select a move</div>
+        <div class="panel-copy">Each action reorients the radar around the relevant rules before it executes.</div>
+      </div>
+      <div id="actions" class="actions"></div>
+    </aside>
+
+    <div id="stateStrip" class="state-strip"></div>
+  </div>
+
+  <script>
+    const demo = window.createMaintenanceWorkOrderDemo();
+    const esc = window.mwoEsc;
+    const fmt = window.mwoFormatValue;
+
+    document.getElementById("undoBtn").onclick = () => demo.undo();
+    document.getElementById("resetBtn").onclick = () => demo.reset();
+
+    function render(view) {
+      document.getElementById("ledger").innerHTML = `
+        <div class="ledger-card">
+          <div class="ledger-label">Urgent</div>
+          <div class="ledger-value">${view.sim.data.Urgent ? "true" : "false"}</div>
+          <div class="ledger-meta">Flip the work order urgency to watch the StartWork guard react.</div>
+          <div style="margin-top:10px;"><button onclick="demo.toggleUrgent()">Toggle Urgent</button></div>
+        </div>
+        <div class="ledger-card">
+          <div class="ledger-label">Estimated hours</div>
+          <div class="ledger-value">${esc(view.sim.data.EstimatedHours)}</div>
+          <div class="ledger-meta">This directly changes the Complete tolerance window.</div>
+          <div style="margin-top:10px;"><input id="estimateInput" type="number" min="1" value="${esc(view.sim.data.EstimatedHours)}" style="width:88px;border:1px solid var(--border);background:rgba(12,12,15,0.85);color:var(--text);border-radius:5px;padding:4px 6px;"></div>
+        </div>
+        ${view.fields.slice(0, 4).map((field) => `
+          <div class="ledger-card">
+            <div class="ledger-label">${esc(field.label)}</div>
+            <div class="ledger-value">${esc(fmt(field.value))}</div>
+            <div class="ledger-meta">${esc(field.provenance)}</div>
+          </div>
+        `).join("")}
+      `;
+      document.getElementById("estimateInput").onchange = (event) => demo.setEstimate(event.target.value);
+
+      const preview = view.preview;
+      const positions = [
+        "top: 6%; left: 34%;",
+        "top: 32%; right: 4%;",
+        "bottom: 8%; left: 38%;",
+        "top: 36%; left: 4%;",
+      ];
+      document.getElementById("radar").innerHTML = `
+        <div class="radar-ring"></div>
+        <div class="radar-ring mid"></div>
+        <div class="radar-core">
+          <div class="panel-kicker">Current state</div>
+          <div class="core-state">${esc(view.sim.currentState)}</div>
+          <div class="core-copy">${preview ? esc(preview.summary) : "Select an action to preview its guard picture."}</div>
+        </div>
+        ${preview ? preview.rules.map((rule, index) => `
+          <div class="rule-blip ${rule.ok ? "ok" : "blocked"}" style="${positions[index]}">
+            <div class="rule-name">${esc(rule.label)}</div>
+            <div class="rule-expr">${esc(rule.expr)}</div>
+            <div class="rule-detail">${esc(rule.detail)}</div>
+          </div>
+        `).join("") : ""}
+      `;
+
+      document.getElementById("actions").innerHTML = view.actions.map((action) => `
+        <article class="action-card ${action.id === view.selectedAction ? "selected" : ""}">
+          <div class="action-name">${esc(action.label)}</div>
+          <div class="action-copy">${esc(action.reason)}</div>
+          <div class="action-foot">
+            <button onclick="demo.setSelectedAction('${action.id}')">Inspect</button>
+            <button ${action.enabled ? "" : "disabled"} onclick="demo.commitAction('${action.id}')">Fire</button>
+          </div>
+        </article>
+      `).join("");
+
+      document.getElementById("stateStrip").innerHTML = view.stateNodes.map((state) => `
+        <span class="state-node ${state.current ? "current" : ""} ${state.visited ? "visited" : ""}">${esc(state.name)}</span>
+      `).join("");
+    }
+
+    demo.subscribe(render);
+  </script>
+</body>
+</html>

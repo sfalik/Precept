@@ -1,0 +1,2784 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 28: Quiet Card Forms - Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 6px 16px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .header-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .header-file {
+      color: var(--dusk);
+      font-size: 11px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .header-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .layout-hint {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.9px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .layout-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 2px;
+      background: rgba(17, 17, 20, 0.78);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+
+    .header-actions button,
+    .layout-switch button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font: inherit;
+      font-size: 10px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 120ms;
+    }
+
+    .layout-switch button {
+      border-color: transparent;
+      padding-inline: 9px;
+    }
+
+    .layout-switch button.active {
+      border-color: rgba(99, 102, 241, 0.35);
+      color: var(--indigo);
+      background: rgba(99, 102, 241, 0.10);
+    }
+
+    .header-actions button:hover,
+    .layout-switch button:hover {
+      border-color: var(--indigo);
+      color: var(--indigo);
+    }
+
+    .header-actions button:active,
+    .layout-switch button:active {
+      transform: scale(0.96);
+    }
+
+    .main-layout {
+      --splitter-size: 12px;
+      --stack-state-size: 150px;
+      --stack-timeline-size: 248px;
+      --split-state-size: 320px;
+      --split-timeline-size: 248px;
+      flex: 1;
+      min-height: 0;
+      min-width: 0;
+      display: grid;
+      gap: 0;
+      padding: 10px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at top right, rgba(48, 184, 232, 0.05), transparent 34%),
+        radial-gradient(circle at left center, rgba(99, 102, 241, 0.05), transparent 32%),
+        var(--bg);
+    }
+
+    .main-layout.layout-stack {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: var(--stack-state-size) var(--splitter-size) minmax(0, 1fr) var(--splitter-size) var(--stack-timeline-size);
+      grid-template-areas:
+        'state'
+        'divider-primary'
+        'data'
+        'divider-secondary'
+        'timeline';
+    }
+
+    .main-layout.layout-split {
+      grid-template-columns: minmax(280px, var(--split-state-size)) var(--splitter-size) minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) var(--splitter-size) var(--split-timeline-size);
+      grid-template-areas:
+        'state divider-primary data'
+        'divider-secondary divider-secondary divider-secondary'
+        'timeline timeline timeline';
+    }
+
+    .panel-shell {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid rgba(39, 39, 42, 0.92);
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(22, 22, 26, 0.96), rgba(13, 13, 16, 0.98));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+    }
+
+    .state-shell { grid-area: state; }
+    .data-shell { grid-area: data; }
+    .timeline-shell { grid-area: timeline; }
+
+    .layout-divider {
+      position: relative;
+      z-index: 2;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .divider-primary { grid-area: divider-primary; }
+    .divider-secondary { grid-area: divider-secondary; }
+
+    .main-layout.layout-stack .layout-divider,
+    .main-layout.layout-split .divider-secondary {
+      cursor: row-resize;
+    }
+
+    .main-layout.layout-split .divider-primary {
+      cursor: col-resize;
+    }
+
+    .main-layout.layout-stack .layout-divider::before,
+    .main-layout.layout-split .divider-secondary::before {
+      content: '';
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      top: 50%;
+      height: 2px;
+      transform: translateY(-50%);
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(144, 150, 166, 0.12), rgba(168, 152, 245, 0.34), rgba(48, 184, 232, 0.18));
+    }
+
+    .main-layout.layout-split .divider-primary::before {
+      content: '';
+      position: absolute;
+      top: 14px;
+      bottom: 14px;
+      left: 50%;
+      width: 2px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(144, 150, 166, 0.12), rgba(168, 152, 245, 0.34), rgba(48, 184, 232, 0.18));
+    }
+
+    .layout-divider:hover::before,
+    body.is-resizing .layout-divider::before {
+      box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.18), 0 0 14px rgba(99, 102, 241, 0.16);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 10px;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.82);
+      background: linear-gradient(180deg, rgba(26, 26, 32, 0.82), rgba(19, 19, 23, 0.74));
+      flex-shrink: 0;
+    }
+
+    .panel-name {
+      font-size: 10px;
+      color: var(--text);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.9px;
+    }
+
+    .panel-caption {
+      font-size: 9px;
+      color: var(--dusk);
+    }
+
+    .panel-body {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .state-panel-body {
+      padding: 10px 12px 12px;
+      overflow: auto;
+      overscroll-behavior: contain;
+    }
+
+    .sd-svg-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100%;
+    }
+
+    .sd-svg-container svg {
+      width: 100%;
+      max-width: 760px;
+      height: auto;
+    }
+
+    .main-layout.layout-split .sd-svg-container {
+      justify-content: flex-start;
+      align-items: flex-start;
+    }
+
+    .main-layout.layout-split .sd-svg-container svg {
+      max-width: none;
+      min-width: 620px;
+    }
+
+    .sd-node {
+      fill: transparent;
+      stroke: #4338CA;
+      stroke-width: 1.5;
+      cursor: pointer;
+      transition: fill 400ms ease, stroke 400ms ease, stroke-width 400ms ease;
+    }
+
+    .sd-node-initial {
+      fill: transparent;
+      stroke: #4338CA;
+      stroke-width: 2.5;
+      cursor: pointer;
+    }
+
+    .sd-node-visited {
+      fill: rgba(144, 150, 166, 0.06);
+      stroke: var(--dusk);
+      stroke-width: 1.5;
+      cursor: pointer;
+    }
+
+    .sd-node-current {
+      fill: rgba(30, 27, 75, 0.25);
+      stroke: var(--violet);
+      stroke-width: 2;
+      cursor: pointer;
+    }
+
+    .sd-node-terminal {
+      fill: transparent;
+      stroke: #6366F1;
+      stroke-width: 2;
+      cursor: pointer;
+    }
+
+    .sd-node-terminal-outer {
+      fill: none;
+      stroke: rgba(99, 102, 241, 0.30);
+      stroke-width: 1;
+    }
+
+    .sd-glow {
+      fill: none;
+      stroke: rgba(168, 152, 245, 0.25);
+      stroke-width: 2;
+      animation: sdGlowPulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes sdGlowPulse {
+      0%, 100% { stroke-opacity: 0.15; }
+      50% { stroke-opacity: 0.6; }
+    }
+
+    .sd-initial-dot { fill: #4338CA; }
+
+    .sd-label {
+      fill: rgba(113, 113, 122, 0.7);
+      font-size: 9px;
+      text-anchor: middle;
+      font-family: inherit;
+      pointer-events: none;
+    }
+
+    .sd-label-visited { fill: var(--dusk); }
+    .sd-label-current { fill: var(--violet); font-weight: 700; font-size: 9.5px; }
+
+    .sd-edge {
+      stroke: rgba(39, 39, 42, 0.6);
+      stroke-width: 1;
+      fill: none;
+      cursor: pointer;
+      transition: stroke 400ms ease;
+    }
+
+    .sd-edge-traced { stroke: rgba(52, 211, 153, 0.35); stroke-width: 1.5; }
+    .sd-edge-active { stroke: var(--enabled); stroke-width: 2; animation: sdEdgeFlash 900ms ease-out; }
+
+    @keyframes sdEdgeFlash {
+      0% { stroke: rgba(52, 211, 153, 0.9); stroke-width: 3; }
+      100% { stroke: rgba(52, 211, 153, 0.35); stroke-width: 1.5; }
+    }
+
+    .sd-arrow { fill: rgba(39, 39, 42, 0.5); transition: fill 400ms ease; }
+    .sd-arrow-traced { fill: rgba(52, 211, 153, 0.35); }
+    .sd-arrow-active { fill: var(--enabled); animation: sdArrowFlash 900ms ease-out; }
+
+    @keyframes sdArrowFlash {
+      0% { fill: rgba(52, 211, 153, 0.9); }
+      100% { fill: rgba(52, 211, 153, 0.35); }
+    }
+
+    .sd-edge-label {
+      fill: rgba(113, 113, 122, 0.4);
+      font-size: 7.5px;
+      text-anchor: middle;
+      font-family: inherit;
+      cursor: pointer;
+      transition: fill 300ms ease;
+    }
+
+    .sd-edge-label-traced { fill: var(--cyan); opacity: 0.8; }
+    .sd-edge-label-active { fill: var(--cyan); opacity: 1; }
+
+    .sd-self-loop {
+      stroke: rgba(39, 39, 42, 0.35);
+      stroke-width: 1;
+      fill: none;
+      cursor: pointer;
+      transition: stroke 300ms ease;
+    }
+
+    .sd-self-flash { stroke: rgba(52, 211, 153, 0.6); stroke-width: 1.5; animation: sdSelfFlash 800ms ease-out; }
+
+    @keyframes sdSelfFlash {
+      0% { stroke: rgba(52, 211, 153, 0.9); stroke-width: 2.5; }
+      100% { stroke: rgba(52, 211, 153, 0.6); stroke-width: 1.5; }
+    }
+
+    .sd-self-label {
+      fill: rgba(113, 113, 122, 0.35);
+      font-size: 7px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .sd-node-hover {
+      stroke: var(--violet) !important;
+      stroke-width: 2.5 !important;
+      fill: rgba(168, 152, 245, 0.12) !important;
+    }
+
+    .sd-edge-hover {
+      stroke: var(--cyan) !important;
+      stroke-width: 2 !important;
+    }
+
+    .sd-edge-label-hover {
+      fill: var(--cyan) !important;
+      opacity: 1 !important;
+    }
+
+    .data-panel {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 12px 14px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .data-panel.is-reading {
+      background: linear-gradient(180deg, rgba(16, 16, 20, 0.26), rgba(12, 12, 15, 0));
+    }
+
+    .data-panel.is-editing {
+      background: linear-gradient(180deg, rgba(30, 30, 42, 0.22), rgba(12, 12, 15, 0));
+    }
+
+    .dp-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .dp-header-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .dp-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .dp-mode-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.75px;
+      border: 1px solid rgba(39, 39, 42, 0.7);
+      color: var(--dusk);
+      background: rgba(17, 17, 20, 0.72);
+    }
+
+    .dp-mode-pill.editing {
+      color: var(--indigo);
+      border-color: rgba(99, 102, 241, 0.28);
+      background: rgba(99, 102, 241, 0.10);
+    }
+
+    .dp-mode-pill.reading {
+      color: var(--slate);
+      border-color: rgba(176, 190, 197, 0.16);
+      background: rgba(176, 190, 197, 0.05);
+    }
+
+    .dp-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.9px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .dp-count,
+    .dp-subcopy {
+      font-size: 10px;
+      color: var(--dim);
+      line-height: 1.4;
+    }
+
+    .dp-dirty-note {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 9px;
+      color: var(--gold);
+      background: rgba(251, 191, 36, 0.08);
+      border: 1px solid rgba(251, 191, 36, 0.18);
+      border-radius: 4px;
+      padding: 2px 8px;
+    }
+
+    .is-hidden {
+      display: none !important;
+    }
+
+    .form-summary {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1px;
+      padding: 6px 9px;
+      border-radius: 6px;
+      border: 1px solid rgba(54, 54, 64, 0.62);
+      border-top: 3px solid rgba(176, 190, 197, 0.22);
+      background: rgba(14, 14, 18, 0.46);
+      font-size: 9px;
+      color: var(--dim);
+      line-height: 1.35;
+    }
+
+    .form-summary.issue {
+      border-color: rgba(251, 113, 133, 0.22);
+      border-top-color: rgba(251, 113, 133, 0.68);
+      background: rgba(43, 23, 29, 0.58);
+      color: #f7b4c0;
+    }
+
+    .form-summary-title {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .form-summary-text {
+      color: inherit;
+      text-align: left;
+    }
+
+    .dp-summary {
+      margin-top: 2px;
+    }
+
+    .dp-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .dp-edit-btn,
+    .dp-save-btn,
+    .dp-cancel-btn {
+      font: inherit;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 5px 11px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 150ms;
+    }
+
+    .dp-edit-btn {
+      border: 1px solid rgba(99, 102, 241, 0.28);
+      color: var(--indigo);
+      background: rgba(99, 102, 241, 0.06);
+    }
+
+    .dp-edit-btn:hover {
+      background: rgba(99, 102, 241, 0.12);
+      border-color: var(--indigo);
+    }
+
+    .dp-save-btn {
+      border: 1px solid rgba(52, 211, 153, 0.32);
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.08);
+    }
+
+    .dp-save-btn:hover {
+      background: rgba(52, 211, 153, 0.16);
+    }
+
+    .dp-save-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .dp-cancel-btn {
+      border: 1px solid var(--border);
+      color: var(--dim);
+      background: transparent;
+    }
+
+    .dp-cancel-btn:hover {
+      border-color: rgba(251, 113, 133, 0.40);
+      color: var(--blocked);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 12px;
+      row-gap: 0;
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 6px 6px 8px;
+      border: 1px solid transparent;
+      border-bottom-color: rgba(39, 39, 42, 0.54);
+      border-radius: 8px;
+      background: transparent;
+      transition: background 180ms ease, box-shadow 180ms ease;
+      min-width: 0;
+    }
+
+    .form-field.span-full {
+      grid-column: 1 / -1;
+    }
+
+    .form-field-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .form-field.recently-changed {
+      background: rgba(16, 29, 24, 0.18);
+      box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.32);
+      animation: dataFlash 800ms ease-out;
+    }
+
+    .form-field.editing {
+      background: rgba(25, 25, 38, 0.16);
+      box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.22);
+    }
+
+    .form-field.dirty {
+      box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.32);
+    }
+
+    .form-field.has-issue {
+      background: rgba(32, 19, 24, 0.14);
+      box-shadow: inset 0 0 0 1px rgba(251, 113, 133, 0.42);
+    }
+
+    .form-label {
+      font-size: 9px;
+      color: #d6deea;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+
+    .form-required {
+      font-size: 8px;
+      color: #f1a3b2;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .form-control {
+      min-height: 30px;
+      display: flex;
+      align-items: stretch;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .form-readout,
+    .form-input,
+    .form-select {
+      width: 100%;
+      min-width: 0;
+      border-radius: 5px;
+      border: 1px solid rgba(54, 54, 64, 0.72);
+      background: rgba(12, 12, 15, 0.58);
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      line-height: 1.35;
+      padding: 5px 8px;
+    }
+
+    .form-readout {
+      display: flex;
+      align-items: center;
+      min-height: 30px;
+      overflow-wrap: anywhere;
+      white-space: normal;
+      font-weight: 500;
+      color: var(--slate-val);
+    }
+
+    .form-readout.multiline {
+      align-items: flex-start;
+      min-height: 56px;
+      padding-top: 7px;
+      padding-bottom: 7px;
+      white-space: pre-wrap;
+    }
+
+    .form-readout.null {
+      color: var(--muted);
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    .form-readout.bool-true,
+    .toggle-label.bool-true {
+      color: var(--enabled);
+    }
+
+    .form-readout.bool-false,
+    .toggle-label.bool-false {
+      color: var(--blocked);
+      opacity: 0.7;
+    }
+
+    .form-input,
+    .form-select {
+      outline: none;
+      transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+    }
+
+    .form-input:focus,
+    .form-select:focus {
+      border-color: var(--indigo);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+      background: rgba(12, 12, 15, 0.78);
+    }
+
+    .form-field.has-issue .form-input,
+    .form-field.has-issue .form-select,
+    .form-field.has-issue .form-readout {
+      border-color: rgba(251, 113, 133, 0.34);
+    }
+
+    .form-textarea {
+      min-height: 56px;
+      resize: vertical;
+      white-space: pre-wrap;
+    }
+
+    .form-input::placeholder,
+    .form-select::placeholder {
+      color: var(--muted);
+      opacity: 0.7;
+    }
+
+    .toggle-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+      min-height: 36px;
+    }
+
+    .toggle-track {
+      width: 34px;
+      height: 18px;
+      border-radius: 999px;
+      background: rgba(251, 113, 133, 0.15);
+      border: 1px solid rgba(251, 113, 133, 0.28);
+      position: relative;
+      transition: all 140ms;
+      flex-shrink: 0;
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--blocked);
+      opacity: 0.7;
+      transition: all 140ms;
+    }
+
+    .toggle-row.on .toggle-track {
+      background: rgba(52, 211, 153, 0.20);
+      border-color: rgba(52, 211, 153, 0.35);
+    }
+
+    .toggle-row.on .toggle-track::after {
+      left: 18px;
+      background: var(--enabled);
+      opacity: 1;
+    }
+
+    .toggle-label {
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .field-note {
+      font-size: 9px;
+      color: var(--dim);
+      line-height: 1.3;
+      margin-top: 0;
+    }
+
+    .field-note.info {
+      color: var(--slate-val);
+    }
+
+    .field-note.help {
+      color: var(--dim);
+    }
+
+    .field-note.issue {
+      color: #f7b4c0;
+    }
+
+    .validation-strip {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+      padding-top: 2px;
+    }
+
+    .validation-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 8px 10px;
+      border: 1px solid rgba(39, 39, 42, 0.46);
+      border-radius: 8px;
+      background: rgba(14, 14, 18, 0.42);
+    }
+
+    .validation-title {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.85px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .validation-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      font-size: 10px;
+      line-height: 1.4;
+      color: var(--slate-val);
+    }
+
+    .validation-item.ok { color: var(--slate-val); }
+    .validation-item.issue { color: var(--gold); }
+
+    .validation-icon {
+      width: 14px;
+      flex-shrink: 0;
+      text-align: center;
+      font-weight: 700;
+      color: inherit;
+    }
+
+    .validation-targets {
+      display: inline-flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-left: 6px;
+    }
+
+    .validation-target {
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 999px;
+      background: rgba(176, 190, 197, 0.08);
+      border: 1px solid rgba(176, 190, 197, 0.16);
+      color: var(--slate);
+    }
+
+    .timeline-surface {
+      --timeline-node-height: 76px;
+      flex: 1;
+      min-height: 0;
+      overflow-x: auto;
+      overflow-y: auto;
+      padding: 14px 16px 16px;
+      background: transparent;
+      scroll-behavior: smooth;
+    }
+
+    .tl-h-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .tl-horizontal-flow {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 0;
+      min-width: max-content;
+      min-height: 160px;
+    }
+
+    .past-trail-h {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 0;
+      flex-shrink: 0;
+    }
+
+    .origin-card,
+    .past-card,
+    .present-marker-h,
+    .future-state-card-h,
+    .future-card-h,
+    .terminal-message-h,
+    .no-past-h {
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+    }
+
+    .origin-card,
+    .present-marker-h,
+    .future-state-card-h {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 16px;
+      min-width: 152px;
+      min-height: 76px;
+      flex-shrink: 0;
+      border-radius: 12px;
+      background: rgba(18, 18, 23, 0.3);
+      text-align: center;
+      transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    }
+
+    .origin-card {
+      border: 2px solid #4338CA;
+    }
+
+    .origin-card-title {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .origin-card .oc-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: #4338CA;
+    }
+
+    .origin-card .oc-label {
+      font-size: 12px;
+      color: var(--violet);
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .past-card {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      padding: 12px 14px;
+      background: rgba(18, 18, 22, 0.78);
+      border: 1px solid rgba(39, 39, 42, 0.56);
+      border-radius: 10px;
+      min-width: 148px;
+      max-width: 184px;
+      min-height: 132px;
+      flex-shrink: 0;
+      transition: border-color 180ms ease, background 180ms ease;
+    }
+
+    .past-card:hover {
+      border-color: rgba(144, 150, 166, 0.30);
+      background: rgba(20, 20, 24, 0.82);
+    }
+
+    .past-card.edit-card {
+      border-color: rgba(99, 102, 241, 0.28);
+      background: rgba(22, 23, 35, 0.82);
+    }
+
+    .past-card.edit-card:hover {
+      border-color: rgba(99, 102, 241, 0.42);
+      background: rgba(24, 26, 40, 0.88);
+    }
+
+    .pc-event {
+      font-size: 12px;
+      color: var(--cyan);
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .past-card.edit-card .pc-event {
+      color: var(--indigo);
+    }
+
+    .pc-outcome {
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--slate-val);
+    }
+
+    .pc-outcome.transition { color: var(--enabled); }
+    .pc-outcome.no-transition { color: var(--cyan); opacity: 0.85; }
+
+    .pc-state {
+      color: var(--violet);
+      font-weight: 700;
+    }
+
+    .pc-delta {
+      font-size: 9px;
+      color: var(--dim);
+      line-height: 1.35;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pc-delta .field { color: var(--slate); }
+    .pc-delta .after { color: var(--enabled); }
+
+    .h-connector {
+      width: 28px;
+      height: 2px;
+      background: linear-gradient(to right, rgba(144, 150, 166, 0.15), rgba(168, 152, 245, 0.30));
+      flex-shrink: 0;
+      align-self: flex-start;
+      margin-top: 42px;
+      border-radius: 1px;
+    }
+
+    .h-connector.past-to-present {
+      width: 36px;
+      background: linear-gradient(to right, rgba(168, 152, 245, 0.30), rgba(168, 152, 245, 0.50));
+    }
+
+    .h-connector.present-to-future {
+      width: 36px;
+      background: linear-gradient(to right, rgba(168, 152, 245, 0.50), rgba(48, 184, 232, 0.30));
+    }
+
+    .h-connector.future-to-state {
+      width: 28px;
+      background: linear-gradient(to right, rgba(48, 184, 232, 0.25), rgba(67, 56, 202, 0.30));
+    }
+
+    .present-marker-h {
+      position: relative;
+      animation: spotlightIn 400ms ease-out;
+      cursor: pointer;
+      min-width: 160px;
+      border: 2px solid var(--violet);
+      background: rgba(30, 27, 75, 0.25);
+    }
+
+    .present-marker-h:hover,
+    .present-marker-h.hover-highlight {
+      border-color: rgba(168, 152, 245, 0.75);
+      box-shadow: 0 0 18px rgba(168, 152, 245, 0.12);
+    }
+
+    .present-marker-h::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 14px;
+      pointer-events: none;
+      box-shadow: 0 0 20px rgba(168, 152, 245, 0.08);
+    }
+
+    .present-marker-h.terminal-state {
+      border-color: #6366F1;
+      box-shadow: inset 0 0 0 1px rgba(12, 12, 15, 0.94), inset 0 0 0 2px rgba(99, 102, 241, 0.24);
+    }
+
+    .present-marker-h.terminal-state::before {
+      box-shadow: none;
+    }
+
+    .pm-h-eyebrow {
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .pm-h-state-name,
+    .future-state-name-h {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--violet);
+      line-height: 1.3;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .pm-h-footer,
+    .future-state-sources-h {
+      font-size: 8px;
+      color: var(--dusk);
+      line-height: 1.35;
+    }
+
+    .future-events-h {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+      padding-left: 0;
+    }
+
+    .future-section-h {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .future-transition-lanes-h {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .future-transition-lane-h {
+      display: grid;
+      grid-template-columns: max-content 28px max-content;
+      align-items: start;
+      gap: 0;
+      flex-shrink: 0;
+    }
+
+    .future-transition-lane-h .h-connector.future-to-state {
+      align-self: start;
+      margin-top: calc((var(--timeline-node-height) / 2) - 1px);
+    }
+
+    .future-card-h {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 14px;
+      background: rgba(18, 22, 27, 0.76);
+      border: 1px solid rgba(39, 39, 42, 0.72);
+      border-radius: 10px;
+      transition: border-color 180ms, background 180ms, transform 180ms;
+      cursor: default;
+      min-width: 306px;
+      max-width: 360px;
+      min-height: 132px;
+      position: relative;
+    }
+
+    .future-card-h.can-fire {
+      cursor: pointer;
+    }
+
+    .future-card-h.can-fire:hover,
+    .future-card-h.hover-highlight {
+      border-color: rgba(48, 184, 232, 0.30);
+      background: rgba(18, 26, 32, 0.82);
+      transform: translateX(3px);
+    }
+
+    .future-card-h.blocked-card {
+      opacity: 0.76;
+      border-color: rgba(251, 113, 133, 0.18);
+      background: rgba(31, 18, 24, 0.58);
+    }
+
+    .event-card-top {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      align-items: start;
+    }
+
+    .ec-guard-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 9px;
+      color: var(--dusk);
+      line-height: 1.35;
+    }
+
+    .ec-guard-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 8px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .ec-guard-status.pass {
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.08);
+      border: 1px solid rgba(52, 211, 153, 0.20);
+    }
+
+    .ec-guard-status.fail {
+      color: var(--blocked);
+      background: rgba(251, 113, 133, 0.08);
+      border: 1px solid rgba(251, 113, 133, 0.20);
+    }
+
+    .event-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 12px;
+      row-gap: 0;
+    }
+
+    .future-card-h .form-summary {
+      margin-bottom: 6px;
+    }
+
+    .event-form-grid .form-field {
+      padding: 6px 0 8px;
+      background: transparent;
+    }
+
+    .event-form-grid .form-field.has-issue {
+      background: transparent;
+    }
+
+    .event-form-grid .field-note {
+      min-height: 12px;
+    }
+
+    .event-form-grid .form-control {
+      min-height: 30px;
+    }
+
+    .ec-actions {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-top: auto;
+      width: 100%;
+    }
+
+    .ec-fire-btn {
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.3;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 6px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      border: 1px solid rgba(48, 184, 232, 0.30);
+      color: var(--cyan);
+      background: rgba(48, 184, 232, 0.08);
+      white-space: nowrap;
+      transition: all 150ms;
+    }
+
+    .ec-fire-btn:hover {
+      color: #6fd7f3;
+      border-color: rgba(48, 184, 232, 0.48);
+      background: rgba(48, 184, 232, 0.18);
+    }
+
+    .ec-fire-btn.blocked {
+      border-color: rgba(251, 113, 133, 0.22);
+      color: var(--blocked);
+      background: rgba(251, 113, 133, 0.06);
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .future-state-card-h {
+      border: 1.5px solid rgba(67, 56, 202, 0.4);
+      cursor: pointer;
+      position: relative;
+      align-self: start;
+      min-height: var(--timeline-node-height);
+      height: var(--timeline-node-height);
+      padding: 10px 16px;
+      box-sizing: border-box;
+    }
+
+    .future-transition-lane-h .future-state-card-h {
+      width: 152px;
+      min-width: 152px;
+      max-width: 152px;
+    }
+
+    .present-marker-h.state-initial .pm-h-state-name::before,
+    .future-state-card-h.state-initial .future-state-name-h::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: #4338CA;
+    }
+
+    .future-state-card-h.state-initial {
+      border-width: 2px;
+      border-color: #4338CA;
+    }
+
+    .future-state-card-h.state-current {
+      border: 2px solid var(--violet);
+      background: rgba(30, 27, 75, 0.25);
+    }
+
+    .future-state-card-h.state-terminal {
+      border-color: #6366F1;
+      box-shadow: inset 0 0 0 1px rgba(12, 12, 15, 0.94);
+    }
+
+    .future-state-card-h.state-terminal::before {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 14px;
+      border: 1px solid rgba(99, 102, 241, 0.30);
+      pointer-events: none;
+    }
+
+    .future-state-card-h.state-terminal .future-state-name-h {
+      color: #c7ccff;
+    }
+
+    .future-state-card-h:hover,
+    .future-state-card-h.hover-highlight {
+      border-color: rgba(168, 152, 245, 0.55);
+      background: rgba(168, 152, 245, 0.08);
+    }
+
+    .future-state-sources-h .source-event {
+      color: var(--cyan);
+      font-weight: 700;
+    }
+
+    .terminal-message-h,
+    .no-past-h {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+      padding: 14px 18px;
+      border-radius: 8px;
+      border: 1px dashed rgba(144, 150, 166, 0.20);
+      background: rgba(17, 17, 20, 0.52);
+      color: var(--dim);
+      font-size: 10px;
+      line-height: 1.45;
+      flex-shrink: 0;
+    }
+
+    .terminal-message-h {
+      align-items: center;
+      text-align: center;
+    }
+
+    .terminal-message-h .tm-icon {
+      font-size: 20px;
+      color: var(--dusk);
+    }
+
+    .toast {
+      position: fixed;
+      top: 50px;
+      right: 20px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: all 300ms ease;
+      pointer-events: none;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    .toast.transition-toast { background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.35); color: var(--enabled); }
+    .toast.no-transition-toast { background: rgba(48, 184, 232, 0.10); border: 1px solid rgba(48, 184, 232, 0.25); color: var(--cyan); }
+    .toast.rejected-toast { background: rgba(251, 113, 133, 0.12); border: 1px solid rgba(251, 113, 133, 0.30); color: var(--blocked); }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 5px 16px;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+      color: var(--dim);
+      flex-shrink: 0;
+    }
+
+    .status-left {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .status-ok { color: var(--enabled); }
+    .status-warn { color: var(--gold); }
+
+    body.is-resizing {
+      user-select: none;
+    }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateX(-12px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes spotlightIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes dataFlash {
+      0% { background: rgba(52, 211, 153, 0.12); }
+      100% { background: rgba(52, 211, 153, 0.03); }
+    }
+
+    @media (max-width: 920px) {
+      .main-layout.layout-split,
+      .main-layout.layout-stack {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: 160px 0 minmax(0, 1fr) 0 270px;
+        grid-template-areas:
+          'state'
+          'divider-primary'
+          'data'
+          'divider-secondary'
+          'timeline';
+      }
+
+      .layout-divider {
+        display: none;
+      }
+
+      .form-grid,
+      .event-form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .form-field.span-full {
+        grid-column: auto;
+      }
+
+      .future-card-h {
+        min-width: 280px;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .header {
+        align-items: flex-start;
+      }
+
+      .header-actions {
+        width: 100%;
+        justify-content: space-between;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+        column-gap: 0;
+      }
+
+      .event-form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .form-summary {
+        grid-template-columns: 1fr;
+      }
+
+      .status-bar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+
+  <div class="header">
+    <div class="header-left">
+      <span class="concept-badge">28 · QUIET CARD FORMS</span>
+      <span class="header-title">MaintenanceWorkOrder</span>
+      <span class="sep">·</span>
+      <span class="header-file">maintenance-work-order.precept</span>
+    </div>
+    <div class="header-actions">
+      <div class="header-group">
+        <span class="layout-hint">Layout</span>
+        <div class="layout-switch" role="group" aria-label="Layout presets">
+          <button data-layout-mode="stack" class="active" onclick="setLayoutMode('stack')">State top</button>
+          <button data-layout-mode="split" onclick="setLayoutMode('split')">State left</button>
+        </div>
+      </div>
+      <div class="header-group">
+        <button onclick="undoStep()">← Undo</button>
+        <button onclick="resetSimulation()">↺ Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mainLayout" class="main-layout layout-stack">
+    <section class="panel-shell state-shell">
+      <div class="panel-head">
+        <span class="panel-name">State</span>
+        <span class="panel-caption">Lifecycle stays visible in both layouts</span>
+      </div>
+      <div class="panel-body state-panel-body">
+        <div id="stateDiagram" class="sd-svg-container"></div>
+      </div>
+    </section>
+
+    <div class="layout-divider divider-primary" data-divider="primary" role="separator" aria-label="Resize state and data panels"></div>
+
+    <section class="panel-shell data-shell">
+      <div class="panel-head">
+        <span class="panel-name">Data</span>
+        <span class="panel-caption">Calm read mode, explicit edit mode, validation kept secondary</span>
+      </div>
+      <div class="panel-body">
+        <div id="dataPanel" class="data-panel"></div>
+      </div>
+    </section>
+
+    <div class="layout-divider divider-secondary" data-divider="secondary" role="separator" aria-label="Resize timeline panel"></div>
+
+    <section class="panel-shell timeline-shell">
+      <div class="panel-head">
+        <span class="panel-name">Timeline</span>
+        <span class="panel-caption">Same bottom timeline, with cleaner argument form language inside each card</span>
+      </div>
+      <div class="panel-body">
+        <div class="timeline-surface" id="timeline"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-left">
+      <span id="statusStep">Step 0</span>
+      <span class="sep">·</span>
+      <span id="statusInvariants" class="status-ok">✓ 2 invariants ok</span>
+      <span class="sep">·</span>
+      <span id="statusInfo">6 states · 7 events · 10 fields</span>
+    </div>
+    <div>
+      <span><span style="color: var(--indigo);">Fire</span> <span>an event from the bottom timeline</span></span>
+    </div>
+  </div>
+
+  <script>
+    const STATES = ['Draft', 'Open', 'Scheduled', 'InProgress', 'Completed', 'Cancelled'];
+
+    const STATE_META = {
+      Draft:      { initial: true,  terminal: false },
+      Open:       { initial: false, terminal: false },
+      Scheduled:  { initial: false, terminal: false },
+      InProgress: { initial: false, terminal: false },
+      Completed:  { initial: false, terminal: true  },
+      Cancelled:  { initial: false, terminal: true  },
+    };
+
+    const FIELD_DEFS = {
+      RequesterName:       { type: 'string',  nullable: true,  default: null },
+      Location:            { type: 'string',  nullable: true,  default: null },
+      IssueSummary:        { type: 'string',  nullable: true,  default: null },
+      AssignedTechnician:  { type: 'string',  nullable: true,  default: null },
+      EstimatedHours:      { type: 'number',  nullable: false, default: 0 },
+      ActualHours:         { type: 'number',  nullable: false, default: 0 },
+      Urgent:              { type: 'boolean', nullable: false, default: false },
+      PartsApproved:       { type: 'boolean', nullable: false, default: false },
+      CompletionNote:      { type: 'string',  nullable: true,  default: null },
+      CancellationReason:  { type: 'string',  nullable: true,  default: null },
+    };
+
+    const INVARIANTS = [
+      { expr: 'EstimatedHours >= 0', msg: 'Estimated hours cannot be negative', targets: ['EstimatedHours'], check: data => data.EstimatedHours >= 0 },
+      { expr: 'ActualHours >= 0', msg: 'Actual hours cannot be negative', targets: ['ActualHours'], check: data => data.ActualHours >= 0 },
+    ];
+
+    const EDITABLE_FIELDS = { Draft: ['Location', 'IssueSummary', 'Urgent'] };
+
+    const STATE_ASSERTIONS = {
+      Scheduled: [{ expr: 'AssignedTechnician != null', msg: 'Scheduled work must have an assigned technician', targets: ['AssignedTechnician'], check: data => data.AssignedTechnician !== null }],
+      Completed: [{ expr: 'CompletionNote != null', msg: 'Completed work orders need a completion note', targets: ['CompletionNote'], check: data => data.CompletionNote !== null }],
+    };
+
+    const FROM_ASSERTIONS = {
+      InProgress: [{ expr: 'AssignedTechnician != null', msg: 'Active work cannot finish without a technician', targets: ['AssignedTechnician'], check: data => data.AssignedTechnician !== null }],
+    };
+
+    function getAvailableEvents(state, data) {
+      const events = [];
+
+      if (state === 'Draft') {
+        events.push({ name: 'Submit', args: [
+            { name: 'Requester', type: 'string', placeholder: 'Jane Doe' },
+            { name: 'WorkLocation', type: 'string', placeholder: 'Building A, Room 204' },
+            { name: 'Summary', type: 'string', placeholder: 'HVAC not cooling' },
+            { name: 'IsUrgent', type: 'boolean', default: false },
+          ], rows: [{ guard: null, guardDisplay: null, outcome: 'transition', target: 'Open',
+            mutations: ['RequesterName = Requester', 'Location = WorkLocation', 'IssueSummary = Summary', 'Urgent = IsUrgent'],
+            eventAsserts: [
+              { expr: 'Requester != ""', msg: 'A requester name is required', check: args => args.Requester && args.Requester !== '' },
+              { expr: 'WorkLocation != ""', msg: 'A location is required', check: args => args.WorkLocation && args.WorkLocation !== '' },
+              { expr: 'Summary != ""', msg: 'An issue summary is required', check: args => args.Summary && args.Summary !== '' },
+            ],
+            canFire: args => args.Requester && args.Requester !== '' && args.WorkLocation && args.WorkLocation !== '' && args.Summary && args.Summary !== '',
+            blockReason: args => {
+              if (!args.Requester || args.Requester === '') return 'A requester name is required';
+              if (!args.WorkLocation || args.WorkLocation === '') return 'A location is required';
+              if (!args.Summary || args.Summary === '') return 'An issue summary is required';
+              return '';
+            },
+            apply: (currentData, args) => ({ ...currentData, RequesterName: args.Requester, Location: args.WorkLocation, IssueSummary: args.Summary, Urgent: !!args.IsUrgent }),
+          }],
+        });
+      }
+
+      if (state === 'Open') {
+        events.push({ name: 'Assign', args: [
+            { name: 'Technician', type: 'string', placeholder: 'Bob Smith' },
+            { name: 'Estimate', type: 'number', placeholder: '4' },
+          ], rows: [{ guard: null, guardDisplay: null, outcome: 'transition', target: 'Scheduled',
+            mutations: ['AssignedTechnician = Technician', 'EstimatedHours = Estimate'],
+            eventAsserts: [
+              { expr: 'Technician != ""', msg: 'A technician is required', check: args => args.Technician && args.Technician !== '' },
+              { expr: 'Estimate > 0', msg: 'Estimated hours must be positive', check: args => Number(args.Estimate) > 0 },
+            ],
+            canFire: args => args.Technician && args.Technician !== '' && Number(args.Estimate) > 0,
+            blockReason: args => {
+              if (!args.Technician || args.Technician === '') return 'A technician is required';
+              if (!Number(args.Estimate) || Number(args.Estimate) <= 0) return 'Estimated hours must be positive';
+              return '';
+            },
+            apply: (currentData, args) => ({ ...currentData, AssignedTechnician: args.Technician, EstimatedHours: Number(args.Estimate) }),
+          }],
+        });
+        events.push({ name: 'Cancel', args: [{ name: 'Reason', type: 'string', placeholder: 'No longer needed', nullable: true, default: '' }],
+          rows: [{ guard: null, guardDisplay: null, outcome: 'transition', target: 'Cancelled', mutations: ['CancellationReason = Reason'],
+            eventAsserts: [{ expr: 'Reason == null || Reason != ""', msg: 'A supplied cancellation reason cannot be blank', check: args => !args.Reason || args.Reason === '' || args.Reason.trim() !== '' }],
+            canFire: () => true, blockReason: () => '', apply: (currentData, args) => ({ ...currentData, CancellationReason: args.Reason || null }),
+          }],
+        });
+      }
+
+      if (state === 'Scheduled') {
+        events.push({ name: 'ApproveParts', args: [], rows: [{ guard: null, guardDisplay: null, outcome: 'no-transition', target: null, mutations: ['PartsApproved = true'], eventAsserts: [], canFire: () => true, blockReason: () => '', apply: currentData => ({ ...currentData, PartsApproved: true }) }] });
+        events.push({ name: 'StartWork', args: [], rows: [
+            { guard: '!Urgent || PartsApproved', guardDisplay: '!Urgent || PartsApproved', outcome: 'transition', target: 'InProgress', eventAsserts: [], canFire: (args, currentData) => !currentData.Urgent || currentData.PartsApproved, blockReason: () => 'Urgent work must have parts approved before it starts', apply: currentData => currentData },
+            { guard: null, guardDisplay: null, outcome: 'rejected', target: null, rejectMsg: 'Urgent work must have parts approved before it starts', eventAsserts: [], canFire: () => false, apply: currentData => currentData },
+          ] });
+        events.push({ name: 'Cancel', args: [{ name: 'Reason', type: 'string', placeholder: 'Budget cut', nullable: true, default: '' }],
+          rows: [{ guard: null, guardDisplay: null, outcome: 'transition', target: 'Cancelled', mutations: ['CancellationReason = Reason'],
+            eventAsserts: [{ expr: 'Reason == null || Reason != ""', msg: 'A supplied cancellation reason cannot be blank', check: args => !args.Reason || args.Reason === '' || args.Reason.trim() !== '' }],
+            canFire: () => true, blockReason: () => '', apply: (currentData, args) => ({ ...currentData, CancellationReason: args.Reason || null }),
+          }],
+        });
+      }
+
+      if (state === 'InProgress') {
+        events.push({ name: 'RecordProgress', args: [{ name: 'Hours', type: 'number', placeholder: '2' }],
+          rows: [{ guard: null, guardDisplay: null, outcome: 'no-transition', target: null, mutations: ['ActualHours = ActualHours + Hours'],
+            eventAsserts: [{ expr: 'Hours > 0', msg: 'Progress entries must be positive', check: args => Number(args.Hours) > 0 }],
+            canFire: args => Number(args.Hours) > 0, blockReason: () => 'Progress entries must be positive',
+            apply: (currentData, args) => ({ ...currentData, ActualHours: currentData.ActualHours + Number(args.Hours) }),
+          }],
+        });
+        events.push({ name: 'Complete', args: [{ name: 'Note', type: 'string', placeholder: 'Fixed compressor unit' }],
+          rows: [
+            { guard: 'ActualHours <= EstimatedHours + 4', guardDisplay: 'ActualHours <= EstimatedHours + 4', outcome: 'transition', target: 'Completed', mutations: ['CompletionNote = Note'],
+              eventAsserts: [{ expr: 'Note != ""', msg: 'A completion note is required', check: args => args.Note && args.Note !== '' }],
+              canFire: (args, currentData) => args.Note && args.Note !== '' && currentData.ActualHours <= currentData.EstimatedHours + 4,
+              blockReason: (args, currentData) => {
+                if (!args.Note || args.Note === '') return 'A completion note is required';
+                return 'Work orders that exceed the estimate by more than four hours need review first';
+              },
+              apply: (currentData, args) => ({ ...currentData, CompletionNote: args.Note }),
+            },
+            { guard: null, guardDisplay: null, outcome: 'rejected', target: null, rejectMsg: 'Work orders that exceed the estimate by more than four hours need review first', eventAsserts: [], canFire: () => false, apply: currentData => currentData },
+          ],
+        });
+      }
+
+      return events;
+    }
+
+    function getDefaultData() {
+      const data = {};
+      for (const [key, definition] of Object.entries(FIELD_DEFS)) data[key] = definition.default;
+      return data;
+    }
+
+    function getInitialSimulation() {
+      return { currentState: 'Draft', data: getDefaultData(), history: [], stepCount: 0, visitedStates: new Set(['Draft']), changedFields: new Set() };
+    }
+
+    let sim = getInitialSimulation();
+    let isEditing = false;
+    let draftData = null;
+    let dirtyFields = new Set();
+    const eventDrafts = {};
+    let touchedFields = new Set();
+    const eventTouched = {};
+    const eventAttempts = {};
+    const uiState = { layout: 'stack' };
+    const panelSizes = {
+      stackState: 150,
+      stackTimeline: 248,
+      splitState: 320,
+      splitTimeline: 248,
+    };
+    let activeResize = null;
+
+    function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+    function formatTokenLabel(value) {
+      return value.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+    }
+
+    function titleCaseLabel(value) {
+      const spaced = formatTokenLabel(value);
+      return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+    }
+
+    function isLongTextName(name) {
+      return /(Summary|Reason|Note)$/i.test(name);
+    }
+
+    function shouldSpanFullWidth(name) {
+      return isLongTextName(name);
+    }
+
+    function isFieldRequired(fieldName) {
+      return sim.currentState === 'Draft' && (fieldName === 'Location' || fieldName === 'IssueSummary');
+    }
+
+    function getFieldHelp(fieldName) {
+      return {
+        Location: 'Enter the building, area, or room for the request.',
+        IssueSummary: 'Enter a short business summary of the work needed.',
+        Urgent: 'Select Yes when the request needs priority handling.',
+      }[fieldName] || '';
+    }
+
+    function getFieldMeta(fieldName) {
+      return {
+        label: titleCaseLabel(fieldName),
+        required: isFieldRequired(fieldName),
+        help: getFieldHelp(fieldName),
+      };
+    }
+
+    function getEventDraftKey(eventName) {
+      return `${sim.currentState}:${eventName}`;
+    }
+
+    function getEventDraftValue(evt, arg) {
+      const key = getEventDraftKey(evt.name);
+      const draft = eventDrafts[key];
+      if (draft && Object.prototype.hasOwnProperty.call(draft, arg.name)) return draft[arg.name];
+      if (arg.default !== undefined) return arg.default;
+      if (arg.type === 'boolean') return false;
+      return '';
+    }
+
+    function setEventDraftValue(eventName, argName, rawValue, argType) {
+      const key = getEventDraftKey(eventName);
+      if (!eventDrafts[key]) eventDrafts[key] = {};
+      if (argType === 'boolean') eventDrafts[key][argName] = rawValue === true || rawValue === 'true';
+      else eventDrafts[key][argName] = rawValue;
+      if (!eventTouched[key]) eventTouched[key] = {};
+      eventTouched[key][argName] = true;
+      syncEventCard(eventName);
+    }
+
+    function clearEventDrafts() {
+      Object.keys(eventDrafts).forEach(key => delete eventDrafts[key]);
+      Object.keys(eventTouched).forEach(key => delete eventTouched[key]);
+      Object.keys(eventAttempts).forEach(key => delete eventAttempts[key]);
+    }
+
+    function getEventArgValues(evt) {
+      const args = {};
+      evt.args.forEach(arg => {
+        const el = document.getElementById(`arg-${evt.name}-${arg.name}`);
+        if (el) {
+          if (arg.type === 'boolean') args[arg.name] = el.value === 'true';
+          else if (arg.type === 'number') args[arg.name] = el.value;
+          else args[arg.name] = el.value || '';
+        } else {
+          const draft = getEventDraftValue(evt, arg);
+          args[arg.name] = draft;
+        }
+      });
+      return args;
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function applyLayoutSizing() {
+      const main = document.getElementById('mainLayout');
+      if (!main) return;
+      main.style.setProperty('--stack-state-size', `${panelSizes.stackState}px`);
+      main.style.setProperty('--stack-timeline-size', `${panelSizes.stackTimeline}px`);
+      main.style.setProperty('--split-state-size', `${panelSizes.splitState}px`);
+      main.style.setProperty('--split-timeline-size', `${panelSizes.splitTimeline}px`);
+    }
+
+    function updateDividerMetadata() {
+      const primary = document.querySelector('.divider-primary');
+      const secondary = document.querySelector('.divider-secondary');
+      if (primary) primary.setAttribute('aria-orientation', uiState.layout === 'split' ? 'vertical' : 'horizontal');
+      if (secondary) secondary.setAttribute('aria-orientation', 'horizontal');
+    }
+
+    function beginResize(divider, event) {
+      if (event.button !== undefined && event.button !== 0) return;
+      const main = document.getElementById('mainLayout');
+      if (!main) return;
+      const rect = main.getBoundingClientRect();
+      activeResize = {
+        divider,
+        layout: uiState.layout,
+        startX: event.clientX,
+        startY: event.clientY,
+        rect,
+        start: { ...panelSizes },
+      };
+      document.body.classList.add('is-resizing');
+      document.body.style.cursor = uiState.layout === 'split' && divider === 'primary' ? 'col-resize' : 'row-resize';
+      document.addEventListener('pointermove', handleResizeMove);
+      document.addEventListener('pointerup', endResize);
+      document.addEventListener('pointercancel', endResize);
+      event.preventDefault();
+    }
+
+    function handleResizeMove(event) {
+      if (!activeResize) return;
+      const { divider, layout, startX, startY, rect, start } = activeResize;
+      if (layout === 'stack') {
+        if (divider === 'primary') {
+          const maxState = Math.max(110, rect.height - panelSizes.stackTimeline - 180);
+          panelSizes.stackState = clamp(start.stackState + (event.clientY - startY), 110, maxState);
+        } else {
+          const maxTimeline = Math.max(180, rect.height - panelSizes.stackState - 150);
+          panelSizes.stackTimeline = clamp(start.stackTimeline - (event.clientY - startY), 180, maxTimeline);
+        }
+      } else {
+        if (divider === 'primary') {
+          const maxState = Math.max(280, rect.width - 320);
+          panelSizes.splitState = clamp(start.splitState + (event.clientX - startX), 280, maxState);
+        } else {
+          const maxTimeline = Math.max(180, rect.height - 170);
+          panelSizes.splitTimeline = clamp(start.splitTimeline - (event.clientY - startY), 180, maxTimeline);
+        }
+      }
+      applyLayoutSizing();
+      renderStateDiagram();
+    }
+
+    function endResize() {
+      if (!activeResize) return;
+      activeResize = null;
+      document.body.classList.remove('is-resizing');
+      document.body.style.cursor = '';
+      document.removeEventListener('pointermove', handleResizeMove);
+      document.removeEventListener('pointerup', endResize);
+      document.removeEventListener('pointercancel', endResize);
+    }
+
+    function setLayoutMode(mode) {
+      if (mode !== 'stack' && mode !== 'split') return;
+      if (uiState.layout === mode) return;
+      uiState.layout = mode;
+      const main = document.getElementById('mainLayout');
+      if (!main) return;
+      main.classList.toggle('layout-stack', mode === 'stack');
+      main.classList.toggle('layout-split', mode === 'split');
+      document.querySelectorAll('[data-layout-mode]').forEach(button => {
+        const active = button.dataset.layoutMode === mode;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+      });
+      updateDividerMetadata();
+      renderStateDiagram();
+      showToast(mode === 'split' ? 'State left, data right' : 'State top, data centered', 'no-transition');
+    }
+
+    function startEditing() {
+      if (!EDITABLE_FIELDS[sim.currentState]) return;
+      isEditing = true;
+      draftData = deepClone(sim.data);
+      dirtyFields = new Set();
+      touchedFields = new Set();
+      render();
+    }
+
+    function cancelEditing() {
+      isEditing = false;
+      draftData = null;
+      dirtyFields = new Set();
+      touchedFields = new Set();
+      render();
+    }
+
+    function saveDraftEdits() {
+      if (!isEditing || dirtyFields.size === 0) return;
+      const deltas = [];
+      for (const field of dirtyFields) {
+        const before = sim.data[field];
+        const after = draftData[field];
+        if (JSON.stringify(before) !== JSON.stringify(after)) {
+          deltas.push({ field, before, after });
+          sim.data[field] = after;
+        }
+      }
+      if (deltas.length > 0) {
+        sim.stepCount++;
+        sim.history.push({ stepNum: sim.stepCount, fromState: sim.currentState, event: 'edit ' + [...dirtyFields].join(', '), args: {}, toState: sim.currentState, outcome: 'no-transition', deltas, dataSnapshot: deepClone(sim.data) });
+        sim.changedFields = new Set(deltas.map(delta => delta.field));
+        showToast(`Saved ${deltas.length} field${deltas.length > 1 ? 's' : ''}`, 'no-transition');
+      }
+      isEditing = false;
+      draftData = null;
+      dirtyFields = new Set();
+      touchedFields = new Set();
+      clearEventDrafts();
+      render();
+    }
+
+    function updateDraftField(fieldName, value) {
+      if (!draftData) return;
+      touchedFields.add(fieldName);
+      draftData[fieldName] = value;
+      if (JSON.stringify(value) !== JSON.stringify(sim.data[fieldName])) dirtyFields.add(fieldName);
+      else dirtyFields.delete(fieldName);
+      syncDraftEditingUi();
+    }
+
+    function toggleDraftBool(fieldName) {
+      if (!draftData) return;
+      updateDraftField(fieldName, !draftData[fieldName]);
+    }
+
+    function fireEvent(eventName, rowIndex) {
+      if (isEditing) cancelEditing();
+      const events = getAvailableEvents(sim.currentState, sim.data);
+      const evt = events.find(item => item.name === eventName);
+      if (!evt) return;
+      const args = gatherArgs(evt);
+      const row = rowIndex !== undefined ? evt.rows[rowIndex] : evt.rows.find(item => item.canFire(args, sim.data)) || evt.rows[0];
+
+      if (row.eventAsserts) {
+        for (const assertion of row.eventAsserts) {
+          if (!assertion.check(args)) {
+            eventAttempts[getEventDraftKey(evt.name)] = true;
+            renderTimeline();
+            showToast(assertion.msg, 'rejected');
+            return;
+          }
+        }
+      }
+
+      if (!row.canFire(args, sim.data)) {
+        eventAttempts[getEventDraftKey(evt.name)] = true;
+        renderTimeline();
+        showToast(row.blockReason ? row.blockReason(args, sim.data) : (row.rejectMsg || 'Guard failed'), 'rejected');
+        return;
+      }
+
+      const prevData = deepClone(sim.data);
+      const prevState = sim.currentState;
+      sim.data = row.apply(deepClone(sim.data), args);
+      const deltas = [];
+      for (const key of Object.keys(FIELD_DEFS)) {
+        const before = prevData[key];
+        const after = sim.data[key];
+        if (JSON.stringify(before) !== JSON.stringify(after)) deltas.push({ field: key, before, after });
+      }
+      sim.changedFields = new Set(deltas.map(delta => delta.field));
+      const toState = row.target || sim.currentState;
+      sim.stepCount++;
+      sim.history.push({ stepNum: sim.stepCount, fromState: prevState, event: eventName, args: deepClone(args), toState, outcome: row.outcome, deltas, dataSnapshot: deepClone(sim.data) });
+      sim.currentState = toState;
+      sim.visitedStates.add(toState);
+      showToast(row.outcome === 'transition' ? `${eventName} → ${toState}` : `${eventName} stayed in ${sim.currentState}`, row.outcome === 'transition' ? 'transition' : 'no-transition');
+      render();
+      setTimeout(() => {
+        const timeline = document.getElementById('timeline');
+        if (timeline) timeline.scrollLeft = timeline.scrollWidth;
+      }, 50);
+    }
+
+    function gatherArgs(evt) {
+      const args = {};
+      evt.args.forEach(arg => {
+        const el = document.getElementById(`arg-${evt.name}-${arg.name}`);
+        if (el) {
+          if (arg.type === 'boolean') args[arg.name] = el.value === 'true';
+          else if (arg.type === 'number') args[arg.name] = el.value ? Number(el.value) : 0;
+          else args[arg.name] = el.value || '';
+        } else {
+          const draft = getEventDraftValue(evt, arg);
+          if (arg.type === 'number') args[arg.name] = draft === '' || draft === null || draft === undefined ? 0 : Number(draft);
+          else args[arg.name] = draft;
+        }
+      });
+      return args;
+    }
+
+    function resetSimulation() {
+      isEditing = false;
+      draftData = null;
+      dirtyFields = new Set();
+      touchedFields = new Set();
+      clearEventDrafts();
+      sim = getInitialSimulation();
+      render();
+      showToast('Reset to Draft', 'transition');
+    }
+
+    function undoStep() {
+      if (sim.history.length === 0) return;
+      isEditing = false;
+      draftData = null;
+      dirtyFields = new Set();
+      touchedFields = new Set();
+      clearEventDrafts();
+      sim.history.pop();
+      sim.stepCount = sim.history.length;
+      if (sim.history.length > 0) {
+        const last = sim.history[sim.history.length - 1];
+        sim.currentState = last.toState;
+        sim.data = deepClone(last.dataSnapshot);
+      } else {
+        sim.currentState = 'Draft';
+        sim.data = getDefaultData();
+      }
+      sim.visitedStates = new Set(['Draft']);
+      sim.history.forEach(step => {
+        sim.visitedStates.add(step.fromState);
+        sim.visitedStates.add(step.toState);
+      });
+      sim.visitedStates.add(sim.currentState);
+      sim.changedFields = new Set();
+      render();
+      showToast(`Undid back to ${sim.currentState}`, 'no-transition');
+    }
+
+    let toastTimer = null;
+    function showToast(message, type) {
+      const toast = document.getElementById('toast');
+      toast.className = `toast ${type}-toast show`;
+      toast.textContent = type === 'transition' ? `▸ ${message}` : type === 'rejected' ? `✕ ${message}` : `∼ ${message}`;
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    function setHoverEvent(name) {
+      document.querySelectorAll('[data-event]').forEach(el => {
+        const match = el.dataset.event === name;
+        el.classList.toggle('sd-edge-label-hover', match && el.classList.contains('sd-edge-label'));
+        el.classList.toggle('sd-edge-hover', match && (el.tagName === 'line' || el.tagName === 'LINE'));
+        el.classList.toggle('hover-highlight', match && el.classList.contains('future-card-h'));
+      });
+    }
+
+    function clearHoverEvent() {
+      document.querySelectorAll('.sd-edge-label-hover, .sd-edge-hover, .future-card-h.hover-highlight').forEach(el => {
+        el.classList.remove('sd-edge-label-hover', 'sd-edge-hover', 'hover-highlight');
+      });
+    }
+
+    function setHoverState(name) {
+      document.querySelectorAll('[data-state]').forEach(el => {
+        const match = el.dataset.state === name;
+        if (el.tagName === 'rect' || el.tagName === 'circle' || el.tagName === 'RECT' || el.tagName === 'CIRCLE') el.classList.toggle('sd-node-hover', match);
+        else el.classList.toggle('hover-highlight', match);
+      });
+    }
+
+    function clearHoverState() {
+      document.querySelectorAll('.sd-node-hover, .hover-highlight').forEach(el => el.classList.remove('sd-node-hover', 'hover-highlight'));
+    }
+
+    function render() {
+      renderDataPanel();
+      renderStateDiagram();
+      renderTimeline();
+      renderStatus();
+    }
+
+    function getDataPanelContext() {
+      const editableSet = new Set(EDITABLE_FIELDS[sim.currentState] || []);
+      const hasEditable = editableSet.size > 0;
+      const displayData = isEditing ? draftData : sim.data;
+      const issueCount = Object.keys(FIELD_DEFS).reduce((count, name) => count + (getVisibleFieldIssues(displayData, name, editableSet.has(name)).length > 0 ? 1 : 0), 0);
+      return { editableSet, hasEditable, displayData, issueCount };
+    }
+
+    function getDataPanelHeaderMarkup(hasEditable) {
+      const editableCount = (EDITABLE_FIELDS[sim.currentState] || []).length;
+      const summaryCopy = hasEditable
+        ? `${editableCount} editable field${editableCount === 1 ? '' : 's'} in ${sim.currentState}.`
+        : `Values are read-only in ${sim.currentState}.`;
+
+      let html = `<div class="dp-header-copy">
+          <div class="dp-title-row">
+            <span class="dp-title">Record Data</span>
+            <span class="dp-count">${Object.keys(FIELD_DEFS).length} fields · ${sim.currentState}</span>
+            <span class="dp-mode-pill ${isEditing ? 'editing' : 'reading'}">${isEditing ? 'Editable' : 'Read only'}</span>
+            ${isEditing && dirtyFields.size > 0 ? `<span class="dp-dirty-note">${dirtyFields.size} unsaved change${dirtyFields.size === 1 ? '' : 's'}</span>` : ''}
+          </div>
+          <div class="dp-subcopy">${isEditing ? 'Changes are kept locally until you save.' : summaryCopy}</div>
+        </div>
+        <div class="dp-header-actions">`;
+
+      if (hasEditable && !isEditing) html += `<button class="dp-edit-btn" type="button" onclick="startEditing()">Edit</button>`;
+      if (isEditing) {
+        html += `<button class="dp-cancel-btn" type="button" onclick="cancelEditing()">Cancel</button>`;
+        html += `<button class="dp-save-btn" type="button" onclick="saveDraftEdits()" ${dirtyFields.size === 0 ? 'disabled' : ''}>Save</button>`;
+      }
+      html += `</div>`;
+      return html;
+    }
+
+    function getDataPanelSummaryMarkup(issueCount) {
+      if (!(issueCount > 0 || (isEditing && dirtyFields.size > 0))) return '';
+      return `<span class="form-summary-title">${issueCount > 0 ? `${issueCount} field${issueCount === 1 ? '' : 's'} need attention` : 'Unsaved changes'}</span><span class="form-summary-text">${issueCount > 0 ? 'Review the highlighted fields before saving or moving to the next action.' : `${dirtyFields.size} change${dirtyFields.size === 1 ? '' : 's'} ready to save.`}</span>`;
+    }
+
+    function getValidationMarkup(data) {
+      const validationGroups = getValidationGroups(data);
+      if (validationGroups.length === 0) return '';
+
+      let html = '';
+      validationGroups.forEach(group => {
+        html += `<div class="validation-group"><div class="validation-title">${group.title}</div>`;
+        group.items.forEach(item => {
+          html += `<div class="validation-item ${item.ok ? 'ok' : 'issue'}">`;
+          html += `<span class="validation-icon">${item.ok ? '✓' : '!'}</span>`;
+          html += `<span>${item.msg}`;
+          if (item.targets && item.targets.length > 0) {
+            html += `<span class="validation-targets">${item.targets.map(target => `<span class="validation-target">${target}</span>`).join('')}</span>`;
+          }
+          html += `</span></div>`;
+        });
+        html += `</div>`;
+      });
+      return html;
+    }
+
+    function getDataFieldClassName(name, displayData, isEditableField) {
+      const issues = getVisibleFieldIssues(displayData, name, isEditableField);
+      const wasChanged = sim.changedFields.has(name) && !isEditing;
+      const isDirty = isEditing && dirtyFields.has(name);
+      let cls = 'form-field';
+      if (wasChanged) cls += ' recently-changed';
+      if (isEditing && isEditableField) cls += ' editing';
+      if (isDirty) cls += ' dirty';
+      if (issues.length > 0) cls += ' has-issue';
+      return cls;
+    }
+
+    function syncDataFieldUi(fieldEl, name, displayData, isEditableField) {
+      fieldEl.className = getDataFieldClassName(name, displayData, isEditableField);
+      const note = getInlineFieldNote(displayData, name, isEditableField);
+      const noteEl = fieldEl.querySelector('[data-field-note]');
+      if (noteEl) {
+        noteEl.className = `field-note ${note.tone}`;
+        noteEl.textContent = note.text;
+      }
+    }
+
+    function syncDraftEditingUi() {
+      if (!isEditing || !draftData) return;
+      const el = document.getElementById('dataPanel');
+      if (!el) return;
+
+      const { editableSet, hasEditable, displayData, issueCount } = getDataPanelContext();
+      el.className = `data-panel ${isEditing ? 'is-editing' : 'is-reading'}`;
+
+      const headerEl = el.querySelector('[data-dp-header]');
+      if (headerEl) headerEl.innerHTML = getDataPanelHeaderMarkup(hasEditable);
+
+      const summaryEl = el.querySelector('[data-dp-summary]');
+      if (summaryEl) {
+        const showSummary = issueCount > 0 || dirtyFields.size > 0;
+        summaryEl.className = `form-summary dp-summary${issueCount > 0 ? ' issue' : ''}${showSummary ? '' : ' is-hidden'}`;
+        summaryEl.innerHTML = showSummary ? getDataPanelSummaryMarkup(issueCount) : '';
+      }
+
+      el.querySelectorAll('[data-data-field]').forEach(fieldEl => {
+        const name = fieldEl.dataset.dataField;
+        syncDataFieldUi(fieldEl, name, displayData, editableSet.has(name));
+      });
+
+      const validationEl = el.querySelector('[data-dp-validation]');
+      if (validationEl) {
+        const markup = getValidationMarkup(displayData);
+        validationEl.className = `validation-strip${markup ? '' : ' is-hidden'}`;
+        validationEl.innerHTML = markup;
+      }
+    }
+
+    function renderDataPanel() {
+      const el = document.getElementById('dataPanel');
+      const { editableSet, hasEditable, displayData, issueCount } = getDataPanelContext();
+
+      el.className = `data-panel ${isEditing ? 'is-editing' : 'is-reading'}`;
+
+      let html = `<div class="dp-header" data-dp-header>${getDataPanelHeaderMarkup(hasEditable)}</div>`;
+
+      const showSummary = issueCount > 0 || (isEditing && dirtyFields.size > 0);
+      html += `<div class="form-summary dp-summary ${issueCount > 0 ? 'issue' : ''}${showSummary ? '' : ' is-hidden'}" data-dp-summary>${showSummary ? getDataPanelSummaryMarkup(issueCount) : ''}</div>`;
+
+      html += `<div class="form-grid">`;
+      for (const [name, def] of Object.entries(FIELD_DEFS)) {
+        const value = displayData[name];
+        const isEditableField = editableSet.has(name);
+        const fieldMeta = getFieldMeta(name);
+        const note = getInlineFieldNote(displayData, name, isEditableField);
+
+        html += `<div class="${getDataFieldClassName(name, displayData, isEditableField)}${shouldSpanFullWidth(name) ? ' span-full' : ''}" data-data-field="${name}">`;
+        html += `<div class="form-field-head"><div class="form-label">${fieldMeta.label}</div>${fieldMeta.required && isEditableField ? '<span class="form-required">* Required</span>' : ''}</div>`;
+        html += `<div class="form-control">${renderDataControl(name, def, value, isEditableField)}</div>`;
+        html += `<div class="field-note ${note.tone}" data-field-note>${note.text}</div>`;
+        html += `</div>`;
+      }
+      html += `</div>`;
+
+      const validationMarkup = getValidationMarkup(displayData);
+      html += `<div class="validation-strip${validationMarkup ? '' : ' is-hidden'}" data-dp-validation>${validationMarkup}</div>`;
+
+      el.innerHTML = html;
+    }
+
+    function renderDataControl(name, def, value, isEditableField) {
+      if (isEditing && isEditableField && def.type === 'boolean') {
+        return `<select class="form-select" id="edit-${name}" onchange="updateDraftField('${name}', this.value === 'true')"><option value="false" ${value ? '' : 'selected'}>No</option><option value="true" ${value ? 'selected' : ''}>Yes</option></select>`;
+      }
+
+      if (isEditing && isEditableField) {
+        const escaped = value !== null ? escHtml(String(value)) : '';
+        if (isLongTextName(name)) {
+          return `<textarea class="form-input form-textarea" id="edit-${name}" placeholder="${def.nullable ? 'Enter details' : ''}" oninput="updateDraftField('${name}', this.value || null)">${escaped}</textarea>`;
+        }
+        return `<input class="form-input" id="edit-${name}" type="text" value="${escaped}" placeholder="${def.nullable ? 'Enter value' : ''}" oninput="updateDraftField('${name}', this.value || null)" />`;
+      }
+
+      return renderFieldValue(value, def, 'form-readout', name);
+    }
+
+    function getFieldValidationState(data, fieldName) {
+      const hardIssues = [];
+      const submitIssues = [];
+      const checks = [
+        ...INVARIANTS.filter(item => (item.targets || []).includes(fieldName)),
+        ...(STATE_ASSERTIONS[sim.currentState] || []).filter(item => (item.targets || []).includes(fieldName)),
+        ...(FROM_ASSERTIONS[sim.currentState] || []).filter(item => (item.targets || []).includes(fieldName)),
+      ];
+
+      checks.forEach(check => {
+        if (!check.check(data)) hardIssues.push(check.msg);
+      });
+
+      if (sim.currentState === 'Draft') {
+        if (fieldName === 'Location' && (!data.Location || data.Location === '')) submitIssues.push('Location is required when you submit the work order.');
+        if (fieldName === 'IssueSummary' && (!data.IssueSummary || data.IssueSummary === '')) submitIssues.push('Issue summary is required when you submit the work order.');
+      }
+
+      return {
+        hardIssues: [...new Set(hardIssues)],
+        submitIssues: [...new Set(submitIssues)],
+      };
+    }
+
+    function getVisibleFieldIssues(data, fieldName, isEditableField) {
+      const validation = getFieldValidationState(data, fieldName);
+      const showSubmitIssues = isEditing && isEditableField && (touchedFields.has(fieldName) || dirtyFields.has(fieldName));
+      return [...validation.hardIssues, ...(showSubmitIssues ? validation.submitIssues : [])];
+    }
+
+    function getInlineFieldNote(data, fieldName, isEditableField) {
+      const fieldMeta = getFieldMeta(fieldName);
+      const validation = getFieldValidationState(data, fieldName);
+      const issues = getVisibleFieldIssues(data, fieldName, isEditableField);
+      if (issues.length > 0) return { tone: 'issue', text: issues[0] };
+      if (isEditing && dirtyFields.has(fieldName)) return { tone: 'info', text: 'Unsaved change.' };
+      if (sim.changedFields.has(fieldName) && !isEditing) return { tone: 'info', text: 'Updated by the latest committed step.' };
+      if (validation.submitIssues.length > 0 && !isEditing) return { tone: 'help', text: validation.submitIssues[0] };
+      if (validation.submitIssues.length > 0 && isEditableField && !touchedFields.has(fieldName)) return { tone: 'help', text: fieldMeta.help || validation.submitIssues[0] };
+      if (isEditing && isEditableField && fieldMeta.help) return { tone: 'help', text: fieldMeta.help };
+      return { tone: 'help', text: '' };
+    }
+
+    function getEventArgHint(evt, arg) {
+      const primaryRow = evt.rows[0];
+      const isRequired = (primaryRow.eventAsserts || []).some(assertion => (assertion.expr || '').includes(arg.name));
+      return {
+        required: isRequired,
+        label: titleCaseLabel(arg.name),
+        help: getEventArgHelp(evt, arg, isRequired),
+      };
+    }
+
+    function getEventArgHelp(evt, arg, isRequired) {
+      if (arg.placeholder) return `Example: ${arg.placeholder}.`;
+      if (arg.type === 'boolean') return 'Select Yes or No.';
+      if (arg.type === 'number') return isRequired ? 'Enter a valid number before continuing.' : 'Enter a number if needed.';
+      return isRequired ? `Required for ${evt.name}.` : '';
+    }
+
+    function getEventArgIssues(evt, arg, args) {
+      const issues = [];
+      const relevantChecks = (evt.rows[0].eventAsserts || []).filter(assertion => (assertion.expr || '').includes(arg.name));
+      relevantChecks.forEach(assertion => {
+        if (!assertion.check(args)) issues.push(assertion.msg);
+      });
+      return [...new Set(issues)];
+    }
+
+    function shouldShowEventArgIssues(evt, arg) {
+      const key = getEventDraftKey(evt.name);
+      return !!eventAttempts[key] || !!(eventTouched[key] && eventTouched[key][arg.name]);
+    }
+
+    function getEventFieldNote(evt, arg, args) {
+      const hint = getEventArgHint(evt, arg);
+      const issues = getEventArgIssues(evt, arg, args);
+      if (issues.length > 0 && shouldShowEventArgIssues(evt, arg)) return { tone: 'issue', text: issues[0], required: hint.required, label: hint.label };
+      if (hint.help) return { tone: 'help', text: hint.help, required: hint.required, label: hint.label };
+      return { tone: 'help', text: '', required: hint.required, label: hint.label };
+    }
+
+    function getEventFormSummary(evt, args, isBlocked) {
+      const issueCount = evt.args.reduce((count, arg) => count + ((shouldShowEventArgIssues(evt, arg) && getEventArgIssues(evt, arg, args).length > 0) ? 1 : 0), 0);
+      if (issueCount > 1) {
+        return {
+          tone: 'issue',
+          title: `${issueCount} field${issueCount === 1 ? '' : 's'} need attention`,
+          text: 'Complete the highlighted fields, then use the action button.',
+        };
+      }
+      if (isBlocked && evt.rows[1] && evt.rows[1].rejectMsg) {
+        return {
+          tone: 'issue',
+          title: 'Action currently unavailable',
+          text: evt.rows[1].rejectMsg,
+        };
+      }
+      return null;
+    }
+
+    function getValidationGroups(data) {
+      const groups = [];
+      const failedInvariants = INVARIANTS
+        .filter(item => !item.check(data))
+        .map(item => ({ ok: false, msg: item.msg, targets: item.targets || [] }));
+      if (failedInvariants.length > 0) groups.push({ title: 'Record Checks', items: failedInvariants });
+
+      const failedStateChecks = [
+        ...(STATE_ASSERTIONS[sim.currentState] || []).filter(item => !item.check(data)).map(item => ({ ok: false, msg: item.msg, targets: item.targets || [] })),
+        ...(FROM_ASSERTIONS[sim.currentState] || []).filter(item => !item.check(data)).map(item => ({ ok: false, msg: item.msg, targets: item.targets || [] })),
+      ];
+      if (failedStateChecks.length > 0) groups.push({ title: `${sim.currentState} Requirements`, items: failedStateChecks });
+      return groups;
+    }
+
+    function renderFieldValue(value, def, baseClass, fieldName = '') {
+      if (value === null || value === undefined) return `<div class="${baseClass} null">Not provided</div>`;
+      if (def.type === 'boolean') return `<div class="${baseClass} ${value ? 'bool-true' : 'bool-false'}">${value ? 'Yes' : 'No'}</div>`;
+      return `<div class="${baseClass} ${isLongTextName(fieldName) ? 'multiline' : ''}">${escHtml(String(value))}</div>`;
+    }
+
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function renderStateDiagram() {
+      const el = document.getElementById('stateDiagram');
+      if (!el) return;
+
+      const nodeWidth = 82;
+      const nodeHeight = 24;
+      const nodeRadius = 12;
+      const xSpacing = 120;
+      const yMain = 40;
+      const yCancel = 90;
+      const nodes = [
+        { id: 'Draft', x: 60, y: yMain },
+        { id: 'Open', x: 60 + xSpacing, y: yMain },
+        { id: 'Scheduled', x: 60 + xSpacing * 2, y: yMain },
+        { id: 'InProgress', x: 60 + xSpacing * 3, y: yMain },
+        { id: 'Completed', x: 60 + xSpacing * 4, y: yMain },
+        { id: 'Cancelled', x: 60 + xSpacing * 2, y: yCancel },
+      ];
+      const edges = [
+        { from: 'Draft', to: 'Open', label: 'Submit' },
+        { from: 'Open', to: 'Scheduled', label: 'Assign' },
+        { from: 'Open', to: 'Cancelled', label: 'Cancel' },
+        { from: 'Scheduled', to: 'InProgress', label: 'StartWork' },
+        { from: 'Scheduled', to: 'Cancelled', label: 'Cancel' },
+        { from: 'InProgress', to: 'Completed', label: 'Complete' },
+      ];
+      const selfLoops = { Scheduled: ['ApproveParts'], InProgress: ['RecordProgress'] };
+
+      const nodeMap = {};
+      nodes.forEach(node => nodeMap[node.id] = node);
+      const lastStep = sim.history.length > 0 ? sim.history[sim.history.length - 1] : null;
+      const lastEdge = lastStep && lastStep.fromState !== lastStep.toState ? { from: lastStep.fromState, to: lastStep.toState } : null;
+      const lastSelf = lastStep && lastStep.fromState === lastStep.toState && !lastStep.event.startsWith('edit') ? lastStep.fromState : null;
+
+      const svgWidth = 60 + xSpacing * 4 + nodeWidth / 2 + 20;
+      const svgHeight = yCancel + nodeHeight / 2 + 20;
+      function arrowPath(x1, y1, x2, y2, size) {
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        return `M${x2.toFixed(1)},${y2.toFixed(1)} L${(x2 - size * Math.cos(angle - 0.45)).toFixed(1)},${(y2 - size * Math.sin(angle - 0.45)).toFixed(1)} L${(x2 - size * Math.cos(angle + 0.45)).toFixed(1)},${(y2 - size * Math.sin(angle + 0.45)).toFixed(1)} Z`;
+      }
+
+      let svg = `<svg viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">`;
+
+      edges.forEach(edge => {
+        const from = nodeMap[edge.from];
+        const to = nodeMap[edge.to];
+        let x1;
+        let y1;
+        let x2;
+        let y2;
+        if (to.y > from.y) {
+          x1 = from.x;
+          y1 = from.y + nodeHeight / 2;
+          x2 = to.x;
+          y2 = to.y - nodeHeight / 2;
+        } else {
+          x1 = from.x + nodeWidth / 2;
+          y1 = from.y;
+          x2 = to.x - nodeWidth / 2;
+          y2 = to.y;
+        }
+        const isTraced = sim.history.some(step => step.fromState === edge.from && step.toState === edge.to);
+        const isActive = lastEdge && lastEdge.from === edge.from && lastEdge.to === edge.to;
+        let lineClass = 'sd-edge';
+        let arrowClass = 'sd-arrow';
+        let textClass = 'sd-edge-label';
+        if (isActive) {
+          lineClass += ' sd-edge-active';
+          arrowClass += ' sd-arrow-active';
+          textClass += ' sd-edge-label-active';
+        } else if (isTraced) {
+          lineClass += ' sd-edge-traced';
+          arrowClass += ' sd-arrow-traced';
+          textClass += ' sd-edge-label-traced';
+        }
+        svg += `<line class="${lineClass}" data-event="${edge.label}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" onmouseenter="setHoverEvent('${edge.label}')" onmouseleave="clearHoverEvent()"/>`;
+        svg += `<path class="${arrowClass}" d="${arrowPath(x1, y1, x2, y2, 5)}"/>`;
+        let midX = (x1 + x2) / 2;
+        let midY = (y1 + y2) / 2;
+        if (to.y > from.y) midX += 30;
+        else midY -= 8;
+        svg += `<text class="${textClass} sd-edge-label" data-event="${edge.label}" x="${midX}" y="${midY}" onmouseenter="setHoverEvent('${edge.label}')" onmouseleave="clearHoverEvent()">${edge.label}</text>`;
+      });
+
+      for (const [stateId, events] of Object.entries(selfLoops)) {
+        const node = nodeMap[stateId];
+        let cls = 'sd-self-loop';
+        if (lastSelf === stateId) cls += ' sd-self-flash';
+        const topY = node.y - nodeHeight / 2 - 1;
+        svg += `<path class="${cls}" data-event="${events[0]}" d="M${node.x - 10},${topY} C${node.x - 10},${topY - 16} ${node.x + 10},${topY - 16} ${node.x + 10},${topY}" onmouseenter="setHoverEvent('${events[0]}')" onmouseleave="clearHoverEvent()"/>`;
+        svg += `<text class="sd-self-label sd-edge-label" data-event="${events[0]}" x="${node.x}" y="${topY - 16}" text-anchor="middle" style="font-size:6.5px" onmouseenter="setHoverEvent('${events[0]}')" onmouseleave="clearHoverEvent()">${events.join(', ')}</text>`;
+      }
+
+      nodes.forEach(node => {
+        const isCurrent = sim.currentState === node.id;
+        const isVisited = sim.visitedStates.has(node.id);
+        const meta = STATE_META[node.id];
+        const hoverAttrs = `data-state="${node.id}" onmouseenter="setHoverState('${node.id}')" onmouseleave="clearHoverState()"`;
+        if (isCurrent) {
+          if (meta.initial) svg += `<circle class="sd-glow" cx="${node.x}" cy="${node.y}" r="${nodeRadius + 5}"/>`;
+          else svg += `<rect class="sd-glow" x="${node.x - nodeWidth / 2 - 4}" y="${node.y - nodeHeight / 2 - 4}" width="${nodeWidth + 8}" height="${nodeHeight + 8}" rx="${nodeRadius + 3}"/>`;
+        }
+        let nodeClass = 'sd-node';
+        if (isCurrent) nodeClass = 'sd-node-current';
+        else if (isVisited) nodeClass = 'sd-node-visited';
+
+        if (meta.initial) {
+          svg += `<circle class="${nodeClass} sd-node-initial" cx="${node.x}" cy="${node.y}" r="${nodeRadius}" ${isCurrent ? 'style="stroke-width:2.5"' : ''} ${hoverAttrs}/>`;
+          svg += `<circle class="sd-initial-dot" cx="${node.x}" cy="${node.y}" r="4" opacity="${isCurrent ? 1 : 0.5}"/>`;
+        } else if (meta.terminal) {
+          svg += `<rect class="sd-node-terminal-outer" x="${node.x - nodeWidth / 2 - 3}" y="${node.y - nodeHeight / 2 - 3}" width="${nodeWidth + 6}" height="${nodeHeight + 6}" rx="${nodeRadius + 2}"/>`;
+          svg += `<rect class="${nodeClass} sd-node-terminal" x="${node.x - nodeWidth / 2}" y="${node.y - nodeHeight / 2}" width="${nodeWidth}" height="${nodeHeight}" rx="${nodeRadius}" ${hoverAttrs}/>`;
+        } else {
+          svg += `<rect class="${nodeClass}" x="${node.x - nodeWidth / 2}" y="${node.y - nodeHeight / 2}" width="${nodeWidth}" height="${nodeHeight}" rx="${nodeRadius}" ${hoverAttrs}/>`;
+        }
+        let labelClass = 'sd-label';
+        if (isCurrent) labelClass = 'sd-label sd-label-current';
+        else if (isVisited) labelClass = 'sd-label sd-label-visited';
+        svg += `<text class="${labelClass}" x="${node.x}" y="${node.y + 3.5}">${node.id}</text>`;
+      });
+
+      svg += '</svg>';
+      el.innerHTML = svg;
+    }
+
+    function renderTimeline() {
+      const el = document.getElementById('timeline');
+      const isTerminal = STATE_META[sim.currentState].terminal;
+
+      let html = `<div class="tl-h-label">Timeline</div><div class="tl-horizontal-flow">`;
+
+      if (sim.history.length > 0) {
+        html += `<div class="past-trail-h"><div class="origin-card"><div class="origin-card-title"><div class="oc-dot"></div><div class="oc-label">Draft</div></div></div>`;
+        sim.history.forEach((step, index) => {
+          const isEditStep = step.event.startsWith('edit ');
+          html += `<div class="h-connector"></div>`;
+          html += `<div class="past-card${isEditStep ? ' edit-card' : ''}" style="animation: fadeSlideIn 300ms ease-out ${index * 80}ms both">`;
+          html += `<div class="pc-event">${escHtml(step.event)}</div>`;
+          if (step.outcome !== 'transition') {
+            html += `<div class="pc-outcome ${step.outcome}">↻ <span class="pc-state">${step.fromState}</span></div>`;
+          }
+          if (step.deltas.length > 0) {
+            const delta = step.deltas[0];
+            html += `<div class="pc-delta"><span class="field">${delta.field}</span> = <span class="after">${formatVal(delta.after)}</span>${step.deltas.length > 1 ? ` +${step.deltas.length - 1}` : ''}</div>`;
+          }
+          html += `</div>`;
+        });
+        html += `</div><div class="h-connector past-to-present"></div>`;
+      }
+
+      const presentStateClasses = getTimelineStateClassNames(sim.currentState, { isCurrent: true, includeTerminalLegacy: true });
+      const presentStateLabel = getTimelineStateSemanticLabel(sim.currentState, true);
+      html += `<div class="present-marker-h ${presentStateClasses}" data-state="${sim.currentState}" onmouseenter="setHoverState('${sim.currentState}')" onmouseleave="clearHoverState()">
+        <div class="pm-h-eyebrow">${presentStateLabel}</div>
+        <div class="pm-h-state-name">${sim.currentState}</div>
+        ${sim.stepCount === 0 ? '' : `<div class="pm-h-footer">${sim.stepCount} committed step${sim.stepCount === 1 ? '' : 's'}</div>`}
+      </div>`;
+
+      if (isTerminal) {
+        html += `<div class="h-connector present-to-future"></div>`;
+        html += `<div class="terminal-message-h"><div class="tm-icon">${sim.currentState === 'Completed' ? '✓' : '⊘'}</div><div>${sim.currentState} is terminal. No further events are available.</div></div>`;
+      } else {
+        html += `<div class="h-connector present-to-future"></div>`;
+
+        const events = getAvailableEvents(sim.currentState, sim.data);
+        const selfLoopEvents = events.filter(evt => evt.rows[0].outcome === 'no-transition' || !evt.rows[0].target);
+        const transitionEvents = events.filter(evt => evt.rows[0].outcome === 'transition' && evt.rows[0].target);
+        html += `<div class="future-section-h">`;
+        if (selfLoopEvents.length > 0) {
+          html += `<div class="future-events-h">`;
+          selfLoopEvents.forEach(evt => { html += renderSlimEventCardH(evt); });
+          html += `</div>`;
+        }
+        if (transitionEvents.length > 0) {
+          html += `<div class="future-transition-lanes-h">`;
+          transitionEvents.forEach(evt => {
+            const target = evt.rows[0].target;
+            const targetStateClasses = getTimelineStateClassNames(target);
+            const targetStateLabel = getTimelineStateSemanticLabel(target, false);
+            html += `<div class="future-transition-lane-h">`;
+            html += renderSlimEventCardH(evt);
+            html += `<div class="h-connector future-to-state"></div>`;
+            html += `<div class="future-state-card-h ${targetStateClasses}" data-state="${target}" onmouseenter="setHoverState('${target}')" onmouseleave="clearHoverState()">`;
+            html += `<div class="future-state-sources-h">${targetStateLabel}</div>`;
+            html += `<div class="future-state-name-h">${target}</div>`;
+            html += `</div>`;
+            html += `</div>`;
+          });
+          html += `</div>`;
+        }
+        html += `</div>`;
+      }
+
+      html += `</div>`;
+      el.innerHTML = html;
+    }
+
+    function getTimelineStateClassNames(state, { isCurrent = false, includeTerminalLegacy = false } = {}) {
+      const meta = STATE_META[state] || { initial: false, terminal: false };
+      return [
+        isCurrent ? 'state-current' : '',
+        meta.initial ? 'state-initial' : '',
+        meta.terminal ? 'state-terminal' : '',
+        includeTerminalLegacy && meta.terminal ? 'terminal-state' : ''
+      ].filter(Boolean).join(' ');
+    }
+
+    function getTimelineStateSemanticLabel(state, isCurrent = false) {
+      const meta = STATE_META[state] || { initial: false, terminal: false };
+      if (isCurrent && meta.initial) return 'Current initial state';
+      if (isCurrent && meta.terminal) return 'Current terminal state';
+      if (isCurrent) return 'Current state';
+      if (meta.initial) return 'Initial state';
+      if (meta.terminal) return 'Terminal state';
+      return 'State';
+    }
+
+    function renderSlimEventCardH(evt) {
+      const primaryRow = evt.rows[0];
+      const argValues = getEventArgValues(evt);
+      const hasArgIssues = evt.args.some(arg => getEventArgIssues(evt, arg, argValues).length > 0);
+      const isBlocked = !!primaryRow.guard && !hasArgIssues && !primaryRow.canFire(argValues, sim.data);
+      const summary = getEventFormSummary(evt, argValues, isBlocked);
+
+      let html = `<div class="future-card-h ${isBlocked ? 'blocked-card' : 'can-fire'}" data-event="${evt.name}" data-event-card="${evt.name}" onmouseenter="setHoverEvent('${evt.name}')" onmouseleave="clearHoverEvent()">`;
+
+      html += `<div class="form-summary ${summary ? summary.tone : ''}${summary ? '' : ' is-hidden'}" data-event-summary>${summary ? `<span class="form-summary-title">${escHtml(summary.title)}</span><span class="form-summary-text">${escHtml(summary.text)}</span>` : ''}</div>`;
+
+      if (evt.args.length > 0) {
+        html += `<div class="event-form-grid">`;
+        evt.args.forEach(arg => {
+          const note = getEventFieldNote(evt, arg, argValues);
+          const rawValue = getEventDraftValue(evt, arg);
+          const value = arg.type === 'boolean' ? String(!!rawValue) : escHtml(String(rawValue ?? ''));
+          const fieldClass = `form-field${note.tone === 'issue' ? ' has-issue' : ''}${shouldSpanFullWidth(arg.name) ? ' span-full' : ''}`;
+          html += `<div class="${fieldClass}" data-event-field="${evt.name}:${arg.name}">`;
+          html += `<div class="form-field-head"><div class="form-label">${note.label}</div>${note.required ? '<span class="form-required">* Required</span>' : ''}</div>`;
+          html += `<div class="form-control">`;
+          if (arg.type === 'boolean') {
+            html += `<select class="form-select" id="arg-${evt.name}-${arg.name}" onchange="setEventDraftValue('${evt.name}', '${arg.name}', this.value, 'boolean')"><option value="false" ${value === 'false' ? 'selected' : ''}>No</option><option value="true" ${value === 'true' ? 'selected' : ''}>Yes</option></select>`;
+          } else {
+            if (isLongTextName(arg.name)) {
+              html += `<textarea class="form-input form-textarea" id="arg-${evt.name}-${arg.name}" placeholder="${arg.placeholder || ''}" oninput="setEventDraftValue('${evt.name}', '${arg.name}', this.value, '${arg.type}')">${value}</textarea>`;
+            } else {
+              html += `<input class="form-input" id="arg-${evt.name}-${arg.name}" type="${arg.type === 'number' ? 'number' : 'text'}" value="${value}" placeholder="${arg.placeholder || ''}" oninput="setEventDraftValue('${evt.name}', '${arg.name}', this.value, '${arg.type}')" />`;
+            }
+          }
+          html += `</div>`;
+          html += `<div class="field-note ${note.tone}" data-event-note>${escHtml(note.text)}</div>`;
+          html += `</div>`;
+        });
+        html += `</div>`;
+      }
+
+      html += `<div class="ec-actions">`;
+      html += `<button class="ec-fire-btn${isBlocked && primaryRow.guard ? ' blocked' : ''}" data-fire-btn type="button" onclick="fireEvent('${evt.name}')" ${isBlocked && primaryRow.guard ? 'disabled' : ''}>${evt.name}</button>`;
+      html += `</div>`;
+      html += `</div>`;
+      return html;
+    }
+
+    function syncEventCard(eventName) {
+      const card = document.querySelector(`[data-event-card="${eventName}"]`);
+      if (!card) return;
+
+      const evt = getAvailableEvents(sim.currentState, sim.data).find(item => item.name === eventName);
+      if (!evt) return;
+
+      const primaryRow = evt.rows[0];
+      const argValues = getEventArgValues(evt);
+      const hasArgIssues = evt.args.some(arg => getEventArgIssues(evt, arg, argValues).length > 0);
+      const isBlocked = !!primaryRow.guard && !hasArgIssues && !primaryRow.canFire(argValues, sim.data);
+      const summary = getEventFormSummary(evt, argValues, isBlocked);
+
+      card.classList.toggle('blocked-card', isBlocked);
+      card.classList.toggle('can-fire', !isBlocked);
+
+      const summaryEl = card.querySelector('[data-event-summary]');
+      if (summaryEl) {
+        summaryEl.className = `form-summary ${summary ? summary.tone : ''}${summary ? '' : ' is-hidden'}`;
+        summaryEl.innerHTML = summary ? `<span class="form-summary-title">${escHtml(summary.title)}</span><span class="form-summary-text">${escHtml(summary.text)}</span>` : '';
+      }
+
+      evt.args.forEach(arg => {
+        const fieldEl = card.querySelector(`[data-event-field="${evt.name}:${arg.name}"]`);
+        if (!fieldEl) return;
+        const note = getEventFieldNote(evt, arg, argValues);
+        fieldEl.className = `form-field ${note.tone === 'issue' ? 'has-issue' : ''}`;
+        const noteEl = fieldEl.querySelector('[data-event-note]');
+        if (noteEl) {
+          noteEl.className = `field-note ${note.tone}`;
+          noteEl.textContent = note.text;
+        }
+      });
+
+      const fireBtn = card.querySelector('[data-fire-btn]');
+      if (fireBtn) {
+        fireBtn.className = `ec-fire-btn${isBlocked && primaryRow.guard ? ' blocked' : ''}`;
+        fireBtn.disabled = isBlocked && !!primaryRow.guard;
+      }
+    }
+
+    function formatVal(value) {
+      if (value === null || value === undefined) return 'null';
+      if (typeof value === 'boolean') return String(value);
+      return escHtml(String(value));
+    }
+
+    function getStateDescription(state) {
+      return {
+        Draft: 'New work order. Fill in details or submit straight from the timeline.',
+        Open: 'Submitted and waiting for assignment.',
+        Scheduled: 'Technician assigned. Parts can be approved or work can start.',
+        InProgress: 'Work is underway. Record progress or complete the job.',
+        Completed: 'Work finished and closed.',
+        Cancelled: 'Work order cancelled.'
+      }[state] || '';
+    }
+
+    function renderStatus() {
+      document.getElementById('statusStep').textContent = `Step ${sim.stepCount}`;
+      const ok = INVARIANTS.every(item => item.check(sim.data));
+      const invEl = document.getElementById('statusInvariants');
+      if (ok) {
+        invEl.className = 'status-ok';
+        invEl.textContent = `✓ ${INVARIANTS.length} invariants ok`;
+      } else {
+        invEl.className = 'status-warn';
+        invEl.textContent = '⚠ invariant violated';
+      }
+    }
+
+    applyLayoutSizing();
+    updateDividerMetadata();
+    document.querySelectorAll('.layout-divider').forEach(divider => {
+      divider.addEventListener('pointerdown', event => beginResize(divider.dataset.divider, event));
+    });
+    window.addEventListener('resize', () => {
+      applyLayoutSizing();
+      renderStateDiagram();
+    });
+
+    render();
+  </script>
+</body>
+</html>

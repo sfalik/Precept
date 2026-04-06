@@ -23,6 +23,7 @@ These are **research documents, not proposals.** They exist to give the team pri
 | [`state-machine-expressiveness.md`](./state-machine-expressiveness.md) | What PLT and statecharts offer beyond `from/on/transition` | Statecharts (Harel), hierarchical states, parallel regions, CSP | **Medium** — Hierarchical states are high cost with limited domain benefit. Multi-event `on` clause and catch-all rows are lower-cost takeaways. |
 | [`multi-event-shorthand.md`](./multi-event-shorthand.md) | Formal patterns for further event-level shorthand | Symbolic automata, CSP event sets, UML multi-event arcs | **High** — Multi-event `on` remains one of the clearest future compactness candidates. |
 | [`expression-evaluation.md`](./expression-evaluation.md) | Principled expression system expansion while keeping semantics decidable | Many-sorted FOL fragments, symbolic finite automata, type narrowing | **High** — String predicates, bounded built-ins, and derived-value proposals all depend on this footing. |
+| [`type-system-survey.md`](./type-system-survey.md) | What data types business rule engines and expression languages need | Cross-system survey: DMN/FEEL, Cedar, Drools, NRules, BPMN, SQL | **High** — Direct evidence base for Proposal #25 (choice and date types). Confirms date and enum are universal consensus. |
 
 ---
 

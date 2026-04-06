@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 25: Inspector X-Ray - Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <script src="preview-reimagined-maintenance-work-order.js"></script>
+  <style>
+    body { display: flex; flex-direction: column; background: radial-gradient(circle at right, rgba(168, 152, 245, 0.10), transparent 26%), #09090c; }
+    .header, .toolbar { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+    .header { background: rgba(12, 12, 15, 0.95); }
+    .toolbar { background: rgba(18, 18, 22, 0.92); }
+    .header-left, .toolbar-left, .toolbar-actions { display: flex; align-items: center; gap: 10px; }
+    .header-title { font-size: 13px; font-weight: 700; }
+    .header-file, .toolbar-copy { font-size: 11px; color: var(--slate-val); }
+    button, input { font: inherit; }
+    button { appearance: none; border: 1px solid var(--border); background: transparent; color: var(--text); padding: 4px 10px; border-radius: 5px; cursor: pointer; }
+    button:hover { border-color: rgba(99, 102, 241, 0.45); background: rgba(99, 102, 241, 0.10); }
+    .shell { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.2fr 360px; gap: 12px; padding: 12px; }
+    .panel { min-width: 0; min-height: 0; border: 1px solid rgba(39, 39, 42, 0.88); border-radius: 16px; background: linear-gradient(180deg, rgba(18, 18, 22, 0.96), rgba(12, 12, 15, 0.98)); overflow: auto; }
+    .panel-head { padding: 16px; border-bottom: 1px solid rgba(39, 39, 42, 0.86); }
+    .panel-kicker { font-size: 10px; text-transform: uppercase; letter-spacing: 1.3px; color: var(--violet); }
+    .panel-title { font-size: 14px; font-weight: 700; margin-top: 5px; }
+    .panel-copy { font-size: 11px; color: var(--slate-val); line-height: 1.6; margin-top: 5px; }
+    .xray { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+    .layer { border-radius: 16px; border: 1px solid rgba(39, 39, 42, 0.82); background: rgba(17, 17, 20, 0.68); backdrop-filter: blur(10px); padding: 14px; }
+    .layer.state { background: linear-gradient(180deg, rgba(99, 102, 241, 0.12), rgba(17, 17, 20, 0.82)); }
+    .layer.diagram { background: rgba(48, 184, 232, 0.06); }
+    .layer.fields { background: rgba(168, 152, 245, 0.06); }
+    .layer.rules { background: rgba(251, 191, 36, 0.05); }
+    .layer-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1.1px; color: var(--muted); }
+    .layer-copy { font-size: 12px; color: var(--slate-val); line-height: 1.7; margin-top: 6px; }
+    .state-row, .rule-row, .field-row { display: flex; justify-content: space-between; gap: 10px; align-items: start; padding: 10px 0; border-top: 1px solid rgba(39, 39, 42, 0.66); }
+    .state-row:first-of-type, .rule-row:first-of-type, .field-row:first-of-type { border-top: none; }
+    .state-row.current .state-name { color: var(--violet); }
+    .state-name, .field-name, .rule-name { font-size: 12px; font-weight: 700; }
+    .state-meta, .field-meta, .rule-meta { font-size: 10px; color: var(--slate-val); line-height: 1.6; }
+    .field-row { cursor: pointer; }
+    .field-row.selected { background: rgba(99, 102, 241, 0.08); margin: 0 -8px; padding: 10px 8px; border-radius: 10px; }
+    .inspector { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+    .inspector-card { padding: 12px; border-radius: 12px; border: 1px solid rgba(39, 39, 42, 0.82); background: rgba(22, 22, 26, 0.86); }
+    .inspector-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+    .inspector-value { font-size: 13px; font-weight: 700; margin-top: 4px; }
+    .inspector-copy { font-size: 11px; color: var(--slate-val); line-height: 1.6; margin-top: 5px; }
+    .action-list { display: flex; flex-direction: column; gap: 8px; }
+    .action-row { padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(39, 39, 42, 0.82); background: rgba(17, 17, 20, 0.86); }
+    .action-row.selected { border-color: rgba(99, 102, 241, 0.44); background: rgba(99, 102, 241, 0.08); }
+    @media (max-width: 1060px) { .shell { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <span class="concept-badge">25 - INSPECTOR X-RAY</span>
+      <span class="header-title">MaintenanceWorkOrder</span>
+      <span class="sep">.</span>
+      <span class="header-file">maintenance-work-order.precept</span>
+    </div>
+    <div class="toolbar-actions">
+      <button id="undoBtn">Undo</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <div>
+        <div class="panel-kicker">Inspector-first layout</div>
+        <div class="header-title">Stack translucent layers so the user can read state, field provenance, and guard impact in one vertical x-ray.</div>
+      </div>
+    </div>
+    <div class="toolbar-copy">The state diagram is a layer inside the inspection stack, not a separate destination.</div>
+  </div>
+
+  <div class="shell">
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-kicker">X-ray stack</div>
+        <div class="panel-title">Read through the order from lifecycle to fields to rules.</div>
+        <div class="panel-copy">Click a field to focus the right-hand inspector on its provenance and whether the selected action changes it.</div>
+      </div>
+      <div id="xray" class="xray"></div>
+    </section>
+
+    <aside class="panel">
+      <div class="panel-head">
+        <div class="panel-kicker">Inspector</div>
+        <div class="panel-title">Focused detail</div>
+        <div class="panel-copy">A narrow lane for the currently selected field and action.</div>
+      </div>
+      <div id="inspector" class="inspector"></div>
+    </aside>
+  </div>
+
+  <script>
+    const demo = window.createMaintenanceWorkOrderDemo();
+    const esc = window.mwoEsc;
+    const fmt = window.mwoFormatValue;
+
+    document.getElementById("undoBtn").onclick = () => demo.undo();
+    document.getElementById("resetBtn").onclick = () => demo.reset();
+
+    function render(view) {
+      const selectedField = view.fields.find((field) => field.name === view.selectedField) || view.fields[0];
+      const preview = view.preview;
+      const touchesSelected = preview ? preview.changes.some((change) => change.field === selectedField.name) : false;
+
+      document.getElementById("xray").innerHTML = `
+        <section class="layer state">
+          <div class="layer-title">State shell</div>
+          <div class="layer-copy">Current state: <strong style="color: var(--text);">${esc(view.sim.currentState)}</strong>. The user should be able to understand the active lifecycle position before scanning anything else.</div>
+        </section>
+        <section class="layer diagram">
+          <div class="layer-title">State diagram layer</div>
+          ${view.stateNodes.map((state) => `
+            <div class="state-row ${state.current ? "current" : ""}">
+              <div>
+                <div class="state-name">${esc(state.name)}</div>
+                <div class="state-meta">${esc(state.description)}</div>
+              </div>
+              <div class="state-meta">${state.visited ? "Seen" : "Unseen"}</div>
+            </div>
+          `).join("")}
+        </section>
+        <section class="layer fields">
+          <div class="layer-title">Field layer</div>
+          ${view.fields.map((field) => `
+            <div class="field-row ${field.selected ? "selected" : ""}" onclick="demo.selectField('${field.name}')">
+              <div>
+                <div class="field-name">${esc(field.label)}</div>
+                <div class="field-meta">${esc(field.provenance)}</div>
+              </div>
+              <div class="field-meta">${esc(fmt(field.value))}</div>
+            </div>
+          `).join("")}
+        </section>
+        <section class="layer rules">
+          <div class="layer-title">Rule layer</div>
+          ${preview ? preview.rules.map((rule) => `
+            <div class="rule-row">
+              <div>
+                <div class="rule-name">${esc(rule.label)}</div>
+                <div class="rule-meta">${esc(rule.expr)}</div>
+              </div>
+              <div class="rule-meta">${rule.ok ? "OK" : "Blocked"}</div>
+            </div>
+          `).join("") : "<div class='layer-copy'>Select an action to inspect its guard path.</div>"}
+        </section>
+      `;
+
+      document.getElementById("inspector").innerHTML = `
+        <div class="inspector-card">
+          <div class="inspector-label">Selected field</div>
+          <div class="inspector-value">${esc(selectedField.label)}</div>
+          <div class="inspector-copy">Current value: ${esc(fmt(selectedField.value))}. Provenance: ${esc(selectedField.provenance)}.</div>
+        </div>
+        <div class="inspector-card">
+          <div class="inspector-label">Selected action</div>
+          <div class="inspector-value">${preview ? esc(preview.label) : "None"}</div>
+          <div class="inspector-copy">${preview ? esc(preview.reason) : "Pick an action from the list below."}</div>
+          <div class="inspector-copy">${preview ? (touchesSelected ? `${esc(selectedField.label)} changes if this action commits.` : `${esc(selectedField.label)} stays unchanged if this action commits.`) : ""}</div>
+        </div>
+        <div class="inspector-card">
+          <div class="inspector-label">Quick edits</div>
+          <div class="inspector-copy">Use small edits here to make the guard picture move without leaving the inspection lane.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+            <button onclick="demo.toggleUrgent()">Toggle Urgent</button>
+            <button onclick="demo.setEstimate(${view.sim.data.EstimatedHours + 1})">Add 1h Estimate</button>
+          </div>
+        </div>
+        <div class="inspector-card">
+          <div class="inspector-label">Action list</div>
+          <div class="action-list">
+            ${view.actions.map((action) => `
+              <div class="action-row ${action.id === view.selectedAction ? "selected" : ""}">
+                <div class="field-name">${esc(action.label)}</div>
+                <div class="inspector-copy">${esc(action.reason)}</div>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                  <button onclick="demo.setSelectedAction('${action.id}')">Inspect</button>
+                  <button ${action.enabled ? "" : "disabled"} onclick="demo.commitAction('${action.id}')">Fire</button>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    demo.subscribe(render);
+  </script>
+</body>
+</html>

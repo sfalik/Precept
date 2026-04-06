@@ -12,7 +12,7 @@
 
 | Name | Role | Charter | Status |
 |------|------|---------|--------|
-| Frank | Lead/Architect | `.squad/agents/frank/charter.md` | 🟢 Active |
+| Frank | Lead/Architect & Language Designer | `.squad/agents/frank/charter.md` | 🟢 Active |
 | George | Runtime Dev | `.squad/agents/george/charter.md` | 🟢 Active |
 | Kramer | Tooling Dev | `.squad/agents/kramer/charter.md` | 🟢 Active |
 | Newman | MCP/AI Dev | `.squad/agents/newman/charter.md` | 🟢 Active |

@@ -35,6 +35,7 @@ This folder now follows a strict split:
 | `#16` | Numeric built-in functions (`min`, `max`, `abs`, `round`) | `expressiveness/expression-language-audit.md`, `references/expression-evaluation.md` |
 | `#17` | Computed / derived fields | `expressiveness/expression-language-audit.md`, `references/expression-evaluation.md` |
 | `#18` | Conditional outcome in `->` chain (rejected) | `expressiveness/linq.md`, `expressiveness/expression-language-audit.md` |
+| `#25` | Type system expansion (choice and date types) | `references/type-system-survey.md`, `expressiveness/expression-language-audit.md` |
 
 ## Rule of engagement
 

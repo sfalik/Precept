@@ -22,6 +22,7 @@ These files are **research evidence, not proposal sources**. Canonical proposal 
 | [expression-language-audit.md](./expression-language-audit.md) | Runtime-grounded map of the current expression surface and its constraints |
 | [internal-verbosity-analysis.md](./internal-verbosity-analysis.md) | Corpus-based compactness analysis |
 | [expression-tracking-notes.md](./expression-tracking-notes.md) | Labeling guidance for `dsl-expressiveness` vs `dsl-compactness` |
+| [type-system-domain-survey.md](./type-system-domain-survey.md) | Real-world domain + platform evidence validating proposal #25 (choice + date types) |
 
 ## Proposal issue map
 
@@ -38,6 +39,7 @@ Use the issue for the proposal body; use the research file for evidence.
 | `#16` | Numeric built-in functions (`min`, `max`, `abs`, `round`) | `expression-language-audit.md` |
 | `#17` | Computed / derived fields | `expression-language-audit.md` |
 | `#18` | Conditional outcome in `->` chain (rejected) | `linq.md`, `expression-language-audit.md` |
+| `#25` | Type system expansion (choice + date) | `type-system-domain-survey.md` |
 
 ## Proposal-author rule
 
