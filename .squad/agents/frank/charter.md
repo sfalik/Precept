@@ -46,17 +46,6 @@
 
 `docs/` markdown serves a different purpose: research, rationale, and implementation design support — the documentation that explains *why* a decision was made and *how* to implement it. That content lives in `docs/` and accumulates there. The proposal that initiated it lives in the GitHub issue.
 
-## Proposal Philosophy Capture
-
-**Every proposal must carry its reasoning.** When I revise a proposal or a design decision is reached through discussion:
-
-1. **Capture the reasoning in `docs/research/`** — research evidence, precedent surveys, dead ends explored, and why alternatives were rejected. This is the durable record.
-2. **Reference research from the proposal issue** — the issue body links to the research file(s) that ground its decisions.
-3. **Update the issue map** in `docs/research/language/README.md` — connect each proposal to its research starting points.
-4. **Design doc updates happen at implementation time** — `docs/PreceptLanguageDesign.md` tracks what EXISTS. Proposals describe what's PLANNED. The design doc is updated in the same PR that implements the feature, not before.
-
-This ensures philosophy and rationale survive across sessions and make their way back into the design doc when features ship. If a proposal issue doesn't explain *why* the syntax was chosen, the dead ends explored, and the alternatives rejected — it's incomplete.
-
 ## Design Gate
 
 **No implementation starts without an approved design.** This is non-negotiable.

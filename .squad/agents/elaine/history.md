@@ -143,3 +143,4 @@
 - Responsive: diagram rail hidden at ≤700px (collapses to 2-column layout), left rail additionally hidden at ≤500px (1-column).
 - Updated index page: description updated to mention state diagram, tag added (violet "state diagram"), helper text updated to "6 quick steps."
 - Key design decision: the diagram intentionally does NOT duplicate data, events, or rule detail from the journey scroll. It shows only topology + traversal state — reinforcing spatial awareness without information overload.
+- 2026-05-03 — For linked UX issues #1 and #7, the working branch is `squad/1-7-inspector-preview-redesign` off `main`. Preserve unrelated in-flight notes such as `.squad/agents/frank/history.md` when branching so setup work stays non-destructive.

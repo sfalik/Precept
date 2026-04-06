@@ -80,6 +80,10 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 
 ## Recent Updates
 
+### 2026-04-06T00:48:04Z - Kramer Concept 26 bounded configurability recorded
+- Wrote a lightweight session log capturing Kramer's Concept 26 direction: layout presets, split resizing, and per-panel collapse without freeform docking.
+- No decision inbox merge was needed, and no product mockup files or preview index files were touched in this pass.
+
 ### 2026-04-05T16-16-48Z - Rule proposal consolidation recorded
 - Wrote orchestration/session records for Frank, George, J. Peterman, and Steinbrenner; merged the inbox notes into .squad/decisions.md, cleared .squad/decisions/inbox/, and updated the affected histories.
 - Archived older decisions as needed; no agent history crossed the summarization threshold after this pass.
