@@ -6,6 +6,58 @@
 
 ---
 
+### 2026-04-07T23:30:44Z: README Contract Image & DSL Copyable Block Cleanup
+**By:** J. Peterman (Brand/DevRel)  
+**Status:** Decided  
+
+README.md Quick Example section refactored to remove explanatory hedge, copyable DSL block, and replace markdown image syntax with fixed-width HTML img tag for consistent GitHub rendering.
+
+**What Changed:**
+1. Removed explanatory sentence about DSL rendering fallback
+2. Removed copyable DSL code block from Quick Example
+3. Replaced markdown image syntax with `<img src="design/brand/readme-hero-dsl.png" alt="..." width="600" />`
+
+**Rationale:** Simplify visual hierarchy, trust the professionally-rendered contract image, and direct DSL learners to `samples/` and language reference rather than README copy-paste scaffolding.
+
+**Brand Rationale:** The Quick Example teaches the pattern, not the DSL. Remove defensive scaffolding; the rendered contract is the hero artifact.
+
+---
+
+### 2026-04-07T23:20:00Z: PR #34 Merge — Squad Upgrade + README Image Fix
+**By:** Frank  
+**Status:** Merged  
+
+Merged PR #34 (chore: upgrade Squad configuration and fix README image links) to `main` using merge commit strategy.
+
+**Context:**
+- Branch `chore/upgrade-squad-latest` carried Squad configuration updates plus README.md image path fixes
+- Image paths corrected: `brand/readme-hero.svg` → `design/brand/readme-hero.svg`
+- README fixes directly related to stated Squad upgrade task scope
+- No branch protection blockers
+
+**Actions:**
+1. Committed README.md image fix with Co-authored-by trailer
+2. Pushed branch with upstream tracking
+3. Created PR via `gh pr create` with explicit base/head branches
+4. Merged with merge-commit strategy
+5. Deleted remote branch post-merge
+
+**Outcome:**
+- PR #34 merged successfully
+- Main now carries both Squad updates and corrected README image references
+- Remote branch cleaned up
+- No unrelated code changes; scope remained surgical
+
+---
+
+### 2026-04-07T23:16:55Z: User directive — Branch retention for future work
+**By:** shane (via Copilot)  
+**Status:** Captured
+
+Keep the `chore/upgrade-squad-latest` branch open for other work — user request captured for team memory.
+
+---
+
 ### 2026-04-05T16-16-48Z: User directive — philosophy/readability bar
 **By:** shane (via Copilot)
 **Status:** Captured

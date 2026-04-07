@@ -7,6 +7,13 @@
 
 ## Recent Updates
 
+### 2026-04-07 - README Quick Example refactored for clarity
+- Removed explanatory hedge sentence about DSL rendering fallback
+- Removed copyable DSL code block from Quick Example section
+- Switched image from markdown syntax to fixed-width HTML img tag (`width="600"`) for consistent GitHub rendering
+- Decision: Render contract image is the hero artifact; declutter example by trusting design
+- See: `.squad/decisions.md` for full brand rationale
+
 ### 2026-04-05 - Rule framing reinforced by readability review
 - Pushed proposal #8 toward a narrow, English-ish rule concept that reads like authored business policy rather than academic programming vocabulary.
 - Added the explicit readability bar that language examples should feel closer to configuration or scripting than to a general-purpose programming language.
@@ -56,3 +63,10 @@
 - Compactness proposals land cleanly only when they strengthen Precept's core story: deterministic inspectability, keyword-anchored structure, and the split between data truth (`invariant`) and movement truth (`assert`).
 - Named guard reuse across `when`, `invariant`, and state `assert` fits that philosophy when framed as a named business predicate, not as a general alias or macro system.
 - Key paths: `docs\PreceptLanguageDesign.md`, `docs\research\dsl-expressiveness\README.md`, `docs\research\dsl-expressiveness\expression-feature-proposals.md`, `.squad\decisions\inbox\j-peterman-philosophy-pass.md`.
+
+### 2024-12 - README Quick Example: Remove redundant DSL copy, commit to rendered image
+- Removed the explanatory sentence about GitHub not rendering DSL faithfully—that claim is now stale hedging.
+- Removed the collapsed copyable DSL code block that duplicated the rendered contract image below it.
+- Switched from markdown image syntax `![...](...)` to fixed-size HTML `<img src="..." width="600" />` to ensure the contract diagram reads at proper visual scale alongside surrounding page text in GitHub's README view.
+- Brand rationale: The Quick Example section is a teaching artifact, not an archive. The professionally rendered contract image is the hero; the copyable fallback was defensive scaffolding. Removing it simplifies visual hierarchy and directs curious readers toward `samples/` or the language reference for further exploration.
+- Decision written to `.squad/decisions/inbox/j-peterman-readme-contract.md`.
