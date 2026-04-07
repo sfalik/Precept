@@ -6543,3 +6543,54 @@ Concept 11 is a solid addition to the exploration set. It's the most intuitive c
 
 - Mockup: `tools/Precept.VsCode/mockups/preview-reimagined-11-kanban-board.html`
 - Index (updated): `tools/Precept.VsCode/mockups/preview-reimagined-index.html`
+
+---
+
+# PR #35 Merge: README Cleanup and Squad Decision Recording
+
+**Date:** 2026-04-07T23:40:00Z  
+**Actor:** Frank (Lead/Architect)  
+**Outcome:** MERGED to main
+
+## Summary
+
+Merged PR #35 containing README Quick Example refactoring and Squad orchestration recording. The branch `chore/upgrade-squad-latest` carried 2 commits that finalized the README contract cleanup decision (removing explanatory hedge and copyable DSL block, fixing image sizing) and recorded the orchestration outcome.
+
+## What Merged
+
+- **Commit 1759b33:** Scribe post-task recording for PR #34 merge
+  - Updated `.squad/agents/frank/history.md` with PR #34 learnings
+  - Recorded decisions in `.squad/decisions.md` (Squad config + README image fix outcome, user directive to keep branch open)
+  - Cleaned up merged inbox entries
+  
+- **Commit 3798d92:** .squad merge J. Peterman README contract cleanup decision
+  - Updated `.squad/agents/j-peterman/history.md` with team update
+  - Merged `j-peterman-readme-contract.md` decision into `.squad/decisions.md`
+  - Added README Quick Example refactoring decision record
+
+## PR Details
+
+- **PR:** #35 "chore: finalize README cleanup and record Squad decision"
+- **Base:** main
+- **Head:** sfalik:chore/upgrade-squad-latest
+- **Status:** Merged via merge commit
+- **Changes:** 81 additions, 3 files changed (README.md, .squad/decisions.md, .squad/agents/j-peterman/history.md)
+- **Checks:** None (no blocking checks on this PR)
+
+## Key Decisions
+
+1. **Clean working tree before push:** Separated uncommitted Squad sync artifacts from committed README cleanup work. Reset working tree to HEAD, removed untracked workflow files, then pushed the 2 clean commits.
+
+2. **Explicit PR creation:** Used `gh pr create --base main --head sfalik:chore/upgrade-squad-latest` to ensure correct target branch despite branch name potentially matching multiple remotes.
+
+3. **Branch retention:** Per user directive, branch was NOT deleted post-merge. It remains available locally and remotely for future work in this upgrade cycle.
+
+## Scope Verification
+
+✓ Zero scope creep — only the README cleanup commits from the branch were included  
+✓ No unrelated code changes  
+✓ Co-authored-by trailer included in original commits  
+
+## Next Steps
+
+Branch `chore/upgrade-squad-latest` is available for additional Squad upgrade work. Main now carries the finalized README Quick Example refactoring and complete orchestration record.

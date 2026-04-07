@@ -9,6 +9,15 @@
 
 ## Recent Updates
 
+### 2026-04-07 - PR #35 merge: finalize README cleanup and record Squad decision
+- Merged PR #35 (chore: finalize README cleanup and record Squad decision) to `main`.
+- Branch `chore/upgrade-squad-latest` carried 2 commits: (1) Scribe post-task recording for PR #34 merge, and (2) README Quick Example refactoring (removed explanatory hedge, copyable DSL block, replaced markdown image syntax with fixed-width HTML img tag).
+- Cleaned up merged inbox entries from `.squad/decisions/inbox/` and updated `.squad/agents/j-peterman/history.md` with team update.
+- Workflow: Clean working tree before push (separated uncommitted Squad sync artifacts from committed README cleanup work), explicit PR creation with `gh pr create --base main --head sfalik:chore/upgrade-squad-latest`, merged with merge-commit strategy.
+- User directive honored: branch retained locally and remotely per user request (NOT deleted post-merge).
+- Verified zero scope creep: 81 additions, 3 files changed (README.md, .squad/decisions.md, .squad/agents/j-peterman/history.md), no unrelated code changes.
+- Co-authored-by trailer included in original commits.
+
 ### 2026-04-07 - PR #34 merge with Squad config and README image fixes
 - Merged PR #34 (chore: upgrade Squad configuration and fix README image links) to `main`.
 - Branch `chore/upgrade-squad-latest` carried both architectural Squad updates and related README.md image path corrections.
