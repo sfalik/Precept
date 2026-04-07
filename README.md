@@ -13,13 +13,13 @@
 
 > Temporary hero sample — using the current top-rated Subscription Billing candidate while the final hero decision stays open.
 
-![Precept Subscription hero](brand/readme-hero.svg)
+![Precept Subscription hero](design/brand/readme-hero.svg)
 
 **The Contract**
 
 GitHub cannot render the styled DSL treatment faithfully, so the README uses the rendered contract and keeps the source copyable below.
 
-![Rendered Precept Subscription contract](brand/readme-hero-dsl.png)
+![Rendered Precept Subscription contract](design/brand/readme-hero-dsl.png)
 
 <details>
 <summary>Copyable DSL</summary>
