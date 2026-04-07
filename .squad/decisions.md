@@ -6,6 +6,41 @@
 
 ---
 
+### 2026-04-07T23:20:00Z: PR #34 Merge — Squad Upgrade + README Image Fix
+**By:** Frank  
+**Status:** Merged  
+
+Merged PR #34 (chore: upgrade Squad configuration and fix README image links) to `main` using merge commit strategy.
+
+**Context:**
+- Branch `chore/upgrade-squad-latest` carried Squad configuration updates plus README.md image path fixes
+- Image paths corrected: `brand/readme-hero.svg` → `design/brand/readme-hero.svg`
+- README fixes directly related to stated Squad upgrade task scope
+- No branch protection blockers
+
+**Actions:**
+1. Committed README.md image fix with Co-authored-by trailer
+2. Pushed branch with upstream tracking
+3. Created PR via `gh pr create` with explicit base/head branches
+4. Merged with merge-commit strategy
+5. Deleted remote branch post-merge
+
+**Outcome:**
+- PR #34 merged successfully
+- Main now carries both Squad updates and corrected README image references
+- Remote branch cleaned up
+- No unrelated code changes; scope remained surgical
+
+---
+
+### 2026-04-07T23:16:55Z: User directive — Branch retention for future work
+**By:** shane (via Copilot)  
+**Status:** Captured
+
+Keep the `chore/upgrade-squad-latest` branch open for other work — user request captured for team memory.
+
+---
+
 ### 2026-04-05T16-16-48Z: User directive — philosophy/readability bar
 **By:** shane (via Copilot)
 **Status:** Captured
