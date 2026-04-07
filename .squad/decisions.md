@@ -6,6 +6,23 @@
 
 ---
 
+### 2026-04-07T23:30:44Z: README Contract Image & DSL Copyable Block Cleanup
+**By:** J. Peterman (Brand/DevRel)  
+**Status:** Decided  
+
+README.md Quick Example section refactored to remove explanatory hedge, copyable DSL block, and replace markdown image syntax with fixed-width HTML img tag for consistent GitHub rendering.
+
+**What Changed:**
+1. Removed explanatory sentence about DSL rendering fallback
+2. Removed copyable DSL code block from Quick Example
+3. Replaced markdown image syntax with `<img src="design/brand/readme-hero-dsl.png" alt="..." width="600" />`
+
+**Rationale:** Simplify visual hierarchy, trust the professionally-rendered contract image, and direct DSL learners to `samples/` and language reference rather than README copy-paste scaffolding.
+
+**Brand Rationale:** The Quick Example teaches the pattern, not the DSL. Remove defensive scaffolding; the rendered contract is the hero artifact.
+
+---
+
 ### 2026-04-07T23:20:00Z: PR #34 Merge — Squad Upgrade + README Image Fix
 **By:** Frank  
 **Status:** Merged  
