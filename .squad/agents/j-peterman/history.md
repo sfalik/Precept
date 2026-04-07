@@ -34,10 +34,23 @@
 
 ## Learnings
 
+### 2026-04-07 - Image link path integrity check
+- README.md hero images had stale relative paths (`brand/readme-hero.svg` instead of `design/brand/readme-hero.svg`).
+- Root cause: Brand assets live in `design/brand/`, not a top-level `brand/` folder. The path prefix was omitted during earlier README updates.
+- Fix: Updated both image references to use `design/brand/` prefix. Both assets verified to exist at corrected paths.
+- Learning: When touching README documentation, validate all relative paths against the actual file tree. Asset movements can create broken links that silently fail in GitHub's markdown renderer.
+
 ### 2026-04-05 - README hero PNG fallback
 - `README.md` now uses `brand/readme-hero-dsl.png` for the GitHub-facing contract sample, with the source kept in a collapsed copyable block instead of styled inline HTML.
 - For branded DSL samples on GitHub, image-first presentation plus an intentional plaintext fallback is safer than relying on GitHub to preserve custom code styling.
 - Key paths: `README.md`, `brand/readme-hero-dsl.png`, `brand/readme-hero-dsl.precept`.
+
+### 2026-04-07 - README image link path integrity
+- README.md hero images had stale relative paths (`brand/readme-hero.svg` instead of `design/brand/readme-hero.svg`).
+- Root cause: Brand assets live in `design/brand/`, not a top-level `brand/` folder. The path prefix was omitted during earlier README updates.
+- Fix: Updated both image references to use `design/brand/` prefix. Both assets verified to exist at corrected paths.
+- Learning: When touching README documentation, validate all relative paths against the actual file tree. Asset movements can create broken links that silently fail in GitHub's markdown renderer.
+- Decision merged to `.squad/decisions/decisions.md`.
 
 ### 2026-04-05 - Philosophy filter for DSL compactness proposals
 - Compactness proposals land cleanly only when they strengthen Precept's core story: deterministic inspectability, keyword-anchored structure, and the split between data truth (`invariant`) and movement truth (`assert`).
