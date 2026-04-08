@@ -16,6 +16,27 @@
 - User directive honored: branch retained locally and remotely per user request (NOT deleted post-merge).
 - Verified zero scope creep: 81 additions, 3 files changed (README.md, .squad/decisions.md, .squad/agents/j-peterman/history.md), no unrelated code changes.
 - Co-authored-by trailer included in original commits.
+### 2026-04-08 - Sample ceiling consolidation recorded
+- Team update (2026-04-08T01:13:25.793Z): Scribe merged Frank's ceiling analysis and philosophy addendum with Steinbrenner's planning lane and Peterman's benchmark lane into `.squad/decisions.md` — decided by Frank, Steinbrenner, and J. Peterman.
+- Shared outcome: 42 is now the hard upper bound for the flat in-repo corpus, while the real acceptance gate is whether a candidate strengthens domain fit, prevention, inspectability, and marginal corpus value.
+
+
+### 2026-05-18 - Sample ceiling philosophy addendum
+- Produced docs/research/sample-realism/frank-sample-ceiling-philosophy-addendum.md.
+- Made explicit how Precept philosophy (prevention, inspectability, determinism, one-file completeness, AI-first) shapes corpus size, domain selection, and refusal criteria.
+- Established domain-fit tiers: Tier 1 (native) = claims/disputes, financial approvals, compliance; Tier 2 = IAM, healthcare auth, HR lifecycle; Tier 3 = scheduling/logistics, reference data.
+- Defined dilution test: 5 questions to evaluate whether a candidate sample earns its slot or inflates count.
+- Reframed 42 as an upper bound, not a quota. Realistic philosophy-driven range is 30–42 depending on how many candidates pass the quality floor.
+- Decision note filed to .squad/decisions/inbox/frank-sample-ceiling-philosophy.md.
+
+### 2026-05-17 - Sample corpus ceiling analysis
+- Produced docs/research/sample-realism/frank-sample-ceiling-analysis.md.
+- Recommended optimal operating band of 40-50 samples, soft ceiling at 50, hard ceiling at 55.
+- Proposed three-tier model: Core Canon (15-20), Extended Canon (20-25), Experimental (5-10 rotating).
+- Confirmed Steinbrenner's 42-sample target as sound near-term anchor at the low end of the optimal band.
+- Introduced marginal-value gate: new samples past 42 must demonstrate value on ≥2 of 3 axes (domain, shape, construct).
+- Decision note filed to .squad/decisions/inbox/frank-sample-ceiling.md.
+
 ### 2026-04-08 - Sample realism research consolidated
 - Scribe merged Frank, George, J. Peterman, and Steinbrenner sample-realism findings into .squad/decisions.md and cleared the inbox notes.
 - The active decision set now locks the FUTURE(#N) comment protocol, modeling-over-syntax principle, case-centric flagship sample bias, the 42-sample portfolio direction, and Shane's directive to use Opus when sample/design judgment is especially high.
@@ -260,6 +281,8 @@ Each exclusion removes complexity that Superpower would struggle with (indentati
 - Rejected: #18 conditional outcome in `->` chain
 
 All proposals are additive and Superpower-compatible. No structural redesign required.
+- 2026-05-18: philosophy-driven corpus analysis is more useful than count-driven analysis because it gives the team a refusal test ("does this sample demonstrate prevention, inspectability, or deterministic policy enforcement?") rather than a quota ("we need 7 more to hit 42"). Refusal criteria prevent dilution; quotas invite it.
+- 2026-05-17: corpus ceiling is best argued from three converging axes (domain breadth, workflow shape, construct coverage) rather than raw count. All three saturate in the 40-55 range for a focused DSL. Maintenance cost is the hard backstop — past ~55 files, single-feature update passes become unreliable without migration tooling.
 - 2026-05-17: sample realism is mostly a semantic-types and policy-density problem, not a sample-count problem. The biggest credibility failures are categorical values, money, and calendar logic forced through string/number workarounds.
 - 2026-05-16: keep PRs surgically scoped when Shane asks for targeted metadata changes; local bookkeeping should not hitchhike into those PRs.
 - 2026-05-15: GitHub issue hygiene works best when routing labels, taxonomy labels, board status, and close/open state each keep one job.

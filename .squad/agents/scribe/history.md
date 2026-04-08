@@ -93,6 +93,15 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 
 ## Recent Updates
 
+## 2026-04-08T01:13:25.793Z - Sample ceiling research consolidated
+
+- Wrote orchestration and session logs for Frank's analysis/addendum plus Steinbrenner's and J. Peterman's sample-ceiling lanes.
+- Consolidated 4 inbox decision(s) into 1 shared sample-ceiling decision in `.squad/decisions.md`, cleared `.squad/decisions/inbox/`, and archived 0 older active decision entry(ies).
+- Updated the affected agent histories and summarized Elaine's oversized history back into a compact `## Core Context` record.
+
+---
+
+
 ### 2026-04-06T00:48:04Z - Kramer Concept 26 bounded configurability recorded
 - Wrote a lightweight session log capturing Kramer's Concept 26 direction: layout presets, split resizing, and per-panel collapse without freeform docking.
 - No decision inbox merge was needed, and no product mockup files or preview index files were touched in this pass.
@@ -118,4 +127,3 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 ### 2026-04-05 - Frank language proposal review recorded
 - Wrote orchestration and session logs for Frank's GitHub issue review across proposals #8-#13.
 - Merged 4 decision inbox item(s) into .squad/decisions.md, cleared .squad/decisions/inbox/, updated affected histories, and archived 0 older decision entries.
-

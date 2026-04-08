@@ -24,6 +24,43 @@ The README DSL hero remains an image-based branded treatment, but it must now be
 - Native README text/fenced code remains the only fully robust way to keep DSL text scaling in lockstep with surrounding prose across viewport and zoom changes.
 - GitHub page-geometry research still matters: the repo shell tops out around **1280px** and the README/article frame around **1012px**, but the displayed README image for this treatment clamps earlier at about **830px**.
 - Do not rely on custom CSS, sanitizer-sensitive HTML, or viewport-specific image swapping as a stable README contract.
+# Decision: Sample ceiling operating model (consolidated)
+
+**By:** Frank, Steinbrenner, J. Peterman  
+**Date:** 2026-04-08  
+**Status:** Consolidated
+
+## What
+
+- Treat **30 total samples** as the near-term expansion target and **30-36 co-equal canonical business samples** as the realistic operating band for the current product stage.
+- Treat **42 total in-repo samples** as the current hard upper bound for a flat corpus. Anything above that needs explicit tiering, stronger curation infrastructure, and a trigger-driven justification.
+- Organize the library as a **tiered corpus**: a small flagship canon, a broader extended shelf, and a constrained reference/experimental lane instead of presenting every sample as equal-strength evidence.
+- Make **quality gates outrank quotas**. A candidate past the low 30s must clear both a **marginal-value gate** (new domain, workflow shape, or construct pressure) and a **dilution/refusal test** (prevention, inspectability, deterministic policy enforcement, one-file completeness, and real domain fit).
+- Prefer **deepening native-fit domains** over adding thin marginal domains. Claims/disputes, financial approvals/exceptions, and compliance/regulatory workflows remain the strongest flagship pressure-test lanes.
+- Revisit the ceiling only when the product or corpus structure materially changes: new language surface ships, docs/navigation improve, or the team adds ownership/segmentation strong enough to support a larger maintained shelf.
+
+## Why
+
+- Steinbrenner's planning pass showed that documentation, onboarding, review bandwidth, and future sample-test burden make the mid-30s the most believable place for a co-equal canon.
+- Peterman's benchmark lane showed that projects with 40+ examples usually segment them into canonical, reference, experimental, or overflow lanes rather than one undifferentiated shelf.
+- Frank's ceiling analysis argued that breadth and workflow-shape coverage saturate around the 40-50 range, but only if the team accepts tiered maintenance and marginal-value screening.
+- Frank's philosophy addendum tightened that further: the real question is not 'how many can we fit?' but 'which samples still prove Precept's prevention and inspectability story without diluting it?'
+
+## Differences resolved in consolidation
+
+- The **near-term operating guidance** now follows Steinbrenner/Peterman: smaller canon, explicit curation, and 42 as an upper bound rather than the default target.
+- Frank's **40-50 / 50-55** framing is preserved as a longer-horizon ceiling analysis, not today's operating plan. It becomes relevant only if the corpus is tiered and the team has stronger maintenance structure.
+- The shared team position is therefore: **plan for ~30 now, operate cautiously through the mid-30s, allow growth toward 42 only when each addition earns its slot, and do not chase a quota.**
+
+## Artifacts
+
+- `docs/research/sample-realism/frank-sample-ceiling-analysis.md`
+- `docs/research/sample-realism/frank-sample-ceiling-philosophy-addendum.md`
+- `docs/research/sample-realism/steinbrenner-sample-ceiling-plan.md`
+- `docs/research/sample-realism/peterman-sample-corpus-benchmarks.md`
+
+---
+
 # Decision: Sample Realism Initiative — Language & Philosophy Guardrails
 
 **Filed by:** Frank (Lead Architect & Language Designer)

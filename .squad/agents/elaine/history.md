@@ -1,30 +1,29 @@
 ## Core Context
 
-- Owns UX/design for README structure, brand-spec surfaces, palette application, and cross-surface scannability.
+- Owns UX/design for README structure, preview/inspector product shape, brand-spec surfaces, palette application, and cross-surface scannability.
 - Locked README principles: mobile-first above-the-fold layout, single primary CTA, semantic heading hierarchy, progressive disclosure, viewport resilience, screen-reader compatibility, and AI-parseable structure.
 - Brand surfaces separate identity palette from syntax/runtime semantics. Emerald, Amber, and Rose carry runtime meaning; Gold is a judicious brand-mark accent, not a general UI color lane.
 - Peterman owns public prose; Elaine owns form, layout, and surface presentation rules. Hero samples must remain legible in plaintext and constrained viewports before any decorative treatment.
+- Preview work converged from broad concept exploration toward a shipping-oriented hybrid: Contract Explorer / Interactive Journey as the leading direction, with Notebook, Matrix, and Storyboard concepts as secondary modes rather than competing primaries.
+- InsuranceClaim is the minimum credible stress-test sample for preview UX; Subscription is only sufficient for basic demonstrations. Complex samples must surface collection rendering, guarded rejects, edit-in-place, structured violations, and the six-stage fire pipeline.
+- Sidebar-width and responsive constraints are first-order product requirements. Timeline/Journey/Notebook-style vertical patterns survive narrow VS Code panels; Matrix, Dashboard, and Kanban concepts degrade without wider canvases.
+- Useful long-lived preview patterns now include data provenance annotations, recently-changed field emphasis, what-if inspection, inline execution trace, lightweight history awareness, and topology rails that complement rather than duplicate detailed state/event data.
+- For linked UX issues #1 and #7, the working branch is `squad/1-7-inspector-preview-redesign` off `main`; preserve unrelated in-flight notes when branching.
 
 ## Recent Updates
 
-### 2026-04-05 - Kanban concept decision merged into squad record
-- Moved Concept 11's kanban-board preview decision from .squad/decisions/inbox/elaine-kanban-preview-concept.md into .squad/decisions.md during the proposal-expansion consolidation pass.
-- Preserved the core recommendation: use kanban as a complementary lifecycle-overview mode for simpler linear precepts, not as a replacement for Timeline, Storyboard, or Notebook views.
+### 2026-05-03 - Interactive Journey gained a topology rail
+- Added an animated SVG state diagram to Concept 17's right rail so traversal state is visible without duplicating event/data detail.
+- Expanded the coach-mark tour, kept the diagram responsive (hidden at narrower breakpoints), and preserved undo/reset awareness in the rail.
 
-- Team update (2026-04-04T23:02:22Z): Hero snippet source of truth now lives in brand/brand-spec.html section 2.6, mirrors the README verbatim, stays TEMPORARY, and treats plaintext reuse as canonical across README, VS Code Marketplace, NuGet, Claude Marketplace, and AI contexts. Decision by J. Peterman.
+### 2026-05-02 - Preview concepts narrowed to a leading product shape
+- Deep analysis across the concept set moved the team toward Contract Explorer plus history-aware Journey/Navigator ideas, with Interactive Journey as the clickable synthesis.
+- Flow Cards validated the first InsuranceClaim-based stress test; Contract Explorer layered in inline execution trace, structured violations, edit-in-place, what-if inspection, and all six outcome kinds.
+- The fire-and-observe loop (`fill args -> Fire -> watch past/present/future recalculate`) is now the core interaction model for any production preview.
 
-### 2026-04-07 - README Form/Shape Pass Applied
-- Removed visual noise from the title block, tightened the quick example layout, simplified Getting Started, and reduced section heading density.
-- Preserved Peterman's content ownership while making the README easier to scan on GitHub and small viewports.
-- Key learning: README structure work is primarily rhythm, hierarchy, and line economy; code-block-safe vertical layouts beat clever side-by-side treatments.
-
-### 2026-04-07 - README Rewrite: Direct Contribution Role Defined
-- Locked Elaine's direct contribution areas to README form: title block composition, hero layout constraints, CTA structure, heading hygiene, separators, and contributing-section formatting.
-- Key learning: the 60-character line budget for hero code is a layout dependency, not a copy preference.
-
-### 2026-04-05 - Brand Mark Color Revision: Emerald Arrows + Judicious Gold
-- Shifted transition arrows to Emerald, strengthened the Gold because accent where approved, and aligned mark-family explanations across the spec.
-- Key learning: color meaning must stay semantically consistent across the brand mark, editor surfaces, and documentation.
+### 2026-04-07 - README and preview form rules stayed aligned
+- Applied the README form/shape pass, defined Elaine's direct-contribution lane, and kept layout decisions grounded in line economy, viewport safety, and semantic color consistency.
+- Preserved the rule that preview/inspector detail should live in coherent surfaces rather than drifting across stale reference docs.
 
 ---
 
@@ -149,3 +148,9 @@
 - 2026-05-17 — Frank's architectural analysis of the PNG sizing problem is thorough and correct on the core constraint. His recommendation (fenced code block) is the same as mine, and that tradeoff is now preserved in `.squad/decisions.md`.
 - 2026-05-18 — Regenerated `readme-hero-dsl.png` to match GitHub's 830px max image display width. Previous image (1268px) scaled to 830px, shrinking code text to ~8.5px vs GitHub's ~13.6px code blocks. New approach: capture at 830px viewport with 2× deviceScaleFactor → 1660px image. Code text now renders at ~13px on GitHub. Added `design/brand/capture-hero-dsl.mjs` Playwright script for reproducible regeneration. Final width contract is now preserved in `.squad/decisions.md`.
 - 2026-05-18 — GitHub README image width reference: repo README view caps at 830px (per wh0/banner-width research). The `.markdown-body` container maxes at 980px with 45px padding. Different views have different caps: markdown view 1012px, VS Code extension 882px, VS Marketplace ~711px.
+- The current preview surface is a combined shell: header chrome, diagram canvas with in-canvas data lane, and bottom event dock unless Shane approves a structural change.
+- State/topology views are most useful when they show spatial context and traversal state, not when they repeat every field, rule, and event outcome already present elsewhere on the screen.
+- Data provenance (`← set at #N`) and recently-changed emphasis are low-cost, high-value affordances for debugging simulated runs.
+- Observable-style reactive recomputation maps cleanly to Precept's hypothetical inspect/update story and should inform future what-if interactions.
+- Collection rendering is a shared-component problem: sets, queues, and stacks each need distinct compact treatments that still fit sidebar-width constraints.
+- Gold should signal constrained/exceptional status carefully; runtime/editor semantics still belong primarily to Violet, Cyan, Emerald, Amber, Rose, and the neutral slate family.

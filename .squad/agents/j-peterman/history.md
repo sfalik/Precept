@@ -12,6 +12,11 @@
 - Changes: removed explanatory hedge, removed copyable DSL code block, replaced markdown image syntax with fixed-width HTML img tag (`width="600"`).
 - Decision reinforced: Rendered contract image is the hero artifact; declutter Quick Example by trusting design.
 - Full orchestration recorded in `.squad/decisions.md` and PR merged to main with team collaboration.
+### 2026-04-08 - Sample ceiling consolidation recorded
+- Team update (2026-04-08T01:13:25.793Z): Scribe merged Peterman's benchmark lane with Frank's architectural/philosophy notes and Steinbrenner's PM plan into `.squad/decisions.md` — decided by Frank, Steinbrenner, and J. Peterman.
+- Shared outcome: future sample storytelling now depends on explicit tiering, canon-versus-extended segmentation, and quota-resistant quality gates before the corpus grows past the mid-30s.
+
+
 ### 2026-04-08 - Sample realism recommendations merged
 - Scribe merged Peterman's benchmark research into .squad/decisions.md together with the directive to use Opus when sample/design judgment is especially high.
 - The active brand/devrel guidance now explicitly favors evidence-bearing, exception-rich, case-centric flagship workflows over more approval-ladder demos.
@@ -84,3 +89,9 @@
 - Created `docs\research\sample-realism\peterman-realistic-domain-benchmarks.md` after reviewing the README, brand positioning, and representative samples against external workflow research.
 - Core finding: the strongest future samples should look like governed case files with evidence loops, exception handling, and post-decision fulfillment, not just clean approval ladders.
 - Recommendation merged into `.squad/decisions.md`; inbox cleared so future sample selection stays aligned with the category story.
+
+### 2026-04-08 - Sample corpus ceiling research
+- Created `docs\research\sample-realism\peterman-sample-corpus-benchmarks.md` after benchmarking Precept's sample-count question against Temporal, XState, Dagster, AWS guidance patterns, Mermaid, and JSON Schema.
+- Core finding: benchmark projects support a **tiered** sample strategy; once official corpora approach the 40+ range, they usually separate canonical, reference, experimental, or fixture lanes instead of keeping one flat shelf.
+- Recommendation: treat roughly **38-46 total in-repo samples** as Precept's realistic upper-end band, with only about **30-36** of those carrying co-equal canonical business weight.
+- Team follow-up written to `.squad/decisions/inbox/peterman-sample-ceiling.md`.

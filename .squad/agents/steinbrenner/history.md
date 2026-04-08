@@ -8,6 +8,15 @@
 
 ## Recent Updates
 
+### 2026-04-08 - Sample ceiling consolidation recorded
+- Team update (2026-04-08T01:13:25.793Z): Scribe merged Steinbrenner's portfolio-cap proposal with Frank's ceiling analysis/addendum and Peterman's benchmark findings into `.squad/decisions.md` — decided by Frank, Steinbrenner, and J. Peterman.
+- Shared outcome: the team now plans around ~30 near-term samples, treats the mid-30s as the credible canonical operating band, and keeps 42 as an upper bound rather than a default planning quota.
+
+
+### 2026-04-08 - Sample ceiling reframed around curation cost
+- Reworked the corpus-sizing recommendation from a fixed 42-sample target to a tiered plan: 30 near-term, 36 operating cap, 42 hard upper bound.
+- Locked the PM framing that canon quality, docs discoverability, review capacity, and eventual sample-test burden are now first-order constraints, not afterthoughts.
+
 ### 2026-04-08 - Sample realism portfolio consolidated
 - Scribe merged Steinbrenner's portfolio plan with Frank, George, and J. Peterman's sample-realism findings into .squad/decisions.md, alongside Shane's directive to use Opus when sample/design judgment is especially high.
 - The active sample plan targets 42 total repo samples, rewrites the eight roadmap-anchor samples first, adds missing domain lanes next, and holds a deliberate data-only lane for proposal #22.
@@ -24,6 +33,8 @@
 
 ## Learnings
 
+- 2026-04-08: sample ceilings should be set by curation economics as much as by language pressure; 42 is more credible as a hard limit than as the default operating target.
+- 2026-04-08: a sample library needs a small flagship canon plus a broader extended shelf, or onboarding and proposal citation both degrade.
 - 2026-04-08: sample planning should treat the corpus as roadmap instrumentation, not as a neutral demo shelf. Rewrite known anchor samples before inventing more examples.
 - 2026-04-05: the durable repo-wide issue model is one shared lifecycle plus durable taxonomy/ownership labels, with blocked/deferred reserved for true exceptions.
 - 2026-04-05: the philosophy screen for language proposals remains domain integrity, deterministic inspectability, keyword-anchored flat statements, first-match routing, compile-time soundness, and AI legibility.
