@@ -1679,6 +1679,18 @@ public static class PreceptCompiler
         CollectDuplicateStateAssertDiagnostics(model, diagnostics);
         CollectSubsumedStateAssertDiagnostics(model, diagnostics);
 
+        // SYNC:CONSTRAINT:C55
+        if (!model.IsStateless && model.EditBlocks is { Count: > 0 })
+        {
+            foreach (var eb in model.EditBlocks.Where(static eb => eb.State is null))
+            {
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C55,
+                    DiagnosticCatalog.C55.MessageTemplate,
+                    eb.SourceLine));
+            }
+        }
+
         var defaultData = BuildDefaultData(model);
 
         // 1. Validate invariants against default values
