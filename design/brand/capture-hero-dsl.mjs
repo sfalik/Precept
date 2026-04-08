@@ -3,7 +3,7 @@
  *
  * Width target: 1660px image (2× retina for GitHub's 830px max image width).
  * The capture uses deviceScaleFactor: 2 so the 1× source HTML renders at
- * double resolution — text at 13px in source appears at ~13.5px when GitHub
+ * double resolution — text at 14px in source appears at ~14.5px when GitHub
  * scales the 1660px image down to 830px display.
  *
  * Run:  node design/brand/capture-hero-dsl.mjs
@@ -51,7 +51,7 @@ async function capture() {
   const imgHeight = Math.round(box.height * 2);
   console.log(`Captured: ${imgWidth}×${imgHeight}px (2× retina) → ${outputPath}`);
   console.log(`  Display width on GitHub: ${GITHUB_MAX_IMAGE_WIDTH}px`);
-  console.log(`  Effective code font-size: ~${(13 * GITHUB_MAX_IMAGE_WIDTH / imgWidth * 2).toFixed(1)}px`);
+  console.log(`  Effective code font-size: ~${(14 * GITHUB_MAX_IMAGE_WIDTH / imgWidth * 2).toFixed(1)}px`);
 
   await browser.close();
 }
