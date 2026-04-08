@@ -1885,7 +1885,7 @@ public static class PreceptCompiler
 
 public sealed record PreceptInstance(
     string WorkflowName,
-    string CurrentState,
+    string? CurrentState,
     string? LastEvent,
     DateTimeOffset UpdatedAt,
     IReadOnlyDictionary<string, object?> InstanceData);

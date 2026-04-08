@@ -155,6 +155,11 @@ public enum PreceptToken
     Any,
 
     [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Quantifier for all declared fields")]
+    [TokenSymbol("all")]
+    All,
+
+    [TokenCategory(TokenCategory.Grammar)]
     [TokenDescription("Collection inner-type separator")]
     [TokenSymbol("of")]
     Of,
