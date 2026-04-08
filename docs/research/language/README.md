@@ -33,7 +33,7 @@ This folder now follows a strict split:
 | `#14` | Conditional invariants (`when`/`unless` guards + `not` keyword) | `expressiveness/conditional-logic-strategy.md`, `references/conditional-invariant-survey.md`, `expressiveness/fluent-validation.md`, `references/constraint-composition.md` |
 | `#15` | String `.contains()` membership test | `expressiveness/expression-language-audit.md`, `references/expression-evaluation.md` |
 | `#16` | Numeric built-in functions (`min`, `max`, `abs`, `round`) | `expressiveness/expression-language-audit.md`, `references/expression-evaluation.md` |
-| `#17` | Computed / derived fields | `expressiveness/expression-language-audit.md`, `references/expression-evaluation.md` |
+| `#17` | Computed / derived fields | `expressiveness/computed-fields.md`, `expressiveness/expression-language-audit.md`, `references/expression-evaluation.md` |
 | `#18` | Conditional outcome in `->` chain (rejected) | `expressiveness/linq.md`, `expressiveness/expression-language-audit.md` |
 | `#25` | Type system expansion (choice and date types) | `references/type-system-survey.md`, `expressiveness/expression-language-audit.md` |
 | `#22` | Data-only precepts (stateless domain definitions) | `expressiveness/data-only-precepts-research.md` |

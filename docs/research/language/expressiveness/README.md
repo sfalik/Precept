@@ -19,6 +19,7 @@ These files are **research evidence, not proposal sources**. Canonical proposal 
 
 | File | Purpose |
 |---|---|
+| [computed-fields.md](./computed-fields.md) | Research grounding for computed / derived fields and the contracts issue #17 still needs to make explicit |
 | [expression-language-audit.md](./expression-language-audit.md) | Runtime-grounded map of the current expression surface and its constraints |
 | [internal-verbosity-analysis.md](./internal-verbosity-analysis.md) | Corpus-based compactness analysis |
 | [expression-tracking-notes.md](./expression-tracking-notes.md) | Labeling guidance for `dsl-expressiveness` vs `dsl-compactness` |
@@ -36,7 +37,7 @@ Use the issue for the proposal body; use the research file for evidence.
 | `#14` | Conditional invariants (`when` on `invariant`) | `fluent-validation.md`, `expression-language-audit.md` |
 | `#15` | String `.contains()` membership test | `expression-language-audit.md` |
 | `#16` | Numeric built-in functions (`min`, `max`, `abs`, `round`) | `expression-language-audit.md` |
-| `#17` | Computed / derived fields | `expression-language-audit.md` |
+| `#17` | Computed / derived fields | `computed-fields.md`, `expression-language-audit.md` |
 | `#18` | Conditional outcome in `->` chain (rejected) | `linq.md`, `expression-language-audit.md` |
 
 ## Proposal-author rule
