@@ -1,10 +1,11 @@
 /**
  * Captures readme-hero-dsl.png from readme-hero-dsl.html.
  *
- * Width target: 1660px image (2× retina for GitHub's 830px max image width).
- * The capture uses deviceScaleFactor: 2 so the 1× source HTML renders at
- * double resolution — text at 14px in source appears at ~14.5px when GitHub
- * scales the 1660px image down to 830px display.
+ * Regeneration contract (mirrored in the HTML source comment):
+ *  - GitHub README images cap at 830px display width.
+ *  - Source type is 14px mono (set in the HTML's <pre> font-size).
+ *  - Capture at 2× (deviceScaleFactor: 2) → 1660px-wide retina PNG.
+ *    GitHub scales it to 830px; text lands at ~14.5px effective.
  *
  * Run:  node design/brand/capture-hero-dsl.mjs
  */
