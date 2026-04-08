@@ -2,7 +2,7 @@
 
 ## Architecture
 
-Precept is a domain integrity engine for .NET — a DSL runtime that binds an entity's state, data, and business rules into a single executable contract.
+Precept is a domain integrity engine for .NET — a DSL runtime that governs how a business entity's data evolves under business rules across its lifecycle, making invalid configurations structurally impossible.
 
 | Component | Path | Purpose |
 |-----------|------|---------|
@@ -13,7 +13,7 @@ Precept is a domain integrity engine for .NET — a DSL runtime that binds an en
 | Copilot plugin | `tools/Precept.Plugin/` | Agent definition + 2 skills + MCP launcher |
 | Sample files | `samples/` | 20 `.precept` files — canonical DSL usage examples |
 
-Key design docs: `docs/PreceptLanguageDesign.md` (DSL semantics), `docs/RuntimeApiDesign.md` (C# API), `docs/McpServerDesign.md` (MCP tool specs), `docs/CatalogInfrastructureDesign.md` (metadata registries). See `docs/` for the full set.
+Key design docs: `docs/philosophy.md` (product philosophy), `docs/PreceptLanguageDesign.md` (DSL semantics), `docs/RuntimeApiDesign.md` (C# API), `docs/McpServerDesign.md` (MCP tool specs), `docs/CatalogInfrastructureDesign.md` (metadata registries). See `docs/` for the full set.
 
 ## Build & Test
 
@@ -71,6 +71,19 @@ To check a `.precept` file for errors:
 1. Use the `get_errors` tool on the `.precept` file path (reads the VS Code Problems panel, populated by the language server).
 2. Cross-check against sample files in `samples/`.
 
+## Product Philosophy (Non-Negotiable)
+
+`docs/philosophy.md` is the grounding document for Precept's identity — what the product is, what it governs, how it's positioned, and why. Read it before making design decisions, writing public-facing copy, or proposing language changes.
+
+When any of the following change, update the philosophy in the same pass:
+
+- The category of entities Precept can govern (e.g. stateless precepts shipping)
+- The core guarantee (prevention, determinism, inspectability)
+- The positioning relative to adjacent tools
+- The constraint model or operation surface
+
+Do not let the philosophy drift behind the implementation. If the runtime can do something the philosophy doesn't describe, or the philosophy claims something the runtime can't do, fix the gap immediately.
+
 ## Documentation Sync (Non-Negotiable)
 
 When making any code, interface, test, or behavior change, keep documentation in sync in the same edit pass. Unless explicitly told not to, include documentation synchronization as part of every relevant code change.
@@ -78,8 +91,8 @@ When making any code, interface, test, or behavior change, keep documentation in
 ### Source of Truth
 
 - `README.md` — public project narrative and usage guide. Must track real implementation: update API names, behavioral semantics, examples, and feature claims on every meaningful change. Never leave aspirational claims as if implemented.
-- `docs/` — canonical technical design decision records, architecture notes, implementation plans, and research.
-- `design/brand/` — canonical source for brand identity, philosophy, brand spec, and brand-level semantic meaning.
+- `docs/` — canonical technical design decision records, architecture notes, implementation plans, research, and project philosophy.
+- `design/brand/` — canonical source for brand identity, brand spec, and brand-level semantic meaning.
 - `design/system/` — canonical source for reusable product-facing visual-system guidance and surface specs.
 - Legacy files (`README-legacy.md`, `docs/DesignNotes-legacy.md`) — archived, do not update.
 
@@ -89,7 +102,7 @@ Keep updates focused and factual. If uncertain whether a claim is implemented, v
 
 - Use `design/brand/` for identity and brand meaning.
 - Use `design/system/` for reusable visual-system rules and surface specs.
-- Use `docs/` for explanatory and technical documentation.
+- Use `docs/` for project philosophy, explanatory documentation, and technical documentation.
 - Durable design prototypes belong in `design/prototypes/`.
 - Hot, code-near prototypes may temporarily live near their owning tool surface, but should be promoted into `design/prototypes/` once they become durable design references.
 
