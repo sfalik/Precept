@@ -93,6 +93,14 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 
 ## Recent Updates
 
+## 2026-04-08T02:31:54Z - Research organization recorded
+
+- Wrote orchestration/session records for Frank's philosophy-promotion lane and J. Peterman's sample-realism organization lane.
+- Consolidated 2 inbox decision(s) into .squad/decisions.md, cleared .squad/decisions/inbox/, and archived 0 older decision entry(ies).
+- Updated the affected agent histories; no history.md file crossed the summarization threshold.
+
+---
+
 ## 2026-04-08T01:13:25.793Z - Sample ceiling research consolidated
 
 - Wrote orchestration and session logs for Frank's analysis/addendum plus Steinbrenner's and J. Peterman's sample-ceiling lanes.

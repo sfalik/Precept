@@ -6688,3 +6688,79 @@ Merged PR #35 containing README Quick Example refactoring and Squad orchestratio
 ## Next Steps
 
 Branch `chore/upgrade-squad-latest` is available for additional Squad upgrade work. Main now carries the finalized README Quick Example refactoring and complete orchestration record.
+# Decision: Philosophy research promoted into durable landing zone
+
+**By:** Frank
+**Date:** 2026-07-18
+**Status:** Proposed
+
+## What
+
+- Created `docs/research/philosophy/` as a durable landing zone for product-philosophy evidence, distinct from language research and sample-realism planning.
+- Promoted the reusable, non-sample-specific conclusions from the sample-realism research initiative into `docs/research/philosophy/entity-first-positioning-evidence.md`.
+- Updated `docs/philosophy.md` to link to the new evidence base and tightened wording around entity-first framing, states-are-optional, workflow-as-one-dimension, and category positioning.
+- Updated `docs/research/README.md` to register the new philosophy folder in the research structure.
+
+## Why
+
+The sample-realism research produced durable philosophical conclusions — entity-first framing, three-archetype model, category positioning evidence — that were buried in sample-planning documents. Those conclusions inform the product narrative independently of any sample roster or corpus plan.
+
+Without a dedicated home, philosophy-grounding evidence either stays scattered across sample-realism artifacts (where it decays as sample planning moves on) or gets inlined into `docs/philosophy.md` (making the philosophy doc bloated and evidence-heavy instead of concise and declarative).
+
+The new structure separates concerns:
+- `docs/philosophy.md` — concise, canonical, product-facing
+- `docs/research/philosophy/` — evidence base that grounds the philosophy claims
+- `docs/research/sample-realism/` — sample-specific planning and research (unchanged)
+
+## Team implications
+
+- **George:** Language research stays in `docs/research/language/`. Philosophy research is a separate lane — cross-reference where useful but do not merge the folders.
+- **Steinbrenner:** Sample planning and portfolio work stay in sample-realism. The philosophy evidence doc is upstream context, not a planning input to act on.
+- **Peterman:** Entity-centric and enterprise benchmark conclusions are cited in the philosophy evidence doc. Original research artifacts remain authoritative in their current locations.
+- **All:** When research produces conclusions that strengthen or challenge claims in `docs/philosophy.md`, promote those conclusions into `docs/research/philosophy/` rather than leaving them embedded in domain-specific research.
+
+## Artifacts
+
+- `docs/research/philosophy/README.md` — landing page for philosophy research
+- `docs/research/philosophy/entity-first-positioning-evidence.md` — first promoted evidence document
+- `docs/philosophy.md` — updated with links and tightened wording
+- `docs/research/README.md` — updated with philosophy folder entry
+
+---
+
+# Decision: Sample-Realism Research Organization
+
+**Author:** J. Peterman (Brand/DevRel)
+**Date:** 2026-07-18
+**Scope:** Documentation organization — non-destructive
+
+## What changed
+
+Created `docs/research/sample-realism/README.md` — an organizational map for the twelve existing research artifacts in that directory.
+
+## Classification
+
+The README sorts documents into four buckets:
+
+1. **Corpus planning** (Steinbrenner's portfolio and ceiling plans) — what to build.
+2. **Realism criteria and sample-design guidance** (Frank's language/philosophy doc, George's audit) — how to evaluate and write samples.
+3. **Philosophy-relevant inputs** (Frank's ceiling philosophy addendum, entity modeling addendum, enterprise platform survey) — conclusions that transcend sample design and should inform product identity.
+4. **External benchmark artifacts** (all four Peterman benchmark passes) — evidence from outside Precept.
+
+## Key distinction made explicit
+
+Three documents carry conclusions with **dual citizenship** — they originated as sample-realism research but contain product-level findings:
+
+- The **domain-fit tiers** and **dilution test** (from Frank's ceiling philosophy addendum) belong in product philosophy.
+- The **entity-vs-workflow identity correction** (from Frank's entity modeling addendum) belongs in brand philosophy.
+- The **platform-fit analysis** (from Frank's enterprise platform survey) belongs in competitive positioning.
+
+The README instructs future authors to cite these from philosophy/positioning docs rather than duplicate them.
+
+## What did NOT change
+
+All twelve research files remain in place. No files were moved, renamed, or modified. This is a map, not a restructuring.
+
+## Guidance added
+
+The README includes a contributor guide: naming conventions, what to include, where new research should land, and the explicit instruction to flag conclusions that inform product identity beyond sample design.

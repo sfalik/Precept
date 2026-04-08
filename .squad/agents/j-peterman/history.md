@@ -12,6 +12,10 @@
 - Changes: removed explanatory hedge, removed copyable DSL code block, replaced markdown image syntax with fixed-width HTML img tag (`width="600"`).
 - Decision reinforced: Rendered contract image is the hero artifact; declutter Quick Example by trusting design.
 - Full orchestration recorded in `.squad/decisions.md` and PR merged to main with team collaboration.
+### 2026-04-08 - Sample-realism organization map recorded
+- Team update (2026-04-08T02:31:54Z): Scribe logged Peterman's research-organization pass, merged the resulting decision into .squad/decisions.md, and cleared the related inbox note.
+- Shared outcome: docs/research/sample-realism/README.md now classifies the research corpus, separates dual-citizenship philosophy findings from sample-planning work, and gives future authors placement guidance.
+
 ### 2026-04-08 - Platform and entity research consolidated
 - Team update (2026-04-08T01:48:59Z): Scribe logged Peterman's enterprise and entity benchmark passes, merged the consolidated decision into .squad/decisions.md, and cleared the related inbox notes.
 - Shared outcome: future sample storytelling must combine workflow realism signals with explicit entity/data-contract lanes instead of presenting Precept as workflow-only.

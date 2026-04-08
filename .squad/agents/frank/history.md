@@ -16,6 +16,10 @@
 - User directive honored: branch retained locally and remotely per user request (NOT deleted post-merge).
 - Verified zero scope creep: 81 additions, 3 files changed (README.md, .squad/decisions.md, .squad/agents/j-peterman/history.md), no unrelated code changes.
 - Co-authored-by trailer included in original commits.
+### 2026-04-08 - Philosophy research promotion recorded
+- Team update (2026-04-08T02:31:54Z): Scribe logged Frank's philosophy-promotion lane, merged the organization decision into .squad/decisions.md, and cleared the related inbox note.
+- Shared outcome: reusable entity-first and category-positioning evidence now has a durable home in docs/research/philosophy/, while docs/philosophy.md stays concise and links back to the evidence base.
+
 ### 2026-04-08 - Platform and entity research consolidated
 - Team update (2026-04-08T01:48:59Z): Scribe logged Frank's enterprise-platform and entity-modeling research, merged the shared decision into .squad/decisions.md, and cleared the related inbox notes.
 - Shared outcome: sample planning now treats workflow, entity/stateless, and hybrid contracts as co-equal research lanes while preserving the four missing enterprise lifecycle shapes as near-term roadmap pressure.
