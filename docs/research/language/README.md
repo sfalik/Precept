@@ -46,7 +46,9 @@ If you need the current **proposal shape or status**, go to the corresponding Gi
 
 ## Proposal tracking workflow
 
-Language proposals now follow one GitHub-native workflow:
+See [CONTRIBUTING.md](/CONTRIBUTING.md) for the full proposal lifecycle: issue → research → implementation PR → merge → docs updated.
+
+Quick reference:
 
 - Keep the proposal body in the GitHub issue, not in `docs/`
 - Add every language proposal to **Precept Language Improvements**

@@ -163,6 +163,8 @@ Before writing or editing any `.precept` file or any DSL snippet, read at least 
 
 ## Proposal Philosophy Capture (Non-Negotiable)
 
+See [CONTRIBUTING.md](/CONTRIBUTING.md) for the full proposal lifecycle and where each artifact lives.
+
 Language proposals (GitHub issues) must include the design philosophy and rationale — not just the syntax and acceptance criteria. When a proposal is revised or a new feature is decided through design discussion:
 
 1. **Capture the reasoning in `docs/research/`** — research evidence, precedent surveys, dead ends explored, and why alternatives were rejected. This is the durable record that explains *why*.
