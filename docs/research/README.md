@@ -13,6 +13,7 @@ Research lives in this repository. Proposal decisions and canonical proposal bod
 | Folder | Owner | Purpose |
 |--------|-------|---------|
 | `language/` | George + Steinbrenner | Unified language research: comparative expressiveness studies, implementation-grounded audits, and formal language references that inform GitHub proposal issues. |
+| `philosophy/` | Frank | Product-philosophy evidence: entity-first positioning, category analysis, and durable conclusions promoted from domain-specific research. Grounds claims in `docs/philosophy.md`. |
 
 ## Storage Rule
 
