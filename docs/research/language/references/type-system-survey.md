@@ -1,505 +1,371 @@
-# Type System Survey — Reference and Semantic Contracts
+# Type System Survey
 
-**Research date:** 2026-06-12
-**Author:** Frank (Lead/Architect & Language Designer)
-**Relevance:** Formal grounding for evaluating type-system expansion proposals (#25, #26, #27, #29). Covers literals, operators, coercion policy, nullability interaction, numeric semantics, categorical values, comparison rules, and collection-membership implications.
-
-**Companion document:** [type-system-domain-survey.md](../expressiveness/type-system-domain-survey.md) covers domain-level research (sample pressure, cross-category precedent, philosophy fit, dead ends). This file covers the theory, reference semantics, and semantic contracts that must hold regardless of domain.
+**Research date:** 2026-05-18 (expanded from 2026-05-14)
+**Author:** George (Runtime Dev)
+**Relevance:** Formal grounding and cross-system precedent for Precept's type-system expansion: `choice` (#25), `date` (#26), `decimal` (#27), `integer` (#29), and any future type-system proposals in this domain.
 
 ---
 
-## Scope and Non-Goals
+## Formal Grounding
 
-### In scope
+### What kind of type system is Precept extending?
 
-- Literal syntax and parsing rules for each proposed type
-- Operator semantics: which operators are defined, what types they accept, what types they return
-- Coercion policy: which implicit conversions exist, which are forbidden, and why
-- Nullability interaction: how `nullable` composes with each new type
-- Exact-decimal vs integer vs approximate-number semantics
-- Ordered vs unordered categorical values
-- Comparison rules across type boundaries
-- Collection-membership implications (inner types for `set`, `queue`, `stack`)
-- Explicit non-goals for this type-system pass
+Precept's current type system is a **many-sorted first-order type system** with three base sorts: `string`, `number`, and `boolean`. Fields are typed at declaration time. Expressions are statically typed. There is no subtyping, no generics, no higher-kinded types, and no type inference beyond collection element types.
 
-### Not in scope
+The expansion adds four types. In formal terms these are:
 
-- Domain justification for each type (see [type-system-domain-survey.md](../expressiveness/type-system-domain-survey.md))
-- Implementation plan or parser mechanics (see proposal bodies in `temp/issue-body-rewrites/`)
-- Function-call surface (`round`, `floor`, `ceil`, `truncate`) — covered by #16 and #27 proposals; only function *signatures* relevant to type semantics are noted here
-- Grammar or language-server completions (tooling sync, not theory)
+- **`choice(v1, v2, ...) [ordered]`** — a *nominal sum type with string-valued constructors and optional total order*. In type theory, an enum is a finite sum type whose variants carry no data. Precept's `choice(...)` is string-backed rather than integer-backed (unlike C# `enum`), which makes the values self-describing and JSON-serializable without an additional mapping layer.
+- **`date`** — a *scalar temporal type with day granularity*. From the type system perspective it is an opaque scalar type with an external representation (`YYYY-MM-DD`), a partial algebra (`date ± integer → date`, `date - date → integer`), and a set of read-only component accessors.
+- **`decimal`** — a *scalar exact-numeric type*. It is a subtype of the numeric tower in terms of value coverage but is not in a subtype relationship with `number` for assignment purposes, because mixing exact and approximate arithmetic is semantically harmful. The type system enforces this explicitly.
+- **`integer`** — a *scalar whole-number type*. It participates in implicit widening to both `decimal` and `number`, but neither `decimal` nor `number` narrow to `integer` without an explicit function call.
 
----
+### Type vs constraint
 
-## Current Type System
+Precept distinguishes type from constraint. The type defines what kind of value the field can hold. The constraint restricts which values of that type are valid. A field typed as `decimal` with `maxplaces 2` is typed as `decimal`; the `maxplaces 2` is a post-type constraint that narrows the allowed value range. A field typed as `choice("Low","High")` is typed as `choice`; the value set is part of the type definition, not a separate constraint. This distinction matters for the type checker: type errors are caught before constraint errors, and they produce different diagnostic categories.
 
-Precept's current scalar types, per the [language catalog](../../../../tools/Precept.Mcp/):
+### Coercion hierarchy
 
-| Type | Literal form | Operators | Accessors | Collection inner type |
-|------|-------------|-----------|-----------|----------------------|
-| `string` | `"text"` | `==`, `!=`, `contains` | — | `set of string`, `queue of string`, `stack of string` |
-| `number` | `42`, `3.14`, `-7` | `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `>`, `<`, `>=`, `<=` | — | `set of number`, `queue of number`, `stack of number` |
-| `boolean` | `true`, `false` | `==`, `!=`, `&&` / `||` / `!` (pending: `and`, `or`, `not`) | — | `set of boolean`, `queue of boolean`, `stack of boolean` |
+The numeric tower has a defined widening direction:
 
-Collection accessors (all collection kinds): `.count` → `number`, `.min` / `.max` → inner type (numeric only), `.peek` → inner type (queue/stack only).
-
-`null` is a literal value, not a type. Any type with the `nullable` modifier accepts `null`.
-
----
-
-## Reference Survey: Type Semantics in Rule and Decision Systems
-
-This survey covers how six rule/decision systems handle the four proposed type domains. These are the same systems referenced by the proposal bodies — this section provides the primary-source grounding.
-
-### 1. FEEL (DMN) — Friendly Enough Expression Language
-
-**Source:** [OMG DMN Specification §10 FEEL Semantics](https://www.omg.org/spec/DMN/1.4/PDF), [Camunda FEEL Data Types](https://docs.camunda.io/docs/components/modeler/feel/language-guide/feel-data-types/)
-
-| Concern | FEEL semantics |
-|---------|---------------|
-| **Numeric** | Single `number` type backed by Java `BigDecimal`. All arithmetic is exact. No integer/float distinction in the type system. |
-| **Categorical** | No first-class enum. String comparison only. |
-| **Temporal** | `date` (day-granularity), `time`, `date and time`, `days and time duration`, `years and months duration`. Five distinct temporal types. |
-| **Literals** | Numbers: `42`, `3.14`. Dates: `date("2026-03-15")`. Strings: `"text"`. Booleans: `true`, `false`. |
-| **Coercion** | No implicit coercion between types. `number + date` is a type error in the spec (Camunda allows `date + number` as add-days). |
-| **Null** | First-class `null` value. `null + 1 = null` (null-propagating arithmetic). `null == null` is `true`. |
-| **Comparison** | Defined only between same-type operands. Cross-type comparison produces `null` (not an error). |
-| **Collections** | `list` type with index access, filtering, quantified expressions (`every`, `some`). |
-
-**Key design lesson:** FEEL chose a single exact-number type, avoiding the integer/decimal split entirely. This simplifies coercion but loses the semantic signal that "this field is a count." FEEL's five-temporal-type model shows a mature system splitting date from time from duration — Precept's day-only `date` is the correct bounded first step.
-
-### 2. Cedar (AWS) — Authorization Policy Language
-
-**Source:** [Cedar Language Reference](https://docs.cedarpolicy.com/policies/syntax-grammar.html), [Cedar Operators](https://docs.cedarpolicy.com/policies/syntax-operators.html)
-
-| Concern | Cedar semantics |
-|---------|----------------|
-| **Numeric** | `Long` only (64-bit signed integer). No floating point. No decimal. Deliberate restriction for formal verification. |
-| **Categorical** | No first-class enum. String equality only. |
-| **Temporal** | `datetime` and `duration` as extension types. `datetime` is offset-aware (RFC 3339). |
-| **Literals** | Integers: `42`. Strings: `"text"`. Booleans: `true`, `false`. Extension constructors: `datetime("2026-03-15T00:00:00Z")`, `duration("5d")`. |
-| **Coercion** | None. Cedar has no implicit conversions. `Long + String` does not type-check. |
-| **Null** | No `null` value. Attributes are either present or absent; missing-attribute access is a type error. |
-| **Comparison** | `<`, `>`, `<=`, `>=` defined on `Long` only. Strings support `==`, `!=`, `like` (glob). |
-| **Collections** | `Set` type with `contains`, `containsAll`, `containsAny`. No ordered lists, no index access. |
-
-**Key design lesson:** Cedar deliberately omits decimal and floating-point types to preserve formal verifiability. Its `Long`-only model validates that integer-as-sole-numeric is viable for policy systems, but business entity governance needs fractional arithmetic. Cedar's zero-coercion policy is the strongest precedent for Precept's "no silent conversion" rule.
-
-### 3. Drools (Red Hat) — Business Rule Engine
-
-**Source:** [Drools Documentation — DRL Rules](https://docs.drools.org/latest/drools-docs/drools/language-reference/index.html)
-
-| Concern | Drools semantics |
-|---------|-----------------|
-| **Numeric** | Inherits Java: `int`, `long`, `float`, `double`, `BigDecimal`, `BigInteger`. Full Java numeric tower. |
-| **Categorical** | `declare enum` or Java `enum`. First-class with switch/case matching. |
-| **Temporal** | `java.time.LocalDate`, `LocalDateTime`, `Duration`, etc. Drools itself adds temporal operators (`before`, `after`, `during`, `meets`). |
-| **Literals** | Java literals: `42`, `3.14`, `42L` (long), `3.14B` (BigDecimal). |
-| **Coercion** | Java widening rules. `int → long → float → double` implicit. `BigDecimal` requires explicit construction. |
-| **Null** | Java `null`. NullPointerException on unguarded access. |
-| **Comparison** | Java semantics. `==` is identity for objects unless overridden; `.equals()` for value equality. Drools LHS uses `==` as value comparison. |
-| **Collections** | Java collections. `from` clause iterates. `accumulate` for aggregation. |
-
-**Key design lesson:** Drools inherits the full Java type system, gaining power but losing one-file completeness. Its `declare enum` is the closest model for Precept's `choice` — a type declared inside the rule definition rather than externally.
-
-### 4. NRules (.NET)
-
-**Source:** [NRules Wiki — Getting Started](https://github.com/NRules/NRules/wiki/Getting-Started)
-
-| Concern | NRules semantics |
-|---------|-----------------|
-| **Numeric** | Inherits C#: `int`, `long`, `decimal`, `double`. Full .NET numeric hierarchy. |
-| **Categorical** | C# `enum`. Not declared in rules; declared in host code. |
-| **Temporal** | C# `DateTime`, `DateOnly`, `DateTimeOffset`. Host types. |
-| **Literals** | C# literals within LINQ expressions. |
-| **Coercion** | C# implicit/explicit conversion rules. `int → long → decimal` implicit. `double → decimal` requires explicit cast. |
-| **Null** | C# nullable reference/value types. |
-| **Comparison** | C# `==`, `IComparable<T>`. |
-| **Collections** | C# `IEnumerable<T>`, LINQ queries. |
-
-**Key design lesson:** NRules is the "just use the host language" model. It demonstrates that for .NET rule systems, `decimal` and `int`/`long` are the standard carriers. Precept can't follow this model (no one-file completeness), but NRules validates the C#-aligned coercion semantics proposed for `integer` and `decimal`.
-
-### 5. BPMN / Camunda
-
-**Source:** [BPMN 2.0 Specification](https://www.omg.org/spec/BPMN/2.0.2/PDF), [Camunda Modeler FEEL Types](https://docs.camunda.io/docs/components/modeler/feel/language-guide/feel-data-types/)
-
-| Concern | BPMN semantics |
-|---------|---------------|
-| **Numeric** | XSD types: `xsd:integer`, `xsd:decimal`, `xsd:double`. Three distinct numeric tiers. |
-| **Categorical** | XSD `enumeration` restriction on `xsd:string`. |
-| **Temporal** | `xsd:date`, `xsd:time`, `xsd:dateTime`, `xsd:duration`. ISO 8601 lexical forms. |
-| **Literals** | XSD lexical representations. `2026-03-15` for date, `42` for integer, `3.14` for decimal. |
-| **Coercion** | XSD type hierarchy. `xsd:integer` is a restriction of `xsd:decimal`. Widening is implicit in the type hierarchy. |
-| **Null** | `xsi:nil` attribute. Separate from empty values. |
-| **Comparison** | XSD-defined for each type. Date comparison is chronological. Enumeration comparison is string equality unless restricted. |
-| **Collections** | Not first-class in BPMN data; modeled as multi-instance activities. |
-
-**Key design lesson:** BPMN's XSD foundation explicitly separates `integer` as a restriction of `decimal`. This is the strongest standards-body precedent for treating `integer` as a semantically distinct type rather than a constraint on `number`. The `xsd:enumeration` model — restricting a base type to named values — aligns with Precept's `choice` design (restricting string to a closed set).
-
-### 6. SQL (ISO Standard / PostgreSQL)
-
-**Source:** [SQL:2016 Standard Part 2: Foundation](https://www.iso.org/standard/63556.html), [PostgreSQL Numeric Types](https://www.postgresql.org/docs/current/datatype-numeric.html), [PostgreSQL Enum Types](https://www.postgresql.org/docs/current/datatype-enum.html), [PostgreSQL Date/Time Types](https://www.postgresql.org/docs/current/datatype-datetime.html)
-
-| Concern | SQL semantics |
-|---------|--------------|
-| **Numeric** | `INTEGER` / `BIGINT` (exact whole), `NUMERIC(p,s)` / `DECIMAL(p,s)` (exact fractional), `REAL` / `DOUBLE PRECISION` (approximate). Three-tier numeric tower: integer → exact decimal → approximate float. |
-| **Categorical** | `ENUM` (PostgreSQL extension). Ordered by declaration order. `CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy')`. Also `CHECK(col IN ('a','b','c'))` as the standard-SQL alternative. |
-| **Temporal** | `DATE`, `TIME`, `TIMESTAMP`, `INTERVAL`. `DATE` is day-granularity. `TIMESTAMP WITH TIME ZONE` is offset-aware. `INTERVAL` supports complex period arithmetic. |
-| **Literals** | `42` (integer), `3.14` (numeric), `'text'` (string), `DATE '2026-03-15'` (typed date literal). |
-| **Coercion** | Implicit widening: `INTEGER → NUMERIC → DOUBLE PRECISION`. No implicit narrowing. `NUMERIC` to `INTEGER` requires explicit `CAST` or `TRUNC`. |
-| **Null** | `NULL` is a mark, not a value. Three-valued logic: `TRUE`, `FALSE`, `UNKNOWN`. `NULL = NULL` is `UNKNOWN`, not `TRUE`. `IS NULL` / `IS NOT NULL` for null testing. |
-| **Comparison** | Defined per type. `ENUM` comparison uses declaration order. `DATE` comparison is chronological. Cross-type numeric comparison widens. |
-| **Collections** | `ARRAY` type (PostgreSQL). `ANY`, `ALL` operators. No `SET` type in standard SQL. |
-
-**Key design lesson:** SQL's three-tier numeric tower (integer → decimal → float) is the most complete model for what Precept is proposing. The `ENUM` type with declaration-order comparison directly validates `choice ... ordered`. PostgreSQL's `MONEY` type — [widely considered a mistake](https://wiki.postgresql.org/wiki/Don't_Do_This#Don.27t_use_money) — validates Precept's decision to use `decimal` + `choice` for currency instead of a dedicated `money` type.
-
----
-
-## Semantic Contracts
-
-These contracts must hold across the type-system expansion. They are derived from the reference survey and from Precept's design principles (determinism, inspectability, prevention, no silent behavior).
-
-### Contract 1: No silent coercion across type boundaries
-
-**Rule:** No implicit conversion between:
-- `string` ↔ `choice` (choice is structurally distinct from open text)
-- `number` ↔ `decimal` (approximate ↔ exact)
-- `number` ↔ `integer` (fractional ↔ whole; *widening* from `integer` to `number` is allowed)
-- `decimal` ↔ `number` (exact ↔ approximate)
-- `string` ↔ `date` (no auto-parsing)
-- `choice` ↔ `date`, `decimal`, `integer`, `number`, `boolean` (categorical values are strings, but the type boundary is real)
-
-**Widening hierarchy (implicit, safe):**
 ```
-integer → decimal   (whole number is exact fractional with zero decimal places)
-integer → number    (whole number is representable as double)
+integer --> decimal
+integer --> number
 ```
 
-**Narrowing (always explicit, never implicit):**
-```
-number → integer    (requires truncate/floor/ceil function)
-number → decimal    (forbidden — choose decimal from the start)
-decimal → integer   (requires truncate/floor/ceil function)
-```
+There is no widening between `decimal` and `number`. Mixing them is always a type error. The coercion rules follow C#/.NET semantics where they exist:
+- `int` widens to `decimal` in C# — so `integer` widens to `decimal` in Precept
+- `int` widens to `double` in C# — so `integer` widens to `number` in Precept
+- `decimal` does NOT widen to `double` in C# implicitly — so `decimal` does NOT widen to `number` in Precept
 
-**Reference justification:**
-- Cedar: zero coercion. Every type boundary is explicit.
-- SQL: implicit widening (INTEGER → NUMERIC → FLOAT), explicit narrowing (CAST required).
-- FEEL: no coercion between types; cross-type operations produce `null`.
-- C# (.NET): implicit widening (`int → long → decimal`), explicit narrowing.
+This is not an original design decision. It inherits from the platform.
 
-Precept follows the SQL/C# widening model — it is familiar to .NET developers and loses no safety because widening is value-preserving. Narrowing is always explicit because it is value-changing.
+### Sum-type theory and `choice`
 
-### Contract 2: Literal parsing rules are unambiguous
+A sum type (or union type, or tagged union, or discriminated union) is a type whose values are drawn from a disjoint union of possible forms. In the simplest case — one constructor per variant with no payload — a sum type is an enum. Precept's `choice(...)` is exactly this: a closed set of string-valued constructors with no data payload.
 
-**Rule:** A literal's type is determined by its syntactic form alone, with no context-dependent inference.
+The critical property is *closedness*: the type system can exhaustively check against the declared set. A `choice` without `ordered` supports equality comparisons only. A `choice` with `ordered` gains a total order defined by declaration position, enabling relational comparisons. Declaration-position ordering is more predictable than lexicographic ordering (which depends on value strings) and more honest than backing-integer ordering (which leaks implementation details).
 
-| Literal form | Type | Examples |
-|-------------|------|---------|
-| `"text"` | `string` | `"hello"`, `""`, `"2026-03-15"` |
-| Digit sequence without `.` | `integer` | `42`, `0`, `-7` |
-| Digit sequence with `.` | `number` | `3.14`, `0.0`, `-7.5` |
-| `true`, `false` | `boolean` | |
-| `null` | null literal | (assignable to any `nullable` target) |
-| `date("YYYY-MM-DD")` | `date` | `date("2026-03-15")` |
-| `choice(...)` | — | Not a literal; a type constructor in declarations only |
-
-**Design notes:**
-- Integer literals (`42`) parse as `integer` when the `integer` type exists. Before #29 ships, all bare numerics parse as `number` (current behavior). This is the one parsing-behavior change that #29 introduces.
-- `number` literals always contain a decimal point: `5.0` is `number`, `5` is `integer`. This mirrors C# (`5` is `int`, `5.0` is `double`).
-- `decimal` has no distinct literal form in v1. Decimal fields receive values from integer literals (widening), from `round()` results, and from event arguments. A future `5m` or `decimal(5.00)` literal suffix is possible but not proposed.
-- `date(...)` is a constructor call, not a bare literal. This avoids context-dependent string parsing (`"2026-03-15"` remains a string, always).
-
-**Reference justification:**
-- SQL: `DATE '2026-03-15'` uses a typed literal prefix. Precept's `date("...")` is the keyword-anchored equivalent.
-- Cedar: `datetime("2026-03-15T00:00:00Z")` uses a constructor form. Same pattern.
-- FEEL: `date("2026-03-15")` — identical syntax to what Precept proposes.
-
-### Contract 3: Operator validity is statically determined by operand types
-
-**Rule:** The type checker can determine at compile time whether an operator application is valid, based solely on the declared types of its operands. No runtime type tests.
-
-| Operator class | Valid operand types | Result type |
-|---------------|--------------------| ------------|
-| Arithmetic (`+`, `-`, `*`, `/`, `%`) | `integer` × `integer` → `integer`; `integer` × `decimal` → `decimal`; `integer` × `number` → `number`; `decimal` × `decimal` → `decimal`; `number` × `number` → `number`; `date` + `integer`/`number` → `date`; `date` - `date` → `integer` (day count) | See per-pair |
-| Comparison (`==`, `!=`) | Same-type or widening-compatible | `boolean` |
-| Ordering (`<`, `>`, `<=`, `>=`) | `number` × `number`, `integer` × `integer` (or widened), `decimal` × `decimal` (or widened), `date` × `date`, `choice` × `choice` (only with `ordered`, same field type) | `boolean` |
-| Membership (`contains`) | `collection` × `inner type` | `boolean` |
-| Assignment (`=`) | Target type must accept source type (same type or implicit widening) | — |
-
-**Forbidden cross-type operations (compile-time errors):**
-- `decimal + number` / `number + decimal` — mixing approximate and exact
-- `choice + anything` / `choice - anything` — categorical values are not arithmetic
-- `date + date` — adding two dates is meaningless
-- `date * number` — scaling a date is meaningless
-- `string + number` — no implicit concatenation/coercion
-- `choice < choice` on an unordered choice field — ordering must be declared
-
-**Reference justification:**
-- Cedar: all operators are statically typed. Invalid combinations are compile-time errors.
-- SQL: operator validity is resolved at query planning (compile) time. `DATE + DATE` is an error.
-- FEEL: cross-type operators produce `null` — a weaker form of rejection. Precept should reject at compile time, not produce null.
-
-### Contract 4: `choice` is a closed type, not decorated `string`
-
-**Rule:** A `choice(...)` field is a distinct type. String operations do not apply. Assignment accepts only declared members.
-
-| Property | Contract |
-|----------|----------|
-| Member values | String literals declared at field definition time |
-| Universe | Closed at compile time. No runtime extension. |
-| Equality | `==`, `!=` between choice values of the same field type |
-| Ordering | Only with `ordered` keyword. Declaration order defines the total order (first = lowest, last = highest). |
-| Cross-field compatibility | Two fields with textually identical `choice(...)` declarations are NOT assignment-compatible. Each declaration creates a distinct type. |
-| String interop | `choice` values are serialized as strings in JSON/MCP. But `choice == string` is a compile-time error. No implicit conversion. |
-| Collection inner type | `set of choice(...)` is valid. `add` validates membership at compile time. |
-
-**Ordered choice semantics:**
-
-Given `field Severity as choice("Low", "Medium", "High") ordered`:
-- `Severity == "High"` → valid
-- `Severity > "Low"` → valid (compares by declaration position: "Low" = 0, "Medium" = 1, "High" = 2)
-- `Severity > "Unknown"` → compile-time error ("Unknown" is not a member)
-
-Without `ordered`: `>`, `<`, `>=`, `<=` are compile-time errors. `==`, `!=` remain valid.
-
-**Reference justification:**
-- PostgreSQL ENUM: ordered by declaration order. `'sad' < 'ok' < 'happy'` is valid. Ordering is intrinsic, not opt-in. Precept's `ordered` opt-in is more conservative.
-- SQL CHECK: `CHECK(col IN ('a','b','c'))` constrains values but provides no ordering. Equivalent to unordered `choice`.
-- Cedar: no enum; string equality only. No ordering on categorical values.
-- FEEL: no enum. String comparison uses lexicographic order, which is not domain-meaningful.
-- Drools: `declare enum` with declaration-order semantics (through Java enum ordinals).
-
-### Contract 5: `date` means calendar day with no timezone and no time-of-day
-
-**Rule:** `date` is a day-granularity value in the proleptic Gregorian calendar. No timezone. No sub-day precision. Deterministic by construction.
-
-| Property | Contract |
-|----------|----------|
-| Granularity | Day (no hours, minutes, seconds) |
-| Calendar | Proleptic Gregorian (ISO 8601) |
-| Constructor | `date("YYYY-MM-DD")` — ISO 8601 format only |
-| Timezone | None. Dates are naive calendar facts. |
-| Arithmetic | `date + integer` → `date` (add N days), `date - integer` → `date`, `date - date` → `integer` (day count, signed) |
-| Comparison | `<`, `>`, `<=`, `>=`, `==`, `!=` — chronological ordering |
-| Accessors | `.year` → `integer`, `.month` → `integer`, `.day` → `integer`, `.dayOfWeek` → `integer` (1=Mon, 7=Sun per ISO 8601) |
-| Null | `nullable` modifier allowed. Null date is distinct from any calendar date. |
-| Invalid dates | `date("2026-02-30")` is a compile-time error when the literal is known, a runtime rejection otherwise |
-
-**What `date` is NOT:**
-- Not a timestamp. No time component.
-- Not timezone-aware. `date("2026-03-15")` means the same calendar day regardless of where the server runs.
-- Not a duration. `date - date` produces a day count (integer), not a duration object.
-
-**Reference justification:**
-- FEEL: `date("2026-03-15")` — identical constructor syntax. Day-granularity. Separate from `date and time`.
-- SQL: `DATE` type is day-granularity. `DATE '2026-03-15'`. Arithmetic produces intervals (Precept simplifies to integer day count in v1).
-- Cedar: `datetime` is offset-aware (RFC 3339). Precept deliberately avoids this — a naive date is deterministic; an offset-aware datetime requires ambient context.
-- PostgreSQL: `DATE` is calendar-day-only. `DATE - DATE` → `INTEGER` (days). Direct alignment.
-
-### Contract 6: `decimal` means exact base-10 arithmetic, not "number with precision annotation"
-
-**Rule:** `decimal` uses exact base-10 representation (.NET `System.Decimal`). No floating-point approximation. No silent rounding. Precision is constrained by `maxplaces`, not by type parameters.
-
-| Property | Contract |
-|----------|----------|
-| Representation | .NET `System.Decimal` (128-bit, 28–29 significant digits) |
-| Arithmetic | Exact. `0.1 + 0.2 == 0.3` is `true`. |
-| Precision constraint | `maxplaces <N>` — values with more than N decimal places are **rejected**, not rounded |
-| Rounding | Explicit only, via `round(decimal, N)`. Banker's rounding (MidpointRounding.ToEven). |
-| Mixed with `integer` | Implicit widening: `integer → decimal`. `decimal + integer` → `decimal`. |
-| Mixed with `number` | **Type error.** `decimal + number` does not compile. Prevents mixing exact and approximate. |
-| Division | `decimal / decimal` → `decimal`. May produce arbitrary decimal places. Target field's `maxplaces` rejects if not rounded. Division by zero is a runtime error. |
-| Comparison | Full ordering: `<`, `>`, `<=`, `>=`, `==`, `!=`. Cross-type comparison with `integer` widens to `decimal`. |
-| Null | `nullable` allowed. Null is distinct from zero. |
-| Default | Must satisfy all constraints: `decimal default 1.999 maxplaces 2` is a compile-time error. |
-
-**The `maxplaces` constraint is a constraint, not a type parameter:**
-- `maxplaces` fires on assignment, not during intermediate computation.
-- `UnitPrice * Quantity` (both `decimal`) may produce a result with many decimal places. The assignment to a `maxplaces 2` field rejects unless the author explicitly calls `round(expr, 2)`.
-- This is consistent with Precept's constraint philosophy: constraints declare what must be true; the engine rejects violations.
-
-**Reference justification:**
-- SQL `NUMERIC(p,s)`: precision and scale are type parameters, not constraints. Precept's approach is simpler — one `decimal` type with optional `maxplaces` constraint.
-- PostgreSQL `MONEY`: a convenience type that bundles locale and rounding. [Community consensus: don't use it.](https://wiki.postgresql.org/wiki/Don't_Do_This#Don.27t_use_money) Validates `decimal + choice` over `money`.
-- FEEL: single `number` backed by `BigDecimal`. All arithmetic is exact. No distinction between integer and decimal — simpler but loses semantic signal.
-- Cedar `decimal` extension: fixed 4 decimal places. Simpler than `maxplaces` but inflexible.
-- C# `System.Decimal`: 28–29 digits, banker's rounding default. Precept's backing type.
-
-### Contract 7: `integer` means whole-number semantics, not "decimal with zero places"
-
-**Rule:** `integer` is a distinct type for values that are semantically whole numbers. Backed by `System.Int64`.
-
-| Property | Contract |
-|----------|----------|
-| Representation | .NET `System.Int64` (64-bit signed, range ±9.2 × 10¹⁸) |
-| Literal form | Digit sequence without decimal point: `42`, `0`, `-7` |
-| Integer division | Truncates toward zero: `5 / 2` → `2`, `-5 / 2` → `-2`. Matches C#. |
-| Modulo | Follows dividend sign: `17 % 5` → `2`, `-17 % 5` → `-2`. Matches C#. |
-| Mixed with `decimal` | Implicit widening: `integer → decimal`. Result is `decimal`. |
-| Mixed with `number` | Implicit widening: `integer → number`. Result is `number`. |
-| Assignment narrowing | `integer` field = `number` expr → **type error**. Requires explicit `truncate`/`floor`/`ceil`. |
-| Boolean conversion | None. `when Count` is a type error. `when Count > 0` is required. |
-| Constraints | `nonnegative`, `positive`, `min <N>`, `max <N>` from #13. `maxplaces` on integer is a compile-time error. |
-| Collection inner type | `set of integer`, `queue of integer`, `stack of integer`. `.min`/`.max` return `integer`. |
-| `.count` accessor | Returns `number` for backward compatibility (refinement to `integer` is a future option). |
-
-**Why `integer` is not just `decimal maxplaces 0`:**
-- Semantic readability: `field VisitCount as integer` communicates intent instantly. `field VisitCount as decimal maxplaces 0` communicates a precision constraint, not a domain fact.
-- Division behavior: `integer / integer` truncates. `decimal / decimal` produces exact fractional results. These are different operations.
-- Representation: `System.Int64` vs `System.Decimal` — different memory layout, different performance characteristics, different overflow behavior.
-- Coercion asymmetry: `integer` widens to both `number` and `decimal`. `decimal maxplaces 0` widens only to `decimal` (not to `number`, since `decimal + number` is a type error).
-
-**Reference justification:**
-- SQL: `INTEGER` and `DECIMAL` are distinct types in the standard. `INTEGER` truncates on division; `DECIMAL` does not.
-- BPMN/XSD: `xsd:integer` is a restriction of `xsd:decimal` in the type hierarchy but a distinct named type.
-- C#: `int`/`long` and `decimal` are distinct types with distinct division behavior.
-- Cedar: `Long` only. Validates that integer-as-primary-numeric is viable.
-- FEEL: no integer type. Single `number`. Simplifies but loses the "this is a count" signal.
+Two `choice(...)` declarations with identical value sets are structurally equal but nominally distinct. Precept uses nominal typing for `choice`: the field identity, not the value set, defines the type. This prevents `field DocumentType as choice("A","B")` from being silently assignment-compatible with `field StatusCode as choice("A","B")`.
 
 ---
 
-## Nullability Interaction
+## Database Systems
 
-Each new type composes with `nullable` using the same semantics as existing types. No special null-propagation rules (unlike FEEL's `null + 1 = null`).
+### PostgreSQL
 
-**Rule:** `nullable` is a modifier, not a type. `T nullable` means the field accepts `null` OR a value of type `T`. Null is not a member of `T`; it is an alternative to having a value.
+**Enum type:** `CREATE TYPE status_code AS ENUM ('draft', 'active', 'closed')`. Values are stored as integers internally but exposed as strings. Ordered by declaration position. Supports `<`, `>`, `<=`, `>=` comparison by declaration order without an explicit opt-in. Adding values later is possible via `ALTER TYPE ... ADD VALUE` but removing values is not. Casting between enum types requires explicit CAST. [Docs](https://www.postgresql.org/docs/current/datatype-enum.html)
 
-| Scenario | Behavior |
-|----------|----------|
-| `choice("A","B") nullable` | Field holds one of `"A"`, `"B"`, or `null`. |
-| `date nullable` | Field holds a date or `null`. |
-| `decimal nullable maxplaces 2` | Field holds `null`, or a decimal with ≤ 2 places. `null` satisfies `maxplaces`. |
-| `integer nullable nonnegative` | Field holds `null`, or a non-negative integer. |
-| `nullable field == null` in guard | Narrows to "field is null" in the true branch; "field is not null" in the false branch. Existing `&&`-narrowing applies. |
-| `nullable field.year` | Compile-time error unless guarded by `field != null`. Accessor requires non-null narrowing. |
-| `nullable choice field > "Low"` | Compile-time error unless guarded. Ordering requires non-null narrowing. |
+*Precept divergence:* Precept's `ordered` is opt-in; PostgreSQL enums always support ordering. Precept's inline-declared `choice(...)` cannot be extended after definition — the closed-universe model is stronger.
 
-**Constraints on nullable fields:** Constraints (`nonnegative`, `positive`, `min`, `max`, `maxplaces`, `ordered`) apply only to non-null values. `null` always satisfies constraints — it is not a value that can violate them.
+**Date type:** `DATE` stores a calendar date (year, month, day) without time zone. `TIME` adds time of day. `TIMESTAMP` combines both without timezone. `TIMESTAMPTZ` adds timezone offset. These are four distinct types, not a single polymorphic type. Date arithmetic: `date + integer` (days) returns `date`; `date - date` returns `interval` (day count component). [Docs](https://www.postgresql.org/docs/current/datatype-datetime.html)
 
-**Reference justification:**
-- SQL: `NULL` satisfies `CHECK` constraints by SQL standard convention. Constraints are about valid values; NULL means "no value."
-- C#: nullable value types (`int?`) — constraints on the underlying value apply only when `HasValue` is true.
-- Cedar: no null at all. If an attribute might be absent, the policy must use `has` to test presence before access.
+*Precept alignment:* The `DATE` type maps directly to Precept's `date`. The `TIMESTAMP` / `TIMESTAMPTZ` distinction validates why Precept defers time-of-day: timezone handling is a separate type design problem, not an extension of day-granularity dates.
+
+**Decimal type:** `DECIMAL(p,s)` and `NUMERIC(p,s)` are synonyms — exact numeric with user-specified precision `p` (total digits) and scale `s` (digits after decimal point). `MONEY` type exists but stores currency as a locale-dependent string; the PostgreSQL documentation itself recommends against `MONEY` for financial calculations due to rounding under locale changes. [Docs](https://www.postgresql.org/docs/current/datatype-numeric.html) and [money docs](https://www.postgresql.org/docs/current/datatype-money.html)
+
+*Precept alignment:* The `MONEY` lesson is directly applicable. Precept's `decimal` does not parameterize precision and scale at the type level (unlike `DECIMAL(p,s)`) — it uses `maxplaces N` as a constraint instead. This is a deliberate simplification: `System.Decimal` covers 28-29 digits, making p/s parameterization unnecessary.
+
+**Integer type:** `SMALLINT` (16-bit), `INTEGER` (32-bit), `BIGINT` (64-bit). Distinct from floating-point types. Integer division truncates toward zero. [Docs](https://www.postgresql.org/docs/current/datatype-numeric.html)
 
 ---
 
-## Collection-Membership Implications
+### SQL Server
 
-Each new type should be usable as a collection inner type.
+**Constrained strings:** No native `ENUM` type. Constrained value sets are implemented via `CHECK` constraints (`CHECK column IN ('A','B','C')`) or lookup tables with foreign keys. This is verbose and does not surface in IntelliSense or static analysis. The absence of a first-class enum type is considered a weakness by the T-SQL community.
 
-| Declaration | Valid | Membership check | `.min` / `.max` |
-|------------|-------|-----------------|-----------------|
-| `set of choice("A","B","C")` | ✅ | `contains "A"` → valid; `contains "D"` → compile error | Not meaningful (no ordering without `ordered`) |
-| `set of choice("A","B","C") ordered` | Design question | `contains "B"` → valid | Meaningful — `.min` = first declared, `.max` = last declared |
-| `set of date` | ✅ | `contains date("2026-03-15")` → valid | `.min` = earliest date, `.max` = latest date |
-| `set of decimal` | ✅ | `contains 3.14` — requires type compatibility | `.min` / `.max` return `decimal` |
-| `set of integer` | ✅ | `contains 42` → valid | `.min` / `.max` return `integer` |
-| `queue of date` | ✅ | N/A (queue has `.peek`, not `contains`) | N/A |
-| `stack of integer` | ✅ | N/A (stack has `.peek`, not `contains`) | N/A |
+*Precept improvement:* `choice(...)` is the typed, compile-time-checked version of what SQL Server authors do with CHECK constraints. Precept improves on this by making membership a type-level concept with IDE support and compile-time diagnostics.
 
-**`add` and `remove` type checking:** For `set of choice(...)`, the `add` operand must be a compile-time-valid member of the choice set. `add MissingDocs "BirthCert"` is a compile-time error if `"BirthCert"` is not in the choice declaration. This extends the existing `add` type checking for `set of string` — the check is strictly tighter.
+**Date type:** `DATE` (day only), `TIME(n)` (time only with fractional seconds), `DATETIME2(n)` (date + time without TZ), `DATETIMEOFFSET(n)` (date + time + TZ offset). Each is a distinct type. [Docs](https://learn.microsoft.com/en-us/sql/t-sql/data-types/date-transact-sql)
 
-**Open design question for `set of choice(...) ordered`:** Should the `ordered` keyword apply to the choice declaration inside a collection type? If so, `.min` and `.max` acquire meaning. The domain survey does not show strong pressure for this — defer to proposal-level decision.
+*Precept alignment:* The `DATE` type is the direct analog of Precept's `date`. The separation of `DATETIME2` and `DATETIMEOFFSET` illustrates why timezone handling is a separate type problem.
 
----
+**Decimal type:** `DECIMAL(p,s)` and `NUMERIC(p,s)` are identical. `MONEY` (19 digits, 4 decimal places) and `SMALLMONEY` (10 digits, 4 decimal places) exist; SQL Server documentation warns that division operations on `MONEY` type may lose precision and recommends using `DECIMAL` for financial calculations. [Docs](https://learn.microsoft.com/en-us/sql/t-sql/data-types/decimal-and-numeric-transact-sql)
 
-## Comparison Rules — Consolidated
+*Precept alignment:* Another independent confirmation that `MONEY` is a design mistake. `DECIMAL` is the correct financial type.
 
-The following table consolidates all comparison behavior across existing and proposed types. It is the single reference for what the type checker must enforce.
+**Integer type:** `TINYINT` (8-bit), `SMALLINT` (16-bit), `INT` (32-bit), `BIGINT` (64-bit). All signed except `TINYINT`. [Docs](https://learn.microsoft.com/en-us/sql/t-sql/data-types/int-bigint-smallint-and-tinyint-transact-sql)
 
-| Left type | Right type | `==`, `!=` | `<`, `>`, `<=`, `>=` |
-|-----------|-----------|-----------|----------------------|
-| `string` | `string` | ✅ | ❌ (no ordering on strings) |
-| `number` | `number` | ✅ | ✅ |
-| `boolean` | `boolean` | ✅ | ❌ |
-| `integer` | `integer` | ✅ | ✅ |
-| `integer` | `number` | ✅ (widens) | ✅ (widens) |
-| `integer` | `decimal` | ✅ (widens) | ✅ (widens) |
-| `decimal` | `decimal` | ✅ | ✅ |
-| `decimal` | `number` | ❌ **type error** | ❌ **type error** |
-| `number` | `decimal` | ❌ **type error** | ❌ **type error** |
-| `date` | `date` | ✅ | ✅ (chronological) |
-| `choice` | same `choice` type | ✅ | ✅ only with `ordered` |
-| `choice` | different `choice` type | ❌ **type error** | ❌ **type error** |
-| `choice` | `string` | ❌ **type error** | ❌ **type error** |
-| Any type | different incompatible type | ❌ **type error** | ❌ **type error** |
-
-**Note:** `null` comparisons use `== null` and `!= null` on any `nullable` type. `null < null` is not defined; ordering operators require non-null operands (enforced by nullable narrowing).
+*Precept simplification:* Precept uses `System.Int64` (64-bit) exclusively — no width parameterization needed for business entity modeling.
 
 ---
 
-## Explicit Non-Goals for This Type-System Pass
+### MySQL
 
-These are deliberate exclusions grounded in the reference survey and Precept's product identity. Each has been considered and rejected with evidence.
+**Enum type:** `ENUM('v1','v2',...)` — inline declaration, stored as integer index, ordered by declaration position. The documentation notes that this can cause unexpected behavior when values are added out of order later. Comparison uses declaration order. String operations on `ENUM` columns work but can produce surprising results. [Docs](https://dev.mysql.com/doc/refman/8.0/en/enum.html)
 
-### 1. `datetime` / `timestamp` / timezone semantics
+*Precept alignment:* MySQL's inline `ENUM` is the closest structural match to Precept's inline `choice(...)`. The ordering-by-declaration-position behavior matches Precept's `ordered` semantics. Precept's `ordered` opt-in avoids the MySQL footgun of implicit ordering that surprises authors.
 
-Precept will not add any time-bearing temporal type in this pass. Timezone-aware comparison introduces ambient context (server timezone, user timezone, offset normalization) that directly violates deterministic inspectability. Cedar's `datetime` is offset-aware but operates in an authorization context where the evaluator controls the clock. Precept operates across entity lifecycles where the evaluator does not control the clock.
+**Date type:** `DATE` (YYYY-MM-DD), `DATETIME` (no timezone), `TIMESTAMP` (UTC-stored, session-tz-displayed). The distinction between `DATETIME` and `TIMESTAMP` is exactly the determinism argument: `TIMESTAMP` values change meaning depending on session timezone setting. [Docs](https://dev.mysql.com/doc/refman/8.0/en/date-and-time-types.html)
 
-`date` (day-granularity, naive) is sufficient for the domain evidence. Time and duration types are explicitly deferred.
+*Precept alignment:* Confirms `date` without time is the safe, deterministic choice for v1.
 
-### 2. `money` as a scalar type
+**Decimal type:** `DECIMAL(p,s)` / `NUMERIC(p,s)` — exact, same semantics as PostgreSQL. [Docs](https://dev.mysql.com/doc/refman/8.0/en/numeric-types.html)
 
-No system in the survey except PostgreSQL's deprecated `MONEY` type bundles amount, currency, rounding, and locale into one scalar. Industry practice is `decimal` for amount + `choice`/`enum` for currency code. Precept follows this pattern.
-
-### 3. Parameterized types (`decimal(p,s)`, `integer(32)`, `choice<T>`)
-
-Parameterized types would require a type-parameter syntax, generic resolution, and constraint propagation infrastructure that does not exist in the Precept parser or type checker. The proposed design uses constraint-zone annotations (`maxplaces`, `ordered`, `min`, `max`) to express the same restrictions at lower language complexity. This is consistent with Precept's configuration-like posture — constraints on declarations, not type algebra.
-
-### 4. Records, maps, or structured types
-
-These would shift Precept from flat, field-local entity declarations toward nested data-shape modeling. That is a category change with major parser, tooling, editability, and inspectability costs. The domain survey shows no sample pressure for nested structures — real entities have flat field sets.
-
-### 5. `any` / dynamic typing / open payload slots
-
-Dynamic escape hatches would defeat the type-system expansion's purpose. The entire point is making domain distinctions structurally enforceable. An `any` type is a loophole that makes every other type optional.
-
-### 6. Host-language type leakage
-
-Precept fields will not reference C# types, .NET enums, or SDK wrappers. One-file completeness means the `.precept` file declares all types it uses. MCP and inspect surfaces expose DSL-level values (strings for choices, ISO 8601 for dates, plain numbers for integer/decimal), not .NET runtime objects.
-
-### 7. Implicit boolean conversion from numeric types
-
-`when Count` (where `Count` is an integer) will be a type error. `when Count > 0` is required. This prevents the class of bugs where `0` is "falsy" — Precept does not inherit truthy/falsy semantics from any host language.
-
-### 8. String ordering (`string < string`)
-
-Lexicographic string comparison is not proposed. It is locale-dependent and semantically meaningless for the domains Precept governs. `choice ... ordered` provides domain-meaningful ordering for categorical values.
+**Integer type:** `TINYINT`, `SMALLINT`, `INT`, `BIGINT`. [Docs](https://dev.mysql.com/doc/refman/8.0/en/numeric-types.html)
 
 ---
 
-## Key References
+## Languages
 
-Primary sources cited in this survey:
+### C# / .NET
 
-| Reference | URL | Used for |
-|-----------|-----|----------|
-| OMG DMN 1.4 Specification (FEEL) | https://www.omg.org/spec/DMN/1.4/PDF | Temporal types, single-number model, null semantics |
-| Camunda FEEL Data Types | https://docs.camunda.io/docs/components/modeler/feel/language-guide/feel-data-types/ | FEEL type reference, date constructor |
-| Cedar Language Reference | https://docs.cedarpolicy.com/policies/syntax-grammar.html | Zero-coercion policy, Long-only numeric, extension types |
-| Cedar Operators | https://docs.cedarpolicy.com/policies/syntax-operators.html | Operator validity by type |
-| Drools DRL Reference | https://docs.drools.org/latest/drools-docs/drools/language-reference/index.html | Java type inheritance, `declare enum` |
-| NRules Wiki | https://github.com/NRules/NRules/wiki/Getting-Started | .NET type alignment |
-| BPMN 2.0 Specification | https://www.omg.org/spec/BPMN/2.0.2/PDF | XSD type hierarchy, integer as decimal restriction |
-| SQL:2016 Standard Part 2 | https://www.iso.org/standard/63556.html | Three-tier numeric tower, ENUM, DATE, coercion |
-| PostgreSQL Numeric Types | https://www.postgresql.org/docs/current/datatype-numeric.html | INTEGER, NUMERIC, MONEY (deprecated) |
-| PostgreSQL Enum Types | https://www.postgresql.org/docs/current/datatype-enum.html | Declaration-order comparison |
-| PostgreSQL Date/Time Types | https://www.postgresql.org/docs/current/datatype-datetime.html | DATE semantics, DATE - DATE → integer |
-| PostgreSQL "Don't Do This" — Money | https://wiki.postgresql.org/wiki/Don't_Do_This#Don.27t_use_money | MONEY type deprecation evidence |
-| C# Numeric Types | https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/integral-numeric-types | int/long semantics, widening rules |
-| C# Decimal Type | https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/floating-point-numeric-types | System.Decimal, MidpointRounding.ToEven |
-| C# DateOnly | https://learn.microsoft.com/en-us/dotnet/api/system.dateonly | Day-granularity date in .NET |
-| Pierce, *Types and Programming Languages* Ch. 8 | ISBN 978-0-262-16209-8 | Typed arithmetic expressions, safety theorems |
-| Pierce, *TAPL* Ch. 15 | ISBN 978-0-262-16209-8 | Subtyping and coercion theory |
-| Cardelli, "Type Systems" (CRC Handbook) | https://lucacardelli.name/Papers/TypeSystems.pdf | Type system classification, coercion taxonomy |
+**Enum:** `enum Status { Draft, Active, Closed }` — named integer-backed constants. Compiler enforces that variables hold declared values; runtime does not prevent out-of-range integer casts. `[Flags]` enables bitfield semantics. Enums require a full class declaration. [Docs](https://learn.microsoft.com/en-us/csharp/language-reference/builtin-types/enum)
+
+*Precept divergence:* C# enums are integer-backed (not string-backed) and require a separate declaration block. Precept's `choice(...)` is inline, string-backed, and scope-local to the field. For a domain language that must remain human-readable and AI-readable without compilation context, string-backed is the right choice.
+
+**DateOnly:** `System.DateOnly` — introduced in .NET 6. Represents a year-month-day without time component. Arithmetic: `AddDays(n)`, subtraction via `DayNumber` property. ISO 8601 parsing via `DateOnly.Parse("YYYY-MM-DD")`. [Docs](https://learn.microsoft.com/en-us/dotnet/api/system.dateonly)
+
+*Precept alignment:* `System.DateOnly` is the exact backing type for Precept's `date`. The `DayNumber` property enables `date - date` → `integer` arithmetic efficiently.
+
+**Decimal:** `System.Decimal` — 128-bit, base-10 floating point, 28-29 significant decimal digits. Does not widen to `double` implicitly. Division can produce a `DivideByZeroException`. `Math.Round(d, places, MidpointRounding.ToEven)` implements banker's rounding. [Docs](https://learn.microsoft.com/en-us/dotnet/api/system.decimal)
+
+*Precept alignment:* `System.Decimal` is the backing type for `decimal`. The absence of implicit widening to `double` in C# is what makes the `decimal + number → type error` rule correct — it directly mirrors C# semantics.
+
+**Int64:** `System.Int64` — 64-bit signed integer. `long` in C#. Widening to `double` and to `decimal` is both implicit in C#. Division truncates toward zero (not floor). Overflow in `unchecked` context wraps silently. [Docs](https://learn.microsoft.com/en-us/dotnet/api/system.int64)
+
+*Precept alignment:* `System.Int64` is the backing type for `integer`. The widening behavior mirrors Precept's coercion rules.
 
 ---
 
-## Cross-References
+### TypeScript
 
-- Domain-level research: [type-system-domain-survey.md](../expressiveness/type-system-domain-survey.md)
-- Computed fields (recomputation timing interacts with type constraints): [computed-fields.md](../expressiveness/computed-fields.md)
-- Expression evaluation (decidability of new types): [expression-evaluation.md](./expression-evaluation.md)
-- Constraint composition (field-level constraints host `maxplaces`, `ordered`): [constraint-composition.md](./constraint-composition.md)
-- Proposals: [#25](https://github.com/sfalik/Precept/issues/25) (choice), [#26](https://github.com/sfalik/Precept/issues/26) (date), [#27](https://github.com/sfalik/Precept/issues/27) (decimal), [#29](https://github.com/sfalik/Precept/issues/29) (integer)
+**String literal union types:** `type Priority = "Low" | "Normal" | "High" | "Urgent"`. Compile-time membership checking, no runtime overhead, no ordering semantics. Template literal types (`type Prefix = "doc_${string}"`) provide constrained string patterns, not closed value sets. [Docs](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#union-types)
+
+*Precept alignment:* String literal unions are the TypeScript equivalent of `choice`. The absence of ordering semantics in TypeScript's unions validates Precept's `ordered` opt-in as an explicit addition. TypeScript's `const enum` compiles to inlined integers, which is the opposite of Precept's goal (string values for inspectability).
+
+**Numbers:** TypeScript has only `number` (IEEE 754 double). `bigint` for arbitrary-precision integers. No `decimal` type. The TC39 Decimal proposal has been under discussion for years with no standardization. This is a known gap in the TypeScript ecosystem. [TypeScript handbook](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html)
+
+*Precept improvement:* TypeScript's lack of a decimal type is a well-documented pain point for financial applications. Precept adding `decimal` as a first-class type positions it ahead of TypeScript in this dimension.
+
+---
+
+### Kotlin
+
+**Enum classes:** `enum class Severity { LOW, MEDIUM, HIGH, CRITICAL }`. Each constant is an object with `name`, `ordinal`, and optionally custom properties. Comparable by declaration order via `ordinal`. Pattern matching via `when`. [Docs](https://kotlinlang.org/docs/enum-classes.html)
+
+**Sealed classes:** `sealed class Status { object Draft : Status(); data class Active(val since: LocalDate) : Status() }` — richer variant type with data payloads. [Docs](https://kotlinlang.org/docs/sealed-classes.html)
+
+*Precept relationship:* Kotlin's `enum class` is the nominal, typed equivalent of `choice`. Sealed classes are more powerful (payload-bearing variants) but also more complex. Precept's `choice` is deliberate in being payload-free — the string value IS the data.
+
+**Dates:** `java.time.LocalDate` (day only), `java.time.LocalDateTime` (no tz), `java.time.ZonedDateTime` (with tz). Smart casting after null checks applies to date values.
+
+---
+
+### F#
+
+**Discriminated unions:** `type DocumentType = ID | ProofOfAddress | PoliceReport`. Pattern matching is exhaustive — the compiler requires all variants to be handled in `match` expressions. [Docs](https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/discriminated-unions)
+
+*Precept relationship:* F# discriminated unions are the formal type-theory analog of `choice`. They are more powerful (variants can carry payloads, have methods) and require pattern matching for access. Precept's `choice` is the read-configuration subset of a discriminated union: string-valued, payload-free, equality and optional ordering only.
+
+**Units of measure:** `[<Measure>] type USD` and `[<Measure>] type EUR` — compile-time dimensional type safety. `1.5<USD> + 1.5<EUR>` is a type error. [Docs](https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/units-of-measure)
+
+*Future Precept relevance:* Units of measure are the type-system approach to currency safety (preventing USD + EUR). Precept's v1 approach (separate `choice` for currency code, `decimal` for amount) does not provide this guarantee. A future parameterized `money("USD")` type would be the Precept equivalent. This is Batch 3+ territory — noted as a known gap, not a current proposal.
+
+---
+
+### Rust
+
+**Enums:** `enum DocumentType { ID, ProofOfAddress, PoliceReport, MedicalRecord }`. Algebraic data type. Pattern matching via `match` is exhaustive. Derive `PartialOrd`/`Ord` for comparison by declaration order. [Docs](https://doc.rust-lang.org/book/ch06-01-defining-an-enum.html)
+
+*Precept alignment:* Rust's exhaustiveness checking is the gold standard for what Precept's `choice` type checker should enforce: assigning a non-member value is a compile error, and future tooling (like exhaustiveness checks in `when` guards) would mirror `match` coverage analysis.
+
+**Numeric types:** `i32`, `i64` for integers; `f32`, `f64` for floats; no stdlib decimal. The `rust_decimal` crate is common for financial applications. No implicit coercion between numeric types — all conversions are explicit `as` casts.
+
+*Precept alignment:* Rust's strict no-implicit-coercion model is stronger than Precept's model (Precept allows widening). Rust's pattern confirms that mixing integer and float without explicit conversion is a design smell. Precept's widening (integer to decimal or number) is intentional and explicit in the coercion rules.
+
+---
+
+### Python
+
+**Enum:** `class Status(enum.Enum): DRAFT = "draft"; ACTIVE = "active"`. String-valued enums with `.value` for the string. `IntEnum` for integer-backed ordered enums. `StrEnum` (3.11+) for string-backed with comparison support. Membership testing via `Status("draft")` raises `ValueError` for non-members. [Docs](https://docs.python.org/3/library/enum.html)
+
+*Precept alignment:* Python's `StrEnum` is the closest language analog to `choice`. String-backed, declared set, membership enforced. Python's `IntEnum` with ordering is the analog for `choice(...) ordered`. The `ValueError` on non-member construction is the Python equivalent of Precept's compile-time rejection.
+
+**Date:** `datetime.date` — year, month, day. ISO 8601 parsing via `date.fromisoformat("YYYY-MM-DD")`. `timedelta` for date arithmetic (add/subtract days). No timezone on `date`. [Docs](https://docs.python.org/3/library/datetime.html)
+
+*Precept alignment:* Python's `date.fromisoformat()` maps directly to Precept's `date("YYYY-MM-DD")` constructor. The `timedelta` type is the analog of future Precept `duration` — not needed in v1.
+
+**Decimal:** `decimal.Decimal` — IEEE 754-2008 decimal arithmetic with configurable context (precision and rounding mode). `getcontext().prec = 28` sets precision. `ROUND_HALF_EVEN` is banker's rounding. [Docs](https://docs.python.org/3/library/decimal.html)
+
+*Precept alignment:* Python's `Decimal` with `ROUND_HALF_EVEN` is the behavioral model for `round(decimal, N)` with banker's rounding.
+
+---
+
+## Enterprise Platforms
+
+### Salesforce
+
+**Picklist fields:** Field type that stores one value from a defined list. Values are strings. Display labels can differ from API names. Global picklists allow sharing value sets across fields (an analog for future Precept `choiceset`). Picklist values are enforced on write by the Salesforce API. [Docs](https://help.salesforce.com/s/articleView?id=sf.fields_about_picklist_values.htm&type=5)
+
+*Precept alignment:* Salesforce Picklist is the enterprise-platform precedent for `choice`. The global picklist (shared value set) is the platform analog for a future `choiceset` keyword. The local picklist (per-field value set) is the v1 `choice(...)` model. The enforcement-on-write pattern matches Precept's rejection-at-assignment model.
+
+**Date field:** Stores a date without time component. Displayed in user's locale. API stores ISO 8601. Formula fields can reference Date fields for date arithmetic.
+
+**Currency field:** Stores a decimal amount in the organization's currency. Multi-currency orgs have a `CurrencyIsoCode` field that stores the ISO 4217 code separately from the amount. This is the exact `decimal` + `choice("USD","EUR","GBP")` pattern Precept uses.
+
+---
+
+### Dynamics 365 / Dataverse
+
+**Choice column:** A column where the user selects from a predefined option set. Option sets can be local (defined on the column) or global (reused across tables). Values have an integer key and a display label. [Docs](https://learn.microsoft.com/en-us/power-apps/maker/data-platform/types-of-fields)
+
+*Precept alignment:* Dataverse Choice is the platform-level equivalent of `choice`. The global option set is the analog for a future `choiceset`. The local option set is v1 `choice(...)`. Dataverse's integer keys are an implementation detail; Precept uses string values directly.
+
+**Date and Time column:** Three behaviors — `Date Only`, `Date and Time` (user-local time), `Date and Time (Time Zone Independent)`. `Date Only` has no time component and no timezone conversion. [Docs](https://learn.microsoft.com/en-us/power-apps/maker/data-platform/behavior-format-date-time-field)
+
+*Precept alignment:* Dataverse's `Date Only` behavior maps exactly to Precept's `date`. The three behaviors illustrate why the separation matters: `Date and Time` with timezone conversion is a different semantic entity from a calendar date.
+
+**Decimal Number column:** `Decimal` — up to 10 decimal places, exact arithmetic. Distinct from `Whole Number` (integer) and `Floating Point Number` (IEEE 754). The explicit three-way split — Whole Number, Decimal Number, Floating Point — is the direct enterprise precedent for Precept's `integer`, `decimal`, `number` split.
+
+---
+
+### ServiceNow
+
+**Choice field:** `choice` — a string field with a predefined list of values. Dependent choices (child choices filtered by a parent choice value) are supported. Values are stored as strings.
+
+**Date field:** `glide_date` — stored as YYYY-MM-DD. Separate from `glide_date_time`. No timezone conversion on `glide_date`. [Docs](https://docs.servicenow.com/bundle/washingtondc-platform-administration/page/administer/field-administration/reference/field-types.htm)
+
+**Decimal field:** `decimal` — stored as a decimal in the database. Used for financial and measurement values.
+
+**Integer field:** `integer` — 32-bit. `long integer` available for 64-bit values.
+
+*Overall Precept alignment:* ServiceNow's field type vocabulary (`choice`, `glide_date`, `decimal`, `integer`) maps almost exactly to Precept's expansion. The naming alignment across ServiceNow, Dataverse, and Salesforce — all using `choice` or `Choice` and `Date Only` and `Decimal` — is strong product-positioning evidence that these are the right concepts at the right level of abstraction for an entity-definition platform.
+
+---
+
+## End-User Tools
+
+### Excel
+
+**Data Validation lists:** A cell or range can be restricted to a list of values. Values are defined inline or in a range. Membership is enforced on user entry; formulas can bypass validation. [Docs](https://support.microsoft.com/en-us/office/apply-data-validation-to-cells-29fecbcc-d1b9-42c1-9d76-eff3ce5f7249)
+
+**Date cells:** Dates are stored as serial numbers (days since Jan 1, 1900). Displayed in locale-specific or ISO 8601 format. Date arithmetic is integer arithmetic on the serial number. No timezone concept. [Docs](https://support.microsoft.com/en-us/office/format-numbers-as-dates-or-times-418bd3fe-0577-47c8-8caa-b4d30c528309)
+
+**Numbers:** All numbers are IEEE 754 double. No decimal type. `ROUND()`, `ROUNDUP()`, `ROUNDDOWN()` functions exist for display precision, but the underlying storage is still floating-point.
+
+*Precept improvement:* Excel's number precision issues in financial models are legendary (the `0.1 + 0.2` problem surfaces in financial audit contexts regularly). Precept's `decimal` type gives the guarantee Excel cannot. Excel's data validation list is the end-user mental model that `choice` should meet — the user experience of selecting from a known set is already established.
+
+---
+
+### Google Sheets
+
+**Data Validation with dropdown:** Lists, custom criteria, or range-based value constraints. Membership enforced on user input; formulas bypass. [Docs](https://support.google.com/docs/answer/186103)
+
+**Numbers:** Same as Excel — IEEE 754 double. No exact decimal type.
+
+*Precept improvement:* Same analysis as Excel. Sheets users encounter financial precision issues. The data validation dropdown is the end-user analog of `choice`.
+
+---
+
+### Notion
+
+**Select property:** A closed set of colored option values. Author defines the option set; users select from it. New values can be created by users unless restricted by workspace settings. [Docs](https://www.notion.so/help/database-properties)
+
+**Date property:** Stores a date (with optional time). ISO 8601 internally. Date-only mode available.
+
+**Number property:** IEEE 754 double with various display formats (number, dollar, percent, etc.). No exact decimal type.
+
+*Precept improvement:* Notion's Select is the closest end-user analog of `choice`. The ability for users to add new option values (unlike Precept's closed universe) is the key difference — and it is a deliberate Precept strength. A `choice(...)` set is declared in code; it cannot be extended at runtime.
+
+---
+
+## Rule Engines and Decision Systems
+
+### FEEL (DMN / Camunda)
+
+**Types:** `number` (BigDecimal-backed, arbitrary precision), `string`, `boolean`, `date` (ISO 8601 day only), `date and time` (combined), `time`, `days and time duration`, `years and months duration`. No enum type. Constrained value sets in decision tables are expressed as entry conditions, not types. [Docs](https://docs.camunda.io/docs/components/modeler/feel/language-guide/feel-data-types/)
+
+*Precept comparison:* FEEL's two-duration-type model (`days and time duration` vs `years and months duration`) is the cautionary precedent for Precept's `duration` deferral. Month arithmetic and day arithmetic are not the same: "add 1 month to 2026-01-31" is ambiguous in days. FEEL solves this with two distinct duration types. Precept's v1 `date` supports integer-day arithmetic only — the correct conservative scope. FEEL's `number` being BigDecimal-backed means FEEL does not need a separate `decimal` type; Precept's `number` is IEEE 754, so Precept does.
+
+---
+
+### Cedar (AWS)
+
+**Types:** `Long` (64-bit integer, the only numeric type), `String`, `Boolean`, `Decimal` extension (fixed 4 decimal places), `datetime` (RFC 3339, includes timezone offset). No float. No enum — constrained values are expressed as policy conditions. [Docs](https://docs.cedarpolicy.com/policies/syntax-datatypes.html)
+
+*Precept comparison:* Cedar's `Long`-only numeric model (no float at all) is at one extreme. Precept's three-type split (integer, decimal, number) is a deliberate middle ground: integer for discrete counts, decimal for exact financial values, and number for the (rare) cases where floating-point approximation is appropriate. Cedar's `Decimal` extension with fixed 4 places is weaker than Precept's `maxplaces N` constraint — 4 places covers many cases but not all (tax rates may require 6).
+
+---
+
+### Drools / NRules
+
+These systems inherit their type systems from the host language (Java / C#). Drools authors use `java.math.BigDecimal` for exact arithmetic, `java.time.LocalDate` for dates, and Java `enum` for constrained values. NRules authors use `System.Decimal`, `System.DateOnly`, and C# `enum`. [Drools docs](https://docs.jboss.org/drools/release/latest/drools-docs/drools-docs.html)
+
+*Precept comparison:* Rule engines that host-language-delegate all type decisions are the "no opinion" baseline. Precept's explicit type vocabulary is a design choice to give entity definitions a self-contained, readable type system that does not require C# knowledge to understand.
+
+---
+
+## Validators
+
+### Pydantic (Python)
+
+`@computed_field` and `model_validator` give Pydantic a rich type-narrowing model. Field types use Python type annotations. `str` can be constrained with `Annotated[str, Field(pattern=r'...')]`. `Enum` fields enforce membership. `datetime.date` for day-only dates. `Decimal` for exact arithmetic.
+
+*Precept comparison:* Pydantic is the closest validator analog to Precept's type system. It uses Python's own types. Precept's DSL type system is the one-file equivalent — no Python class definitions required.
+
+---
+
+### Zod / Valibot
+
+Zod's `z.enum(["A","B","C"])` creates a runtime-enforced string union. `.date()` validates ISO 8601 date strings (not a native date type). No exact decimal type. [Zod docs](https://zod.dev/)
+
+*Precept comparison:* Zod validates at runtime boundaries. Precept enforces at compile time and at the runtime boundary both. Zod's `z.enum(...)` is inline like `choice(...)` — same structural pattern. Zod's lack of a native `date` type (it validates strings that look like dates) confirms that validation-focused tools leave the date type gap for the host language.
+
+---
+
+## Non-Goals
+
+These type additions are explicitly out of scope for the type system expansion and should not recur as proposals without new evidence.
+
+### `money` type
+
+A dedicated `money` type (or `money("USD")`) encodes currency into the type. This requires a parameterized type system and introduces cross-currency type safety (preventing `USD + EUR`). The entire database and enterprise platform ecosystem has converged on the pattern of using `decimal` for amount and a separate code field for currency. Precept follows this consensus. A future parameterized `money("USD")` type would require a significant type-system extension and is not warranted by current domain evidence.
+
+### `timestamp` / timezone-aware `datetime`
+
+Time-of-day with timezone is a determinism problem. The same precept definition would produce different behavior depending on the deployment timezone, violating one-file completeness. This is not a deferral for convenience — it is a deliberate boundary. If Precept ever ships `datetime`, it will require an explicit timezone contract (like Cedar's RFC 3339 with mandatory offset), not a silent timezone assumption.
+
+### `duration` type
+
+Day arithmetic on `date` fields is supported in v1 (`date + integer` adds days). Month and year arithmetic requires a duration type because months and years do not have fixed day counts. FEEL's two-duration-type split (`days and time duration` vs `years and months duration`) shows how complex this becomes. Deferred to Batch 3 research.
+
+### Parameterized `decimal(p,s)`
+
+Database-style precision and scale as type parameters. `System.Decimal`'s 28-29 significant digits covers all practical business scenarios. `maxplaces N` as a constraint is the right mechanism for scale enforcement. Total-digit precision (`precision N`) has no domain evidence in the survey.
+
+### Parameterized integer widths (`int32`, `int16`, `uint`)
+
+No domain evidence. `System.Int64` covers all practical business integers. Width parameterization adds parser complexity for zero user benefit in business entity modeling.
+
+### Structural / record types
+
+Inline structured fields (`field Address as { Street as string, City as string }`). The flat-field model is Precept's authoring design. Nested structures create object-graph semantics (partial nullability, partial mutability, traversal syntax) that require significant type-system work. No domain evidence suggests flat fields are insufficient for the entity-modeling use case.
+
+### Dynamic or open-ended `choice` sets
+
+A `choice` whose members can be extended at runtime defeats the compile-time membership checking guarantee. Open-ended value sets belong to `string` fields with invariants or to external validation. The `choice` type is a closed universe by definition.
+
+### Implicit coercion between `decimal` and `number`
+
+The precision guarantee that `decimal` provides is only meaningful if mixing `decimal` and `number` in arithmetic is never silent. An implicit coercion (in either direction) would either silently degrade to floating-point arithmetic or silently introduce a potentially-lossy conversion. Both are worse than a type error. The `decimal + number → type error` rule is non-negotiable.
+
+### Bit operations on `integer`
+
+`&`, `|`, `^`, `<<`, `>>`. No business entity modeling use case found. These are programming-level operations. Out of scope.
+
+### User-defined function calls on any new type
+
+`choice` values with methods, `date` with custom formatting functions, `decimal` with custom aggregation. The built-in function surface (from #16) is the only extension point. User-defined functions introduce undecidability and are outside Precept's design constraints.
+
+---
+
+## Cross-System Pattern Summary
+
+| Concept | PostgreSQL | SQL Server | MySQL | C# | TypeScript | Kotlin | F# | Rust | Python | Salesforce | Dataverse | ServiceNow | FEEL | Cedar |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Closed value set | ENUM | CHECK | ENUM | enum | string union | enum class | DU | enum | Enum | Picklist | Choice | choice | (none) | (none) |
+| Day-only date | DATE | DATE | DATE | DateOnly | (Temporal) | LocalDate | DateOnly | NaiveDate | date | Date | Date Only | glide_date | date | (none) |
+| Exact numeric | DECIMAL | DECIMAL | DECIMAL | Decimal | (none) | BigDecimal | decimal | (decimal crate) | Decimal | Currency | Decimal Number | decimal | number | Decimal ext |
+| Whole-number | INTEGER/BIGINT | INT/BIGINT | INT/BIGINT | Int64 | (none) | Int/Long | int/int64 | i64 | int | (Number, 0 dec) | Whole Number | integer | (none) | Long |
+
+The pattern is clear: all four type categories exist in every major database system and every enterprise platform. The gap is in general-purpose programming languages (TypeScript lacks decimal; Python lacks integer type; etc.) and in rule/decision engines that delegate to the host language. Precept, as a domain language, should match the database and enterprise platform tier — where type systems serve entity modeling — not the programming language tier, where types serve algorithm implementation.
