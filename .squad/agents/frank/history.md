@@ -16,6 +16,16 @@
 - User directive honored: branch retained locally and remotely per user request (NOT deleted post-merge).
 - Verified zero scope creep: 81 additions, 3 files changed (README.md, .squad/decisions.md, .squad/agents/j-peterman/history.md), no unrelated code changes.
 - Co-authored-by trailer included in original commits.
+### 2026-05-19 - Entity modeling addendum: correcting workflow-heavy framing
+- Produced docs/research/sample-realism/frank-entity-modeling-addendum.md.
+- Corrected the sample-realism research framing from workflow-only to entity-inclusive, per Shane's directive that Precept is for modeling business entities, not just workflow.
+- Promoted reference data from Tier 3 to Tier 2 in domain-fit ranking. Defined three precept archetypes (Workflow, Entity, Hybrid). Revised corpus target to 60-70% workflow, 15-20% entity, 8-12% hybrid.
+- Reframed dilution test question #1 to cover governed integrity (lifecycle + field constraints + editability), not just lifecycle transitions.
+- Identified 8 entity-precept sample candidates, 3 hybrid candidates, and 3 domain-suite concepts (workflow + entity precepts in the same domain).
+- Cataloged external analogs for entity modeling: Salesforce objects, ServiceNow records, Guidewire entities, MDM tools, JSON Schema, FluentValidation, ACORD/FHIR/ISO 20022 standards, DMN/OPA/Cedar policy systems.
+- Recommended 6 new research lanes for the entity/data-contract side, prioritized by immediate value.
+- Decision note filed to .squad/decisions/inbox/frank-entity-sample-balance.md.
+
 ### 2026-04-08 - Sample ceiling consolidation recorded
 - Team update (2026-04-08T01:13:25.793Z): Scribe merged Frank's ceiling analysis and philosophy addendum with Steinbrenner's planning lane and Peterman's benchmark lane into `.squad/decisions.md` — decided by Frank, Steinbrenner, and J. Peterman.
 - Shared outcome: 42 is now the hard upper bound for the flat in-repo corpus, while the real acceptance gate is whether a candidate strengthens domain fit, prevention, inspectability, and marginal corpus value.
@@ -282,6 +292,8 @@ Each exclusion removes complexity that Superpower would struggle with (indentati
 
 All proposals are additive and Superpower-compatible. No structural redesign required.
 - 2026-05-18: philosophy-driven corpus analysis is more useful than count-driven analysis because it gives the team a refusal test ("does this sample demonstrate prevention, inspectability, or deterministic policy enforcement?") rather than a quota ("we need 7 more to hit 42"). Refusal criteria prevent dilution; quotas invite it.
+- 2026-05-19: when framing a product's sample corpus, the lens you choose (workflow-only vs. entity-inclusive) determines which samples even qualify for consideration. A workflow-only lens systematically excludes the majority of entities in every real business domain — the reference data, configuration records, and master data that workflow entities depend on. Broadening the lens is not "adding a feature" to the portfolio; it is correcting a categorical blind spot.
+- 2026-05-18: philosophy-driven corpus analysisis more useful than count-driven analysis because it gives the team a refusal test ("does this sample demonstrate prevention, inspectability, or deterministic policy enforcement?") rather than a quota ("we need 7 more to hit 42"). Refusal criteria prevent dilution; quotas invite it.
 - 2026-05-17: corpus ceiling is best argued from three converging axes (domain breadth, workflow shape, construct coverage) rather than raw count. All three saturate in the 40-55 range for a focused DSL. Maintenance cost is the hard backstop — past ~55 files, single-feature update passes become unreliable without migration tooling.
 - 2026-05-17: sample realism is mostly a semantic-types and policy-density problem, not a sample-count problem. The biggest credibility failures are categorical values, money, and calendar logic forced through string/number workarounds.
 - 2026-05-16: keep PRs surgically scoped when Shane asks for targeted metadata changes; local bookkeeping should not hitchhike into those PRs.
