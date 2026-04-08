@@ -369,3 +369,316 @@ The precision guarantee that `decimal` provides is only meaningful if mixing `de
 | Whole-number | INTEGER/BIGINT | INT/BIGINT | INT/BIGINT | Int64 | (none) | Int/Long | int/int64 | i64 | int | (Number, 0 dec) | Whole Number | integer | (none) | Long |
 
 The pattern is clear: all four type categories exist in every major database system and every enterprise platform. The gap is in general-purpose programming languages (TypeScript lacks decimal; Python lacks integer type; etc.) and in rule/decision engines that delegate to the host language. Precept, as a domain language, should match the database and enterprise platform tier — where type systems serve entity modeling — not the programming language tier, where types serve algorithm implementation.
+
+---
+
+## Semantics Reference — Operators, Literals, Coercion, and Nullability
+
+The per-system sections above are a precedent survey. This section synthesizes the cross-cutting semantic principles that should govern any type in Precept's system — now and in future proposals. All claims are grounded in the evidence above.
+
+---
+
+### Literal Syntax and Constructor Form
+
+A type system's value story starts with how values are written. Three patterns appear across systems:
+
+**Bare literal:** `5`, `"hello"`, `true`. No decoration; the parser assigns a type by token class alone. This is unambiguous for numbers and booleans. It is ambiguous for strings that could be dates (`"2026-01-15"`) or choice members (`"Low"`) — the parser cannot assign the correct type without context.
+
+**Typed prefix / cast:** SQL's `DATE '2026-01-15'`, `CAST('2026-01-15' AS DATE)`. Contextual disambiguation via a keyword before the literal. Verbose but unambiguous at the source level.
+
+**Constructor form:** FEEL's `date("2026-01-15")`, Cedar's `datetime("2024-10-15T00:00:00Z")`. A function-call syntax where the type name is the function and the literal is the argument. Consistent with how complex types are expressed in expression languages. Unambiguous in all positions.
+
+**Design principle: constructor form for non-trivial types.** For types whose values cannot be distinguished from string literals by token class alone — dates, in particular — a constructor form is the safe and consistent choice. It prevents the lexer from needing to look ahead into string content to determine a token's type, and it makes type intent visible at the usage site without requiring type-inference context. Bare numeric literals (`5`, `5.0`) remain sufficient for `integer` and `number` because their token class (digit sequences with or without decimal point) is unambiguous.
+
+**Integer vs decimal literals.** The absence of a decimal point is the canonical integer-literal signal across all surveyed systems: C# (`5` = `int`, `5.0` = `double`), Java (`5` = `int`, `5.0` = `double`), Python (`5` = `int`, `5.0` = `float`). This convention is deep enough that relying on it is not a design choice — it is alignment with universal expectation. `5` in a Precept expression should be inferred as `integer`; `5.0` as `number`.
+
+**Choice member literals.** Choice values are string literals at the source level. Membership validation is a compile-time type check, not a token-class distinction. The type system assigns the choice type based on the field or argument context. `"Low"` is a bare string literal unless the context assigns it a `choice(...)` type, at which point the type checker validates membership.
+
+---
+
+### Arithmetic Operator Closure
+
+**Closure** is the guarantee that applying an operator to operands of known types produces a result of a known type. Without closure, the type checker cannot propagate types through expressions.
+
+#### Integer arithmetic
+
+| Expression | Result type | Notes |
+|---|---|---|
+| `integer + integer` | `integer` | Closed; no promotion needed |
+| `integer - integer` | `integer` | Closed |
+| `integer * integer` | `integer` | Closed; overflow is a runtime concern |
+| `integer / integer` | `integer` | **Truncates toward zero** — this is C#, Java, Cedar, and SQL convention (not floor division) |
+| `integer % integer` | `integer` | Remainder; sign follows dividend (not divisor) |
+| `-integer` (unary) | `integer` | Closed |
+
+**Integer division truncates toward zero** is the universal rule for systems that inherit C or Java semantics. `5 / 2 = 2`, `-5 / 2 = -2` (not `-3`). This is a deliberate truncation (toward zero), not a floor (toward negative infinity). Any future type that participates in integer division should inherit this convention.
+
+#### Decimal arithmetic
+
+| Expression | Result type | Notes |
+|---|---|---|
+| `decimal + decimal` | `decimal` | Exact; intermediate precision is max of operands |
+| `decimal - decimal` | `decimal` | Exact |
+| `decimal * decimal` | `decimal` | Exact; precision expands |
+| `decimal / decimal` | `decimal` | Exact; may produce infinite decimal (banker's rounding at assignment) |
+| `-decimal` (unary) | `decimal` | Closed |
+
+**Decimal arithmetic is always closed on `decimal`.** There is no expression involving two `decimal` operands that produces a `number` (IEEE 754) result. This is the `System.Decimal` contract in C#: all `decimal` operators return `decimal`. The same is true of PostgreSQL `NUMERIC` and Python `Decimal`. Violating this would silently degrade exact arithmetic to floating-point.
+
+#### Mixed-type arithmetic
+
+| Expression | Result type | Sound? | Notes |
+|---|---|---|---|
+| `integer + decimal` | `decimal` | ✓ | Lossless widening of integer |
+| `decimal + integer` | `decimal` | ✓ | Symmetric |
+| `integer * decimal` | `decimal` | ✓ | Lossless widening |
+| `integer + number` | `number` | ✓ | Lossless widening (for representable integers) |
+| `number + integer` | `number` | ✓ | Symmetric |
+| `decimal + number` | **type error** | — | Exact + approximate = unknown; must be explicit |
+| `number + decimal` | **type error** | — | Symmetric; same reasoning |
+
+**The `decimal + number → type error` rule is non-negotiable.** Once a value has been through IEEE 754 arithmetic, its precision is already lost before the addition. Allowing `decimal + number` would mean: start with exact arithmetic, add an approximate value, produce an exact result. The "exact result" would be contaminated by the approximation in the `number` operand. The only honest outcome is a type error — force the author to be explicit about which type they want.
+
+#### Date arithmetic
+
+| Expression | Result type | Notes |
+|---|---|---|
+| `date + integer` | `date` | Add N days; result is a calendar date |
+| `date - integer` | `date` | Subtract N days |
+| `date - date` | `integer` | Day count between dates (not a `duration` type in v1) |
+| `date + date` | **type error** | Undefined; no meaning |
+| `date + decimal` | **type error** | Days must be whole numbers |
+| `date + number` | **type error** | Imprecise day count violates day-granularity contract |
+| `date.year` | `integer` | Read-only accessor |
+| `date.month` | `integer` | Read-only accessor (1–12) |
+| `date.day` | `integer` | Read-only accessor (1–31) |
+| `date.dayOfWeek` | `integer` | Read-only accessor (ISO 8601: 1=Monday, 7=Sunday) |
+
+**Date arithmetic is closed only with integer day counts.** Adding a `decimal` (e.g., `1.5 days`) is semantically undefined at day granularity. Adding a `number` introduces floating-point imprecision into temporal arithmetic. Both are type errors. When duration types are added in a future wave, `date + duration → date` will be the appropriate form.
+
+---
+
+### Comparison Operators and Cross-Type Policy
+
+All surveyed systems support `==`, `!=`, `<`, `>`, `<=`, `>=` for numeric and date types. The critical dimension is what happens when the two operands have different types.
+
+#### Within-type comparison (always valid)
+
+| Type | `==` / `!=` | `<` / `>` / `<=` / `>=` | Ordering semantics |
+|---|---|---|---|
+| `integer` | ✓ | ✓ | Numeric |
+| `decimal` | ✓ | ✓ | Numeric (exact) |
+| `number` | ✓ | ✓ | Numeric (IEEE 754; NaN comparisons are false) |
+| `date` | ✓ | ✓ | Chronological |
+| `string` | ✓ | ✓ | Lexicographic (byte-order) |
+| `boolean` | ✓ | ✗ | No total order on booleans |
+| `choice` (no `ordered`) | ✓ (==, !=) | **type error** | No ordinal semantics |
+| `choice` (`ordered`) | ✓ | ✓ | Declaration order |
+
+#### Cross-type comparison
+
+| Comparison | Policy | Rationale |
+|---|---|---|
+| `integer == decimal` | Widens integer to decimal; compares exact | Lossless; correct |
+| `integer == number` | Widens integer to number; compares IEEE 754 | May lose precision for very large integers; permitted for practical range |
+| `decimal == number` | **type error** | Mixing exact and approximate comparison; result would be meaningless |
+| `decimal == string` | **type error** | Different kinds; no coercion |
+| `date == integer` | **type error** | Date is not a serial number in Precept |
+| `choice == string` | Validates string is a member; compares as string | Allows literal comparisons without constructor |
+
+**`decimal == number` is a type error, not a widening.** If the `number` operand was produced by IEEE 754 arithmetic, its precision is already contaminated. Comparing it to a `decimal` value would compare an exact representation with an approximate one, and a result of `false` would be ambiguous: does it mean the values are different, or does it mean IEEE 754 lost precision? The type error forces the author to be explicit.
+
+**Choice comparison without `ordered` is `==`/`!=` only.** There is no natural ordering on an unordered choice set. `Priority < "High"` is not defined unless `Priority` was declared with `ordered`. This prevents a common enum bug: comparing enum values lexicographically when you meant to compare by domain significance. Lexicographic order (`"High" < "Low"` because `H < L`) is usually wrong for priority enums. Declaration order is the correct semantics — but only when the author explicitly opts in with `ordered`.
+
+---
+
+### Coercion and Widening Policy
+
+**Widening** is a type promotion that is always lossless. **Narrowing** is a conversion that may lose information and is never implicit.
+
+#### Widening table (always implicit, always lossless)
+
+| From | To | Lossless? | C# analog |
+|---|---|---|---|
+| `integer` | `decimal` | ✓ | `long` → `decimal` |
+| `integer` | `number` | ✓ (for representable integers) | `long` → `double` |
+| `decimal` | `number` | **never** (explicit only) | `decimal` → `double` is explicit in C# |
+| `number` | `decimal` | **never** (explicit only) | `double` → `decimal` is explicit in C# |
+
+There are exactly two valid widening paths: integer widens to decimal, and integer widens to number. No other widening is defined. This graph is:
+
+```
+integer → decimal
+integer → number
+```
+
+There is intentionally no `decimal ↔ number` edge. The two numeric representations are not in a subtype relationship for assignment purposes.
+
+#### Narrowing (always explicit via function)
+
+| Narrowing | Function required |
+|---|---|
+| `decimal` → `integer` | `truncate(decimal)`, `floor(decimal)`, `ceil(decimal)` |
+| `number` → `integer` | `truncate(number)`, `floor(number)`, `ceil(number)` |
+| `decimal` → `number` | Not defined (avoids exact→approximate confusion) |
+| `number` → `decimal` | Not defined (the number may already be imprecise) |
+
+**No implicit narrowing.** C#'s rule is definitive: `long = decimal` is a compile error, requiring an explicit cast or conversion. Precept follows this. The author must call `truncate()`, `floor()`, or `ceil()` to convert a fractional value to an integer, making the truncation decision explicit and readable.
+
+#### Assignment coercion
+
+Assignment is a subset of expression coercion. The target field's type constrains what can be assigned:
+
+| Assigned from → | to `integer` field | to `decimal` field | to `number` field |
+|---|---|---|---|
+| `integer` expression | ✓ | ✓ (widens) | ✓ (widens) |
+| `decimal` expression | **type error** | ✓ | **type error** |
+| `number` expression | **type error** | **type error** | ✓ |
+
+**`decimal field = number expr` is a type error** even though `integer` widens to both. The decimal field's exact-arithmetic contract would be violated the moment an approximate value is assigned to it. Similarly, `number field = decimal expr` is a type error: not because it would cause data loss, but because it allows the author to silently escape the exact-arithmetic boundary. If an author wants to assign a decimal result to a number field, they have chosen a type mismatch that should be explicit.
+
+---
+
+### Nullability Interaction
+
+#### Null semantics across paradigms
+
+Three distinct null models appear in the survey:
+
+1. **Three-valued logic (SQL NULL):** `NULL` propagates through arithmetic — `NULL + 5 = NULL`. Comparisons produce `UNKNOWN` — `NULL = 5` is neither `true` nor `false`. Requires `IS NULL` / `IS NOT NULL` checks. The source of many bugs: `WHERE status != 'Approved'` silently excludes `NULL` rows.
+
+2. **Propagating null with symmetric equality (FEEL):** `null` is a value; arithmetic with `null` produces `null`. But `null = null` is `true` (unlike SQL). Comparisons involving `null` propagate `null`.
+
+3. **Nullable types with two-valued logic (C#, Kotlin, TypeScript strict null):** Null is a distinct type-level annotation (`T?`). Operations on a nullable type produce nullable results. Smart casts and type narrowing narrow `T?` to `T` within a null-checked branch. Boolean operators evaluate normally on non-null booleans; they do not propagate null.
+
+**Precept's model follows C#'s nullable type approach** (not SQL three-valued logic). A `nullable` field is annotated at declaration time; expressions that reference it may produce nullable results; the type checker requires explicit null guards before accessing a nullable field in an expression. This is the deterministic, two-valued model: constraints are either satisfied or not, with no `UNKNOWN` outcome.
+
+#### Constraint semantics with null
+
+The SQL `CHECK CONSTRAINT` null rule is the correct model for Precept constraints: **a constraint that checks a nullable field applies only to non-null values**. A field declared `decimal nullable min 0` accepts `null` and also accepts any non-null decimal ≥ 0. It does not accept `-5` (violates `min 0`), but it does accept `null` (null is not subject to `min`).
+
+This is also C#'s behavior for nullable value types with `[Range]` attributes: the attribute is skipped when the value is `null`.
+
+#### Nullable arithmetic propagation
+
+| Expression | Result | Notes |
+|---|---|---|
+| `nullable_field + 5` | nullable | If field is null, result is null |
+| `nullable_field == 5` | boolean | False if null (not unknown) — Precept uses two-valued logic |
+| `nullable_field != null` | boolean | True only if field has a value |
+| `nullable_field > 0 && nullable_field < 100` | boolean | The `&&` short-circuits; if field is null, `nullable_field > 0` is false |
+
+**Null guards narrow the type.** Following a check `when Field != null`, the type of `Field` within that branch is narrowed to the non-nullable form. This eliminates the need for defensive null checks inside the guarded expression. This is the Kotlin smart-cast / TypeScript type-narrowing pattern applied to Precept's nullable model.
+
+#### Default values and null
+
+A field with a `default` may not also be `nullable` in most cases — the default eliminates the need for null. Conversely, a `nullable` field without a `default` starts as `null` at `CreateInstance`. This is consistent with C# nullable properties and SQL `DEFAULT NULL`.
+
+---
+
+### Collection Membership Types
+
+A typed collection constrains both the operations available on it and the types of values it can hold. The key principle across all surveyed systems: **the element type of a collection is part of the collection's type, and the type system enforces membership at the element level.**
+
+#### Typed collections and element type enforcement
+
+| System | Mechanism | Compile-time enforcement |
+|---|---|---|
+| C# `HashSet<T>` | Generic type parameter | `Add(wrongType)` is compile error |
+| TypeScript `Set<T>` | Generic type parameter | Type error on wrong element |
+| PostgreSQL `ARRAY` | Element type in declaration (`int[]`) | Runtime rejection for type mismatch |
+| PostgreSQL enum | Enum column | Runtime rejection for non-member values |
+
+**For Precept collections, the element type is the field's declared element type.** A `set of string` accepts any string. A `set of choice("ID","Passport")` accepts only `"ID"` or `"Passport"`. A `set of integer` accepts only whole numbers. Attempting to `add` a value that violates the element type is a compile-time error — not a constraint violation at runtime.
+
+#### `set of choice(...)` — membership is part of the type
+
+The critical semantic point for choice-typed collections: **a `set of choice(...)` is not a `set of string` with a runtime membership invariant.** It is a typed collection whose element type is a `choice` type. The distinction matters:
+
+- `set of string` — any string; membership constraint would be an `invariant`
+- `set of choice("ID","Passport")` — only `"ID"` or `"Passport"`; membership is enforced at compile time by the type checker on every `add` operation
+
+This is the `Set<DocumentType>` in C# or TypeScript — `add("BirthCertificate")` is a compile error if `BirthCertificate` is not a declared member of `DocumentType`.
+
+#### Collection accessor types
+
+Collection accessors return typed values. Their types must be consistent with the element type:
+
+| Accessor | Element type | Return type | Notes |
+|---|---|---|---|
+| `.count` | any | `integer` | Always defined; empty collection → 0 |
+| `.min` | `number`, `integer`, `decimal`, `date` | same as element | Undefined on empty collection |
+| `.max` | `number`, `integer`, `decimal`, `date` | same as element | Undefined on empty collection |
+| `.peek` | any | element type (nullable) | Undefined on empty queue/stack |
+| `contains` | any | `boolean` | Always defined |
+
+The return type of `.min` and `.max` follows the element type — for a `set of integer`, `.min` returns `integer`. For a `set of decimal`, `.max` returns `decimal`. This is type closure applied to collection accessors: the type of the element determines the type of the accessor result.
+
+**`.count` returns `integer`, not `number`.** A count of elements in a collection is always a whole number. The current behavior (returning `number` for backward compatibility) is a temporary compromise — the correct type is `integer`, and when `integer` ships, `.count`'s return type should be refined. However, changing `.count` to return `integer` widens its usability (integer widens to number, so existing comparisons like `.count > 0` where `0` is currently a `number` literal would still work when `0` becomes an `integer` literal).
+
+---
+
+### Exact-Decimal vs Integer Semantics — Synthesis
+
+The three-type numeric split exists to serve three distinct semantic domains in business entity modeling. The MONEY anti-pattern is the clearest evidence that conflating these domains produces systems that cannot be trusted.
+
+#### Domain mapping
+
+| Semantic domain | Correct Precept type | Why NOT the other types |
+|---|---|---|
+| **Counting things** (participants, seats, defects, days delinquent) | `integer` | These are discrete units; `2.7 participants` is semantically wrong; `decimal maxplaces 0` is a hack that communicates the wrong intent |
+| **Exact financial amounts** (prices, premiums, tolerances, rates) | `decimal` | IEEE 754 produces `0.30000000000000004`; invoice totals will not sum; audit tests will fail |
+| **Scientific / ratio computations** (where approximation is acceptable) | `number` | When the calculation is inherently approximate and the result's imprecision is acceptable to the domain |
+
+#### The MONEY type anti-pattern
+
+PostgreSQL's `MONEY` type is the definitive negative example. It was designed to simplify financial amounts but introduced locale-dependent behavior and imprecise division. The PostgreSQL community now [documents it as something to avoid](https://www.postgresql.org/docs/current/datatype-money.html), and the PostgreSQL wiki's "Don't Do This" guide lists it explicitly.
+
+The lesson: **a named type that embeds domain semantics (currency) into a numeric type creates problems that outweigh the convenience.** The correct design is:
+
+1. `decimal` for the amount (exact arithmetic, precision-constrained via `maxplaces`)
+2. `choice("USD", "EUR", "GBP")` for the currency code (closed set, compile-time checked)
+
+These two fields together model a monetary amount more correctly than any `money` type, and they do so without requiring the type system to understand currencies, exchange rates, or arithmetic rules for mixed-currency operations.
+
+#### Integer division as a semantic boundary
+
+`integer / integer → integer` (truncating) is the correct rule for counting-domain arithmetic. `5 participants / 2 groups = 2 (whole groups)` — not `2.5`. The truncation is semantically meaningful: you cannot have half a group. When a fractional result IS needed, the author must make the type promotion explicit: `decimal(5) / decimal(2) = 2.5` (exact).
+
+This is also why `integer / integer → number` would be wrong: it would silently produce a floating-point approximation of a count, mixing the counting domain with the approximation domain.
+
+#### Banker's rounding as the standard for `round()`
+
+When explicit rounding is required (for `decimal` fields with `maxplaces` constraints), the rounding mode matters for financial correctness. Three modes are in common use:
+
+| Mode | Rule | Bias | Precedent |
+|---|---|---|---|
+| Half-up (common) | Round 0.5 always up | Positive bias over large datasets | SQL `ROUND()` default |
+| Half-down | Round 0.5 always down | Negative bias | Uncommon |
+| Banker's rounding (half-even) | Round 0.5 to nearest even | No systematic bias | C# `Math.Round` default, Python `round()`, FEEL decimal function |
+
+**Banker's rounding is the statistically neutral choice.** For large datasets where many values fall at the midpoint, always rounding up (or down) produces a systematic bias that accumulates into audit discrepancies. Banker's rounding eliminates this bias. Its use in C#'s `Math.Round(v, n, MidpointRounding.ToEven)` and Python's `round()` built-in makes it the .NET and Python default, which is the correct alignment for Precept's `round()` function.
+
+---
+
+## Key References
+
+- [PostgreSQL Numeric Types](https://www.postgresql.org/docs/current/datatype-numeric.html)
+- [PostgreSQL ENUM Type](https://www.postgresql.org/docs/current/datatype-enum.html)
+- [PostgreSQL Date/Time Types](https://www.postgresql.org/docs/current/datatype-datetime.html)
+- [PostgreSQL MONEY Type](https://www.postgresql.org/docs/current/datatype-money.html)
+- [C# Numeric Conversions](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/numeric-conversions)
+- [System.Decimal (.NET)](https://learn.microsoft.com/en-us/dotnet/api/system.decimal)
+- [System.Int64 (.NET)](https://learn.microsoft.com/en-us/dotnet/api/system.int64)
+- [System.DateOnly (.NET 6+)](https://learn.microsoft.com/en-us/dotnet/api/system.dateonly)
+- [MidpointRounding (.NET)](https://learn.microsoft.com/en-us/dotnet/api/system.midpointrounding)
+- [Cedar Datatypes](https://docs.cedarpolicy.com/policies/syntax-datatypes.html)
+- [Cedar Operators](https://docs.cedarpolicy.com/policies/syntax-operators.html)
+- [FEEL Data Types (Camunda docs)](https://docs.camunda.io/docs/components/modeler/feel/language-guide/feel-data-types/)
+- [OMG DMN 1.4 Specification](https://www.omg.org/spec/DMN/1.4/PDF)
+- [Java BigDecimal](https://docs.oracle.com/en/java/se/17/docs/api/java.base/java/math/BigDecimal.html)
+- [TypeScript Union Types and Literal Types](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#union-types)
+- [Python Enum](https://docs.python.org/3/library/enum.html)
+- [Python Decimal](https://docs.python.org/3/library/decimal.html)
+- [Python datetime.date](https://docs.python.org/3/library/datetime.html)
+- [XSD Numeric Types (W3C)](https://www.w3.org/TR/xmlschema-2/#numeric)
