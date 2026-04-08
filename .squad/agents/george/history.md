@@ -7,6 +7,10 @@
 
 ## Recent Updates
 
+### 2026-04-08 - Platform and entity research merged
+- Team update (2026-04-08T01:48:59Z): Scribe merged Frank/Peterman platform + entity research plus Shane's directive into .squad/decisions.md.
+- Shared outcome: future sample authoring should pressure both missing enterprise lifecycle shapes and upcoming entity/stateless lanes without flattening the domain model.
+
 ### 2026-04-08 - Sample realism guidance merged
 - Scribe merged George's sample-audit guidance into .squad/decisions.md alongside the team directive to use Opus when sample/design judgment is high.
 - The standing runtime-facing guidance is to keep realistic domains intact and use aspirational comments rather than flattening workflows to today's weakest primitives.

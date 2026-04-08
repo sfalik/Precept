@@ -8,6 +8,10 @@
 
 ## Recent Updates
 
+### 2026-04-08 - Platform and entity research merged
+- Team update (2026-04-08T01:48:59Z): Scribe merged the platform/entity research pass into .squad/decisions.md and cleared the supporting inbox notes.
+- Shared outcome: portfolio planning now needs explicit room for entity/stateless samples alongside workflow gaps, instead of treating data-only precepts as side-channel work.
+
 ### 2026-04-08 - Sample ceiling consolidation recorded
 - Team update (2026-04-08T01:13:25.793Z): Scribe merged Steinbrenner's portfolio-cap proposal with Frank's ceiling analysis/addendum and Peterman's benchmark findings into `.squad/decisions.md` — decided by Frank, Steinbrenner, and J. Peterman.
 - Shared outcome: the team now plans around ~30 near-term samples, treats the mid-30s as the credible canonical operating band, and keeps 42 as an upper bound rather than a default planning quota.

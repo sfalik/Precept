@@ -24,6 +24,42 @@ The README DSL hero remains an image-based branded treatment, but it must now be
 - Native README text/fenced code remains the only fully robust way to keep DSL text scaling in lockstep with surrounding prose across viewport and zoom changes.
 - GitHub page-geometry research still matters: the repo shell tops out around **1280px** and the README/article frame around **1012px**, but the displayed README image for this treatment clamps earlier at about **830px**.
 - Do not rely on custom CSS, sanitizer-sensitive HTML, or viewport-specific image swapping as a stable README contract.
+# Decision: Sample realism must cover workflows, entities, and stateless contracts
+
+**By:** Frank, J. Peterman, Shane (directive captured via Copilot)  
+**Date:** 2026-04-08  
+**Status:** Consolidated
+
+## What
+
+- Treat Precept sample and research work as covering **three archetypes**: workflow contracts, entity/stateless contracts, and hybrid contracts that mix lifecycle with dense field governance.
+- Preserve the newly verified **enterprise lifecycle gaps** as first-class roadmap pressure: authorization-gate, appeal-loop, containment-before-remediation, and amendment-loop shapes should appear in the next serious sample wave.
+- Reserve explicit room for **entity-centric/data-only samples** when proposal #22 lands: master data contracts, reference data definitions, and domain-rule contracts should occupy **4-6 in-repo slots** rather than being treated as optional extras.
+- Keep the enterprise benchmark tables and research-gap lists as **living planning references** so future sample additions are justified by domain fit, realism signals, and lifecycle-shape coverage instead of by quota.
+
+## Why
+
+- Frank's platform survey showed that the current sample set is missing recurring enterprise lifecycle shapes that appear across multiple major ecosystems.
+- Frank's entity-modeling addendum corrected the earlier workflow-only lens: real business domains also include reference data, master data, and other governed entities that future stateless precepts should cover.
+- Peterman's enterprise benchmark established the realism signals that make examples feel credible in public product narratives.
+- Peterman's entity-centric benchmark showed that strong stateless examples need enterprise-grade field semantics, cross-field rules, and inspectable invariants — not flat schema demos.
+- Shane explicitly directed the team to stop treating Precept as workflow-only and to cover business entities plus future data-only/stateless precepts in both research and samples.
+
+## Consolidated implications
+
+- **George:** future sample authoring should cover both missing workflow shapes and future entity/hybrid lanes without flattening domains to today's weakest primitives.
+- **Steinbrenner:** portfolio planning should reserve workflow and stateless/entity capacity together; data-only slots are additive evidence, not throwaway teaching extras.
+- **Frank + Peterman:** continue using external enterprise systems as the benchmark lens for both roadmap pressure and public sample credibility.
+
+## Artifacts
+
+- docs/research/sample-realism/frank-enterprise-platform-and-research-gaps.md
+- docs/research/sample-realism/peterman-enterprise-ecosystem-benchmarks.md
+- docs/research/sample-realism/frank-entity-modeling-addendum.md
+- docs/research/sample-realism/peterman-entity-centric-benchmarks.md
+
+---
+
 # Decision: Sample ceiling operating model (consolidated)
 
 **By:** Frank, Steinbrenner, J. Peterman  
@@ -336,7 +372,6 @@ Use the GitHub label dsl-compactness as the categorization tag for the current l
 
 ---
 
-
 ### Decision: Gold Brand Mark Exception
 
 **Date:** 2026-04-04
@@ -595,9 +630,6 @@ Two new <h3> blocks within the existing §2.2 card:
 **Full analysis:** rand/references/brand-spec-diagram-color-mapping-review-elaine.md
 
 ---
----
-
----
 
 # Team Knowledge Refresh — 2026-04-04 Findings
 *Filed by Scribe, 2026-04-04T06:08:06Z. Consolidated from 6 domain reviews.*
@@ -834,8 +866,6 @@ Three methods (`Hydrate`, `Dehydrate`, `CloneCollections`) invoked at three muta
 
 ---
 
----
-
 # Brand Research — Team Observations
 *Filed by J. Peterman, 2026-04-05. For team awareness.*
 
@@ -883,8 +913,6 @@ This should be treated as a blocking item for any launch-facing work.
 "Small caps is the typographic convention for defined terms, legal codes, and axioms — exactly what a precept is." This is a strong line that builds brand credibility with developers who notice intentionality. It currently lives only in internal brand files.
 
 **Recommendation:** Surface this reasoning in the README or a brief "About the design" section. Not a manifesto — two sentences. Developers who care about craft will notice it. Developers who don't will skip it.
-
----
 
 ---
 
@@ -983,8 +1011,6 @@ Should candidate I be promoted as the third shortlisted hero candidate alongside
 
 ---
 
----
-
 # Hero Domain Verdict — Subscription
 
 **Decision:** The Precept hero snippet domain is **Subscription**.
@@ -1013,8 +1039,6 @@ Should candidate I be promoted as the third shortlisted hero candidate alongside
 - **Loan:** Canonical 35-line sample already exists in `samples/loan-application.precept`. A 15-line version would be a worse imitation of existing work.
 - **Shipment:** Too many bootstrap fields (weight, carrier, address) to generate natural rules within the line budget.
 - **ServiceTicket:** Strong (5/5) but narrower projection target than Subscription — requires knowing your team uses a ticketing system.
-
----
 
 ---
 
@@ -1189,8 +1213,6 @@ Avoid: anything that requires 3+ fields to make the domain legible (kills the li
 
 ---
 
----
-
 # Steinbrenner — Lang Spec Review Decisions
 
 **Date:** 2026-04-04
@@ -1253,8 +1275,6 @@ Avoid: anything that requires 3+ fields to make the domain legible (kills the li
 **Rationale:** The runtime returns full `ConstraintViolation` objects. The webview still receives flat strings. Field-level inline highlighting in the inspector panel is blocked by this gap. Not urgent, but it's a visible UX deficit in the flagship developer surface.
 
 **Action:** Schedule as the next "Later" item to graduate to an active milestone after syntax highlighting and plugin distribution are done.
-
----
 
 ---
 
@@ -1366,8 +1386,6 @@ Trade-off: Catching contradictions at compile time is powerful and differentiati
 
 ---
 
----
-
 # Phase 1 Research Findings — Hero Research Sprint (2026-04-04T13:39:08Z)
 
 *Filed by Scribe; consolidated from 4 agents (J. Peterman, Steinbrenner, Uncle Leo, George)*
@@ -1423,8 +1441,6 @@ This section consolidates inbox items from Phase 1 research agents:
 **By:** shane (via Copilot)
 **What:** Research files should be stored according to domain ownership: Peterman's research (brand/copy) → rand/references/; Steinbrenner's research (PM/product/docs) → docs/references/. Each agent's research artifacts live under their domain root, not a shared location.
 **Why:** User request — captured for team memory
-
----
 
 ---
 
@@ -1507,8 +1523,6 @@ This decision record is the direct input for:
 
 ---
 
----
-
 # Palette Mapping Visual Unification
 
 **Filed by:** Elaine
@@ -1570,8 +1584,6 @@ Added ~70 lines of scoped CSS creating a "Surface Palette Mapping" design system
 ## Applicability
 
 The `.spm-*` system is intentionally general. When §2.3 (Inspector), §2.4 (Docs), or §2.5 (CLI) need detailed element-to-color mappings, the same components apply.
-
----
 
 ---
 
@@ -1883,8 +1895,6 @@ These are **constraints**, not suggestions. The proposal can refine the executio
 
 ---
 
----
-
 # Elaine — Reviewer Corrections Applied to Brand Spec
 
 **Date:** 2026-04-04  
@@ -1978,8 +1988,6 @@ All corrections applied to:
 
 **Signed:** Elaine  
 **Date:** 2026-04-04
-
----
 
 ---
 
@@ -2087,8 +2095,6 @@ The brand marks were using a color outside this system. The replacements bring t
 
 ---
 
----
-
 # Decision: brand-spec §1.4 Palette Structure Refactor
 
 **Filed by:** Frank (Lead/Architect)
@@ -2126,8 +2132,6 @@ J. Peterman (brand-spec maintainer) with Elaine review.
 ## Status
 
 PENDING — awaiting Shane sign-off.
-
----
 
 ---
 
@@ -2336,8 +2340,6 @@ Per charter, this qualifies as a non-design-gated fix because it's a small proto
 
 ---
 
----
-
 # Runtime Review: README Restructure Proposal — Three Required Changes
 
 **Filed by:** George (Runtime Dev)  
@@ -2527,8 +2529,6 @@ The brand and UX design principles in Elaine's spec are sound — the color syst
 
 ---
 
----
-
 # Brand-Spec Color Information Architecture — Implementation Complete
 
 **Author:** J. Peterman
@@ -2619,8 +2619,6 @@ Key things to review:
 
 ---
 
----
-
 # Decision: Brand-Spec § 1.4 Palette Structure Reorganization
 **Filed by:** J. Peterman  
 **Date:** 2026-04-06  
@@ -2667,8 +2665,6 @@ Three issues:
 
 ---
 
----
-
 # J. Peterman — Final Brand-Spec Cleanup Pass
 
 **Date:** 2026-04-04  
@@ -2697,8 +2693,6 @@ Treat the §1.4 palette card as the color source of truth and normalize all rema
 ## Remaining blocker
 
 One item still requires Shane sign-off before the brand spec can be considered fully closed: the current-state indicator treatment in `brand/brand-spec.html` §2.2.
-
----
 
 ---
 
@@ -2746,8 +2740,6 @@ All 16 constraints from Elaine's UX/IA review are documented as non-negotiables 
 
 ---
 
----
-
 # Decision: README Badge Cleanup + Sample Catalog Count
 
 **Author:** Kramer  
@@ -2783,8 +2775,6 @@ The NuGet badge (`https://img.shields.io/nuget/v/Precept` → `https://www.nuget
 
 ## No Numeric Catalog/Constructs Count Claim Found
 Searched README for claims about number of DSL constructs, catalog items, or language features. No such claim exists.
-
----
 
 ---
 
@@ -2875,8 +2865,6 @@ The two-surfaces card adapted from `brand/explorations/visual-language-explorati
 
 ---
 
----
-
 # Decision: Replace README Hero with TimeMachine
 
 **Date:** 2026-07-11  
@@ -2922,8 +2910,6 @@ This is the correct register for a hero example.
 
 ---
 
----
-
 # Decision: Indigo Overview Card Format in § 1.4
 
 **Date:** 2026-05-01  
@@ -2965,8 +2951,6 @@ The exploration card format (width: 320px, dark #141414 background, context-bloc
 - Added a `pc-` CSS class prefix family to brand-spec.html's `<style>` block. The existing `.palette-card` class in brand-spec serves the palette swatch grid (a different context) and could not be repurposed.
 - The `pc-context-block h3` override resets brand-spec.html's global `h3` styles (uppercase + border-bottom) to match the exploration card's style.
 - All surrounding § 1.4 content preserved: heading, both callouts, and the structural/state/event/data/rules/comments/verdicts cards below.
-
----
 
 ---
 
@@ -3025,8 +3009,6 @@ The in-context examples (badge, syntax, diagram) demonstrate the palette in the 
 ## Closing line
 
 *"Depth and authority. Selected over teal, amber, and steel. The only brand color that reads as both technical precision and earned trust."*
-
----
 
 ---
 
@@ -3093,8 +3075,6 @@ Compare: "Say goodbye to bugs forever!" (performative) vs. "If you've been writi
 
 ---
 
----
-
 # Decision: README Restructure Proposal — Editorial Review Complete
 
 **Date:** 2026-04-06  
@@ -3132,8 +3112,6 @@ Overall structure, section order, CTA hierarchy (Primary/Secondary/Tertiary), du
 ## Status
 
 Blocked on RC-1 and RC-2. Frank's four required changes are separate and not duplicated here. George's technical accuracy review is ongoing.
-
----
 
 ---
 
@@ -3521,8 +3499,6 @@ Claude Sonnet 4.6 remains the default model for design and polish work. However,
 
 ---
 
----
-
 # Brand Mark Icons: Spec Alignment
 
 **Author:** Elaine (UX Designer)
@@ -3551,8 +3527,6 @@ Icons are abstractions, but they still speak the spec's locked visual language. 
 ## Pattern established
 
 **Brand mark icons inherit their parent surface's semantic rules.** If a brand mark depicts a state diagram, it uses §2.2 diagram colors and shapes. If it depicts a code page, it uses §2.1 syntax colors. The icons don't get to invent their own palette — they are small-scale renderings of the locked system.
-
----
 
 ---
 
@@ -3586,8 +3560,6 @@ Gold already carries this meaning in syntax highlighting: every `because` and `r
 
 - `brand/brand-spec.html` — SVG updated, color key updated, prose updated in §1.3, §1.4 intro, §1.4.1, and the Rules · Gold surface section
 - `.squad/skills/color-roles/SKILL.md` — Rule 2 and the Gold row updated to reflect this exception
-
----
 
 ---
 
@@ -3628,8 +3600,6 @@ The brand mark color key now shows Emerald as a fifth entry (Transition #34D399)
 - Emerald is not a second structural lane — it only appears on the transition arrow (one element per mark)
 - Gold does not appear on the state-only mark (no `because` line there; nothing to represent)
 - State shapes and Indigo/Violet structure unchanged
-
----
 
 ---
 
@@ -3739,13 +3709,11 @@ Elaine owns the formatting of the Contributing section:
 
 ---
 
----
-
 # Decision: Elaine's Gate Role in README Rewrite Flow
 
 **Date:** 2026-04-07  
 **By:** Elaine (UX Designer)  
-**Status:** Recommendation — pending Shane acknowledgment  
+**Status:** Recommendation — pending Shane acknowledgment
 
 ---
 
@@ -3812,8 +3780,6 @@ Elaine's constraints were treated as hard non-negotiables in the proposal precis
 
 ---
 
----
-
 # Decision: README Form/Shape Pass
 
 **Author:** Elaine (UX)  
@@ -3846,8 +3812,6 @@ The previous draft had good content but felt dense. Each section competed for at
 - Section order
 - The brand mark (kept current state per task brief)
 - Hero domain (Order) — marked as temporary but acceptable
-
----
 
 ---
 
@@ -3946,8 +3910,6 @@ Both paths are valid. The scaffold path prevents one class of hero-related rewor
 
 ---
 
----
-
 # Decision: Gold — Judicious Use, Tablet Mark Inclusion, Emerald Transition Arrows
 
 **Date:** 2026-04-07  
@@ -3980,8 +3942,6 @@ Emerald on transition arrows is semantically correct: Emerald means "allowed, do
 
 - `brand/brand-spec.html` — tablet SVG, combined mark, §2.2 SVG diagram, §2.2 color mapping, §1.4 palette card, §1.4.1 cross-surface table, §2.1 Rules · Gold description, brand paragraph, color key
 - `.squad/skills/color-roles/SKILL.md` — (already updated in prior session; confirmed current)
-
----
 
 ---
 
@@ -4032,8 +3992,6 @@ Until the usability review says otherwise, the current README Order example is t
 1. Merge this into `decisions.md` after review.
 2. Use §2.6 as the source when updating README-adjacent marketplace copy.
 3. Revisit only if usability testing or language/API changes force a new hero.
-
----
 
 ---
 
@@ -4126,14 +4084,12 @@ All required changes from Frank, George, and Uncle Leo are incorporated into the
 
 ---
 
----
-
 # Decision: README Restructure Proposal — Shane Feedback Revision
 
 **Author:** J. Peterman  
 **Date:** 2026-04-07  
 **Source:** Shane's feedback pass on `brand/references/readme-restructure-proposal.md`  
-**Status:** Inbox — awaiting Shane sign-off  
+**Status:** Inbox — awaiting Shane sign-off
 
 ---
 
@@ -4240,12 +4196,10 @@ All required changes from Frank, George, and Uncle Leo are incorporated into the
 
 ---
 
----
 date: 2026-04-08T00:00:00Z
 author: j-peterman
 status: ready_for_shane
 phase: readme_copy_refinement
----
 
 ---
 
@@ -4296,8 +4250,6 @@ Ready for Shane sign-off. README is near-signoff state: structure locked by Elai
 
 ---
 
----
-
 # Decision: README Proposal Review Gap Pass — All Required Changes Applied
 
 **Author:** J. Peterman  
@@ -4344,13 +4296,11 @@ The proposal is ready for Shane's sign-off. The rewrite can begin.
 
 ---
 
----
-
 # Decision: README Restructure Trim Summary Added to Proposal
 
 **Filed by:** J. Peterman  
 **Date:** 2026-04-06  
-**Status:** Proposed — pending Shane review  
+**Status:** Proposed — pending Shane review
 
 ---
 
@@ -4380,8 +4330,6 @@ A fifth category — **Net-New Content** — captures additions the restructure 
 ## Team Impact
 
 The trim summary is a reference artifact for whoever executes the rewrite. It functions as a checklist: if any item in the "Removed Entirely" list appears in the rewritten README, something went wrong. If any item in "Deferred to External Docs" appears as embedded content (not a link), that is also a regression.
-
----
 
 ---
 
@@ -4472,8 +4420,6 @@ This is not a ruling against Elaine's involvement. Elaine's structural requireme
 
 ---
 
----
-
 # Decision: Signal Color Family Names
 
 **Date:** 2026-04-07
@@ -4497,8 +4443,6 @@ Updated `brand/brand-spec.html` to use the family names (Emerald, Amber, Rose) c
 ## Implication for team
 
 All future references to these colors — in docs, copy, surface specs, and team communications — should use **Emerald**, **Amber**, and **Rose**. Plain "green/yellow/red" is now retired from brand vocabulary.
-
----
 
 ---
 
@@ -4545,8 +4489,6 @@ Both `spm-header` (CSS class, `padding: 18px 24px`) and `spm-grid` (inline `styl
 ## Applies To
 
 Any future `spm-*` sections (§2.3 Inspector, §2.4 Docs Site, §2.5 CLI/Terminal) must follow this rule when adding new `spm-header` or `spm-grid` blocks inside `spm-group`.
-
----
 
 ---
 
@@ -4651,22 +4593,19 @@ A rewriter working from this proposal needs one thing: the hero sample. Everythi
 **What:** Use the top-rated hero snippet from the visual-language exploration as the temporary live hero until the final hero question is settled later.
 **Why:** User request — captured for team memory
 
-
----
-
 ---
 
 # Decision Inbox Merge — 2026-04-05T02:00:30Z
 
 **Merged by:** Scribe  
 **Source:** .squad/decisions/inbox/
+
 ---
 
 ### 2026-04-04T23:22:00Z: User directive
 **By:** shane (via Copilot)
 **What:** For the README hero snippet, visual impact matters more than copyability; it is a hero artifact, not a practical code sample.
 **Why:** User request — captured for team memory
-
 
 ---
 
@@ -4675,14 +4614,12 @@ A rewriter working from this proposal needs one thing: the hero sample. Everythi
 **What:** Do not show a raw Precept code block in the README hero; use the SVG route for the hero treatment instead.
 **Why:** User request — captured for team memory
 
-
 ---
 
 ### 2026-04-05T01:10:02Z: User directive
 **By:** shane (via Copilot)
 **What:** Also include Frank as the architect on the SVG hero effort.
 **Why:** User request — captured for team memory
-
 
 ---
 
@@ -4691,7 +4628,6 @@ A rewriter working from this proposal needs one thing: the hero sample. Everythi
 **What:** Frank should lead on architecture for the SVG hero effort.
 **Why:** User request — captured for team memory
 
-
 ---
 
 ### 2026-04-05T01:15:32Z: User directive
@@ -4699,16 +4635,12 @@ A rewriter working from this proposal needs one thing: the hero sample. Everythi
 **What:** Do not use Haiku. Use non-Haiku models for squad work.
 **Why:** User request — captured for team memory
 
-
 ---
 
 ### 2026-04-05T01:25:49Z: User directive
 **By:** shane (via Copilot)
 **What:** Always use the latest version of models; do not route work to older model versions like gpt-4.1 by default.
 **Why:** User request — captured for team memory
-
-
----
 
 ---
 
@@ -4814,7 +4746,9 @@ GitHub renders SVGs server-side with limited font availability. The design degra
 
 # Precept
 badges + definition + tagline
+
 ---
+
 ## Quick Example  ← hero area (raw code blocks)
 ```
 
@@ -4825,9 +4759,13 @@ badges + definition + tagline
 
 # Precept
 badges + definition + tagline
+
 ---
+
 ![Precept — Subscription lifecycle](brand/readme-hero.svg)
+
 ---
+
 ## Quick Example  ← raw code blocks preserved below hero
 ```
 
@@ -4899,9 +4837,6 @@ Once these are settled, the SVG can be refined without reopening narrative strat
 4. README wiring: insert SVG, remove "temporary" note, verify Quick Example still works
 5. Brand-spec §2.6 update to reflect the new hero treatment
 6. Shane final sign-off on the implemented README
-
-
----
 
 ---
 
@@ -5127,7 +5062,6 @@ It has the highest signal-to-chrome ratio. Three nodes, two arrows, one blocked 
 2. **Rejection message wording.** The current DSL uses `"Cancelled subscriptions cannot be reactivated"`. This is good — clear, direct, slightly formal. If we want more warmth for the hero moment, options include keeping it exactly as-is (recommended — the formality IS the humor) or adjusting slightly.
 3. **"precept Subscription" label.** Should the top-left context label be present? It hints at the DSL without showing raw code. Alternative: omit it and let the diagram stand alone.
 
-
 ---
 
 ### SVG Hero Architecture Proposal — Issue #4
@@ -5308,9 +5242,6 @@ This is already stated in issue #4 ("current live concept can remain Subscriptio
 | Design iteration takes multiple rounds | Medium | Expected. The handoff sequence (§3) has clear gates. Each round is scoped: Elaine owns visual, Peterman owns brand, Frank owns GitHub constraints. |
 | Subscription Billing domain changes before SVG ships | Low | Issue #4 explicitly locks it. If it changes, the SVG is replaced — the architecture (file path, wiring, `<picture>` pattern) is domain-agnostic. |
 
-
----
-
 ---
 
 # J. Peterman — Brand/DevRel proposal pass for issue #4
@@ -5361,14 +5292,10 @@ That is the real decision gate. Once those are approved, SVG execution becomes c
 
 ---
 
----
-
 # Decision Inbox Merge — 2026-04-05T02:32:19Z
 
 **Merged by:** Scribe  
 **Source:** .squad/decisions/inbox/
-
----
 
 ---
 
@@ -5382,15 +5309,10 @@ That is the real decision gate. Once those are approved, SVG execution becomes c
 
 ---
 
----
-
 # README link removal
 
 - Removed the contract artifact links from `README.md` and kept the inline DSL block as the single quick-example reading path.
 - Left the standalone files in place, but stopped advertising them in the README so the hero section reads cleanly without sending readers away.
-
-
----
 
 ---
 
@@ -5401,8 +5323,6 @@ That is the real decision gate. Once those are approved, SVG execution becomes c
 **Summary:** Team safe recommendation = freeze-and-curate cutover. Frank's force-promote recommendation remains logged as a dissenting architectural view and is currently blocked by reviewer rejection.
 **Merged:** 4
 **Skipped as duplicates:** 0
-
----
 
 ---
 
@@ -5581,8 +5501,6 @@ The only scenario where curated re-landing makes sense is when the feature branc
 
 ---
 
----
-
 # Decision: Safe Return to Trunk from `feature/language-redesign`
 
 **Date:** 2026-04-05
@@ -5696,8 +5614,6 @@ We are back on trunk and finalized on the current strategy when all of the follo
 
 ---
 
----
-
 # Uncle Leo - Consolidation Safety Review
 
 **Date:** 2026-04-05
@@ -5793,8 +5709,6 @@ Rejected because the trunk history would inherit exploratory/squad/checkpoint no
 ## Bottom line
 
 This branch can be the source of truth for a landing, but **not by direct merge and not by floating-ref force push**. Freeze the SHA, curate the landing, and treat trunk touch as a repository cutover with explicit artifact review gates.
-
----
 
 ---
 
@@ -6557,8 +6471,6 @@ If we want a fast first pass on language value vs. implementation cost, the clea
 4. #11 Event absorb shorthand
 5. #12 Inline `else reject`
 6. #13 Field-level basic constraints (caveated)
-
----
 
 ---
 

@@ -16,6 +16,10 @@
 - User directive honored: branch retained locally and remotely per user request (NOT deleted post-merge).
 - Verified zero scope creep: 81 additions, 3 files changed (README.md, .squad/decisions.md, .squad/agents/j-peterman/history.md), no unrelated code changes.
 - Co-authored-by trailer included in original commits.
+### 2026-04-08 - Platform and entity research consolidated
+- Team update (2026-04-08T01:48:59Z): Scribe logged Frank's enterprise-platform and entity-modeling research, merged the shared decision into .squad/decisions.md, and cleared the related inbox notes.
+- Shared outcome: sample planning now treats workflow, entity/stateless, and hybrid contracts as co-equal research lanes while preserving the four missing enterprise lifecycle shapes as near-term roadmap pressure.
+
 ### 2026-05-19 - Entity modeling addendum: correcting workflow-heavy framing
 - Produced docs/research/sample-realism/frank-entity-modeling-addendum.md.
 - Corrected the sample-realism research framing from workflow-only to entity-inclusive, per Shane's directive that Precept is for modeling business entities, not just workflow.
