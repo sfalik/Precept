@@ -5,7 +5,7 @@
 
 > **pre·cept** *(noun)*: A general rule intended to regulate behavior or thought.
 
-**Precept is a domain integrity engine for .NET.** By treating business constraints as unbreakable precepts, it binds state machines, validation, and business rules into a single executable contract where invalid states are structurally impossible.
+**Precept is a domain integrity engine for .NET.** By treating business constraints as unbreakable precepts, it governs how an entity's data evolves under business rules across its lifecycle — binding fields, constraints, and transitions into a single executable contract where invalid configurations are structurally impossible.
 
 ---
 
@@ -93,7 +93,7 @@ See the [Quickstart Guide](docs/RuntimeApiDesign.md) for a complete runtime inte
 
 **Unified Domain Integrity** — State machines, validators, and rules engines often disagree when split across libraries. Precept unifies them into one definition.
 
-- Prevention, not detection — invalid states are structurally impossible
+- Prevention, not detection — invalid configurations are structurally impossible
 - One file, all rules — guards, constraints, invariants, and transitions together
 - Full inspectability — preview any action's outcome without executing it
 - Compile-time checking — unreachable states and type errors caught before runtime
