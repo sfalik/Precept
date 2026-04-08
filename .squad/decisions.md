@@ -6,6 +6,27 @@
 
 ---
 
+### 2026-05-18T00:25:00Z: README DSL Hero Image Width Contract
+**By:** Elaine (UX), Kramer (Tooling), with Frank's sizing analysis preserved  
+**Status:** Applied  
+
+The README DSL hero remains an image-based branded treatment, but it must now be sized against GitHub's actual repo-view image ceiling instead of the wider article frame.
+
+**Decision:**
+- Keep the README DSL hero as an image for now
+- Regenerate/capture it at **1660px** source width from an **830px** viewport at **2×** device scale
+- Treat **830px** as the effective GitHub repo README image display cap for this asset
+- Tune the rendered code text for about **13px** apparent size at display
+- Spend any extra composition room on whitespace rather than on additional contract width
+- Preserve `design/brand/capture-hero-dsl.mjs` as the repeatable regeneration path
+
+**Tradeoffs and retained learning:**
+- Native README text/fenced code remains the only fully robust way to keep DSL text scaling in lockstep with surrounding prose across viewport and zoom changes.
+- GitHub page-geometry research still matters: the repo shell tops out around **1280px** and the README/article frame around **1012px**, but the displayed README image for this treatment clamps earlier at about **830px**.
+- Do not rely on custom CSS, sanitizer-sensitive HTML, or viewport-specific image swapping as a stable README contract.
+
+---
+
 ### 2026-04-07T23:30:44Z: README Contract Image & DSL Copyable Block Cleanup
 **By:** J. Peterman (Brand/DevRel)  
 **Status:** Decided  

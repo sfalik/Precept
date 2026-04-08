@@ -33,3 +33,15 @@
 - Current approach (```precept fence) is already optimal: truthful, future-proof, follows DSL industry practice.
 - Key learning: for custom DSLs, using the language name in code fences is standard practice even without Linguist support. Provides documentation value and future-proofs for potential Linguist addition. Alternative approaches (mislabeling as similar language, using no tag) provide no real improvement and introduce misleading claims.
 - Decision documented in .squad/decisions/inbox/kramer-readme-syntax-highlighting.md
+
+### 2026-05-18 - GitHub README width contract clarified
+- Split README sizing research into two separate ceilings: the broader repo/article layout (`~1280px` shell, `~1012px` article) and the actual repo-view README image display cap (`~830px`) that governs the DSL hero asset.
+- Recorded the reusable audit workflow at `.squad/skills/github-readme-width-audit/SKILL.md` and preserved the merged sizing outcome in `.squad/decisions.md`.
+- Key learning: for README hero images, composition guidance and final image-display limits are different measurements; size the shipped asset to the image cap, not the wider article container.
+
+## Learnings
+
+- GitHub README rendering gives reliable control over image assets, not over text-inside-image scaling relative to surrounding prose. If size parity with nearby copy matters, real Markdown text or fenced code is the only robust answer.
+- For image-based README treatments, external SVG rendered through `<img>` with an explicit width is the strongest compromise; PNG plus `<img width>` can be tuned, but it remains more fragile across mobile, zoom, and density changes.
+- GitHub officially supports `<picture>` for light/dark asset swaps, but viewport-specific mobile/desktop swapping and custom CSS/media-query tricks are not a dependable README strategy.
+- Live GitHub repo pages clamp the overall content frame before ultra-wide browsers run out of space: the repo page tops out around a 1280px shell, and the rendered README/article column tops out around 1012px. For README hero images, optimize the meaningful artwork for roughly 880-920 displayed pixels and spend any extra width on whitespace instead of extra content columns.
