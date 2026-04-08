@@ -320,10 +320,18 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, "\\bbecause\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return [SnippetItem("because reason", "because \"${1:Reason}\"", "Constraint reason")];
 
-        // After "in State edit " → suggest field names
+        // After root "edit " → suggest 'all' + field names (stateless precept root-level editability)
+        if (Regex.IsMatch(beforeCursor, "^\\s*edit\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+            return DistinctAndSort(
+                new CompletionItem[] { new() { Label = "all", Kind = CompletionItemKind.Keyword } }
+                    .Concat(BuildItems(dataFields, CompletionItemKind.Field))
+                    .Concat(BuildItems(collectionFields, CompletionItemKind.Field)));
+
+        // After "in State edit " → suggest 'all' + field names (in any edit all / in State edit Fields)
         if (Regex.IsMatch(beforeCursor, "^\\s*in\\s+[^\\n]*\\s+edit\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return DistinctAndSort(
-                BuildItems(dataFields, CompletionItemKind.Field)
+                new CompletionItem[] { new() { Label = "all", Kind = CompletionItemKind.Keyword } }
+                    .Concat(BuildItems(dataFields, CompletionItemKind.Field))
                     .Concat(BuildItems(collectionFields, CompletionItemKind.Field)));
 
         // After "event Name with Arg as Type [nullable] [default Value] " → suggest delimiter / modifiers
