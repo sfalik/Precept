@@ -3,6 +3,10 @@
     "precept": {
       "command": "node",
       "args": ["tools/scripts/start-precept-mcp.js"]
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/"
     }
   }
 }
