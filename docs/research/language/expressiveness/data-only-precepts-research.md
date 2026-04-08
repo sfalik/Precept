@@ -73,6 +73,41 @@ A domain modeling language that only supports entities forces value objects into
 
 **Decision:** No stateless preview rendering in current panel. Deferred to the full preview panel redesign.
 
+### Event-State Boundary: Warning, Not Error
+
+**Decision:** Events declared in a stateless precept trigger a **warning** (not a compile error). C50 (dead-end state) severity upgraded from hint to warning for consistency.
+
+**Background:** The original proposal framed "states, events, and transitions forbidden in stateless precepts" as a single compile-error rule. Shane's review (April 8, 2026) identified three problems:
+
+1. **States forbidden** — tautological. Adding a state makes it stateful by definition. Not a prohibition.
+2. **Transitions forbidden** — structurally impossible. C54 (undefined state reference) already catches this.
+3. **Events forbidden** — the only real design decision. Events parse fine without states (parser has zero state dependencies for event declarations), so this requires a deliberate type-checker rule.
+
+**Why warning over error:** The single-state escape hatch (`state Active initial` + events + `no transition`) produces a structurally parallel pattern — events that dispatch but never change state. C50 flagged this as a hint. Shane's consistency argument: if single-state+events+no-transitions gets a hint, zero-states+events should not get a hard error — the severity should match for structurally parallel diagnostics.
+
+Frank argued the scenarios differ at the API level (`Fire()` requires `currentState` — with zero states events are unaddressable, with one state events fire and mutate fields). Shane heard the argument and made a different call: consistency wins. Both upgraded to warning.
+
+**Severity alignment:** "Events that dispatch to nowhere" is structurally closer to C49 (orphaned event — warning) than to C53 (empty precept — hint). C50-as-hint was too lenient — upgraded to warning as a correction.
+
+**No sample impact:** Verified that no canonical sample triggers C50.
+
+### Stateless Event Boundary: Binary Taxonomy
+
+**Decision:** Precept has two entity tiers — **data** (fields + invariants + editability) and **behavioral** (fields + invariants + states + events + transitions). No middle tier.
+
+**Why no "data + commands" middle tier:**
+
+| Problem | Impact |
+|---------|--------|
+| Syntax: What replaces `from State on Event`? | New statement form — parallel dispatch path, not simplification |
+| Vocabulary: `on Event assert` guards movement truth — what does it guard without transitions? | Data-truth/movement-truth vocabulary breaks down |
+| Grammar: Every transition feature needs "stateless-with-events?" branching | Maintenance surface doubles |
+| Inspect: All events shown as always-available from no state | Semantically empty noise |
+
+**Precedent confirming the binary:** Terraform data sources can't have lifecycle hooks. DDD value objects don't process commands. SQL tables with CHECK constraints don't have inline triggers. No surveyed system provides "data entity with named commands but no lifecycle."
+
+**The single-state pattern is legitimate, not ceremonial:** `state Active initial` communicates a true fact — "single behavioral mode." Events fire, actions execute, fields mutate. The entity *does something*. One line of honest structural declaration for the behavioral tier.
+
 ## Dead Ends Explored
 
 ### "Close #22 — Out of Scope"

@@ -6,6 +6,32 @@
 
 ---
 
+### 2026-04-08: Issue #22 semantic rules rewrite — warning model and binary taxonomy
+**By:** Shane (owner decision), with Frank (research/analysis) and George (runtime evidence)
+**Status:** Decided
+
+Issue #22's "States, events, and transitions forbidden in stateless precepts" semantic rule was decomposed and rewritten:
+
+1. **"States forbidden" dropped** — tautological. The absence of states IS what makes a precept stateless; it's definitional, not prohibitive.
+2. **"Transitions forbidden" dropped** — structurally impossible. C54 already rejects transition rows referencing undeclared states.
+3. **Events-without-states = warning, not error.** Events declared but without any routing surface (states) can never fire. Severity set to warning for consistency with C49 (orphaned event).
+4. **C50 upgraded from hint to warning.** A non-terminal state where all outgoing rows dead-end (reject or no-transition) is "probably wrong," not just "FYI." Hint was too lenient. Consistency with C49 and the events-without-states warning.
+5. **Binary taxonomy confirmed:** data tier (fields/invariants/editability) or behavioral tier (fields/invariants/states/events/transitions). No middle tier. The "middle tier" (data + events, no states) is a category error.
+
+**Research base:** `.squad/decisions/inbox/frank-stateless-event-boundary.md` (deep analysis), `.squad/decisions/inbox/frank-warning-model-research.md` (diagnostic infrastructure audit + external precedent), `.squad/decisions/inbox/frank-issue22-semantic-rule-rewrite.md` (decomposition recommendation).
+
+---
+
+### 2026-04-08: No temporary local files for GitHub issue editing
+**By:** Shane (owner directive)
+**Status:** Standing policy
+
+When composing or editing GitHub issue bodies, use the GitHub API directly (MCP tools or `gh` CLI). Do not create temporary local markdown files as intermediate drafts — they create confusion, clutter the workspace, and drift from the actual issue content. Compose the content in memory and post it in one step.
+
+This applies to all agents. The decisions inbox (`.squad/decisions/inbox/`) is for team decisions, not for staging issue text.
+
+---
+
 ### 2026-04-08T18:53:22Z: Broadened target model for computed-field rule violations
 **By:** Scribe, recording review consensus from Shane
 **Status:** Captured
