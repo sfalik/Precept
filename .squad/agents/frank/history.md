@@ -53,6 +53,15 @@
 
 ## Learnings
 
+### 2026-05-18 - Philosophy draft terminology correction
+- Corrected `design/brand/research/philosophy-draft-v2.md` to use actual DSL construct names in concept lists: fields, states, events, invariants, and assertions. `guard` remains acceptable only as informal prose or as the inline `when` condition concept, not as a top-level declared construct.
+- Adjusted the draft's opening construct list and Peterman note so fields and states are framed as peer authoring tools rather than a required-vs-optional hierarchy. This keeps the philosophy aligned with the intended stateless-precept direction from Issue #22 without overstating current parser constraints.
+
+### 2026-04-08 - Philosophy location canonicalized
+- Philosophy canonical location: `docs/philosophy.md` (not `design/brand/`)
+- `design/brand/philosophy.md` is now a redirect pointer
+- The old icon-specific sections were stripped in earlier edits
+
 ### 2026-05-18 - README hero sizing PR closeout
 - Merged PR #36 (`chore: finalize README hero DSL sizing contract`) from `chore/upgrade-squad-latest` into `main` with a merge commit, preserving the branch per Shane's standing directive to keep it open for follow-on work.
 - Final README hero DSL tuning is now anchored to GitHub's 830px repo-view image ceiling; the durable regeneration contract lives in `design/brand/readme-hero-dsl.html` and `design/brand/capture-hero-dsl.mjs`, with the rendered artifact at `design/brand/readme-hero-dsl.png`.

@@ -13,7 +13,7 @@ Precept is a domain integrity engine for .NET — a DSL runtime that binds an en
 | Copilot plugin | `tools/Precept.Plugin/` | Agent definition + 2 skills + MCP launcher |
 | Sample files | `samples/` | 20 `.precept` files — canonical DSL usage examples |
 
-Key design docs: `docs/PreceptLanguageDesign.md` (DSL semantics), `docs/RuntimeApiDesign.md` (C# API), `docs/McpServerDesign.md` (MCP tool specs), `docs/CatalogInfrastructureDesign.md` (metadata registries). See `docs/` for the full set.
+Key design docs: `docs/philosophy.md` (product philosophy), `docs/PreceptLanguageDesign.md` (DSL semantics), `docs/RuntimeApiDesign.md` (C# API), `docs/McpServerDesign.md` (MCP tool specs), `docs/CatalogInfrastructureDesign.md` (metadata registries). See `docs/` for the full set.
 
 ## Build & Test
 
@@ -78,8 +78,8 @@ When making any code, interface, test, or behavior change, keep documentation in
 ### Source of Truth
 
 - `README.md` — public project narrative and usage guide. Must track real implementation: update API names, behavioral semantics, examples, and feature claims on every meaningful change. Never leave aspirational claims as if implemented.
-- `docs/` — canonical technical design decision records, architecture notes, implementation plans, and research.
-- `design/brand/` — canonical source for brand identity, philosophy, brand spec, and brand-level semantic meaning.
+- `docs/` — canonical technical design decision records, architecture notes, implementation plans, research, and project philosophy.
+- `design/brand/` — canonical source for brand identity, brand spec, and brand-level semantic meaning.
 - `design/system/` — canonical source for reusable product-facing visual-system guidance and surface specs.
 - Legacy files (`README-legacy.md`, `docs/DesignNotes-legacy.md`) — archived, do not update.
 
@@ -89,7 +89,7 @@ Keep updates focused and factual. If uncertain whether a claim is implemented, v
 
 - Use `design/brand/` for identity and brand meaning.
 - Use `design/system/` for reusable visual-system rules and surface specs.
-- Use `docs/` for explanatory and technical documentation.
+- Use `docs/` for project philosophy, explanatory documentation, and technical documentation.
 - Durable design prototypes belong in `design/prototypes/`.
 - Hot, code-near prototypes may temporarily live near their owning tool surface, but should be promoted into `design/prototypes/` once they become durable design references.
 
