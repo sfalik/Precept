@@ -1,6 +1,6 @@
 # Sample Realism Research
 
-This directory contains twelve research artifacts produced across the sample-realism initiative. They range from external benchmarks and architectural philosophy to audits and concrete portfolio plans. This README classifies what's here, marks which conclusions belong to sample design versus broader product philosophy, and tells future contributors where to put new work.
+This directory contains sixteen research artifacts produced across the sample-realism initiative. They range from external benchmarks and architectural philosophy to audits and concrete portfolio plans. This README classifies what's here, marks which conclusions belong to sample design versus broader product philosophy, and tells future contributors where to put new work.
 
 ---
 
@@ -14,6 +14,8 @@ Actionable plans for corpus size, shape, phasing, and curation economics.
 |----------|--------|---------|
 | `steinbrenner-sample-portfolio-plan.md` | Steinbrenner (PM) | 42-sample target with domain-lane distribution, difficulty tiers, and phased rollout sequence. The operational blueprint. |
 | `steinbrenner-sample-ceiling-plan.md` | Steinbrenner (PM) | Ceiling discipline: 30–36 operating range, 42 hard cap, core canon of 12–14 flagships plus an extended set. Curation economics over count inflation. |
+| `steinbrenner-state-graph-taxonomy-planning.md` | Steinbrenner (PM) | Two-axis taxonomy for workflow, hybrid, and stateless/entity sample planning; converts realism research into lane priorities, rewrite order, and sequencing. |
+| `steinbrenner-eam-maintenance-sample-planning.md` | Steinbrenner (PM) | Places EAM / maintenance across W3, W4, H1, and future E1/E2/E3 lanes; recommends work-order-first sequencing plus asset/failure-code/PM companions. |
 
 ### Realism Criteria & Sample-Design Guidance — How to Evaluate and Write Samples
 
@@ -44,6 +46,16 @@ Primary research grounding sample decisions in external evidence. These are refe
 | `peterman-sample-corpus-benchmarks.md` | J. Peterman | Corpus-size benchmarks from Temporal (75), XState (49), Dagster (36), AWS patterns, Mermaid, and JSON Schema. Finding: mid-30s is normal; 50+ needs infrastructure; tiering is universal past ~40. |
 | `peterman-enterprise-ecosystem-benchmarks.md` | J. Peterman | Deep enterprise platform analysis (Salesforce, ServiceNow, Pega, Appian, Camunda, IBM, Guidewire, Temporal + 10 supplementary sources). Extracts five realism signals and twelve prioritized research lanes. |
 | `peterman-entity-centric-benchmarks.md` | J. Peterman | Entity-modeling ecosystem benchmarks (15 systems: Salesforce, SAP MDG, JSON Schema, Zod, FluentValidation, Pydantic, Drools, NRules, XState, Terraform, OpenAPI, DDD, ERP). Grounds the data-only sample lane in external evidence. |
+| `peterman-additional-sample-research.md` | J. Peterman | Closes the remaining external-facing lanes: public process corpora, regulatory/compliance obligations, and serious entity/reference-data standards. Recommends paired workflow + entity/reference-data sample bundles. |
+| `peterman-eam-maintenance-benchmarks.md` | J. Peterman | Deep EAM / maintenance / APM domain research. Benchmarks 5 EAM platforms (SAP PM, IBM Maximo, Bentley AssetWise, Infor EAM, cloud CMMS) and 5 standards (ISO 14224, ISO 55000, MIMOSA, API 510/570/580/581, OSHA LOTO). Identifies 6 sample candidates across workflow, hybrid, and entity archetypes. Scores EAM as Tier 1 domain (24/25). |
+
+### Structural Analysis — Graph Shapes and Domain-Depth Evidence
+
+Research that formalizes the structural vocabulary for lifecycle graph shapes and provides domain-specific depth evidence.
+
+| Document | Author | Summary |
+|----------|--------|---------|
+| `frank-state-graph-taxonomy-and-insurance-realism.md` | Frank (Architect) | Nine-shape lifecycle graph taxonomy (L, B, D, SL, ML, AG, AL, EL, CP), current corpus mapping showing four missing enterprise shapes, ACORD/Guidewire insurance field-per-state editability evidence, and insurance-depth mandate for three-sample domain suite. |
 
 ---
 
@@ -58,13 +70,14 @@ Primary research grounding sample decisions in external evidence. These are refe
 | "This enterprise platform models lifecycles this way" | `docs/research/sample-realism/` | Platform surveys |
 | "Precept competes with X for Y use cases" | `docs/research/` (competitive research) — cite sample-realism benchmarks as evidence | Competitive positioning derived from benchmarks |
 
-### Three documents with dual citizenship
+### Four documents with dual citizenship
 
 These originated here but carry conclusions that should propagate:
 
 1. **`frank-sample-ceiling-philosophy-addendum.md`** → The domain-fit tiers and dilution test should be referenced from product philosophy docs when those are next revised.
 2. **`frank-entity-modeling-addendum.md`** → The entity-vs-workflow identity correction should be reflected in brand philosophy and language design docs.
 3. **`frank-enterprise-platform-and-research-gaps.md`** → The platform-fit analysis should inform competitive positioning research.
+4. **`frank-state-graph-taxonomy-and-insurance-realism.md`** → The nine-shape lifecycle taxonomy is useful beyond sample planning — for evaluating customer use cases and competitive positioning. The ACORD field-editability findings strengthen the product's governed-integrity positioning.
 
 These files stay here as their research origin. Philosophy and positioning docs should **cite** them, not duplicate them.
 
@@ -106,4 +119,4 @@ Examples: `frank-language-and-philosophy.md`, `peterman-realistic-domain-benchma
 
 ---
 
-*Last updated: 2026-07-18. Twelve research artifacts classified.*
+*Last updated: 2026-07-19. Seventeen research artifacts classified.*
