@@ -7,6 +7,12 @@
 
 ## Recent Updates
 
+### 2026-04-07 - README Quick Example refactored and PR #35 merged
+- README Quick Example refactoring merged into PR #35 (chore: finalize README cleanup and record Squad decision).
+- Changes: removed explanatory hedge, removed copyable DSL code block, replaced markdown image syntax with fixed-width HTML img tag (`width="600"`).
+- Decision reinforced: Rendered contract image is the hero artifact; declutter Quick Example by trusting design.
+- Full orchestration recorded in `.squad/decisions.md` and PR merged to main with team collaboration.
+
 ### 2026-04-07 - README Quick Example refactored for clarity
 - Removed explanatory hedge sentence about DSL rendering fallback
 - Removed copyable DSL code block from Quick Example section

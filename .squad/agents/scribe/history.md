@@ -1,3 +1,11 @@
+## 2026-05-18T00:25:00Z - README image-width adjustment recorded
+
+- Wrote orchestration logs for Kramer and Elaine plus a brief session log for the README DSL hero width pass.
+- Merged 5 related README sizing/width inbox notes into `.squad/decisions.md`, updated affected history references, and cleared the processed inbox files.
+- Preserved the final contract: GitHub repo README image cap about 830px, regenerated source width 1660px at 2×, and native text remains the only fully robust typographic match.
+
+---
+
 ## 2026-04-05T03:04:51Z - Early history expansion recorded
 
 - Wrote orchestration and session logs for J. Peterman's `docs/HowWeGotHere.md` early-period expansion and the related `repo-journey-summary` skill update.
