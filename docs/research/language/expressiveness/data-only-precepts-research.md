@@ -63,6 +63,12 @@ A domain modeling language that only supports entities forces value objects into
 
 **Graduation path:** Root-level `edit` is a compile error when states are declared. Compiler tells the user to use `in any edit all` or `in <State> edit ...`. No silent behavioral change.
 
+### Constraint Changes: C12 Redefined, C13 Conditional
+
+**Decision:** C12 redefined from "At least one state must be declared" to "Precept requires at least one field or state." C13 conditional on `States.Count > 0`. Same diagnostic codes, broadened/gated semantics.
+
+**Why redefine, not remove:** Reusing C12 keeps the diagnostic catalog stable — no gaps in the code sequence, no new unnumbered constraint needed. The check still fires for empty precepts (neither fields nor states), which is the degenerate case worth catching. The semantics broaden from "must have states" to "must have structure."
+
 ### API: Nullable CurrentState, Undefined Results
 
 **Decision:** `CurrentState` = null for stateless instances. `Fire()`/`Inspect(event)` return `Undefined` (not throw).
