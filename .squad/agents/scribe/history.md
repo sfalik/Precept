@@ -3,6 +3,11 @@
 - Wrote orchestration logs for Kramer and Elaine plus a brief session log for the README DSL hero width pass.
 - Merged 5 related README sizing/width inbox notes into `.squad/decisions.md`, updated affected history references, and cleared the processed inbox files.
 - Preserved the final contract: GitHub repo README image cap about 830px, regenerated source width 1660px at 2×, and native text remains the only fully robust typographic match.
+## 2026-04-08T00:50:04.708Z - Sample realism research consolidated
+
+- Wrote orchestration logs for Frank, George, J. Peterman, and Steinbrenner plus the brief session log for the sample-realism pass.
+- Merged 5 inbox decision(s) into .squad/decisions.md, cleared the processed inbox files, and kept the archive unchanged because no active decisions were older than 30 days.
+- Updated the affected agent histories and summarized Frank/Steinbrenner history files back into compact ## Core Context sections.
 
 ---
 

@@ -1,11 +1,10 @@
 ## Core Context
 
-- Owns architecture, system boundaries, and review gates across the runtime, tooling, and documentation surfaces.
-- **Language Designer:** Owns Precept language design, grammar evolution, and Superpower parser strategy. `docs/PreceptLanguageDesign.md` is the foundational document.
-- **Language research co-owner:** Co-owns `docs/research/language/` with George. Knows the comparative studies (xstate, Polly, FluentValidation, Zod/Valibot, LINQ, FluentAssertions, FEEL/DMN, Cedar), expression audit, verbosity analysis, and all PLT references.
-- Core architectural discipline: keep MCP tools as thin wrappers, keep docs honest about implemented behavior, and document open decisions instead of inventing values.
-- Technical-surface work flows through Elaine (UX), Peterman (brand compliance), Frank (architectural fit), then Shane (sign-off).
-- README and brand-spec changes should reflect actual runtime semantics, not speculative future behavior.
+- Owns architecture, system boundaries, language direction, and final architectural review across runtime, tooling, and documentation surfaces.
+- Co-owns docs/research/language/ with George; proposal work must stay aligned with docs/PreceptLanguageDesign.md, the MCP/runtime truth, and Shane sign-off gates.
+- Public-facing docs and design assets must describe implemented behavior honestly; samples and README examples are product claims, not decorative filler.
+- The sample corpus is roadmap instrumentation. Preserve real domain pressure, classify sample complexity explicitly, and use FUTURE(#N) comments when a believable workflow needs not-yet-shipped syntax.
+- Architectural guardrails remain stable: thin MCP wrappers, keyword-anchored flat statements, deterministic inspectability, first-match routing, and no speculative semantics in docs.
 
 ## Recent Updates
 
@@ -17,39 +16,28 @@
 - User directive honored: branch retained locally and remotely per user request (NOT deleted post-merge).
 - Verified zero scope creep: 81 additions, 3 files changed (README.md, .squad/decisions.md, .squad/agents/j-peterman/history.md), no unrelated code changes.
 - Co-authored-by trailer included in original commits.
+### 2026-04-08 - Sample realism research consolidated
+- Scribe merged Frank, George, J. Peterman, and Steinbrenner sample-realism findings into .squad/decisions.md and cleared the inbox notes.
+- The active decision set now locks the FUTURE(#N) comment protocol, modeling-over-syntax principle, case-centric flagship sample bias, the 42-sample portfolio direction, and Shane's directive to use Opus when sample/design judgment is especially high.
+
+### 2026-05-17 - Sample realism initiative: language & philosophy research
+- Produced docs/research/sample-realism/frank-language-and-philosophy.md.
+- Established realism criteria, sample complexity labels, and feature-to-sample traceability expectations for the sample expansion pass.
+- Ranked proposal impact on sample quality: Tier 1 choice, conditional expressions, field constraints, logical operators; Tier 2 integer/decimal/conditional invariants/computed fields/named rules; Tier 3 data-only, absorb, date, .length, .contains(), and functions.
+- Proposed 20 additional sample candidates spanning missing business domains so the corpus can teach category breadth instead of only syntax coverage.
+
+### 2026-05-01 - Expression feature research
+- Produced docs/research/dsl-expressiveness/expression-feature-proposals.md and aligned the research README around verified parser/runtime gaps.
+- Recommended staged rollout: Wave 1 .length plus conditional expressions, Wave 2 named rules and conditional invariants, later waves for richer string/numeric helpers.
+- FEEL/DMN remains the strongest business-rule comparator; Cedar remains the strongest analyzability counterweight.
 
 ### 2026-04-07 - PR #34 merge with Squad config and README image fixes
-- Merged PR #34 (chore: upgrade Squad configuration and fix README image links) to `main`.
-- Branch `chore/upgrade-squad-latest` carried both architectural Squad updates and related README.md image path corrections.
-- Image references corrected: `brand/readme-hero.svg` → `design/brand/readme-hero.svg` (added `design/` prefix per canonical asset layout).
-- Workflow: Committed image fix with Co-authored-by trailer, pushed with `-u` for upstream tracking, created PR via `gh pr create` with explicit `--base` and `--head` flags, merged with merge-commit strategy, deleted remote branch post-merge.
-- Remote branch cleaned up post-merge; no uncommitted changes remaining.
-- User directive captured: keep branch open for future work (logged in decisions).
-- Verified zero scope creep: only Squad config + image link fixes, no unrelated code changes.
+- Merged PR #34 to main, keeping the scope to Squad metadata plus README image-path corrections.
+- Confirmed the workflow pattern: commit related uncommitted work before push, create the PR with explicit base/head, and keep the history auditable with the required trailer.
 
 ### 2026-04-05 - Named rule proposal converged
-- Reached the final proposal framing for issue #8: rule <Name> when <BoolExpr>, with reuse allowed in when, invariant, and state assert, but not on <Event> assert.
-- The standing architecture filter now treats philosophy, non-programmer readability, and configuration-like legibility as explicit review criteria instead of secondary polish.
-
-### 2026-05-01 - Expression feature research & proposals
-- Produced comprehensive expression-surface research at `docs/research/dsl-expressiveness/expression-feature-proposals.md`.
-- Confirmed current expression limitations via MCP compile: no ternary (`?` parse error), no `.length` on strings (PRECEPT038), no function calls, no named guards.
-- Proposed 7 features across 3 waves: Wave 1 (ternary + `.length`), Wave 2 (named guards + conditional invariants), Wave 3 (`.contains()` + numeric functions), Future (computed fields).
-- Extended research base beyond existing 6-library set to include FEEL/DMN, Drools DRL, and Cedar (AWS). FEEL is the strongest comparator for business-rule DSL expression design — it has ternary, string functions, numeric functions, and range membership, all of which Precept currently lacks.
-- Updated `docs/research/dsl-expressiveness/README.md` with the new file entry.
-- Decision note filed at `.squad/decisions/inbox/frank-expression-research.md`. No implementation authorized — Shane sign-off required per wave.
-
-### 2026-04-05 - Proposal bodies expanded for issues #11-#13
-- Expanded GitHub issues #11, #12, and #13 into fuller proposal narratives with before/after Precept examples, reference-language snippets, and explicit architectural cautions.
-- Logged the wave placement and guardrails in .squad/decisions.md so the issue bodies stay aligned with keyword-anchored flat statements and first-match routing.
-
-### 2026-04-05 - Trunk consolidation dissent logged
-- Audited the repo topology and argued for force-promoting 'feature/language-redesign' to 'main' because 'main' still carries only placeholder history.
-- The team did not adopt that path: Uncle Leo's review blocked direct trunk replacement, so Frank's recommendation now stands as a documented dissent pending Shane sign-off.
-
----
-
-2026-04-05T03:20:00Z: Steinbrenner applied branch protection to main (pull requests required, force pushes/admin only, no branch deletion).
+- Finalized the proposal framing around rule <Name> when <BoolExpr> with reuse in when, invariant, and state assert, but not on <Event> assert.
+- Elevated philosophy fit and non-programmer readability from soft preferences to explicit review gates.
 
 ## Learnings
 
@@ -272,3 +260,9 @@ Each exclusion removes complexity that Superpower would struggle with (indentati
 - Rejected: #18 conditional outcome in `->` chain
 
 All proposals are additive and Superpower-compatible. No structural redesign required.
+- 2026-05-17: sample realism is mostly a semantic-types and policy-density problem, not a sample-count problem. The biggest credibility failures are categorical values, money, and calendar logic forced through string/number workarounds.
+- 2026-05-16: keep PRs surgically scoped when Shane asks for targeted metadata changes; local bookkeeping should not hitchhike into those PRs.
+- 2026-05-15: GitHub issue hygiene works best when routing labels, taxonomy labels, board status, and close/open state each keep one job.
+- 2026-05-01: validate DSL capability claims with MCP tools before writing research, and benchmark new expression ideas against both FEEL and Cedar.
+- 2026-04-07: for PRs on dirty branches, commit the relevant work first, push with upstream tracking, and use explicit base/head flags to avoid routing mistakes.
+- 2026-04-05: sequence language proposals by containment risk; anything that pressures keyword-anchored flat statements or first-match routing needs extra architectural scrutiny before implementation.

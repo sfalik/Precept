@@ -24,6 +24,130 @@ The README DSL hero remains an image-based branded treatment, but it must now be
 - Native README text/fenced code remains the only fully robust way to keep DSL text scaling in lockstep with surrounding prose across viewport and zoom changes.
 - GitHub page-geometry research still matters: the repo shell tops out around **1280px** and the README/article frame around **1012px**, but the displayed README image for this treatment clamps earlier at about **830px**.
 - Do not rely on custom CSS, sanitizer-sensitive HTML, or viewport-specific image swapping as a stable README contract.
+# Decision: Sample Realism Initiative — Language & Philosophy Guardrails
+
+**Filed by:** Frank (Lead Architect & Language Designer)
+**Date:** 2026-05-17
+**Status:** Research delivered — awaiting Shane review
+
+## Decision Summary
+
+Established the language-design guardrails, realism criteria, and aspirational-comment protocol for the sample-realism initiative. Key decisions:
+
+### 1. FUTURE(#N) Comment Protocol
+
+Aspirational samples that use not-yet-implemented syntax MUST:
+- Compile cleanly with today's syntax (active lines only)
+- Use `# FUTURE(#N): <proposed syntax>` prefix for aspirational logic
+- Show the current workaround alongside the aspirational form
+- Never mix aspirational syntax into active (non-commented) lines
+
+This enables mechanical grep-and-update when features ship.
+
+### 2. Modeling-Over-Syntax Principle
+
+Language limitations constrain *expression*, never *domain models*. If we don't have `choice` type, we don't simplify the domain — we model severity as `number` with invariants and add FUTURE comments. The domain model is the sample's reason for existing.
+
+### 3. Realism Criteria
+
+Defined structural criteria (S1–S6, must-pass) and quality criteria (Q1–Q8, should-pass) plus corpus-level criteria (C1–C6) for the full sample set. Every sample must compile clean, use domain-idiomatic names, have at least one real business rule, and be self-contained.
+
+### 4. Complexity Classification
+
+Samples must be explicitly classified in their header comments as Teaching/Standard/Complex, with domain family noted. This prevents toy demos from masquerading as realistic contracts.
+
+### 5. Feature-to-Sample Traceability
+
+Every language enhancement PR that ships must include sample updates. `FUTURE(#N)` grep makes this mechanical. A feature without sample updates is a feature that doesn't exist for new users.
+
+### 6. Impact Ranking
+
+Tier 1 (transformative): #25 (choice), #9 (if...then...else), #13 (field constraints), #31 (and/or/not)
+Tier 2 (significant): #29 (integer), #27 (decimal), #14 (conditional invariants), #17 (computed fields), #8 (named rules)
+Tier 3 (targeted): #22 (data-only), #11 (absorb), #26 (date), #10 (.length), #15 (.contains()), #16 (functions)
+
+## Artifact
+
+`docs/research/sample-realism/frank-language-and-philosophy.md`
+
+## Next Steps
+
+- Team members author sample-specific research artifacts
+- Sample authoring begins using these guardrails
+- Shane reviews and approves the overall approach
+
+---
+
+# George — sample audit decision
+
+Date: 2026-04-08
+
+## Decision
+
+Future realistic sample revisions should prefer **honest aspirational comments** over flattening the domain down to today’s weakest primitive. If a workflow wants dates, typed categories, computed totals, reusable policy names, or richer string validation, the sample should keep the current valid DSL and add comments describing the intended rule shape.
+
+## Why
+
+- The current corpus is drifting toward syntax fixtures instead of believable business contracts.
+- Flattened surrogates (`CurrentDay`, free-form strings, manual copied totals, `set Field = Event.Arg` walls) make the product look less capable than the roadmap intends.
+- Samples are one of the clearest planning inputs for runtime and language work; they should expose pressure, not hide it.
+
+## Consequences
+
+- Sample expansion should bias toward denser business domains, not more toy/state-machine examples.
+- Flagship pressure-test samples should be `insurance-claim`, `loan-application`, `travel-reimbursement`, and `vehicle-service-appointment`.
+- Proposed language features most likely to improve sample realism are: `choice`, `date`, `decimal`, computed fields, field constraints, declaration guards, named rules, and absorb shorthand.
+
+---
+
+# Peterman sample research decision
+
+## Decision
+
+For future realism-focused sample work, prefer **case-centric, evidence-bearing, exception-rich workflows** over additional straight-line approval examples.
+
+## Why
+
+External research across prior authorization, claims, IAM, KYC/AML, public-sector casework, AP exceptions, and payment disputes keeps converging on the same shape: intake, routing, evidence collection, policy review, decision, fulfillment, and some form of appeal/reopen/audit closure.
+
+That is where Precept's category claim is strongest. The product reads best when one governed entity carries real institutional pressure, not when a sample is only a short approval ladder.
+
+## Practical consequence
+
+When choosing future sample domains, bias toward:
+
+- request-for-information loops
+- exception queues
+- escalation or reconsideration states
+- post-decision fulfillment gates
+- explicit policy reasons in rejects and assertions
+
+Avoid using pipeline-orchestration or abstract task-choreography examples as flagship samples. They are adjacent to the market, but weaker for Precept's entity-contract narrative.
+
+## References
+
+- `docs\research\sample-realism\peterman-realistic-domain-benchmarks.md`
+- `README.md`
+- `design\brand\brand-decisions.md`
+
+---
+
+### 2026-04-08T01:05:00Z: Sample portfolio scope
+**By:** Steinbrenner
+**What:** Treat the canonical sample-expansion target as **42 total repo samples**: **40 roadmap-grade business samples** plus **2 teaching/control samples** (`trafficlight`, `crosswalk-signal`) that remain in-repo but do not drive language-priority decisions.
+**Why:** The current corpus is broad but still under-pressures the roadmap in exact-money, calendar-date, data-only, and policy-dense domains. Doubling the count only helps if the added samples are chosen as roadmap evidence, not just as more demos.
+
+### 2026-04-08T01:05:00Z: Rewrite-before-add sequencing
+**By:** Steinbrenner
+**What:** Rewrite the existing anchor samples first (`clinic-appointment-scheduling`, `library-book-checkout`, `travel-reimbursement`, `it-helpdesk-ticket`, `insurance-claim`, `loan-application`, `utility-outage-report`, `subscription-cancellation-retention`), then add missing domain lanes, then add data-only samples when #22 is ready.
+**Why:** Those eight files already appear in proposal reasoning. Upgrading them gives faster roadmap value than inventing all-new examples first.
+
+---
+
+### 2026-04-08T00:29:05Z: User directive
+**By:** Shane (via Copilot)
+**What:** Use Opus when appropriate so the team produces a strong, high-quality set of samples.
+**Why:** User request — captured for team memory
 
 ---
 

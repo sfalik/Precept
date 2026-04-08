@@ -12,6 +12,9 @@
 - Changes: removed explanatory hedge, removed copyable DSL code block, replaced markdown image syntax with fixed-width HTML img tag (`width="600"`).
 - Decision reinforced: Rendered contract image is the hero artifact; declutter Quick Example by trusting design.
 - Full orchestration recorded in `.squad/decisions.md` and PR merged to main with team collaboration.
+### 2026-04-08 - Sample realism recommendations merged
+- Scribe merged Peterman's benchmark research into .squad/decisions.md together with the directive to use Opus when sample/design judgment is especially high.
+- The active brand/devrel guidance now explicitly favors evidence-bearing, exception-rich, case-centric flagship workflows over more approval-ladder demos.
 
 ### 2026-04-07 - README Quick Example refactored for clarity
 - Removed explanatory hedge sentence about DSL rendering fallback
@@ -76,3 +79,8 @@
 - Switched from markdown image syntax `![...](...)` to fixed-size HTML `<img src="..." width="600" />` to ensure the contract diagram reads at proper visual scale alongside surrounding page text in GitHub's README view.
 - Brand rationale: The Quick Example section is a teaching artifact, not an archive. The professionally rendered contract image is the hero; the copyable fallback was defensive scaffolding. Removing it simplifies visual hierarchy and directs curious readers toward `samples/` or the language reference for further exploration.
 - Decision written to `.squad/decisions/inbox/j-peterman-readme-contract.md`.
+
+### 2026-04-08 - Realistic domain benchmark lane
+- Created `docs\research\sample-realism\peterman-realistic-domain-benchmarks.md` after reviewing the README, brand positioning, and representative samples against external workflow research.
+- Core finding: the strongest future samples should look like governed case files with evidence loops, exception handling, and post-decision fulfillment, not just clean approval ladders.
+- Recommendation merged into `.squad/decisions.md`; inbox cleared so future sample selection stays aligned with the category story.
