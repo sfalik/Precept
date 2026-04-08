@@ -1595,23 +1595,26 @@ public static class PreceptCompiler
 
         var diagnostics = new List<PreceptValidationDiagnostic>();
 
-        // SYNC:CONSTRAINT:C27
-        if (string.IsNullOrWhiteSpace(model.InitialState.Name))
+        if (!model.IsStateless)
         {
-            diagnostics.Add(new PreceptValidationDiagnostic(
-                DiagnosticCatalog.C27,
-                DiagnosticCatalog.C27.FormatMessage(),
-                model.SourceLine));
-        }
+            // SYNC:CONSTRAINT:C27
+            if (string.IsNullOrWhiteSpace(model.InitialState!.Name))
+            {
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C27,
+                    DiagnosticCatalog.C27.FormatMessage(),
+                    model.SourceLine));
+            }
 
-        // SYNC:CONSTRAINT:C28
-        if (!model.States.Any(state => string.Equals(state.Name, model.InitialState.Name, StringComparison.Ordinal)))
-        {
-            diagnostics.Add(new PreceptValidationDiagnostic(
-                DiagnosticCatalog.C28,
-                DiagnosticCatalog.C28.FormatMessage(("stateName", model.InitialState.Name), ("workflowName", model.Name)),
-                model.InitialState.SourceLine > 0 ? model.InitialState.SourceLine : model.SourceLine,
-                StateContext: model.InitialState.Name));
+            // SYNC:CONSTRAINT:C28
+            if (!model.States.Any(state => string.Equals(state.Name, model.InitialState!.Name, StringComparison.Ordinal)))
+            {
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C28,
+                    DiagnosticCatalog.C28.FormatMessage(("stateName", model.InitialState!.Name), ("workflowName", model.Name)),
+                    model.InitialState!.SourceLine > 0 ? model.InitialState!.SourceLine : model.SourceLine,
+                    StateContext: model.InitialState!.Name));
+            }
         }
 
         // SYNC:CONSTRAINT:C38

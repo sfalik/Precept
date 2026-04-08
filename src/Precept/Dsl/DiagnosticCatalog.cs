@@ -406,7 +406,7 @@ public static class DiagnosticCatalog
         "C50", "compile",
         "Non-terminal state has outgoing rows but none can reach another state.",
         "State '{State}' has outgoing transitions but all reject or no-transition — no path forward.",
-        ConstraintSeverity.Hint);
+        ConstraintSeverity.Warning);
 
     /// <summary>Every transition row for a state/event pair rejects, so the event can never succeed there.</summary>
     public static readonly LanguageConstraint C51 = Register(
