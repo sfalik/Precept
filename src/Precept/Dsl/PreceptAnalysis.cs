@@ -95,7 +95,7 @@ internal static class PreceptAnalysis
         }
 
         var reachable = new HashSet<string>(StringComparer.Ordinal);
-        if (!string.IsNullOrWhiteSpace(definition.InitialState.Name) && graph.ContainsKey(definition.InitialState.Name))
+        if (!string.IsNullOrWhiteSpace(definition.InitialState!.Name) && graph.ContainsKey(definition.InitialState!.Name))
         {
             var queue = new Queue<string>();
             queue.Enqueue(definition.InitialState.Name);
