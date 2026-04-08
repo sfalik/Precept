@@ -1,3 +1,32 @@
+# Decision: README Image Link Fixes
+
+**Date:** 2026-04-07  
+**Owner:** J. Peterman (Brand/DevRel)  
+**Status:** Completed
+
+## Problem
+README.md contained two broken image references that used incorrect relative paths:
+- `brand/readme-hero.svg` 
+- `brand/readme-hero-dsl.png`
+
+These links pointed to `./brand/` but the actual assets are in `./design/brand/`.
+
+## Solution
+Updated both image references in README.md to use the correct path prefix:
+- `brand/readme-hero.svg` → `design/brand/readme-hero.svg`
+- `brand/readme-hero-dsl.png` → `design/brand/readme-hero-dsl.png`
+
+## Verification
+- ✅ Files verified to exist at corrected paths
+- ✅ No other image references found in README
+- ✅ Documentation context (hero example, contract display) remains accurate
+
+## Impact
+- Fixes broken hero example and contract diagram display in the README Quick Example section
+- No behavioral changes—purely corrects link resolution for public-facing documentation
+
+## Notes
+The README's narrative around the hero example remains valid: it correctly notes that GitHub cannot render the styled DSL treatment, so the README displays the rendered contract (`readme-hero-dsl.png`) alongside copyable DSL source code. The path fix enables both assets to load correctly in GitHub's markdown renderer.
 
 ---
 

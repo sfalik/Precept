@@ -32,21 +32,14 @@ The plugin's MCP server exposes five tools:
 
 ## Local Development
 
-Enable the agent plugins preview in your VS Code user settings:
+Daily local development is worktree-native:
 
-```json
-{
-  "chat.plugins.enabled": true
-}
-```
+- MCP uses the committed workspace override in `.vscode/mcp.json`.
+- The Precept Author agent and companion skills load from `.github/agents/` and `.github/skills/` in the current checkout.
+- Reload the window after editing those workspace-native customization files.
 
-Then register the plugin locally using the workspace task:
+If you previously used a `chat.pluginLocations`-based local setup, remove any stale registration that points at `tools/Precept.Plugin/`. The workspace-native `.github/` customizations are now the default local authoring path.
 
-- **`plugin: enable`** — adds `tools/Precept.Plugin/` to `chat.pluginLocations`
-- **`plugin: disable`** — removes it
+`tools/Precept.Plugin/` is the shipped plugin payload, not the default local authoring surface. When you want to refresh that payload from the workspace-native sources for explicit validation, run task `plugin: sync payload`.
 
-After enabling, reload the window (`Developer: Reload Window`). Copilot will discover the plugin's MCP server, agent, and skills automatically.
-
-Once loaded, the MCP tools are available to Copilot without requiring an explicit agent switch. The agent and skills are additional layers on top of the same tool surface.
-
-The plugin's `.mcp.json` uses `dotnet tool run precept-mcp` — the same command for both VS Code and Copilot CLI consumers. During development, `.vscode/mcp.json` overrides this with a launcher script that builds from source and shadow-copies the output to prevent file locking during rebuilds.
+The plugin's `.mcp.json` stays in shipped/distribution form with `dotnet tool run precept-mcp`. The workspace-owned `.vscode/mcp.json` remains the source-first local MCP path.

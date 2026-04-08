@@ -15,7 +15,7 @@ No competitor occupies this frame. Precept defines the category, then becomes sy
 The deterministic semantics + structured tool APIs make Precept uniquely suited for AI authoring and validation. This is the "why now" signal, not the primary identity.
 
 **Combined single-sentence positioning**:
-> "Precept is a domain integrity engine for .NET — a single declarative contract that binds state, data, and business rules into an engine where invalid states are structurally impossible."
+> "Precept is a domain integrity engine for .NET — a single declarative contract for modelling business entities, governing how their data evolves under business rules across a lifecycle and making invalid configurations structurally impossible."
 
 The AI-native angle lives in supporting copy, not the opening line.
 
@@ -52,7 +52,7 @@ Models: Serilog's professionalism + MediatR's economy + Workflow Core's clarifyi
 | Do | Don't |
 |----|-------|
 | "Precept compiles business rules into an engine." | "Precept supercharges your business logic!" |
-| "Invalid states are structurally impossible." | "Say goodbye to bugs forever!" |
+| "Invalid configurations are structurally impossible." | "Say goodbye to bugs forever!" |
 | "Think: scattered validation across six services — Precept puts it in one file." | "Imagine a world where..." |
 | "Same definition + same data = same outcome." | "Precept guarantees 100% reliability!" |
 | "One file. Every rule." | "All your rules in one convenient place!" |

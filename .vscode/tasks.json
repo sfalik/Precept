@@ -48,22 +48,11 @@
             "problemMatcher": []
         },
         {
-            "label": "plugin: enable",
+            "label": "plugin: sync payload",
             "type": "shell",
             "command": "node",
             "args": [
-                "${workspaceFolder}/tools/scripts/toggle-plugin.js",
-                "--enable"
-            ],
-            "problemMatcher": []
-        },
-        {
-            "label": "plugin: disable",
-            "type": "shell",
-            "command": "node",
-            "args": [
-                "${workspaceFolder}/tools/scripts/toggle-plugin.js",
-                "--disable"
+                "${workspaceFolder}/tools/scripts/sync-precept-plugin-assets.js"
             ],
             "problemMatcher": []
         }

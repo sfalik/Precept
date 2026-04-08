@@ -524,9 +524,11 @@ The plugin uses the **Claude format** (`.claude-plugin/plugin.json`). The `.mcp.
 
 The plugin uses `dotnet tool run precept-mcp` to launch the MCP server. This is a globally resolvable command that works across both VS Code (via the plugin system) and Copilot CLI (via `/plugin install`). End users must have the .NET SDK installed (same prerequisite as using the Precept NuGet package).
 
+This is the shipped/distribution shape. It is kept in the plugin payload for end-user installation and explicit distribution validation, not as the default local development path for this repo.
+
 ### .vscode/mcp.json (Development Override)
 
-During development in this repo, `.vscode/mcp.json` overrides the plugin's MCP config with a launcher script:
+During development in this repo, the workspace-owned `.vscode/mcp.json` defines the local source-first MCP launch path with a launcher script:
 
 ```json
 {
@@ -539,7 +541,7 @@ During development in this repo, `.vscode/mcp.json` overrides the plugin's MCP c
 }
 ```
 
-The launcher (`tools/scripts/start-precept-mcp.js`) builds from source, shadow-copies the output, and runs the copy — preventing file locking during rebuilds. Per the MCP loading precedence, `.vscode/mcp.json` is checked before plugin configs in both VS Code and Copilot CLI — but plugin configs (level 3) override workspace configs (level 2) when both define the same server name. In practice this is fine: developers working from source don't install the plugin from a marketplace, and external users don't have this `.vscode/mcp.json`. The path is relative so it resolves correctly in both VS Code (`${workspaceFolder}` as cwd) and Copilot CLI (launched from the workspace root).
+The launcher (`tools/scripts/start-precept-mcp.js`) builds from source, shadow-copies the output, and runs the copy — preventing file locking during rebuilds. This workspace file is the dev-time override owned by the current checkout and uses the VS Code `servers` schema. The plugin's `.mcp.json` remains in shipped `dotnet tool run precept-mcp` form for plugin payloads and explicit distribution validation, and that plugin file uses its own `mcpServers` payload schema. The path is relative so it resolves correctly from the workspace root.
 
 ### Distribution Channels
 
@@ -557,27 +559,18 @@ The plugin can be distributed through multiple channels:
 }
 ```
 
-4. **Local development** — register the plugin directory via `chat.pluginLocations` setting during development:
-
-```json
-{
-  "chat.pluginLocations": {
-    "/path/to/precept-plugin": true
-  }
-}
+4. **Local development** — use the committed workspace MCP override in `.vscode/mcp.json` and workspace-native customizations in `.github/agents/` and `.github/skills/`. Do not require editor-level plugin registration for the default inner loop.
 ```
 
 ### Developer Inner Loop
+
+Cross-artifact policy now lives in `docs/ArtifactOperatingModelDesign.md`. This section is the MCP-specific view of that broader operating model.
 
 This repo produces two VS Code artifacts: the **extension** (editor features) and the **agent plugin** (Copilot features). Both are developed locally from `tools/` and follow the same edit → build → reload cycle.
 
 #### Prerequisites
 
-Enable the agent plugins preview in your user settings:
-
-```json
-{ "chat.plugins.enabled": true }
-```
+Open the repo in VS Code. The committed workspace files provide the local MCP path and workspace-native customizations.
 
 #### Tasks
 
@@ -588,8 +581,7 @@ All dev tasks are in `.vscode/tasks.json`, runnable via **Tasks: Run Task**:
 | `build` | Builds the language server to `temp/dev-language-server/` |
 | `extension: install` | Builds + installs the extension from `tools/Precept.VsCode/` |
 | `extension: uninstall` | Uninstalls the local extension |
-| `plugin: enable` | Registers `tools/Precept.Plugin/` in workspace `chat.pluginLocations` |
-| `plugin: disable` | Unregisters the plugin from `chat.pluginLocations` |
+| `plugin: sync payload` | Copies workspace-native agent and skill sources into `tools/Precept.Plugin/` for explicit plugin validation |
 
 #### Edit → Test cycle
 
@@ -600,11 +592,9 @@ All dev tasks are in `.vscode/tasks.json`, runnable via **Tasks: Run Task**:
 
 **Plugin changes** (agent, skills, MCP tools):
 
-1. For agent/skill markdown: edit in `tools/Precept.Plugin/`, then `Developer: Reload Window`.
+1. For agent/skill markdown: edit in `.github/agents/` and `.github/skills/`, then `Developer: Reload Window`.
 2. For MCP server C#: edit in `tools/Precept.Mcp/`, then `Developer: Reload Window` and invoke any MCP tool. The launcher rebuilds and shadow-copies lazily on the next tool invocation after reload.
-3. First-time setup: run task `plugin: enable` (one time), then `Developer: Reload Window`.
-
-The toggle script (`tools/scripts/toggle-plugin.js`) updates `chat.pluginLocations` in `.vscode/settings.json`. To stop loading the plugin, run task `plugin: disable` and reload.
+3. For shipped plugin payload validation: run task `plugin: sync payload`, then validate `tools/Precept.Plugin/` as the distribution-shaped artifact.
 
 #### File locking safety
 
@@ -623,14 +613,14 @@ The running process never locks the build output directory. Old runtime copies a
 |---|---|---|
 | Language server | Dev build + shadow copy (auto-restart on `Ctrl+Shift+B`) | Bundled in VSIX under `server/` (framework-dependent) |
 | MCP server launch | `.vscode/mcp.json` override with launcher script (build + shadow copy) | Plugin `.mcp.json` with `dotnet tool run precept-mcp` |
-| Plugin registration | `chat.pluginLocations` → `./tools/Precept.Plugin` | Marketplace install or Git URL |
+| Workspace customizations | `.github/agents/` and `.github/skills/` | Marketplace install or Git URL |
 | Extension registration | `extension: install` task | VS Code Marketplace |
-| Plugin toggle | `plugin: enable` / `plugin: disable` tasks | Extensions panel |
+| Plugin payload sync | `plugin: sync payload` task | Packaging/validation only |
 | .NET prerequisite | .NET SDK (builds from source) | .NET runtime (runs pre-built binaries) |
 
 **Extension packaging for marketplace:** Run `npm run package:marketplace` in `tools/Precept.VsCode/`. This publishes the language server into `server/` (framework-dependent, no self-contained runtime) and packages the VSIX. The `vscode:prepublish` hook runs the same `dotnet publish` step automatically.
 
-**Plugin packaging for distribution:** The plugin's `.mcp.json` already uses the distribution format (`dotnet tool run precept-mcp`). No rewriting is needed at publish time. The launcher script (`tools/scripts/start-precept-mcp.js`) and `.vscode/mcp.json` are workspace-level dev infrastructure, not part of the published plugin.
+**Plugin packaging for distribution:** The plugin's `.mcp.json` already uses the distribution format (`dotnet tool run precept-mcp`). No rewriting is needed at publish time. The launcher script (`tools/scripts/start-precept-mcp.js`) and `.vscode/mcp.json` are workspace-level dev infrastructure, not part of the published plugin. Workspace-native agent and skill sources under `.github/` should be synced into `tools/Precept.Plugin/` before validation or packaging.
 
 ### Precept Author Agent
 

@@ -46,6 +46,8 @@ These principles have driven every syntax and semantics decision:
 
 12. **AI is a first-class consumer.** The DSL is readable by humans and writable by hand, but its properties are chosen to make AI authoring reliable. Deterministic semantics (no hidden state, no side effects) mean an AI can reason about outcomes. Keyword-anchored flat statements mean an AI can parse and generate without tracking indentation context. Structured tool APIs (MCP) return typed JSON that an AI can validate, audit, and iterate against without human feedback. The language reference itself is queryable as data (`precept_language`), so the AI never relies on training-data recall for syntax. The intended workflow: a domain expert describes intent, the AI authors the precept, and the toolchain closes the correctness loop.
 
+13. **Keywords for domain, symbols for math.** Precept uses English keywords for domain concepts, structural anchors, actions, and logical operators (`and`, `or`, `not`). Symbols are reserved for universal mathematical notation (`+`, `-`, `==`, `!=`) and the one structural exception `->`. This line is drawn deliberately — see the [Keyword vs Symbol Design Framework](#keyword-vs-symbol-design-framework-locked).
+
 ## Non-Goals
 
 - Perfect parity with the current DSL syntax.
@@ -87,6 +89,68 @@ in Open, InProgress, Blocked assert Assignee != null because "Must have an assig
 # any — expands to all declared states
 from any assert AuditLog.count > 0 because "Must have audit trail to leave any state"
 ```
+
+---
+## Keyword vs Symbol Design Framework (Locked)
+
+Precept sits between Python and SQL on the keyword-symbol spectrum — keyword-dominant for structure and domain concepts, symbolic only for universal mathematical notation. This is not an inherited default from a host language; it is a deliberate position grounded in Precept's multi-audience design.
+
+### The spectrum
+
+```
+APL → Haskell → C → Rust → C# → TypeScript → Python → PRECEPT → SQL → COBOL → Gherkin
+                          ←— more symbolic              more keyword —→
+```
+
+More keyword-dominant than C#/TypeScript, but without the verbosity of COBOL or Gherkin. Principle #3 (minimal ceremony) prevents keyword bloat — `and` is 3 characters, not `PERFORM VARYING`.
+
+### Where the line is drawn
+
+**Structure and domain concepts use keywords.** Precept's architecture depends on keyword anchoring — the Superpower parser, IntelliSense completions, and semantic tokens all use keywords as parse points. Every statement starts with a recognizable keyword (`field`, `state`, `from`, `on`, `set`, `transition`). Domain-semantic operators like `contains` are keywords, not symbols. Every comparable external DSL with non-programmer audiences (Cedar, Drools, Gherkin) draws this same line.
+
+**Mathematical and comparison operators use symbols.** Arithmetic (`+`, `-`, `*`, `/`, `%`) and comparisons (`==`, `!=`, `>`, `<`, `>=`, `<=`) are universal mathematical notation. These symbols are learned once and recognized instantly by all audiences. Nobody benefits from spelling out `plus` or `greater than or equal to`.
+
+**Logical operators use keywords.** `and`, `or`, `not` — not `&&`, `||`, `!`. This is the one category where languages fundamentally disagree (Python and SQL use keywords; C# and Java use symbols), and Precept sides with keywords for three reasons:
+
+1. **Audience.** Precept's primary readers include domain experts validating business rules. `when not IsPremium and Score >= 680` reads as English that a business analyst can verify. `when !IsPremium && Score >= 680` reads as code that requires developer training.
+2. **Internal consistency.** `contains` is already a keyword operator. `and`, `or`, `not` as keywords unify all domain-semantic operators under one form.
+3. **The asymmetry with `!=` is natural, not problematic.** Unary negation (`not X`) and binary comparison (`X != Y`) are cognitively distinct — different operations, different arity, different linguistic roles. Every keyword-for-logic system (SQL, Python, Alloy, DMN) retains `!=` as a symbol without creating pressure to replace it. 50+ years of SQL and 33+ years of Python confirm: keyword `not` coexists with symbolic `!=` without confusion. Languages that went fully symbolic (APL) excluded non-programmer audiences. Languages that went fully keyword (COBOL) created verbosity. The keyword-for-logic, symbol-for-math split is the proven balance.
+
+**`->` is the exception — a structural symbol.** The arrow is the one structural symbol in Precept. It is justified by Principle #11: `→` is universal notation in state machines and formal logic, it creates clear visual separation between context and action, and every keyword alternative is weaker (`then` is taken by `if...then...else`; `do` sounds imperative, not declarative). The arrow's visual distinctness — a sigil that the eye tracks differently from keywords — makes it a stronger separator than any word.
+
+### Decision matrix for new syntax
+
+| Category | Rule | Examples |
+|----------|------|----------|
+| **Structural anchors** (start-of-statement, delimiters) | ALWAYS keywords | `field`, `state`, `from`, `on`, `set`, `transition` |
+| **Domain concepts** (ubiquitous language) | ALWAYS keywords | `invariant`, `assert`, `because`, `contains` |
+| **Logical operators** (boolean connectives) | Keywords | `and`, `or`, `not` |
+| **Math/comparison operators** | Symbols | `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `>`, `<`, `>=`, `<=` |
+| **Structural separators** | Symbols only if universally understood | `->` (state machine notation), `.` (member access) |
+| **Punctuation/grouping** | Symbols | `(`, `)`, `[`, `]`, `,`, `"`, `#` |
+
+**Tiebreaker:** Default to keyword. Symbols require memorized association; keywords are self-documenting. Only use a symbol when universal notation makes it more recognizable than any keyword alternative.
+
+### Current balance
+
+| Category | Count | Form |
+|----------|-------|------|
+| Keywords | ~50 | Structure, domain concepts, actions, types, logical operators |
+| Symbols | ~23 | Math, comparison, assignment, `->`, punctuation |
+| Ratio | ~2 : 1 | Keyword-dominant by design |
+
+### Logical operator migration (Implementation Pending — [#31](https://github.com/sfalik/Precept/issues/31))
+
+The following changes are decided but not yet implemented:
+
+| Current (symbolic) | Target (keyword) | Status |
+|-------------------|-----------------|--------|
+| `!` (unary NOT) | `not` | Pending — [#31](https://github.com/sfalik/Precept/issues/31) |
+| `&&` (logical AND) | `and` | Pending — [#31](https://github.com/sfalik/Precept/issues/31) |
+| `\\|\\|` (logical OR) | `or` | Pending — [#31](https://github.com/sfalik/Precept/issues/31) |
+| `!=` (inequality) | `!=` (no change) | Stays as-is |
+
+Until implementation, the runtime accepts `!`, `&&`, `||`. After implementation, the runtime will accept `not`, `and`, `or` as keywords, and `!`, `&&`, `||` will be removed.
 
 ---
 ## File Structure (Locked)
@@ -219,21 +283,14 @@ from <State|any> on <Event> when <Guard> -> ...
 
 ### Semantics
 
-`when` expresses **conditional availability** — whether the row is applicable to the current instance at all — which is a different question from which branch fires inside an applicable row.
+`when` expresses **conditional availability** — whether the row is applicable to the current instance at all. This is distinct from rejection, which is an explicit outcome for an applicable row.
 
-- `when` == `false` → the row is skipped entirely. No mutations, no branch evaluation, no `reject` message. The outcome is `Unmatched`, which is distinct from `Rejected`.
-- `when` == `true` → the row body is entered and branch guards evaluate normally.
+- `when` == `false` → the row is skipped entirely. No mutations, no rejection message. The outcome is `Unmatched`, which is distinct from `Rejected`.
+- `when` == `true` → the row body is entered and actions execute.
 
-**`when` vs `if`:**
+**`when` is the only conditional routing mechanism in the DSL.** Precept uses flat rows with `when` guards and first-match evaluation instead of nested branching. When multiple outcomes are needed for the same `(State, Event)` pair, write multiple rows — each with its own `when` guard — and let first-match routing select the appropriate one.
 
-| | `when` | `if` |
-|---|---|---|
-| Position | Row header | Row body |
-| Controls | Whether the row is applicable | Which branch fires |
-| False result | `Unmatched` — event not available | Falls through to next `else if` or `else` |
-| Use for | Structural availability | Routing logic |
-
-Use `when` when the intent is "this action isn't meaningful right now." Use `if`/`else`/`reject` when the intent is "this action was attempted but failed."
+Use `when` when the intent is "this action isn't meaningful right now." Use `reject` in a catch-all row (without `when`) when the intent is "this action was attempted but the conditions for success were not met."
 
 ### Authoring patterns
 
@@ -265,11 +322,11 @@ Once `ReopenCount` reaches 3, `Reopen` becomes `Unmatched` for this instance —
 
 **Nullable precondition — nullable narrowing inside the row body:**
 
-When the `when` expression constrains a nullable field (e.g. `when OfficerName != null`), the language server narrows that field to non-nullable inside all branches of the row body. No redundant null check needed inside.
+When the `when` expression constrains a nullable field (e.g. `when OfficerName != null`), the language server narrows that field to non-nullable inside all statements of the row body. No redundant null check needed inside.
 
 ### Scope restriction
 
-`when` expressions may only reference declared instance data fields and their properties. Event argument references (`EventName.ArgName`) in a `when` expression are a parse error. Arguments are not yet available when availability is evaluated — use `if` guards inside the body for argument-dependent routing.
+`when` expressions may only reference declared instance data fields and their properties. Event argument references (`EventName.ArgName`) in a `when` expression are a parse error. Arguments are not yet available when availability is evaluated — use additional rows with argument-dependent `when` guards for argument-dependent routing.
 
 ### Multiple rows for the same state+event
 
@@ -295,6 +352,8 @@ Full reserved keyword list:
 `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `into`,
 `transition`, `no`, `reject`,
 `string`, `number`, `boolean`, `true`, `false`, `null`, `contains`
+
+**Pending additions ([#31](https://github.com/sfalik/Precept/issues/31)):** `and`, `or`, `not` — replacing symbolic `&&`, `||`, `!` for logical operators. See [Keyword vs Symbol Design Framework](#keyword-vs-symbol-design-framework-locked).
 
 ### Dual-use: `set`
 
@@ -767,8 +826,8 @@ on Cancel assert reason != "" because "Cancel requires a reason"
 The expression language supports:
 
 - arithmetic: `+`, `-`, `*`, `/`, `%`
-- unary: `-` (numeric negation), `!` (logical not)
-- logical: `&&`, `||`
+- unary: `-` (numeric negation), `!` (logical not) — **pending migration to `not` keyword per [#31](https://github.com/sfalik/Precept/issues/31)**
+- logical: `&&`, `||` — **pending migration to `and`, `or` keywords per [#31](https://github.com/sfalik/Precept/issues/31)**
 - comparisons: `==`, `!=`, `>`, `>=`, `<`, `<=`
 - membership: `contains`
 - parentheses
@@ -780,6 +839,8 @@ Collection accessor members carried forward conceptually:
 - `.peek` (queue/stack)
 
 Exact operator precedence and literal forms should align with the runtime expression parser.
+
+See [Keyword vs Symbol Design Framework](#keyword-vs-symbol-design-framework-locked) for the rationale behind using keywords for logical operators and symbols for math/comparison.
 
 ---
 

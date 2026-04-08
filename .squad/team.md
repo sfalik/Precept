@@ -32,10 +32,11 @@
 
 ## Project Context
 
-- **Project:** Precept — a domain integrity engine for .NET. Binds entity state, data, and business rules into a single executable contract via a declarative DSL. Makes invalid states structurally impossible.
+- **Project:** Precept — a domain integrity engine for .NET. A single declarative contract for modelling business entities, governing how their data evolves under business rules across a lifecycle. Makes invalid configurations structurally impossible.
 - **Stack:** C# / .NET 10.0 (core runtime, language server, MCP server), TypeScript (VS Code extension), xUnit + FluentAssertions (tests), LSP (language server protocol)
 - **Components:** Core DSL runtime (`src/Precept/`), Language Server (`tools/Precept.LanguageServer/`), MCP Server (`tools/Precept.Mcp/`), VS Code Extension (`tools/Precept.VsCode/`), Copilot Plugin (`tools/Precept.Plugin/`)
 - **Design Structure:** `design/brand/` is the source of truth for brand identity and canonical meaning. `design/system/` is the source of truth for reusable product-facing visual-system guidance and surface specs. `design/prototypes/` holds durable design prototypes. `docs/` remains the source of truth for technical and explanatory documentation.
+- **Philosophy:** `docs/philosophy.md` — grounding document for product identity, positioning, and conceptual hierarchy. All agents must read before design decisions, positioning work, or language proposals. Keep in sync with the implementation.
 - **Distribution:** NuGet (core library), VS Code Marketplace (extension), Claude Marketplace (plugin)
 - **Owner:** shane
 - **Universe:** Seinfeld
