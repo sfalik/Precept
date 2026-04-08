@@ -29,7 +29,7 @@ This folder holds the *evidence* behind those claims. Philosophy.md links here w
 
 ## Source research
 
-The conclusions in this folder were promoted from the following domain-specific research:
+The conclusions in this folder were promoted from domain-specific research conducted during the sample-realism initiative. The source files live in `docs/research/sample-realism/` *(pending merge from `chore/misc` — not yet present on this branch)*. Philosophy research cites these sources for provenance; it does not duplicate sample-planning detail.
 
 | Source | Location | What it contributed |
 |--------|----------|---------------------|

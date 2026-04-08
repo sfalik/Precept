@@ -14,6 +14,7 @@ Research lives in this repository. Proposal decisions and canonical proposal bod
 |--------|-------|---------|
 | `language/` | George + Steinbrenner | Unified language research: comparative expressiveness studies, implementation-grounded audits, and formal language references that inform GitHub proposal issues. |
 | `philosophy/` | Frank | Product-philosophy evidence: entity-first positioning, category analysis, and durable conclusions promoted from domain-specific research. Grounds claims in `docs/philosophy.md`. |
+| `sample-realism/` | Frank + Steinbrenner | *(Incoming — pending merge from `chore/misc`.)* Sample-specific realism research: corpus planning, domain benchmarks, realism criteria, and enterprise platform surveys. Philosophy-relevant conclusions are cited from `philosophy/`, not duplicated. |
 
 ## Storage Rule
 

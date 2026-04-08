@@ -2,7 +2,7 @@
 
 ## Architecture
 
-Precept is a domain integrity engine for .NET — a DSL runtime that binds an entity's state, data, and business rules into a single executable contract.
+Precept is a domain integrity engine for .NET — a DSL runtime that governs how a business entity's data evolves under business rules across its lifecycle, making invalid configurations structurally impossible.
 
 | Component | Path | Purpose |
 |-----------|------|---------|
@@ -70,6 +70,19 @@ Start with MCP tools for authoritative data, then read source code only for impl
 To check a `.precept` file for errors:
 1. Use the `get_errors` tool on the `.precept` file path (reads the VS Code Problems panel, populated by the language server).
 2. Cross-check against sample files in `samples/`.
+
+## Product Philosophy (Non-Negotiable)
+
+`docs/philosophy.md` is the grounding document for Precept's identity — what the product is, what it governs, how it's positioned, and why. Read it before making design decisions, writing public-facing copy, or proposing language changes.
+
+When any of the following change, update the philosophy in the same pass:
+
+- The category of entities Precept can govern (e.g. stateless precepts shipping)
+- The core guarantee (prevention, determinism, inspectability)
+- The positioning relative to adjacent tools
+- The constraint model or operation surface
+
+Do not let the philosophy drift behind the implementation. If the runtime can do something the philosophy doesn't describe, or the philosophy claims something the runtime can't do, fix the gap immediately.
 
 ## Documentation Sync (Non-Negotiable)
 
