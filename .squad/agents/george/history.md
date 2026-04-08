@@ -7,6 +7,14 @@
 
 ## Recent Updates
 
+### 2026-04-08 - Language research corpus completed
+- George's type-system lane now sits inside a finished language research corpus: Batch 1/2 evidence landed in `54a77da` and `48860ae`, and the closing corpus/index sweep landed in `3cc5343`.
+- Final bookkeeping preserved the domain-first indexes so the type-system survey and semantics work stay grounded in research docs rather than being pushed back into proposal-body edits.
+
+### 2026-04-08 - Type-system research corpus landed
+- The type-system domain research packet landed as part of Batch 1, and the later rewrite of `docs/research/language/references/type-system-survey.md` was included in the Batch 2 commit `48860ae`.
+- The durable type lane now has both a domain survey and a stronger formal/reference survey, which keeps the research corpus aligned with the no-proposal-body-edit rule for batch curation.
+
 ### 2026-04-05 - Named rule scope and naming converged
 - Confirmed field-scoped reuse is sound in when, invariant, and state assert, while on <Event> assert remains incompatible because it is event-arg-only.
 - Reweighted the naming decision around Precept's readability goals and aligned the runtime recommendation with rule over predicate.

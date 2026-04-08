@@ -9,6 +9,15 @@
 
 ## Recent Updates
 
+### 2026-04-08 - Language research corpus completed
+- Closed the domain-first corpus with the final sweep in `3cc5343`, keeping `docs/research/language/domain-map.md` as the canonical map and leaving proposal bodies untouched.
+- The finished corpus now spans Batch 1 `54a77da`, Batch 2 `48860ae`, and the final corpus/index pass `3cc5343`, while preserving `computed-fields.md` as the quality bar and keeping horizon domains visible.
+
+### 2026-04-08 - Language research corpus map locked
+- Preserved `docs/research/language/domain-map.md` as the canonical research-corpus map and kept the corpus organized by domain rather than by issue.
+- Held the session guardrails: no proposal-body edits during corpus curation, `computed-fields.md` remains the quality bar, and horizon domains stay in scope even before proposals exist.
+- The alternate map-file experiment was folded back out; Batch 1 research landed in `54a77da`, Batch 2 landed in `48860ae`, and only Batch 3 plus the final README/index sweep remain.
+
 ### 2026-04-07 - PR #35 merge: finalize README cleanup and record Squad decision
 - Merged PR #35 (chore: finalize README cleanup and record Squad decision) to `main`.
 - Branch `chore/upgrade-squad-latest` carried 2 commits: (1) Scribe post-task recording for PR #34 merge, and (2) README Quick Example refactoring (removed explanatory hedge, copyable DSL block, replaced markdown image syntax with fixed-width HTML img tag).
@@ -51,7 +60,38 @@
 
 2026-04-05T03:20:00Z: Steinbrenner applied branch protection to main (pull requests required, force pushes/admin only, no branch deletion).
 
+### 2026-04-08 - Issue #17 computed fields proposal revamp
+- Revamped `temp/issue-body-rewrites/17.md` to incorporate all findings from the research document and all 7 team re-reviews.
+- Resolved all 6 semantic contracts from the research: scope boundary, recomputation timing (Fire+Update+Inspect), nullability/accessor safety, dependency ordering, writeability/external input, tooling surface.
+- Used Steinbrenner's default-if-skipped options: (a) conservative nullable rejection, (a) `.count` only for collection accessors, (a) Terraform-model external input rejection, (a) single pass after all mutations.
+- Added 3 new locked decisions (#9 nullable conservative rejection, #10 external input rejection, #11 `.count`-only collection accessor restriction).
+- Expanded locked decision #8 from Fire-only to all three pipelines citing George's `CommitCollections` analysis.
+- Added `->` dual-use acknowledgment note to locked decision #1.
+- Replaced "Open Questions: None" with a "Resolved decisions" table mapping all 6 research contracts to locked decisions.
+- Changed wave from "Wave 4: Compactness + Composition" to "Composition" framing per Steinbrenner's recommendation.
+- Added new sections: Tooling surface (hover, MCP compile, inspect/fire, completions), Teachable error messages (9 scenarios), Before/after example using travel-reimbursement, Interleaved fields examples, `->` reading guide callout.
+- Surfaced the research's cross-category positioning claim in Motivation section.
+- Added spreadsheet mental model sentence to Summary.
+- Linked research document in Research and rationale links.
+- Expanded Explicit exclusions with: silent default fallbacks, writable computed fields, null-coalescing operator, unsafe collection accessors. Merged fixed-point evaluation with cycle detection.
+- Expanded acceptance criteria from 19 to 37 items, organized by category (parser, type checker, runtime, LS, MCP, general). Added all items from Soup Nazi's must-add and should-add lists plus Uncle Leo's blockers.
+- Expanded implementation scope from 10 to 16 items covering nullable validation, accessor safety, Update pipeline, external input rejection, LS filtering, MCP specifics.
+
 ## Learnings
+
+### 2026-04-08 - Proposal revamp process
+- When research identifies semantic contracts and multiple reviewers converge on the same gaps, the work is bounded editing rather than rethinking. The 7 reviews all pointed to the same 3-4 core gaps — the volume of reviews was higher than the volume of actual decisions needed.
+- Steinbrenner's "default-if-skipped" pattern is valuable: each gate decision has a clearly stated default, so the editing pass can proceed without blocking on explicit Shane sign-off for each one.
+
+### 2026-04-08 - Rationale pass on computed fields proposal
+- Added "Why" rationale to all 11 locked design decisions in `temp/issue-body-rewrites/17.md`. Each decision now includes alternatives considered, precedent citations, tradeoff accepted, and the philosophy principle it serves.
+- Incorporated Shane's 3 specific design points:
+  1. **Non-nullable inputs (#9):** Documented that Precept is stricter than all 24 surveyed systems. Those systems all have null-handling operators (COALESCE, BLANKVALUE, etc.); we don't — so conservative rejection is the only sound choice. Practical impact near zero (all numeric fields in samples are non-nullable with defaults).
+  2. **No constraints on computed values (#4):** Clarified that invariants already CAN reference computed fields, which covers output validation. Field-level constraints are the wrong abstraction because they validate externally-supplied data — computed fields have no external supply path. Determinism isn't threatened either way; the choice is about mechanism clarity.
+  3. **Inspect recomputation (#8 + semantic rules):** Reworded to clarify that Inspect operates on a clone — recomputation is simulated on a working copy, consistent with how Inspect already simulates `set` mutations. Skipping recomputation would break Inspect's preview contract (disagreement with Fire on constraint results).
+- Also added rationale to semantic rules section and expanded exclusions with brief "because" statements.
+- Key learning: proposals that state WHAT without WHY are incomplete. The research doc had all the evidence — the gap was in surfacing the key "because" statement at each decision point in the proposal itself.
+- Error message tables are a force multiplier: each row simultaneously specifies a compile error, documents the user-facing UX, and implicitly defines an acceptance criterion. Elaine was right that these are the primary learning surface.
 
 ### 2026-05-18 - Philosophy draft terminology correction
 - Corrected `design/brand/research/philosophy-draft-v2.md` to use actual DSL construct names in concept lists: fields, states, events, invariants, and assertions. `guard` remains acceptable only as informal prose or as the inline `when` condition concept, not as a top-level declared construct.

@@ -1,13 +1,12 @@
 ---
-updated_at: 2026-04-05T18:08:00Z
-focus_area: Workflow closeout
-active_issues:
-  - "GitHub workflow migration closeout"
-  - "Trunk consolidation prep"
+updated_at: 2026-04-08T13:29:23Z
+focus_area: Language research corpus complete
+active_issues: []
 ---
 
 # What We're Focused On
 
-Closing out the workflow migration end-to-end: finish the repo-side label retirement and
-separate the governance/trunk path from the preview/mockup lane before touching live
-GitHub projects, labels, and proposal issues.
+The language research corpus is complete on `squad/language-research-corpus`. The three
+research milestones landed as `54a77da`, `48860ae`, and `3cc5343`, and the final
+README/index sweep is no longer outstanding. This pass is only closing out Squad memory
+so the next work can start from a clean branch state.

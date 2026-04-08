@@ -19,6 +19,14 @@ The **GitHub issue is the canonical proposal**. It contains:
 - Acceptance criteria
 - Implementation scope (t-shirt sizes per layer)
 
+Every locked design decision in the proposal must include explicit rationale:
+- **Why this choice** — the reasoning, not just the outcome
+- **Alternatives rejected** — what else was considered and why it lost
+- **Precedent** — what research or prior art grounds the decision
+- **Tradeoff accepted** — what downside the team is deliberately taking on
+
+A proposal that states WHAT without WHY is incomplete. Send it back for rationale before it moves to Ready.
+
 Create the issue with labels `proposal` + `language` (and optionally `dsl-expressiveness` or `dsl-compactness`). Add it to the **Precept Language Improvements** project. Assign a wave milestone.
 
 #### 2. Research (`docs/research/`)
@@ -31,6 +39,8 @@ Research documents live in `docs/research/` and capture:
 Research files are linked from the issue, not the other way around. The issue map in `docs/research/language/README.md` connects each proposal to its research starting points.
 
 **Research is durable.** It explains *why* decisions were made and survives across sessions. When a proposal is revised, update the research doc with the new reasoning.
+
+**Quality bar for rationale:** `docs/research/language/expressiveness/computed-fields.md` and the Issue #17 proposal demonstrate the expected depth — alternatives surveyed with precedent, explicit tradeoff analysis, and design philosophy grounding each locked decision.
 
 #### 3. Implementation (Feature Branch + PR)
 
@@ -96,7 +106,7 @@ Language proposals are assigned to wave milestones that reflect priority and dep
 | What the DSL syntax IS | `docs/PreceptLanguageDesign.md` | Permanent — tracks reality |
 | What the C# API IS | `docs/RuntimeApiDesign.md` | Permanent — tracks reality |
 | What a feature SHOULD BE | GitHub issue body | Until implemented |
-| WHY a decision was made | `docs/research/` | Permanent — rationale archive |
+| WHY a decision was made | Issue body (per-decision rationale) + `docs/research/` (full evidence base) | Permanent — rationale lives in both places |
 | HOW to implement (checklist) | PR body | Ephemeral — dies with the PR |
 | AI agent directives | `.github/copilot-instructions.md` | Permanent — updated as process evolves |
 

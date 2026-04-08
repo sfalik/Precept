@@ -6,6 +6,15 @@
 
 ## Recent Updates
 
+### 2026-04-08 - Language research plan fully executed
+- The three-batch domain-first plan is complete on `squad/language-research-corpus`, closed by `3cc5343` after Batch 1 `54a77da` and Batch 2 `48860ae`.
+- PM guardrails held through closeout: no proposal-body edits, horizon domains remained represented, and the final indexes point active proposals back to their grounding research.
+
+### 2026-04-08 - Language research batching finalized
+- Finished `docs/research/language/domain-research-batches.md` as the domain-first execution plan for the corpus.
+- Regrouped Batch 1 so constraint composition stays with the rest of the validator/rule/declaration lane instead of being split into a later pass.
+- Preserved the session rules: no proposal-body edits during corpus work, horizon domains stay visible, and each completed batch closes with its own commit (`54a77da` for Batch 1, `48860ae` for Batch 2). Batch 3 and the final README/index sweep remain open.
+
 ### 2026-04-05 - Proposal #8 finalized around named rules
 - Synced the roadmap framing to rule <Name> when <BoolExpr>, locked the field-only/boolean-only boundaries, and recorded the issue rename to "Proposal: Named rule declarations."
 - PM proposal guidance now requires philosophy fit, non-goals, and the configuration-like readability check on future language work.
