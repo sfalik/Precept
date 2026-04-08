@@ -142,5 +142,16 @@ The design doc (around line 226) contains a `when` vs `if` comparison table show
 | #12 | Declined — semantic dual-meaning of `else` | Closed |
 | #14 | `when` guards on invariants and edit declarations | Open — proposal revised, `unless` dropped |
 | #25 | Choice type eliminates boolean negation at modeling level | Open |
-| #31 | Replace `!` with `not` keyword (language-wide) | Open — split from #14 |
+| #31 | Replace all symbolic logical operators with keywords (`and`, `or`, `not`) | Open — expanded from `not`-only to full logical operator migration |
 | #8 | Named rules — future composability for grouped constraints | Open |
+
+## Keyword vs Symbol Decision (April 6, 2026)
+
+The `not` keyword decision expanded into a broader design question: where should Precept draw the line between keywords and symbols across the entire language?
+
+Research across the keyword-symbol spectrum (APL through COBOL), cognitive readability studies, DSL design literature (Fowler), and a full inventory of Precept's 47 keywords / 26 symbols led to a settled framework now captured in `docs/PreceptLanguageDesign.md` § Keyword vs Symbol Design Framework (Locked):
+
+- **Keywords** for structure, domain concepts, and logical operators (`and`, `or`, `not`)
+- **Symbols** for math/comparison (`+`, `-`, `==`, `!=`) and the one structural exception `->` (universal state machine notation, defended by Principle #11)
+
+#31 was expanded from `not`-only to cover all three logical operators (`&&` → `and`, `||` → `or`, `!` → `not`). `!=` stays as a symbol — unary negation and binary comparison are different operator families, and every keyword-for-logic system (SQL, Python, Alloy, DMN) retains `!=` without issue.

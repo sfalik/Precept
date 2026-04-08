@@ -36,6 +36,7 @@ This folder now follows a strict split:
 | `#17` | Computed / derived fields | `expressiveness/expression-language-audit.md`, `references/expression-evaluation.md` |
 | `#18` | Conditional outcome in `->` chain (rejected) | `expressiveness/linq.md`, `expressiveness/expression-language-audit.md` |
 | `#25` | Type system expansion (choice and date types) | `references/type-system-survey.md`, `expressiveness/expression-language-audit.md` |
+| `#22` | Data-only precepts (stateless domain definitions) | `expressiveness/data-only-precepts-research.md` |
 | `#31` | Replace `!` with `not` keyword for logical negation | `expressiveness/conditional-logic-strategy.md`, `references/conditional-invariant-survey.md` |
 
 ## Rule of engagement
