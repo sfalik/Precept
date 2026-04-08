@@ -112,17 +112,30 @@ The evolved process keeps the implementation checklist in the PR body (ephemeral
 
 ## Build & Test
 
+Precept is built with .NET 10.0 and TypeScript.
+
 ```bash
 dotnet build                        # Build everything
 dotnet test                         # Run all tests (xUnit + FluentAssertions)
 ```
 
+### First-time local setup
+
+1. Run task `build`.
+2. Run task `extension: install`, then reload the window.
+
+If you previously used an older local plugin-registration flow, remove any stale `chat.pluginLocations` entry that points at `tools/Precept.Plugin/`. The current local model uses workspace-native `.github/agents/`, `.github/skills/`, and `.vscode/mcp.json` instead.
+
+### Reload rules
+
 | What you changed | Command | Reload VS Code? |
-|------------------|---------|-----------------|
+|------------------|---------|------------------|
 | C# runtime or language server | `Ctrl+Shift+B` (Build task) | No |
 | TypeScript, webview, or syntax | Task: `extension: install` | Yes |
 | Agent or skill markdown | Reload Window | Yes |
 | MCP server | Reload Window | Lazy rebuild on next tool call |
+
+See [ArtifactOperatingModelDesign.md](docs/ArtifactOperatingModelDesign.md) for the local-vs-distribution operating model, worktree rules, the workspace `.vscode/mcp.json` `servers` schema, and the plugin payload sync boundary.
 
 ### Test projects
 
