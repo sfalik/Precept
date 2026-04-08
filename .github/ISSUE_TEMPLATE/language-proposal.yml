@@ -40,13 +40,18 @@ body:
     id: proposal
     attributes:
       label: Proposed syntax or behavior
-      description: Include concrete examples.
+      description: Include concrete examples and semantic rules if compile-time or runtime behavior matters.
       render: markdown
       placeholder: |
         ```precept
         precept Example
         ...
         ```
+
+        Describe any important semantics as well:
+        - where the construct is valid
+        - where it is not valid
+        - type-checking or runtime behavior
     validations:
       required: true
 
@@ -58,6 +63,20 @@ body:
       placeholder: List the decisions that are already locked so implementation does not drift.
     validations:
       required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies or related issues
+      description: List proposal dependencies, related issues, or adjacent proposals that affect this one.
+      placeholder: Depends on #31. Related: #25, #9.
+
+  - type: textarea
+    id: exclusions
+    attributes:
+      label: Explicit exclusions / out of scope
+      description: State what this proposal intentionally does not include and why.
+      placeholder: Regex, email validation, and schema-validator features are out of scope.
 
   - type: textarea
     id: open_questions
@@ -72,10 +91,25 @@ body:
     id: research
     attributes:
       label: Research and rationale links
-      description: Link the research docs or prior issues that explain why this proposal exists.
+      description: Link the research docs, precedent surveys, or prior issues that explain why this proposal exists.
       placeholder: docs/research/language/...
     validations:
       required: true
+
+  - type: checkboxes
+    id: implementation_scope
+    attributes:
+      label: Implementation scope
+      description: Select the layers this proposal is expected to affect.
+      options:
+        - label: Parser
+        - label: Type checker
+        - label: Runtime engine
+        - label: Language server (diagnostics, completions, semantic tokens)
+        - label: TextMate grammar / syntax highlighting
+        - label: MCP tools or DTOs
+        - label: Sample files
+        - label: Spec or design documentation
 
   - type: textarea
     id: acceptance
