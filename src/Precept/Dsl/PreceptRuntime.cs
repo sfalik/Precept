@@ -1821,7 +1821,7 @@ public static class PreceptCompiler
             {
                 diagnostics.Add(new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C55,
-                    DiagnosticCatalog.C55.MessageTemplate,
+                    DiagnosticCatalog.C55.FormatMessage(),
                     eb.SourceLine));
             }
         }
@@ -1846,7 +1846,8 @@ public static class PreceptCompiler
         }
 
         // 2. Validate initial state asserts (in + to) against default data
-        if (model.StateAsserts is { Count: > 0 })
+        // Stateless precepts have no state asserts — InitialState is null and this block is unreachable for them.
+        if (!model.IsStateless && model.StateAsserts is { Count: > 0 })
         {
             var initialStateName = model.InitialState!.Name;
             foreach (var sa in model.StateAsserts)

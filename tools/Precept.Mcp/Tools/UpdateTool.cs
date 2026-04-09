@@ -28,9 +28,12 @@ public static class UpdateTool
         PreceptInstance instance;
         try
         {
-            instance = engine.IsStateless
-                ? engine.CreateInstance(nativeData?.AsReadOnly())
-                : engine.CreateInstance(currentState!, nativeData?.AsReadOnly());
+            if (engine.IsStateless)
+                instance = engine.CreateInstance(nativeData?.AsReadOnly());
+            else if (string.IsNullOrWhiteSpace(currentState))
+                return UpdateToolResult.WithError("currentState is required for stateful precepts.");
+            else
+                instance = engine.CreateInstance(currentState, nativeData?.AsReadOnly());
         }
         catch (Exception ex)
         {
