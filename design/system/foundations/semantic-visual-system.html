@@ -159,6 +159,7 @@ pre {
 .dv { color: var(--data-v); }
 .ru { color: var(--rule); }
 .cm { color: var(--comment); font-style: italic; }
+.ctx { color: var(--soft); }
 .ok { color: var(--valid); }
 .no { color: var(--violated); }
 .so { color: var(--data-t); }
@@ -1057,29 +1058,29 @@ pre {
 
       <div class="specimen-pair">
         <!-- Definition -->
-        <div class="specimen-half">
+        <div class="specimen-half" style="border-top:2px solid var(--structure)">
           <div class="specimen-half-bar">
             <span class="specimen-half-label">Definition</span>
-            <span class="specimen-half-tag">authored &middot; syntax token</span>
+            <span class="specimen-half-tag">authored &middot; grammar template</span>
           </div>
           <div class="specimen-half-inner"><pre
-><span class="s">precept</span> <span class="ru">InsuranceClaim</span>
+><span class="s">precept</span> &mdash;
 
-<span class="s">state</span> <span class="st">Filed</span>        <span class="s">initial</span>
-<span class="s">state</span> <span class="st">UnderReview</span>
-<span class="s">state</span> <span class="st">Settled</span>
-<span class="s">state</span> <span class="st">Rejected</span>
+<span class="s">state</span> &mdash;   <span class="s">initial</span>
+<span class="s">state</span> &mdash;
+<span class="s">state</span> &mdash;
+<span class="s">state</span> &mdash;
 
-<span class="s">event</span> <span class="ev">OpenReview</span>
-<span class="s">event</span> <span class="ev">Settle</span>
-<span class="s">event</span> <span class="ev">Reject</span>
+<span class="s">event</span> &mdash;
+<span class="s">event</span> &mdash;
+<span class="s">event</span> &mdash;
 
-<span class="s">from</span> <span class="st">Filed</span> <span class="s">on</span> <span class="ev">OpenReview</span>
-  -> <span class="s">transition</span> <span class="st">UnderReview</span>
-<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Settle</span>
-  -> <span class="s">transition</span> <span class="st">Settled</span>
-<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Reject</span>
-  -> <span class="s">transition</span> <span class="st">Rejected</span></pre>
+<span class="s">from</span> &mdash; <span class="s">on</span> &mdash;
+  -&gt; <span class="s">transition</span> &mdash;
+<span class="s">from</span> &mdash; <span class="s">on</span> &mdash;
+  -&gt; <span class="s">transition</span> &mdash;
+<span class="s">from</span> &mdash; <span class="s">on</span> &mdash;
+  -&gt; <span class="s">transition</span> &mdash;</pre>
           </div>
         </div>
 
@@ -1122,7 +1123,7 @@ pre {
 
       <div class="specimen-pair">
         <!-- Definition -->
-        <div class="specimen-half">
+        <div class="specimen-half" style="border-top:2px solid var(--state)">
           <div class="specimen-half-bar">
             <span class="specimen-half-label">Definition</span>
             <span class="specimen-half-tag">authored &middot; state declarations</span>
@@ -1186,19 +1187,18 @@ pre {
 
       <div class="specimen-pair">
         <!-- Definition -->
-        <div class="specimen-half">
+        <div class="specimen-half" style="border-top:2px solid var(--event)">
           <div class="specimen-half-bar">
             <span class="specimen-half-label">Definition</span>
-            <span class="specimen-half-tag">authored &middot; from-on blocks</span>
+            <span class="specimen-half-tag">authored &middot; event declarations</span>
           </div>
           <div class="specimen-half-inner">
-            <pre><span class="s">from</span> <span class="st">Draft</span>       <span class="s">on</span> <span class="ev">Submit</span>
-  -> <span class="s">transition</span> <span class="st">UnderReview</span>
-<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span>
-  -> <span class="s">transition</span> <span class="st">Approved</span>
+            <pre><span class="s">event</span> <span class="ev">Submit</span>
+<span class="s">event</span> <span class="ev">Approve</span>  <span class="s">with</span> <span class="da">Amount</span>   <span class="s">as</span> <span class="so">number</span>
+<span class="s">event</span> <span class="ev">Reject</span>
 
-<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Reject</span>
-  -> <span class="s">transition</span> <span class="st">Rejected</span></pre>
+<span class="s">event</span> <span class="ev">Escalate</span> <span class="s">with</span> <span class="da">Reason</span>   <span class="s">as</span> <span class="so">string</span>
+<span class="s">event</span> <span class="ev">Close</span></pre>
           </div>
         </div>
 
@@ -1256,16 +1256,16 @@ pre {
 
       <div class="specimen-pair">
         <!-- Definition -->
-        <div class="specimen-half">
+        <div class="specimen-half" style="border-top:2px solid var(--data)">
           <div class="specimen-half-bar">
             <span class="specimen-half-label">Definition</span>
             <span class="specimen-half-tag">authored &middot; field declarations</span>
           </div>
           <div class="specimen-half-inner"><pre
-><span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="dt">string</span>  <span class="s">nullable</span>
-<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="dt">number</span>  <span class="s">default</span> <span class="dv">0</span>
-<span class="s">field</span> <span class="da">IncomeVerified</span>  <span class="s">as</span> <span class="dt">boolean</span>
-<span class="s">field</span> <span class="da">ReviewNotes</span>     <span class="s">as</span> <span class="dt">string</span>  <span class="s">nullable</span></pre>
+><span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="so">string</span>  <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="so">number</span>  <span class="s">default</span> <span class="so">0</span>
+<span class="s">field</span> <span class="da">IncomeVerified</span>  <span class="s">as</span> <span class="so">boolean</span>
+<span class="s">field</span> <span class="da">ReviewNotes</span>     <span class="s">as</span> <span class="so">string</span>  <span class="s">nullable</span></pre>
           </div>
         </div>
 
@@ -1350,22 +1350,22 @@ pre {
 
       <div class="specimen-pair">
         <!-- Definition -->
-        <div class="specimen-half">
+        <div class="specimen-half" style="border-top:2px solid var(--rule)">
           <div class="specimen-half-bar">
             <span class="specimen-half-label">Definition</span>
             <span class="specimen-half-tag">authored &middot; assert blocks</span>
           </div>
           <div class="specimen-half-inner">
             <pre><span class="s">on</span> <span class="ev">Submit</span>
-  <span class="s">assert</span> <span class="da">ApplicantName</span> != <span class="dv">null</span>
+  <span class="s">assert</span> <span class="da">ApplicantName</span> != <span class="so">null</span>
   <span class="s">because</span> <span class="ru">&ldquo;Name is required&rdquo;</span>
 
 <span class="s">on</span> <span class="ev">Submit</span>
-  <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt; <span class="dv">0</span>
+  <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt; <span class="so">0</span>
   <span class="s">because</span> <span class="ru">&ldquo;Amount must be positive&rdquo;</span>
 
 <span class="s">on</span> <span class="ev">Submit</span>
-  <span class="s">assert</span> <span class="da">RequestedAmount</span> &lt;= <span class="dv">1000000</span>
+  <span class="s">assert</span> <span class="da">RequestedAmount</span> &lt;= <span class="so">1000000</span>
   <span class="s">because</span> <span class="ru">&ldquo;Within policy limit&rdquo;</span></pre>
           </div>
         </div>
