@@ -97,6 +97,7 @@ See the [Quickstart Guide](docs/RuntimeApiDesign.md) for a complete runtime inte
 - One file, all rules — guards, constraints, invariants, and transitions together
 - Full inspectability — preview any action's outcome without executing it
 - Compile-time checking — unreachable states and type errors caught before runtime
+- **Stateful or stateless** — precepts can govern stateful workflows (with lifecycle states and transitions) or stateless domain objects (fields and edit rules only, no states)
 
 **Live Editor Experience** — Completions, semantic highlighting, inline diagnostics, and a live state diagram preview in VS Code.
 

@@ -1,0 +1,21 @@
+precept CustomerProfile
+
+# A stateless data-only precept representing a customer identity object.
+# No lifecycle states or events — this precept governs what a CustomerProfile
+# must look like at all times, and which fields the host application can edit.
+#
+# This is a stateless precept: it has fields, invariants, and editability rules,
+# but no states, no events, and no transitions. Use it to represent domain objects
+# that evolve through direct field edits rather than state-machine transitions.
+
+field Name as string nullable
+field Email as string nullable
+field Phone as string nullable
+field PreferredContactMethod as string default "email"
+field MarketingOptIn as boolean default false
+
+invariant PreferredContactMethod != "" because "Preferred contact method must be specified"
+invariant MarketingOptIn == false || Email != null because "Marketing opt-in requires an email address"
+
+# All fields are editable — a customer profile can be fully updated at any time.
+edit all
