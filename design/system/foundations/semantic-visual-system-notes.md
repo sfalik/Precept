@@ -48,20 +48,21 @@ Purpose: lightweight working notes for discussion around a consolidated definiti
 For each core construct, define:
 
 1. Identifier: the textual way the construct is recognized.
-2. Visual depiction: the consistent base form used across surfaces.
-3. Semantic modifiers: additive visual signals layered onto the base form to represent specific meanings.
+2. Base depiction — Definition: how it appears in authored DSL source (token form — colour, weight, mono).
+3. Base depiction — Runtime: how it appears as a rendered component across Diagram, Data Form, and Timeline.
+4. Semantic modifiers: additive visual signals layered onto the base form to represent specific meanings.
 
 Modifier rule: modifiers are additive rather than replacement-based. Examples include an initial-state dot or a terminal-state double border.
 
 ### First-pass construct table
 
-| Construct | Identity | Visual Depiction | Semantic Modifiers |
-|---|---|---|---|
-| Structure | Not applicable | Indigo family | None |
-| State | State name | Violet family | initial, terminal, constrained, reachableFromInitial, reachableFromCurrent, current |
-| Event | Event name | Cyan family | transition, self-transition, no-transition, rejected, constraint failure, unmatched |
-| Data | Field name | Three tonal shades: name / type / value | editable, constrained, violated, required |
-| Rule | Rule message text (the because / reject string) | Gold `#FBBF24` — the message is the visual interrupt | satisfied, violated |
+| Construct | Identity | Base Depiction — Definition (Code) | Base Depiction — Runtime (Diagram · Data Form · Timeline) | Semantic Modifiers |
+|---|---|---|---|---|
+| Structure | Not applicable | Indigo syntax tokens: keywords (`precept`, `state`, `event`, `from…on`, `set`, `transition`) in structure colour — grammar rendered as colour | Indigo framing chrome: container borders, section headers, rail, group labels — ambient structural scaffolding | None |
+| State | State name | Violet mono token in `state StateName { }` declaration | Hard-rect node, violet border, violet mono label — same shape on all runtime surfaces | initial (dot), terminal (double border), constrained (italic label), reachableFromInitial, reachableFromCurrent, current |
+| Event | Event name | Cyan mono token in `on EventName` / `from X on EventName` clause | Directed arc or row with cyan label + directional marker — marker is invariant on all runtime surfaces | transition, self-transition, no-transition, rejected, constraint failure, unmatched |
+| Data | Field name | Data-colour mono token for field name; type annotation in data-t; no value shown (values are runtime-assigned, not authored) | Three-part row: name (data, mono) · type (data-t, mono) · value (data-v, mono) — mono throughout, no carve-outs | editable, constrained (italic name label), violated (dashed border on row), required |
+| Rule | Rule message text (the `because` / `reject` string) | Gold mono token inline in `because "…"` or `reject "…"` clause | Gold message rendered below field or as verdict overlay when rule fires — the message is the visual interrupt | satisfied, violated |
 
 ### Team research synthesis
 
@@ -163,3 +164,86 @@ Visual implication: every structural decision should be judged against whether i
 - Cover explanatory/docs as the translational surface that carries the same semantic language into narrative and reference contexts.
 - For each surface, state what remains invariant, what adapts to the medium, and what that surface helps the user read fastest.
 - Include one deliberate stateless specimen somewhere in this section so the philosophy is visible in the artifact, without forcing equal airtime for stateful and stateless cases.
+
+## Session Decisions — 2026-04-08
+
+### Color System
+
+- Section 06 Colors added to the document: authoring palette strip (8 swatches), comments + verdicts + background strip, six concept cells (one per construct family plus comments), four rule channels.
+- Canonical palette CSS vars locked:
+  - `--bg: #040506`, `--panel: #090b0e`, `--panel-2: #0d1014`
+  - `--structure-d: #4338CA` (semantic, bold), `--structure: #6366F1` (grammar)
+  - `--state: #A898F5`, `--event: #30B8E8`
+  - `--data: #B0BEC5`, `--data-t: #9AA8B5`, `--data-v: #84929F`
+  - `--rule: #FBBF24`, `--comment: #9096A6`
+  - `--valid: #34D399`, `--violated: #F87171`, `--warn: #FDE047`
+- Token class mapping locked: `.s` (structure grammar), `.sd` (structure semantic, bold), `.st` (state), `.ev` (event), `.da` (data name), `.dt` (data type), `.dv` (data value), `.ru` (rule/message), `.cm` (comment, italic), `.ok` (valid), `.no` (violated), `.so` (data-t tonal).
+- Label vocabulary rule: no color-name terms in semantic labels. Terms like "amber tone," "rose mark," "emerald callout," "violated tone" are banned. Labels name semantic roles, not color names.
+
+### Construct Gallery Redesign
+
+- Each construct gallery now shows two specimens side-by-side: **Definition** (authored DSL syntax token, left) and **Runtime** (rendered component, right), separated by a strong hairline seam.
+- Cross-surface translation strips removed from all galleries. Cross-surface translation is reserved for the Surfaces section (Section 04).
+- Per-construct Runtime specimens:
+  - Structure/Runtime: indigo container frame with nested state rects inside — the perimeter relationship made visible.
+  - State/Runtime: four hard-rect state nodes showing all role variants (initial dot, active fill, double border for terminal, italic for constrained).
+  - Event/Runtime: three transition rows showing outcome variants (plain, guarded/italic, blocked/dashed-violated).
+  - Data/Runtime: field-table with semantic tonal classes — `.da` name, `.dt` type, `.dv` value. Four rows covering valid, violated/required (constrained italic), editable, locked.
+  - Rule/Runtime: three verdict callouts rendered as actual specimens — satisfied (green), violated (red), unmatched (amber).
+- Data table tonal classes corrected: `.dt` for type, `.dv` for value (previously `.so`). Semantically correct; visual output unchanged.
+- Modifier sections now visually demonstrate modifier traits in the chips themselves where possible (e.g. dashed border on blocked chip, italic on guarded chip, double border on terminal chip).
+- Rule modifiers section replaced chips for callout variants with full-width rendered callout specimens.
+- New CSS classes added: `.specimen-pair`, `.specimen-half`, `.specimen-half-bar`, `.specimen-half-label`, `.specimen-half-tag`, `.specimen-half-inner`, `.callout-demo` (+ variants), `.tonal-demo`, `.tonal-cell`, `.tonal-cell-lbl`.
+- `.rule-callout` semantic: border, background, and text are violated (red family), not rule (gold). A callout rendered because a rule fired is a verdict signal, not a rule color signal.
+
+### Surface Inventory
+
+- Final surface model: **Code · State Diagram · Data Form · Event Timeline**.
+- Docs dropped from the active surface scope. Surface count: four.
+- "Stateless Precept" is not a peer surface. Code is code — a stateless precept is just a precept without state declarations. No separate specimen category for it.
+- "Inspector" term is banned. The canonical term is **Data Form** everywhere.
+
+### Definition / Runtime Framework
+
+- Surfaces are organized as: **Definition** (Code) and **Runtime** (State Diagram · Data Form · Event Timeline).
+- The State Diagram is a Runtime surface — it is rendered from a compiled `PreceptDefinition`, not from DSL text directly.
+- Definition and Runtime are the two organizing categories. No "authoring/presentation" or "textual/visual" split.
+- The three runtime surfaces are peer surfaces. No surface among Diagram, Data Form, and Timeline is primary over the others.
+
+### Channel Consistency Rules (Runtime Surfaces)
+
+- "Visually consistent" across runtime surfaces means all four channels are consistent: colour, typography, form, and layout.
+- **Colour**: runtime construct families map to their canonical colour tokens on all surfaces. No surface gets a local palette exception.
+- **Typography**:
+  - Mono for everything the runtime reasons about: state names, event names, field names, field values, rule messages.
+  - Sans for ambient context: labels, captions, nav, structural UI text.
+  - Italic = constraint pressure on identity label only, all surfaces (no other italic use).
+- **Form**:
+  - States = hard-rect (square corners) on all runtime surfaces. No rounded states anywhere.
+  - Blocked/violated = dashed border. This is the exclusive form signal for that meaning — reserved, no other use.
+  - Events carry a directional marker (arrow) on all runtime surfaces.
+- **Layout**: layout grammars differ by surface purpose but share the same principles (grouping by meaning, consistent spacing rhythm). No surface invents private layout semantics.
+- **Field values = mono** on all runtime surfaces. No carve-outs for long strings — truncation handles overflow.
+
+### Construct Table
+
+- "Visual Depiction" column split into two: **Base Depiction — Definition (Code)** and **Base Depiction — Runtime (Diagram · Data Form · Timeline)**.
+- Rationale: Definition and Runtime are now the two organizing categories for surfaces. Base depiction differs between them — in Code constructs appear as syntax tokens (colour + mono); in Runtime they appear as rendered components (shape, row, arc, chrome).
+- Definition pattern updated to match: now defines four things per construct — identity, base depiction (Definition), base depiction (Runtime), and semantic modifiers.
+- Key per-construct notes from the split:
+  - Structure/Definition: indigo syntax tokens (grammar keywords). Structure/Runtime: indigo framing chrome (borders, headers, rail).
+  - State/Definition: violet mono token in declaration. State/Runtime: hard-rect node, violet, mono label — same shape on all runtime surfaces.
+  - Event/Definition: cyan mono token in clause. Event/Runtime: directed arc or row with cyan label + directional marker (marker invariant on all runtime surfaces).
+  - Data/Definition: name in data colour, type in data-t, no value (values are runtime-assigned). Data/Runtime: three-part row — name (data) · type (data-t) · value (data-v) — mono throughout.
+  - Rule/Definition: gold mono token in `because`/`reject` clause. Rule/Runtime: gold message as verdict overlay below field when rule fires.
+
+### Concepts Section Redesign
+
+- Concepts section redesigned as an architectural block diagram — not a specimen matrix. Level of detail is overview/orientation only. No specimens of any kind in this section.
+- Three-layer composition top-to-bottom: Constructs (foundation row) → Registers + Surfaces (split layer) → Channels (full-width spanning band). Visual hierarchy encodes the dependency chain.
+- Register column ratio 1:3 (Definition : Runtime) encodes the 1-surface (Code) vs 3-surface (Diagram · Data Form · Timeline) structure in layout.
+- Channels band placed full-width, spanning both registers — communicates that channels are cross-cutting, not surface-local. Signal precedence language locked in channels header: "colour answers first, form second, layout third, typography throughout."
+- Four concept annotation cells restored as prose below the diagram: Semantic Identity, Authored vs Runtime Meaning, Additive Modifiers & Runtime Overlays, Cross-Surface Translation.
+- Docs surface: appears in the Concepts section matrix (5 surfaces total), but does not get a full specimen in Section 04 Surfaces. Distinction: Concepts shows all 5 surfaces in the overview; Surfaces section covers the four primary runtime+definition surfaces in depth.
+- All old `smx-*` and `sys-matrix`/`sys-channels` CSS classes removed. New prefix: `cov-`.
+- Specimens live exclusively in Section 03 (System). Concepts section earns orientation without stealing Section 03's impact.

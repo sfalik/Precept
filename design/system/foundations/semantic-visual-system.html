@@ -32,6 +32,7 @@
   --mono: "Cascadia Cove","Cascadia Code",Consolas,monospace;
   --sans: "Inter","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
   --nav-w: 196px;
+  --nav-w-collapsed: 36px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
@@ -54,8 +55,40 @@ body {
   align-content: start;
   gap: 2px;
   overflow-y: auto;
+  overflow-x: hidden;
   z-index: 100;
+  transition: width 0.2s ease;
 }
+.nav-rail.collapsed {
+  width: var(--nav-w-collapsed);
+  padding: 28px 0;
+}
+.nav-rail.collapsed .nav-wordmark,
+.nav-rail.collapsed .nav-item,
+.nav-rail.collapsed .nav-section-meta {
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.nav-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--nav-w-collapsed);
+  flex-shrink: 0;
+  height: 28px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--soft);
+  font-size: 14px;
+  margin-bottom: 12px;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.nav-toggle:hover { color: var(--text); }
+.nav-rail.collapsed .nav-toggle { margin-bottom: 0; }
 .nav-wordmark {
   font-size: 11px;
   letter-spacing: 0.22em;
@@ -90,6 +123,10 @@ body {
   margin-left: var(--nav-w);
   padding: 0 56px 120px;
   max-width: 1320px;
+  transition: margin-left 0.2s ease;
+}
+.nav-rail.collapsed ~ .page {
+  margin-left: var(--nav-w-collapsed);
 }
 /* ── SHARED ───────────────────────────────── */
 .eyebrow {
@@ -482,7 +519,8 @@ pre {
 <body>
 
 <!-- ─── Nav rail ─────────────────────────────────── -->
-<nav class="nav-rail" aria-label="Document navigation">
+<nav class="nav-rail" id="navRail" aria-label="Document navigation">
+  <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation" title="Toggle navigation">&#8250;</button>
   <div class="nav-wordmark">Precept</div>
   <a class="nav-item active" href="#intro"     data-sec="intro">Intro</a>
   <a class="nav-item"        href="#concepts"  data-sec="concepts">Concepts</a>
@@ -563,71 +601,440 @@ pre {
 <!-- ═══════════════════════════════════════════════ -->
 <!-- 02 · CONCEPTS                                   -->
 <!-- ═══════════════════════════════════════════════ -->
+<style>
+/* ── § 02 CONCEPTS · system map ─────────────────────────────── */
+.cov-frame {
+  border: 1px solid var(--line-strong);
+}
+/* ─ zone header rows ─ */
+.cov-zone-hdr {
+  padding: 9px 20px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.cov-z-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: rgba(103,114,129,0.50);
+}
+.cov-z-note {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: rgba(103,114,129,0.45);
+}
+/* ─ constructs band ─ */
+.cov-constructs {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border-bottom: 1px solid var(--line-strong);
+}
+.cov-cs {
+  padding: 20px 18px;
+  background: var(--panel);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cov-cs-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.cov-cs-name {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+/* ─ registers ─ */
+.cov-registers {
+  display: grid;
+  grid-template-columns: 1fr 3fr;
+  background: var(--line-strong);
+  gap: 1px;
+  border-bottom: 2px solid var(--line-strong);
+}
+.cov-reg {
+  background: var(--panel);
+  display: grid;
+  gap: 0;
+}
+.cov-reg-head {
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.cov-reg-name {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.cov-reg-tag {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--soft);
+}
+.cov-reg-body {
+  padding: 22px 22px 20px;
+  display: grid;
+  gap: 20px;
+  align-content: start;
+}
+.cov-reg-note {
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.72;
+  color: var(--soft);
+  max-width: 38ch;
+}
+.cov-surfaces {
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+}
+.cov-reg--def .cov-surfaces { grid-template-columns: 1fr; }
+.cov-reg--rt  .cov-surfaces { grid-template-columns: repeat(3, 1fr); }
+.cov-sf {
+  padding: 13px 15px;
+  background: var(--panel-2);
+}
+.cov-sf-name {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: block;
+}
+.cov-sf-note {
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--soft);
+  opacity: 0.65;
+  display: block;
+  margin-top: 5px;
+}
+/* ─ channels ─ */
+.cov-ch-hdr {
+  padding: 9px 20px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  border-top: 2px solid var(--line-strong);
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.cov-channels {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--line);
+}
+.cov-ch {
+  padding: 22px 20px;
+  background: var(--bg);
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.cov-ch-num {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(103,114,129,0.35);
+}
+.cov-ch-name {
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.cov-ch-note {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--soft);
+}
+/* ─ concept annotations ─ */
+.cov-concepts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  margin-top: 32px;
+}
+.cov-concept {
+  padding: 28px;
+  background: var(--panel);
+}
+.cov-concept-lbl {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 10px;
+  display: block;
+}
+.cov-concept p {
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+/* ─ responsive ─ */
+@media (max-width: 960px) {
+  .cov-constructs { grid-template-columns: repeat(3, 1fr); }
+  .cov-registers  { grid-template-columns: 1fr; }
+  .cov-reg--rt .cov-surfaces { grid-template-columns: 1fr; }
+  .cov-channels   { grid-template-columns: repeat(2, 1fr); }
+  .cov-concepts   { grid-template-columns: 1fr; }
+}
+</style>
+
 <section class="section" id="concepts">
   <div class="section-head">
     <div class="eyebrow">02 · Concepts</div>
-    <h2>How the system works</h2>
-    <p>The concepts specific to the semantic visual system itself — not a recap of Precept, but the grammar that governs how Precept means things on screen.</p>
+    <h2>Five constructs&thinsp;·&thinsp;Two registers&thinsp;·&thinsp;Four channels</h2>
+    <p>The system has four structural parts. Five construct types form the identity substrate — the semantic vocabulary that stays recognizable wherever it appears. Two depiction registers translate that identity into authored source (Definition) and rendered components (Runtime). Four signal channels encode meaning in both. Four surfaces provide the contexts in which all of this manifests.</p>
   </div>
 
-  <div class="concepts-grid">
-    <div class="concept-cell">
-      <h3>Semantic Identity</h3>
-      <p>The stable type classification of any authored construct. Structure is always structure. A state is always a state. Identity persists across surfaces — it does not reset when the rendering context changes.</p>
+  <!-- Architecture map ─────────────────────────── -->
+  <div class="cov-frame" role="img" aria-label="System architecture: five constructs across two depiction registers, four signal channels spanning both">
+
+    <!-- Layer 1 · Constructs -->
+    <div class="cov-zone-hdr">
+      <span class="cov-z-label">Constructs</span>
+      <span class="cov-z-note">five types&thinsp;·&thinsp;stable semantic identity across all registers and surfaces</span>
     </div>
-    <div class="concept-cell">
-      <h3>Base Depiction</h3>
-      <p>The canonical visual form that represents a construct in its default, unmodified condition. Base depiction is the floor; all other treatment is additive above it.</p>
+    <div class="cov-constructs">
+      <div class="cov-cs">
+        <span class="cov-cs-dot" style="background:var(--structure)"></span>
+        <span class="cov-cs-name s">Structure</span>
+      </div>
+      <div class="cov-cs">
+        <span class="cov-cs-dot" style="background:var(--state)"></span>
+        <span class="cov-cs-name st">State</span>
+      </div>
+      <div class="cov-cs">
+        <span class="cov-cs-dot" style="background:var(--event)"></span>
+        <span class="cov-cs-name ev">Event</span>
+      </div>
+      <div class="cov-cs">
+        <span class="cov-cs-dot" style="background:var(--data)"></span>
+        <span class="cov-cs-name da">Data</span>
+      </div>
+      <div class="cov-cs">
+        <span class="cov-cs-dot" style="background:var(--rule)"></span>
+        <span class="cov-cs-name ru">Rule</span>
+      </div>
     </div>
-    <div class="concept-cell">
-      <h3>Semantic Modifier</h3>
-      <p>An additive signal layered onto a base depiction to express a meaningful variant — initial, terminal, constrained, violated. Modifiers qualify the base reading; they do not replace it.</p>
+
+    <!-- Layer 2 · Two depiction registers -->
+    <div class="cov-registers">
+
+      <!-- Definition register -->
+      <div class="cov-reg cov-reg--def">
+        <div class="cov-reg-head">
+          <span class="cov-reg-name">Definition</span>
+          <span class="cov-reg-tag">authored DSL&thinsp;·&thinsp;what it is</span>
+        </div>
+        <div class="cov-reg-body">
+          <p class="cov-reg-note">The token form of a construct in the DSL editor. Syntax colour, monospaced weight, and keyword grammar carry each construct's authored identity — the stable visual form before any runtime evaluation.</p>
+          <div class="cov-surfaces">
+            <div class="cov-sf">
+              <span class="cov-sf-name">Code</span>
+              <span class="cov-sf-note">syntax token in authored source</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Runtime register -->
+      <div class="cov-reg cov-reg--rt">
+        <div class="cov-reg-head">
+          <span class="cov-reg-name">Runtime</span>
+          <span class="cov-reg-tag">rendered components&thinsp;·&thinsp;what is happening to it now</span>
+        </div>
+        <div class="cov-reg-body">
+          <p class="cov-reg-note">The component form of a construct in rendered views. The same identity as Definition; three distinct visual conventions suited to each surface. All four signal channels held consistent across all three.</p>
+          <div class="cov-surfaces">
+            <div class="cov-sf">
+              <span class="cov-sf-name">Diagram</span>
+              <span class="cov-sf-note">nodes, arcs, topology</span>
+            </div>
+            <div class="cov-sf">
+              <span class="cov-sf-name">Data Form</span>
+              <span class="cov-sf-note">fields, values, constraints</span>
+            </div>
+            <div class="cov-sf">
+              <span class="cov-sf-name">Timeline</span>
+              <span class="cov-sf-note">events, state transitions</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /.cov-registers -->
+
+    <!-- Layer 3 · Channels (signal grammar spanning both registers) -->
+    <div class="cov-ch-hdr">
+      <span class="cov-z-label">Channels</span>
+      <span class="cov-z-note">signal grammar&thinsp;·&thinsp;both registers&thinsp;·&thinsp;colour answers first, form second, layout third, typography throughout</span>
     </div>
-    <div class="concept-cell">
-      <h3>Runtime Overlay</h3>
-      <p>Evaluation output drawn on top of authored constructs at runtime. Allowed, blocked, and warning do not replace a construct's identity — they say what is happening to it right now.</p>
+    <div class="cov-channels">
+      <div class="cov-ch">
+        <span class="cov-ch-num">01</span>
+        <span class="cov-ch-name">Colour</span>
+        <p class="cov-ch-note">Five construct families, three verdict states. Hue encodes type identity; saturation and weight signal runtime outcome.</p>
+      </div>
+      <div class="cov-ch">
+        <span class="cov-ch-num">02</span>
+        <span class="cov-ch-name">Typography</span>
+        <p class="cov-ch-note">Mono for all semantic names. Sans for prose and context. Weight and style carry constraint and modification status.</p>
+      </div>
+      <div class="cov-ch">
+        <span class="cov-ch-num">03</span>
+        <span class="cov-ch-name">Form</span>
+        <p class="cov-ch-note">Stable base shapes encode construct type. Modifier signals&thinsp;—&thinsp;border weight, fill, dash, outline&thinsp;—&thinsp;layer additively without displacing the base.</p>
+      </div>
+      <div class="cov-ch">
+        <span class="cov-ch-num">04</span>
+        <span class="cov-ch-name">Layout</span>
+        <p class="cov-ch-note">Adjacency, ordering, and depth encode relationship, sequence, and structural hierarchy across all surfaces.</p>
+      </div>
     </div>
-    <div class="concept-cell">
-      <h3>Signal Precedence</h3>
-      <p>When multiple channels speak at once, precedence governs the reading order. Colour answers first. Form answers second. Layout answers third. Typography carries register and pressure throughout.</p>
+
+  </div><!-- /.cov-frame -->
+
+  <!-- Concept definitions ─────────────────────── -->
+  <div class="cov-concepts">
+    <div class="cov-concept">
+      <span class="cov-concept-lbl">Semantic Identity</span>
+      <p>Each construct carries a stable type classification that persists regardless of surface. Structure is always indigo, State always violet, Event always cyan, Data always steel, Rule always amber. Moving from code editor to diagram to data form to timeline, the same construct speaks in the same visual register&thinsp;—&thinsp;the medium adapts, the identity does not.</p>
     </div>
-    <div class="concept-cell">
-      <h3>Cross-Surface Translation</h3>
-      <p>The same semantic construct expressed through the appropriate conventions of a different surface while maintaining stable identity. A state in DSL code and a state node in a diagram are the same thing, differently dressed.</p>
+    <div class="cov-concept">
+      <span class="cov-concept-lbl">Authored vs Runtime Meaning</span>
+      <p>Definition captures what a construct <em>is</em>&thinsp;—&thinsp;its place in the governed schema, independent of any live instance. Runtime captures what is <em>happening</em> to it now&thinsp;—&thinsp;current lifecycle position, field values, evaluation results. These two readings are formally distinct. The same construct identity underlies both; the register changes, the identity holds.</p>
     </div>
-    <div class="concept-cell">
-      <h3>Authored vs. Runtime Meaning</h3>
-      <p>Authored meaning is defined at write time: what a construct is, what it is named, what rules constrain it. Runtime meaning is evaluated at execution: whether it is currently allowed, blocked, or reachable. Both are present on most surfaces.</p>
+    <div class="cov-concept">
+      <span class="cov-concept-lbl">Additive Modifiers &amp; Runtime Overlays</span>
+      <p>Runtime state and constraint status are expressed as signals layered onto the base depiction&thinsp;—&thinsp;never as replacements. A blocked transition marks the event; it does not erase it. A violated rule flags the field row; it does not suppress it. Evaluation output&thinsp;—&thinsp;allowed, blocked, warning&thinsp;—&thinsp;is drawn on top. Overlay reveals; it does not displace.</p>
     </div>
-    <div class="concept-cell">
-      <h3>Adjacent Semantics</h3>
-      <p>Verdicts, transitions, and annotations that participate in the visual system without belonging to the five core constructs. They borrow vocabulary from the construct system and return runtime or relational meaning.</p>
+    <div class="cov-concept">
+      <span class="cov-concept-lbl">Cross-Surface Translation</span>
+      <p>Moving from code editor to diagram to data form to timeline, a construct adopts different visual conventions appropriate to each medium. What remains invariant is its semantic identity: colour family, name form, and the modifier logic that applies to it. The system defines what stays constant so nothing needs to be relearned as surfaces change.</p>
     </div>
   </div>
 
-  <div class="channels-grid">
-    <div class="channel">
-      <span class="channel-name">Channel 01</span>
-      <h3>Colour</h3>
-      <p>Five families locked to the five constructs. Three verdict hues above them, runtime-only. No channel may borrow from another's family without becoming ambiguous.</p>
-    </div>
-    <div class="channel">
-      <span class="channel-name">Channel 02</span>
-      <h3>Typography</h3>
-      <p>Mono governs identity, headings, labels, and executable names. Inter carries reading prose. Italic marks semantic pressure — a constrained name, a rule-adjacent term — not decoration.</p>
-    </div>
-    <div class="channel">
-      <span class="channel-name">Channel 03</span>
-      <h3>Form</h3>
-      <p>Shape before colour. The silhouette of a construct — frame, card, row, badge, callout — should survive context changes. If colour is lost, form still tells the reader what kind of thing they are looking at.</p>
-    </div>
-    <div class="channel">
-      <span class="channel-name">Channel 04</span>
-      <h3>Layout</h3>
-      <p>Adjacency and order carry meaning. What is next to what, what precedes what, what is nested inside what — these are signal, not decoration. Layout says relationship; colour says identity.</p>
-    </div>
-  </div>
 </section>
+
+<style>
+/* ── § 03 SYSTEM · specimen pair (Definition / Runtime) ─────── */
+.specimen-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--line-strong);
+  border: 1px solid var(--line);
+}
+.specimen-half {
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+}
+.specimen-half-bar {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.specimen-half-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.specimen-half-tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: rgba(103,114,129,0.5);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.specimen-half-inner {
+  padding: 24px 20px;
+  flex: 1;
+}
+/* Rule callout demos ─────────────────────────────────────────── */
+.callout-demo {
+  padding: 10px 14px;
+  border-left: 3px solid;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 3px 0;
+}
+.callout-demo--satisfied {
+  border-color: var(--valid);
+  background: rgba(52,211,153,0.04);
+  color: var(--valid);
+}
+.callout-demo--violated {
+  border-color: var(--violated);
+  background: rgba(248,113,113,0.04);
+  color: var(--violated);
+}
+.callout-demo--warn {
+  border-color: var(--warn);
+  background: rgba(253,224,71,0.04);
+  color: var(--warn);
+}
+/* Data tonal hierarchy demo ──────────────────────────────────── */
+.tonal-demo {
+  display: flex;
+  border: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.tonal-cell {
+  flex: 1;
+  padding: 10px 14px;
+  border-right: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.tonal-cell:last-child { border-right: none; }
+.tonal-cell-lbl {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 7px;
+}
+@media (max-width: 960px) {
+  .specimen-pair { grid-template-columns: 1fr; }
+}
+</style>
 
 <!-- ═══════════════════════════════════════════════ -->
 <!-- 03 · SYSTEM                                     -->
@@ -636,7 +1043,7 @@ pre {
   <div class="section-head">
     <div class="eyebrow">03 · System</div>
     <h2>Five constructs, one grammar</h2>
-    <p>Each gallery shows the base depiction, semantic modifiers, and cross-surface translation for one of Precept's five authored constructs. All five use the same composed structure.</p>
+    <p>Each gallery shows two base depictions — Definition (how the construct appears as a syntax token in authored code) and Runtime (how it appears as a rendered component) — followed by semantic modifiers. All five constructs use the same composed structure.</p>
   </div>
 
   <!-- STRUCTURE ─────────────────────────────────── -->
@@ -647,42 +1054,60 @@ pre {
       <p style="font-size:14px;margin-top:8px">Registration, grouping, and governed boundaries. The perimeter that makes everything inside coherent.</p>
     </div>
     <div class="construct-body">
-      <div class="construct-specimen">
-        <div class="specimen-bar"><span>Base depiction</span><div class="specimen-dots"><span class="specimen-dot"></span><span class="specimen-dot"></span><span class="specimen-dot"></span></div></div>
-        <div class="construct-specimen-inner"><pre
+
+      <div class="specimen-pair">
+        <!-- Definition -->
+        <div class="specimen-half">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Definition</span>
+            <span class="specimen-half-tag">authored &middot; syntax token</span>
+          </div>
+          <div class="specimen-half-inner"><pre
 ><span class="s">precept</span> <span class="ru">InsuranceClaim</span>
 
-<span class="s">state</span> <span class="st">Filed</span> <span class="s">initial</span>
+<span class="s">state</span> <span class="st">Filed</span>        <span class="s">initial</span>
 <span class="s">state</span> <span class="st">UnderReview</span>
 <span class="s">state</span> <span class="st">Settled</span>
+<span class="s">state</span> <span class="st">Rejected</span>
 
 <span class="s">event</span> <span class="ev">OpenReview</span>
 <span class="s">event</span> <span class="ev">Settle</span>
+<span class="s">event</span> <span class="ev">Reject</span>
 
-<span class="s">from</span> <span class="st">Filed</span> <span class="s">on</span> <span class="ev">OpenReview</span> -> <span class="s">transition</span> <span class="st">UnderReview</span>
-<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Settle</span> -> <span class="s">transition</span> <span class="st">Settled</span></pre>
+<span class="s">from</span> <span class="st">Filed</span> <span class="s">on</span> <span class="ev">OpenReview</span>
+  -> <span class="s">transition</span> <span class="st">UnderReview</span>
+<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Settle</span>
+  -> <span class="s">transition</span> <span class="st">Settled</span>
+<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Reject</span>
+  -> <span class="s">transition</span> <span class="st">Rejected</span></pre>
+          </div>
+        </div>
+
+        <!-- Runtime -->
+        <div class="specimen-half">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Runtime</span>
+            <span class="specimen-half-tag">rendered &middot; container frame</span>
+          </div>
+          <div class="specimen-half-inner">
+            <div style="border:1px solid rgba(99,102,241,0.45);">
+              <div style="padding:9px 14px;border-bottom:1px solid rgba(99,102,241,0.2);display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--structure)">InsuranceClaim</span>
+                <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.20em;text-transform:uppercase;color:rgba(99,102,241,0.35)">precept</span>
+              </div>
+              <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <div style="padding:7px 12px;border:1px solid rgba(168,152,245,0.35);display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px;color:var(--state);">
+                  <span style="width:6px;height:6px;border-radius:50%;background:var(--structure);flex-shrink:0;"></span>Filed
+                </div>
+                <div style="padding:7px 12px;border:1px solid rgba(168,152,245,0.3);font-family:var(--mono);font-size:12px;color:var(--state);">UnderReview</div>
+                <div style="padding:7px 12px;border:2px solid rgba(168,152,245,0.5);box-shadow:0 0 0 1px rgba(168,152,245,0.18);font-family:var(--mono);font-size:12px;color:var(--state);">Settled</div>
+                <div style="padding:7px 12px;border:1px solid rgba(168,152,245,0.2);font-family:var(--mono);font-size:12px;color:var(--state);font-style:italic;">Rejected</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <div>
-        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
-        <div class="construct-modifiers">
-          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35)">precept &lt;name&gt;</span>
-          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35)">state … initial</span>
-          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35)">from … on</span>
-          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35)">-&gt; transition</span>
-          <span class="modifier-tag">field … as type</span>
-          <span class="modifier-tag">event with args</span>
-        </div>
-      </div>
-      <div>
-        <div class="eyebrow" style="margin-bottom:0">Cross-surface translation</div>
-        <div class="cross-surface-strip">
-          <div class="surface-chip">Code<span class="s">Indigo keywords, outer frame</span></div>
-          <div class="surface-chip">Diagram<span class="s">Container border, cluster label</span></div>
-          <div class="surface-chip">Data Form<span class="s">Panel shell, section divider</span></div>
-          <div class="surface-chip">Docs<span class="s">Named precept heading block</span></div>
-        </div>
-      </div>
+
     </div>
   </div>
 
@@ -694,44 +1119,59 @@ pre {
       <p style="font-size:14px;margin-top:8px">A named lifecycle position. States describe what is true right now, not how the entity arrived there.</p>
     </div>
     <div class="construct-body">
-      <div class="construct-specimen">
-        <div class="specimen-bar"><span>Base depiction + role modifiers</span><div class="specimen-dots"><span class="specimen-dot"></span><span class="specimen-dot"></span><span class="specimen-dot"></span></div></div>
-        <div class="construct-specimen-inner">
-          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:18px">
-            <span style="display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border:1px solid rgba(168,152,245,0.4);font-family:var(--mono);font-size:13px">
-              <span style="width:7px;height:7px;border-radius:50%;background:var(--structure)"></span>
-              <span class="st">Draft</span>
-              <span class="so" style="font-size:10px;text-transform:uppercase;letter-spacing:0.12em">initial</span>
-            </span>
-            <span style="padding:7px 14px;border:1px solid rgba(168,152,245,0.3);font-family:var(--mono);font-size:13px;color:var(--state)">UnderReview</span>
-            <span style="padding:7px 14px;border:2px solid rgba(168,152,245,0.55);font-family:var(--mono);font-size:13px;color:var(--state)">Approved <span class="so" style="font-size:10px;text-transform:uppercase;letter-spacing:0.12em">terminal</span></span>
-            <span style="padding:7px 14px;border:1px solid rgba(168,152,245,0.2);font-family:var(--mono);font-size:13px;color:var(--state);font-style:italic">Constrained</span>
+
+      <div class="specimen-pair">
+        <!-- Definition -->
+        <div class="specimen-half">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Definition</span>
+            <span class="specimen-half-tag">authored &middot; state declarations</span>
           </div>
-          <pre><span class="s">state</span> <span class="st">Draft</span> <span class="s">initial</span>
+          <div class="specimen-half-inner">
+            <pre><span class="s">state</span> <span class="st">Draft</span>        <span class="s">initial</span>
 <span class="s">state</span> <span class="st">UnderReview</span>
 <span class="s">state</span> <span class="st">Approved</span>
 <span class="s">state</span> <span class="st">Rejected</span></pre>
+          </div>
+        </div>
+
+        <!-- Runtime -->
+        <div class="specimen-half">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Runtime</span>
+            <span class="specimen-half-tag">rendered &middot; state nodes</span>
+          </div>
+          <div class="specimen-half-inner">
+            <div style="display:grid;gap:8px;">
+              <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid rgba(168,152,245,0.4);font-family:var(--mono);font-size:13px;color:var(--state);width:fit-content;">
+                <span style="width:7px;height:7px;border-radius:50%;background:var(--structure);flex-shrink:0;"></span>
+                Draft<span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--soft);margin-left:6px;">initial</span>
+              </div>
+              <div style="display:inline-flex;align-items:center;padding:8px 14px;border:1px solid rgba(168,152,245,0.35);background:rgba(168,152,245,0.07);font-family:var(--mono);font-size:13px;color:var(--state);width:fit-content;">
+                UnderReview<span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(168,152,245,0.55);margin-left:8px;">current</span>
+              </div>
+              <div style="display:inline-flex;align-items:center;padding:8px 14px;border:2px solid rgba(168,152,245,0.55);box-shadow:inset 0 0 0 3px rgba(168,152,245,0.12);font-family:var(--mono);font-size:13px;color:var(--state);width:fit-content;">
+                Approved<span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--soft);margin-left:8px;">terminal</span>
+              </div>
+              <div style="display:inline-flex;align-items:center;padding:8px 14px;border:1px solid rgba(168,152,245,0.2);font-family:var(--mono);font-size:13px;color:var(--state);font-style:italic;width:fit-content;">
+                Rejected<span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--soft);margin-left:8px;font-style:normal;">constrained</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+
       <div>
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
         <div class="construct-modifiers">
-          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.35)">initial — origin dot</span>
-          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.35)">terminal — double border</span>
-          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.35)">current — active fill</span>
-          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.35)">reachable — dim highlight</span>
-          <span class="modifier-tag" style="font-style:italic">constrained — italic name</span>
+          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.35);display:inline-flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--structure);display:inline-block;flex-shrink:0;"></span>initial &mdash; origin dot</span>
+          <span class="modifier-tag st" style="border-width:2px;border-color:rgba(168,152,245,0.5);box-shadow:inset 0 0 0 2px rgba(168,152,245,0.14);">terminal &mdash; double border</span>
+          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.45);background:rgba(168,152,245,0.10);">current &mdash; active fill</span>
+          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.2);opacity:0.65;">reachable &mdash; dim highlight</span>
+          <span class="modifier-tag" style="font-style:italic;color:var(--state);border-color:rgba(168,152,245,0.2);">constrained &mdash; italic name</span>
         </div>
       </div>
-      <div>
-        <div class="eyebrow" style="margin-bottom:0">Cross-surface translation</div>
-        <div class="cross-surface-strip">
-          <div class="surface-chip">Code<span class="st">Violet keyword + name</span></div>
-          <div class="surface-chip">Diagram<span class="st">Hard rect, role shape</span></div>
-          <div class="surface-chip">Data Form<span class="st">Active state badge</span></div>
-          <div class="surface-chip">Docs<span class="st">State row in lifecycle table</span></div>
-        </div>
-      </div>
+
     </div>
   </div>
 
@@ -743,38 +1183,65 @@ pre {
       <p style="font-size:14px;margin-top:8px">A discrete trigger. Events carry intent without narrating it. They cause transitions and execute rules.</p>
     </div>
     <div class="construct-body">
-      <div class="construct-specimen">
-        <div class="specimen-bar"><span>Base depiction + outcome modifiers</span><div class="specimen-dots"><span class="specimen-dot"></span><span class="specimen-dot"></span><span class="specimen-dot"></span></div></div>
-        <div class="construct-specimen-inner">
-          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:18px">
-            <span style="padding:6px 12px;border:1px solid rgba(48,184,232,0.35);font-family:var(--mono);font-size:13px;color:var(--event)">Submit</span>
-            <span style="padding:6px 12px;border:1px solid rgba(48,184,232,0.25);font-family:var(--mono);font-size:13px;color:var(--event);font-style:italic">Approve <span class="so" style="font-size:10px;font-style:normal">guarded</span></span>
-            <span style="padding:6px 12px;border:1px dashed rgba(248,113,113,0.4);font-family:var(--mono);font-size:13px;color:var(--violated)">Reject <span class="so" style="font-size:10px">blocked</span></span>
+
+      <div class="specimen-pair">
+        <!-- Definition -->
+        <div class="specimen-half">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Definition</span>
+            <span class="specimen-half-tag">authored &middot; from-on blocks</span>
           </div>
-          <pre><span class="s">from</span> <span class="st">Draft</span> <span class="s">on</span> <span class="ev">Submit</span> -> <span class="s">transition</span> <span class="st">UnderReview</span>
-<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span> -> <span class="s">transition</span> <span class="st">Approved</span>
-<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Reject</span> -> <span class="s">transition</span> <span class="st">Rejected</span></pre>
+          <div class="specimen-half-inner">
+            <pre><span class="s">from</span> <span class="st">Draft</span>       <span class="s">on</span> <span class="ev">Submit</span>
+  -> <span class="s">transition</span> <span class="st">UnderReview</span>
+<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span>
+  -> <span class="s">transition</span> <span class="st">Approved</span>
+
+<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Reject</span>
+  -> <span class="s">transition</span> <span class="st">Rejected</span></pre>
+          </div>
+        </div>
+
+        <!-- Runtime -->
+        <div class="specimen-half">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Runtime</span>
+            <span class="specimen-half-tag">rendered &middot; event tokens</span>
+          </div>
+          <div class="specimen-half-inner">
+            <div style="display:grid;gap:14px;">
+              <div style="display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;">
+                <span style="padding:5px 11px;border:1px solid rgba(48,184,232,0.4);color:var(--event);">Submit</span>
+                <span style="color:var(--soft);font-size:12px">&rarr;</span>
+                <span style="padding:5px 11px;border:1px solid rgba(168,152,245,0.3);color:var(--state);font-size:12px">UnderReview</span>
+              </div>
+              <div style="display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;">
+                <span style="padding:5px 11px;border:1px solid rgba(48,184,232,0.25);color:var(--event);font-style:italic;">Approve</span>
+                <span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--soft);">guarded</span>
+                <span style="color:var(--soft);font-size:12px">&rarr;</span>
+                <span style="padding:5px 11px;border:1px solid rgba(168,152,245,0.3);color:var(--state);font-size:12px">Approved</span>
+              </div>
+              <div style="display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;">
+                <span style="padding:5px 11px;border:1px dashed rgba(248,113,113,0.5);color:var(--violated);">Reject</span>
+                <span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--violated);">blocked</span>
+                <span style="color:rgba(248,113,113,0.35);font-size:13px">&times;</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+
       <div>
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
         <div class="construct-modifiers">
-          <span class="modifier-tag ev" style="border-color:rgba(48,184,232,0.35)">transition — directional arrow</span>
-          <span class="modifier-tag ev" style="border-color:rgba(48,184,232,0.35)">no-transition — no destination</span>
-          <span class="modifier-tag" style="font-style:italic">guarded — italic name</span>
-          <span class="modifier-tag no" style="border-color:rgba(248,113,113,0.35)">blocked — violated</span>
-          <span class="modifier-tag" style="color:var(--warn);border-color:rgba(253,224,71,0.3)">unmatched — warning</span>
+          <span class="modifier-tag ev" style="border-color:rgba(48,184,232,0.35);">&rarr; transition &mdash; directional arrow</span>
+          <span class="modifier-tag ev" style="border-color:rgba(48,184,232,0.2);opacity:0.7;">&empty; no-transition &mdash; no destination</span>
+          <span class="modifier-tag ev" style="font-style:italic;border-color:rgba(48,184,232,0.22);color:var(--event);">guarded &mdash; italic name</span>
+          <span class="modifier-tag no" style="border-style:dashed;border-color:rgba(248,113,113,0.45);">blocked &mdash; dashed violated border</span>
+          <span class="modifier-tag" style="color:var(--warn);border-color:rgba(253,224,71,0.3);">unmatched &mdash; warning colour</span>
         </div>
       </div>
-      <div>
-        <div class="eyebrow" style="margin-bottom:0">Cross-surface translation</div>
-        <div class="cross-surface-strip">
-          <div class="surface-chip">Code<span class="ev">Cyan keyword in from-on block</span></div>
-          <div class="surface-chip">Diagram<span class="ev">Labeled transition arrow</span></div>
-          <div class="surface-chip">Data Form<span class="ev">Action button row</span></div>
-          <div class="surface-chip">Docs<span class="ev">Event row with rule summary</span></div>
-        </div>
-      </div>
+
     </div>
   </div>
 
@@ -786,69 +1253,89 @@ pre {
       <p style="font-size:14px;margin-top:8px">The factual payload under governance. Data fields carry the matter that business rules act on and protect.</p>
     </div>
     <div class="construct-body">
-      <div class="construct-specimen">
-        <div class="specimen-bar"><span>Base depiction — field table</span><div class="specimen-dots"><span class="specimen-dot"></span><span class="specimen-dot"></span><span class="specimen-dot"></span></div></div>
-        <div class="construct-specimen-inner">
-          <table class="field-table">
-            <thead>
-              <tr><th>Field</th><th>Type</th><th>Value</th><th>State</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td class="da">ApplicantName</td>
-                <td class="so">string</td>
-                <td style="color:var(--text)">"Jane Doe"</td>
-                <td><span style="color:var(--valid);font-size:11px">✓ valid</span></td>
-              </tr>
-              <tr>
-                <td class="da">RequestedAmount</td>
-                <td class="so">number</td>
-                <td style="color:var(--text)">45000</td>
-                <td><span style="color:var(--valid);font-size:11px">✓ valid</span></td>
-              </tr>
-              <tr>
-                <td class="da" style="font-style:italic">IncomeVerified</td>
-                <td class="so">boolean</td>
-                <td class="so">—</td>
-                <td><span style="color:var(--violated);font-size:11px">⊘ required</span></td>
-              </tr>
-              <tr>
-                <td class="da">ReviewNotes</td>
-                <td class="so">string</td>
-                <td class="so">—</td>
-                <td><span style="color:var(--soft);font-size:11px">editable</span></td>
-              </tr>
-              <tr>
-                <td class="da">ApprovedAmount</td>
-                <td class="so">number</td>
-                <td class="so">—</td>
-                <td><span style="color:var(--soft);font-size:11px">locked</span></td>
-              </tr>
-            </tbody>
-          </table>
+
+      <div class="specimen-pair">
+        <!-- Definition -->
+        <div class="specimen-half">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Definition</span>
+            <span class="specimen-half-tag">authored &middot; field declarations</span>
+          </div>
+          <div class="specimen-half-inner"><pre
+><span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="dt">string</span>  <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="dt">number</span>  <span class="s">default</span> <span class="dv">0</span>
+<span class="s">field</span> <span class="da">IncomeVerified</span>  <span class="s">as</span> <span class="dt">boolean</span>
+<span class="s">field</span> <span class="da">ReviewNotes</span>     <span class="s">as</span> <span class="dt">string</span>  <span class="s">nullable</span></pre>
+          </div>
+        </div>
+
+        <!-- Runtime -->
+        <div class="specimen-half">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Runtime</span>
+            <span class="specimen-half-tag">rendered &middot; field table</span>
+          </div>
+          <div class="specimen-half-inner" style="padding:0;">
+            <table class="field-table">
+              <thead>
+                <tr><th>Field</th><th>Type</th><th>Value</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="da">ApplicantName</td>
+                  <td class="dt">string</td>
+                  <td class="dv">&ldquo;Jane Doe&rdquo;</td>
+                  <td><span style="color:var(--valid);font-size:11px">&checkmark; valid</span></td>
+                </tr>
+                <tr>
+                  <td class="da" style="font-style:italic">IncomeVerified</td>
+                  <td class="dt">boolean</td>
+                  <td class="dv">&mdash;</td>
+                  <td><span style="color:var(--violated);font-size:11px">&oslash; required</span></td>
+                </tr>
+                <tr>
+                  <td class="da">ReviewNotes</td>
+                  <td class="dt">string</td>
+                  <td class="dv">&mdash;</td>
+                  <td><span style="color:var(--soft);font-size:11px">editable</span></td>
+                </tr>
+                <tr>
+                  <td class="da">RequestedAmount</td>
+                  <td class="dt">number</td>
+                  <td class="dv">45000</td>
+                  <td><span style="color:rgba(255,255,255,0.22);font-size:11px">locked</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
+
       <div>
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
-        <div class="construct-modifiers">
-          <span class="modifier-tag da" style="border-color:rgba(176,190,197,0.3)">name — bright slate</span>
-          <span class="modifier-tag" style="color:rgba(176,190,197,0.6)">type — dim slate</span>
-          <span class="modifier-tag" style="color:rgba(176,190,197,0.4)">value — softest slate</span>
-          <span class="modifier-tag ok" style="border-color:rgba(52,211,153,0.3)">valid — mark</span>
-          <span class="modifier-tag no" style="border-color:rgba(248,113,113,0.3)">violated — mark</span>
-          <span class="modifier-tag" style="font-style:italic">constrained — italic name</span>
-          <span class="modifier-tag" style="color:var(--soft)">editable — open border</span>
+        <div class="tonal-demo">
+          <div class="tonal-cell">
+            <span class="tonal-cell-lbl">Name</span>
+            <span class="da">ApplicantName</span>
+          </div>
+          <div class="tonal-cell">
+            <span class="tonal-cell-lbl">Type</span>
+            <span class="dt">string</span>
+          </div>
+          <div class="tonal-cell">
+            <span class="tonal-cell-lbl">Value</span>
+            <span class="dv">&ldquo;Jane Doe&rdquo;</span>
+          </div>
+        </div>
+        <div class="construct-modifiers" style="padding-top:0;">
+          <span class="modifier-tag ok" style="border-color:rgba(52,211,153,0.3);">valid &mdash; check mark</span>
+          <span class="modifier-tag no" style="border-color:rgba(248,113,113,0.3);">violated &mdash; mark</span>
+          <span class="modifier-tag da" style="font-style:italic;border-color:rgba(176,190,197,0.25);">constrained &mdash; italic name</span>
+          <span class="modifier-tag" style="color:var(--soft);">editable</span>
+          <span class="modifier-tag" style="color:rgba(255,255,255,0.22);">locked</span>
         </div>
       </div>
-      <div>
-        <div class="eyebrow" style="margin-bottom:0">Cross-surface translation</div>
-        <div class="cross-surface-strip">
-          <div class="surface-chip">Code<span class="da">Slate tokens in data block</span></div>
-          <div class="surface-chip">Diagram<span class="da">Field list inside state node</span></div>
-          <div class="surface-chip">Data Form<span class="da">Editable form input row</span></div>
-          <div class="surface-chip">Docs<span class="da">Field table in property ref</span></div>
-        </div>
-      </div>
+
     </div>
   </div>
 
@@ -857,43 +1344,60 @@ pre {
     <div class="construct-sidebar">
       <div class="construct-index">05</div>
       <div class="construct-name ru">Rule</div>
-      <p style="font-size:14px;margin-top:8px">Causal language. The because and why of Precept's governance. Rules interrupt — they do not narrate.</p>
+      <p style="font-size:14px;margin-top:8px">Causal language. The because and why of Precept&rsquo;s governance. Rules interrupt &mdash; they do not narrate.</p>
     </div>
     <div class="construct-body">
-      <div class="construct-specimen">
-        <div class="specimen-bar"><span>Base depiction + verdict overlay</span><div class="specimen-dots"><span class="specimen-dot"></span><span class="specimen-dot"></span><span class="specimen-dot"></span></div></div>
-        <div class="construct-specimen-inner">
-          <pre><span class="s">on</span> <span class="ev">Submit</span> <span class="s">assert</span> <span class="da">ApplicantName</span> != <span class="so">null</span> <span class="s">because</span> <span class="ru">"Name is required"</span>
-<span class="s">on</span> <span class="ev">Submit</span> <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt; <span class="so">0</span> <span class="s">because</span> <span class="ru">"Amount must be positive"</span>
-<span class="s">on</span> <span class="ev">Submit</span> <span class="s">assert</span> <span class="da">RequestedAmount</span> &lt;= <span class="so">1000000</span> <span class="s">because</span> <span class="ru">"Within policy limit"</span>
-<span class="s">from</span> <span class="st">Draft</span> <span class="s">on</span> <span class="ev">Submit</span> -> <span class="s">transition</span> <span class="st">UnderReview</span></pre>
-          <div style="margin-top:16px">
-            <div class="rule-callout" style="border-left-color:var(--violated);background:rgba(248,113,113,0.04)"><p style="color:var(--violated)">⊘ RequestedAmount must be greater than 0</p></div>
-            <div class="rule-callout" style="border-left-color:var(--valid);background:rgba(52,211,153,0.04)">
-              <p style="color:var(--valid)">✓ ApplicantName is required — satisfied</p>
+
+      <div class="specimen-pair">
+        <!-- Definition -->
+        <div class="specimen-half">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Definition</span>
+            <span class="specimen-half-tag">authored &middot; assert blocks</span>
+          </div>
+          <div class="specimen-half-inner">
+            <pre><span class="s">on</span> <span class="ev">Submit</span>
+  <span class="s">assert</span> <span class="da">ApplicantName</span> != <span class="dv">null</span>
+  <span class="s">because</span> <span class="ru">&ldquo;Name is required&rdquo;</span>
+
+<span class="s">on</span> <span class="ev">Submit</span>
+  <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt; <span class="dv">0</span>
+  <span class="s">because</span> <span class="ru">&ldquo;Amount must be positive&rdquo;</span>
+
+<span class="s">on</span> <span class="ev">Submit</span>
+  <span class="s">assert</span> <span class="da">RequestedAmount</span> &lt;= <span class="dv">1000000</span>
+  <span class="s">because</span> <span class="ru">&ldquo;Within policy limit&rdquo;</span></pre>
+          </div>
+        </div>
+
+        <!-- Runtime -->
+        <div class="specimen-half">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Runtime</span>
+            <span class="specimen-half-tag">rendered &middot; verdict callouts</span>
+          </div>
+          <div class="specimen-half-inner">
+            <div style="display:grid;gap:4px;">
+              <div style="padding:11px 14px;border-left:3px solid var(--valid);background:rgba(52,211,153,0.04);font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--valid);">&checkmark; Name is required <span style="color:rgba(52,211,153,0.45);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;">&mdash; satisfied</span></div>
+              <div style="padding:11px 14px;border-left:3px solid var(--violated);background:rgba(248,113,113,0.04);font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--violated);">&oslash; Amount must be positive <span style="color:rgba(248,113,113,0.45);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;">&mdash; violated</span></div>
+              <div style="padding:11px 14px;border-left:3px solid var(--warn);background:rgba(253,224,71,0.03);font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--warn);">&#9889; Within policy limit <span style="color:rgba(253,224,71,0.4);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;">&mdash; unmatched</span></div>
             </div>
           </div>
         </div>
       </div>
+
       <div>
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
         <div class="construct-modifiers">
-          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35)">assert / invariant — indigo</span>
-          <span class="modifier-tag ru" style="border-color:rgba(251,191,36,0.35)">because "message" — rule</span>
-          <span class="modifier-tag ok" style="border-color:rgba(52,211,153,0.3)">satisfied — callout</span>
-          <span class="modifier-tag no" style="border-color:rgba(248,113,113,0.3)">violated — callout</span>
-          <span class="modifier-tag" style="color:var(--warn);border-color:rgba(253,224,71,0.3)">unmatched — callout</span>
+          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35);">assert / because &mdash; rule keyword</span>
+        </div>
+        <div style="margin-top:8px;display:grid;gap:4px;">
+          <div class="callout-demo callout-demo--satisfied">&checkmark; satisfied &mdash; condition met, transition allowed</div>
+          <div class="callout-demo callout-demo--violated">&oslash; violated &mdash; condition failed, transition blocked</div>
+          <div class="callout-demo callout-demo--warn">&#9889; unmatched &mdash; guard not evaluated for current state</div>
         </div>
       </div>
-      <div>
-        <div class="eyebrow" style="margin-bottom:0">Cross-surface translation</div>
-        <div class="cross-surface-strip">
-          <div class="surface-chip">Code<span class="ru">Gold rule keyword + condition</span></div>
-          <div class="surface-chip">Diagram<span class="ru">Guard label on transition</span></div>
-          <div class="surface-chip">Data Form<span class="ru">Violation callout panel</span></div>
-          <div class="surface-chip">Docs<span class="ru">Constraint note in event ref</span></div>
-        </div>
-      </div>
+
     </div>
   </div>
 
@@ -1277,6 +1781,28 @@ pre {
 
   document.addEventListener("scroll", update, { passive: true });
   update();
+}());
+
+// ── Nav collapse ────────────────────────────────────────
+(function() {
+  const nav    = document.getElementById("navRail");
+  const toggle = document.getElementById("navToggle");
+  const STORE  = "precept-nav-collapsed";
+
+  function setCollapsed(collapsed) {
+    nav.classList.toggle("collapsed", collapsed);
+    toggle.textContent = collapsed ? "\u203a" : "\u2039";
+    toggle.setAttribute("title", collapsed ? "Expand navigation" : "Collapse navigation");
+    try { localStorage.setItem(STORE, collapsed ? "1" : "0"); } catch(e) {}
+  }
+
+  // Default: collapsed
+  const stored = (() => { try { return localStorage.getItem(STORE); } catch(e) { return null; } })();
+  setCollapsed(stored === null ? true : stored === "1");
+
+  toggle.addEventListener("click", function() {
+    setCollapsed(!nav.classList.contains("collapsed"));
+  });
 }());
 </script>
 </body>
