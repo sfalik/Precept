@@ -7,6 +7,19 @@
 
 ## Recent Updates
 
+### 2026-04-08 - Issue #22 semantic rules runtime/parser analysis
+- Reviewed issue #22 semantic rules against actual parser/type-checker code at Shane's request.
+- Key findings: (1) C12 fires at end of AssembleModel — adding a state doesn't violate anything, making "states forbidden" tautological. (2) EventDecl parser has zero state dependencies — events parse fine without states but have no dispatch surface; a new diagnostic would be needed. (3) C54 already rejects transitions referencing undeclared states, making "transitions forbidden" structurally redundant.
+- Recommended reframe: drop tautological rules, add explicit "events forbidden in stateless" as a new type-checker diagnostic.
+
+### 2026-04-08 - Language research corpus completed
+- George's type-system lane now sits inside a finished language research corpus: Batch 1/2 evidence landed in `54a77da` and `48860ae`, and the closing corpus/index sweep landed in `3cc5343`.
+- Final bookkeeping preserved the domain-first indexes so the type-system survey and semantics work stay grounded in research docs rather than being pushed back into proposal-body edits.
+
+### 2026-04-08 - Type-system research corpus landed
+- The type-system domain research packet landed as part of Batch 1, and the later rewrite of `docs/research/language/references/type-system-survey.md` was included in the Batch 2 commit `48860ae`.
+- The durable type lane now has both a domain survey and a stronger formal/reference survey, which keeps the research corpus aligned with the no-proposal-body-edit rule for batch curation.
+
 ### 2026-04-05 - Named rule scope and naming converged
 - Confirmed field-scoped reuse is sound in when, invariant, and state assert, while on <Event> assert remains incompatible because it is event-arg-only.
 - Reweighted the naming decision around Precept's readability goals and aligned the runtime recommendation with rule over predicate.
@@ -50,3 +63,8 @@
 - Feasibility verdicts: ternary=feasible, string.length=feasible, named-guards=feasible-with-caveats, abs/functions=feasible-with-caveats, collection-any-all predicates=not-recommended.
 - The `on <Event> assert` scope limitation is the one item needing a design decision before any code — it touches the fire pipeline stage contract, not just the parser.
 - Notified team via `.squad/decisions/inbox/george-expression-limitations.md`. No implementation until Frank's proposal and Shane's approval.
+
+### 2026-04-08 - Issue #22 semantic rules review (data-only precepts)
+- Reviewed issue #22 semantic rule about "states, events, and transitions forbidden in stateless precepts" against actual parser/type-checker code.
+- Key findings from parser source: (1) C12 fires at the *end* of AssembleModel — adding a `state` to a definition doesn't violate anything, it just makes it stateful. The "prohibition" is tautological. (2) `EventDecl` parser has zero state dependencies — events parse fine without states, but have no dispatch surface. The type checker would need a *new* diagnostic to reject them. (3) C54 already rejects transition rows referencing undeclared states, making an explicit "transitions forbidden" rule structurally redundant.
+- Recommended the issue reframe: remove tautological "states forbidden" rule, add explicit "events forbidden in stateless" as a new type-checker diagnostic (not parser), and note that transitions are already structurally impossible via C54.

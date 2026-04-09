@@ -1,8 +1,8 @@
 # Expression Evaluation
 
-**Research date:** 2026-04-04  
-**Author:** George (Runtime Dev)  
-**Relevance:** Principled ways to expand Precept's expression system while keeping semantics decidable and AI-readable
+**Research date:** 2026-04-04 (original); 2026-04-08 (expanded)  
+**Authors:** George (Runtime Dev), Frank (Lead/Architect)  
+**Relevance:** Principled ways to expand Precept's expression system while keeping semantics decidable and AI-readable. This is the formal/theory companion to the domain-first research in [expression-expansion-domain.md](../expressiveness/expression-expansion-domain.md).
 
 ---
 
@@ -12,17 +12,31 @@ Precept's expression language is a **many-sorted first-order decidable fragment*
 
 PLT provides a well-understood taxonomy for expanding such systems:
 
-| Expansion Type | Formal Category | Decidability Risk |
-|----------------|-----------------|-------------------|
-| Additional comparison operators | Same fragment, new symbols | None |
-| Boolean connectives | Boolean algebra extension | None |
-| String predicates (length, prefix) | Regular language predicates | None if pattern-free |
-| String pattern matching (regex) | Omega-regular expressions | Decidable but expensive |
-| Arithmetic over reals | Presburger arithmetic | Decidable |
-| Quantified constraints (`all x in S`) | First-order logic over sets | Decidable over finite domains |
-| User-defined functions | Lambda calculus fragment | Undecidable in general |
+| Expansion Type | Formal Category | Decidability Risk | Precept proposals |
+|----------------|-----------------|-------------------|-------------------|
+| Additional comparison operators | Same fragment, new symbols | None | — (already complete) |
+| Boolean connectives | Boolean algebra extension | None | #31 (`and`/`or`/`not` — token swap only) |
+| Conditional value selection | Total function, case split | None | #9 (`if...then...else`) |
+| String predicates (length, prefix, substring) | Regular language predicates | None if pattern-free | #10 (`.length`), #15 (`.contains()`), #16 (`startsWith`, `endsWith`) |
+| String pattern matching (regex) | Omega-regular expressions | Decidable but expensive (ReDoS risk) | **Excluded** — no proposal |
+| Bounded built-in functions | Closed-form total functions | None (deterministic, no recursion) | #16 (`abs`, `round`, `min`, `max`, etc.) |
+| Arithmetic over reals | Presburger arithmetic | Decidable | — (already present) |
+| Quantified constraints (`all x in S`) | First-order logic over sets | Decidable over finite domains | **Deferred** — high grammar cost |
+| User-defined functions | Lambda calculus fragment | Undecidable in general | **Permanently excluded** |
 
 Precept's current expression set sits in the lowest-risk zone: standard Boolean algebra over three sorts with arithmetic, comparison, and membership. Every proposed addition should be evaluated against this taxonomy.
+
+### Why the proposed expansions stay decidable
+
+The five open proposals (#9, #10, #15, #16, #31) all fall within the **None** risk column:
+
+1. **Conditional expressions** (`if C then T else E`) are total case splits: `C` is boolean, both branches produce a typed value, exactly one is selected. This is syntactic sugar over an existing evaluation-time branch — the evaluator already selects between transition rows via guards. Conditional expressions move the branch from the row level to the value level. No new decidability concern.
+
+2. **String predicates** (`.length`, `.contains()`, `startsWith()`, `endsWith()`) are regular-language predicates as classified by Veanes et al. (2021). They compose with Boolean operators without leaving the decidable fragment. The constraint: arguments must be compile-time string literals (not variables or expressions) to keep the predicate alphabet finite.
+
+3. **Bounded built-in functions** (`abs`, `round`, `floor`, `ceil`, `min`, `max`) are closed-form total functions over the `number` sort. They do not introduce recursion, iteration, or unbounded computation. Each function maps a finite numeric input to a deterministic numeric output. The type checker validates arity and argument types statically.
+
+4. **Keyword logical operators** (`and`/`or`/`not`) are a token swap for `&&`/`||`/`!`. Identical Boolean algebra semantics. No decidability change whatsoever.
 
 ---
 
@@ -189,35 +203,255 @@ Precept's design principle 12 requires AI authoring to be reliable. This constra
 
 ---
 
+## Vocabulary Taxonomy — Formal Framework
+
+The expression expansion introduces four distinct vocabulary categories. Each has different formal properties, different grammar integration costs, and different extension rules. This taxonomy is the authoritative classification for any future expression-surface discussion.
+
+### 1. Operators (Binary and Unary)
+
+**Formal category:** Infix/prefix symbols or keywords at a defined precedence level in the expression grammar.
+
+**Grammar integration:** Operators are parsed as part of the precedence-climbing algorithm. Adding a new operator means adding a token and a precedence level.
+
+**Existing inventory:**
+
+| Level | Operators | Sort constraints |
+|---|---|---|
+| Unary (7) | `!` / `not`, unary `-` | Boolean, Number respectively |
+| Multiplicative (6) | `*`, `/`, `%` | Number × Number → Number |
+| Additive (5) | `+`, `-` | Number × Number → Number; String × String → String (concatenation) |
+| Comparison (4) | `==`, `!=`, `>`, `>=`, `<`, `<=`, `contains` | Various; `contains` is Collection × Inner → Boolean |
+| Logical AND (2) | `&&` / `and` | Boolean × Boolean → Boolean |
+| Logical OR (1) | `||` / `or` | Boolean × Boolean → Boolean |
+
+**Extension criteria:** An operation should be an operator when it is (a) binary or unary, (b) has natural precedence placement relative to existing operators, and (c) reads fluently inline without parenthesized arguments.
+
+### 2. Accessors (Dotted Property Reads)
+
+**Formal category:** Parameterless property reads on typed identifiers, parsed as `Identifier.Member` atoms.
+
+**Grammar integration:** Accessors are resolved during atom parsing. The parser produces a `PreceptIdentifierExpression` with `Member` set. No new AST node needed.
+
+**Decidability property:** Each accessor is a **total function from its receiver type to a scalar type** with a fixed, known signature. The type checker injects them into the symbol table at compile time.
+
+| Accessor | Receiver | Return sort | Totality |
+|---|---|---|---|
+| `.count` | `set<T>`, `queue<T>`, `stack<T>` | `number` | Total (empty → 0) |
+| `.min`, `.max` | `set<T>` (numeric inner) | inner type | Partial (empty set) |
+| `.peek` | `queue<T>`, `stack<T>` | inner type | Partial (empty collection) |
+| `.length` (proposed) | `string` | `number` | Total (empty string → 0) |
+
+**Extension criteria:** An operation should be an accessor when it is (a) parameterless, (b) scoped to a specific receiver type, and (c) returns a scalar value. The accessor surface should remain small and discoverable — a handful of well-known properties per type.
+
+### 3. Methods (Dotted Calls with Arguments)
+
+**Formal category:** Call expressions with a typed receiver and parenthesized arguments, parsed as `Identifier.method(args)`.
+
+**Grammar integration:** Methods require the parser to recognize `.Identifier(` as a method-call form on a preceding expression. This is a new grammar form not present in the current parser — it extends the atom/postfix parsing to handle method calls on typed receivers.
+
+**Decidability property:** Methods are **total functions from (receiver type × argument types) to a result type**, with the same decidability as accessors provided arguments are compile-time constants or typed expressions within the decidable fragment.
+
+| Method | Receiver | Arguments | Return sort | Proposed |
+|---|---|---|---|---|
+| `.contains(sub)` | `string` | `string` (literal) | `boolean` | #15 |
+
+**Extension criteria:** An operation should be a method when it is (a) scoped to a specific receiver type, (b) requires at least one argument, and (c) reads naturally as a property of the receiver rather than a free-standing computation.
+
+### 4. Functions (Prefix Calls)
+
+**Formal category:** Named function calls with parenthesized arguments, parsed as `functionName(arg1, arg2, ...)`.
+
+**Grammar integration:** Functions require a new `PreceptFunctionCallExpression(Name, Arguments)` AST node and a static function registry in the type checker. The parser inserts a function-call atom alternative before `DottedIdentifier` in the `Atom` combinator, using lookahead on `(` to distinguish `Name(` from `Name` followed by other tokens.
+
+**Decidability property:** All functions in the registry are **closed-form total functions over the base sorts**. No recursion, no iteration, no unbounded computation. Each function maps a fixed number of typed inputs to a deterministic typed output. The registry is finite and known at compile time.
+
+| Function | Signature | Decidability | Proposed |
+|---|---|---|---|
+| `abs(x)` | `number → number` | Total, closed-form | #16 |
+| `floor(x)` | `number → number` | Total, closed-form | #16 |
+| `ceil(x)` | `number → number` | Total, closed-form | #16 |
+| `round(x)` | `number → number` | Total, closed-form | #16 |
+| `min(a, b)` | `number × number → number` | Total, closed-form | #16 |
+| `max(a, b)` | `number × number → number` | Total, closed-form | #16 |
+| `startsWith(s, p)` | `string × string → boolean` | Regular predicate | #16 |
+| `endsWith(s, p)` | `string × string → boolean` | Regular predicate | #16 |
+| `toLower(s)` | `string → string` | Total, closed-form | #16 |
+| `toUpper(s)` | `string → string` | Total, closed-form | #16 |
+| `trim(s)` | `string → string` | Total, closed-form | #16 |
+
+**Extension criteria:** An operation should be a function when it is (a) not scoped to a single receiver type, or (b) takes multiple arguments of different types, or (c) would read unnaturally as a method or accessor.
+
+### Boundary enforcement
+
+The four categories form a strict hierarchy of grammar cost and extension risk:
+
+```
+Operators < Accessors < Methods < Functions
+(existing)   (1 new)    (1 new form)  (new AST node)
+```
+
+Each new category should be justified by the precedent survey and sample-corpus evidence before introduction. The domain research document ([expression-expansion-domain.md](../expressiveness/expression-expansion-domain.md)) establishes that all four categories are needed for the proposed expression expansion.
+
+---
+
+## Conditional Expression Semantics
+
+`if C then T else E` is a **total expression** — it always produces a value.
+
+### Type rules
+
+```
+Γ ⊢ C : boolean    Γ ⊢ T : τ    Γ ⊢ E : τ
+─────────────────────────────────────────────
+         Γ ⊢ if C then T else E : τ
+```
+
+Both branches must produce the same type `τ`. The condition must be boolean. The result type is `τ`.
+
+### Null narrowing in branches
+
+If the condition performs a null check (`X != null`), the `then` branch sees `X` narrowed to non-null. This extends the existing `&&` narrowing model:
+
+```
+Γ ⊢ X : τ | null    C = (X != null)
+──────────────────────────────────────
+Γ, [X : τ] ⊢ T : σ    Γ ⊢ E : σ
+──────────────────────────────────────
+Γ ⊢ if X != null then T else E : σ
+```
+
+### Evaluation semantics
+
+Short-circuit: evaluate `C`; if true, evaluate and return `T`; otherwise evaluate and return `E`. The unevaluated branch has no effect. Both branches are type-checked regardless of which is evaluated at runtime.
+
+### Precedence
+
+`if...then...else` has the lowest precedence in the expression grammar (below `or`/`||`). Nesting requires parentheses: `if A then (if B then 1 else 2) else 3`.
+
+---
+
+## Function-Call Semantics in Constrained Expression Languages
+
+### Static dispatch model
+
+Precept's function registry uses **name + arity** for dispatch. The type checker looks up the function by name, validates arity, checks argument types against the signature, and produces the return type. There is no dynamic dispatch, no overload resolution by subtyping, and no polymorphism.
+
+For functions that will support multiple numeric types (when `integer` and `decimal` ship), overload resolution selects the **most-specific signature** — `abs(integer)` is preferred over `abs(number)` when the argument is statically known to be integer. This is standard overload resolution by specificity, not ad-hoc polymorphism.
+
+### Compile-time constant constraints
+
+Some functions impose compile-time constraints on arguments: `round(decimal, N)` requires `N` to be a non-negative integer literal. The type checker validates this constraint during compilation. The rationale: if `N` were a variable, the scale of the result would be unknown at compile time, defeating static type inference.
+
+### Totality and error handling
+
+All functions in the registry are total over their declared domain:
+
+- `abs(x)` is total for all `number` values.
+- `round(x)` is total using banker's rounding (`MidpointRounding.ToEven`).
+- `min(a, b)` and `max(a, b)` are total for all pairs.
+
+If a nullable argument bypasses the type checker (should not happen), the evaluator produces a runtime error with a clear message rather than propagating null. This is a defensive guard, not a design choice — the type checker should reject nullable arguments statically.
+
+### Formal precedent
+
+FEEL (DMN) provides the closest formal model: a fixed function library with named functions, static type checking, and deterministic evaluation. FEEL's function library is larger (50+ functions) but shares the same architectural properties:
+- No user-defined functions
+- No higher-order functions
+- All functions are total over their declared types
+- The evaluator dispatches by name and arity
+
+Cedar (AWS) provides the conservative counter-model: only 4 extension functions (`ip()`, `decimal()`, `isIpv4()`, `isIpv6()`), all type-constructors rather than computation. Cedar's position is that computation belongs in the policy evaluation engine, not in the policy language. Precept's position is different: `set` expressions compute values, which justifies computation functions.
+
+---
+
+## String Predicate Theory
+
+String predicates in Precept's expression language fall into two categories from symbolic automata theory (Veanes et al., 2021):
+
+### Character-count predicates (`.length`)
+
+`.length` maps a string to a natural number. Combined with arithmetic comparison (`>=`, `<=`), this produces **length constraints** — a well-studied class in string constraint solving. Length constraints are decidable and compose freely with Boolean operators.
+
+The key property: `.length` is **independent of string content**. It constrains *how much* data, not *what* data. This makes it the safest string predicate to add.
+
+### Substring predicates (`.contains()`, `startsWith()`, `endsWith()`)
+
+These are **regular-language membership tests** when the argument is a compile-time string literal. `s.contains("@")` is equivalent to testing membership in the regular language `Σ*@Σ*`. `startsWith(s, "USR-")` tests membership in `USR-Σ*`. These compose with Boolean operators without leaving the decidable fragment.
+
+The constraint: if the argument were a variable (another field), the predicate would become a **string equation** (`s contains t` where both are variables), which is decidable but significantly more complex (word equations, Makanin's algorithm). Precept's v1 restriction to literal arguments avoids this entirely.
+
+### Pattern matching (regex) — excluded
+
+Unrestricted regex matching falls into the **omega-regular** category. While decidable in theory, it introduces ReDoS risk (catastrophic backtracking) when patterns are not carefully constrained. FEEL and Cedar both omit regex. Precept follows their lead: substring predicates with literal arguments cover the documented sample-corpus needs without regex risk.
+
+---
+
+## Null Safety in the Expanded Expression Surface
+
+### Current model
+
+Precept tracks nullability via `StaticValueKind.Null` flags in the type checker. The `&&` operator provides null narrowing: in `X != null && X.count > 0`, the right operand sees `X` narrowed to non-null.
+
+### Extension for new constructs
+
+The null safety model extends uniformly to all new expression forms:
+
+| Construct | Null input behavior | Type checker action |
+|---|---|---|
+| `if C then T else E` | `C` may narrow nullables in `then` branch | Apply narrowing context to `T` |
+| `Field.length` | Nullable `Field` → compile error | Reject unless narrowed (`Field != null && Field.length > 0`) |
+| `Field.contains(sub)` | Nullable `Field` → compile error | Reject unless narrowed |
+| `abs(x)` | Nullable `x` → compile error | Reject — function signatures require non-null |
+| `round(x)` | Nullable `x` → compile error | Reject |
+| `startsWith(s, p)` | Nullable `s` → compile error | Reject unless narrowed |
+
+The policy is **conservative rejection**: nullable inputs are always compile errors unless the author has narrowed first. No implicit coercion to default values. This is consistent with the existing collection accessor model (collection fields default to empty, never null) and the computed-fields research contract (#3 — nullable accessor safety).
+
+### Null-coalescing (`??`) — future
+
+When a null-coalescing operator is proposed, it will integrate with this model as a **narrowing operator**: `X ?? default` narrows `X` from `τ | null` to `τ` by providing a fallback value. The result type strips the `Null` bit. This interacts with the type checker's `StaticValueKind` flag system — the result kind is `leftKind & ~StaticValueKind.Null`.
+
+---
+
 ## Implementation Cost Summary
 
-| Addition | Parser Cost | Evaluator Cost | Type-checker Cost | Risk |
-|----------|------------|---------------|------------------|------|
-| `Field.length` accessor | Low | Low | Low | None |
-| `startsWith` / `endsWith` operators | Low | Low | Low | None |
-| `matches` (literal regex only) | Medium | Medium | Medium | ReDoS if open |
-| `sum` collection accessor | Low | Low | Medium (no interval analysis) | None |
-| Quantified expressions | High | High | High | Scope leakage |
-| Nullable collection support + `?.` | Medium | Medium | Medium | Type model change |
+| Addition | Parser Cost | Evaluator Cost | Type-checker Cost | Risk | Proposal |
+|----------|------------|---------------|------------------|------|----------|
+| `and`/`or`/`not` keywords | Low (token swap) | None | None | None | #31 |
+| `Field.length` accessor | Low | Low | Low | None | #10 |
+| `if...then...else` expression | Medium (new atom form) | Low | Medium (branch type unification) | Low | #9 |
+| `.contains(sub)` method | Medium (new method-call form) | Low | Low | Low | #15 |
+| `abs`/`round`/`min`/`max` functions | Medium (new AST node) | Low | Medium (function registry) | Low | #16 |
+| `startsWith`/`endsWith` functions | Included in #16 | Low | Low | None | #16 |
+| `toLower`/`toUpper`/`trim` functions | Included in #16 | Low | Low | None | #16 |
+| `matches` (literal regex only) | Medium | Medium | Medium | ReDoS if open | **Excluded** |
+| `sum` collection accessor | Low | Low | Medium (no interval analysis) | None | Deferred |
+| Quantified expressions | High | High | High | Scope leakage | Deferred |
+| Nullable collection support + `?.` | Medium | Medium | Medium | Type model change | Deferred |
 
 ---
 
 ## Semantic Risks Specific to Precept
 
-1. **Constraint subject extraction**: `ExpressionSubjects.Extract()` walks the AST to find field/arg references for violation targets. New operator forms (dotted string accessors, new binary operators) must be handled in this walker or violation targets will be misattributed.
+1. **Constraint subject extraction**: `ExpressionSubjects.Extract()` walks the AST to find field/arg references for violation targets. New expression forms — conditional expressions, method calls, function calls — must be handled in this walker or violation targets will be misattributed. The conditional expression is the most important case: both branches may reference different fields, and the walker must traverse both.
 
-2. **Type coercion for new types**: The evaluator handles `JsonElement` unwrapping for external data. New operators must handle JSON string inputs correctly — `string.Length` works on CLR strings but may need a guard against `JsonElement` values.
+2. **Type coercion for new types**: The evaluator handles `JsonElement` unwrapping for external data. New operators, accessors, methods, and functions must handle JSON string inputs correctly — `string.Length` works on CLR strings but may need a guard against `JsonElement` values that haven't been unwrapped.
 
-3. **Operator precedence placement**: New operators must be inserted at the correct precedence level in the existing chain (Unary → Multiplicative → Additive → Comparison → AND → OR). String operators (`startsWith`, `endsWith`) belong at the Comparison level (same as `contains`).
+3. **Operator precedence placement**: The `if...then...else` expression has the lowest precedence (below `or`). Function calls and method calls parse at atom level (highest precedence). `and`/`or`/`not` inherit the existing `&&`/`||`/`!` precedence levels. No precedence conflicts arise.
 
-4. **AI prompt fidelity**: If a new operator is added to the parser but not to the `precept_language` MCP tool response, AI agents will not know to use it. Parser, evaluator, type-checker, MCP tool, and language server completions must all be updated together.
+4. **AI prompt fidelity**: Every new expression construct must appear simultaneously in the parser, evaluator, type checker, `precept_language` MCP tool response, and language server completions. If any one is missing, AI agents will not know the construct exists. The function registry should be automatically reflected in the `precept_language` tool output.
+
+5. **Function-call ambiguity**: The parser must distinguish `Name(` (function call) from `Name !=` or `Name ==` (identifier in comparison). The Superpower `.Try()` composition handles this: the function-call atom alternative uses lookahead on `(` and is inserted before the identifier alternative. `Name` followed by anything other than `(` falls through to the identifier parse. This is unambiguous because field names and function names occupy different namespaces (function names are a fixed static set; field names are declared per-precept).
 
 ---
 
 ## Key References
 
-- Pierce, *Types and Programming Languages* Ch. 8 — typed arithmetic expressions
-- Veanes et al., "Symbolic Finite Automata" (CACM 2021) — decidable Boolean algebras over string predicates
-- Kozen, "On the Complexity of Reasoning in Kleene Algebra" — decidability of regular expression logic
-- TypeScript Handbook, "Narrowing" — flow-sensitive type narrowing as a checker extension
-- Z3 SMT solver documentation — Presburger arithmetic decision procedures
+- Pierce, *Types and Programming Languages* Ch. 8 — typed arithmetic expressions; Ch. 11 — simple extensions (let, sequencing, conditionals as expressions)
+- Veanes et al., "Symbolic Finite Automata" (CACM 2021) — decidable Boolean algebras over string predicates; composition of character-class and string-length predicates
+- Kozen, "On the Complexity of Reasoning in Kleene Algebra" — decidability of regular expression logic; relevance to string pattern matching exclusion
+- TypeScript Handbook, "Narrowing" — flow-sensitive type narrowing as a checker extension; model for Precept's `&&` narrowing and conditional expression branch narrowing
+- Z3 SMT solver documentation — Presburger arithmetic decision procedures; string constraint theory
+- OMG DMN 1.4 Specification — FEEL function library as formal precedent for bounded built-in functions in a business-rule DSL
+- Cedar Language Specification — counter-precedent: minimal expression surface for authorization policy; deliberate omission of math functions and conditionals
+- Makanin, "The Problem of Solvability of Equations in a Free Semigroup" (1977) — decidability of word equations; justification for restricting `.contains()` arguments to literals

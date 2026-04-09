@@ -187,6 +187,17 @@ Language proposals (GitHub issues) must include the design philosophy and ration
 3. **Update the issue map** in `docs/research/language/README.md` — connect each proposal to its research starting points.
 4. **Design doc updates happen at implementation time** — `docs/PreceptLanguageDesign.md` tracks what EXISTS in the runtime. Proposals describe what's PLANNED. The design doc is updated in the same PR that implements the feature, not before.
 
+### Per-Decision Rationale Requirement
+
+When writing or reviewing proposals, ensure every locked design decision includes:
+
+- **Rationale** — why this choice, not just what it is
+- **Alternatives considered and rejected** — with reasons for rejection
+- **Precedent from the research base** — the evidence that grounds the decision
+- **Tradeoff accepted** — the known downside the team is deliberately taking on
+
+A proposal that states WHAT without WHY is incomplete. Flag it for rationale before it advances.
+
 This ensures philosophy and rationale survive across sessions and make their way back into the design doc when features ship.
 
 ## Design Option Responses

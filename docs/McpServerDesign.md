@@ -415,17 +415,24 @@ Fields: `line` (1-based), `column` (0-based, optional), `message`, `code` (optio
 
 ```json
 {
-  "message": "Active requires assignee",
+  "message": "Approved total cannot exceed requested total",
   "source": {
-    "kind": "state-assertion",
-    "stateName": "Active",
-    "anchor": "in",
-    "expressionText": "Assignee != null",
-    "reason": "Active requires assignee",
-    "sourceLine": 14
+    "kind": "invariant",
+    "stateName": null,
+    "anchor": null,
+    "expressionText": "ApprovedTotal <= RequestedTotal",
+    "reason": "Approved total cannot exceed requested total",
+    "sourceLine": 18
   },
   "targets": [
-    { "kind": "field", "fieldName": "Assignee" }
+    { "kind": "field", "fieldName": "ApprovedTotal" },
+    { "kind": "field", "fieldName": "RequestedTotal" },
+    { "kind": "field", "fieldName": "LodgingTotal" },
+    { "kind": "field", "fieldName": "MealsTotal" },
+    { "kind": "field", "fieldName": "MileageTotal" },
+    { "kind": "field", "fieldName": "Miles" },
+    { "kind": "field", "fieldName": "Rate" },
+    { "kind": "definition" }
   ]
 }
 ```
@@ -433,7 +440,9 @@ Fields: `line` (1-based), `column` (0-based, optional), `message`, `code` (optio
 `ViolationDto` is a full projection of core `ConstraintViolation`:
 
 - **`source`** — projects `ConstraintSource` (4 subtypes: `invariant`, `state-assertion`, `event-assertion`, `transition-rejection`). Each subtype carries its relevant fields (expression text, reason, state name, anchor, event name, source line).
-- **`targets`** — projects `ConstraintTarget[]` (5 subtypes: `field`, `event-arg`, `event`, `state`, `definition`). Each subtype carries its relevant identifiers.
+- **`targets`** — projects `ConstraintTarget[]` (5 subtypes: `field`, `event-arg`, `event`, `state`, `definition`). Each subtype carries its relevant identifiers. For field-based rule violations, `targets` represents the full semantic dependency set, not just the field names written literally in the rule text: if a violated invariant or state assertion reads a computed field, the violation includes that computed field and every transitive field input beneath it, while still carrying the normal scope target.
+
+This means `precept_inspect`, `precept_fire`, and `precept_update` report the entity data the violated rule actually depends on, explicitly and implicitly, so AI and UI consumers can attribute the failure to the real editable surface without reconstructing the computed-field graph themselves.
 
 This preserves the full structured violation model from core without information loss.
 
