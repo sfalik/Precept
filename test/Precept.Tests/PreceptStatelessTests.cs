@@ -184,6 +184,23 @@ public class PreceptStatelessParserTests
 
         result.Diagnostics.Should().Contain(d => d.Code == "PRECEPT055");
     }
+
+    [Fact]
+    public void Parse_C49_MultipleEvents_ProducesOneWarningPerEvent()
+    {
+        const string dsl = """
+            precept Config
+            field Setting as string default ""
+            event Changed
+            event Reset
+            event Refreshed
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        var c49Warnings = result.Diagnostics.Where(d => d.Code == "PRECEPT049").ToList();
+        c49Warnings.Should().HaveCount(3);
+    }
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -590,6 +607,28 @@ public class PreceptStatelessUpdateTests
         result.IsSuccess.Should().BeFalse();
         result.Violations.Should().NotBeEmpty();
         result.Violations.Should().Contain(v => v.Message.Contains("Discount cannot exceed base fee"));
+    }
+
+    [Fact]
+    public void Update_StatefulPrecept_EditAll_ExpandsToAllFields()
+    {
+        const string dsl = """
+            precept Widget
+            field Name as string default ""
+            field Color as string default "red"
+            field Weight as number default 0
+            state Active initial
+            in Active edit all
+            """;
+
+        var engine = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var instance = engine.CreateInstance("Active");
+
+        var result = engine.Update(instance, patch => patch.Set("Name", "Test"));
+
+        result.Outcome.Should().Be(UpdateOutcome.Update);
+        result.IsSuccess.Should().BeTrue();
+        result.UpdatedInstance!.InstanceData["Name"].Should().Be("Test");
     }
 }
 
