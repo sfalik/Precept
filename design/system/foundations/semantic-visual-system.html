@@ -3,1931 +3,1281 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Precept Semantic Visual System</title>
+<title>Precept — Semantic Visual System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap">
 <style>
-  :root {
-    --bg: #050608;
-  .nav-group-label {
-    font-family: var(--mono);
-    font-size: 9px;
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-    color: var(--structure);
-    padding: 10px 0 4px;
-    margin-top: 4px;
-  }
-  
-  .nav-sub {
-    padding-left: 10px;
-  }
-    --panel: #0b0d12;
-    --panel-2: #0f1218;
-    --text: #f4f7fb;
-    --muted: #a7b0c0;
-    --soft: #778196;
-  
-  .hero-note {
-    padding-top: 12px;
-    border-top: 1px solid var(--line-soft);
-  }
-    --line: rgba(99, 102, 241, 0.18);
-    --line-strong: rgba(99, 102, 241, 0.36);
-    --line-soft: rgba(255, 255, 255, 0.06);
-    --structure-deep: #4338ca;
-    --structure: #6366f1;
-    --structure-soft: #98a3ff;
-    --state: #a898f5;
-    --event: #30b8e8;
-    --data-name: #b0bec5;
-    --data-type: #9aa8b5;
-    --data-value: #84929f;
-    --gold-keyword: #b8860b;
-    --gold: #fbbf24;
-    --emerald: #34d399;
-    --rose: #f87171;
-    --amber: #fde047;
-    --mono: "Cascadia Cove", "Cascadia Code", Consolas, monospace;
-    --reading: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-    --shadow: none;
-    --radius-xl: 32px;
-    --radius-lg: 24px;
-    --radius-md: 18px;
-    --radius-sm: 12px;
-  }
-
-  * {
-    box-sizing: border-box;
-  }
-
-  html {
-    scroll-behavior: smooth;
-  }
-
-  body {
-    margin: 0;
-    min-height: 100vh;
-    color: var(--text);
-    font-family: var(--reading);
-    background: var(--bg);
-  }
-
-  a {
-    color: inherit;
-  }
-
-  .page {
-    position: relative;
-    width: min(1480px, calc(100vw - 28px));
-    margin: 0 auto;
-    padding: 18px 0 72px;
-  }
-
-  .eyebrow,
-  .micro,
-  .chip,
-  .nav-link,
-  .matrix-label,
-  .footnote {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-  }
-
-  .masthead-bar,
-  .kicker,
-  .wordmark,
-  .hero-title,
-  .signal strong,
-  .eyebrow,
-  .micro,
-  .chip,
-  .nav-link,
-  .matrix-label,
-  .footnote,
-  .rail-card h2,
-  .section-head h2,
-  .card h3,
-  .boundary h2,
-  .boundary h3,
-  .matrix-head,
-  .matrix-row h3,
-  .law h3,
-  .tag,
-  .semantic-band strong,
-  .specimen-head,
-  .specimen-foot {
-    font-family: var(--mono);
-  }
-
-  .frame {
-    border: 1px solid var(--line);
-    border-radius: var(--radius-xl);
-    background: var(--panel);
-    box-shadow: var(--shadow);
-    overflow: hidden;
-    position: relative;
-  }
-
-  .frame::before {
-    content: none;
-  }
-
-  .masthead-bar {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--line-soft);
-    color: var(--muted);
-  }
-
-  .hero {
-    position: relative;
-    z-index: 1;
-  }
-
-  .hero-left {
-    padding: 34px 34px 30px;
-    display: grid;
-    align-content: space-between;
-    gap: 30px;
-  }
-
-  .kicker {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    color: var(--muted);
-  }
-
-  .kicker::before {
-    content: "";
-    width: 38px;
-    height: 1px;
-    background: var(--structure-soft);
-  }
-
-  .hero-title-block {
-    display: grid;
-    gap: 18px;
-  }
-
-  .wordmark {
-    margin: 0;
-    font-size: clamp(38px, 8vw, 104px);
-    line-height: 0.88;
-    font-weight: 700;
-    font-variant: small-caps;
-    letter-spacing: 0.16em;
-    color: #ffffff;
-  }
-
-  .hero-title {
-    margin: 0;
-    font-size: clamp(34px, 5vw, 72px);
-    line-height: 0.92;
-    letter-spacing: 0.02em;
-    color: #ffffff;
-  }
-
-  .hero-lede,
-  .section-head p,
-  .card p,
-  .matrix-cell p,
-  .boundary p,
-  .rail-card p,
-  .manifesto-quote p,
-  .manifesto-note p,
-  .semantic-band span,
-  .stance-note,
-  .matrix-row p,
-  li {
-    margin: 0;
-    font-size: 14px;
-    line-height: 1.76;
-    color: var(--muted);
-    font-family: var(--reading);
-  }
-
-  .hero-lede {
-    font-size: 16px;
-    color: #dbe0ea;
-  }
-
-  strong {
-    color: #ffffff;
-    font-weight: 700;
-  }
-
-  .hero-signals {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-  }
-
-  .signal {
-    padding: 12px 12px 14px;
-    border-radius: 16px;
-    border: 1px solid var(--line-soft);
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--muted);
-    font-family: var(--reading);
-    font-size: 13px;
-    line-height: 1.72;
-    letter-spacing: normal;
-    text-transform: none;
-  }
-
-  .signal strong {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-  }
-
-  .stance-note {
-    color: var(--soft);
-    font-size: 12px;
-    line-height: 1.72;
-  }
-
-  .specimen {
-    position: relative;
-    border: 1px solid var(--line-strong);
-    border-radius: 22px;
-    background: #0d1016;
-    padding: 18px;
-    min-height: 100%;
-    display: grid;
-    gap: 14px;
-  }
-
-  .specimen::before {
-    content: none;
-  }
-
-  .specimen-head,
-  .specimen-foot {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    color: var(--soft);
-  }
-
-  .lights {
-    display: inline-flex;
-    gap: 6px;
-  }
-
-  .lights span {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.18);
-  }
-
-  .semantic-stack {
-    position: relative;
-    z-index: 1;
-    display: grid;
-    gap: 10px;
-  }
-
-  .semantic-band {
-    display: grid;
-    grid-template-columns: 108px minmax(0, 1fr);
-    gap: 14px;
-    align-items: center;
-    padding: 13px 14px;
-    border-radius: 16px;
-    border: 1px solid var(--line-soft);
-    background: rgba(255, 255, 255, 0.022);
-  }
-
-  .semantic-band strong {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-  }
-
-  .semantic-band span {
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.58;
-  }
-
-  .semantic-band.structure strong { color: var(--structure); }
-  .semantic-band.state strong { color: var(--state); }
-  .semantic-band.event strong { color: var(--event); }
-  .semantic-band.data strong { color: var(--data-name); }
-  .semantic-band.rule strong { color: var(--gold); }
-  .semantic-band.verdict strong { color: var(--emerald); }
-
-  .workspace {
-    display: grid;
-    grid-template-columns: 280px minmax(0, 1fr);
-    gap: 22px;
-    margin-top: 24px;
-    align-items: start;
-  }
-
-  .rail {
-    position: sticky;
-    top: 16px;
-    display: grid;
-    gap: 14px;
-  }
-
-  .rail-card,
-  .section,
-  .boundary {
-    border: 1px solid var(--line);
-    border-radius: 24px;
-    background: var(--panel-2);
-    box-shadow: var(--shadow);
-    position: relative;
-    overflow: hidden;
-  }
-
-  .rail-card::before,
-  .section::before,
-  .boundary::before {
-    content: none;
-  }
-
-  .rail-card {
-    padding: 16px;
-  }
-
-  .rail-card h2,
-  .section-head h2,
-  .card h3,
-  .boundary h2,
-  .boundary h3,
-  .matrix-cell h3,
-  .law h3 {
-    margin: 0;
-    color: #ffffff;
-    line-height: 1.15;
-  }
-
-  .rail-card h2 {
-    font-size: 13px;
-    margin-bottom: 10px;
-  }
-
-  .rail-card p {
-    margin: 0;
-    font-size: 12px;
-    line-height: 1.68;
-    color: var(--muted);
-  }
-
-  .nav {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: 8px;
-  }
-
-  .nav a {
-    display: block;
-    padding: 10px 11px;
-    border-radius: 12px;
-    text-decoration: none;
-    border: 1px solid transparent;
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--muted);
-  }
-
-  .nav a:hover,
-  .nav a:focus-visible {
-    outline: none;
-    background: rgba(99, 102, 241, 0.08);
-    border-color: rgba(99, 102, 241, 0.24);
-  }
-
-  .legend {
-    display: grid;
-    gap: 10px;
-  }
-
-  .legend-item {
-    display: grid;
-    grid-template-columns: 14px minmax(0, 1fr);
-    gap: 10px;
-    align-items: start;
-  }
-
-  .legend-dot {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    margin-top: 2px;
-  }
-
-  .content {
-    display: grid;
-    gap: 22px;
-  }
-
-  .section-inner {
-    position: relative;
-    z-index: 1;
-    padding: 24px;
-  }
-
-  .section-head {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-    gap: 22px;
-    align-items: end;
-    margin-bottom: 18px;
-  }
-
-  .section-head h2 {
-    font-size: clamp(28px, 3vw, 46px);
-    letter-spacing: 0.01em;
-  }
-
-  .eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    color: var(--muted);
-    margin-bottom: 12px;
-  }
-
-  .eyebrow::before {
-    content: "";
-    width: 28px;
-    height: 1px;
-    background: var(--structure-soft);
-  }
-
-  .grid-2,
-  .grid-3,
-  .grid-4 {
-    display: grid;
-    gap: 14px;
-  }
-
-  .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-
-  .card,
-  .matrix-cell,
-  .law {
-    position: relative;
-    overflow: hidden;
-    border: 1px solid var(--line-soft);
-    border-radius: 18px;
-    background: #12141b;
-    padding: 18px;
-  }
-
-  .card::before,
-  .matrix-cell::before,
-  .law::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    height: 2px;
-    background: rgba(255, 255, 255, 0.12);
-  }
-
-  .tone-structure::before { background: var(--structure); }
-  .tone-state::before { background: var(--state); }
-  .tone-event::before { background: var(--event); }
-  .tone-data::before { background: var(--data-name); }
-  .tone-rule::before { background: var(--gold); }
-  .tone-verdict::before { background: var(--emerald); }
-  .tone-rose::before { background: var(--rose); }
-  .tone-amber::before { background: var(--amber); }
-
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 7px 10px;
-    margin-bottom: 12px;
-    border-radius: 999px;
-    border: 1px solid var(--line-soft);
-    background: rgba(255, 255, 255, 0.03);
-    color: var(--muted);
-  }
-
-  .signal-card-label {
-    display: inline-block;
-    margin-bottom: 12px;
-    font-family: var(--mono);
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    color: var(--muted);
-  }
-
-  .tone-structure .chip { color: var(--structure); background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.22); }
-  .tone-state .chip { color: var(--state); background: rgba(168, 152, 245, 0.08); border-color: rgba(168, 152, 245, 0.22); }
-  .tone-event .chip { color: var(--event); background: rgba(48, 184, 232, 0.08); border-color: rgba(48, 184, 232, 0.22); }
-  .tone-data .chip { color: var(--data-name); background: rgba(176, 190, 197, 0.08); border-color: rgba(176, 190, 197, 0.2); }
-  .tone-rule .chip { color: var(--gold); background: rgba(251, 191, 36, 0.08); border-color: rgba(251, 191, 36, 0.2); }
-  .tone-verdict .chip { color: var(--emerald); background: rgba(52, 211, 153, 0.08); border-color: rgba(52, 211, 153, 0.22); }
-  .tone-rose .chip { color: var(--rose); background: rgba(248, 113, 113, 0.08); border-color: rgba(248, 113, 113, 0.2); }
-  .tone-amber .chip { color: var(--amber); background: rgba(253, 224, 71, 0.08); border-color: rgba(253, 224, 71, 0.2); }
-
-  .card h3,
-  .law h3,
-  .matrix-cell h3 {
-    font-size: 15px;
-    margin-bottom: 9px;
-  }
-
-  .visual {
-    margin-bottom: 14px;
-    min-height: 124px;
-    padding: 14px;
-    border-radius: 16px;
-    border: 1px solid var(--line-soft);
-    background: #080a0e;
-    overflow: hidden;
-  }
-
-  .visual svg {
-    width: 100%;
-    height: 100%;
-  }
-
-  .signal-visual {
-    min-height: 88px;
-    padding: 12px;
-    display: grid;
-    gap: 10px;
-  }
-
-  .signal-family-strip,
-  .signal-overlay-strip,
-  .signal-form-strip {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .signal-family-pill,
-  .signal-overlay-pill,
-  .signal-form-pill {
-    display: inline-flex;
-    align-items: center;
-    padding: 6px 9px;
-    border-radius: 999px;
-    border: 1px solid var(--line-soft);
-    background: rgba(255, 255, 255, 0.03);
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .signal-family-pill.structure { color: var(--structure); border-color: rgba(99, 102, 241, 0.28); }
-  .signal-family-pill.state { color: var(--state); border-color: rgba(168, 152, 245, 0.28); }
-  .signal-family-pill.event { color: var(--event); border-color: rgba(48, 184, 232, 0.28); }
-  .signal-family-pill.data { color: var(--data-name); border-color: rgba(176, 190, 197, 0.24); }
-  .signal-family-pill.rule { color: var(--gold); border-color: rgba(251, 191, 36, 0.24); }
-
-  .signal-overlay-pill.base { color: var(--state); border-color: rgba(168, 152, 245, 0.28); }
-  .signal-overlay-pill.allowed { color: var(--emerald); border-color: rgba(52, 211, 153, 0.28); box-shadow: inset 0 0 0 1px rgba(168, 152, 245, 0.22); }
-  .signal-overlay-pill.warning { color: var(--amber); border-color: rgba(253, 224, 71, 0.28); box-shadow: inset 0 0 0 1px rgba(168, 152, 245, 0.22); }
-  .signal-overlay-pill.blocked { color: var(--rose); border-color: rgba(248, 113, 113, 0.28); box-shadow: inset 0 0 0 1px rgba(168, 152, 245, 0.22); }
-
-  .signal-type-stack {
-    display: grid;
-    gap: 8px;
-  }
-
-  .signal-type-heading {
-    font-family: var(--mono);
-    font-size: 20px;
-    line-height: 1;
-    color: #ffffff;
-    letter-spacing: 0.04em;
-  }
-
-  .signal-type-line {
-    font-family: var(--mono);
-    font-size: 12px;
-    line-height: 1.4;
-    color: #dbe0ea;
-  }
-
-  .signal-pressure-stack {
-    display: grid;
-    gap: 8px;
-  }
-
-  .signal-pressure-row {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    gap: 8px;
-    align-items: center;
-    font-family: var(--mono);
-    font-size: 12px;
-    line-height: 1.4;
-  }
-
-  .signal-pressure-arrow {
-    color: var(--soft);
-    font-size: 11px;
-    letter-spacing: 0.08em;
-  }
-
-  .signal-layout-demo {
-    display: grid;
-    grid-template-columns: 1.35fr 0.9fr;
-    gap: 10px;
-    align-items: stretch;
-  }
-
-  .signal-layout-group,
-  .signal-layout-side,
-  .signal-layout-child {
-    border: 1px solid var(--line-soft);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.03);
-  }
-
-  .signal-layout-group {
-    padding: 10px;
-    display: grid;
-    gap: 8px;
-  }
-
-  .signal-layout-child {
-    min-height: 18px;
-  }
-
-  .signal-layout-child.lead { border-color: rgba(99, 102, 241, 0.28); }
-  .signal-layout-child.secondary { border-color: rgba(168, 152, 245, 0.22); }
-  .signal-layout-child.related { border-color: rgba(176, 190, 197, 0.18); }
-
-  .signal-layout-side {
-    position: relative;
-    display: grid;
-    place-items: center;
-    color: var(--soft);
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .signal-layout-side::before {
-    content: "";
-    position: absolute;
-    left: -14px;
-    top: 50%;
-    width: 12px;
-    height: 1px;
-    background: var(--structure-soft);
-  }
-
-  .signal-form-frame {
-    border: 1px solid rgba(99, 102, 241, 0.26);
-    border-radius: 16px;
-    padding: 10px;
-    display: grid;
-    gap: 10px;
-  }
-
-  .signal-form-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .signal-form-pill.frame { color: var(--structure); border-color: rgba(99, 102, 241, 0.28); }
-  .signal-form-pill.chip { color: var(--state); border-color: rgba(168, 152, 245, 0.28); }
-  .signal-form-pill.badge { color: var(--emerald); border-color: rgba(52, 211, 153, 0.28); }
-
-  .signal-form-arrow {
-    width: 24px;
-    height: 1px;
-    background: var(--structure-soft);
-    position: relative;
-  }
-
-  .signal-form-arrow::after {
-    content: "";
-    position: absolute;
-    right: -1px;
-    top: -3px;
-    width: 7px;
-    height: 7px;
-    border-top: 1px solid var(--structure-soft);
-    border-right: 1px solid var(--structure-soft);
-    transform: rotate(45deg);
-  }
-
-  .manifesto {
-    display: grid;
-    grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
-    gap: 14px;
-  }
-
-  .manifesto-quote {
-    padding: 18px;
-    border-radius: 18px;
-    border: 1px solid rgba(99, 102, 241, 0.24);
-    background: rgba(99, 102, 241, 0.06);
-  }
-
-  .manifesto-quote p {
-    font-size: 17px;
-    line-height: 1.72;
-    color: #d8deea;
-  }
-
-  .manifesto-note {
-    padding: 18px;
-    border-radius: 18px;
-    border: 1px solid var(--line-soft);
-    background: rgba(255, 255, 255, 0.02);
-  }
-
-  .manifesto-note p {
-    font-size: 13px;
-    color: var(--muted);
-  }
-
-  .manifesto-note p + p {
-    margin-top: 12px;
-  }
-
-  .matrix {
-    border: 1px solid var(--line-soft);
-    border-radius: 20px;
-    overflow: hidden;
-    background: #101218;
-  }
-
-  .matrix-head,
-  .matrix-row {
-    display: grid;
-    grid-template-columns: minmax(230px, 260px) repeat(4, minmax(0, 1fr));
-  }
-
-  .matrix-head {
-    background: rgba(255, 255, 255, 0.025);
-    border-bottom: 1px solid var(--line-soft);
-  }
-
-  .matrix-head div,
-  .matrix-row > div {
-    padding: 16px;
-  }
-
-  .matrix-head div {
-    color: var(--muted);
-  }
-
-  .matrix-row {
-    border-bottom: 1px solid var(--line-soft);
-  }
-
-  .matrix-row:last-child {
-    border-bottom: 0;
-  }
-
-  .matrix-row:nth-child(even) {
-    background: rgba(255, 255, 255, 0.012);
-  }
-
-  .matrix-label {
-    display: block;
-    margin-bottom: 8px;
-    color: var(--muted);
-  }
-
-  .matrix-row h3 {
-    font-size: 13px;
-    margin-bottom: 8px;
-  }
-
-  .matrix-row p {
-    font-size: 13px;
-    line-height: 1.66;
-  }
-
-  .tag {
-    display: inline-flex;
-    margin-top: 10px;
-    padding: 5px 8px;
-    border-radius: 999px;
-    border: 1px solid var(--line-soft);
-    color: var(--soft);
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-
-  .type-table-wrap {
-    margin-top: 14px;
-    overflow-x: auto;
-    border: 1px solid var(--line-soft);
-    border-radius: 20px;
-    background: #101218;
-  }
-
-  .type-table {
-    width: 100%;
-    min-width: 820px;
-    border-collapse: collapse;
-  }
-
-  .type-table th,
-  .type-table td {
-    padding: 16px;
-    border-bottom: 1px solid var(--line-soft);
-    vertical-align: top;
-  }
-
-  .type-table th {
-    background: rgba(255, 255, 255, 0.025);
-    color: var(--muted);
-    text-align: left;
-    font-family: var(--mono);
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-  }
-
-  .type-table tr:last-child td {
-    border-bottom: 0;
-  }
-
-  .type-table td p {
-    margin: 0;
-  }
-
-  .type-stack {
-    display: block;
-    margin-top: 6px;
-    font-family: var(--mono);
-    font-size: 12px;
-    line-height: 1.6;
-    color: #dbe0ea;
-  }
-
-  .type-sample {
-    margin-top: 12px;
-    padding: 14px;
-    border-radius: 16px;
-    border: 1px solid var(--line-soft);
-    background: #080a0e;
-  }
-
-  .type-wordmark-sample {
-    font-family: var(--mono);
-    font-size: clamp(30px, 4vw, 52px);
-    font-weight: 700;
-    line-height: 0.92;
-    font-variant: small-caps;
-    letter-spacing: 0.14em;
-    color: #ffffff;
-  }
-
-  .type-heading-sample {
-    font-family: var(--mono);
-    font-size: clamp(24px, 3vw, 34px);
-    line-height: 1.04;
-    color: #ffffff;
-  }
-
-  .type-label-strip,
-  .type-token-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 12px;
-  }
-
-  .type-label-strip span,
-  .type-token {
-    display: inline-flex;
-    align-items: center;
-    padding: 7px 10px;
-    border-radius: 999px;
-    border: 1px solid var(--line-soft);
-    background: rgba(255, 255, 255, 0.03);
-  }
-
-  .type-label-strip span {
-    font-family: var(--mono);
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    color: var(--muted);
-  }
-
-  .type-reading-sample {
-    max-width: 58ch;
-    font-family: var(--reading);
-    font-size: 15px;
-    line-height: 1.74;
-    color: #dbe0ea;
-  }
-
-  .type-token {
-    font-family: var(--mono);
-    font-size: 13px;
-    line-height: 1.6;
-    color: #dbe0ea;
-  }
-
-  .list {
-    margin: 12px 0 0;
-    padding-left: 18px;
-  }
-
-  .list li + li {
-    margin-top: 10px;
-  }
-
-  .boundary {
-    padding: 24px;
-  }
-
-  .boundary h2 {
-    font-size: clamp(26px, 3vw, 42px);
-    margin-bottom: 12px;
-  }
-
-  .footer-note {
-    margin-top: 18px;
-    text-align: center;
-    color: var(--soft);
-  }
-
-  .t-structure { color: var(--structure); }
-  .t-state { color: var(--state); }
-  .t-event { color: var(--event); }
-  .t-data { color: var(--data-name); }
-  .t-rule { color: var(--gold); }
-  .t-emerald { color: var(--emerald); }
-  .t-rose { color: var(--rose); }
-  .t-amber { color: var(--amber); }
-
-  @media (max-width: 1260px) {
-    .workspace {
-      grid-template-columns: 1fr;
-    }
-
-    .rail {
-      position: static;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  @media (max-width: 1120px) {
-    .hero,
-    .section-head,
-    .grid-4,
-    .grid-3,
-    .grid-2,
-    .matrix-head,
-    .matrix-row,
-    .manifesto {
-      grid-template-columns: 1fr;
-    }
-
-    .hero-left {
-      border-right: 0;
-      border-bottom: 1px solid var(--line-soft);
-    }
-
-    .hero-signals {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @media (max-width: 820px) {
-    .page {
-      width: min(100vw - 16px, 1480px);
-      padding-top: 8px;
-    }
-
-    .masthead-bar,
-    .hero-left,
-    .hero-right,
-    .section-inner,
-    .boundary {
-      padding-left: 16px;
-      padding-right: 16px;
-    }
-
-    .semantic-band {
-      grid-template-columns: 1fr;
-      gap: 8px;
-    }
-
-    .rail {
-      grid-template-columns: 1fr;
-    }
-
-  }
+:root {
+  --bg: #040506;
+  --panel: #090b0e;
+  --panel-2: #0d1014;
+  --line: rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --text: #f1f3f6;
+  --muted: #a7afbb;
+  --soft: #687281;
+  --structure-d: #4338CA;
+  --structure: #6366F1;
+  --state: #A898F5;
+  --event: #30B8E8;
+  --data: #B0BEC5;
+  --data-t: #9AA8B5;
+  --data-v: #84929F;
+  --rule: #FBBF24;
+  --comment: #9096A6;
+  --valid: #34D399;
+  --violated: #F87171;
+  --warn: #FDE047;
+  --mono: "Cascadia Cove","Cascadia Code",Consolas,monospace;
+  --sans: "Inter","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+  --nav-w: 196px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  min-height: 100vh;
+}
+/* ── NAV RAIL ─────────────────────────────── */
+.nav-rail {
+  position: fixed;
+  top: 0; left: 0;
+  width: var(--nav-w);
+  height: 100vh;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  padding: 28px 16px;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  overflow-y: auto;
+  z-index: 100;
+}
+.nav-wordmark {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+  padding: 0 4px 18px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.nav-item {
+  display: block;
+  padding: 6px 8px;
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--soft);
+  text-decoration: none;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.nav-item:hover { color: var(--text); }
+.nav-item.active { color: var(--structure); }
+.nav-section-meta {
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(103,114,129,0.55);
+  padding: 14px 8px 4px;
+}
+/* ── PAGE LAYOUT ──────────────────────────── */
+.page {
+  margin-left: var(--nav-w);
+  padding: 0 56px 120px;
+  max-width: 1320px;
+}
+/* ── SHARED ───────────────────────────────── */
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 16px;
+}
+p, li {
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.76;
+  color: var(--muted);
+}
+strong { color: var(--text); }
+pre {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.9;
+  color: #eef3f8;
+}
+.s  { color: var(--structure); }
+.sd { color: var(--structure-d); font-weight: bold; }
+.st { color: var(--state); }
+.ev { color: var(--event); }
+.da { color: var(--data); }
+.dt { color: var(--data-t); }
+.dv { color: var(--data-v); }
+.ru { color: var(--rule); }
+.cm { color: var(--comment); font-style: italic; }
+.ok { color: var(--valid); }
+.no { color: var(--violated); }
+.so { color: var(--data-t); }
+/* ── SECTION SHELL ────────────────────────── */
+.section {
+  padding: 80px 0 64px;
+  border-bottom: 1px solid var(--line);
+}
+.section:last-child { border-bottom: none; }
+.section-head {
+  margin-bottom: 56px;
+}
+.section-head h2 {
+  font-family: var(--mono);
+  font-size: clamp(28px, 4vw, 58px);
+  line-height: 0.96;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 20px;
+  max-width: 22ch;
+}
+.section-head p { max-width: 62ch; }
+/* ── 01 INTRO ─────────────────────────────── */
+.intro-hero {
+  display: grid;
+  gap: 56px;
+}
+.intro-wordmark {
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 32px;
+}
+.intro-h1 {
+  font-family: var(--mono);
+  font-size: clamp(40px, 6vw, 88px);
+  line-height: 0.92;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 32px;
+  max-width: 20ch;
+}
+.intro-copy-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.intro-body p { max-width: 60ch; }
+.intro-body p + p { margin-top: 18px; }
+.cast-strip {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 36px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.cast-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.cast-dot { width: 6px; height: 6px; border-radius: 50%; }
+.intro-specimen {
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+}
+.specimen-bar {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--soft);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.specimen-dots { display: flex; gap: 6px; }
+.specimen-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
+.specimen-body { padding: 20px; }
+/* ── 02 CONCEPTS ──────────────────────────── */
+.concepts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.concept-cell {
+  padding: 26px;
+  background: var(--panel);
+}
+.concept-cell h3 {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.concept-cell p { font-size: 15px; }
+.channels-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  margin-top: 1px;
+}
+.channel {
+  padding: 24px;
+  background: var(--panel-2);
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+.channel-name {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.channel h3 {
+  font-family: var(--mono);
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.channel p { font-size: 15px; }
+/* ── 03 SYSTEM ────────────────────────────── */
+.construct-gallery {
+  padding: 56px 0;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: 200px minmax(0,1fr);
+  gap: 40px;
+  align-items: start;
+}
+.construct-gallery:last-of-type { border-bottom: none; }
+.construct-sidebar { position: sticky; top: 32px; }
+.construct-index {
+  font-size: 52px;
+  line-height: 1;
+  color: rgba(255,255,255,0.06);
+  margin-bottom: 12px;
+  font-family: var(--mono);
+}
+.construct-name {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.construct-body { display: grid; gap: 32px; }
+.construct-specimen {
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.construct-specimen-inner { padding: 20px; }
+.construct-modifiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 16px;
+}
+.modifier-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  color: var(--soft);
+}
+.cross-surface-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.surface-chip {
+  padding: 14px 16px;
+  background: var(--panel-2);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.surface-chip span { display: block; margin-top: 6px; font-size: 11px; color: var(--text); }
+.field-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.field-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--soft);
+  border-bottom: 1px solid var(--line);
+}
+.field-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.field-table tr:last-child td { border-bottom: none; }
+.verdict-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  margin-top: 48px;
+}
+.verdict-cell { padding: 22px; background: var(--panel-2); }
+.verdict-name {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+/* ── 04 SURFACES ──────────────────────────── */
+.surfaces-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.surface-specimen {
+  background: var(--panel);
+  padding: 26px;
+}
+.surface-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 6px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.surface-h3 {
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin: 14px 0 6px;
+}
+.sf-note {
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.72;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+.panel-inner {
+  border: 1px solid var(--line);
+  padding: 16px;
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 130px minmax(0,1fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 13px;
+  align-items: baseline;
+}
+.form-row:last-child { border-bottom: none; }
+.form-lbl { color: var(--soft); font-size: 11px; letter-spacing: 0.10em; }
+.evt-btn {
+  padding: 6px 14px;
+  border: 1px solid rgba(48,184,232,0.35);
+  background: rgba(48,184,232,0.05);
+  color: var(--event);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.evt-btn[disabled] {
+  border-color: var(--line);
+  background: none;
+  color: var(--soft);
+  opacity: 0.5;
+  cursor: default;
+}
+.timeline-row {
+  display: grid;
+  grid-template-columns: 90px 14px minmax(0,1fr);
+  gap: 12px;
+  padding: 8px 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  align-items: start;
+}
+.tl-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 1px solid;
+  margin-top: 2px;
+}
+.rule-callout {
+  padding: 12px 16px;
+  border-left: 3px solid var(--violated);
+  background: rgba(248,113,113,0.05);
+  margin: 6px 0;
+}
+.rule-callout p {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--violated);
+}
+/* ── RESPONSIVE ───────────────────────────── */
+@media (max-width: 960px) {
+  .nav-rail { display: none; }
+  .page { margin-left: 0; padding: 0 24px 80px; }
+  .intro-hero,
+  .construct-gallery,
+  .channels-grid,
+  .surfaces-grid,
+  .cross-surface-strip,
+  .verdict-strip { grid-template-columns: 1fr; }
+  .concepts-grid { grid-template-columns: 1fr; }
+  .construct-sidebar { position: static; }
+}
 </style>
 </head>
 <body>
-  <div class="page">
-    <header class="frame" id="top">
-      <div class="masthead-bar eyebrow">
-        <span>Precept / Design System / Semantic Visual System</span>
-        <span>Canonical surface expression · updated 2026-04-06</span>
+
+<!-- ─── Nav rail ─────────────────────────────────── -->
+<nav class="nav-rail" aria-label="Document navigation">
+  <div class="nav-wordmark">Precept</div>
+  <a class="nav-item active" href="#intro"     data-sec="intro">Intro</a>
+  <a class="nav-item"        href="#concepts"  data-sec="concepts">Concepts</a>
+  <a class="nav-item"        href="#system"    data-sec="system">System</a>
+  <span class="nav-section-meta">Constructs</span>
+  <a class="nav-item"        href="#structure" data-sec="structure" style="padding-left:18px">Structure</a>
+  <a class="nav-item"        href="#state"     data-sec="state"     style="padding-left:18px">State</a>
+  <a class="nav-item"        href="#event"     data-sec="event"     style="padding-left:18px">Event</a>
+  <a class="nav-item"        href="#data-c"    data-sec="data-c"    style="padding-left:18px">Data</a>
+  <a class="nav-item"        href="#rule"      data-sec="rule"      style="padding-left:18px">Rule</a>
+  <span class="nav-section-meta" style="margin-top:6px"></span>
+  <a class="nav-item"        href="#surfaces"  data-sec="surfaces">Surfaces</a>
+  <span class="nav-section-meta" style="margin-top:6px"></span>
+  <a class="nav-item"        href="#typography" data-sec="typography">Typography</a>
+  <a class="nav-item"        href="#colors"     data-sec="colors">Colors</a>
+</nav>
+
+<div class="page">
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 01 · INTRO                                      -->
+<!-- ═══════════════════════════════════════════════ -->
+<section class="section" id="intro">
+  <div class="eyebrow">Precept / Design System</div>
+  <div class="intro-hero">
+    <div class="intro-body">
+      <p class="intro-wordmark">Semantic Visual System</p>
+      <h1 class="intro-h1">The Semantic World of Precept</h1>
+      <div class="intro-copy-row">
+        <p>Precept governs the integrity of a business entity's data across its lifecycle. The semantic visual system governs how that governance is communicated on screen: how structure, states, events, data fields, and rules each look in every surface where Precept is present.</p>
+        <p>Five authored constructs. One runtime verdict layer that sits on top of them without replacing them. A stable visual grammar that survives when the context shifts from code editor to topology diagram to data form to public documentation.</p>
       </div>
-
-      <div class="hero">
-        <section class="hero-left" aria-label="Document overview">
-          <div class="hero-title-block">
-            <div class="kicker micro">Precept's fullest visual-system expression</div>
-            <h1 class="wordmark">Precept</h1>
-            <h2 class="hero-title">Semantic Visual System</h2>
-            <p class="hero-lede"><strong>The semantic visual system defines how Precept means things on screen.</strong> It gives <span class="t-structure">structure</span>, <span class="t-state">states</span>, <span class="t-event">events</span>, <span class="t-data">data</span>, <span class="t-rule">explanatory rule language</span>, and runtime verdicts — <span class="t-emerald">allowed</span>, <span class="t-rose">blocked</span>, or <span class="t-amber">cautionary</span> — a stable visual grammar so meaning stays recognizable across authoring, topology, preview, diagnostics, and public explanation. The point is not decoration. The point is faster recognition, lower confusion, and a surface language that feels unmistakably Precept.</p>
-          </div>
-
-          <div class="hero-signals" aria-label="Core system convictions">
-            <div class="signal"><strong>Meaning stays stable.</strong> Semantic identity should survive when the surface changes from code to graph to panel to editorial page.</div>
-            <div class="signal"><strong>Forms may adapt.</strong> A surface can change shape, density, rhythm, and emphasis without rewriting the semantic contract.</div>
-            <div class="signal"><strong>Brand stays visible.</strong> Black field, Cascadia hierarchy, indigo structure, and disciplined semantic lanes keep the system recognizably Precept.</div>
-          </div>
-
-          <p class="stance-note hero-note"><strong>Design conviction:</strong> this document should be the fullest embodiment of Precept's visual system: rigorous enough to govern the system, expressive enough to prove it. It should dogfood the semantic language it defines so the page feels unmistakably Precept while still functioning as the canonical reference.</p>
-        </section>
-
-
+      <div class="cast-strip" aria-label="Five core constructs">
+        <span class="cast-pill"><span class="cast-dot" style="background:var(--structure)"></span><span class="s">Structure</span></span>
+        <span class="cast-pill"><span class="cast-dot" style="background:var(--state)"></span><span class="st">State</span></span>
+        <span class="cast-pill"><span class="cast-dot" style="background:var(--event)"></span><span class="ev">Event</span></span>
+        <span class="cast-pill"><span class="cast-dot" style="background:var(--data)"></span><span class="da">Data</span></span>
+        <span class="cast-pill"><span class="cast-dot" style="background:var(--rule)"></span><span class="ru">Rule</span></span>
       </div>
-    </header>
+    </div>
+    <div class="intro-specimen" aria-label="Specimen: LoanApplication precept">
+      <div class="specimen-bar">
+        <span>loan-application.precept</span>
+        <div class="specimen-dots">
+          <span class="specimen-dot"></span>
+          <span class="specimen-dot"></span>
+          <span class="specimen-dot"></span>
+        </div>
+      </div>
+      <div class="specimen-body"><pre
+><span class="s">precept</span> <span class="ru">LoanApplication</span>
 
-    <div class="workspace">
-      <aside class="rail" aria-label="Page navigation and locked signals">
-        <section class="rail-card">
-          <h2>Sections</h2>
-          <ul class="nav">
-            <li><a class="nav-link" href="#overview">Overview</a></li>
-            <li class="nav-group-label">Signal Language</li>
-            <li><a class="nav-link nav-sub" href="#foundations">Foundation Rules</a></li>
-            <li><a class="nav-link nav-sub" href="#families">Core Constructs</a></li>
-            <li><a class="nav-link nav-sub" href="#typography">Typography Roles</a></li>
-            <li><a class="nav-link nav-sub" href="#primitives">Composition Primitives</a></li>
-            <li><a class="nav-link nav-sub" href="#signal-grammar">Shape &amp; Grammar</a></li>
-            <li class="nav-group-label">Surfaces</li>
-            <li><a class="nav-link nav-sub" href="#surface-matrix">Surface Translation</a></li>
-            <li><a class="nav-link nav-sub" href="#application-notes">Inheritance &amp; Adaptation</a></li>
-            <li><a class="nav-link nav-sub" href="#invariants">Compliance Floor</a></li>
-          </ul>
-        </section>
+<span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="so">number</span> <span class="s">default</span> <span class="so">0</span>
+<span class="s">field</span> <span class="da">ReviewNotes</span>     <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">ApprovedAmount</span>  <span class="s">as</span> <span class="so">number</span> <span class="s">default</span> <span class="so">0</span>
 
-        <section class="rail-card">
-          <h2>Locked signals</h2>
-          <div class="legend">
-            <div class="legend-item"><span class="legend-dot" style="background:#6366f1;"></span><p><strong>Structure</strong> uses restrained indigo framing and grammar cues.</p></div>
-            <div class="legend-item"><span class="legend-dot" style="background:#a898f5;"></span><p><strong>States</strong> stay violet; lifecycle is carried primarily by shape and context.</p></div>
-            <div class="legend-item"><span class="legend-dot" style="background:#30b8e8;"></span><p><strong>Events</strong> stay cyan and should always read as action.</p></div>
-            <div class="legend-item"><span class="legend-dot" style="background:#b0bec5;"></span><p><strong>Data</strong> stays inside the bright-slate family.</p></div>
-            <div class="legend-item"><span class="legend-dot" style="background:#fbbf24;"></span><p><strong>Gold</strong> remains interruptive, explanatory, and sparse.</p></div>
-            <div class="legend-item"><span class="legend-dot" style="background:#34d399;"></span><p><strong>Verdicts</strong> are runtime overlays, not authoring identities.</p></div>
-          </div>
-        </section>
-      </aside>
+<span class="s">state</span> <span class="st">Draft</span> <span class="s">initial</span>
+<span class="s">state</span> <span class="st">UnderReview</span>
+<span class="s">state</span> <span class="st">Approved</span>
+<span class="s">state</span> <span class="st">Rejected</span>
 
-      <main class="content">
-        <section class="section" id="overview">
-          <div class="section-inner">
-            <div class="section-head">
-              <div>
-                <div class="eyebrow">Overview</div>
-                <h2>Visual meaning that holds across every surface Precept touches.</h2>
-              </div>
-              <p>Five core constructs, one color contract, plus a separate runtime verdict layer. Every surface built with or on top of Precept should feel like the same language.</p>
-            </div>
+<span class="s">event</span> <span class="ev">Submit</span>
+<span class="s">event</span> <span class="ev">Approve</span> <span class="s">with</span> <span class="da">Amount</span> <span class="s">as</span> <span class="so">number</span>
+<span class="s">event</span> <span class="ev">Reject</span>
 
-            <div class="manifesto">
-              <div class="manifesto-quote">
-                <p><strong>Precept should look like a language with internal law and visible confidence.</strong> The same semantic grammar applies whether the user is reading code, navigating a diagram, using an inspector, or reading a README. When the surface changes and the meaning holds, the system is working.</p>
-              </div>
+<span class="s">on</span> <span class="ev">Submit</span> <span class="s">assert</span> <span class="da">ApplicantName</span> != <span class="so">null</span> <span class="s">because</span> <span class="ru">"Name is required"</span>
+<span class="s">on</span> <span class="ev">Submit</span> <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt; <span class="so">0</span> <span class="s">because</span> <span class="ru">"Amount must be positive"</span>
 
-              <div class="manifesto-note">
-                <p>A <strong>surface</strong> is the user-facing context — editor, diagram, inspector, public documentation. A <strong>signal</strong> is the visual mechanism — color, shape, typography, highlighting, border, or pattern — used within that context to express semantic meaning. The system keeps meaning stable across surfaces by fixing the categories while letting forms adapt to local density, rhythm, and affordance needs.</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="section" id="signal-language">
-          <div class="section-inner">
-            <div class="section-head">
-              <div>
-                <div class="eyebrow">Signal Language</div>
-                <h2>The canonical map of Precept's signal channels and combination rules.</h2>
-              </div>
-              <p>This section defines which channels are allowed to carry meaning in Precept, what each channel is responsible for, what each channel is forbidden to say, and how those channels compose when the same semantic object moves between editor, diagram, inspector, and documentation surfaces.</p>
-            </div>
-
-            <div class="manifesto">
-              <div class="manifesto-quote">
-                <p><strong>Signal language is the contract between semantic meaning and visual treatment.</strong> In Precept, the authored construct stays fixed while the surface adapts. A state should still read as a state, an event as an event, data as data, and a rule as explanation even when the presentation shifts from code to diagram to panel to editorial page. Runtime verdicts speak on top of those constructs; they do not replace them.</p>
-              </div>
-
-              <div class="manifesto-note">
-                <p><strong>Core channels:</strong> semantic color, typography, layout, and form. These are allowed to carry meaning and are governed here.</p>
-                <p><strong>Supportive treatments:</strong> borders, highlighting, pattern, and motion may reinforce the reading, but they do not get to invent new semantics on their own. If a surface loses color or density, the remaining channels still need to preserve the reading.</p>
-              </div>
-            </div>
-
-            <div class="matrix" aria-label="Canonical signal channel map">
-              <div class="matrix-head">
-                <div>Channel</div>
-                <div>Primary job</div>
-                <div>Must carry</div>
-                <div>Must not carry</div>
-                <div>Fallback and notes</div>
-              </div>
-
-              <div class="matrix-row">
-                <div>
-                  <span class="matrix-label">Core channel</span>
-                  <h3>Semantic Color</h3>
-                  <p>Core construct identity and reserved runtime overlays.</p>
-                  <div class="tag">Fixed across surfaces</div>
-                </div>
-                <div>
-                  <p>Answer the first question: what kind of thing is this?</p>
-                </div>
-                <div>
-                  <p><span class="t-structure">Structure</span>, <span class="t-state">state</span>, <span class="t-event">event</span>, <span class="t-data">data</span>, and <span class="t-rule">rule language</span> keep their construct colors. <span class="t-emerald">Allowed</span>, <span class="t-rose">blocked</span>, and <span class="t-amber">warning</span> are reserved for runtime evaluation.</p>
-                </div>
-                <div>
-                  <p>Color may not announce initial vs terminal state, selection, emphasis, or interaction priority by itself. Verdict hues may not replace a base construct identity.</p>
-                </div>
-                <div>
-                  <p>If color weakens or disappears, form and layout still have to preserve the semantic reading. Decorative brand glow is not semantic color.</p>
-                </div>
-              </div>
-
-              <div class="matrix-row">
-                <div>
-                  <span class="matrix-label">Core channel</span>
-                  <h3>Typography</h3>
-                  <p>Voice, hierarchy, executable register, and semantic pressure.</p>
-                  <div class="tag">Identity and pressure</div>
-                </div>
-                <div>
-                  <p>Separate executable language from reading prose, and mark constrained names without changing which construct they belong to.</p>
-                </div>
-                <div>
-                  <p>Cascadia carries headings, labels, chips, navigation, and executable names. Segoe UI Variable Text carries paragraph explanation. Small caps marks identity. Italic marks constrained or rule-pressured names.</p>
-                </div>
-                <div>
-                  <p>Typography may not replace construct color, runtime verdict, or state-role shape. Italic is not for generic emphasis or decorative editorial flourish.</p>
-                </div>
-                <div>
-                  <p>When density changes, the font split remains. If a surface compresses, keep the register distinction before adding ornament.</p>
-                </div>
-              </div>
-
-              <div class="matrix-row">
-                <div>
-                  <span class="matrix-label">Core channel</span>
-                  <h3>Layout</h3>
-                  <p>Relationship, causality, grouping, and reading order.</p>
-                  <div class="tag">Explains what acts on what</div>
-                </div>
-                <div>
-                  <p>Show which parts belong together, what triggers what, and where a result or explanation comes from.</p>
-                </div>
-                <div>
-                  <p>State groups, event rows, transition adjacency, inspector sections, verdict rows, and rule notes should occupy distinct positions in the reading order.</p>
-                </div>
-                <div>
-                  <p>Layout may not reclassify a thing into another construct or rely on density tricks that collapse contract structure, action path, and runtime output into one lane.</p>
-                </div>
-                <div>
-                  <p>If space shrinks, preserve adjacency and order first. Compression is allowed; semantic shuffling is not.</p>
-                </div>
-              </div>
-
-              <div class="matrix-row">
-                <div>
-                  <span class="matrix-label">Core channel</span>
-                  <h3>Form</h3>
-                  <p>Silhouette, object kind, and state-role shape grammar.</p>
-                  <div class="tag">Shape before color</div>
-                </div>
-                <div>
-                  <p>Show whether the reader is looking at a shell, state card, event row, transition path, verdict badge, or rule callout.</p>
-                </div>
-                <div>
-                  <p>Precept form includes the outer tablet or frame, equal rounded state cards, an origin-marked initial state, a visibly closed terminal state, directional transition arrows, row-shaped events, panel shells, verdict badges, and inset rule callouts.</p>
-                </div>
-                <div>
-                  <p>Form may not collapse everything into generic cards, pills, or boxes. It may not use verdict shape to replace verdict color, and it may not hide state role behind color alone.</p>
-                </div>
-                <div>
-                  <p>If a surface loses rich treatment, the silhouette ladder still needs to survive: shell, state, event, transition, runtime output, explanation.</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="grid-3">
-              <article class="card tone-structure">
-                <div class="chip">Reading order</div>
-                <h3>Construct first, form second, layout third, typography fourth.</h3>
-                <p>The first read is construct identity, the second is object kind, the third is relationship, and the fourth is pressure or explanatory register. A surface can compress those reads; it cannot scramble them.</p>
-              </article>
-
-              <article class="card tone-verdict">
-                <div class="chip">Composition law</div>
-                <h3>Runtime overlays sit on top of authoring identity.</h3>
-                <p>A <span class="t-state">state</span> stays a state when it becomes <span class="t-emerald">allowed</span> or <span class="t-rose">blocked</span>. Evaluation modifies the reading; it does not replace the underlying family, shape, or role.</p>
-              </article>
-
-              <article class="card tone-rule">
-                <div class="chip">Boundary</div>
-                <h3>Brand atmosphere is not signal language.</h3>
-                <p>Black field, tone, contrast, and atmosphere make the system recognizably Precept, but they are not allowed to invent semantic categories. If a treatment cannot survive without aesthetic mood, it is style, not signal.</p>
-              </article>
-            </div>
-
-            <div class="grid-4">
-              <article class="card tone-structure">
-                <div class="signal-card-label">Semantic Color</div>
-                <div class="visual signal-visual">
-                  <div class="signal-family-strip">
-                    <span class="signal-family-pill structure">Structure</span>
-                    <span class="signal-family-pill state">State</span>
-                    <span class="signal-family-pill event">Event</span>
-                    <span class="signal-family-pill data">Data</span>
-                    <span class="signal-family-pill rule">Rule</span>
-                  </div>
-                  <div class="signal-overlay-strip">
-                    <span class="signal-overlay-pill base">State</span>
-                    <span class="signal-overlay-pill allowed">Allowed</span>
-                    <span class="signal-overlay-pill warning">Warning</span>
-                    <span class="signal-overlay-pill blocked">Blocked</span>
-                  </div>
-                </div>
-                <h3>Core Construct Color</h3>
-                <p>Color says what kind of authored construct this is first: <span class="t-structure">structure</span>, <span class="t-state">state</span>, <span class="t-event">event</span>, <span class="t-data">data</span>, and <span class="t-rule">rule language</span>. <span class="t-emerald">Allowed</span>, <span class="t-rose">blocked</span>, and <span class="t-amber">warning</span> are runtime overlays on top of that identity, not replacements for it, and hover, focus, or selection treatments do not get to steal those semantic hues.</p>
-              </article>
-
-              <article class="card tone-data">
-                <div class="signal-card-label">Typography</div>
-                <div class="visual signal-visual">
-                  <div class="signal-type-stack">
-                    <div class="type-wordmark-sample" style="font-size: 20px; letter-spacing: 0.12em; color: #ffffff;">PRECEPT</div>
-                    <div class="signal-type-line">State Chip</div>
-                    <div class="signal-type-line">event.approve()</div>
-                    <div class="signal-type-line" style="font-style: italic;">Approved</div>
-                  </div>
-                </div>
-                <h3>Type gives Precept its voice, hierarchy, and pressure.</h3>
-                <p>Precept typography is a governed split: Cascadia carries identity, headings, labels, chips, and executable names, while Segoe UI Variable Text carries paragraph-length explanation. Small caps marks identity moments, and italic adds semantic pressure when a <span class="t-state">state</span>, <span class="t-event">event</span>, or <span class="t-rule">rule-bound</span> name is under constraint. Typography sharpens the reading; it does not replace construct color, state role, or verdict status.</p>
-              </article>
-
-              <article class="card tone-structure">
-                <div class="signal-card-label">Layout</div>
-                <div class="visual signal-visual">
-                  <div class="signal-layout-demo">
-                    <div class="signal-layout-group">
-                      <div class="signal-layout-child lead"></div>
-                      <div class="signal-layout-child secondary"></div>
-                      <div class="signal-layout-child related"></div>
-                    </div>
-                    <div class="signal-layout-side">Related</div>
-                  </div>
-                </div>
-                <h3>Hierarchy and Relationship</h3>
-                <p>Layout shows how <span class="t-state">states</span>, <span class="t-event">events</span>, transitions, inspector sections, verdict rows, and rule messages relate. Grouping, spacing, order, and adjacency tell the reader what belongs together, what acts on what, where an outcome comes from, and which explanation belongs to which runtime event.</p>
-              </article>
-
-              <article class="card tone-state">
-                <div class="signal-card-label">Form</div>
-                <div class="visual signal-visual">
-                  <div class="signal-form-frame">
-                    <div class="signal-form-row">
-                      <span class="signal-form-pill frame">Frame</span>
-                      <span class="signal-form-pill chip">Chip</span>
-                      <span class="signal-form-pill badge">Badge</span>
-                    </div>
-                    <div class="signal-form-row">
-                      <span class="signal-form-pill frame">Panel</span>
-                      <span class="signal-form-arrow"></span>
-                      <span class="signal-form-pill chip">Transition</span>
-                    </div>
-                  </div>
-                </div>
-                <h3>Shape and Interaction Grammar</h3>
-                <p>Form gives distinct shape to Precept's recurring parts: the outer contract frame, equal rounded <span class="t-state">state</span> cards, an origin-marked initial state, a visibly closed terminal state, <span class="t-event">event</span> rows, directional transition paths, inspector panels, verdict badges, and <span class="t-rule">rule</span> callouts. Shape tells the reader whether they are looking at governed structure, a state-role variant, an action path, runtime output, or causal explanation before color finishes the sentence.</p>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section class="section" id="foundations">
-          <div class="section-inner">
-            <div class="section-head">
-              <div>
-                <div class="eyebrow">Foundation Rules</div>
-                <h2>Three rules govern every signal in the system.</h2>
-              </div>
-              <p>Every surface inherits these constraints before it begins solving its own local design problem.</p>
-            </div>
-
-            <div class="grid-3">
-              <article class="card tone-structure">
-                <div class="chip">Category permanence</div>
-                <h3>Each authored core construct owns its color.</h3>
-                <p><span class="t-structure">Structure</span>, <span class="t-state">states</span>, <span class="t-event">events</span>, <span class="t-data">data</span>, and <span class="t-rule">rule language</span> each hold their visual identity across every surface. A surface can shade a color lighter or darker; it cannot reassign that authored construct identity. <span class="t-emerald">Verdict</span> colors remain a separate runtime overlay layer.</p>
-              </article>
-
-              <article class="card tone-structure">
-                <div class="chip">Shape before color</div>
-                <h3>Structural signals carry meaning before color does.</h3>
-                <p>Whether a state is initial, terminal, or currently active should be legible from shape and position. Color reinforces that reading; it does not replace it.</p>
-              </article>
-
-              <article class="card tone-verdict">
-                <div class="chip">Runtime only</div>
-                <h3>Verdict colors appear only when the runtime is speaking.</h3>
-                <p><span class="t-emerald">Emerald</span>, <span class="t-rose">rose</span>, and <span class="t-amber">amber</span> signal what happened or what would happen, not what a thing is. They belong to evaluation, not authoring.</p>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section class="section" id="families">
-          <div class="section-inner">
-            <div class="section-head">
-              <div>
-                <div class="eyebrow">Core Constructs</div>
-                <h2>Five core constructs define what a Precept contract is made of.</h2>
-              </div>
-              <p>The authored side of Precept is made of five core constructs. Those constructs determine color, tonal register, and reading contract: <span class="t-structure">structure</span> frames the contract, <span class="t-state">states</span> name conditions, <span class="t-event">events</span> signal actions, <span class="t-data">data</span> carries facts, and <span class="t-rule">rules</span> express constraints and explanation. <span class="t-emerald">Verdict</span> is separate: it is the runtime layer that evaluates those constructs without becoming one of them.</p>
-            </div>
-
-            <div class="semantic-stack">
-              <div class="semantic-band structure">
-                <strong>Structure</strong>
-                <span>Frames scope, grammar, grouping, and governed boundaries.</span>
-              </div>
-              <div class="semantic-band state">
-                <strong>State</strong>
-                <span>Names condition and lifecycle identity without becoming a rainbow taxonomy.</span>
-              </div>
-              <div class="semantic-band event">
-                <strong>Event</strong>
-                <span>Signals action, trigger, and executable intent.</span>
-              </div>
-              <div class="semantic-band data">
-                <strong>Data</strong>
-                <span>Carries field names, types, values, and factual payload as one construct lane.</span>
-              </div>
-              <div class="semantic-band rule">
-                <strong>Rule</strong>
-                <span>Interrupts with because-language, rejection-language, and causal explanation.</span>
-              </div>
-            </div>
-
-            <div class="grid-2" style="margin-top: 14px;">
-              <article class="card tone-verdict">
-                <div class="chip">Runtime layer</div>
-                <h3>Verdict is not a core construct.</h3>
-                <p><span class="t-emerald">Allowed</span>, <span class="t-rose">blocked</span>, and <span class="t-amber">cautionary</span> verdicts are runtime overlays that evaluate authored constructs. They speak after the contract is read; they do not replace structure, state, event, data, or rule identity.</p>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section class="section" id="typography">
-          <div class="section-inner">
-            <div class="section-head">
-              <div>
-                <div class="eyebrow">Typography Roles</div>
-                <h2>Type carries identity, interface authority, and semantic pressure.</h2>
-              </div>
-              <p>The split is deliberate and now canonical for this system. The Cascadia stack owns identity and system-facing roles. <strong>Segoe UI Variable Text</strong> with <strong>Segoe UI</strong> fallback owns paragraph-length reading. Mono names and governs; the reading face explains.</p>
-            </div>
-
-            <div class="grid-3">
-              <article class="card tone-structure">
-                <div class="chip">Cascadia-first authority</div>
-                <h3>Identity and interface chrome stay in the same family.</h3>
-                <p>Wordmark, section headings, labels, chips, navigation, inline semantic tokens, and other system-facing cues should stay on the <span class="t-structure">Cascadia Cove / Cascadia Code / Consolas</span> stack. This keeps the editorial page, the UI shell, and the executable language in one typographic voice.</p>
-                <div class="type-sample">
-                  <div class="type-wordmark-sample">Precept</div>
-                  <div class="type-heading-sample" style="margin-top: 14px;">Semantic Visual System</div>
-                  <div class="type-label-strip">
-                    <span>Overview</span>
-                    <span>Signal Grammar</span>
-                    <span>Blocked Path</span>
-                  </div>
-                </div>
-              </article>
-
-              <article class="card tone-data">
-                <div class="chip">Reading lane</div>
-                <h3>Paragraph prose should calm the page down.</h3>
-                <p>Use the non-serif reading face for sentences that need sustained comprehension: ledes, section copy, notes, guidance, and public-facing explanation. The current reading lane is <span class="t-data">Segoe UI Variable Text</span> with <span class="t-data">Segoe UI</span> and system sans fallbacks. It exists so long-form explanation does not feel like raw source code.</p>
-                <div class="type-sample">
-                  <p class="type-reading-sample">The semantic visual system keeps meaning stable while signals adapt to context. That explanation should read fluently at paragraph length, which is why prose switches to the calmer reading face instead of forcing every sentence through monospace.</p>
-                </div>
-              </article>
-
-              <article class="card tone-rule">
-                <div class="chip">Pressure signal</div>
-                <h3>Italic means pressure, not decoration.</h3>
-                <p>Typography is the second semantic channel. Italic belongs to constrained <span class="t-state">states</span>, constrained <span class="t-event">events</span>, invariant-guarded names, and nearby editorial annotation about executable material. Do not spend italics on generic emphasis in headings, navigation, chips, or marketing-style prose; that would blur the system's pressure signal.</p>
-                <div class="type-sample">
-                  <div class="type-token-row">
-                    <span class="type-token"><span class="t-state" style="font-style: italic;">Approved</span></span>
-                    <span class="type-token"><span class="t-event" style="font-style: italic;">Submit</span></span>
-                    <span class="type-token"><span class="t-data" style="font-style: italic;">ApplicantName</span></span>
-                    <span class="type-token"><span style="color:#9096A6; font-style: italic;"># review remains manual above 50k</span></span>
-                  </div>
-                </div>
-              </article>
-            </div>
-
-            <div class="type-table-wrap" aria-label="Canonical typography role map">
-              <table class="type-table">
-                <thead>
-                  <tr>
-                    <th>Role</th>
-                    <th>Family</th>
-                    <th>Default treatment</th>
-                    <th>Application note</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><strong>Wordmark / identity</strong></td>
-                    <td>
-                      Cascadia stack
-                      <span class="type-stack">Cascadia Cove, Cascadia Code, Consolas, monospace</span>
-                    </td>
-                    <td><p>700 weight, small caps, tracked spacing in the 0.10em-0.16em range, white on the black field.</p></td>
-                    <td><p>The mark should read like a defined term or named law. Do not substitute the reading face here.</p></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Section headings</strong></td>
-                    <td>
-                      Cascadia stack
-                      <span class="type-stack">Same family as the wordmark, normal case unless the mark itself appears.</span>
-                    </td>
-                    <td><p>600-700 weight, tight leading, restrained tracking, sentence or title case rather than all caps.</p></td>
-                    <td><p>Headings should feel like system headings, not editorial magazine display type. Small caps is for the wordmark moment, not every heading.</p></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Labels, chips, navigation</strong></td>
-                    <td>
-                      Cascadia stack
-                      <span class="type-stack">System-facing chrome stays mono.</span>
-                    </td>
-                    <td><p>11-12px, uppercase, 0.12em-0.14em tracking, compact pills or rails.</p></td>
-                    <td><p>These are control-surface elements. Keeping them mono aligns the UI shell with the code it frames.</p></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Paragraph text</strong></td>
-                    <td>
-                      Reading sans
-                      <span class="type-stack">Segoe UI Variable Text, Segoe UI, system-ui, sans-serif</span>
-                    </td>
-                    <td><p>14-16px, 1.7-1.8 line height, normal case, max measure around 65-75 characters.</p></td>
-                    <td><p>Use this for explanatory prose, notes, and public-facing narrative. Serif is off the table; the reading face should stay modern, quiet, and technical.</p></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Matrix / table content</strong></td>
-                    <td>
-                      Mixed by density
-                      <span class="type-stack">Headers, row labels, and short factual cells in Cascadia; longer sentence-level explanation may use the reading face inside the cell.</span>
-                    </td>
-                    <td><p>12-13px for dense factual content, with mono carrying labels and short values.</p></td>
-                    <td><p>Tables are system-facing first. Keep the structural frame mono so scanning stays crisp, then allow reading prose only where the cell genuinely becomes explanatory.</p></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Inline tokens, specimens, code</strong></td>
-                    <td>
-                      Cascadia stack
-                      <span class="type-stack">Use the same family across examples, tokens, mock code, and executable snippets.</span>
-                    </td>
-                    <td><p>12-14px, normal case, semantic hue carries core construct identity, italic only when semantics require pressure.</p></td>
-                    <td><p>Do not introduce a second code face. The code should still feel like it grows out of the wordmark.</p></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Constraint pressure / italic</strong></td>
-                    <td>
-                      Underlying role family
-                      <span class="type-stack">Italic modifies the existing family; it does not swap typefaces.</span>
-                    </td>
-                    <td><p>Reserve italic for constrained states, constrained events, guarded data names, and comment-lane annotation tied to executable material.</p></td>
-                    <td><p>If a reader cannot trust italic to mean pressure, the second semantic channel has been wasted. Prefer weight, spacing, or sentence structure for ordinary emphasis.</p></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <section class="section" id="primitives">
-          <div class="section-inner">
-            <div class="section-head">
-              <div>
-                <div class="eyebrow">Composition Primitives</div>
-                <h2>These are the pieces surfaces compose from.</h2>
-              </div>
-              <p>Primitives are not components. They are the semantic parts a surface composes into its own information architecture.</p>
-            </div>
-
-            <div class="grid-3">
-              <article class="card tone-structure">
-                <div class="visual">
-                  <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
-                    <rect x="18" y="18" width="284" height="84" rx="18" stroke="#6366F1" stroke-width="3"/>
-                    <line x1="46" y1="42" x2="164" y2="42" stroke="#4338CA" stroke-width="5" stroke-linecap="round"/>
-                    <line x1="46" y1="66" x2="206" y2="66" stroke="#98A3FF" stroke-width="4" stroke-linecap="round"/>
-                  </svg>
-                </div>
-                <h3>Structural frame</h3>
-                <p>The <span class="t-structure">indigo</span> frame defines context: code block, diagram cluster, overlay shell, or diagnostics group. It tells the user where governed information starts and stops.</p>
-              </article>
-
-              <article class="card tone-state">
-                <div class="visual">
-                  <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
-                    <rect x="34" y="34" width="70" height="52" rx="16" stroke="#A898F5" stroke-width="3"/>
-                    <rect x="216" y="34" width="70" height="52" rx="16" stroke="#30B8E8" stroke-width="3"/>
-                    <line x1="104" y1="60" x2="216" y2="60" stroke="#6366F1" stroke-width="3" stroke-linecap="round"/>
-                  </svg>
-                </div>
-                <h3>Actor pairing</h3>
-                <p><span class="t-state">States</span> and <span class="t-event">events</span> stay visually distinct even when adjacent. The system should never make a user infer whether a label is a condition or an action from wording alone.</p>
-              </article>
-
-              <article class="card tone-data">
-                <div class="visual">
-                  <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
-                    <rect x="24" y="24" width="272" height="72" rx="18" stroke="#1E293B" stroke-width="2"/>
-                    <line x1="52" y1="46" x2="128" y2="46" stroke="#B0BEC5" stroke-width="4" stroke-linecap="round"/>
-                    <line x1="52" y1="70" x2="116" y2="70" stroke="#9AA8B5" stroke-width="4" stroke-linecap="round"/>
-                    <line x1="182" y1="46" x2="246" y2="46" stroke="#84929F" stroke-width="4" stroke-linecap="round"/>
-                  </svg>
-                </div>
-                <h3>Data stack</h3>
-                <p><span class="t-data">Data</span> may use tonal variation inside the bright-slate family, but it should still read as one factual lane. Names, types, and values may separate. The family does not.</p>
-              </article>
-
-              <article class="card tone-rule">
-                <div class="visual">
-                  <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
-                    <rect x="26" y="34" width="268" height="52" rx="16" fill="rgba(251,191,36,0.08)" stroke="#FBBF24" stroke-opacity="0.35" stroke-width="2"/>
-                    <line x1="54" y1="60" x2="264" y2="60" stroke="#FBBF24" stroke-width="4" stroke-linecap="round"/>
-                  </svg>
-                </div>
-                <h3>Rule-message interrupt</h3>
-                <p><span class="t-rule">Gold</span> enters the interface as explanation the human should notice. It is an interrupt, not a running style. If too much becomes <span class="t-rule">gold</span>, rule meaning disappears.</p>
-              </article>
-
-              <article class="card tone-rule">
-                <div class="visual">
-                  <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
-                    <text x="40" y="70" fill="#A898F5" font-family="Cascadia Code, Consolas, monospace" font-size="36" font-style="italic">Active</text>
-                  </svg>
-                </div>
-                <h3>Constraint pressure</h3>
-                <p>Italic is the shared pressure signal. Surfaces may apply it differently, but they must preserve the meaning: this thing is under explicit rule attention.</p>
-              </article>
-
-              <article class="card tone-verdict">
-                <div class="visual">
-                  <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
-                    <rect x="34" y="26" width="68" height="68" rx="18" stroke="#A898F5" stroke-width="3"/>
-                    <circle cx="68" cy="60" r="7" fill="#6366F1"/>
-                    <rect x="216" y="26" width="68" height="68" rx="18" stroke="#A898F5" stroke-width="3"/>
-                    <path d="M102 60H216" stroke="#34D399" stroke-width="4" stroke-linecap="round"/>
-                    <path d="M204 48L216 60L204 72" stroke="#34D399" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </div>
-                <h3>Allowed flow</h3>
-                <p><span class="t-emerald">Emerald</span> flow appears when the interface is speaking about a runtime allowance or executable path. It should never be mistaken for general navigation chrome.</p>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section class="section" id="signal-grammar">
-          <div class="section-inner">
-            <div class="section-head">
-              <div>
-                <div class="eyebrow">Shape &amp; Grammar</div>
-                <h2>How signals are read - shape, scale, and overlay.</h2>
-              </div>
-              <p>These are the rules for reading a signal correctly. Shape and scale determine semantic identity. Verdicts overlay without replacing it.</p>
-            </div>
-
-            <div class="grid-3">
-              <article class="card tone-structure">
-                <div class="chip">Context</div>
-                <h3>Use structure to define the governed zone.</h3>
-                <p><span class="t-structure">Indigo</span> frames, rails, dividers, operators, and headings should establish where the official semantic content begins, ends, and groups itself.</p>
-              </article>
-
-              <article class="card tone-state">
-                <div class="chip">Identity</div>
-                <h3>Keep authored constructs legible at first glance.</h3>
-                <p><span class="t-state">State</span> identity must stay distinct from <span class="t-event">event</span> identity even inside dense surfaces. If a user has to parse the sentence to know which is which, the signal is too weak.</p>
-              </article>
-
-              <article class="card tone-rule">
-                <div class="chip">Explanation</div>
-                <h3>Reserve gold for causal language.</h3>
-                <p><span class="t-rule">Gold</span> belongs to because-language, rejection-language, or other explicit causal explanation. It should not become a general accent lane for headings, decorative dividers, or chrome.</p>
-              </article>
-
-              <article class="card tone-verdict">
-                <div class="visual">
-                  <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
-                    <rect x="34" y="28" width="92" height="64" rx="18" stroke="#A898F5" stroke-width="3"/>
-                    <rect x="194" y="28" width="92" height="64" rx="18" stroke="#A898F5" stroke-width="3"/>
-                    <path d="M126 60H194" stroke="#34D399" stroke-width="4" stroke-linecap="round"/>
-                    <path d="M182 48L194 60L182 72" stroke="#34D399" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </div>
-                <h3>Enabled overlay</h3>
-                <p><span class="t-emerald">Emerald</span> may tint an edge, row accent, badge, or prospective outcome label. The <span class="t-state">state</span> and <span class="t-event">event</span> identities beneath it remain <span class="t-state">violet</span> and <span class="t-event">cyan</span>.</p>
-              </article>
-
-              <article class="card tone-rose">
-                <div class="visual">
-                  <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
-                    <rect x="34" y="28" width="92" height="64" rx="18" stroke="#A898F5" stroke-width="3"/>
-                    <rect x="194" y="28" width="92" height="64" rx="18" stroke="#A898F5" stroke-width="3"/>
-                    <path d="M126 60H194" stroke="#F87171" stroke-width="4" stroke-linecap="round" stroke-dasharray="8 8"/>
-                    <line x1="150" y1="34" x2="170" y2="86" stroke="#F87171" stroke-width="4"/>
-                  </svg>
-                </div>
-                <h3>Blocked overlay</h3>
-                <p><span class="t-rose">Rose</span> means the path or action is structurally denied in the current runtime context. Use enough geometry, label text, or iconography that the blocked state is not color-only.</p>
-              </article>
-
-              <article class="card tone-amber">
-                <div class="visual">
-                  <svg viewBox="0 0 320 120" fill="none" aria-hidden="true">
-                    <rect x="26" y="34" width="268" height="52" rx="16" fill="rgba(253,224,71,0.1)" stroke="#FDE047" stroke-opacity="0.35" stroke-width="2"/>
-                    <circle cx="58" cy="60" r="8" fill="#FDE047"/>
-                    <line x1="84" y1="60" x2="244" y2="60" stroke="#FDE047" stroke-width="4" stroke-linecap="round"/>
-                  </svg>
-                </div>
-                <h3>Warning overlay</h3>
-                <p><span class="t-amber">Amber</span> marks unmatched, cautionary, or attention-worthy runtime output. It should read as a diagnostic pause, not as a new semantic family.</p>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section class="section" id="surfaces">
-          <div class="section-inner">
-            <div class="section-head">
-              <div>
-                <div class="eyebrow">Surfaces</div>
-                <h2>The same signal language lands differently across each surface.</h2>
-              </div>
-              <p>These sections show how the system is translated into real product contexts. The meaning stays fixed; the surface solves for layout, density, and workflow.</p>
-            </div>
-          </div>
-        </section>
-
-        <section class="section" id="surface-matrix">
-          <div class="section-inner">
-            <div class="section-head">
-              <div>
-                <div class="eyebrow">Surface Translation</div>
-                <h2>Same meaning, different signal.</h2>
-              </div>
-              <p>The matrix below shows how current major Precept surfaces express the same system without changing what the user is being told.</p>
-            </div>
-
-            <div class="matrix">
-              <div class="matrix-head micro">
-                <div>Surface</div>
-                <div class="t-structure">Structure</div>
-                <div class="t-state">Actors</div>
-                <div class="t-data">Data and rules</div>
-                <div class="t-emerald">Verdicts</div>
-              </div>
-
-              <div class="matrix-row">
-                <div>
-                  <span class="matrix-label">Syntax editor</span>
-                  <h3>Authoring-time code surface</h3>
-                  <p>The most literal semantic signal. Everything starts here.</p>
-                </div>
-                <div class="matrix-cell tone-structure">
-                  <p><span class="t-structure">Indigo</span> declarations, connectors, and operators establish executable grammar.</p>
-                  <span class="tag">Text + weight</span>
-                </div>
-                <div class="matrix-cell tone-state">
-                  <p><span class="t-state">States</span> stay <span class="t-state">violet</span>, <span class="t-event">events</span> stay <span class="t-event">cyan</span>, and italic adds constraint pressure where needed.</p>
-                  <span class="tag">Hue + italic</span>
-                </div>
-                <div class="matrix-cell tone-data">
-                  <p>Bright <span class="t-data">slate</span> handles names, types, and values. <span class="t-rule">Gold</span> is reserved for because and reject messages.</p>
-                  <span class="tag">Tone + interruption</span>
-                </div>
-                <div class="matrix-cell tone-verdict">
-                  <p>None. Verdict colors are withheld from authoring-time syntax.</p>
-                  <span class="tag">No runtime overlay</span>
-                </div>
-              </div>
-
-              <div class="matrix-row">
-                <div>
-                  <span class="matrix-label">State diagram</span>
-                  <h3>Topology and path surface</h3>
-                  <p>The graph should show structure before outcomes.</p>
-                </div>
-                <div class="matrix-cell tone-structure">
-                  <p><span class="t-structure">Indigo</span> frames, rails, and neutral graph scaffolding stabilize the canvas.</p>
-                  <span class="tag">Frame + edge</span>
-                </div>
-                <div class="matrix-cell tone-state">
-                  <p><span class="t-state">Violet</span> state labels and <span class="t-event">cyan</span> event labels persist. Initial and final state are primarily shape distinctions.</p>
-                  <span class="tag">Shape + label</span>
-                </div>
-                <div class="matrix-cell tone-rule">
-                  <p><span class="t-data">Data</span> is secondary here. <span class="t-rule">Gold</span> should appear only in explicit explanatory callouts, not routine node decoration.</p>
-                  <span class="tag">Sparse annotation</span>
-                </div>
-                <div class="matrix-cell tone-verdict">
-                  <p>Verdicts may tint edges, halos, badges, or path emphasis, but they sit on top of the underlying graph semantics.</p>
-                  <span class="tag">Overlay layer</span>
-                </div>
-              </div>
-
-              <div class="matrix-row">
-                <div>
-                  <span class="matrix-label">Preview / inspector</span>
-                  <h3>Runtime decision surface</h3>
-                  <p>The user needs current condition, legal actions, and factual payload in one view.</p>
-                </div>
-                <div class="matrix-cell tone-structure">
-                  <p><span class="t-structure">Indigo</span> defines the shell, section boundaries, and decision frame. The current <span class="t-state">state</span> should be explicit, not implied by color alone.</p>
-                  <span class="tag">Shell + hierarchy</span>
-                </div>
-                <div class="matrix-cell tone-event">
-                  <p><span class="t-state">Violet</span> still identifies state context and <span class="t-event">cyan</span> still identifies event rows. They should not collapse into generic list styling.</p>
-                  <span class="tag">List identity</span>
-                </div>
-                <div class="matrix-cell tone-rule">
-                  <p>Bright <span class="t-data">slate</span> organizes field names, types, and values. <span class="t-rule">Gold</span> surfaces rule banners, row explanations, and causal messages.</p>
-                  <span class="tag">Lane + banner</span>
-                </div>
-                <div class="matrix-cell tone-verdict">
-                  <p><span class="t-emerald">Enabled</span>, <span class="t-rose">blocked</span>, and <span class="t-amber">warning</span> verdicts annotate rows, banners, and transition previews with non-color redundancy.</p>
-                  <span class="tag">Badge + message</span>
-                </div>
-              </div>
-
-              <div class="matrix-row">
-                <div>
-                  <span class="matrix-label">Docs, README, website, diagnostics</span>
-                  <h3>Explanatory surfaces</h3>
-                  <p>These surfaces turn semantic structure into prose, examples, and evidence for public and internal readers.</p>
-                </div>
-                <div class="matrix-cell tone-structure">
-                  <p><span class="t-structure">Indigo</span> still frames scope and references the language's formal skeleton.</p>
-                  <span class="tag">Editorial frame</span>
-                </div>
-                <div class="matrix-cell tone-state">
-                  <p><span class="t-state">States</span> and <span class="t-event">events</span> can appear as inline chips, code tokens, or diagram legends while preserving construct identity.</p>
-                  <span class="tag">Inline tokens</span>
-                </div>
-                <div class="matrix-cell tone-rule">
-                  <p>Bright <span class="t-data">slate</span> handles factual examples. <span class="t-rule">Gold</span> should remain purposeful, usually for quoted rules or explanatory payloads.</p>
-                  <span class="tag">Quoted rule language</span>
-                </div>
-                <div class="matrix-cell tone-verdict">
-                  <p>Verdicts only appear when describing or showing runtime outcomes, not as general note styling.</p>
-                  <span class="tag">Outcome evidence</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="section" id="application-notes">
-          <div class="section-inner">
-            <div class="section-head">
-              <div>
-                <div class="eyebrow">Inheritance &amp; Adaptation</div>
-                <h2>Future surface work should start here.</h2>
-              </div>
-              <p>This is the compliance split for future work: what must stay stable, what may adapt, and what every surface must still define locally.</p>
-            </div>
-
-            <div class="grid-3">
-              <article class="card tone-verdict">
-                <div class="visual">
-                  <svg viewBox="0 0 320 140" fill="none" aria-hidden="true">
-                    <rect x="18" y="20" width="284" height="100" rx="20" stroke="#6366F1" stroke-width="3"/>
-                    <line x1="42" y1="48" x2="130" y2="48" stroke="#4338CA" stroke-width="4" stroke-linecap="round"/>
-                    <line x1="42" y1="72" x2="150" y2="72" stroke="#A898F5" stroke-width="4" stroke-linecap="round"/>
-                    <line x1="42" y1="96" x2="186" y2="96" stroke="#30B8E8" stroke-width="4" stroke-linecap="round"/>
-                  </svg>
-                </div>
-                <h3>Must preserve</h3>
-                <ul class="list">
-                  <li>Core construct identity for <span class="t-structure">structure</span>, <span class="t-state">state</span>, <span class="t-event">event</span>, <span class="t-data">data</span>, <span class="t-rule">rule language</span>, plus the separate runtime verdict overlay layer.</li>
-                  <li>Minimum redundancy rules for <span class="t-rose">blocked</span>, <span class="t-amber">warning</span>, and <span class="t-emerald">allowed</span> runtime states.</li>
-                </ul>
-              </article>
-
-              <article class="card tone-state">
-                <div class="visual">
-                  <svg viewBox="0 0 320 140" fill="none" aria-hidden="true">
-                    <rect x="26" y="28" width="268" height="84" rx="18" fill="rgba(255,255,255,0.02)" stroke="#1F2937" stroke-width="2"/>
-                    <rect x="46" y="48" width="92" height="44" rx="12" stroke="#A898F5" stroke-width="3"/>
-                    <rect x="182" y="48" width="92" height="44" rx="12" stroke="#30B8E8" stroke-width="3"/>
-                  </svg>
-                </div>
-                <h3>May adapt</h3>
-                <ul class="list">
-                  <li>Signal medium: shape, weight, chip form, row styling, overlay badge, legend, or pattern.</li>
-                  <li>Layout, density, motion, and information grouping for the local workflow.</li>
-                  <li>Local tonal tuning within a construct lane when contrast and recognition stay intact.</li>
-                </ul>
-              </article>
-
-              <article class="card tone-rule">
-                <div class="visual">
-                  <svg viewBox="0 0 320 140" fill="none" aria-hidden="true">
-                    <rect x="26" y="34" width="268" height="72" rx="18" fill="rgba(251,191,36,0.08)" stroke="#FBBF24" stroke-opacity="0.35" stroke-width="2"/>
-                    <line x1="54" y1="70" x2="266" y2="70" stroke="#FBBF24" stroke-width="4" stroke-linecap="round"/>
-                  </svg>
-                </div>
-                <h3>Must define locally</h3>
-                <ul class="list">
-                  <li>Exact layout, interaction model, and density rules for that surface.</li>
-                  <li>Focus, selection, hover, and keyboard behavior that do not collide with semantic cues.</li>
-                  <li>Any surface-specific affordances, motion, or help text needed to make the inherited contract usable in context.</li>
-                </ul>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section class="section" id="invariants">
-          <div class="section-inner">
-            <div class="section-head">
-              <div>
-                <div class="eyebrow">Compliance Floor</div>
-                <h2>Rules that apply on every surface.</h2>
-              </div>
-              <p>These rules govern signal application system-wide, not just on individual surfaces.</p>
-            </div>
-
-            <div class="grid-4">
-              <article class="law tone-state">
-                <h3>Preserve semantic identity</h3>
-                <p>A surface may mute or intensify a construct lane locally, but it may not swap authored constructs, demote <span class="t-rule">rule language</span> into generic chrome, or treat verdict colors as authoring identity.</p>
-              </article>
-
-              <article class="law tone-rose">
-                <h3>Never ship color-only verdicts</h3>
-                <p><span class="t-emerald">Allowed</span>, <span class="t-rose">blocked</span>, and <span class="t-amber">warning</span> states must use at least one non-hue signal such as iconography, line pattern, label text, badge shape, or row position.</p>
-              </article>
-
-              <article class="law tone-state">
-                <h3>Make current condition explicit</h3>
-                <p>The current <span class="t-state">state</span>, <span class="t-event">event</span> availability, and runtime outcome must be named in text somewhere on the surface. Users should not have to infer active condition from framing or tint alone.</p>
-              </article>
-
-              <article class="law tone-rule">
-                <h3>Expose the reason when the runtime knows it</h3>
-                <p>If the system knows why an action is <span class="t-rose">blocked</span>, unmatched, or exceptional, the surface must expose that cause as readable copy. <span class="t-rule">Gold</span> remains the preferred explanatory signal when rule language is shown.</p>
-              </article>
-            </div>
-          </div>
-        </section>
-      </main>
+<span class="s">from</span> <span class="st">Draft</span> <span class="s">on</span> <span class="ev">Submit</span> -> <span class="s">transition</span> <span class="st">UnderReview</span>
+<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span> -> <span class="s">set</span> <span class="da">ApprovedAmount</span> = <span class="ev">Approve</span>.<span class="da">Amount</span> -> <span class="s">transition</span> <span class="st">Approved</span>
+<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Reject</span> -> <span class="s">transition</span> <span class="st">Rejected</span></pre>
+      </div>
     </div>
   </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 02 · CONCEPTS                                   -->
+<!-- ═══════════════════════════════════════════════ -->
+<section class="section" id="concepts">
+  <div class="section-head">
+    <div class="eyebrow">02 · Concepts</div>
+    <h2>How the system works</h2>
+    <p>The concepts specific to the semantic visual system itself — not a recap of Precept, but the grammar that governs how Precept means things on screen.</p>
+  </div>
+
+  <div class="concepts-grid">
+    <div class="concept-cell">
+      <h3>Semantic Identity</h3>
+      <p>The stable type classification of any authored construct. Structure is always structure. A state is always a state. Identity persists across surfaces — it does not reset when the rendering context changes.</p>
+    </div>
+    <div class="concept-cell">
+      <h3>Base Depiction</h3>
+      <p>The canonical visual form that represents a construct in its default, unmodified condition. Base depiction is the floor; all other treatment is additive above it.</p>
+    </div>
+    <div class="concept-cell">
+      <h3>Semantic Modifier</h3>
+      <p>An additive signal layered onto a base depiction to express a meaningful variant — initial, terminal, constrained, violated. Modifiers qualify the base reading; they do not replace it.</p>
+    </div>
+    <div class="concept-cell">
+      <h3>Runtime Overlay</h3>
+      <p>Evaluation output drawn on top of authored constructs at runtime. Allowed, blocked, and warning do not replace a construct's identity — they say what is happening to it right now.</p>
+    </div>
+    <div class="concept-cell">
+      <h3>Signal Precedence</h3>
+      <p>When multiple channels speak at once, precedence governs the reading order. Colour answers first. Form answers second. Layout answers third. Typography carries register and pressure throughout.</p>
+    </div>
+    <div class="concept-cell">
+      <h3>Cross-Surface Translation</h3>
+      <p>The same semantic construct expressed through the appropriate conventions of a different surface while maintaining stable identity. A state in DSL code and a state node in a diagram are the same thing, differently dressed.</p>
+    </div>
+    <div class="concept-cell">
+      <h3>Authored vs. Runtime Meaning</h3>
+      <p>Authored meaning is defined at write time: what a construct is, what it is named, what rules constrain it. Runtime meaning is evaluated at execution: whether it is currently allowed, blocked, or reachable. Both are present on most surfaces.</p>
+    </div>
+    <div class="concept-cell">
+      <h3>Adjacent Semantics</h3>
+      <p>Verdicts, transitions, and annotations that participate in the visual system without belonging to the five core constructs. They borrow vocabulary from the construct system and return runtime or relational meaning.</p>
+    </div>
+  </div>
+
+  <div class="channels-grid">
+    <div class="channel">
+      <span class="channel-name">Channel 01</span>
+      <h3>Colour</h3>
+      <p>Five families locked to the five constructs. Three verdict hues above them, runtime-only. No channel may borrow from another's family without becoming ambiguous.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Channel 02</span>
+      <h3>Typography</h3>
+      <p>Mono governs identity, headings, labels, and executable names. Inter carries reading prose. Italic marks semantic pressure — a constrained name, a rule-adjacent term — not decoration.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Channel 03</span>
+      <h3>Form</h3>
+      <p>Shape before colour. The silhouette of a construct — frame, card, row, badge, callout — should survive context changes. If colour is lost, form still tells the reader what kind of thing they are looking at.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Channel 04</span>
+      <h3>Layout</h3>
+      <p>Adjacency and order carry meaning. What is next to what, what precedes what, what is nested inside what — these are signal, not decoration. Layout says relationship; colour says identity.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 03 · SYSTEM                                     -->
+<!-- ═══════════════════════════════════════════════ -->
+<section class="section" id="system">
+  <div class="section-head">
+    <div class="eyebrow">03 · System</div>
+    <h2>Five constructs, one grammar</h2>
+    <p>Each gallery shows the base depiction, semantic modifiers, and cross-surface translation for one of Precept's five authored constructs. All five use the same composed structure.</p>
+  </div>
+
+  <!-- STRUCTURE ─────────────────────────────────── -->
+  <div class="construct-gallery" id="structure">
+    <div class="construct-sidebar">
+      <div class="construct-index">01</div>
+      <div class="construct-name s">Structure</div>
+      <p style="font-size:14px;margin-top:8px">Registration, grouping, and governed boundaries. The perimeter that makes everything inside coherent.</p>
+    </div>
+    <div class="construct-body">
+      <div class="construct-specimen">
+        <div class="specimen-bar"><span>Base depiction</span><div class="specimen-dots"><span class="specimen-dot"></span><span class="specimen-dot"></span><span class="specimen-dot"></span></div></div>
+        <div class="construct-specimen-inner"><pre
+><span class="s">precept</span> <span class="ru">InsuranceClaim</span>
+
+<span class="s">state</span> <span class="st">Filed</span> <span class="s">initial</span>
+<span class="s">state</span> <span class="st">UnderReview</span>
+<span class="s">state</span> <span class="st">Settled</span>
+
+<span class="s">event</span> <span class="ev">OpenReview</span>
+<span class="s">event</span> <span class="ev">Settle</span>
+
+<span class="s">from</span> <span class="st">Filed</span> <span class="s">on</span> <span class="ev">OpenReview</span> -> <span class="s">transition</span> <span class="st">UnderReview</span>
+<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Settle</span> -> <span class="s">transition</span> <span class="st">Settled</span></pre>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
+        <div class="construct-modifiers">
+          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35)">precept &lt;name&gt;</span>
+          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35)">state … initial</span>
+          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35)">from … on</span>
+          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35)">-&gt; transition</span>
+          <span class="modifier-tag">field … as type</span>
+          <span class="modifier-tag">event with args</span>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:0">Cross-surface translation</div>
+        <div class="cross-surface-strip">
+          <div class="surface-chip">Code<span class="s">Indigo keywords, outer frame</span></div>
+          <div class="surface-chip">Diagram<span class="s">Container border, cluster label</span></div>
+          <div class="surface-chip">Data Form<span class="s">Panel shell, section divider</span></div>
+          <div class="surface-chip">Docs<span class="s">Named precept heading block</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATE ─────────────────────────────────────── -->
+  <div class="construct-gallery" id="state">
+    <div class="construct-sidebar">
+      <div class="construct-index">02</div>
+      <div class="construct-name st">State</div>
+      <p style="font-size:14px;margin-top:8px">A named lifecycle position. States describe what is true right now, not how the entity arrived there.</p>
+    </div>
+    <div class="construct-body">
+      <div class="construct-specimen">
+        <div class="specimen-bar"><span>Base depiction + role modifiers</span><div class="specimen-dots"><span class="specimen-dot"></span><span class="specimen-dot"></span><span class="specimen-dot"></span></div></div>
+        <div class="construct-specimen-inner">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:18px">
+            <span style="display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border:1px solid rgba(168,152,245,0.4);font-family:var(--mono);font-size:13px">
+              <span style="width:7px;height:7px;border-radius:50%;background:var(--structure)"></span>
+              <span class="st">Draft</span>
+              <span class="so" style="font-size:10px;text-transform:uppercase;letter-spacing:0.12em">initial</span>
+            </span>
+            <span style="padding:7px 14px;border:1px solid rgba(168,152,245,0.3);font-family:var(--mono);font-size:13px;color:var(--state)">UnderReview</span>
+            <span style="padding:7px 14px;border:2px solid rgba(168,152,245,0.55);font-family:var(--mono);font-size:13px;color:var(--state)">Approved <span class="so" style="font-size:10px;text-transform:uppercase;letter-spacing:0.12em">terminal</span></span>
+            <span style="padding:7px 14px;border:1px solid rgba(168,152,245,0.2);font-family:var(--mono);font-size:13px;color:var(--state);font-style:italic">Constrained</span>
+          </div>
+          <pre><span class="s">state</span> <span class="st">Draft</span> <span class="s">initial</span>
+<span class="s">state</span> <span class="st">UnderReview</span>
+<span class="s">state</span> <span class="st">Approved</span>
+<span class="s">state</span> <span class="st">Rejected</span></pre>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
+        <div class="construct-modifiers">
+          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.35)">initial — origin dot</span>
+          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.35)">terminal — double border</span>
+          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.35)">current — active fill</span>
+          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.35)">reachable — dim highlight</span>
+          <span class="modifier-tag" style="font-style:italic">constrained — italic name</span>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:0">Cross-surface translation</div>
+        <div class="cross-surface-strip">
+          <div class="surface-chip">Code<span class="st">Violet keyword + name</span></div>
+          <div class="surface-chip">Diagram<span class="st">Hard rect, role shape</span></div>
+          <div class="surface-chip">Data Form<span class="st">Active state badge</span></div>
+          <div class="surface-chip">Docs<span class="st">State row in lifecycle table</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EVENT ─────────────────────────────────────── -->
+  <div class="construct-gallery" id="event">
+    <div class="construct-sidebar">
+      <div class="construct-index">03</div>
+      <div class="construct-name ev">Event</div>
+      <p style="font-size:14px;margin-top:8px">A discrete trigger. Events carry intent without narrating it. They cause transitions and execute rules.</p>
+    </div>
+    <div class="construct-body">
+      <div class="construct-specimen">
+        <div class="specimen-bar"><span>Base depiction + outcome modifiers</span><div class="specimen-dots"><span class="specimen-dot"></span><span class="specimen-dot"></span><span class="specimen-dot"></span></div></div>
+        <div class="construct-specimen-inner">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:18px">
+            <span style="padding:6px 12px;border:1px solid rgba(48,184,232,0.35);font-family:var(--mono);font-size:13px;color:var(--event)">Submit</span>
+            <span style="padding:6px 12px;border:1px solid rgba(48,184,232,0.25);font-family:var(--mono);font-size:13px;color:var(--event);font-style:italic">Approve <span class="so" style="font-size:10px;font-style:normal">guarded</span></span>
+            <span style="padding:6px 12px;border:1px dashed rgba(248,113,113,0.4);font-family:var(--mono);font-size:13px;color:var(--violated)">Reject <span class="so" style="font-size:10px">blocked</span></span>
+          </div>
+          <pre><span class="s">from</span> <span class="st">Draft</span> <span class="s">on</span> <span class="ev">Submit</span> -> <span class="s">transition</span> <span class="st">UnderReview</span>
+<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span> -> <span class="s">transition</span> <span class="st">Approved</span>
+<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Reject</span> -> <span class="s">transition</span> <span class="st">Rejected</span></pre>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
+        <div class="construct-modifiers">
+          <span class="modifier-tag ev" style="border-color:rgba(48,184,232,0.35)">transition — directional arrow</span>
+          <span class="modifier-tag ev" style="border-color:rgba(48,184,232,0.35)">no-transition — no destination</span>
+          <span class="modifier-tag" style="font-style:italic">guarded — italic name</span>
+          <span class="modifier-tag no" style="border-color:rgba(248,113,113,0.35)">blocked — violated</span>
+          <span class="modifier-tag" style="color:var(--warn);border-color:rgba(253,224,71,0.3)">unmatched — warning</span>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:0">Cross-surface translation</div>
+        <div class="cross-surface-strip">
+          <div class="surface-chip">Code<span class="ev">Cyan keyword in from-on block</span></div>
+          <div class="surface-chip">Diagram<span class="ev">Labeled transition arrow</span></div>
+          <div class="surface-chip">Data Form<span class="ev">Action button row</span></div>
+          <div class="surface-chip">Docs<span class="ev">Event row with rule summary</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DATA ──────────────────────────────────────── -->
+  <div class="construct-gallery" id="data-c">
+    <div class="construct-sidebar">
+      <div class="construct-index">04</div>
+      <div class="construct-name da">Data</div>
+      <p style="font-size:14px;margin-top:8px">The factual payload under governance. Data fields carry the matter that business rules act on and protect.</p>
+    </div>
+    <div class="construct-body">
+      <div class="construct-specimen">
+        <div class="specimen-bar"><span>Base depiction — field table</span><div class="specimen-dots"><span class="specimen-dot"></span><span class="specimen-dot"></span><span class="specimen-dot"></span></div></div>
+        <div class="construct-specimen-inner">
+          <table class="field-table">
+            <thead>
+              <tr><th>Field</th><th>Type</th><th>Value</th><th>State</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="da">ApplicantName</td>
+                <td class="so">string</td>
+                <td style="color:var(--text)">"Jane Doe"</td>
+                <td><span style="color:var(--valid);font-size:11px">✓ valid</span></td>
+              </tr>
+              <tr>
+                <td class="da">RequestedAmount</td>
+                <td class="so">number</td>
+                <td style="color:var(--text)">45000</td>
+                <td><span style="color:var(--valid);font-size:11px">✓ valid</span></td>
+              </tr>
+              <tr>
+                <td class="da" style="font-style:italic">IncomeVerified</td>
+                <td class="so">boolean</td>
+                <td class="so">—</td>
+                <td><span style="color:var(--violated);font-size:11px">⊘ required</span></td>
+              </tr>
+              <tr>
+                <td class="da">ReviewNotes</td>
+                <td class="so">string</td>
+                <td class="so">—</td>
+                <td><span style="color:var(--soft);font-size:11px">editable</span></td>
+              </tr>
+              <tr>
+                <td class="da">ApprovedAmount</td>
+                <td class="so">number</td>
+                <td class="so">—</td>
+                <td><span style="color:var(--soft);font-size:11px">locked</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
+        <div class="construct-modifiers">
+          <span class="modifier-tag da" style="border-color:rgba(176,190,197,0.3)">name — bright slate</span>
+          <span class="modifier-tag" style="color:rgba(176,190,197,0.6)">type — dim slate</span>
+          <span class="modifier-tag" style="color:rgba(176,190,197,0.4)">value — softest slate</span>
+          <span class="modifier-tag ok" style="border-color:rgba(52,211,153,0.3)">valid — mark</span>
+          <span class="modifier-tag no" style="border-color:rgba(248,113,113,0.3)">violated — mark</span>
+          <span class="modifier-tag" style="font-style:italic">constrained — italic name</span>
+          <span class="modifier-tag" style="color:var(--soft)">editable — open border</span>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:0">Cross-surface translation</div>
+        <div class="cross-surface-strip">
+          <div class="surface-chip">Code<span class="da">Slate tokens in data block</span></div>
+          <div class="surface-chip">Diagram<span class="da">Field list inside state node</span></div>
+          <div class="surface-chip">Data Form<span class="da">Editable form input row</span></div>
+          <div class="surface-chip">Docs<span class="da">Field table in property ref</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RULE ──────────────────────────────────────── -->
+  <div class="construct-gallery" id="rule">
+    <div class="construct-sidebar">
+      <div class="construct-index">05</div>
+      <div class="construct-name ru">Rule</div>
+      <p style="font-size:14px;margin-top:8px">Causal language. The because and why of Precept's governance. Rules interrupt — they do not narrate.</p>
+    </div>
+    <div class="construct-body">
+      <div class="construct-specimen">
+        <div class="specimen-bar"><span>Base depiction + verdict overlay</span><div class="specimen-dots"><span class="specimen-dot"></span><span class="specimen-dot"></span><span class="specimen-dot"></span></div></div>
+        <div class="construct-specimen-inner">
+          <pre><span class="s">on</span> <span class="ev">Submit</span> <span class="s">assert</span> <span class="da">ApplicantName</span> != <span class="so">null</span> <span class="s">because</span> <span class="ru">"Name is required"</span>
+<span class="s">on</span> <span class="ev">Submit</span> <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt; <span class="so">0</span> <span class="s">because</span> <span class="ru">"Amount must be positive"</span>
+<span class="s">on</span> <span class="ev">Submit</span> <span class="s">assert</span> <span class="da">RequestedAmount</span> &lt;= <span class="so">1000000</span> <span class="s">because</span> <span class="ru">"Within policy limit"</span>
+<span class="s">from</span> <span class="st">Draft</span> <span class="s">on</span> <span class="ev">Submit</span> -> <span class="s">transition</span> <span class="st">UnderReview</span></pre>
+          <div style="margin-top:16px">
+            <div class="rule-callout" style="border-left-color:var(--violated);background:rgba(248,113,113,0.04)"><p style="color:var(--violated)">⊘ RequestedAmount must be greater than 0</p></div>
+            <div class="rule-callout" style="border-left-color:var(--valid);background:rgba(52,211,153,0.04)">
+              <p style="color:var(--valid)">✓ ApplicantName is required — satisfied</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
+        <div class="construct-modifiers">
+          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35)">assert / invariant — indigo</span>
+          <span class="modifier-tag ru" style="border-color:rgba(251,191,36,0.35)">because "message" — rule</span>
+          <span class="modifier-tag ok" style="border-color:rgba(52,211,153,0.3)">satisfied — callout</span>
+          <span class="modifier-tag no" style="border-color:rgba(248,113,113,0.3)">violated — callout</span>
+          <span class="modifier-tag" style="color:var(--warn);border-color:rgba(253,224,71,0.3)">unmatched — callout</span>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:0">Cross-surface translation</div>
+        <div class="cross-surface-strip">
+          <div class="surface-chip">Code<span class="ru">Gold rule keyword + condition</span></div>
+          <div class="surface-chip">Diagram<span class="ru">Guard label on transition</span></div>
+          <div class="surface-chip">Data Form<span class="ru">Violation callout panel</span></div>
+          <div class="surface-chip">Docs<span class="ru">Constraint note in event ref</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Adjacent semantics ─────────────────────────── -->
+  <div class="verdict-strip" aria-label="Adjacent semantic vocabulary">
+    <div class="verdict-cell">
+      <div class="verdict-name ok">Allowed</div>
+      <p style="font-size:14px">The event would transition successfully with the current data and state. Runtime-only — never an authored construct property.</p>
+    </div>
+    <div class="verdict-cell">
+      <div class="verdict-name no">Blocked</div>
+      <p style="font-size:14px">One or more rules prevent the event from proceeding. The blocking rule should be surfaced alongside the verdict, not withheld.</p>
+    </div>
+    <div class="verdict-cell">
+      <div class="verdict-name" style="color:var(--warn)">Warning</div>
+      <p style="font-size:14px">The event would proceed but with a condition worth noting — an unmatched guard, a near-boundary value, a missing optional field.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 04 · SURFACES                                   -->
+<!-- ═══════════════════════════════════════════════ -->
+<section class="section" id="surfaces">
+  <div class="section-head">
+    <div class="eyebrow">04 · Surfaces</div>
+    <h2>Where the system lands</h2>
+    <p>Each surface realizes the same semantic vocabulary through its own conventions of density, layout, and workflow context. The meaning is fixed. The surface solves for its own needs.</p>
+  </div>
+
+  <div class="surfaces-grid">
+
+    <!-- Surface 01: Code Window -->
+    <div class="surface-specimen">
+      <div class="surface-label">Surface 01</div>
+      <div class="surface-h3">Code Window</div>
+      <p class="sf-note">Syntax highlighting renders the full semantic palette. Structure keywords in indigo. States in violet. Events in cyan. Data in slate. Rule messages in gold.</p>
+      <pre style="font-size:12px"><span class="s">precept</span> <span class="ru">InsuranceClaim</span>
+
+<span class="s">field</span> <span class="da">ClaimNumber</span>  <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">ClaimAmount</span>  <span class="s">as</span> <span class="so">number</span> <span class="s">default</span> <span class="so">0</span>
+<span class="s">field</span> <span class="da">PolicyHolder</span> <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
+
+<span class="s">state</span> <span class="st">Filed</span> <span class="s">initial</span>
+<span class="s">state</span> <span class="st">UnderReview</span>
+<span class="s">state</span> <span class="st">Settled</span>
+
+<span class="s">event</span> <span class="ev">OpenReview</span>
+
+<span class="s">on</span> <span class="ev">OpenReview</span> <span class="s">assert</span> <span class="da">ClaimAmount</span> &gt; <span class="so">0</span> <span class="s">because</span> <span class="ru">"Claim must be positive"</span>
+
+<span class="s">from</span> <span class="st">Filed</span> <span class="s">on</span> <span class="ev">OpenReview</span> -> <span class="s">transition</span> <span class="st">UnderReview</span></pre>
+    </div>
+
+    <!-- Surface 02: State Diagram -->
+    <div class="surface-specimen">
+      <div class="surface-label">Surface 02</div>
+      <div class="surface-h3">State Diagram</div>
+      <p class="sf-note">Shape before colour. States are equal hard rectangles distinguished by role modifier — initial origin dot, terminal double border. Events label transition arrows.</p>
+      <div class="panel-inner">
+        <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+          <span style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid rgba(168,152,245,0.4);font-family:var(--mono);font-size:12px">
+            <span style="width:7px;height:7px;border-radius:50%;background:var(--structure)"></span>
+            <span class="st">Filed</span>
+          </span>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--event)">── OpenReview ──&gt;</span>
+          <span style="padding:8px 16px;border:1px solid rgba(168,152,245,0.35);font-family:var(--mono);font-size:12px;color:var(--state)">UnderReview</span>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--event)">── Settle ──&gt;</span>
+          <span style="padding:8px 16px;border:2px solid rgba(168,152,245,0.5);font-family:var(--mono);font-size:12px;color:var(--state)">Settled</span>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--soft);text-transform:uppercase;letter-spacing:0.12em">
+          Initial ● &nbsp; Active ─── &nbsp; Terminal ⬡ &nbsp; Blocked ╳
+        </div>
+      </div>
+    </div>
+
+    <!-- Surface 03: Data Form -->
+    <div class="surface-specimen">
+      <div class="surface-label">Surface 03</div>
+      <div class="surface-h3">Data Form</div>
+      <p class="sf-note">The data form composes structure sections, editable data fields, a state badge, and available event buttons into one governed interaction surface.</p>
+      <div class="panel-inner">
+        <div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
+          <span style="font-family:var(--mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--soft)">InsuranceClaim #1042</span>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--state);border:1px solid rgba(168,152,245,0.35);padding:3px 9px">UnderReview</span>
+        </div>
+        <div class="form-row"><span class="form-lbl">ClaimNumber</span><span style="color:var(--text)">"CLM-2024-0042"</span></div>
+        <div class="form-row"><span class="form-lbl">ClaimAmount</span><span style="color:var(--text)">12500</span></div>
+        <div class="form-row"><span class="form-lbl da" style="font-style:italic">PolicyHolder</span><span style="color:var(--violated)">— required</span></div>
+        <div style="margin-top:14px;display:flex;gap:8px">
+          <button class="evt-btn">Settle</button>
+          <button class="evt-btn" disabled>Override</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Surface 04: Timeline -->
+    <div class="surface-specimen">
+      <div class="surface-label">Surface 04</div>
+      <div class="surface-h3">Operation Timeline</div>
+      <p class="sf-note">Timeline orders events chronologically. Each entry shows the event (cyan), the transition outcome (state colours), and any rule evaluation result.</p>
+      <div style="padding:6px 0">
+        <div class="timeline-row">
+          <span class="so" style="font-size:11px">2024-03-01</span>
+          <span class="tl-dot" style="border-color:var(--structure);background:var(--structure)"></span>
+          <span><span class="ev">Submit</span> <span class="so">→</span> <span class="st">UnderReview</span></span>
+        </div>
+        <div class="timeline-row">
+          <span class="so" style="font-size:11px">2024-03-04</span>
+          <span class="tl-dot" style="border-color:var(--violated)"></span>
+          <span><span class="ev">Approve</span> <span class="no">blocked</span> <span class="so">— PolicyHolder required</span></span>
+        </div>
+        <div class="timeline-row">
+          <span class="so" style="font-size:11px">2024-03-05</span>
+          <span class="tl-dot" style="border-color:var(--valid);background:var(--valid)"></span>
+          <span><span class="ev">Approve</span> <span class="ok">→</span> <span class="st">Approved</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Surface 05: Docs -->
+    <div class="surface-specimen">
+      <div class="surface-label">Surface 05</div>
+      <div class="surface-h3">Explanatory Docs</div>
+      <p class="sf-note">Documentation uses the reading typeface for prose and mono for named constructs, with semantic colour in inline references and rule callouts.</p>
+      <p style="font-size:14px;margin-bottom:10px">The <span class="ev">Submit</span> event transitions a <span class="st">Draft</span> loan to <span class="st">UnderReview</span>. Two rules govern the transition:</p>
+      <div class="rule-callout" style="margin-bottom:6px"><p>on Submit assert ApplicantName != null</p></div>
+      <div class="rule-callout"><p>on Submit assert RequestedAmount &gt; 0</p></div>
+      <p style="font-size:14px;margin-top:10px">If either rule fails, the event is blocked and the entity remains in <span class="st">Draft</span>.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- 05 · TYPOGRAPHY                               -->
+<!-- ═══════════════════════════════════════════════════ -->
+<section class="section" id="typography">
+  <div class="section-head">
+    <div class="eyebrow">05 · Typography</div>
+    <h2>Two faces. One rule each.</h2>
+    <p>Cascadia carries all structural identity. Inter carries reading prose. No serifs. Italic marks semantic pressure, not emphasis.</p>
+  </div>
+
+  <div class="concepts-grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+    <div class="concept-cell">
+      <h3>Cascadia — identity &amp; structure</h3>
+      <p>Used for: wordmark, section headings, labels, chips, nav, construct names, table headers, eyebrows, inline tokens, and all code specimens. Cascadia is the face of governed structure. When text needs to read as authored or systematic, it is in Cascadia.</p>
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">
+        <div style="font-family:var(--mono);font-size:clamp(28px,4vw,56px);line-height:1;letter-spacing:0.14em;font-variant:small-caps;color:var(--text)">Precept</div>
+        <div style="font-family:var(--mono);font-size:18px;margin-top:12px;color:var(--text)">Semantic Visual System</div>
+        <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--soft);margin-top:10px">Structure · State · Event · Data · Rule</div>
+      </div>
+    </div>
+    <div class="concept-cell">
+      <h3>Inter — reading prose</h3>
+      <p>Used for: body paragraphs, concept descriptions, surface notes, and any text longer than a label that needs sustained reading. Inter is engineered for screen at 15–18px and sits beside Cascadia without competing. Segoe UI Variable and Segoe UI are the system fallbacks on Windows.</p>
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--sans);font-size:16px;line-height:1.76;color:var(--muted)">
+        Precept governs the integrity of a business entity's data across its lifecycle. The semantic visual system governs how that governance is communicated on screen.
+      </div>
+    </div>
+    <div class="concept-cell">
+      <h3>Wordmark treatment</h3>
+      <p>The identity display — <span style="font-family:var(--mono);font-variant:small-caps;letter-spacing:0.14em">Precept</span> in Cascadia small caps — is reserved for the hero moment and deliberate brand callouts. Inline prose uses plain title case. Nav and labels are already all-caps mono and need no additional treatment. Scarcity is what makes the wordmark land.</p>
+    </div>
+    <div class="concept-cell">
+      <h3>Italic — semantic pressure only</h3>
+      <p>Italic belongs to constrained states, constrained events, invariant-guarded data names, and rule-adjacent annotation in code specimens. It marks that something is under explicit rule attention. It is not used for general emphasis, decorative headings, or editorial flourish. If a reader cannot trust italic to mean pressure, the second semantic channel has been wasted.</p>
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px">
+        <span style="font-family:var(--mono);font-size:13px;font-style:italic;color:var(--state)">Approved</span>
+        <span style="font-family:var(--mono);font-size:13px;font-style:italic;color:var(--event)">Submit</span>
+        <span style="font-family:var(--mono);font-size:13px;font-style:italic;color:var(--data)">PolicyHolder</span>
+        <span style="font-family:var(--mono);font-size:13px;font-style:italic;color:var(--soft)"># review required above 50k</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="channels-grid" style="margin-top:1px">
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>No serifs.</h3>
+      <p>Ever. The posture of this document and of Precept's surfaces is architectural, not editorial. Serifs are not part of the system.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Mono for everything structural.</h3>
+      <p>If it governs, labels, names, or identifies — it is in Cascadia. This includes headings. Cascadia at display size reads as specification, not decoration.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Sans for reading prose.</h3>
+      <p>Inter carries paragraphs. It does not appear in identity positions, labels, or code. The split is strict. Mono names and governs; sans explains.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Italic means pressure.</h3>
+      <p>Not emphasis. Not decoration. Italic communicates that a construct is under rule attention. Spend it only where that meaning is true.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="colors">
+  <div class="section-head">
+    <div class="eyebrow">06 · Color System</div>
+    <h2>Eight shades. Five families. One reason each.</h2>
+    <p>Every authoring-time color has a fixed semantic meaning. Nothing is decorative. Color identifies what kind of construct this is. Italic identifies that a construct is under rule pressure. Runtime verdicts operate in a separate register — they never appear in syntax.</p>
+  </div>
+
+  <!-- Authoring-time palette strip -->
+  <div style="display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:1px;background:var(--line)">
+    <div style="background:#4338CA;padding:16px 12px 14px">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:8px">Structure</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:#fff;letter-spacing:0.04em">#4338CA</div>
+      <div style="font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.45);margin-top:4px">Semantic · bold</div>
+    </div>
+    <div style="background:#6366F1;padding:16px 12px 14px">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:8px">Structure</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:#fff;letter-spacing:0.04em">#6366F1</div>
+      <div style="font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.45);margin-top:4px">Grammar · normal</div>
+    </div>
+    <div style="background:#A898F5;padding:16px 12px 14px">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(15,8,40,0.5);margin-bottom:8px">States</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:rgba(15,8,40,0.9);letter-spacing:0.04em">#A898F5</div>
+      <div style="font-family:var(--mono);font-size:10px;color:rgba(15,8,40,0.45);margin-top:4px">Violet 260°</div>
+    </div>
+    <div style="background:#30B8E8;padding:16px 12px 14px">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(0,18,28,0.5);margin-bottom:8px">Events</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:rgba(0,18,28,0.9);letter-spacing:0.04em">#30B8E8</div>
+      <div style="font-family:var(--mono);font-size:10px;color:rgba(0,18,28,0.45);margin-top:4px">Cyan 195°</div>
+    </div>
+    <div style="background:#B0BEC5;padding:16px 12px 14px">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(8,14,18,0.5);margin-bottom:8px">Data</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:rgba(8,14,18,0.9);letter-spacing:0.04em">#B0BEC5</div>
+      <div style="font-family:var(--mono);font-size:10px;color:rgba(8,14,18,0.45);margin-top:4px">Names</div>
+    </div>
+    <div style="background:#9AA8B5;padding:16px 12px 14px">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(8,14,18,0.5);margin-bottom:8px">Data</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:rgba(8,14,18,0.9);letter-spacing:0.04em">#9AA8B5</div>
+      <div style="font-family:var(--mono);font-size:10px;color:rgba(8,14,18,0.45);margin-top:4px">Types</div>
+    </div>
+    <div style="background:#84929F;padding:16px 12px 14px">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-bottom:8px">Data</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:rgba(255,255,255,0.85);letter-spacing:0.04em">#84929F</div>
+      <div style="font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.4);margin-top:4px">Values</div>
+    </div>
+    <div style="background:#FBBF24;padding:16px 12px 14px">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(20,12,0,0.5);margin-bottom:8px">Rules</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:rgba(20,12,0,0.9);letter-spacing:0.04em">#FBBF24</div>
+      <div style="font-family:var(--mono);font-size:10px;color:rgba(20,12,0,0.45);margin-top:4px">Messages · Gold 45°</div>
+    </div>
+  </div>
+
+  <!-- Comments + verdicts + background strip -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 2fr;gap:1px;background:var(--line);margin-top:1px">
+    <div style="background:var(--panel-2);padding:16px 12px 14px">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--soft);margin-bottom:8px">Comments</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:#9096A6;font-style:italic;letter-spacing:0.04em">#9096A6</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--soft);margin-top:4px">Outside palette · italic</div>
+    </div>
+    <div style="background:var(--panel-2);padding:16px 12px 14px">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(52,211,153,0.5);margin-bottom:8px">Verdict</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:#34D399;letter-spacing:0.04em">#34D399</div>
+      <div style="font-family:var(--mono);font-size:10px;color:rgba(52,211,153,0.45);margin-top:4px">Enabled · runtime only</div>
+    </div>
+    <div style="background:var(--panel-2);padding:16px 12px 14px">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(248,113,113,0.5);margin-bottom:8px">Verdict</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:#F87171;letter-spacing:0.04em">#F87171</div>
+      <div style="font-family:var(--mono);font-size:10px;color:rgba(248,113,113,0.45);margin-top:4px">Blocked · runtime only</div>
+    </div>
+    <div style="background:var(--panel-2);padding:16px 12px 14px">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(253,224,71,0.5);margin-bottom:8px">Verdict</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:#FDE047;letter-spacing:0.04em">#FDE047</div>
+      <div style="font-family:var(--mono);font-size:10px;color:rgba(253,224,71,0.45);margin-top:4px">Warning · runtime only</div>
+    </div>
+    <div style="background:var(--bg);padding:16px 12px 14px;border:1px solid var(--line)">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--soft);margin-bottom:8px">Background</div>
+      <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--muted);letter-spacing:0.04em">#040506</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--soft);margin-top:4px">All CR computed against this</div>
+    </div>
+  </div>
+
+  <!-- Concept grid: one cell per family -->
+  <div class="concepts-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-top:1px">
+    <div class="concept-cell">
+      <h3>Structure · Indigo · 239–245°</h3>
+      <p>Scaffolding and control. Two indigo shades split the DSL words that drive behavior from the grammar that binds them. Semantic indigo (#4338CA, bold) marks behavioral drivers. Grammar indigo (#6366F1) marks connective tissue. Same hue family, different brightness and weight: one for authority, one for articulation.</p>
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mono);font-size:13px;line-height:2.0">
+        <span style="color:#4338CA;font-weight:700">precept</span> <span style="color:#FBBF24">LoanApplication</span><br>
+        <span style="color:#4338CA;font-weight:700">field</span> <span style="color:#B0BEC5">Amount</span> <span style="color:#6366F1">as</span> <span style="color:#9AA8B5">number</span><br>
+        <span style="color:#4338CA;font-weight:700">state</span> <span style="color:#A898F5">Draft</span> <span style="color:#4338CA;font-weight:700">initial</span>
+      </div>
+    </div>
+    <div class="concept-cell">
+      <h3>States · Violet · 260°</h3>
+      <p>Nouns — where you are. One violet shade for all state names in all contexts. Constraint presence is shown with italic, not a different shade. Violet sits far enough from cyan to be instantly distinguishable, close enough to feel part of the same cool system.</p>
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mono);font-size:13px;line-height:2.2;display:flex;gap:20px;align-items:baseline;flex-wrap:wrap">
+        <span style="color:#A898F5">Draft</span>
+        <span style="color:#A898F5">Submitted</span>
+        <span style="color:#A898F5;font-style:italic">Approved</span>
+        <span style="font-size:11px;color:var(--soft);font-family:var(--sans)">italic = constrained</span>
+      </div>
+    </div>
+    <div class="concept-cell">
+      <h3>Events · Cyan · 195°</h3>
+      <p>Verbs — what happens. One cyan shade for all event names. Cyan is positioned 65° away from violet and 20° from slate, so events stay visually separate from states and data at a glance without requiring any hue context. Constraint italic applies here as well.</p>
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mono);font-size:13px;line-height:2.2;display:flex;gap:20px;align-items:baseline;flex-wrap:wrap">
+        <span style="color:#30B8E8">Open</span>
+        <span style="color:#30B8E8;font-style:italic">Submit</span>
+        <span style="color:#30B8E8">Approve</span>
+        <span style="font-size:11px;color:var(--soft);font-family:var(--sans)">italic = constrained</span>
+      </div>
+    </div>
+    <div class="concept-cell">
+      <h3>Data · Bright Slate · 215°</h3>
+      <p>Variables — what you know. Three depths within one slate family: brightest for field and argument names, mid for type keywords, deepest for literal values. The gradient communicates data hierarchy without a new hue. Names italic when guarded by an invariant.</p>
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mono);font-size:13px;line-height:2.0">
+        <span style="color:#B0BEC5">Amount</span> <span style="color:#6366F1">as</span> <span style="color:#9AA8B5">number</span> <span style="color:#6366F1">default</span> <span style="color:#84929F">0</span><br>
+        <span style="color:#B0BEC5;font-style:italic">PolicyHolder</span> <span style="color:#6366F1">as</span> <span style="color:#9AA8B5">string</span>
+        <span style="color:var(--soft);font-size:11px;font-family:var(--sans);margin-left:8px">italic = guarded</span>
+      </div>
+    </div>
+    <div class="concept-cell">
+      <h3>Rules · Gold · 45°</h3>
+      <p>The only warm hue in the authoring-time palette. Gold is reserved exclusively for human-readable message payloads inside <span style="font-family:var(--mono);color:#4338CA;font-weight:700">because</span> and <span style="font-family:var(--mono);color:#4338CA;font-weight:700">reject</span> strings. Rule enforcement keywords join semantic indigo. The warm interruption marks only the explanation, not the enforcement.</p>
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mono);font-size:13px;line-height:2.0">
+        <span style="color:#4338CA;font-weight:700">invariant</span> <span style="color:#B0BEC5">Amount</span> <span style="color:#6366F1">&gt;</span> <span style="color:#84929F">0</span> <span style="color:#4338CA;font-weight:700">because</span> <span style="color:#FBBF24">"Amount must be positive"</span>
+      </div>
+    </div>
+    <div class="concept-cell">
+      <h3>Verdicts · Runtime only</h3>
+      <p>Emerald, coral, and yellow appear only in runtime surfaces: the data form and state diagrams. Never in syntax highlighting or static surfaces. The separation ensures these hues carry a single clear meaning — the engine evaluated your inputs and here is the result.</p>
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.12em;color:#34D399">ENABLED</span>
+        <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.12em;color:#F87171">BLOCKED</span>
+        <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.12em;color:#FDE047">WARNING</span>
+        <span style="font-family:var(--sans);font-size:11px;color:var(--soft)">runtime only</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rule channels -->
+  <div class="channels-grid" style="margin-top:1px">
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Every color has a fixed meaning.</h3>
+      <p>Nothing is aesthetic. If a new surface uses color, it must map to an existing semantic family. Decorative use of any palette color corrupts the signal.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Color says kind. Italic says constrained.</h3>
+      <p>Constraint pressure is expressed through typography, not extra hues. Constrained states, events, and guarded fields are italic within their own family color — same hue, italic only.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Verdicts are runtime only.</h3>
+      <p>Emerald, coral, and yellow appear only when the engine has evaluated something. They are never used in static surfaces, syntax highlighting, or any authoring-time annotation.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Comments are outside the palette.</h3>
+      <p>Dusk #9096A6 in italic keeps comments legible but structurally separate from the five semantic families. Never repurpose a family color for editorial annotation.</p>
+    </div>
+  </div>
+</section>
+
+<script>
+(function () {
+  var items = document.querySelectorAll(".nav-item[data-sec]");
+  var anchors = Array.from(document.querySelectorAll("section[id], .construct-gallery[id]")).filter(function(el){ return el.id !== ""; });
+
+  function update() {
+    var active = anchors[0];
+    for (var i = 0; i < anchors.length; i++) {
+      if (anchors[i].getBoundingClientRect().top <= 80) active = anchors[i];
+    }
+    var id = active ? active.id : "";
+    items.forEach(function (item) {
+      item.classList.toggle("active", item.dataset.sec === id);
+    });
+  }
+
+  document.addEventListener("scroll", update, { passive: true });
+  update();
+}());
+</script>
 </body>
 </html>
