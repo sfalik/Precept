@@ -1137,26 +1137,21 @@ pre {
             <span class="specimen-half-tag">authored &middot; syntax token</span>
           </div>
           <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">Structure keywords &middot; <span class="s">precept &middot; field &middot; state &middot; event &middot; from&hellip;on &middot; transition &middot; set &middot; assert &middot; because</span></span></div>
-            <pre><span class="s">precept</span> LoanApplication
+            <div class="cg-focal-strip"><span class="cg-focal-label">Structure keywords &middot; <span class="s">precept &middot; field &middot; state &middot; event &middot; in &middot; from&hellip;on &middot; set &middot; transition</span></span></div>
+            <pre><span class="s">precept</span> WorkItem
 
-<span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="dt">string</span>  <span class="s">nullable</span>
-<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="dt">number</span>  <span class="s">default</span> <span class="dv">0</span>
+<span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
 
-<span class="s">state</span> <span class="st">Draft</span>       <span class="s">initial</span>
-<span class="s">state</span> <span class="st">UnderReview</span>
-<span class="s">state</span> <span class="st">Approved</span>
+<span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
 
-<span class="s">event</span> <span class="ev">Submit</span>
-<span class="s">event</span> <span class="ev">Approve</span>  <span class="s">with</span> <span class="da">Amount</span>  <span class="s">as</span> <span class="dt">number</span>
+<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
+  <span class="s">because</span> <span class="ru">"Closed items must be done"</span>
 
-<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">ApplicantName</span>   != <span class="dv">null</span>  <span class="s">because</span> <span class="ru">"Name is required"</span>
-<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt;  <span class="dv">0</span>     <span class="s">because</span> <span class="ru">"Amount must be positive"</span>
+<span class="s">event</span> <span class="ev">Close</span>
 
-<span class="s">from</span> <span class="st">Draft</span>       <span class="s">on</span> <span class="ev">Submit</span>  -&gt; <span class="s">transition</span> <span class="st">UnderReview</span>
-<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span>
-  -&gt; <span class="s">set</span> <span class="da">ApprovedAmount</span> = <span class="ev">Approve</span>.<span class="da">Amount</span>
-  -&gt; <span class="s">transition</span> <span class="st">Approved</span></pre>
+<span class="s">from</span> <span class="st">Open</span> <span class="s">on</span> <span class="ev">Close</span>
+  -&gt; <span class="s">set</span> <span class="da">Done</span> = <span class="dv">true</span>
+  -&gt; <span class="s">transition</span> <span class="st">Closed</span></pre>
           </div>
         </div>
 
@@ -1169,7 +1164,7 @@ pre {
           <div class="specimen-half-inner">
             <div style="border:1px solid rgba(99,102,241,0.45);">
               <div style="padding:9px 14px;border-bottom:1px solid rgba(99,102,241,0.2);display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--structure)">InsuranceClaim</span>
+                <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--structure)">WorkItem</span>
                 <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.20em;text-transform:uppercase;color:rgba(99,102,241,0.35)">precept</span>
               </div>
               <div style="padding:32px 16px;display:flex;align-items:center;justify-content:center;">
@@ -1231,26 +1226,21 @@ pre {
             <span class="specimen-half-tag">authored &middot; syntax token</span>
           </div>
           <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">State names &middot; <span class="st">Draft &middot; UnderReview &middot; Approved</span></span></div>
-            <pre><span class="s">precept</span> LoanApplication
+            <div class="cg-focal-strip"><span class="cg-focal-label">State names &middot; <span class="st">Open &middot; Closed</span></span></div>
+            <pre><span class="s">precept</span> WorkItem
 
-<span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="dt">string</span>  <span class="s">nullable</span>
-<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="dt">number</span>  <span class="s">default</span> <span class="dv">0</span>
+<span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
 
-<span class="s">state</span> <span class="st">Draft</span>       <span class="s">initial</span>
-<span class="s">state</span> <span class="st">UnderReview</span>
-<span class="s">state</span> <span class="st">Approved</span>
+<span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
 
-<span class="s">event</span> <span class="ev">Submit</span>
-<span class="s">event</span> <span class="ev">Approve</span>  <span class="s">with</span> <span class="da">Amount</span>  <span class="s">as</span> <span class="dt">number</span>
+<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
+  <span class="s">because</span> <span class="ru">"Closed items must be done"</span>
 
-<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">ApplicantName</span>   != <span class="dv">null</span>  <span class="s">because</span> <span class="ru">"Name is required"</span>
-<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt;  <span class="dv">0</span>     <span class="s">because</span> <span class="ru">"Amount must be positive"</span>
+<span class="s">event</span> <span class="ev">Close</span>
 
-<span class="s">from</span> <span class="st">Draft</span>       <span class="s">on</span> <span class="ev">Submit</span>  -&gt; <span class="s">transition</span> <span class="st">UnderReview</span>
-<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span>
-  -&gt; <span class="s">set</span> <span class="da">ApprovedAmount</span> = <span class="ev">Approve</span>.<span class="da">Amount</span>
-  -&gt; <span class="s">transition</span> <span class="st">Approved</span></pre>
+<span class="s">from</span> <span class="st">Open</span> <span class="s">on</span> <span class="ev">Close</span>
+  -&gt; <span class="s">set</span> <span class="da">Done</span> = <span class="dv">true</span>
+  -&gt; <span class="s">transition</span> <span class="st">Closed</span></pre>
           </div>
         </div>
 
@@ -1262,18 +1252,12 @@ pre {
           </div>
           <div class="specimen-half-inner">
             <div style="display:grid;gap:8px;">
-              <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid rgba(168,152,245,0.4);font-family:var(--mono);font-size:13px;color:var(--state);width:fit-content;">
+              <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid rgba(168,152,245,0.35);background:rgba(168,152,245,0.07);font-family:var(--mono);font-size:13px;color:var(--state);width:fit-content;">
                 <span style="width:7px;height:7px;border-radius:50%;background:var(--structure);flex-shrink:0;"></span>
-                Draft<span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--soft);margin-left:6px;">initial</span>
-              </div>
-              <div style="display:inline-flex;align-items:center;padding:8px 14px;border:1px solid rgba(168,152,245,0.35);background:rgba(168,152,245,0.07);font-family:var(--mono);font-size:13px;color:var(--state);width:fit-content;">
-                UnderReview<span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(168,152,245,0.55);margin-left:8px;">current</span>
+                Open<span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(168,152,245,0.55);margin-left:6px;">initial &middot; current</span>
               </div>
               <div style="display:inline-flex;align-items:center;padding:8px 14px;border:2px solid rgba(168,152,245,0.55);box-shadow:inset 0 0 0 3px rgba(168,152,245,0.12);font-family:var(--mono);font-size:13px;color:var(--state);width:fit-content;">
-                Approved<span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--soft);margin-left:8px;">terminal</span>
-              </div>
-              <div style="display:inline-flex;align-items:center;padding:8px 14px;border:1px solid rgba(168,152,245,0.2);font-family:var(--mono);font-size:13px;color:var(--state);font-style:italic;width:fit-content;">
-                Rejected<span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--soft);margin-left:8px;font-style:normal;">constrained</span>
+                Closed<span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--soft);margin-left:8px;">terminal</span>
               </div>
             </div>
           </div>
@@ -1304,7 +1288,7 @@ pre {
           <div class="cg-channel">
             <div class="cg-channel-name">Typography</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><code class="st">Draft</code><span>Mono &middot; PascalCase name</span></div>
+              <div class="cg-channel-signal"><code class="st">Open</code><span>Mono &middot; PascalCase name</span></div>
             </div>
           </div>
           <div class="cg-channel">
@@ -1342,26 +1326,21 @@ pre {
             <span class="specimen-half-tag">authored &middot; syntax token</span>
           </div>
           <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">Event names &middot; <span class="ev">Submit &middot; Approve</span></span></div>
-            <pre><span class="s">precept</span> LoanApplication
+            <div class="cg-focal-strip"><span class="cg-focal-label">Event name &middot; <span class="ev">Close</span></span></div>
+            <pre><span class="s">precept</span> WorkItem
 
-<span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="dt">string</span>  <span class="s">nullable</span>
-<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="dt">number</span>  <span class="s">default</span> <span class="dv">0</span>
+<span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
 
-<span class="s">state</span> <span class="st">Draft</span>       <span class="s">initial</span>
-<span class="s">state</span> <span class="st">UnderReview</span>
-<span class="s">state</span> <span class="st">Approved</span>
+<span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
 
-<span class="s">event</span> <span class="ev">Submit</span>
-<span class="s">event</span> <span class="ev">Approve</span>  <span class="s">with</span> <span class="da">Amount</span>  <span class="s">as</span> <span class="dt">number</span>
+<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
+  <span class="s">because</span> <span class="ru">"Closed items must be done"</span>
 
-<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">ApplicantName</span>   != <span class="dv">null</span>  <span class="s">because</span> <span class="ru">"Name is required"</span>
-<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt;  <span class="dv">0</span>     <span class="s">because</span> <span class="ru">"Amount must be positive"</span>
+<span class="s">event</span> <span class="ev">Close</span>
 
-<span class="s">from</span> <span class="st">Draft</span>       <span class="s">on</span> <span class="ev">Submit</span>  -&gt; <span class="s">transition</span> <span class="st">UnderReview</span>
-<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span>
-  -&gt; <span class="s">set</span> <span class="da">ApprovedAmount</span> = <span class="ev">Approve</span>.<span class="da">Amount</span>
-  -&gt; <span class="s">transition</span> <span class="st">Approved</span></pre>
+<span class="s">from</span> <span class="st">Open</span> <span class="s">on</span> <span class="ev">Close</span>
+  -&gt; <span class="s">set</span> <span class="da">Done</span> = <span class="dv">true</span>
+  -&gt; <span class="s">transition</span> <span class="st">Closed</span></pre>
           </div>
         </div>
 
@@ -1374,20 +1353,9 @@ pre {
           <div class="specimen-half-inner">
             <div style="display:grid;gap:14px;">
               <div style="display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;">
-                <span style="padding:5px 11px;border:1px solid rgba(48,184,232,0.4);color:var(--event);">Submit</span>
+                <span style="padding:5px 11px;border:1px solid rgba(48,184,232,0.4);color:var(--event);">Close</span>
                 <span style="color:var(--soft);font-size:12px">&rarr;</span>
-                <span style="padding:5px 11px;border:1px solid rgba(168,152,245,0.3);color:var(--state);font-size:12px">UnderReview</span>
-              </div>
-              <div style="display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;">
-                <span style="padding:5px 11px;border:1px solid rgba(48,184,232,0.25);color:var(--event);font-style:italic;">Approve</span>
-                <span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--soft);">guarded</span>
-                <span style="color:var(--soft);font-size:12px">&rarr;</span>
-                <span style="padding:5px 11px;border:1px solid rgba(168,152,245,0.3);color:var(--state);font-size:12px">Approved</span>
-              </div>
-              <div style="display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;">
-                <span style="padding:5px 11px;border:1px dashed rgba(248,113,113,0.5);color:var(--violated);">Reject</span>
-                <span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--violated);">blocked</span>
-                <span style="color:rgba(248,113,113,0.35);font-size:13px">&times;</span>
+                <span style="padding:5px 11px;border:1px solid rgba(168,152,245,0.3);color:var(--state);font-size:12px">Closed</span>
               </div>
             </div>
           </div>
@@ -1418,7 +1386,7 @@ pre {
           <div class="cg-channel">
             <div class="cg-channel-name">Typography</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><code class="ev">Submit</code><span>Mono &middot; PascalCase name</span></div>
+              <div class="cg-channel-signal"><code class="ev">Close</code><span>Mono &middot; PascalCase name</span></div>
             </div>
           </div>
           <div class="cg-channel">
@@ -1456,26 +1424,21 @@ pre {
             <span class="specimen-half-tag">authored &middot; syntax token</span>
           </div>
           <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">Field tokens &middot; <span class="da">ApplicantName &middot; RequestedAmount</span> &middot; <span class="dt">string &middot; number</span> &middot; <span class="dv">null &middot; 0</span></span></div>
-            <pre><span class="s">precept</span> LoanApplication
+            <div class="cg-focal-strip"><span class="cg-focal-label">Field token &middot; <span class="da">Done</span> &middot; <span class="dt">boolean</span> &middot; <span class="dv">false</span></span></div>
+            <pre><span class="s">precept</span> WorkItem
 
-<span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="dt">string</span>  <span class="s">nullable</span>
-<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="dt">number</span>  <span class="s">default</span> <span class="dv">0</span>
+<span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
 
-<span class="s">state</span> <span class="st">Draft</span>       <span class="s">initial</span>
-<span class="s">state</span> <span class="st">UnderReview</span>
-<span class="s">state</span> <span class="st">Approved</span>
+<span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
 
-<span class="s">event</span> <span class="ev">Submit</span>
-<span class="s">event</span> <span class="ev">Approve</span>  <span class="s">with</span> <span class="da">Amount</span>  <span class="s">as</span> <span class="dt">number</span>
+<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
+  <span class="s">because</span> <span class="ru">"Closed items must be done"</span>
 
-<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">ApplicantName</span>   != <span class="dv">null</span>  <span class="s">because</span> <span class="ru">"Name is required"</span>
-<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt;  <span class="dv">0</span>     <span class="s">because</span> <span class="ru">"Amount must be positive"</span>
+<span class="s">event</span> <span class="ev">Close</span>
 
-<span class="s">from</span> <span class="st">Draft</span>       <span class="s">on</span> <span class="ev">Submit</span>  -&gt; <span class="s">transition</span> <span class="st">UnderReview</span>
-<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span>
-  -&gt; <span class="s">set</span> <span class="da">ApprovedAmount</span> = <span class="ev">Approve</span>.<span class="da">Amount</span>
-  -&gt; <span class="s">transition</span> <span class="st">Approved</span></pre>
+<span class="s">from</span> <span class="st">Open</span> <span class="s">on</span> <span class="ev">Close</span>
+  -&gt; <span class="s">set</span> <span class="da">Done</span> = <span class="dv">true</span>
+  -&gt; <span class="s">transition</span> <span class="st">Closed</span></pre>
           </div>
         </div>
 
@@ -1492,28 +1455,10 @@ pre {
               </thead>
               <tbody>
                 <tr>
-                  <td class="da">ApplicantName</td>
-                  <td class="dt">string</td>
-                  <td class="dv">&ldquo;Jane Doe&rdquo;</td>
-                  <td><span style="color:var(--valid);font-size:11px">&checkmark; valid</span></td>
-                </tr>
-                <tr>
-                  <td class="da" style="font-style:italic">IncomeVerified</td>
+                  <td class="da">Done</td>
                   <td class="dt">boolean</td>
-                  <td class="dv">&mdash;</td>
-                  <td><span style="color:var(--violated);font-size:11px">&oslash; required</span></td>
-                </tr>
-                <tr>
-                  <td class="da">ReviewNotes</td>
-                  <td class="dt">string</td>
-                  <td class="dv">&mdash;</td>
+                  <td class="dv">false</td>
                   <td><span style="color:var(--soft);font-size:11px">editable</span></td>
-                </tr>
-                <tr>
-                  <td class="da">RequestedAmount</td>
-                  <td class="dt">number</td>
-                  <td class="dv">45000</td>
-                  <td><span style="color:rgba(255,255,255,0.22);font-size:11px">locked</span></td>
                 </tr>
               </tbody>
             </table>
@@ -1526,15 +1471,15 @@ pre {
         <div class="tonal-demo">
           <div class="tonal-cell">
             <span class="tonal-cell-lbl">Name</span>
-            <span class="da">ApplicantName</span>
+            <span class="da">Done</span>
           </div>
           <div class="tonal-cell">
             <span class="tonal-cell-lbl">Type</span>
-            <span class="dt">string</span>
+            <span class="dt">boolean</span>
           </div>
           <div class="tonal-cell">
             <span class="tonal-cell-lbl">Value</span>
-            <span class="dv">&ldquo;Jane Doe&rdquo;</span>
+            <span class="dv">false</span>
           </div>
         </div>
         <div class="construct-modifiers" style="padding-top:0;">
@@ -1559,7 +1504,7 @@ pre {
           <div class="cg-channel">
             <div class="cg-channel-name">Typography</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><code class="da">ApplicantName</code><span>Mono &middot; three tonal tiers</span></div>
+              <div class="cg-channel-signal"><code class="da">Done</code><span>Mono &middot; three tonal tiers</span></div>
             </div>
           </div>
           <div class="cg-channel">
@@ -1597,26 +1542,21 @@ pre {
             <span class="specimen-half-tag">authored &middot; syntax token</span>
           </div>
           <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">Rule strings &middot; <span class="ru">"Name is required" &middot; "Amount must be positive"</span></span></div>
-            <pre><span class="s">precept</span> LoanApplication
+            <div class="cg-focal-strip"><span class="cg-focal-label">Rule string &middot; <span class="ru">"Closed items must be done"</span></span></div>
+            <pre><span class="s">precept</span> WorkItem
 
-<span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="dt">string</span>  <span class="s">nullable</span>
-<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="dt">number</span>  <span class="s">default</span> <span class="dv">0</span>
+<span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
 
-<span class="s">state</span> <span class="st">Draft</span>       <span class="s">initial</span>
-<span class="s">state</span> <span class="st">UnderReview</span>
-<span class="s">state</span> <span class="st">Approved</span>
+<span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
 
-<span class="s">event</span> <span class="ev">Submit</span>
-<span class="s">event</span> <span class="ev">Approve</span>  <span class="s">with</span> <span class="da">Amount</span>  <span class="s">as</span> <span class="dt">number</span>
+<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
+  <span class="s">because</span> <span class="ru">"Closed items must be done"</span>
 
-<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">ApplicantName</span>   != <span class="dv">null</span>  <span class="s">because</span> <span class="ru">"Name is required"</span>
-<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt;  <span class="dv">0</span>     <span class="s">because</span> <span class="ru">"Amount must be positive"</span>
+<span class="s">event</span> <span class="ev">Close</span>
 
-<span class="s">from</span> <span class="st">Draft</span>       <span class="s">on</span> <span class="ev">Submit</span>  -&gt; <span class="s">transition</span> <span class="st">UnderReview</span>
-<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span>
-  -&gt; <span class="s">set</span> <span class="da">ApprovedAmount</span> = <span class="ev">Approve</span>.<span class="da">Amount</span>
-  -&gt; <span class="s">transition</span> <span class="st">Approved</span></pre>
+<span class="s">from</span> <span class="st">Open</span> <span class="s">on</span> <span class="ev">Close</span>
+  -&gt; <span class="s">set</span> <span class="da">Done</span> = <span class="dv">true</span>
+  -&gt; <span class="s">transition</span> <span class="st">Closed</span></pre>
           </div>
         </div>
 
@@ -1628,9 +1568,7 @@ pre {
           </div>
           <div class="specimen-half-inner">
             <div style="display:grid;gap:4px;">
-              <div style="padding:11px 14px;border-left:3px solid var(--valid);background:rgba(52,211,153,0.04);font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--valid);">&checkmark; Name is required <span style="color:rgba(52,211,153,0.45);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;">&mdash; satisfied</span></div>
-              <div style="padding:11px 14px;border-left:3px solid var(--violated);background:rgba(248,113,113,0.04);font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--violated);">&oslash; Amount must be positive <span style="color:rgba(248,113,113,0.45);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;">&mdash; violated</span></div>
-              <div style="padding:11px 14px;border-left:3px solid var(--warn);background:rgba(253,224,71,0.03);font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--warn);">&#9889; Within policy limit <span style="color:rgba(253,224,71,0.4);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;">&mdash; unmatched</span></div>
+              <div style="padding:11px 14px;border-left:3px solid var(--valid);background:rgba(52,211,153,0.04);font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--valid);">&checkmark; Closed items must be done <span style="color:rgba(52,211,153,0.45);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;">&mdash; satisfied</span></div>
             </div>
           </div>
         </div>
@@ -1661,7 +1599,7 @@ pre {
           <div class="cg-channel">
             <div class="cg-channel-name">Typography</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><code class="ru">"Name is required"</code><span>Mono &middot; quoted string &middot; interrupt</span></div>
+              <div class="cg-channel-signal"><code class="ru">"Closed items must be done"</code><span>Mono &middot; quoted string &middot; interrupt</span></div>
             </div>
           </div>
           <div class="cg-channel">
