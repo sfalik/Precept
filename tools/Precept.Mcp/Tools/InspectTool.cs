@@ -14,7 +14,7 @@ public static class InspectTool
     [Description("From a given state and data, evaluate all declared events and report what each would do — without mutating anything.")]
     public static InspectResult Inspect(
         [Description("The precept definition text")] string text,
-        [Description("Current state name")] string currentState,
+        [Description("Current state name. Pass null for stateless precepts.")] string? currentState,
         [Description("Current instance data (field name → value)")] Dictionary<string, object?>? data = null,
         [Description("Optional event arguments to use during evaluation (event name → { arg name → value })")] Dictionary<string, Dictionary<string, object?>>? eventArgs = null)
     {
@@ -28,7 +28,9 @@ public static class InspectTool
         PreceptInstance instance;
         try
         {
-            instance = engine.CreateInstance(currentState, nativeData?.AsReadOnly());
+            instance = engine.IsStateless
+                ? engine.CreateInstance(nativeData?.AsReadOnly())
+                : engine.CreateInstance(currentState!, nativeData?.AsReadOnly());
         }
         catch (Exception ex)
         {

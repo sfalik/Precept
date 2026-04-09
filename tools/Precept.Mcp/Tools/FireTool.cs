@@ -14,7 +14,7 @@ public static class FireTool
     [Description("Fire a single event against a precept from a given state and data snapshot. Returns the execution outcome.")]
     public static FireResult Fire(
         [Description("The precept definition text")] string text,
-        [Description("Current state name")] string currentState,
+        [Description("Current state name. Pass null for stateless precepts.")] string? currentState,
         [Description("The event to fire")] string @event,
         [Description("Current instance data (field name → value)")] Dictionary<string, object?>? data = null,
         [Description("Optional event arguments (arg name → value)")] Dictionary<string, object?>? args = null)
@@ -29,7 +29,9 @@ public static class FireTool
         PreceptInstance instance;
         try
         {
-            instance = engine.CreateInstance(currentState, nativeData?.AsReadOnly());
+            instance = engine.IsStateless
+                ? engine.CreateInstance(nativeData?.AsReadOnly())
+                : engine.CreateInstance(currentState!, nativeData?.AsReadOnly());
         }
         catch (Exception ex)
         {
