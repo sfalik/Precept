@@ -29,6 +29,69 @@
 - Test the constraint system thoroughly — invariants, asserts, rejections are the core value proposition
 - Read `docs/RulesDesign.md` and `docs/ConstraintViolationDesign.md` to understand what should and shouldn't pass
 
+## MCP Regression Testing
+
+After any feature implementation, DSL change, or PR merge, I run an exploratory 4-round MCP regression using the live tools directly — no unit test runner. This is a required skill.
+
+### Authoring rules (hard-won from execution)
+
+- **Transition rows are single-line.** Multi-line action chains break parsing. Write `from S on E when Guard -> action1 -> action2 -> outcome` on one line.
+- **`when` guard precedes the first `->`.** Correct: `from S on E when Guard -> outcome`. Wrong: `from S on E -> when Guard -> outcome`.
+- **`dequeue`/`pop` require `into <field>`.** Bare `dequeue Queue` is invalid. Correct: `dequeue Queue into TargetField`.
+- **Diagnostic codes vs. constraint indices.** C-prefixed numbers (C12, C13…) are catalog constraint indices. Emitted diagnostic codes are `PRECEPT0NN`. Don't assert "C13 error" — assert `PRECEPT008` (duplicate initial state).
+- **C50 scope.** PRECEPT050 fires only when a state has outgoing rows that nonetheless cannot reach another state. A state with zero rows is a valid terminal state — no diagnostic.
+
+### Round 1: Compile Surface Coverage (exploratory)
+
+Synthesize minimal precepts per construct family using `precept_compile`. Target: every language surface the PR touches.
+
+Required families:
+- All scalar field types (string, number, boolean), nullable, default
+- All 3 collection types (set/queue/stack) with type parameters
+- All 9 collection mutations in a single transition (add, remove, enqueue, dequeue into, push, pop into, clear + union/except if present)
+- All 3 state assert prepositions (`in`, `to`, `from`)
+- All 3 transition outcome types on one event (guarded transition, no transition, reject)
+- Collection reads in guards and invariants (`.count`, arg access `Event.ArgName`)
+- Edit — all forms: `in State edit Field`, `in any edit Field`, `edit all` (stateless), `edit F1, F2` (stateless)
+- Event args: required and nullable, with `on Event assert` form
+- Cross-field invariant + nullable narrowing invariant
+- `from any` routing expansion
+
+Invalid probes — synthesize one trigger per diagnostic:
+- `precept Empty` → PRECEPT012 (error)
+- Stateless + event → PRECEPT049 (warning, valid: true)
+- Root `edit all` + states declared → PRECEPT055 (error, valid: false)
+- Two `initial` states → PRECEPT008 (error, valid: false)
+- Pure garbage input → parse error (valid: false)
+
+Pass: valid probes → 0 errors; invalid probes → exact expected `PRECEPT0NN` code and severity; no surprise codes.
+
+### Round 2: Runtime Path Coverage (exploratory)
+
+Synthesize 3–5 structurally distinct precept shapes — not sample files. Each shape must be topologically different (approval flow ≠ flag-gate ≠ range-guard ≠ collection-mutation). Drive each through `precept_fire`, `precept_inspect`, `precept_update`.
+
+All 7 outcome kinds required every run:
+- `Transition` — a guarded or unguarded state change
+- `NoTransition` — a `no transition` outcome with possible mutation
+- `Rejected` — a `reject` outcome
+- `ConstraintFailure` — an invariant violation rolled back
+- `UneditableField` — update attempt on a field not in the edit block
+- `Update` — a successful `precept_update` mutation
+- `Undefined` — an event fired from a state with no matching row
+
+Pass: every outcome exercised exactly, data mutations consistent with DSL, no unexpected outcomes.
+
+### Round 3: Stateless End-to-End (fixed)
+
+Use synthesized `customer-profile` (edit all) and `fee-schedule` (edit specific fields) shapes or equivalent.
+Cover: null-state inspect, valid update, invariant ConstraintFailure, fire→Undefined, UneditableField on locked field.
+
+### Round 4: Diagnostic Edge Cases (fixed)
+
+Synthesize minimal triggers for PRECEPT012 (empty precept), PRECEPT055 (root edit + states), PRECEPT049 (stateless + event), and a pure parse failure. Confirm exact code, severity, and message wording match the spec.
+
+---
+
 ## DSL Feature Input
 
 When DSL feature proposals are under review (before George builds anything), I assess testability:

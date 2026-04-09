@@ -159,3 +159,4 @@ body:
           required: true
         - label: The motivation frames the problem as an integrity or prevention gap, not just convenience.
           required: true
+        - label: MCP regression testing (all 4 rounds) completed and passed after implementation — verify before closing the PR.
