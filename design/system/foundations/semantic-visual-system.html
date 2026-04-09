@@ -1035,6 +1035,79 @@ pre {
 @media (max-width: 960px) {
   .specimen-pair { grid-template-columns: 1fr; }
 }
+
+/* ─ Focal strip ───────────────────────────── */
+.cg-focal-strip {
+  border-left: 3px solid var(--fc, rgba(255,255,255,0.15));
+  padding: 5px 10px;
+  margin-bottom: 10px;
+  background: rgba(255,255,255,0.02);
+  display: flex;
+  align-items: center;
+}
+.cg-focal-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+  color: var(--fc, rgba(255,255,255,0.55));
+}
+/* ─ Channel grid ─────────────────────────── */
+.cg-channels {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  margin-top: 4px;
+}
+@media (max-width: 640px) {
+  .cg-channels { grid-template-columns: repeat(2, 1fr); }
+}
+.cg-channel {
+  background: var(--bg);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.cg-channel-name {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.28);
+}
+.cg-channel-body {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  min-height: 20px;
+}
+.cg-channel-signal {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.5;
+}
+.cg-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  background: var(--sw, rgba(255,255,255,0.2));
+}
+.cg-form {
+  display: inline-block;
+  flex-shrink: 0;
+  color: var(--fc, rgba(255,255,255,0.2));
+}
+.cg-form--frame   { width:22px; height:14px; border:1px solid currentColor; display:inline-block; }
+.cg-form--node    { width:18px; height:14px; border:2px solid currentColor; display:inline-block; }
+.cg-form--pill    { width:28px; height:14px; border:1px solid currentColor; display:inline-block; }
+.cg-form--row     { width:26px; height:10px; border-bottom:1px solid currentColor; display:inline-block; }
+.cg-form--callout { width:24px; height:14px; border-left:3px solid currentColor; display:inline-block; background:rgba(255,255,255,0.02); }
 </style>
 
 <!-- ═══════════════════════════════════════════════ -->
@@ -1048,7 +1121,7 @@ pre {
   </div>
 
   <!-- STRUCTURE ─────────────────────────────────── -->
-  <div class="construct-gallery" id="structure">
+  <div class="construct-gallery" id="structure" style="--fc: var(--structure)">
     <div class="construct-sidebar">
       <div class="construct-index">01</div>
       <div class="construct-name s">Structure</div>
@@ -1061,26 +1134,29 @@ pre {
         <div class="specimen-half" style="border-top:2px solid var(--structure)">
           <div class="specimen-half-bar">
             <span class="specimen-half-label">Definition</span>
-            <span class="specimen-half-tag">authored &middot; grammar template</span>
+            <span class="specimen-half-tag">authored &middot; syntax token</span>
           </div>
-          <div class="specimen-half-inner"><pre
-><span class="s">precept</span> &mdash;
+          <div class="specimen-half-inner">
+            <div class="cg-focal-strip"><span class="cg-focal-label">Structure keywords &middot; <span class="s">precept &middot; field &middot; state &middot; event &middot; from&hellip;on &middot; transition &middot; set &middot; assert &middot; because</span></span></div>
+            <pre><span class="s">precept</span> LoanApplication
 
-<span class="s">state</span> &mdash;   <span class="s">initial</span>
-<span class="s">state</span> &mdash;
-<span class="s">state</span> &mdash;
-<span class="s">state</span> &mdash;
+<span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="dt">string</span>  <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="dt">number</span>  <span class="s">default</span> <span class="dv">0</span>
 
-<span class="s">event</span> &mdash;
-<span class="s">event</span> &mdash;
-<span class="s">event</span> &mdash;
+<span class="s">state</span> <span class="st">Draft</span>       <span class="s">initial</span>
+<span class="s">state</span> <span class="st">UnderReview</span>
+<span class="s">state</span> <span class="st">Approved</span>
 
-<span class="s">from</span> &mdash; <span class="s">on</span> &mdash;
-  -&gt; <span class="s">transition</span> &mdash;
-<span class="s">from</span> &mdash; <span class="s">on</span> &mdash;
-  -&gt; <span class="s">transition</span> &mdash;
-<span class="s">from</span> &mdash; <span class="s">on</span> &mdash;
-  -&gt; <span class="s">transition</span> &mdash;</pre>
+<span class="s">event</span> <span class="ev">Submit</span>
+<span class="s">event</span> <span class="ev">Approve</span>  <span class="s">with</span> <span class="da">Amount</span>  <span class="s">as</span> <span class="dt">number</span>
+
+<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">ApplicantName</span>   != <span class="dv">null</span>  <span class="s">because</span> <span class="ru">"Name is required"</span>
+<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt;  <span class="dv">0</span>     <span class="s">because</span> <span class="ru">"Amount must be positive"</span>
+
+<span class="s">from</span> <span class="st">Draft</span>       <span class="s">on</span> <span class="ev">Submit</span>  -&gt; <span class="s">transition</span> <span class="st">UnderReview</span>
+<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span>
+  -&gt; <span class="s">set</span> <span class="da">ApprovedAmount</span> = <span class="ev">Approve</span>.<span class="da">Amount</span>
+  -&gt; <span class="s">transition</span> <span class="st">Approved</span></pre>
           </div>
         </div>
 
@@ -1096,14 +1172,40 @@ pre {
                 <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--structure)">InsuranceClaim</span>
                 <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.20em;text-transform:uppercase;color:rgba(99,102,241,0.35)">precept</span>
               </div>
-              <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                <div style="padding:7px 12px;border:1px solid rgba(168,152,245,0.35);display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px;color:var(--state);">
-                  <span style="width:6px;height:6px;border-radius:50%;background:var(--structure);flex-shrink:0;"></span>Filed
-                </div>
-                <div style="padding:7px 12px;border:1px solid rgba(168,152,245,0.3);font-family:var(--mono);font-size:12px;color:var(--state);">UnderReview</div>
-                <div style="padding:7px 12px;border:2px solid rgba(168,152,245,0.5);box-shadow:0 0 0 1px rgba(168,152,245,0.18);font-family:var(--mono);font-size:12px;color:var(--state);">Settled</div>
-                <div style="padding:7px 12px;border:1px solid rgba(168,152,245,0.2);font-family:var(--mono);font-size:12px;color:var(--state);font-style:italic;">Rejected</div>
+              <div style="padding:32px 16px;display:flex;align-items:center;justify-content:center;">
+                <span style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:rgba(99,102,241,0.25)">governed contents</span>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channel signals -->
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Channel signals</div>
+        <div class="cg-channels">
+          <div class="cg-channel">
+            <div class="cg-channel-name">Colour</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--structure)"></span><span class="cg-swatch" style="background:var(--structure-d)"></span><span>Indigo family &middot; <code>--structure</code> &middot; <code>--structure-d</code></span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Typography</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><code class="s">precept</code><span>Mono &middot; lowercase &middot; letter&hyphen;spaced</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Form</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><div class="cg-form cg-form--frame"></div><span>Indigo border &middot; container frame</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Layout</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span>Outer wrapper &middot; governs all other constructs</span></div>
             </div>
           </div>
         </div>
@@ -1113,7 +1215,7 @@ pre {
   </div>
 
   <!-- STATE ─────────────────────────────────────── -->
-  <div class="construct-gallery" id="state">
+  <div class="construct-gallery" id="state" style="--fc: var(--state)">
     <div class="construct-sidebar">
       <div class="construct-index">02</div>
       <div class="construct-name st">State</div>
@@ -1126,13 +1228,29 @@ pre {
         <div class="specimen-half" style="border-top:2px solid var(--state)">
           <div class="specimen-half-bar">
             <span class="specimen-half-label">Definition</span>
-            <span class="specimen-half-tag">authored &middot; state declarations</span>
+            <span class="specimen-half-tag">authored &middot; syntax token</span>
           </div>
           <div class="specimen-half-inner">
-            <pre><span class="s">state</span> <span class="st">Draft</span>        <span class="s">initial</span>
+            <div class="cg-focal-strip"><span class="cg-focal-label">State names &middot; <span class="st">Draft &middot; UnderReview &middot; Approved</span></span></div>
+            <pre><span class="s">precept</span> LoanApplication
+
+<span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="dt">string</span>  <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="dt">number</span>  <span class="s">default</span> <span class="dv">0</span>
+
+<span class="s">state</span> <span class="st">Draft</span>       <span class="s">initial</span>
 <span class="s">state</span> <span class="st">UnderReview</span>
 <span class="s">state</span> <span class="st">Approved</span>
-<span class="s">state</span> <span class="st">Rejected</span></pre>
+
+<span class="s">event</span> <span class="ev">Submit</span>
+<span class="s">event</span> <span class="ev">Approve</span>  <span class="s">with</span> <span class="da">Amount</span>  <span class="s">as</span> <span class="dt">number</span>
+
+<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">ApplicantName</span>   != <span class="dv">null</span>  <span class="s">because</span> <span class="ru">"Name is required"</span>
+<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt;  <span class="dv">0</span>     <span class="s">because</span> <span class="ru">"Amount must be positive"</span>
+
+<span class="s">from</span> <span class="st">Draft</span>       <span class="s">on</span> <span class="ev">Submit</span>  -&gt; <span class="s">transition</span> <span class="st">UnderReview</span>
+<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span>
+  -&gt; <span class="s">set</span> <span class="da">ApprovedAmount</span> = <span class="ev">Approve</span>.<span class="da">Amount</span>
+  -&gt; <span class="s">transition</span> <span class="st">Approved</span></pre>
           </div>
         </div>
 
@@ -1173,11 +1291,42 @@ pre {
         </div>
       </div>
 
+      <!-- Channel signals -->
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Channel signals</div>
+        <div class="cg-channels">
+          <div class="cg-channel">
+            <div class="cg-channel-name">Colour</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--state)"></span><span>Violet &middot; <code>--state</code></span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Typography</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><code class="st">Draft</code><span>Mono &middot; PascalCase name</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Form</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><div class="cg-form cg-form--node"></div><span>Rect node &middot; border weight signals lifecycle position</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Layout</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span>Ordered progression &middot; initial first &middot; terminal last</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
   <!-- EVENT ─────────────────────────────────────── -->
-  <div class="construct-gallery" id="event">
+  <div class="construct-gallery" id="event" style="--fc: var(--event)">
     <div class="construct-sidebar">
       <div class="construct-index">03</div>
       <div class="construct-name ev">Event</div>
@@ -1190,15 +1339,29 @@ pre {
         <div class="specimen-half" style="border-top:2px solid var(--event)">
           <div class="specimen-half-bar">
             <span class="specimen-half-label">Definition</span>
-            <span class="specimen-half-tag">authored &middot; event declarations</span>
+            <span class="specimen-half-tag">authored &middot; syntax token</span>
           </div>
           <div class="specimen-half-inner">
-            <pre><span class="s">event</span> <span class="ev">Submit</span>
-<span class="s">event</span> <span class="ev">Approve</span>  <span class="s">with</span> <span class="da">Amount</span>   <span class="s">as</span> <span class="so">number</span>
-<span class="s">event</span> <span class="ev">Reject</span>
+            <div class="cg-focal-strip"><span class="cg-focal-label">Event names &middot; <span class="ev">Submit &middot; Approve</span></span></div>
+            <pre><span class="s">precept</span> LoanApplication
 
-<span class="s">event</span> <span class="ev">Escalate</span> <span class="s">with</span> <span class="da">Reason</span>   <span class="s">as</span> <span class="so">string</span>
-<span class="s">event</span> <span class="ev">Close</span></pre>
+<span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="dt">string</span>  <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="dt">number</span>  <span class="s">default</span> <span class="dv">0</span>
+
+<span class="s">state</span> <span class="st">Draft</span>       <span class="s">initial</span>
+<span class="s">state</span> <span class="st">UnderReview</span>
+<span class="s">state</span> <span class="st">Approved</span>
+
+<span class="s">event</span> <span class="ev">Submit</span>
+<span class="s">event</span> <span class="ev">Approve</span>  <span class="s">with</span> <span class="da">Amount</span>  <span class="s">as</span> <span class="dt">number</span>
+
+<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">ApplicantName</span>   != <span class="dv">null</span>  <span class="s">because</span> <span class="ru">"Name is required"</span>
+<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt;  <span class="dv">0</span>     <span class="s">because</span> <span class="ru">"Amount must be positive"</span>
+
+<span class="s">from</span> <span class="st">Draft</span>       <span class="s">on</span> <span class="ev">Submit</span>  -&gt; <span class="s">transition</span> <span class="st">UnderReview</span>
+<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span>
+  -&gt; <span class="s">set</span> <span class="da">ApprovedAmount</span> = <span class="ev">Approve</span>.<span class="da">Amount</span>
+  -&gt; <span class="s">transition</span> <span class="st">Approved</span></pre>
           </div>
         </div>
 
@@ -1242,11 +1405,42 @@ pre {
         </div>
       </div>
 
+      <!-- Channel signals -->
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Channel signals</div>
+        <div class="cg-channels">
+          <div class="cg-channel">
+            <div class="cg-channel-name">Colour</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--event)"></span><span>Cyan &middot; <code>--event</code></span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Typography</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><code class="ev">Submit</code><span>Mono &middot; PascalCase name</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Form</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><div class="cg-form cg-form--pill"></div><span>Outlined pill &middot; directional arrow to destination state</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Layout</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span>Paired with destination state via arrow</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
   <!-- DATA ──────────────────────────────────────── -->
-  <div class="construct-gallery" id="data-c">
+  <div class="construct-gallery" id="data-c" style="--fc: var(--data)">
     <div class="construct-sidebar">
       <div class="construct-index">04</div>
       <div class="construct-name da">Data</div>
@@ -1259,13 +1453,29 @@ pre {
         <div class="specimen-half" style="border-top:2px solid var(--data)">
           <div class="specimen-half-bar">
             <span class="specimen-half-label">Definition</span>
-            <span class="specimen-half-tag">authored &middot; field declarations</span>
+            <span class="specimen-half-tag">authored &middot; syntax token</span>
           </div>
-          <div class="specimen-half-inner"><pre
-><span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="so">string</span>  <span class="s">nullable</span>
-<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="so">number</span>  <span class="s">default</span> <span class="so">0</span>
-<span class="s">field</span> <span class="da">IncomeVerified</span>  <span class="s">as</span> <span class="so">boolean</span>
-<span class="s">field</span> <span class="da">ReviewNotes</span>     <span class="s">as</span> <span class="so">string</span>  <span class="s">nullable</span></pre>
+          <div class="specimen-half-inner">
+            <div class="cg-focal-strip"><span class="cg-focal-label">Field tokens &middot; <span class="da">ApplicantName &middot; RequestedAmount</span> &middot; <span class="dt">string &middot; number</span> &middot; <span class="dv">null &middot; 0</span></span></div>
+            <pre><span class="s">precept</span> LoanApplication
+
+<span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="dt">string</span>  <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="dt">number</span>  <span class="s">default</span> <span class="dv">0</span>
+
+<span class="s">state</span> <span class="st">Draft</span>       <span class="s">initial</span>
+<span class="s">state</span> <span class="st">UnderReview</span>
+<span class="s">state</span> <span class="st">Approved</span>
+
+<span class="s">event</span> <span class="ev">Submit</span>
+<span class="s">event</span> <span class="ev">Approve</span>  <span class="s">with</span> <span class="da">Amount</span>  <span class="s">as</span> <span class="dt">number</span>
+
+<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">ApplicantName</span>   != <span class="dv">null</span>  <span class="s">because</span> <span class="ru">"Name is required"</span>
+<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt;  <span class="dv">0</span>     <span class="s">because</span> <span class="ru">"Amount must be positive"</span>
+
+<span class="s">from</span> <span class="st">Draft</span>       <span class="s">on</span> <span class="ev">Submit</span>  -&gt; <span class="s">transition</span> <span class="st">UnderReview</span>
+<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span>
+  -&gt; <span class="s">set</span> <span class="da">ApprovedAmount</span> = <span class="ev">Approve</span>.<span class="da">Amount</span>
+  -&gt; <span class="s">transition</span> <span class="st">Approved</span></pre>
           </div>
         </div>
 
@@ -1336,11 +1546,42 @@ pre {
         </div>
       </div>
 
+      <!-- Channel signals -->
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Channel signals</div>
+        <div class="cg-channels">
+          <div class="cg-channel">
+            <div class="cg-channel-name">Colour</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--data)"></span><span class="cg-swatch" style="background:var(--data-t)"></span><span class="cg-swatch" style="background:var(--data-v)"></span><span>Slate tonal family &middot; name / type / value</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Typography</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><code class="da">ApplicantName</code><span>Mono &middot; three tonal tiers</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Form</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><div class="cg-form cg-form--row"></div><span>Table row &middot; name &middot; type &middot; value columns</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Layout</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span>Tabular &middot; vertically stacked field rows</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
   <!-- RULE ──────────────────────────────────────── -->
-  <div class="construct-gallery" id="rule">
+  <div class="construct-gallery" id="rule" style="--fc: var(--rule)">
     <div class="construct-sidebar">
       <div class="construct-index">05</div>
       <div class="construct-name ru">Rule</div>
@@ -1353,20 +1594,29 @@ pre {
         <div class="specimen-half" style="border-top:2px solid var(--rule)">
           <div class="specimen-half-bar">
             <span class="specimen-half-label">Definition</span>
-            <span class="specimen-half-tag">authored &middot; assert blocks</span>
+            <span class="specimen-half-tag">authored &middot; syntax token</span>
           </div>
           <div class="specimen-half-inner">
-            <pre><span class="s">on</span> <span class="ev">Submit</span>
-  <span class="s">assert</span> <span class="da">ApplicantName</span> != <span class="so">null</span>
-  <span class="s">because</span> <span class="ru">&ldquo;Name is required&rdquo;</span>
+            <div class="cg-focal-strip"><span class="cg-focal-label">Rule strings &middot; <span class="ru">"Name is required" &middot; "Amount must be positive"</span></span></div>
+            <pre><span class="s">precept</span> LoanApplication
 
-<span class="s">on</span> <span class="ev">Submit</span>
-  <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt; <span class="so">0</span>
-  <span class="s">because</span> <span class="ru">&ldquo;Amount must be positive&rdquo;</span>
+<span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="dt">string</span>  <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="dt">number</span>  <span class="s">default</span> <span class="dv">0</span>
 
-<span class="s">on</span> <span class="ev">Submit</span>
-  <span class="s">assert</span> <span class="da">RequestedAmount</span> &lt;= <span class="so">1000000</span>
-  <span class="s">because</span> <span class="ru">&ldquo;Within policy limit&rdquo;</span></pre>
+<span class="s">state</span> <span class="st">Draft</span>       <span class="s">initial</span>
+<span class="s">state</span> <span class="st">UnderReview</span>
+<span class="s">state</span> <span class="st">Approved</span>
+
+<span class="s">event</span> <span class="ev">Submit</span>
+<span class="s">event</span> <span class="ev">Approve</span>  <span class="s">with</span> <span class="da">Amount</span>  <span class="s">as</span> <span class="dt">number</span>
+
+<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">ApplicantName</span>   != <span class="dv">null</span>  <span class="s">because</span> <span class="ru">"Name is required"</span>
+<span class="s">on</span> <span class="ev">Submit</span>  <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt;  <span class="dv">0</span>     <span class="s">because</span> <span class="ru">"Amount must be positive"</span>
+
+<span class="s">from</span> <span class="st">Draft</span>       <span class="s">on</span> <span class="ev">Submit</span>  -&gt; <span class="s">transition</span> <span class="st">UnderReview</span>
+<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span>
+  -&gt; <span class="s">set</span> <span class="da">ApprovedAmount</span> = <span class="ev">Approve</span>.<span class="da">Amount</span>
+  -&gt; <span class="s">transition</span> <span class="st">Approved</span></pre>
           </div>
         </div>
 
@@ -1395,6 +1645,37 @@ pre {
           <div class="callout-demo callout-demo--satisfied">&checkmark; satisfied &mdash; condition met, transition allowed</div>
           <div class="callout-demo callout-demo--violated">&oslash; violated &mdash; condition failed, transition blocked</div>
           <div class="callout-demo callout-demo--warn">&#9889; unmatched &mdash; guard not evaluated for current state</div>
+        </div>
+      </div>
+
+      <!-- Channel signals -->
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Channel signals</div>
+        <div class="cg-channels">
+          <div class="cg-channel">
+            <div class="cg-channel-name">Colour</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--rule)"></span><span>Gold &middot; <code>--rule</code></span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Typography</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><code class="ru">"Name is required"</code><span>Mono &middot; quoted string &middot; interrupt</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Form</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><div class="cg-form cg-form--callout"></div><span>Left-border callout &middot; verdict signal</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Layout</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span>Appears below the triggering field or event</span></div>
+            </div>
+          </div>
         </div>
       </div>
 
