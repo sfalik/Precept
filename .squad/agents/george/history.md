@@ -7,6 +7,38 @@
 
 ## Recent Updates
 
+### 2026-04-08 - Slice 4 implementation for issue #22 (data-only precepts)
+- `PreceptEngine.IsStateless` computed property (`States.Count == 0`); `InitialState` made `string?`.
+- Constructor: `InitialState = model.InitialState?.Name`; edit blocks loop replaced to route `block.State == null` to `_rootEditableFields` (new `HashSet<string>?` field); `"all"` sentinel expanded via `ExpandEditFieldNames()` private helper.
+- `CreateInstance(data)`: stateless path bypasses 2-arg and creates instance with `CurrentState = null`. `CreateInstance(state, data)`: throws `ArgumentException` for stateless.
+- `CheckCompatibility`: stateless branch validates `CurrentState == null`; stateful branch validates state membership; `EvaluateStateAssertions` wrapped in `if (instance.CurrentState is not null)` guard.
+- `Fire`: early `Undefined` return after compatibility check when `IsStateless`.
+- `Inspect(instance, event)`: early `Undefined` return after compatibility check when `IsStateless`.
+- `Inspect(instance)`: stateless path produces all events with `Undefined` outcome; editable fields via new `BuildEditableFieldInfosForStateless`.
+- `Update` Stage 1: branches on `IsStateless` to pull editableFieldSet from `_rootEditableFields` vs `_editableFieldsByState`; Stage 4: `EvaluateStateAssertions` null-guarded.
+- `GetEditableFieldNames(string? state)` + `BuildEditableFieldInfos(string? state, ...)` accept nullable state; BuildEditableFieldInfos delegates to `BuildEditableFieldInfosForStateless` for null.
+- Result records: `EventInspectionResult.CurrentState`, `InspectionResult.CurrentState`, `FireResult.PreviousState` made `string?`; all 12 factory method `string state` params made `string?`.
+- Nullable fixups: null-forgiving `!` after IsStateless guards in Fire/Inspect stateful branches; `EvaluateCurrentRules` + `Inspect(patch)` `EvaluateStateAssertions` null-guarded; `TryValidateScalarValue` `out string? error` → `out string error`; `InitialState` dereferences in `PreceptAnalysis` and `CollectCompileTimeDiagnostics` made null-safe with `!`.
+- Build: 0 errors, 0 warnings on `src/Precept/Precept.csproj`. Committed as `d3fe90d`.
+- Unguarded `CurrentState` in OTHER projects (not fixed in this slice): `tools/Precept.Mcp/Tools/CompileTool.cs:54`, `tools/Precept.LanguageServer/PreceptPreviewHandler.cs:296-297`, `tools/Precept.LanguageServer/PreceptDocumentIntellisense.cs:465`, `test/Precept.Tests/NewSyntaxParserTests.cs:34,1044,1058,1072,1086`, `test/Precept.Tests/PreceptWorkflowTests.cs:47,921`, `test/Precept.Tests/PreceptCollectionTests.cs:946`.
+- Key pattern: after `if (IsStateless) return ...;` the compiler still sees `CurrentState` as `string?` — use `instance.CurrentState!` throughout the now-stateful path. Compiler stops emitting CS8604 for the same variable after the first flagged call site in a method, so some warning sites only appear after upstream ones are fixed.
+
+### 2026-04-08 - Slice 3 implementation for issue #22 (data-only precepts)
+- C50 severity upgraded from `ConstraintSeverity.Hint` to `ConstraintSeverity.Warning` in `DiagnosticCatalog.cs`. Safe: all 21 samples produce zero C50 diagnostics.
+- `PreceptRuntime.Validate`: wrapped C27/C28 checks inside `if (!model.IsStateless)`. Both checks dereference `model.InitialState.Name` which is null for stateless; the guard prevents `NullReferenceException`. Used null-forgiving operator (`!`) inside the block — parser's C13 guarantees `InitialState != null` when `States.Count > 0`.
+- `PreceptAnalysis.Analyze`: added stateless early-return immediately after the three variable declarations (`states`, `events`, `transitionRows`), before `allStateNames`. Fires C49 per declared event (each is structurally orphaned — no state routing surface). Suppresses C53 (no-events hint) for stateless. Returns all-empty state/reachability arrays. Comment uses `// Stateful path continues below...` before the moved `allStateNames` declaration.
+- Build: 0 warnings, 0 errors. The 23 nullable warnings from Slices 1/2 resolved (build mode/config difference — Precept.csproj alone reports clean). Committed as `72c65c1`.
+
+### 2026-04-08 - Slice 2 implementation for issue #22 (data-only precepts)
+- Implemented all parser/diagnostic changes for data-only precepts: `FieldTarget` parser (`all` | identifier list, mirrors `StateTarget`/`any`); `EditDecl` updated to use `FieldTarget` instead of inline identifier list; `RootEditDecl` parser (`edit <FieldTarget>`, root-level, no `in` prefix); `RootEditResult` sealed record; `AssembleModel` routes `RootEditResult` → `PreceptEditBlock(State: null, ...)`; C12 broadened ("at least one field or state"); C13 made conditional on `states.Count > 0`; C55 added to `DiagnosticCatalog` (compile phase, Error) and enforced in `CollectCompileTimeDiagnostics`.
+- Key design decision: C55 is "compile" phase, not "parse" — enforced in type-checker pass, not in `AssembleModel`. Allows root `edit` to parse cleanly; cross-cutting check (states + root edit) runs at validation time.
+- Build confirmed: 23 nullable warnings (Slice 4 scope, unchanged from Slice 1), 0 errors. Committed as `7e9bece`.
+
+### 2026-04-08 - Slice 1 implementation for issue #22 (data-only precepts)
+- Implemented all 4 model/token changes as specified: `PreceptToken.All` added after `Any` with `[TokenCategory(Grammar)]`/`[TokenSymbol("all")]`; `PreceptDefinition.InitialState` made nullable (`PreceptState?`); `PreceptDefinition.IsStateless` computed property added (`States.Count == 0`); `PreceptEditBlock.State` made nullable (`string?`); `PreceptInstance.CurrentState` made nullable (`string?`).
+- Build succeeded with 23 expected nullable warnings (CS8602/CS8604/CS8620/CS8601) in `PreceptRuntime.cs` and `PreceptAnalysis.cs` — all in Slice 4 scope. Zero build errors.
+- Committed as `e0eac05` on `feature/issue-22-data-only-precepts`.
+
 ### 2026-04-08 - Issue #22 semantic rules runtime/parser analysis
 - Reviewed issue #22 semantic rules against actual parser/type-checker code at Shane's request.
 - Key findings: (1) C12 fires at end of AssembleModel — adding a state doesn't violate anything, making "states forbidden" tautological. (2) EventDecl parser has zero state dependencies — events parse fine without states but have no dispatch surface; a new diagnostic would be needed. (3) C54 already rejects transitions referencing undeclared states, making "transitions forbidden" structurally redundant.

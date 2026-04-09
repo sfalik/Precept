@@ -391,8 +391,8 @@ public class CatalogDriftTests
         // C11: Statements after outcome — set action follows the outcome
         ["C11"] = new(H + "field X as number default 0\n" + S2 + "event Go\nfrom A on Go -> transition B -> set X = 1\n", "after an outcome"),
 
-        // C12: No states declared
-        ["C12"] = new(H, "At least one state"),
+        // C12: No states or fields declared
+        ["C12"] = new(H, "At least one field or state"),
 
         // C13: No initial state
         ["C13"] = new(H + "state A\n", "initial"),
@@ -508,6 +508,9 @@ public class CatalogDriftTests
 
         // C54: Undeclared state in transition row
         ["C54"] = new(H + S + "event Go\nfrom A on Go -> transition Nowhere\n", "Undeclared state"),
+
+        // C55: Root-level edit with states declared
+        ["C55"] = new(H + "field Priority as number default 1\n" + S + "edit Priority\n", "Root-level"),
 
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
