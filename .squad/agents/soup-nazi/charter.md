@@ -20,6 +20,7 @@
 
 ## How I Work
 
+- Follow `CONTRIBUTING.md` for implementation workflow — PR structure, slice order, checkbox hygiene, and doc sync rules.
 - Run all tests: `dotnet test`
 - Run single suite: `dotnet test test/Precept.Tests/`
 - Test naming convention: `PascalCase` + `Tests` suffix (e.g., `PreceptParserTests.cs`)
