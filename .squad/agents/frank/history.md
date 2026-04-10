@@ -9,6 +9,9 @@
 
 ## Recent Updates
 
+### 2026-04-10 — Issue #31 shipped
+- PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
+
 ### 2026-04-10 - PR #50 final review — Issue #31 keyword logical operators
 
 **Verdict: APPROVED.** All 8 slices verified. 774/774 tests passing. Full review filed at `.squad/decisions/inbox/frank-31-review.md`.
