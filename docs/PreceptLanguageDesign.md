@@ -139,18 +139,16 @@ More keyword-dominant than C#/TypeScript, but without the verbosity of COBOL or 
 | Symbols | ~23 | Math, comparison, assignment, `->`, punctuation |
 | Ratio | ~2 : 1 | Keyword-dominant by design |
 
-### Logical operator migration (Implementation Pending — [#31](https://github.com/sfalik/Precept/issues/31))
+### Logical operator migration (Implemented — [#31](https://github.com/sfalik/Precept/issues/31))
 
-The following changes are decided but not yet implemented:
-
-| Current (symbolic) | Target (keyword) | Status |
-|-------------------|-----------------|--------|
-| `!` (unary NOT) | `not` | Pending — [#31](https://github.com/sfalik/Precept/issues/31) |
-| `&&` (logical AND) | `and` | Pending — [#31](https://github.com/sfalik/Precept/issues/31) |
-| `\\|\\|` (logical OR) | `or` | Pending — [#31](https://github.com/sfalik/Precept/issues/31) |
+| Symbolic form | Keyword form | Status |
+|--------------|-------------|--------|
+| `!` (unary NOT) | `not` | Implemented |
+| `&&` (logical AND) | `and` | Implemented |
+| `\\|\\|` (logical OR) | `or` | Implemented |
 | `!=` (inequality) | `!=` (no change) | Stays as-is |
 
-Until implementation, the runtime accepts `!`, `&&`, `||`. After implementation, the runtime will accept `not`, `and`, `or` as keywords, and `!`, `&&`, `||` will be removed.
+The runtime accepts `not`, `and`, `or` as keywords. `!`, `&&`, `||` have been removed.
 
 ---
 ## File Structure (Locked)
@@ -403,9 +401,8 @@ Full reserved keyword list:
 `in`, `to`, `from`, `on`, `when`, `any`, `all`, `of`,
 `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `into`,
 `transition`, `no`, `reject`,
-`string`, `number`, `boolean`, `true`, `false`, `null`, `contains`
-
-**Pending additions ([#31](https://github.com/sfalik/Precept/issues/31)):** `and`, `or`, `not` — replacing symbolic `&&`, `||`, `!` for logical operators. See [Keyword vs Symbol Design Framework](#keyword-vs-symbol-design-framework-locked).
+`string`, `number`, `boolean`, `true`, `false`, `null`, `contains`,
+`and`, `or`, `not`
 
 ### Dual-use: `set`
 
@@ -549,30 +546,30 @@ Appending `nullable` to a field or event argument declaration makes it nullable.
 
 Authors must prove non-null before use. There are three standard patterns.
 
-**Pattern 1 — Inline `&&` (test and use in the same guard):**
+**Pattern 1 — Inline `and` (test and use in the same guard):**
 
 ```precept
 from Active on Evaluate
-  -> if Score != null && Score >= 80
+  -> if Score != null and Score >= 80
        -> set RiskTier = "Low"
        -> transition Approved
      else
        -> reject "Score unavailable or below threshold"
 ```
 
-The right-hand side of `&&` is only reached when the left side is `true`. The language server narrows `Score` to non-nullable for `Score >= 80` and for any `set` expressions in that branch. Removing the `Score != null &&` prefix causes a diagnostic on `Score >= 80`.
+The right-hand side of `and` is only reached when the left side is `true`. The language server narrows `Score` to non-nullable for `Score >= 80` and for any `set` expressions in that branch. Removing the `Score != null and` prefix causes a diagnostic on `Score >= 80`.
 
-**Pattern 2 — Inline `||` (short-circuit the null case):**
+**Pattern 2 — Inline `or` (short-circuit the null case):**
 
 ```precept
 from Active on Retry
-  -> if RetryCount == null || RetryCount > 0
+  -> if RetryCount == null or RetryCount > 0
        -> transition Retry
      else
        -> reject "Retry limit reached"
 ```
 
-The right-hand side of `||` is only reached when the left side is `false` (i.e. `RetryCount != null`). The language server narrows `RetryCount` to non-nullable for the `RetryCount > 0` comparison.
+The right-hand side of `or` is only reached when the left side is `false` (i.e. `RetryCount != null`). The language server narrows `RetryCount` to non-nullable for the `RetryCount > 0` comparison.
 
 **Pattern 3 — Early-exit null rejection, then use freely across all following branches:**
 
@@ -879,7 +876,7 @@ Semantics (Locked ordering):
 
 Example:
 
-- `on SubmitOrder assert items.count > 0 && paymentToken != null because "Order must include items and payment"`
+- `on SubmitOrder assert items.count > 0 and paymentToken != null because "Order must include items and payment"`
 
 Focused example:
 
@@ -895,8 +892,8 @@ on Cancel assert reason != "" because "Cancel requires a reason"
 The expression language supports:
 
 - arithmetic: `+`, `-`, `*`, `/`, `%`
-- unary: `-` (numeric negation), `!` (logical not) — **pending migration to `not` keyword per [#31](https://github.com/sfalik/Precept/issues/31)**
-- logical: `&&`, `||` — **pending migration to `and`, `or` keywords per [#31](https://github.com/sfalik/Precept/issues/31)**
+- unary: `-` (numeric negation), `not` (logical not)
+- logical: `and`, `or`
 - comparisons: `==`, `!=`, `>`, `>=`, `<`, `<=`
 - membership: `contains`
 - parentheses
@@ -1097,7 +1094,7 @@ from any on Prioritize -> set Priority = Prioritize.Level -> no transition
 # Complex with collection mutations
 from Signing on RecordSignature
     when PendingSignatories contains RecordSignature.SignatoryName
-        && PendingSignatories.count == 1
+        and PendingSignatories.count == 1
     -> remove PendingSignatories RecordSignature.SignatoryName
     -> add CollectedSignatures RecordSignature.SignatoryName
     -> transition FullySigned
@@ -1134,7 +1131,7 @@ to Submitted assert Items.count > 0 because "Must have items to submit"
 in Submitted assert Email != null because "Email must remain set while submitted"
 
 event SubmitOrder with items as set of string, paymentToken as string nullable
-on SubmitOrder assert items.count > 0 && paymentToken != null because "Order must include items and payment"
+on SubmitOrder assert items.count > 0 and paymentToken != null because "Order must include items and payment"
 
 event Cancel with reason as string
 on Cancel assert reason != "" because "Cancel requires a reason"
