@@ -6,7 +6,7 @@
 <title>Precept — Semantic Visual System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&family=Geist:wght@400;500&display=swap">
 <style>
 :root {
   --bg: #040506;
@@ -29,8 +29,8 @@
   --valid: #34D399;
   --violated: #F87171;
   --warn: #FDE047;
-  --mono: "Cascadia Cove","Cascadia Code",Consolas,monospace;
-  --sans: "Inter","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+  --mono: "Geist Mono","Cascadia Code",Consolas,monospace;
+  --sans: "Geist","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
   --nav-w: 196px;
   --nav-w-collapsed: 36px;
 }
@@ -118,6 +118,19 @@ body {
   color: rgba(103,114,129,0.55);
   padding: 14px 8px 4px;
 }
+.nav-font-status {
+  margin-top: auto;
+  padding: 14px 8px 12px;
+  border-top: 1px solid var(--line);
+  font-family: monospace;
+  font-size: 10px;
+  line-height: 1.8;
+  color: var(--soft);
+}
+.nav-rail.collapsed .nav-font-status {
+  opacity: 0;
+  pointer-events: none;
+}
 /* ── PAGE LAYOUT ──────────────────────────── */
 .page {
   margin-left: var(--nav-w);
@@ -150,7 +163,7 @@ pre {
   line-height: 1.9;
   color: #eef3f8;
 }
-.s  { color: var(--structure); }
+.s  { color: var(--structure); font-weight: bold; }
 .sd { color: var(--structure-d); font-weight: bold; }
 .st { color: var(--state); }
 .ev { color: var(--event); }
@@ -537,6 +550,7 @@ pre {
   <span class="nav-section-meta" style="margin-top:6px"></span>
   <a class="nav-item"        href="#typography" data-sec="typography">Typography</a>
   <a class="nav-item"        href="#colors"     data-sec="colors">Colors</a>
+  <div class="nav-font-status" id="nav-font-status"></div>
 </nav>
 
 <div class="page">
@@ -574,10 +588,10 @@ pre {
       <div class="specimen-body"><pre
 ><span class="s">precept</span> <span class="ru">LoanApplication</span>
 
-<span class="s">field</span> <span class="da">ApplicantName</span>   <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">ApplicantName</span> <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
 <span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="so">number</span> <span class="s">default</span> <span class="so">0</span>
-<span class="s">field</span> <span class="da">ReviewNotes</span>     <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
-<span class="s">field</span> <span class="da">ApprovedAmount</span>  <span class="s">as</span> <span class="so">number</span> <span class="s">default</span> <span class="so">0</span>
+<span class="s">field</span> <span class="da">ReviewNotes</span> <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">ApprovedAmount</span> <span class="s">as</span> <span class="so">number</span> <span class="s">default</span> <span class="so">0</span>
 
 <span class="s">state</span> <span class="st">Draft</span> <span class="s">initial</span>
 <span class="s">state</span> <span class="st">UnderReview</span>
@@ -1656,8 +1670,8 @@ pre {
       <p class="sf-note">Syntax highlighting renders the full semantic palette. Structure keywords in indigo. States in violet. Events in cyan. Data in slate. Rule messages in gold.</p>
       <pre style="font-size:12px"><span class="s">precept</span> <span class="ru">InsuranceClaim</span>
 
-<span class="s">field</span> <span class="da">ClaimNumber</span>  <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
-<span class="s">field</span> <span class="da">ClaimAmount</span>  <span class="s">as</span> <span class="so">number</span> <span class="s">default</span> <span class="so">0</span>
+<span class="s">field</span> <span class="da">ClaimNumber</span> <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">ClaimAmount</span> <span class="s">as</span> <span class="so">number</span> <span class="s">default</span> <span class="so">0</span>
 <span class="s">field</span> <span class="da">PolicyHolder</span> <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
 
 <span class="s">state</span> <span class="st">Filed</span> <span class="s">initial</span>
@@ -1758,13 +1772,13 @@ pre {
   <div class="section-head">
     <div class="eyebrow">05 · Typography</div>
     <h2>Two faces. One rule each.</h2>
-    <p>Cascadia carries all structural identity. Inter carries reading prose. No serifs. Italic marks semantic pressure, not emphasis.</p>
+    <p>Geist Mono carries all structural identity. Geist carries reading prose. No serifs. Italic marks semantic pressure, not emphasis.</p>
   </div>
 
   <div class="concepts-grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
     <div class="concept-cell">
-      <h3>Cascadia — identity &amp; structure</h3>
-      <p>Used for: wordmark, section headings, labels, chips, nav, construct names, table headers, eyebrows, inline tokens, and all code specimens. Cascadia is the face of governed structure. When text needs to read as authored or systematic, it is in Cascadia.</p>
+      <h3>Geist Mono — identity &amp; structure</h3>
+      <p>Used for: wordmark, section headings, labels, chips, nav, construct names, table headers, eyebrows, inline tokens, and all code specimens. Geist Mono is the face of governed structure. When text needs to read as authored or systematic, it is in Geist Mono.</p>
       <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">
         <div style="font-family:var(--mono);font-size:clamp(28px,4vw,56px);line-height:1;letter-spacing:0.14em;font-variant:small-caps;color:var(--text)">Precept</div>
         <div style="font-family:var(--mono);font-size:18px;margin-top:12px;color:var(--text)">Semantic Visual System</div>
@@ -1772,15 +1786,15 @@ pre {
       </div>
     </div>
     <div class="concept-cell">
-      <h3>Inter — reading prose</h3>
-      <p>Used for: body paragraphs, concept descriptions, surface notes, and any text longer than a label that needs sustained reading. Inter is engineered for screen at 15–18px and sits beside Cascadia without competing. Segoe UI Variable and Segoe UI are the system fallbacks on Windows.</p>
+      <h3>Geist — reading prose</h3>
+      <p>Used for: body paragraphs, concept descriptions, surface notes, and any text longer than a label that needs sustained reading. Geist sits beside Geist Mono without competing. Segoe UI Variable and Segoe UI are the system fallbacks on Windows.</p>
       <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--sans);font-size:16px;line-height:1.76;color:var(--muted)">
         Precept governs the integrity of a business entity's data across its lifecycle. The semantic visual system governs how that governance is communicated on screen.
       </div>
     </div>
     <div class="concept-cell">
       <h3>Wordmark treatment</h3>
-      <p>The identity display — <span style="font-family:var(--mono);font-variant:small-caps;letter-spacing:0.14em">Precept</span> in Cascadia small caps — is reserved for the hero moment and deliberate brand callouts. Inline prose uses plain title case. Nav and labels are already all-caps mono and need no additional treatment. Scarcity is what makes the wordmark land.</p>
+      <p>The identity display — <span style="font-family:var(--mono);font-variant:small-caps;letter-spacing:0.14em">Precept</span> in Geist Mono small caps — is reserved for the hero moment and deliberate brand callouts. Inline prose uses plain title case. Nav and labels are already all-caps mono and need no additional treatment. Scarcity is what makes the wordmark land.</p>
     </div>
     <div class="concept-cell">
       <h3>Italic — semantic pressure only</h3>
@@ -1803,12 +1817,17 @@ pre {
     <div class="channel">
       <span class="channel-name">Rule</span>
       <h3>Mono for everything structural.</h3>
-      <p>If it governs, labels, names, or identifies — it is in Cascadia. This includes headings. Cascadia at display size reads as specification, not decoration.</p>
+      <p>If it governs, labels, names, or identifies — it is in Geist Mono. This includes headings. Geist Mono at display size reads as specification, not decoration.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Structure keywords are bold.</h3>
+      <p>Keywords that carry grammar — <span style="font-family:var(--mono);font-weight:bold;color:var(--structure)">precept field state event from on set transition assert reject when</span> — render at font-weight 700. Color identifies the family; weight distinguishes grammar from identifiers.</p>
     </div>
     <div class="channel">
       <span class="channel-name">Rule</span>
       <h3>Sans for reading prose.</h3>
-      <p>Inter carries paragraphs. It does not appear in identity positions, labels, or code. The split is strict. Mono names and governs; sans explains.</p>
+      <p>Geist carries paragraphs. It does not appear in identity positions, labels, or code. The split is strict. Mono names and governs; sans explains.</p>
     </div>
     <div class="channel">
       <span class="channel-name">Rule</span>
@@ -2023,6 +2042,24 @@ pre {
     setCollapsed(!nav.classList.contains("collapsed"));
   });
 }());
+</script>
+
+<script>
+document.fonts.ready.then(function() {
+  var loaded = [];
+  document.fonts.forEach(function(face) {
+    if (face.status === 'loaded') loaded.push(face.family);
+  });
+  var unique = loaded.filter(function(v,i,a){ return a.indexOf(v)===i; });
+  var mono = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim().split(',')[0].replace(/['"]/g,'').trim();
+  var sans = getComputedStyle(document.documentElement).getPropertyValue('--sans').trim().split(',')[0].replace(/['"]/g,'').trim();
+  var monoLoaded = unique.some(function(f){ return f.toLowerCase().indexOf(mono.toLowerCase()) !== -1; });
+  var sansLoaded = unique.some(function(f){ return f.toLowerCase().indexOf(sans.toLowerCase()) !== -1; });
+  var el = document.getElementById('nav-font-status');
+  if (el) el.innerHTML =
+    '<span style="color:' + (monoLoaded ? '#34D399' : '#F87171') + '">' + (monoLoaded ? '✓' : '✗') + ' ' + mono + '</span><br>' +
+    '<span style="color:' + (sansLoaded ? '#34D399' : '#F87171') + '">' + (sansLoaded ? '✓' : '✗') + ' ' + sans + '</span>';
+});
 </script>
 </body>
 </html>
