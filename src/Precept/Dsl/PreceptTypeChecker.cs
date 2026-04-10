@@ -630,13 +630,13 @@ internal static class PreceptTypeChecker
                 if (!TryInferKind(unary.Operand, symbols, out var operandKind, out diagnostic))
                     return false;
 
-                if (unary.Operator == "!")
+                if (unary.Operator == "not")
                 {
                     if (!IsExactly(operandKind, StaticValueKind.Boolean))
                     {
                         diagnostic = new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C40,
-                            "operator '!' requires boolean operand.",
+                            "operator 'not' requires boolean operand.",
                             0);
                         return false;
                     }
@@ -690,14 +690,14 @@ internal static class PreceptTypeChecker
 
         switch (binary.Operator)
         {
-            case "&&":
+            case "and":
             {
                 if (!TryInferKind(binary.Left, symbols, out var leftKind, out diagnostic))
                     return false;
 
                 if (!IsExactly(leftKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator '&&' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'and' requires boolean operands.", 0);
                     return false;
                 }
 
@@ -707,7 +707,7 @@ internal static class PreceptTypeChecker
 
                 if (!IsExactly(rightKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator '&&' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'and' requires boolean operands.", 0);
                     return false;
                 }
 
@@ -715,14 +715,14 @@ internal static class PreceptTypeChecker
                 return true;
             }
 
-            case "||":
+            case "or":
             {
                 if (!TryInferKind(binary.Left, symbols, out var leftKind, out diagnostic))
                     return false;
 
                 if (!IsExactly(leftKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator '||' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'or' requires boolean operands.", 0);
                     return false;
                 }
 
@@ -732,7 +732,7 @@ internal static class PreceptTypeChecker
 
                 if (!IsExactly(rightKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator '||' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'or' requires boolean operands.", 0);
                     return false;
                 }
 
@@ -889,13 +889,13 @@ internal static class PreceptTypeChecker
     {
         expression = StripParentheses(expression);
 
-        if (expression is PreceptUnaryExpression { Operator: "!" } unary)
+        if (expression is PreceptUnaryExpression { Operator: "not" } unary)
             return ApplyNarrowing(unary.Operand, symbols, !assumeTrue);
 
         if (expression is not PreceptBinaryExpression binary)
             return symbols;
 
-        if (binary.Operator == "&&")
+        if (binary.Operator == "and")
         {
             if (!assumeTrue)
                 return symbols;
@@ -904,7 +904,7 @@ internal static class PreceptTypeChecker
             return ApplyNarrowing(binary.Right, leftNarrowed, assumeTrue: true);
         }
 
-        if (binary.Operator == "||")
+        if (binary.Operator == "or")
         {
             if (assumeTrue)
                 return symbols;

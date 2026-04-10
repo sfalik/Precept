@@ -105,6 +105,10 @@ invariant ApprovedAmount <= RequestedAmount because "Approved cannot exceed requ
 
 **Precept wins on concision for cross-field invariants.** Zod needs a `.refine()` wrapper with an options object; Precept's `invariant` is direct.
 
+### Category Distinction
+
+Zod validates when `.parse()` is called — a schema is a validator, invoked by convention. A Precept invariant holds because the runtime prevents any operation from producing a result that violates it. This is the governance-vs-validation distinction the philosophy identifies. Stateless precepts compete with Zod on the same surface — data shape contracts — but with structural enforcement instead of invoked checking.
+
 ### Where Precept is more verbose — GAP 1: Inline field constraints
 
 **The most significant expressiveness gap.** Zod declares type + constraints in a single expression:
@@ -154,5 +158,7 @@ The proposal bodies live in GitHub. This file remains the evidence base for why 
 ---
 
 ## Takeaway for Hero Sample
+
+Stateless precepts occupy the same problem space as Zod — data shape contracts — but enforce structurally rather than by invocation. Hero samples that show stateless precepts should highlight this distinction.
 
 The hero sample should avoid fields with many simple constraints — it will look verbose compared to Zod. Prefer fields where the invariants are *business rules*, not format rules (e.g., `ApprovedAmount <= RequestedAmount` rather than `Name.length > 0`). Business-rule invariants are where Precept's expressiveness is *equal to or better than* Zod, not behind it.

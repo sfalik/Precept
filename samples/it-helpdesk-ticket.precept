@@ -29,7 +29,7 @@ on RegisterAgent assert AgentName != "" because "An agent name is required"
 
 event Triage with Title as string, Level as number default 3
 on Triage assert Title != "" because "A ticket title is required"
-on Triage assert Level >= 1 && Level <= 5 because "Severity must stay within the supported range"
+on Triage assert Level >= 1 and Level <= 5 because "Severity must stay within the supported range"
 
 event Assign
 
@@ -40,7 +40,7 @@ on Resolve assert Note != "" because "A resolution note is required"
 event CloseTicket
 
 event Reopen with Note as string nullable default null
-on Reopen assert Note == null || Note != "" because "A supplied reopen note cannot be blank"
+on Reopen assert Note == null or Note != "" because "A supplied reopen note cannot be blank"
 
 from New on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
 from Assigned on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition

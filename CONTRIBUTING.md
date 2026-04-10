@@ -48,7 +48,7 @@ When ready to implement:
 
 1. Create a feature branch: `feature/issue-N-short-description`
 2. Open a **draft PR** immediately, linked to the issue (`Closes #N`)
-3. The **PR body is the implementation plan** — a checklist of work items. This is ephemeral; it doesn't need to outlive the PR.
+3. Create an implementation plan in the body of the PR, including checkmarks to track progress. This is ephemeral; it doesn't need to outlive the PR.
 4. **Check off items as you complete them.** Update the PR body after each slice or logical group — not at the end. The checkbox list is a live progress tracker; it should reflect current state throughout development so reviewers and collaborators always know where things stand. Use the GitHub UI or `mcp_github_update_pull_request` to check off completed items.
 5. Implement in vertical slices. Suggested order for cross-cutting changes:
    - Parser + model + diagnostics
@@ -60,7 +60,7 @@ When ready to implement:
    - Tests (throughout, not at the end)
    - Sample files
    - Documentation updates
-5. Mark the PR as ready for review when all acceptance criteria are met.
+6. Mark the PR as ready for review when all acceptance criteria are met.
 
 #### 4. Documentation Sync (Same PR — Non-Negotiable)
 
@@ -68,14 +68,32 @@ Every implementation PR must update documentation in the same pass:
 
 | What changed | Update |
 |-------------|--------|
-| New keyword, operator, or syntax | `docs/PreceptLanguageDesign.md` |
+| New keyword, operator, or syntax | `docs/PreceptLanguageDesign.md` + `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` |
 | New or changed API behavior | `docs/RuntimeApiDesign.md` |
 | New editability semantics | `docs/EditableFieldsDesign.md` |
 | New MCP tool behavior | `docs/McpServerDesign.md` |
-| New keyword or syntax form | `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` |
 | Feature claims in README | `README.md` |
 
 **Design docs track what EXISTS in the runtime, not what's planned.** They are updated at implementation time, never before.
+
+**Docs are a final slice, not interleaved.** Update documentation at the end of the implementation — after runtime, tooling, and tests are complete — but still in the same PR. Tests get the "throughout, not at the end" treatment; docs get the "final slice, same PR" treatment.
+
+#### Proposal content at merge time
+
+The table above covers which files to touch during implementation. This table is a closing checklist — where each section of the proposal must land before the issue is closed. **Nothing should exist only in a closed issue.** The issue body is a working document, not an archive.
+
+| Proposal section | Destination at merge time |
+|-----------------|--------------------------|
+| Proposed syntax, behavior, examples | `docs/PreceptLanguageDesign.md` — syntax forms, grammar rules, operator tables, precedence, examples; also `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` for any new keywords or syntax forms |
+| Locked design decisions (the **what**) | `docs/PreceptLanguageDesign.md` — named decisions in the relevant section |
+| Locked design decisions (the **why** / rationale / alternatives rejected) | `docs/research/` — update or create the research doc; if rationale was only in the issue, move it here now |
+| Explicit exclusions / out of scope | `docs/PreceptLanguageDesign.md` — named as deliberate exclusions so they aren't re-proposed later |
+| Open questions resolved during implementation | Resolved decisions go to `docs/research/`; if they changed the design, update the design doc too |
+| Acceptance criteria | Verified by the test suite — tests passing *is* the living acceptance criteria; no separate doc needed |
+| Implementation scope checklist | PR body — ephemeral, discarded after merge |
+| Dependencies / related issues | Tracked in the issues themselves — no migration needed |
+
+The most commonly dropped items are **deliberate exclusions** (they disappear when the issue closes) and **resolved open questions** (the resolution often stays only in an issue comment). Both are durable decisions that belong in permanent homes.
 
 #### 5. Merge and Close
 

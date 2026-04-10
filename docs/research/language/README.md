@@ -59,6 +59,7 @@ Use this table when you already know the issue number and need its research grou
 | [expressiveness/conditional-logic-strategy.md](./expressiveness/conditional-logic-strategy.md) | Guard vocabulary and conditional-shape guidance across the language surface. |
 | [domain-map.md](./domain-map.md) | Full durable map of every language research domain. |
 | [domain-research-batches.md](./domain-research-batches.md) | Sequencing plan for active and horizon domain research. |
+| [references/cel-comparison.md](./references/cel-comparison.md) | Full Precept vs CEL language-level comparison — validates expression expansion priorities. |
 
 ## Domains with research but no active proposal
 

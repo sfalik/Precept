@@ -767,14 +767,14 @@ public class NewSyntaxParserTests
             state A initial
             state B
             event Go
-            from A on Go when X > 5 && X < 20 -> transition B
+            from A on Go when X > 5 and X < 20 -> transition B
             """;
 
         var model = PreceptParser.Parse(dsl);
 
         var guard = model.TransitionRows![0].WhenGuard as PreceptBinaryExpression;
         guard.Should().NotBeNull();
-        guard!.Operator.Should().Be("&&");
+        guard!.Operator.Should().Be("and");
     }
 
     [Fact]
@@ -826,14 +826,14 @@ public class NewSyntaxParserTests
             state A initial
             state B
             event Go
-            from A on Go when !Active -> transition B
+            from A on Go when not Active -> transition B
             """;
 
         var model = PreceptParser.Parse(dsl);
 
         var guard = model.TransitionRows![0].WhenGuard as PreceptUnaryExpression;
         guard.Should().NotBeNull();
-        guard!.Operator.Should().Be("!");
+        guard!.Operator.Should().Be("not");
     }
 
     [Fact]

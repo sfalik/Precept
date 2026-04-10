@@ -4,6 +4,8 @@ Research grounding for future transition compactness proposals. No open proposal
 
 This file is durable research, not a proposal body. It captures why transition shorthand keeps surfacing, what adjacent systems do, which semantic contracts must be explicit before any implementation, and which directions look attractive but weaken Precept's model.
 
+Transition shorthand applies exclusively to stateful precepts. Data-only precepts have no transition rows and are unaffected by this domain.
+
 ## Background and Problem
 
 Precept's transition rows are self-contained: each `from <State> on <Event> [when <Guard>] -> <actions> -> <outcome>` is independently readable, independently routable, and independently auditable. That property is a design asset — it is why the language is AI-writable, flat-file portable, and first-match deterministic.
@@ -110,7 +112,7 @@ This means multi-event `on` in Precept requires a **type-compatibility contract*
 
 ## Philosophy Fit
 
-Each shorthand candidate is evaluated against the 13 design principles in `docs/PreceptLanguageDesign.md`.
+The product's unifying principle is governed integrity — ensuring the entity's data satisfies its declared rules at every moment. Each shorthand candidate is evaluated against the 13 design principles in `docs/PreceptLanguageDesign.md`.
 
 ### Multi-event `on` clauses
 

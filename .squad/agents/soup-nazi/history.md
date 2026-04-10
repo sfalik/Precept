@@ -6,6 +6,12 @@
 
 ## Recent Updates
 
+### 2026-04-10 - Issue #31 Slice 7: keyword logical operator tests
+- Updated 9 existing test files (8 in `test/Precept.Tests/`, 1 in `test/Precept.LanguageServer.Tests/`) to replace DSL symbols `&&` → `and`, `||` → `or`, `!` → `not` in all `.precept` string literals and operator assertions.
+- Created new `test/Precept.Tests/PreceptKeywordLogicalOperatorTests.cs` covering: basic keyword parsing (not/and/or), precedence validation (not > and > or), null narrowing through `not (Field == null)`, `!=` operator unaffected, old symbols `&&`/`||`/`!` produce parse errors, compound expression parse/evaluate, invariant context (or/and).
+- George's runtime changes (parser, tokenizer, type checker, evaluator, samples) were already on the branch — tests written against the finished spec.
+- Key learning: always check if the partner's runtime changes are already on branch before assuming tests will fail. The old-symbol-produces-error tests and keyword tests may pass immediately if George's work is complete.
+
 ### 2026-04-08 - Charter: MCP Regression Testing skill section added
 - `charter.md` now includes a `## MCP Regression Testing` section with the full 4-round methodology, all authoring rules hard-won from live execution (multi-line rows, `when` guard placement, `dequeue`/`pop` into, diagnostic code vs. constraint index, C50 scope), and per-round pass criteria.
 - The section is the canonical reference for future regression rounds authored by any agent — no need to rediscover parse failures from scratch.

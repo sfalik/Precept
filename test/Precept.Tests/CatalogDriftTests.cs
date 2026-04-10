@@ -359,7 +359,7 @@ public class CatalogDriftTests
         //      (invariant/guard expressions are parsed inline by the combinator)
         ["C4"] = new("_unused_", "parse expression", DirectAction: () =>
         {
-            PreceptParser.ParseExpression("&&");
+            PreceptParser.ParseExpression("and");
         }),
 
         // C5: Invalid number literal — unreachable via normal tokenizer, test directly
@@ -556,7 +556,7 @@ public class CatalogDriftTests
         ["C39"] = new(H + "field X as number default 0\n" + S2 + "event Go\nfrom A on Go -> set X = \"text\" -> transition B\n", "PRECEPT039"),
 
         // C40: Unary operator type error
-        ["C40"] = new(H + "field X as boolean default false\nfield Y as string default \"\"\n" + S2 + "event Go\nfrom A on Go -> set X = !Y -> transition B\n", "PRECEPT040"),
+        ["C40"] = new(H + "field X as boolean default false\nfield Y as string default \"\"\n" + S2 + "event Go\nfrom A on Go -> set X = not Y -> transition B\n", "PRECEPT040"),
 
         // C41: Binary operator type error
         ["C41"] = new(H + "field X as number default 0\nfield Y as string default \"\"\n" + S2 + "event Go\nfrom A on Go -> set X = Y - 1 -> transition B\n", "PRECEPT041"),

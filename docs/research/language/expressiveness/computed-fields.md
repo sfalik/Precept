@@ -62,11 +62,11 @@ That is a strong signal that computed fields are not exotic language sugar. They
 
 ### Cross-category pattern
 
-The full sweep across all seven philosophy positioning categories reveals a structural gap. Systems that *have* computed fields — databases, enterprise platforms, spreadsheets, and Pydantic — converge on the same contract: read-only, declared once, automatically recomputed. Systems that *don't* — state machines, validators, orchestrators, policy engines, industry standards, and MDM — either delegate derivation to implementation code or avoid it entirely. No system in the survey combines field-level derivation with lifecycle-aware constraint enforcement. That is precisely the intersection Precept occupies, which means computed fields would not duplicate an existing capability from any adjacent category — they would fill a gap that every category leaves open.
+The full sweep across all seven philosophy positioning categories reveals a structural gap. Systems that *have* computed fields — databases, enterprise platforms, spreadsheets, and Pydantic — converge on the same contract: read-only, declared once, automatically recomputed. Systems that *don't* — state machines, validators, orchestrators, policy engines, industry standards, and MDM — either delegate derivation to implementation code or avoid it entirely. MDM systems and industry standards (FHIR, ACORD, ISO 20022) typically delegate derivation to implementation code rather than declaring it in the entity model — leaving a gap between the vocabulary they define and the derived values that depend on it. No system in the survey combines field-level derivation with lifecycle-aware constraint enforcement. That is precisely the intersection Precept occupies, which means computed fields would not duplicate an existing capability from any adjacent category — they would fill a gap that every category leaves open.
 
 ## Philosophy Fit
 
-Computed fields fit Precept's philosophy only under a narrow contract.
+Computed fields fit Precept's philosophy only under a narrow contract. Computed fields strengthen governed integrity — the unifying principle that an entity's data satisfies its declared rules at every moment — by eliminating manual synchronization of derived values.
 
 **Prevention, not detection.** A derived total that can drift from its inputs weakens the product's central guarantee. A declared derivation improves that guarantee only if the runtime recomputes it before constraint evaluation rather than trusting manual `set` discipline.
 
@@ -100,6 +100,8 @@ The contract must say exactly when recomputation happens in **both** pipelines:
 - **Fire**: after all mutations in the chosen path, including exit actions, row actions, and entry actions, then before invariants and state assertions evaluate.
 - **Update**: after direct field edits are applied, then before invariants and `in <State> assert` rules evaluate.
 - **Inspect**: preview output should reflect post-recomputation values, or the preview becomes misleading.
+
+For stateless precepts, recomputation occurs after Update mutations, before invariant evaluation. The recomputation model is identical — stateless entities simply skip the state-transition pipeline.
 
 This is the most important semantic contract. Without it, computed fields are just nicer syntax for stale caches.
 

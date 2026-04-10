@@ -13,6 +13,15 @@
 
 ## Learnings
 
+### Issue #31 Slice 6 — Operator Inventory (2026-04-10)
+
+- `LanguageTool.cs` is fully catalog-driven via `PreceptTokenMeta.GetSymbol(token)`. When George updates token symbols in `PreceptToken.cs`, the `precept_language` operator inventory updates automatically — no MCP code changes required.
+- The MCP tool layer had zero hardcoded DSL operator strings (verified `CompileTool.cs`, `InspectTool.cs`, `FireTool.cs`, `UpdateTool.cs`). The thin-wrapper rule held perfectly.
+- `docs/McpServerDesign.md` already used `and` in expression text examples — no doc changes needed.
+- Sync work for a George runtime change = add a regression test asserting the new contract; don't touch tool code.
+- New test pattern: `LogicalOperatorsAreKeywordForms` — assert specific operator symbols are present AND assert old symbolic forms are absent. Dual-assertion approach locks both sides of the rename.
+
+
 ### MCP Tool Surface (5 Tools — Final Design)
 
 **Tool philosophy:** One tool per concern. No overlap in reporting. Failure modes reinforce the intended signal chain: `compile → fix → inspect/fire/update`.

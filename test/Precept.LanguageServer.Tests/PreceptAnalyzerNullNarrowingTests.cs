@@ -19,7 +19,7 @@ public class PreceptAnalyzerNullNarrowingTests
             state A initial
             state B
             event Go
-            from A on Go when RetryCount != null && RetryCount > 0 -> transition B
+            from A on Go when RetryCount != null and RetryCount > 0 -> transition B
             from A on Go -> reject "blocked"
             """;
 
@@ -37,7 +37,7 @@ public class PreceptAnalyzerNullNarrowingTests
             state A initial
             state B
             event Go
-            from A on Go when RetryCount == null || RetryCount > 0 -> transition B
+            from A on Go when RetryCount == null or RetryCount > 0 -> transition B
             from A on Go -> reject "blocked"
             """;
 

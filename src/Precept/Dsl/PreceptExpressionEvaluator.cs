@@ -71,9 +71,9 @@ internal static class PreceptExpressionRuntimeEvaluator
 
         return unary.Operator switch
         {
-            "!" => operand.Value is bool b
+            "not" => operand.Value is bool b
                 ? EvaluationResult.Ok(!b)
-                : EvaluationResult.Fail("operator '!' requires boolean operand."),
+                : EvaluationResult.Fail("operator 'not' requires boolean operand."),
             "-" => TryToNumber(operand.Value, out var number)
                 ? EvaluationResult.Ok(-number)
                 : EvaluationResult.Fail("unary '-' requires numeric operand."),
@@ -86,14 +86,14 @@ internal static class PreceptExpressionRuntimeEvaluator
         if (binary.Operator == "contains")
             return EvaluateContains(binary, context);
 
-        if (binary.Operator == "&&")
+        if (binary.Operator == "and")
         {
             var left = Evaluate(binary.Left, context);
             if (!left.Success)
                 return left;
 
             if (left.Value is not bool leftBool)
-                return EvaluationResult.Fail("operator '&&' requires boolean operands.");
+                return EvaluationResult.Fail("operator 'and' requires boolean operands.");
 
             if (!leftBool)
                 return EvaluationResult.Ok(false);
@@ -104,17 +104,17 @@ internal static class PreceptExpressionRuntimeEvaluator
 
             return right.Value is bool rightBool
                 ? EvaluationResult.Ok(rightBool)
-                : EvaluationResult.Fail("operator '&&' requires boolean operands.");
+                : EvaluationResult.Fail("operator 'and' requires boolean operands.");
         }
 
-        if (binary.Operator == "||")
+        if (binary.Operator == "or")
         {
             var left = Evaluate(binary.Left, context);
             if (!left.Success)
                 return left;
 
             if (left.Value is not bool leftBool)
-                return EvaluationResult.Fail("operator '||' requires boolean operands.");
+                return EvaluationResult.Fail("operator 'or' requires boolean operands.");
 
             if (leftBool)
                 return EvaluationResult.Ok(true);
@@ -125,7 +125,7 @@ internal static class PreceptExpressionRuntimeEvaluator
 
             return right.Value is bool rightBool
                 ? EvaluationResult.Ok(rightBool)
-                : EvaluationResult.Fail("operator '||' requires boolean operands.");
+                : EvaluationResult.Fail("operator 'or' requires boolean operands.");
         }
 
         var leftValue = Evaluate(binary.Left, context);

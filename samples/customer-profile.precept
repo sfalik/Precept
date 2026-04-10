@@ -15,7 +15,7 @@ field PreferredContactMethod as string default "email"
 field MarketingOptIn as boolean default false
 
 invariant PreferredContactMethod != "" because "Preferred contact method must be specified"
-invariant MarketingOptIn == false || Email != null because "Marketing opt-in requires an email address"
+invariant MarketingOptIn == false or Email != null because "Marketing opt-in requires an email address"
 
 # All fields are editable — a customer profile can be fully updated at any time.
 edit all

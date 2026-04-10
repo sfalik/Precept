@@ -16,6 +16,8 @@ Use it when you need formal grounding, precedent from language theory, or a prin
 | [multi-event-shorthand.md](./multi-event-shorthand.md) | Transition shorthand | — | Formal basis for multi-event `on` and related event-set sugar. |
 | [state-machine-expressiveness.md](./state-machine-expressiveness.md) | Transition shorthand | — | Statechart and state-machine precedent for what Precept should and should not borrow. |
 | [static-reasoning-expansion.md](./static-reasoning-expansion.md) | Static reasoning expansion | — | Horizon-domain grounding for contradiction detection, deadlock analysis, and interval-first reasoning. |
+| [cel-comparison.md](./cel-comparison.md) | Expression expansion, keyword vs symbol surface | `#9`, `#10`, `#15`, `#16`, `#31` | Full language-level comparison against Google CEL — validates conditional expression priority, small string function surface, and deterministic logical operator semantics. |
+| [governance-vs-validation.md](./governance-vs-validation.md) | Governance architecture, philosophy positioning | `#22` | Defines the governance-vs-validation distinction, surveys cross-system enforcement architectures, catalogs validation failure modes governance prevents. |
 
 ## Pairing guide
 
@@ -26,8 +28,9 @@ If you start from a domain packet, pair it with the reference docs below.
 | [../expressiveness/type-system-domain-survey.md](../expressiveness/type-system-domain-survey.md) | [type-system-survey.md](./type-system-survey.md) |
 | [../expressiveness/event-ingestion-shorthand.md](../expressiveness/event-ingestion-shorthand.md) | [expression-compactness.md](./expression-compactness.md) |
 | [../expressiveness/constraint-composition-domain.md](../expressiveness/constraint-composition-domain.md) | [constraint-composition.md](./constraint-composition.md), [conditional-invariant-survey.md](./conditional-invariant-survey.md) |
-| [../expressiveness/expression-expansion-domain.md](../expressiveness/expression-expansion-domain.md) | [expression-evaluation.md](./expression-evaluation.md) |
+| [../expressiveness/expression-expansion-domain.md](../expressiveness/expression-expansion-domain.md) | [expression-evaluation.md](./expression-evaluation.md), [cel-comparison.md](./cel-comparison.md) |
 | [../expressiveness/entity-modeling-surface.md](../expressiveness/entity-modeling-surface.md) | [expression-evaluation.md](./expression-evaluation.md) |
+| [../expressiveness/data-only-precepts-research.md](../expressiveness/data-only-precepts-research.md) | [governance-vs-validation.md](./governance-vs-validation.md) |
 | [../expressiveness/transition-shorthand.md](../expressiveness/transition-shorthand.md) | [multi-event-shorthand.md](./multi-event-shorthand.md), [state-machine-expressiveness.md](./state-machine-expressiveness.md) |
 | [../expressiveness/type-system-follow-ons.md](../expressiveness/type-system-follow-ons.md) | [type-system-survey.md](./type-system-survey.md) |
 | Horizon compile-time analysis work | [static-reasoning-expansion.md](./static-reasoning-expansion.md) |
@@ -45,12 +48,12 @@ If you start from a domain packet, pair it with the reference docs below.
 | `#15` | String `.contains()` | [expression-evaluation.md](./expression-evaluation.md) |
 | `#16` | Built-in function library | [expression-evaluation.md](./expression-evaluation.md) |
 | `#17` | Computed / derived fields | [expression-evaluation.md](./expression-evaluation.md) |
-| `#22` | Data-only precepts | No dedicated theory-only companion yet; start with [../expressiveness/entity-modeling-surface.md](../expressiveness/entity-modeling-surface.md). |
+| `#22` | Data-only precepts | [governance-vs-validation.md](./governance-vs-validation.md), [../expressiveness/entity-modeling-surface.md](../expressiveness/entity-modeling-surface.md) |
 | `#25` | `choice` type | [type-system-survey.md](./type-system-survey.md) |
 | `#26` | `date` type | [type-system-survey.md](./type-system-survey.md) |
 | `#27` | `decimal` type | [type-system-survey.md](./type-system-survey.md) |
 | `#29` | `integer` type | [type-system-survey.md](./type-system-survey.md) |
-| `#31` | Logical keyword forms (`and` / `or` / `not`) | [expression-evaluation.md](./expression-evaluation.md) |
+| `#31` | Logical keyword forms (`and` / `or` / `not`) | [expression-evaluation.md](./expression-evaluation.md), [cel-comparison.md](./cel-comparison.md) |
 
 ## Theory-first domains with no proposal yet
 

@@ -107,6 +107,24 @@ This repository's canonical workflow lives in [CONTRIBUTING.md](/CONTRIBUTING.md
 - Before declaring implementation work complete, verify whether `README.md`, relevant `docs/*.md` files, syntax grammar, language-server completions, samples, and MCP docs need updates. If none are needed, say so explicitly.
 - When spawning agents for implementation work in this repo, instruct them to read `CONTRIBUTING.md` before coding if the task changes language surface, runtime behavior, tooling behavior, or public documentation.
 
+### Implementation Gate — Draft PR Required (Enforced by Coordinator)
+
+**No implementation work may be routed until a draft PR exists.** This is the coordinator's responsibility to enforce — it is NOT delegated to agents.
+
+When a user asks to "work on" an issue or an agent creates a feature branch, the coordinator MUST:
+
+1. **Check for an existing branch.** Run `git branch -a | grep {issue-number}` to detect any branch already created.
+2. **Check for an existing PR.** Use `mcp_github_list_pull_requests` (or `gh pr list`) to confirm whether a PR already exists for that branch.
+3. **If branch exists but no PR:** The gate is unmet. The coordinator opens the draft PR immediately — before spawning any implementation agents — using `mcp_github_create_pull_request` with `draft: true`. The PR title follows `feat: {short description} (#N)`, the body contains the implementation checklist from the issue's "Implementation scope" section, and the PR is linked with `Closes #N`.
+4. **If neither branch nor PR exists:** Create the branch with an empty chore commit (`git commit --allow-empty -m "chore: open feature branch for issue #N — {description}"`), push it, then open the draft PR as above.
+5. **Only after the draft PR is confirmed open:** Route implementation work to agents.
+
+**What counts as a gate breach:** Any session that routes implementation commits without a draft PR is a gate breach. The coordinator is accountable — agents following coordinator instructions are not at fault.
+
+**Branch naming:** `feature/issue-N-short-description` for user-initiated branches. `squad/N-short-description` for coordinator-initiated branches.
+
+**If `mcp_github_create_pull_request` fails** (e.g., branch has no commits ahead of base): push an empty chore commit first, then retry. See the issue #31 recovery as the canonical example.
+
 **On every session start:** Run `git config user.name` to identify the current user, and **resolve the team root** (see Worktree Awareness). Store the team root — all `.squad/` paths must be resolved relative to it. Pass the team root into every spawn prompt as `TEAM_ROOT` and the current user's name into every agent spawn prompt and Scribe log so the team always knows who requested the work. Check `.squad/identity/now.md` if it exists — it tells you what the team was last focused on. Update it if the focus has shifted.
 
 **⚡ Context caching:** After the first message in a session, `team.md`, `routing.md`, and `registry.json` are already in your context. Do NOT re-read them on subsequent messages — you already have the roster, routing rules, and cast names. Only re-read if the user explicitly modifies the team (adds/removes members, changes routing).

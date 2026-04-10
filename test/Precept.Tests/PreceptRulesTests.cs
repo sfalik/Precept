@@ -1141,7 +1141,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number nullable
-            invariant Balance == null || Balance >= 0 because "Balance must be null or non-negative"
+            invariant Balance == null or Balance >= 0 because "Balance must be null or non-negative"
             state Active initial
             event ClearBalance with NewBalance as number nullable
             from Active on ClearBalance -> set Balance = ClearBalance.NewBalance -> transition Active
