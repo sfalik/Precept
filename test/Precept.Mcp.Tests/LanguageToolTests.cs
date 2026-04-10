@@ -118,6 +118,7 @@ public class LanguageToolTests
         symbols.Should().Contain("not", "logical NOT should be keyword 'not', not '!'");
         symbols.Should().NotContain("&&", "symbolic && must not appear in the operator inventory");
         symbols.Should().NotContain("||", "symbolic || must not appear in the operator inventory");
+        symbols.Should().NotContain("!", "symbolic ! must not appear in the operator inventory");
     }
 
     [Fact]
