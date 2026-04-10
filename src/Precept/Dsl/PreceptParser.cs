@@ -416,6 +416,16 @@ public static class PreceptParser
             .Select(t => t.ToText())
             .AtLeastOnceDelimitedBy(Token.EqualTo(PreceptToken.Comma)));
 
+    /// <summary>
+    /// Parses a field target: 'all' | Name (',' Name)*
+    /// Returns the field names. 'all' is represented as ["all"].
+    /// </summary>
+    private static readonly TokenListParser<PreceptToken, string[]> FieldTarget =
+        Token.EqualTo(PreceptToken.All).Value(new[] { "all" })
+        .Or(Token.EqualTo(PreceptToken.Identifier)
+            .Select(t => t.ToText())
+            .AtLeastOnceDelimitedBy(Token.EqualTo(PreceptToken.Comma)));
+
     // ═══════════════════════════════════════════════════════════════════
     // Outcome Parser
     // ═══════════════════════════════════════════════════════════════════
@@ -742,14 +752,12 @@ public static class PreceptParser
     // Edit Declarations
     // ═══════════════════════════════════════════════════════════════════
 
-    // in <StateTarget> edit <FieldList>
+    // in <StateTarget> edit <FieldTarget>
     private static readonly TokenListParser<PreceptToken, StatementResult> EditDecl =
         (from _ in Token.EqualTo(PreceptToken.In)
          from states in StateTarget
          from __ in Token.EqualTo(PreceptToken.Edit)
-         from fields in Token.EqualTo(PreceptToken.Identifier)
-             .Select(t => t.ToText())
-             .AtLeastOnceDelimitedBy(Token.EqualTo(PreceptToken.Comma))
+         from fields in FieldTarget
          select (StatementResult)new EditResult(states, fields))
         .Named("edit declaration")
             .Register(new ConstructInfo(
@@ -758,6 +766,23 @@ public static class PreceptParser
                 "top-level",
                 "Declares which fields are editable in a state",
                 "in Open edit Priority"));
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Root Edit Declarations (stateless precepts)
+    // ═══════════════════════════════════════════════════════════════════
+
+    // edit <FieldTarget>  (root-level; valid only when no states declared)
+    private static readonly TokenListParser<PreceptToken, StatementResult> RootEditDecl =
+        (from _ in Token.EqualTo(PreceptToken.Edit)
+         from fields in FieldTarget
+         select (StatementResult)new RootEditResult(fields))
+        .Named("root edit declaration")
+            .Register(new ConstructInfo(
+                "root-edit-declaration",
+                "edit <Field>, ... | edit all",
+                "top-level",
+                "Declares which fields are editable (stateless precepts)",
+                "edit all"));
 
     // ═══════════════════════════════════════════════════════════════════
     // Transition Rows
@@ -813,6 +838,7 @@ public static class PreceptParser
     private sealed record StateActionResult(AssertAnchor Prep, string[] States,
         ParsedAction[] Actions) : StatementResult;
     private sealed record EditResult(string[] States, string[] Fields) : StatementResult;
+    private sealed record RootEditResult(string[] Fields) : StatementResult;
     private sealed record TransitionRowResult(string[] States, string EventName,
         PreceptExpression? WhenGuard, ParsedAction[] ActionsAndOutcome, int SourceLine = 0) : StatementResult;
 
@@ -821,6 +847,7 @@ public static class PreceptParser
         // Order matters: more specific patterns before general ones
         // 'in ... edit' before 'in ... assert' (both start with In)
         EditDecl.Try()
+        .Or(RootEditDecl.Try())
         // Event assert: 'on <Event> assert'
         .Or(EventAssertDecl.Try())
         // State assert: 'in/to/from <State> assert'
@@ -949,6 +976,10 @@ public static class PreceptParser
                         editBlocks.Add(new PreceptEditBlock(stateName, edr.Fields.ToList())));
                     break;
 
+                case RootEditResult redr:
+                    editBlocks.Add(new PreceptEditBlock(null, redr.Fields.ToList()));
+                    break;
+
                 case TransitionRowResult trr:
                     var outcomes = trr.ActionsAndOutcome.OfType<OutcomeAction>().ToList();
                     if (outcomes.Count == 0)
@@ -990,10 +1021,10 @@ public static class PreceptParser
                 throw DiagnosticCatalog.C54.ToException(("stateName", st.TargetState));
         }
 
-        if (states.Count == 0)
+        if (states.Count == 0 && fields.Count == 0 && collectionFields.Count == 0)
             // SYNC:CONSTRAINT:C12
             throw DiagnosticCatalog.C12.ToException();
-        if (initialState is null)
+        if (states.Count > 0 && initialState is null)
             // SYNC:CONSTRAINT:C13
             throw DiagnosticCatalog.C13.ToException();
 

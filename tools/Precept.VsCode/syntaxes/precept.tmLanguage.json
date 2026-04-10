@@ -18,6 +18,7 @@
     { "include": "#transitionTarget" },
     { "include": "#eventArgReference" },
     { "include": "#collectionMemberAccess" },
+    { "include": "#rootEditDeclaration" },
     { "include": "#controlKeywords" },
     { "include": "#declarationKeywords" },
     { "include": "#typeKeywords" },
@@ -101,6 +102,34 @@
                 },
                 {
                   "name": "entity.name.type.state.precept",
+                  "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+                },
+                {
+                  "name": "punctuation.separator.comma.precept",
+                  "match": ","
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "rootEditDeclaration": {
+      "comment": "Root-level edit declaration (stateless precepts): edit all | edit Field1, Field2",
+      "patterns": [
+        {
+          "name": "meta.declaration.edit.root.precept",
+          "match": "^(\\s*)(edit)(\\s+)(all|(?:[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*))",
+          "captures": {
+            "2": { "name": "keyword.other.precept" },
+            "4": {
+              "patterns": [
+                {
+                  "name": "keyword.control.precept",
+                  "match": "\\ball\\b"
+                },
+                {
+                  "name": "variable.other.field.precept",
                   "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
                 },
                 {
@@ -327,7 +356,7 @@
       "patterns": [
         {
           "name": "keyword.control.precept",
-          "match": "\\b(precept|state|event|from|on|if|else|initial|when|in|to|any|of)\\b"
+          "match": "\\b(precept|state|event|from|on|if|else|initial|when|in|to|any|all|of)\\b"
         }
       ]
     },

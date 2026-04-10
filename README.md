@@ -100,6 +100,7 @@ See the [Quickstart Guide](docs/RuntimeApiDesign.md) for a complete runtime inte
 - Lifecycle optional — stateless precepts enforce field declarations, invariants, and constraints without a state machine
 - Full inspectability — preview any action's outcome without executing it
 - Compile-time checking — unreachable states and type errors caught before runtime
+- **Stateful or stateless** — precepts can govern stateful workflows (with lifecycle states and transitions) or stateless domain objects (fields and edit rules only, no states)
 
 Precept is not a workflow orchestrator, event sourcing framework, or ORM — it integrates with all of them. It governs the entity contract; they handle orchestration, persistence, and storage. Think: scattered governance across six service classes — Precept puts it in one file.
 

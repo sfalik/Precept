@@ -31,7 +31,7 @@ public class NewSyntaxParserTests
 
         model.Name.Should().Be("Minimal");
         model.States.Should().HaveCount(1);
-        model.InitialState.Name.Should().Be("Idle");
+        model.InitialState!.Name.Should().Be("Idle");
     }
 
     [Fact]
@@ -1041,7 +1041,7 @@ public class NewSyntaxParserTests
         model.States[0].Name.Should().Be("A");
         model.States[1].Name.Should().Be("B");
         model.States[2].Name.Should().Be("C");
-        model.InitialState.Name.Should().Be("A");
+        model.InitialState!.Name.Should().Be("A");
     }
 
     [Fact]
@@ -1055,7 +1055,7 @@ public class NewSyntaxParserTests
         var model = PreceptParser.Parse(dsl);
 
         model.States.Should().HaveCount(3);
-        model.InitialState.Name.Should().Be("B");
+        model.InitialState!.Name.Should().Be("B");
     }
 
     [Fact]
@@ -1069,7 +1069,7 @@ public class NewSyntaxParserTests
         var model = PreceptParser.Parse(dsl);
 
         model.States.Should().HaveCount(3);
-        model.InitialState.Name.Should().Be("A");
+        model.InitialState!.Name.Should().Be("A");
     }
 
     [Fact]
@@ -1083,7 +1083,7 @@ public class NewSyntaxParserTests
         var model = PreceptParser.Parse(dsl);
 
         model.States.Should().HaveCount(3);
-        model.InitialState.Name.Should().Be("C");
+        model.InitialState!.Name.Should().Be("C");
     }
 
     [Fact]

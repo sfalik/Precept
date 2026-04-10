@@ -49,7 +49,8 @@ When ready to implement:
 1. Create a feature branch: `feature/issue-N-short-description`
 2. Open a **draft PR** immediately, linked to the issue (`Closes #N`)
 3. The **PR body is the implementation plan** — a checklist of work items. This is ephemeral; it doesn't need to outlive the PR.
-4. Implement in vertical slices. Suggested order for cross-cutting changes:
+4. **Check off items as you complete them.** Update the PR body after each slice or logical group — not at the end. The checkbox list is a live progress tracker; it should reflect current state throughout development so reviewers and collaborators always know where things stand. Use the GitHub UI or `mcp_github_update_pull_request` to check off completed items.
+5. Implement in vertical slices. Suggested order for cross-cutting changes:
    - Parser + model + diagnostics
    - Type checker
    - Runtime engine

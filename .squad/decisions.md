@@ -6,6 +6,88 @@
 
 ---
 
+### 2026-04-08T23:50:00Z: Soup Nazi exploratory MCP regression — methodology validated, 5 authoring corrections captured
+**By:** Soup Nazi (Tester)
+**Status:** Applied
+
+Exploratory MCP regression rounds 1+2 executed against the data-only precepts implementation (feature/issue-22-data-only-precepts). All probes synthesized from scratch using `precept_language` as vocabulary reference.
+
+**Round 1 (18 compile probes):** 15/18 passed as authored. Three were test-plan syntax errors:
+1. Multi-line action chains not supported — full transition row must be on one line.
+2. `when` guard must precede the first `->`: correct form is `from S on E when Guard -> outcome`.
+3. `dequeue`/`pop` require `into <field>` target; bare form is invalid.
+
+Additional corrections: Probe 16 used wrong diagnostic code (PRECEPT008, not C13/PRECEPT013). Probe 17 had wrong expectation (zero-row terminal state produces no C50 diagnostic — C50 fires only when a state has rows that still can't reach another state). All corrected probes passed.
+
+**Round 2 (7 outcome kinds):** All confirmed across three synthesized shapes (Approval flow, FeatureGate, RangeGuard): Transition, NoTransition, Rejected, ConstraintFailure, UneditableField, Update, Undefined.
+
+**Verdict:** PASS (engine). Five test-plan authoring corrections promoted to Soup Nazi charter `## MCP Regression Testing` skill section.
+
+**Report:** `.squad/decisions/inbox/soup-nazi-mcp-regression-exploratory.md` (merged).
+
+---
+
+### 2026-04-08T22:30:00Z: Soup Nazi MCP regression pass for PR #48 — PASS
+**By:** Soup Nazi (Tester)
+**Status:** Applied
+
+Full 4-round MCP regression against PR #48 (data-only precepts).
+
+- **Round 1 (24 sample compiles):** 24/24 valid, 0 error diagnostics. Three new stateless samples (`customer-profile`, `fee-schedule`, `payment-method`) all return `isStateless: true`.
+- **Round 2 (stateful E2E — maintenance-work-order):** Draft→Open transition fired correctly; UneditableField and Update outcomes both confirmed.
+- **Round 3 (stateless E2E — customer-profile, fee-schedule):** `edit all` expands to all fields; selective edit blocks locked fields with `UneditableField "(stateless)"`; invariant ConstraintFailure triggered correctly; Fire on stateless precept → Undefined with "stateless" message.
+- **Round 4 (diagnostic edge cases):** C12, C55, C49, and parse-failure all behave exactly per spec.
+
+**Verdict:** PASS. PR #48 clear to merge (pending docs gate — see Frank's review below).
+
+**Report:** `.squad/decisions/inbox/soup-nazi-mcp-regression.md` (merged).
+
+---
+
+### 2026-04-08T22:00:00Z: Frank PR #48 review — CHANGES REQUESTED (docs sync missing)
+**By:** Frank (Lead/Architect)
+**Status:** Blocking — awaiting Slice 8 (docs + samples)
+
+PR #48 (feature/issue-22-data-only-precepts, Slices 1–7) reviewed. Architecture is sound; all 12 design Q&A decisions faithfully executed. One blocking gap: docs sync requirement unmet.
+
+**Blocking items (Slice 8):**
+1. `docs/PreceptLanguageDesign.md` — not updated. Missing: stateless precept form, root `edit` grammar rule, C12 redefinition, C13 conditionalization, C55 new constraint, `in State edit all` validity for stateful.
+2. `docs/RuntimeApiDesign.md` — not updated. Missing: `IsStateless` property, nullable `InitialState`/`CurrentState`, `CreateInstance(data)` stateless behavior, `CreateInstance(state, data)` throws `ArgumentException` on stateless.
+3. `docs/McpServerDesign.md` — not updated. Missing: `IsStateless` in CompileResult DTO, nullable `currentState` for Inspect/Fire/Update, stateless null-passing notes.
+4. Sample files — Decision 11 placeholder samples (`customer-profile.precept`, `fee-schedule.precept`, `payment-method.precept`) not present in Slices 1–7.
+
+**Non-blocking notes:** Minor nullable lie on `model.InitialState!` (safe in practice); `TryValidateScalarValue out string error` signature nit; stateful `in State edit all` not in design docs (intentional expansion without coverage).
+
+**Report:** `.squad/decisions/inbox/frank-pr48-review.md` (merged).
+
+---
+
+### 2026-04-08: Uncle Leo security survey — 4 attack surfaces identified, recommendations pending
+**By:** Uncle Leo (Security Champion)
+**Status:** Pending action — recommendations require owner review
+
+Initial security survey of MCP server (5 tools), language server (LSP/stdio), core DSL runtime, and public C# API surface.
+
+**Attack surfaces ranked:**
+| Surface | Risk | Summary |
+|---|---|---|
+| Unbounded `text` input | High | No size limits before tokenization — DoS via oversized DSL text |
+| MCP output echoes DSL content | High | `ExpressionText`, `Reason`, `BranchDto.Guard`, `DiagnosticDto.Message` echo raw user input — indirect prompt injection vector |
+| Unvalidated `data`/`fields`/`args` dicts | Medium | Unknown keys accepted silently — no allowlist against declared field/arg names |
+| No auth on MCP tools | Medium | stdio-only today; assumption not explicitly documented |
+| LS document size (keystroke path) | Medium | Same parser on every change, no size limits |
+| JSON object handling (`ToNative` fallback) | Low | Objects/arrays stringify silently — confusing, not exploitable |
+
+**Clean:** No RCE gadget paths found. No file I/O, process spawning, or unsafe deserialization.
+
+**Top recommended actions (ordered):** (1) Input size limits on `text` parameter. (2) Sanitize MCP output fields that echo DSL content. (3) Add invocation logging to MCP server. (4) Audit `PreceptAnalyzer.cs` regexes for ReDoS.
+
+**External frameworks referenced:** OWASP Input Validation Cheat Sheet, OWASP LLM01:2025 Prompt Injection, OWASP MCP Security Cheat Sheet, OWASP Deserialization Cheat Sheet, Microsoft .NET Security.
+
+**Report:** `.squad/decisions/inbox/uncle-leo-security-survey.md` (merged).
+
+---
+
 ### 2026-04-08: Issue #22 semantic rules rewrite — warning model and binary taxonomy
 **By:** Shane (owner decision), with Frank (research/analysis) and George (runtime evidence)
 **Status:** Decided

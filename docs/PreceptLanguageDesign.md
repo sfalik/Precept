@@ -225,8 +225,10 @@ PushAction         := "push" Identifier Expr
 PopAction          := "pop" Identifier ("into" Identifier)?
 ClearAction        := "clear" Identifier
 
-EditDecl           := "in" StateTarget "edit" FieldList
-FieldList          := Identifier ("," Identifier)*
+EditDecl           := StateEditDecl | RootEditDecl
+StateEditDecl      := "in" StateTarget "edit" FieldTarget
+RootEditDecl       := "edit" FieldTarget
+FieldTarget        := "all" | Identifier ("," Identifier)*
 
 EventDecl          := "event" Identifier ("," Identifier)* ("with" ArgList)?
 ArgList            := ArgDecl ("," ArgDecl)*
@@ -270,6 +272,56 @@ Notes:
 - **Compile-time error (contradiction):** multiple asserts with the same preposition on the same state whose conjoined per-field domains are empty (e.g. two `in Open` asserts that require contradictory values for the same field).
 - **Compile-time error (deadlock):** `in`/`to` vs `from` asserts on the same state whose conjoined per-field domains are empty — the state is provably unexitable.
 - All domain checks use interval/set analysis on the expression AST. Expressions involving `contains` or cross-field relationships that cannot be reduced to per-field domains are assumed satisfiable (no false positives).
+- **Stateless precept** — a precept with no `state` declarations. Only `field`, `invariant`, and root-level `edit` declarations are valid. C12 requires at least one `field` or `state`. C55 rejects root-level `edit` when states are declared. C49 warns per event declared in a stateless precept (events have no transition surface).
+
+---
+
+## Stateless Precepts (Locked)
+
+A precept without any `state` declarations is a **stateless precept** — it represents a domain object governed by data rules and editability constraints, but without a lifecycle or routing surface.
+
+### When to use stateless precepts
+
+Use a stateless precept when the entity has fields and integrity rules but no meaningful lifecycle phases. Common cases: configuration objects, profile records, pricing tables, stored payment methods, and any object where "what the data must be" matters but "what stage the process is in" does not.
+
+### Syntax
+
+A stateless precept omits all `state`, `event`, and `from ... on ...` declarations. Valid declarations are:
+
+- `field` — scalar and collection field declarations
+- `invariant` — data integrity rules (always enforced)
+- `edit` (root-level) — which fields are directly editable; see [Root-level editability](#root-level-editability-stateless-precepts)
+
+```precept
+precept CustomerProfile
+
+field Name as string default ""
+field Email as string default ""
+field Phone as string nullable
+field PreferredContactMethod as string default "email"
+field MarketingOptIn as boolean default false
+
+invariant Name != "" because "Name cannot be empty"
+
+edit all
+```
+
+### Constraints
+
+- **C12 (parse):** At least one `field` or `state` must be declared. A `precept` header alone is not valid.
+- **C55 (compile):** Root-level `edit` is not valid when states are declared. Use `in <State> edit` instead.
+- **C49 (compile, Warning):** Event declared in a stateless precept is unreachable — no transition surface exists.
+- C13 ("Exactly one state must be initial") is suppressed for stateless precepts — no states means no initial state required.
+
+### Runtime behavior
+
+- `PreceptEngine.IsStateless` is `true`; `InitialState` is `null`.
+- `CreateInstance(data?)` — works for both stateful and stateless. For stateless, creates an instance with `CurrentState = null`.
+- `CreateInstance(state, data?)` — throws `ArgumentException` for stateless precepts.
+- `Fire` on a stateless instance — returns `Undefined` outcome. Events have no transition surface.
+- `Inspect(instance, event)` on stateless — returns `Undefined` outcome.
+- `Inspect(instance)` on stateless — returns all events as `Undefined`; `EditableFields` reflects root-editable fields.
+- `Update` on stateless — applies to root-editable fields; `CurrentState` is `null`.
 
 ---
 
@@ -348,7 +400,7 @@ Full reserved keyword list:
 
 `precept`, `field`, `as`, `nullable`, `default`, `invariant`, `because`,
 `state`, `initial`, `event`, `with`, `assert`, `edit`,
-`in`, `to`, `from`, `on`, `when`, `any`, `of`,
+`in`, `to`, `from`, `on`, `when`, `any`, `all`, `of`,
 `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `into`,
 `transition`, `no`, `reject`,
 `string`, `number`, `boolean`, `true`, `false`, `null`, `contains`
@@ -719,6 +771,22 @@ This is LL(2) at most — the parser sees `in` → state list → `assert` or `e
 - **Independence from events:** Edit declarations and event transitions are orthogonal. A field can be both editable and modified by event `set` assignments.
 - **No terminal state exclusion:** `in any edit` includes terminal states. To exclude specific states, list states explicitly.
 
+### Root-level editability (stateless precepts)
+
+Stateless precepts (no `state` declarations) use a root-level `edit` form without the `in <StateTarget>` prefix:
+
+```
+edit all
+edit Field1, Field2
+```
+
+- `edit all` — declares all declared fields as editable. The `all` sentinel is stored as `["all"]` in `FieldNames` and expanded to all scalar and collection field names at engine construction via `ExpandEditFieldNames()`.
+- `edit Field1, Field2` — declares specific named fields as editable.
+
+Root-level `edit` is only valid on stateless precepts. Using it alongside `state` declarations produces **C55 (Error)**: `"Root-level \`edit\` is not valid when states are declared. Use \`in any edit all\` or \`in <State> edit <Fields>\` instead."`
+
+At runtime, `Update` on a stateless instance pulls the editable field set from `_rootEditableFields` (the internal set built from root edit blocks). The `BuildEditableFieldInfosForStateless()` method is used by `Inspect(instance)` to surface root-editable fields for stateless instances.
+
 ### Compile-time checks
 
 | Check | Severity |
@@ -727,6 +795,7 @@ This is LL(2) at most — the parser sees `in` → state list → `assert` or `e
 | State name not declared | Error |
 | Duplicate field in same `edit` statement | Warning |
 | Empty field list | Error |
+| Root-level `edit` while states are declared (C55) | Error |
 
 ### Model
 

@@ -98,6 +98,25 @@ Multi-state `in` is already supported for state asserts (`in Open, InProgress as
 
 `in any edit` makes the listed fields editable in every declared state, including terminal states. `any` means any — no special exclusions.
 
+### Root-level editability (stateless precepts)
+
+Stateless precepts (no `state` declarations) use root-level `edit` declarations without the `in <StateTarget>` prefix:
+
+```precept
+# All fields are editable
+edit all
+
+# Specific fields are editable
+edit Field1, Field2
+```
+
+- `edit all` — the `all` sentinel is stored as `["all"]` in `FieldNames`. At engine construction, `ExpandEditFieldNames()` expands `["all"]` to every declared scalar and collection field name. This is a stateless-only shorthand for "every field the precept declares."
+- `edit Field1, Field2` — only the listed fields are editable. The remaining fields are read-only.
+
+**Relationship to state-scoped edit:** Root-level `edit` is only valid for stateless precepts. Using it alongside `state` declarations produces **C55 (compile Error)**: `"Root-level 'edit' is not valid when states are declared."` For stateful precepts, use `in any edit all` or `in <State> edit <Fields>`.
+
+**Access:** At runtime, `Update` on a stateless instance uses `_rootEditableFields` as the editable field set. `BuildEditableFieldInfosForStateless()` surfaces root-editable fields in the `Inspect(instance)` aggregate result.
+
 ## Semantics
 
 ### Additive across blocks
@@ -156,12 +175,12 @@ The parser produces one `PreceptEditBlock` per `(State, FieldNames)` grouping:
 
 ```csharp
 public sealed record PreceptEditBlock(
-    string State,
+    string? State,          // null for root-level (stateless) edit declarations
     IReadOnlyList<string> FieldNames,
     int SourceLine = 0);
 ```
 
-When `in any edit` is used, the parser expands `any` into one `PreceptEditBlock` per declared state (same expansion pattern as `in any assert`). When `in State1, State2 edit` is used, the parser creates one `PreceptEditBlock` per listed state.
+`State` is `null` for root-level `edit` declarations (stateless precepts). When `in any edit` is used, the parser expands `any` into one `PreceptEditBlock` per declared state. When `in State1, State2 edit` is used, the parser creates one `PreceptEditBlock` per listed state.
 
 ### `PreceptDefinition` extension
 
@@ -169,7 +188,7 @@ When `in any edit` is used, the parser expands `any` into one `PreceptEditBlock`
 public sealed record PreceptDefinition(
     string Name,
     IReadOnlyList<PreceptState> States,
-    PreceptState InitialState,
+    PreceptState? InitialState,         // nullable — null for stateless precepts
     IReadOnlyList<PreceptEvent> Events,
     IReadOnlyList<PreceptTransitionRow> TransitionRows,
     IReadOnlyList<PreceptField> Fields,
@@ -177,17 +196,26 @@ public sealed record PreceptDefinition(
     IReadOnlyList<PreceptInvariant>? Invariants = null,
     IReadOnlyList<StateAssertion>? StateAsserts = null,
     IReadOnlyList<EventAssertion>? EventAsserts = null,
-    IReadOnlyList<PreceptEditBlock>? EditBlocks = null);  // <-- NEW
+    IReadOnlyList<PreceptEditBlock>? EditBlocks = null);
 ```
+
+`IsStateless` is a computed property: `States.Count == 0`.
 
 ### `PreceptEngine` — editability map
 
-At compile time, `PreceptEngine` builds an internal editability map:
+At compile time, `PreceptEngine` builds two internal editability structures:
 
 ```csharp
+// State-scoped edit (stateful precepts): state name → set of editable field names
 private readonly IReadOnlyDictionary<string, HashSet<string>> _editableFieldsByState;
-// Key: state name → Value: set of editable field names (union of all matching edit blocks)
+
+// Root-level edit (stateless precepts): set of editable field names, or null if none declared
+private HashSet<string>? _rootEditableFields;
 ```
+
+`_rootEditableFields` is populated from `PreceptEditBlock` entries where `State == null`. The `ExpandEditFieldNames()` private helper expands `["all"]` to all scalar and collection field names. `BuildEditableFieldInfosForStateless()` is used by `Inspect(instance)` to surface root-editable fields for stateless instances.
+
+At runtime, `Update` Stage 1 branches on `IsStateless`: stateless instances pull the editable field set from `_rootEditableFields`; stateful instances use the `_editableFieldsByState` lookup.
 
 This precomputed map makes `Update` validation O(1) per field.
 

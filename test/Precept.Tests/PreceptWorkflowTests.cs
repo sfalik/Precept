@@ -44,7 +44,7 @@ public class PreceptWorkflowTests
         var machine = PreceptParser.Parse(dsl);
 
         machine.Name.Should().Be("Minimal");
-        machine.InitialState.Name.Should().Be("Idle");
+        machine.InitialState!.Name.Should().Be("Idle");
         machine.Events.Should().BeEmpty();
         machine.TransitionRows.Should().BeNull();
     }
@@ -918,7 +918,7 @@ public class PreceptWorkflowTests
         guardedRow!.SetAssignments.Should().ContainSingle();
         guardedRow!.SetAssignments[0].Key.Should().Be("CarsWaiting");
         guardedRow!.SetAssignments[0].ExpressionText.Should().Be("0");
-        var rejectRow = machine.TransitionRows.FirstOrDefault(r => r.Outcome is Rejection);
+        var rejectRow = machine.TransitionRows!.FirstOrDefault(r => r.Outcome is Rejection);
         rejectRow.Should().NotBeNull();
         ((Rejection)rejectRow!.Outcome).Reason.Should().Be("Cars waiting required");
     }

@@ -628,3 +628,20 @@ Three approaches were evaluated:
 3. **Middle-ground** — keep `Precept` on types whose bare names are too generic for C#; drop it on domain-specific types
 
 The middle-ground was chosen. Types that keep `Precept`: `PreceptField`, `PreceptState`, `PreceptEvent`, `PreceptInstance`, `PreceptDefinition`, `PreceptRuntime`, `PreceptEngine`, `PreceptCompiler`, `PreceptInvariant`, `PreceptTransitionRow`, `PreceptEditableFieldInfo`. Types that drop it: `FireResult`, `EventInspectionResult`, `ConstraintViolation`, `TransitionOutcome`, `AssertAnchor`, `StateAssertion`, `EventAssertion`, `Rejection`, `StateTransition`, `NoTransition`, `ValidationResult`, etc.
+
+---
+
+## Compile-Phase Diagnostics for Structural Constraints
+
+Compile-phase and parse-phase diagnostics (DSL validity checks) use a separate vocabulary from runtime `ConstraintViolation` objects. They are registered in `DiagnosticCatalog` and reported as structured `ParseDiagnostic` entries. The following codes are relevant to data-only (stateless) precepts:
+
+| Code | Phase | Severity | Rule |
+|------|-------|----------|------|
+| C12 / PRECEPT012 | parse | Error | At least one `field` or `state` must be declared. A `precept` header alone with neither a field nor a state is invalid. |
+| C49 / PRECEPT049 | compile | Warning | Event declared but never referenced in any transition row. On a stateless precept, every declared event is structurally orphaned \u2014 no state routing surface exists. Emitted per event. |
+| C50 / PRECEPT050 | compile | Warning | Non-terminal state has outgoing rows but none can reach another state. Upgraded from `Hint` to `Warning` (2026-04-08). Rationale: a state where every outgoing path dead-ends is a structural smell that warrants author attention, not just an informational note. Consistent with the severity model for C49 (same kind of structural quality problem). |
+| C55 / PRECEPT055 | compile | Error | Root-level `edit` is not valid when states are declared. Message: `"Root-level \`edit\` is not valid when states are declared. Use \`in any edit all\` or \`in <State> edit <Fields>\` instead."` |
+
+**Distinction from runtime violations:** These are compile-time diagnostics, not runtime `ConstraintViolation` objects. They are reported during `PreceptCompiler.CompileFromText()` and surfaced via the language server (squiggles), MCP `precept_compile`, and CLI. They do not produce `ConstraintViolation` instances.
+
+**C12 redefinition history:** The original C12 rule was "At least one state must be declared." It was broadened to include fields as part of the data-only precepts feature \u2014 a precept with only fields (no states) is now valid (a stateless precept), so the minimum requirement is at least one field OR at least one state.

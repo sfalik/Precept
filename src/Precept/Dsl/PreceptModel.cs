@@ -5,7 +5,7 @@ namespace Precept;
 public sealed record PreceptDefinition(
     string Name,
     IReadOnlyList<PreceptState> States,
-    PreceptState InitialState,
+    PreceptState? InitialState,
     IReadOnlyList<PreceptEvent> Events,
     IReadOnlyList<PreceptField> Fields,
     IReadOnlyList<PreceptCollectionField> CollectionFields,
@@ -15,7 +15,10 @@ public sealed record PreceptDefinition(
     IReadOnlyList<EventAssertion>? EventAsserts = null,
     IReadOnlyList<PreceptTransitionRow>? TransitionRows = null,
     IReadOnlyList<PreceptEditBlock>? EditBlocks = null,
-    int SourceLine = 0);
+    int SourceLine = 0)
+{
+    public bool IsStateless => States.Count == 0;
+}
 
 public sealed record PreceptState(
     string Name,
@@ -192,6 +195,6 @@ public sealed record PreceptTransitionRow(
 /// Runtime <c>Update</c> API is deferred — model/parser included now.
 /// </summary>
 public sealed record PreceptEditBlock(
-    string State,
+    string? State,
     IReadOnlyList<string> FieldNames,
     int SourceLine = 0);

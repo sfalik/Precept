@@ -76,6 +76,7 @@ AI-first is a design constraint from day one, not a feature to add later.
 
 ## How I Work
 
+- Follow `CONTRIBUTING.md` for implementation workflow — PR structure, slice order, checkbox hygiene, and doc sync rules.
 - Read `docs/PreceptLanguageDesign.md` first — the DSL spec is law
 - Read `docs/RulesDesign.md` for constraint semantics
 - Read `docs/ConstraintViolationDesign.md` for the violation model

@@ -22,6 +22,7 @@
 
 ## How I Work
 
+- Follow `CONTRIBUTING.md` for implementation workflow — PR structure, slice order, checkbox hygiene, and doc sync rules.
 - Read `docs/McpServerDesign.md` before any MCP work — tool contracts are specified there
 - **Document what I change:** When I change an MCP tool's contract, behavior, or DTOs, update `docs/McpServerDesign.md` in the same pass. When I update plugin skills or agent content, update the plugin's README or inline skill descriptions.
 - MCP tools are **thin wrappers** — if a method exceeds ~30 lines of non-serialization logic, it belongs in `src/Precept/`

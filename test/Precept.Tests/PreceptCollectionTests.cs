@@ -943,8 +943,8 @@ public class PreceptCollectionRuntimeTests
         (fire.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
         var col = fire.UpdatedInstance!.InstanceData["Floors"] as List<object>;
         col!.OfType<double>().DefaultIfEmpty(double.NaN).Min().Should().Be(1d);
-        col.Max().Should().Be(7d);
-        col.Count.Should().Be(4);
+        col!.Max().Should().Be(7d);
+        col!.Count.Should().Be(4);
     }
 
     [Fact]

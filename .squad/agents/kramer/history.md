@@ -23,6 +23,16 @@
 - Key file paths: `tools/Precept.VsCode/webview/inspector-preview.html` (source of truth), `tools/Precept.VsCode/src/extension.ts` (host/protocol).
 - Decision inbox: `.squad/decisions/inbox/kramer-preview-audit.md`
 
+### 2026-04-08 - Slice 5 — Grammar, completions, semantic tokens (issue-22 data-only precepts)
+
+- Grammar (`precept.tmLanguage.json`): added `all` to `controlKeywords` alternation (sibling of `any`).
+- Grammar: added `rootEditDeclaration` repository pattern — matches `edit all` and `edit Field1, Field2` at line start; highlights `edit` as `keyword.other`, `all` as `keyword.control`, fields as `variable.other.field`; inserted before `controlKeywords` catch-all for correct priority.
+- Completions (`PreceptAnalyzer.cs`): new root-level `edit` branch suggests `all` + field names (stateless precept context).
+- Completions: updated `in State edit` branch to also suggest `all` (supports `in any edit all`).
+- Semantic tokens: no changes — `PreceptToken.All` auto-picked up via `[TokenCategory(Grammar)]` from Slice 1.
+- Both builds green: LS 0 errors, npm compile clean.
+- Key learning: always check `node_modules` before running `npm run compile` — directory may not exist on a fresh checkout.
+
 ### 2026-04-05 - Retired legacy proposal labels in sync workflow
 
 - Added `needs-decision` and `decided` to `RETIRED_LABELS` in both the active workflow (`.github/workflows/sync-squad-labels.yml`) and the template copy (`.squad/templates/workflows/sync-squad-labels.yml`).

@@ -128,6 +128,7 @@ body:
         - [ ] Parser accepts ...
         - [ ] Runtime returns ...
         - [ ] Docs updated ...
+        - [ ] MCP regression pass: Round 1 (compile surface), Round 2 (runtime path coverage — all 7 outcomes), Round 3 (stateless), Round 4 (edge cases)
     validations:
       required: true
 
@@ -159,3 +160,4 @@ body:
           required: true
         - label: The motivation frames the problem as an integrity or prevention gap, not just convenience.
           required: true
+        - label: MCP regression testing (all 4 rounds) completed and passed after implementation — verify before closing the PR.
