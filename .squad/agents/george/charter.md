@@ -81,6 +81,7 @@ AI-first is a design constraint from day one, not a feature to add later.
 - Read `docs/ConstraintViolationDesign.md` for the violation model
 - Use `samples/` `.precept` files as ground truth for expected behavior
 - **Document what I change:** When I change DSL behavior (new keywords, new constructs, changed semantics), update `docs/PreceptLanguageDesign.md` and affected `samples/` in the same pass. When I add or change diagnostic codes, update `docs/ConstraintViolationDesign.md`.
+- **Check off PR body items as I go.** When a PR has an implementation plan with checkboxes, update the PR body after completing each slice or logical group — not at the end. Use `mcp_github_update_pull_request` to check off completed items. The PR body is a live progress tracker; it should reflect current state throughout development, not just at merge time.
 - Run `dotnet test test/Precept.Tests/` to validate changes
 - Build: `dotnet build src/Precept/`
 
