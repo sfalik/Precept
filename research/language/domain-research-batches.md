@@ -62,7 +62,7 @@ Based on the philosophy refresh assessment, three-agent strategic review (Frank,
 This plan was built from four inputs:
 
 1. the current open proposal queue (`#8`, `#9`, `#10`, `#11`, `#13`, `#14`, `#15`, `#16`, `#17`, `#22`, `#25`, `#26`, `#27`, `#29`, `#31`);
-2. the current research corpus under `docs/research/language/`;
+2. the current research corpus under `research/language/`;
 3. the philosophy filter in `docs/philosophy.md` plus the proposal requirements in `CONTRIBUTING.md`;
 4. the sample corpus in `samples/`.
 

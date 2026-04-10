@@ -6,7 +6,7 @@ Research lives in this repository. Proposal decisions and canonical proposal bod
 
 ## Start here
 
-- `docs/research/language/README.md` — entry point for language research, issue map, and reading order
+- `research/language/README.md` — entry point for language research, issue map, and reading order
 
 ## Structure
 

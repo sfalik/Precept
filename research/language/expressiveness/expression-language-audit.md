@@ -4,7 +4,7 @@
 **Date:** 2026-05-01  
 **Status:** Complete (v1)  
 **Audience:** GitHub proposal authors, Shane (approval gate)  
-**Input artifacts:** `docs/PreceptLanguageDesign.md`, `docs/RulesDesign.md`, `src/Precept/Dsl/`, `samples/` (all 21 files), `docs/research/language/expressiveness/README.md`
+**Input artifacts:** `docs/PreceptLanguageDesign.md`, `docs/RulesDesign.md`, `src/Precept/Dsl/`, `samples/` (all 21 files), `research/language/expressiveness/README.md`
 
 ---
 
@@ -559,8 +559,8 @@ All proposed features follow the existing `Identifier.member` and operator patte
 
 ## 6. References and Prior Work
 
-- `docs/research/language/expressiveness/README.md` — Steinbrenner's PM-level gap analysis with cross-library precedent
-- `docs/research/language/expressiveness/internal-verbosity-analysis.md` — Uncle Leo's statement-count audit
+- `research/language/expressiveness/README.md` — Steinbrenner's PM-level gap analysis with cross-library precedent
+- `research/language/expressiveness/internal-verbosity-analysis.md` — Uncle Leo's statement-count audit
 - `src/Precept/Dsl/PreceptExpressionEvaluator.cs` — runtime evaluator (ground truth for what executes)
 - `src/Precept/Dsl/PreceptTypeChecker.cs` — type checker (ground truth for what compiles)
 - `src/Precept/Dsl/PreceptParser.cs` — expression parser (ground truth for what parses)

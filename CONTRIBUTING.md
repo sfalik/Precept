@@ -36,11 +36,11 @@ Research documents live in `docs/research/` and capture:
 - Dead ends explored and why they were rejected
 - Design philosophy and rationale
 
-Research files are linked from the issue, not the other way around. The issue map in `docs/research/language/README.md` connects each proposal to its research starting points.
+Research files are linked from the issue, not the other way around. The issue map in `research/language/README.md` connects each proposal to its research starting points.
 
 **Research is durable.** It explains *why* decisions were made and survives across sessions. When a proposal is revised, update the research doc with the new reasoning.
 
-**Quality bar for rationale:** `docs/research/language/expressiveness/computed-fields.md` and the Issue #17 proposal demonstrate the expected depth — alternatives surveyed with precedent, explicit tradeoff analysis, and design philosophy grounding each locked decision.
+**Quality bar for rationale:** `research/language/expressiveness/computed-fields.md` and the Issue #17 proposal demonstrate the expected depth — alternatives surveyed with precedent, explicit tradeoff analysis, and design philosophy grounding each locked decision.
 
 #### 3. Implementation (Feature Branch + PR)
 

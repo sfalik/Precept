@@ -3,7 +3,7 @@
 **Date:** 2026-04-08
 **Researcher:** Steinbrenner (PM)
 **Scope:** Competitive and analog landscape analysis for Precept's entity-first/data-centric repositioning
-**Grounded in:** `design/brand/philosophy.md`, `design/brand/research/philosophy-draft-v2.md`, `docs/references/data-vs-state-pm-research.md`, `design/brand/research/data-vs-state-philosophy.md`
+**Grounded in:** `design/brand/philosophy.md`, `research/brand/philosophy-draft-v2.md`, `research/product/data-vs-state-pm-research.md`, `research/brand/data-vs-state-philosophy.md`
 **Requested by:** Shane
 
 ---

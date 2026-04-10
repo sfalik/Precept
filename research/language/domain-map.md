@@ -402,10 +402,10 @@ Domains ranked by research urgency — how badly we need the research to exist b
 
 ## Cross-References
 
-- Issue map: `docs/research/language/README.md`
-- Expressiveness studies: `docs/research/language/expressiveness/README.md`
-- PLT references: `docs/research/language/references/README.md`
-- Quality bar: `docs/research/language/expressiveness/computed-fields.md`
+- Issue map: `research/language/README.md`
+- Expressiveness studies: `research/language/expressiveness/README.md`
+- PLT references: `research/language/references/README.md`
+- Quality bar: `research/language/expressiveness/computed-fields.md`
 - Philosophy: `docs/philosophy.md`
 - Language spec: `docs/PreceptLanguageDesign.md`
 - Design docs: `docs/RulesDesign.md`, `docs/EditableFieldsDesign.md`, `docs/ConstraintViolationDesign.md`
