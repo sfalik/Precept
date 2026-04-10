@@ -380,7 +380,7 @@
       "patterns": [
         {
           "name": "keyword.other.precept",
-          "match": "\\b(set|add|remove|enqueue|dequeue|push|pop|clear|into|contains)\\b"
+          "match": "\\b(set|add|remove|enqueue|dequeue|push|pop|clear|into|contains|and|or|not)\\b"
         }
       ]
     },
@@ -409,10 +409,6 @@
         {
           "name": "keyword.operator.comparison.precept",
           "match": "==|!=|>=|<="
-        },
-        {
-          "name": "keyword.operator.logical.precept",
-          "match": "&&|\\|\\||!"
         },
         {
           "name": "keyword.operator.arithmetic.precept",

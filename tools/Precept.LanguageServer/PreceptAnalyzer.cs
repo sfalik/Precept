@@ -956,9 +956,9 @@ internal sealed class PreceptAnalyzer
         new CompletionItem { Label = ">=", Kind = CompletionItemKind.Operator },
         new CompletionItem { Label = "<", Kind = CompletionItemKind.Operator },
         new CompletionItem { Label = "<=", Kind = CompletionItemKind.Operator },
-        new CompletionItem { Label = "&&", Kind = CompletionItemKind.Operator },
-        new CompletionItem { Label = "||", Kind = CompletionItemKind.Operator },
-        new CompletionItem { Label = "!", Kind = CompletionItemKind.Operator },
+        new CompletionItem { Label = "and", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "or", Kind = CompletionItemKind.Keyword },
+        new CompletionItem { Label = "not", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "contains", Kind = CompletionItemKind.Operator }
     ];
 
