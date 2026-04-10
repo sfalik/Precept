@@ -1183,7 +1183,7 @@ public class PreceptWorkflowTests
             state Green
             event Advance
 
-            from Red on Advance when !(CarsWaiting > 0) -> transition Green
+            from Red on Advance when not (CarsWaiting > 0) -> transition Green
             from Red on Advance -> reject "No cars waiting"
             """;
 
@@ -1796,12 +1796,12 @@ public class PreceptWorkflowTests
             field Frozen as boolean default false
             state Active initial
             event Deposit with Amount as number
-            from Active on Deposit when !Frozen -> no transition
+            from Active on Deposit when not Frozen -> no transition
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
-        // Frozen=true → 'when !Frozen' is false → NotApplicable regardless of args
+        // Frozen=true → 'when not Frozen' is false → NotApplicable regardless of args
         var frozen = workflow.CreateInstance("Active", new Dictionary<string, object?> { ["Frozen"] = true });
 
         // No event args supplied (simulates discovery-mode bulk refresh)
@@ -1823,12 +1823,12 @@ public class PreceptWorkflowTests
             field Frozen as boolean default false
             state Active initial
             event Deposit with Amount as number
-            from Active on Deposit when !Frozen -> no transition
+            from Active on Deposit when not Frozen -> no transition
             """;
 
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
-        // Frozen=false → 'when !Frozen' is true → falls through to normal arg validation
+        // Frozen=false → 'when not Frozen' is true → falls through to normal arg validation
         var unfrozen = workflow.CreateInstance("Active", new Dictionary<string, object?> { ["Frozen"] = false });
 
         // No args: predicate passes, but required 'Amount' is missing → Rejected

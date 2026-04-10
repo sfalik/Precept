@@ -341,7 +341,7 @@ public class PreceptConstraintViolationTests
             state Expired initial
             state Signing
             event ExtendExpiry
-            from Expired on ExtendExpiry when !ExpiryExtended -> set ExpiryExtended = true -> transition Signing
+            from Expired on ExtendExpiry when not ExpiryExtended -> set ExpiryExtended = true -> transition Signing
             """;
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
         var instance = wf.CreateInstance("Expired", new Dictionary<string, object?> { ["ExpiryExtended"] = true });

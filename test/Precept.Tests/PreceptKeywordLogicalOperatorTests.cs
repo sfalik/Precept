@@ -401,9 +401,10 @@ public class PreceptKeywordLogicalOperatorTests
         const string dsl = """
             precept Test
             field Amount as number default 0
-            field IsExempt as boolean default false
+            field IsExempt as boolean default true
             invariant Amount > 0 or IsExempt because "Amount must be positive or entity is exempt"
             state Active initial
+            in Active edit Amount, IsExempt
             event Update
             from Active on Update -> transition Active
             """;
