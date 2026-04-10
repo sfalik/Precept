@@ -51,11 +51,11 @@ public class PreceptExpressionParserTests
     [Fact]
     public void Parse_SetExpression_UnaryNot_IsUnaryExpression()
     {
-        var expression = PreceptExpressionTestHelper.ParseFirstSetExpression("!IsEnabled");
+        var expression = PreceptExpressionTestHelper.ParseFirstSetExpression("not IsEnabled");
 
         expression.Should().BeOfType<PreceptUnaryExpression>();
         var unary = (PreceptUnaryExpression)expression;
-        unary.Operator.Should().Be("!");
+        unary.Operator.Should().Be("not");
         unary.Operand.Should().BeOfType<PreceptIdentifierExpression>();
     }
 
@@ -103,13 +103,13 @@ public class PreceptExpressionParserTests
     [Fact]
     public void Parse_SetExpression_LogicalPrecedence_AndBeforeOr()
     {
-        var expression = PreceptExpressionTestHelper.ParseFirstSetExpression("A || B && C");
+        var expression = PreceptExpressionTestHelper.ParseFirstSetExpression("A or B and C");
 
         expression.Should().BeOfType<PreceptBinaryExpression>();
         var or = (PreceptBinaryExpression)expression;
-        or.Operator.Should().Be("||");
+        or.Operator.Should().Be("or");
         or.Right.Should().BeOfType<PreceptBinaryExpression>();
-        ((PreceptBinaryExpression)or.Right).Operator.Should().Be("&&");
+        ((PreceptBinaryExpression)or.Right).Operator.Should().Be("and");
     }
 
     [Fact]

@@ -161,7 +161,7 @@ public class PreceptConstraintViolationTests
         const string dsl = """
             precept Test
             field Priority as number default 3
-            invariant Priority >= 1 && Priority <= 5 because "Priority must be between 1 and 5"
+            invariant Priority >= 1 and Priority <= 5 because "Priority must be between 1 and 5"
             state Open initial
             in Open edit Priority
             """;

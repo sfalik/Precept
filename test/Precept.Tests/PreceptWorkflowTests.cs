@@ -354,7 +354,7 @@ public class PreceptWorkflowTests
             state A initial
             state B
             event Go
-            from A on Go when Flag && OtherFlag -> transition B
+            from A on Go when Flag and OtherFlag -> transition B
             from A on Go -> reject "Both flags must be true"
             """;
 
