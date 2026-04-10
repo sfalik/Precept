@@ -546,15 +546,15 @@ pre {
   <div class="nav-wordmark">Precept</div>
   <a class="nav-item active" href="#intro"     data-sec="intro">Intro</a>
   <a class="nav-item"        href="#concepts"  data-sec="concepts">Concepts</a>
-  <a class="nav-item"        href="#system"    data-sec="system">System</a>
-  <span class="nav-section-meta">Constructs</span>
+  <a class="nav-item"        href="#typography" data-sec="typography">Typography</a>
+  <a class="nav-item"        href="#colors"     data-sec="colors">Colors</a>
+  <a class="nav-item"        href="#constructs" data-sec="constructs">Constructs</a>
+  <span class="nav-section-meta">Families</span>
   <a class="nav-item"        href="#structure" data-sec="structure" style="padding-left:18px">Structure</a>
   <a class="nav-item"        href="#state"     data-sec="state"     style="padding-left:18px">State</a>
   <a class="nav-item"        href="#event"     data-sec="event"     style="padding-left:18px">Event</a>
   <a class="nav-item"        href="#data-c"    data-sec="data-c"    style="padding-left:18px">Data</a>
   <a class="nav-item"        href="#rule"      data-sec="rule"      style="padding-left:18px">Rule</a>
-  <a class="nav-item"        href="#typography" data-sec="typography">Typography</a>
-  <a class="nav-item"        href="#colors"     data-sec="colors">Colors</a>
   <span class="nav-section-meta" style="margin-top:6px"></span>
   <a class="nav-item"        href="#surfaces"  data-sec="surfaces">Surfaces</a>
   <span class="nav-section-meta" style="margin-top:6px"></span>
@@ -585,40 +585,6 @@ pre {
         <span class="cast-pill"><span class="cast-dot" style="background:var(--rule)"></span><span class="ru">Rule</span></span>
       </div>
     </div>
-    <div class="intro-specimen" aria-label="Specimen: LoanApplication precept">
-      <div class="specimen-bar">
-        <span>loan-application.precept</span>
-        <div class="specimen-dots">
-          <span class="specimen-dot"></span>
-          <span class="specimen-dot"></span>
-          <span class="specimen-dot"></span>
-        </div>
-      </div>
-      <div class="specimen-body"><pre
-><span class="s">precept</span> <span class="ru">LoanApplication</span>
-
-<span class="s">field</span> <span class="da">ApplicantName</span> <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
-<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="so">number</span> <span class="s">default</span> <span class="so">0</span>
-<span class="s">field</span> <span class="da">ReviewNotes</span> <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
-<span class="s">field</span> <span class="da">ApprovedAmount</span> <span class="s">as</span> <span class="so">number</span> <span class="s">default</span> <span class="so">0</span>
-
-<span class="s">state</span> <span class="st">Draft</span> <span class="s">initial</span>
-<span class="s">state</span> <span class="st">UnderReview</span>
-<span class="s">state</span> <span class="st">Approved</span>
-<span class="s">state</span> <span class="st">Rejected</span>
-
-<span class="s">event</span> <span class="ev">Submit</span>
-<span class="s">event</span> <span class="ev">Approve</span> <span class="s">with</span> <span class="da">Amount</span> <span class="s">as</span> <span class="so">number</span>
-<span class="s">event</span> <span class="ev">Reject</span>
-
-<span class="s">on</span> <span class="ev">Submit</span> <span class="s">assert</span> <span class="da">ApplicantName</span> != <span class="so">null</span> <span class="s">because</span> <span class="ru">"Name is required"</span>
-<span class="s">on</span> <span class="ev">Submit</span> <span class="s">assert</span> <span class="da">RequestedAmount</span> &gt; <span class="so">0</span> <span class="s">because</span> <span class="ru">"Amount must be positive"</span>
-
-<span class="s">from</span> <span class="st">Draft</span> <span class="s">on</span> <span class="ev">Submit</span> -> <span class="s">transition</span> <span class="st">UnderReview</span>
-<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Approve</span> -> <span class="s">set</span> <span class="da">ApprovedAmount</span> = <span class="ev">Approve</span>.<span class="da">Amount</span> -> <span class="s">transition</span> <span class="st">Approved</span>
-<span class="s">from</span> <span class="st">UnderReview</span> <span class="s">on</span> <span class="ev">Reject</span> -> <span class="s">transition</span> <span class="st">Rejected</span></pre>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -626,178 +592,241 @@ pre {
 <!-- 02 · CONCEPTS                                   -->
 <!-- ═══════════════════════════════════════════════ -->
 <style>
-/* ── § 02 CONCEPTS · system map ─────────────────────────────── */
-.cov-frame {
-  border: 1px solid var(--line-strong);
+/* ── § 02 CONCEPTS · layered architecture diagram ────────────── */
+
+/* ─ diagram frame ─ */
+.arch-diagram {
+  display: grid;
+  gap: 0;
+  position: relative;
 }
-/* ─ zone header rows ─ */
-.cov-zone-hdr {
-  padding: 9px 20px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  align-items: baseline;
-  gap: 20px;
-  flex-wrap: wrap;
+
+/* ─ layer labels (left edge) ─ */
+.arch-layer {
+  display: grid;
+  gap: 0;
 }
-.cov-z-label {
+.arch-layer-label {
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.26em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--soft);
+  padding: 10px 20px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
 }
-.cov-z-note {
+.arch-layer-label span {
   font-family: var(--sans);
   font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--soft);
+  opacity: 0.6;
+  margin-left: 16px;
 }
-/* ─ constructs band ─ */
-.cov-constructs {
+
+/* ─ construct cards (Layer 1) ─ */
+.arch-constructs {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 1px;
-  background: var(--line);
-  border-bottom: 1px solid var(--line-strong);
-}
-.cov-cs {
-  padding: 20px 18px;
+  gap: 2px;
+  padding: 20px;
   background: var(--panel);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.cov-cs-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 1px;
-  flex-shrink: 0;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
-}
-.cov-cs-name {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-}
-/* ─ registers ─ */
-.cov-registers {
-  display: grid;
-  grid-template-columns: 1fr 3fr;
-  background: var(--line-strong);
-  gap: 1px;
   border-bottom: 2px solid var(--line-strong);
 }
-.cov-reg {
-  background: var(--panel);
+.arch-card {
+  position: relative;
+  padding: 28px 20px 24px;
+  border-radius: 4px;
   display: grid;
-  gap: 0;
+  gap: 10px;
+  align-content: start;
+  overflow: hidden;
 }
-.cov-reg-head {
-  padding: 14px 22px;
-  border-bottom: 1px solid var(--line);
+.arch-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  background: var(--card-color);
+  opacity: 0.10;
+}
+.arch-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--card-color);
+  border-radius: 4px 4px 0 0;
+}
+.arch-card-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
+  background: var(--card-color);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  position: relative;
+}
+.arch-card-name {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--card-color);
+  position: relative;
+}
+.arch-card-role {
+  font-family: var(--sans);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--soft);
+  position: relative;
+}
+
+/* ─ registers band (Layer 2) ─ */
+.arch-registers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  background: var(--line);
+}
+.arch-reg {
+  background: var(--panel);
+  padding: 24px 28px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+.arch-reg-head {
   display: flex;
   align-items: baseline;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 14px;
 }
-.cov-reg-name {
+.arch-reg-name {
   font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.22em;
+  font-size: 14px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text);
 }
-.cov-reg-tag {
+.arch-reg-tag {
   font-family: var(--sans);
   font-size: 12px;
   color: var(--soft);
 }
-.cov-reg-body {
-  padding: 22px 22px 20px;
-  display: grid;
-  gap: 20px;
-  align-content: start;
-}
-.cov-reg-note {
+.arch-reg-note {
   font-family: var(--sans);
   font-size: 14px;
   line-height: 1.72;
   color: var(--soft);
-  max-width: 38ch;
+  max-width: 42ch;
 }
-.cov-surfaces {
-  display: grid;
-  gap: 1px;
-  background: var(--line);
+.arch-surfaces {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
 }
-.cov-reg--def .cov-surfaces { grid-template-columns: 1fr; }
-.cov-reg--rt  .cov-surfaces { grid-template-columns: repeat(3, 1fr); }
-.cov-sf {
-  padding: 13px 15px;
+.arch-sf {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
   background: var(--panel-2);
 }
-.cov-sf-name {
+
+/* ─ verdict register (sits alongside registers) ─ */
+.arch-verdict-lane {
+  margin-top: 2px;
+  padding: 18px 28px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.arch-verdict-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.arch-verdict-chips {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.arch-verdict-chip {
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--muted);
-  display: block;
+  padding: 4px 10px;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  opacity: 0.85;
 }
-.cov-sf-note {
+.arch-verdict-note {
   font-family: var(--sans);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--soft);
-  opacity: 0.65;
-  display: block;
-  margin-top: 5px;
+  opacity: 0.6;
+  margin-left: auto;
 }
-/* ─ channels ─ */
-.cov-ch-hdr {
-  padding: 9px 20px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--line);
-  border-top: 2px solid var(--line-strong);
-  display: flex;
-  align-items: baseline;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-.cov-channels {
+
+/* ─ channels band (Layer 3 — spans full width) ─ */
+.arch-channels {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 1px;
-  background: var(--line);
+  gap: 0;
+  border-top: 2px solid var(--line-strong);
 }
-.cov-ch {
-  padding: 22px 20px;
+.arch-ch {
+  padding: 24px 22px;
   background: var(--bg);
+  border-right: 1px solid var(--line);
   display: grid;
   gap: 8px;
   align-content: start;
 }
-.cov-ch-num {
+.arch-ch:last-child { border-right: none; }
+.arch-ch-num {
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--soft);
 }
-.cov-ch-name {
+.arch-ch-name {
   font-family: var(--mono);
   font-size: 14px;
   letter-spacing: 0.10em;
   text-transform: uppercase;
   color: var(--text);
 }
-.cov-ch-note {
+.arch-ch-note {
   font-family: var(--sans);
   font-size: 13px;
   line-height: 1.65;
   color: var(--soft);
 }
-/* ─ concept annotations ─ */
+
+/* ─ chrome/support outer frame ─ */
+.arch-chrome-frame {
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 3px;
+  position: relative;
+}
+
 /* ─ concept annotations ─ */
 .cov-concepts {
   margin-top: 32px;
@@ -805,7 +834,6 @@ pre {
   display: grid;
   gap: 0;
 }
-/* Foundation concept — full width, two-column */
 .cov-concept--foundation {
   padding: 30px 32px 28px;
   background: var(--panel);
@@ -840,7 +868,6 @@ pre {
   display: block;
   line-height: 1.4;
 }
-/* Derived concepts — row of three */
 .cov-concepts-derived {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -869,14 +896,18 @@ pre {
   font-size: 14px;
   line-height: 1.76;
 }
+
 /* ─ responsive ─ */
 @media (max-width: 960px) {
-  .cov-constructs { grid-template-columns: repeat(3, 1fr); }
-  .cov-registers  { grid-template-columns: 1fr; }
-  .cov-reg--rt .cov-surfaces { grid-template-columns: 1fr; }
-  .cov-channels   { grid-template-columns: repeat(2, 1fr); }
+  .arch-constructs { grid-template-columns: repeat(3, 1fr); }
+  .arch-registers { grid-template-columns: 1fr; }
+  .arch-channels { grid-template-columns: repeat(2, 1fr); }
   .cov-concept--foundation { grid-template-columns: 1fr; }
   .cov-concepts-derived { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .arch-constructs { grid-template-columns: repeat(2, 1fr); }
+  .arch-channels { grid-template-columns: 1fr; }
 }
 </style>
 
@@ -887,113 +918,111 @@ pre {
     <p>The system has four structural parts. Five semantic families form the identity substrate — the authored vocabulary that stays recognizable wherever it appears. Two depiction registers translate that identity into authored source (Definition) and rendered components (Runtime). A separate runtime verdict register reports evaluation without redefining type. A separate chrome/support layer carries canvas, panel, text, and line scaffolding so the surrounding palette can complement the semantic system without competing with it. Four signal channels encode meaning in both. Four surfaces provide the contexts in which all of this manifests.</p>
   </div>
 
-  <!-- Architecture map ─────────────────────────── -->
-  <div class="cov-frame" role="img" aria-label="System architecture: five constructs across two depiction registers, four signal channels spanning both">
+  <!-- Architecture diagram ─────────────────────── -->
+  <div class="arch-chrome-frame" role="img" aria-label="System architecture: five constructs across two depiction registers, four signal channels spanning both">
+    <div class="arch-diagram">
 
-    <!-- Layer 1 · Constructs -->
-    <div class="cov-zone-hdr">
-      <span class="cov-z-label">Constructs</span>
-      <span class="cov-z-note">five types&thinsp;·&thinsp;stable semantic identity across all registers and surfaces</span>
-    </div>
-    <div class="cov-constructs">
-      <div class="cov-cs">
-        <span class="cov-cs-dot" style="background:var(--structure)"></span>
-        <span class="cov-cs-name s">Structure</span>
-      </div>
-      <div class="cov-cs">
-        <span class="cov-cs-dot" style="background:var(--state)"></span>
-        <span class="cov-cs-name st">State</span>
-      </div>
-      <div class="cov-cs">
-        <span class="cov-cs-dot" style="background:var(--event)"></span>
-        <span class="cov-cs-name ev">Event</span>
-      </div>
-      <div class="cov-cs">
-        <span class="cov-cs-dot" style="background:var(--data)"></span>
-        <span class="cov-cs-name da">Data</span>
-      </div>
-      <div class="cov-cs">
-        <span class="cov-cs-dot" style="background:var(--rule)"></span>
-        <span class="cov-cs-name ru">Rule</span>
-      </div>
-    </div>
-
-    <!-- Layer 2 · Two depiction registers -->
-    <div class="cov-registers">
-
-      <!-- Definition register -->
-      <div class="cov-reg cov-reg--def">
-        <div class="cov-reg-head">
-          <span class="cov-reg-name">Definition</span>
-          <span class="cov-reg-tag">authored DSL&thinsp;·&thinsp;what it is</span>
-        </div>
-        <div class="cov-reg-body">
-          <p class="cov-reg-note">The token form of a construct in the DSL editor. Syntax colour, monospaced weight, and keyword grammar carry each construct's authored identity — the stable visual form before any runtime evaluation.</p>
-          <div class="cov-surfaces">
-            <div class="cov-sf">
-              <span class="cov-sf-name">Code</span>
-              <span class="cov-sf-note">syntax token in authored source</span>
-            </div>
+      <!-- Layer 1 · Constructs ─────────────────── -->
+      <div class="arch-layer">
+        <div class="arch-layer-label">Constructs <span>stable semantic identity across all registers and surfaces</span></div>
+        <div class="arch-constructs">
+          <div class="arch-card" style="--card-color: var(--structure)">
+            <div class="arch-card-swatch"></div>
+            <div class="arch-card-name s">Structure</div>
+            <div class="arch-card-role">Registration, grouping, governed boundaries</div>
+          </div>
+          <div class="arch-card" style="--card-color: var(--state)">
+            <div class="arch-card-swatch"></div>
+            <div class="arch-card-name st">State</div>
+            <div class="arch-card-role">Where the entity is in its lifecycle</div>
+          </div>
+          <div class="arch-card" style="--card-color: var(--event)">
+            <div class="arch-card-swatch"></div>
+            <div class="arch-card-name ev">Event</div>
+            <div class="arch-card-role">What happens — triggers and transitions</div>
+          </div>
+          <div class="arch-card" style="--card-color: var(--data)">
+            <div class="arch-card-swatch"></div>
+            <div class="arch-card-name da">Data</div>
+            <div class="arch-card-role">Fields, types, and values the entity carries</div>
+          </div>
+          <div class="arch-card" style="--card-color: var(--rule)">
+            <div class="arch-card-swatch"></div>
+            <div class="arch-card-name ru">Rule</div>
+            <div class="arch-card-role">Invariants, assertions, rejection messages</div>
           </div>
         </div>
       </div>
 
-      <!-- Runtime register -->
-      <div class="cov-reg cov-reg--rt">
-        <div class="cov-reg-head">
-          <span class="cov-reg-name">Runtime</span>
-          <span class="cov-reg-tag">rendered components&thinsp;·&thinsp;what is happening to it now</span>
+      <!-- Layer 2 · Registers ──────────────────── -->
+      <div class="arch-layer">
+        <div class="arch-layer-label">Registers <span>same five constructs, two depiction modes</span></div>
+        <div class="arch-registers">
+          <div class="arch-reg">
+            <div class="arch-reg-head">
+              <span class="arch-reg-name">Definition</span>
+              <span class="arch-reg-tag">authored DSL&thinsp;·&thinsp;what it is</span>
+            </div>
+            <p class="arch-reg-note">The token form in the DSL editor. Syntax colour, monospaced weight, and keyword grammar carry each construct's authored identity — the stable visual form before any runtime evaluation.</p>
+            <div class="arch-surfaces">
+              <span class="arch-sf">Code</span>
+            </div>
+          </div>
+          <div class="arch-reg">
+            <div class="arch-reg-head">
+              <span class="arch-reg-name">Runtime</span>
+              <span class="arch-reg-tag">rendered components&thinsp;·&thinsp;what is happening now</span>
+            </div>
+            <p class="arch-reg-note">The component form in rendered views. Same identity as Definition; three distinct visual conventions suited to each surface.</p>
+            <div class="arch-surfaces">
+              <span class="arch-sf">Diagram</span>
+              <span class="arch-sf">Data Form</span>
+              <span class="arch-sf">Timeline</span>
+            </div>
+          </div>
         </div>
-        <div class="cov-reg-body">
-          <p class="cov-reg-note">The component form of a construct in rendered views. The same identity as Definition; three distinct visual conventions suited to each surface. All four signal channels held consistent across all three.</p>
-          <div class="cov-surfaces">
-            <div class="cov-sf">
-              <span class="cov-sf-name">Diagram</span>
-              <span class="cov-sf-note">nodes, arcs, topology</span>
-            </div>
-            <div class="cov-sf">
-              <span class="cov-sf-name">Data Form</span>
-              <span class="cov-sf-note">fields, values, constraints</span>
-            </div>
-            <div class="cov-sf">
-              <span class="cov-sf-name">Timeline</span>
-              <span class="cov-sf-note">events, state transitions</span>
-            </div>
+
+        <!-- Verdict register -->
+        <div class="arch-verdict-lane">
+          <span class="arch-verdict-label">Verdict Register</span>
+          <div class="arch-verdict-chips">
+            <span class="arch-verdict-chip" style="color:var(--valid)">Enabled</span>
+            <span class="arch-verdict-chip" style="color:var(--violated)">Blocked</span>
+            <span class="arch-verdict-chip" style="color:var(--warn)">Warning</span>
+          </div>
+          <span class="arch-verdict-note">runtime evaluation only — never redefines type identity</span>
+        </div>
+      </div>
+
+      <!-- Layer 3 · Channels ──────────────────── -->
+      <div class="arch-layer">
+        <div class="arch-layer-label">Channels <span>signal grammar spanning both registers</span></div>
+        <div class="arch-channels">
+          <div class="arch-ch">
+            <span class="arch-ch-num">01</span>
+            <span class="arch-ch-name">Colour</span>
+            <p class="arch-ch-note">Five semantic families encode type identity. Chrome/support tones scaffold the surface around them so the complementary palette never redefines semantic meaning.</p>
+          </div>
+          <div class="arch-ch">
+            <span class="arch-ch-num">02</span>
+            <span class="arch-ch-name">Typography</span>
+            <p class="arch-ch-note">Mono for all semantic names. Sans for prose and context. Weight and style carry constraint and modification status.</p>
+          </div>
+          <div class="arch-ch">
+            <span class="arch-ch-num">03</span>
+            <span class="arch-ch-name">Form</span>
+            <p class="arch-ch-note">Stable base shapes encode construct type. Modifier signals layer additively without displacing the base.</p>
+          </div>
+          <div class="arch-ch">
+            <span class="arch-ch-num">04</span>
+            <span class="arch-ch-name">Layout</span>
+            <p class="arch-ch-note">Adjacency, ordering, and depth encode relationship, sequence, and structural hierarchy across all surfaces.</p>
           </div>
         </div>
       </div>
 
-    </div><!-- /.cov-registers -->
-
-    <!-- Layer 3 · Channels (signal grammar spanning both registers) -->
-    <div class="cov-ch-hdr">
-      <span class="cov-z-label">Channels</span>
-      <span class="cov-z-note">signal grammar&thinsp;·&thinsp;both registers&thinsp;·&thinsp;colour answers first, form second, layout third, typography throughout</span>
-    </div>
-    <div class="cov-channels">
-      <div class="cov-ch">
-        <span class="cov-ch-num">01</span>
-        <span class="cov-ch-name">Colour</span>
-        <p class="cov-ch-note">Five semantic families encode type identity. Three verdict states form a separate runtime register. Chrome/support tones scaffold the surface around them so the complementary palette never redefines semantic meaning.</p>
-      </div>
-      <div class="cov-ch">
-        <span class="cov-ch-num">02</span>
-        <span class="cov-ch-name">Typography</span>
-        <p class="cov-ch-note">Mono for all semantic names. Sans for prose and context. Weight and style carry constraint and modification status.</p>
-      </div>
-      <div class="cov-ch">
-        <span class="cov-ch-num">03</span>
-        <span class="cov-ch-name">Form</span>
-        <p class="cov-ch-note">Stable base shapes encode construct type. Modifier signals&thinsp;—&thinsp;border weight, fill, dash, outline&thinsp;—&thinsp;layer additively without displacing the base.</p>
-      </div>
-      <div class="cov-ch">
-        <span class="cov-ch-num">04</span>
-        <span class="cov-ch-name">Layout</span>
-        <p class="cov-ch-note">Adjacency, ordering, and depth encode relationship, sequence, and structural hierarchy across all surfaces.</p>
-      </div>
-    </div>
-
-  </div><!-- /.cov-frame -->
+    </div><!-- /.arch-diagram -->
+  </div><!-- /.arch-chrome-frame -->
 
   <!-- Concept definitions ─────────────────────── -->
   <div class="cov-concepts">
@@ -1028,9 +1057,506 @@ pre {
   </div>
 
 </section>
+<!-- 03 · TYPOGRAPHY                               -->
+<!-- ═══════════════════════════════════════════════════ -->
+<style>
+/* ── 03 Typography ───────────────────────────── */
+.typography-band {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+}
+.typography-band + .typography-band {
+  margin-top: 12px;
+}
+.typography-band--rules {
+  background: var(--panel-2);
+}
+.typography-kicker,
+.typography-card-kicker,
+.typography-rule-label,
+.typography-specimen-bar span {
+  font-family: var(--mono);
+}
+.typography-kicker {
+  padding: 16px 20px 0;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.typography-header,
+.typography-rules-head {
+  display: grid;
+  grid-template-columns: minmax(0,1.2fr) minmax(300px,0.9fr);
+  gap: 28px;
+  align-items: end;
+  padding: 18px 20px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.typography-header h3,
+.typography-rules-head h3 {
+  font-family: var(--mono);
+  font-size: clamp(24px,3.2vw,38px);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  max-width: 18ch;
+  margin-bottom: 14px;
+}
+.typography-header p,
+.typography-rules-head p,
+.typography-card p,
+.typography-rule-card p {
+  font-size: 15px;
+}
+.typography-rules-head p {
+  max-width: 58ch;
+}
+.typography-summary {
+  display: grid;
+  gap: 10px;
+}
+.typography-summary-item {
+  padding: 14px 14px 12px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.018);
+}
+.typography-summary-item span,
+.typography-summary-item small {
+  display: block;
+  font-family: var(--mono);
+}
+.typography-summary-item span {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 10px;
+}
+.typography-summary-item strong {
+  display: block;
+  font-family: var(--mono);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.typography-summary-item small {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.typography-stage,
+.typography-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0,1fr));
+  gap: 12px;
+  padding: 20px;
+}
+.typography-card,
+.typography-rule-card {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.typography-rule-card {
+  background: rgba(255,255,255,0.018);
+}
+.typography-card--mono,
+.typography-card--pressure {
+  grid-column: span 7;
+}
+.typography-card--sans,
+.typography-card--wordmark {
+  grid-column: span 5;
+}
+.typography-rule-card--compact {
+  grid-column: span 4;
+}
+.typography-rule-card--wide {
+  grid-column: span 6;
+}
+.typography-card-kicker,
+.typography-rule-label {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.typography-card h3,
+.typography-rule-card h3 {
+  font-family: var(--mono);
+  font-size: 24px;
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.typography-card-head {
+  display: grid;
+  gap: 10px;
+}
+.typography-specimen {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.02);
+}
+.typography-specimen--tight {
+  gap: 12px;
+}
+.typography-specimen-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.typography-specimen-bar span {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.typography-wordmark-display,
+.typography-wordmark-hero,
+.typography-token,
+.typography-keywords,
+.typography-keywords-soft,
+.typography-inline-label {
+  font-family: var(--mono);
+}
+.typography-wordmark-display,
+.typography-wordmark-hero {
+  font-variant: small-caps;
+  letter-spacing: 0.14em;
+  line-height: 0.92;
+  color: var(--text);
+}
+.typography-wordmark-display {
+  font-size: clamp(32px,4.8vw,64px);
+}
+.typography-wordmark-hero {
+  font-size: clamp(28px,4.2vw,48px);
+}
+.typography-mono-subtitle {
+  font-family: var(--mono);
+  font-size: 18px;
+  line-height: 1.2;
+  color: var(--text);
+}
+.typography-construct-line,
+.typography-inline-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.typography-prose-sample {
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.typography-wordmark-stack {
+  display: grid;
+  gap: 14px;
+}
+.typography-compare {
+  display: grid;
+  gap: 10px;
+}
+.typography-compare-row {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.typography-inline-name {
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.typography-pressure-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.typography-token {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.02);
+  font-size: 13px;
+  line-height: 1;
+}
+.typography-token--state {
+  font-style: italic;
+  color: var(--state);
+}
+.typography-token--event {
+  font-style: italic;
+  color: var(--event);
+}
+.typography-token--data {
+  font-style: italic;
+  color: var(--data);
+}
+.typography-token--annotation {
+  font-style: italic;
+  color: var(--comment);
+}
+.typography-pressure-note {
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--soft);
+}
+.typography-keyword-sample {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.typography-keywords,
+.typography-keywords-soft {
+  display: block;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.typography-keywords {
+  font-weight: 700;
+  color: var(--structure-d);
+}
+.typography-keywords-soft {
+  color: var(--structure);
+}
+@media (max-width: 1180px) {
+  .typography-header,
+  .typography-rules-head {
+    grid-template-columns: 1fr;
+  }
+  .typography-stage,
+  .typography-rules-grid {
+    grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+  .typography-card,
+  .typography-card--mono,
+  .typography-card--sans,
+  .typography-card--wordmark,
+  .typography-card--pressure,
+  .typography-rule-card,
+  .typography-rule-card--compact,
+  .typography-rule-card--wide {
+    grid-column: auto;
+  }
+}
+@media (max-width: 720px) {
+  .typography-kicker {
+    padding: 14px 16px 0;
+  }
+  .typography-header,
+  .typography-rules-head {
+    padding: 16px;
+  }
+  .typography-stage,
+  .typography-rules-grid,
+  .typography-summary {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+  .typography-stage,
+  .typography-rules-grid {
+    gap: 10px;
+  }
+  .typography-card,
+  .typography-rule-card {
+    padding: 16px;
+  }
+  .typography-specimen-bar {
+    display: grid;
+  }
+}
+</style>
+<section class="section" id="typography">
+  <div class="section-head">
+    <div class="eyebrow">03 · Typography</div>
+    <h2>Two faces. One rule each.</h2>
+    <p>Typography governs how identity, prose, and semantic pressure are read across all five constructs. Geist Mono carries structural identity. Geist carries reading prose. No serifs. Italic marks semantic pressure, not emphasis.</p>
+  </div>
+
+  <div class="typography-band">
+    <div class="typography-kicker">Primary split</div>
+    <div class="typography-header">
+      <div>
+        <h3>Type separates authored identity from reading voice.</h3>
+        <p>Typography in Precept is not a styling layer. It divides structural naming from explanatory reading, then reserves a third move for semantic pressure. The section needs to read as a system of roles, not a list of font choices.</p>
+      </div>
+      <div class="typography-summary" aria-label="Typography system summary">
+        <div class="typography-summary-item">
+          <span>Structural face</span>
+          <strong>Geist Mono</strong>
+          <small>wordmark · headings · labels · tokens · code specimens</small>
+        </div>
+        <div class="typography-summary-item">
+          <span>Reading face</span>
+          <strong>Geist</strong>
+          <small>body copy · concept prose · surface notes · long reading</small>
+        </div>
+        <div class="typography-summary-item">
+          <span>Reserved signal</span>
+          <strong>Italic</strong>
+          <small>semantic pressure only, never generic emphasis or flourish</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="typography-stage">
+      <article class="typography-card typography-card--mono">
+        <div class="typography-card-head">
+          <div class="typography-card-kicker">Identity register</div>
+          <h3>Geist Mono — identity &amp; structure</h3>
+        </div>
+        <p>Used for: wordmark, section headings, labels, chips, nav, construct names, table headers, eyebrows, inline tokens, and all code specimens. Geist Mono is the face of governed structure. When text needs to read as authored or systematic, it is in Geist Mono.</p>
+        <div class="typography-specimen">
+          <div class="typography-specimen-bar">
+            <span>Display lockup</span>
+            <span>hero · headings · tokens</span>
+          </div>
+          <div class="typography-wordmark-display">Precept</div>
+          <div class="typography-mono-subtitle">Semantic Visual System</div>
+          <div class="typography-construct-line">Structure · State · Event · Data · Rule</div>
+        </div>
+      </article>
+
+      <article class="typography-card typography-card--sans">
+        <div class="typography-card-head">
+          <div class="typography-card-kicker">Reading register</div>
+          <h3>Geist — reading prose</h3>
+        </div>
+        <p>Used for: body paragraphs, concept descriptions, surface notes, and any text longer than a label that needs sustained reading. Geist sits beside Geist Mono without competing. Segoe UI Variable and Segoe UI are the system fallbacks on Windows.</p>
+        <div class="typography-specimen">
+          <div class="typography-specimen-bar">
+            <span>Reading sample</span>
+            <span>body · notes · explanation</span>
+          </div>
+          <div class="typography-prose-sample">Precept governs the integrity of a business entity's data across its lifecycle. The semantic visual system governs how that governance is communicated on screen.</div>
+        </div>
+      </article>
+
+      <article class="typography-card typography-card--wordmark">
+        <div class="typography-card-head">
+          <div class="typography-card-kicker">Display scarcity</div>
+          <h3>Wordmark treatment</h3>
+        </div>
+        <p>The identity display — <span class="typography-wordmark-hero">Precept</span> in Geist Mono small caps — is reserved for the hero moment and deliberate brand callouts. Inline prose uses plain title case. Nav and labels are already all-caps mono and need no additional treatment. Scarcity is what makes the wordmark land.</p>
+        <div class="typography-specimen typography-specimen--tight">
+          <div class="typography-specimen-bar">
+            <span>Usage contrast</span>
+            <span>hero vs inline</span>
+          </div>
+          <div class="typography-wordmark-stack">
+            <div class="typography-compare-row">
+              <div class="typography-inline-label">Hero callout</div>
+              <div class="typography-wordmark-hero">Precept</div>
+            </div>
+            <div class="typography-compare-row">
+              <div class="typography-inline-label">Inline prose</div>
+              <div class="typography-inline-name">Precept stays plain title case inside reading copy.</div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="typography-card typography-card--pressure">
+        <div class="typography-card-head">
+          <div class="typography-card-kicker">Constraint signal</div>
+          <h3>Italic — semantic pressure only</h3>
+        </div>
+        <p>Italic belongs to constrained states, constrained events, invariant-guarded data names, and rule-adjacent annotation in code specimens. It marks that something is under explicit rule attention. It is not used for general emphasis, decorative headings, or editorial flourish. If a reader cannot trust italic to mean pressure, the second semantic channel has been wasted.</p>
+        <div class="typography-specimen">
+          <div class="typography-specimen-bar">
+            <span>Pressure markers</span>
+            <span>same family · italic only</span>
+          </div>
+          <div class="typography-pressure-row">
+            <span class="typography-token typography-token--state">Approved</span>
+            <span class="typography-token typography-token--event">Submit</span>
+            <span class="typography-token typography-token--data">PolicyHolder</span>
+            <span class="typography-token typography-token--annotation"># review required above 50k</span>
+          </div>
+          <div class="typography-pressure-note">Pressure is additive. The construct keeps its family; italic reports rule attention without inventing a second lane.</div>
+        </div>
+      </article>
+    </div>
+  </div>
+
+  <div class="typography-band typography-band--rules">
+    <div class="typography-kicker">Discipline</div>
+    <div class="typography-rules-head">
+      <div>
+        <h3>Rules keep the split legible.</h3>
+        <p>Typography only works as a semantic channel if each move stays narrow and repeatable. These rules preserve the distinction between governing language, explanatory prose, and pressure states.</p>
+      </div>
+      <div class="typography-summary" aria-label="Typography rule summary">
+        <div class="typography-summary-item">
+          <span>Do not mix</span>
+          <strong>Mono / Sans</strong>
+          <small>naming and prose stay in separate roles</small>
+        </div>
+        <div class="typography-summary-item">
+          <span>Do not decorate</span>
+          <strong>Italic</strong>
+          <small>reserved for semantic pressure and constraint attention</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="typography-rules-grid">
+      <div class="typography-rule-card typography-rule-card--compact">
+        <span class="typography-rule-label">Rule</span>
+        <h3>No serifs.</h3>
+        <p>Ever. The posture of this document and of Precept's surfaces is architectural, not editorial. Serifs are not part of the system.</p>
+      </div>
+      <div class="typography-rule-card typography-rule-card--compact">
+        <span class="typography-rule-label">Rule</span>
+        <h3>Mono for everything structural.</h3>
+        <p>If it governs, labels, names, or identifies — it is in Geist Mono. This includes headings. Geist Mono at display size reads as specification, not decoration.</p>
+      </div>
+      <div class="typography-rule-card typography-rule-card--compact">
+        <span class="typography-rule-label">Rule</span>
+        <h3>Governing keywords are bold.</h3>
+        <p>Semantic indigo keywords render at font-weight 700. Grammar indigo stays normal for connective tokens and logical operators. Color identifies the family; weight distinguishes governing keywords from connective grammar.</p>
+        <div class="typography-keyword-sample">
+          <span class="typography-keywords">precept field state event from on set transition assert reject when</span>
+          <span class="typography-keywords-soft">as default == and or not</span>
+        </div>
+      </div>
+      <div class="typography-rule-card typography-rule-card--wide">
+        <span class="typography-rule-label">Rule</span>
+        <h3>Sans for reading prose.</h3>
+        <p>Geist carries paragraphs. It does not appear in identity positions, labels, or code. The split is strict. Mono names and governs; sans explains.</p>
+      </div>
+      <div class="typography-rule-card typography-rule-card--wide">
+        <span class="typography-rule-label">Rule</span>
+        <h3>Italic means pressure.</h3>
+        <p>Not emphasis. Not decoration. Italic communicates that a construct is under rule attention. Spend it only where that meaning is true.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
 
 <style>
-/* ── § 03 SYSTEM · specimen pair (Definition / Runtime) ─────── */
+/* ── § 04–05 Color & Constructs · specimen pair (Definition / Runtime) ─────── */
 .specimen-pair {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1619,11 +2145,266 @@ pre {
 </style>
 
 <!-- ═══════════════════════════════════════════════ -->
-<!-- 03 · SYSTEM                                     -->
+<!-- 04 · COLOR SYSTEM                               -->
 <!-- ═══════════════════════════════════════════════ -->
-<section class="section" id="system">
+<section class="section" id="colors">
   <div class="section-head">
-    <div class="eyebrow">03 · System</div>
+    <div class="eyebrow">04 · Color System</div>
+    <h2>Five semantic families. Separate outer lanes.</h2>
+    <p>Color defines how authored meaning stays grouped into five families. Structure and Data keep their tonal variants nested inside the parent family. Comments sit in an annotation lane. Runtime verdicts sit in a separate evaluation register. Chrome/support scaffolds the surface around them without becoming a sixth family.</p>
+  </div>
+
+  <div class="color-system-band color-system-band--semantic">
+    <div class="color-system-kicker">Primary meaning</div>
+    <div class="color-system-header">
+      <div>
+        <h3>Semantic families are the first read.</h3>
+        <p>Lead with five grouped families, not a run of eight peers. Secondary tones stay physically nested inside Structure and Data so the model reads as authored identity first, tonal nuance second.</p>
+      </div>
+      <div class="color-system-summary" aria-label="Color system summary">
+        <div class="color-system-summary-item">
+          <span>Primary groups</span>
+          <strong>5 families</strong>
+          <small>Structure · State · Event · Data · Rule</small>
+        </div>
+        <div class="color-system-summary-item">
+          <span>Authored shades</span>
+          <strong>8 tones</strong>
+          <small>Five anchors plus three nested within-family variants</small>
+        </div>
+        <div class="color-system-summary-item">
+          <span>Separate lanes</span>
+          <strong>3 outer layers</strong>
+          <small>Annotation · Runtime verdicts · Chrome/support</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="color-stage-grid" aria-label="Five semantic color families">
+      <div class="semantic-family-card semantic-family-card--structure">
+        <div class="semantic-family-card__head">
+          <div>
+            <div class="semantic-family-card__name">Structure</div>
+            <div class="semantic-family-card__meta">Indigo · 239–245°</div>
+          </div>
+          <div class="semantic-family-card__count">2 tones</div>
+        </div>
+        <div class="semantic-family-swatch" style="background:#4338CA;--tone-fg:#fff;--tone-soft:rgba(255,255,255,0.5)">
+          <div>Primary driver</div>
+          <strong>#4338CA</strong>
+          <div>governing keywords</div>
+        </div>
+        <div class="semantic-family-variants">
+          <div class="semantic-family-variant" style="background:#6366F1;--tone-fg:#fff;--tone-soft:rgba(255,255,255,0.42)">
+            <div>Within family</div>
+            <strong>#6366F1</strong>
+            <div>connective grammar</div>
+          </div>
+        </div>
+        <div class="semantic-family-usage">
+          <span class="semantic-family-usage-label">Carries</span>
+          precept · field · state · event · set · transition
+          <span class="semantic-family-usage-subtle">within family: as · default · == · and · or · not</span>
+        </div>
+      </div>
+
+      <div class="semantic-family-card semantic-family-card--state">
+        <div class="semantic-family-card__head">
+          <div>
+            <div class="semantic-family-card__name">State</div>
+            <div class="semantic-family-card__meta">Violet · 260°</div>
+          </div>
+          <div class="semantic-family-card__count">1 tone</div>
+        </div>
+        <div class="semantic-family-swatch" style="background:#A898F5;--tone-fg:rgba(15,8,40,0.9);--tone-soft:rgba(15,8,40,0.5)">
+          <div>Family anchor</div>
+          <strong>#A898F5</strong>
+          <div>state names</div>
+        </div>
+        <div class="semantic-family-note">Single-shade family</div>
+        <div class="semantic-family-usage">
+          <span class="semantic-family-usage-label">Carries</span>
+          Draft · Submitted · Approved
+          <span class="semantic-family-usage-subtle">italic marks constrained state, not a new hue</span>
+        </div>
+      </div>
+
+      <div class="semantic-family-card semantic-family-card--event">
+        <div class="semantic-family-card__head">
+          <div>
+            <div class="semantic-family-card__name">Event</div>
+            <div class="semantic-family-card__meta">Cyan · 195°</div>
+          </div>
+          <div class="semantic-family-card__count">1 tone</div>
+        </div>
+        <div class="semantic-family-swatch" style="background:#30B8E8;--tone-fg:rgba(0,18,28,0.9);--tone-soft:rgba(0,18,28,0.5)">
+          <div>Family anchor</div>
+          <strong>#30B8E8</strong>
+          <div>event names</div>
+        </div>
+        <div class="semantic-family-note">Single-shade family</div>
+        <div class="semantic-family-usage">
+          <span class="semantic-family-usage-label">Carries</span>
+          Open · Submit · Approve
+          <span class="semantic-family-usage-subtle">italic marks constrained event, not a second lane</span>
+        </div>
+      </div>
+
+      <div class="semantic-family-card semantic-family-card--data">
+        <div class="semantic-family-card__head">
+          <div>
+            <div class="semantic-family-card__name">Data</div>
+            <div class="semantic-family-card__meta">Bright slate · 215°</div>
+          </div>
+          <div class="semantic-family-card__count">3 tones</div>
+        </div>
+        <div class="semantic-family-swatch" style="background:#B0BEC5;--tone-fg:rgba(8,14,18,0.9);--tone-soft:rgba(8,14,18,0.5)">
+          <div>Primary anchor</div>
+          <strong>#B0BEC5</strong>
+          <div>field and argument names</div>
+        </div>
+        <div class="semantic-family-variants semantic-family-variants--double">
+          <div class="semantic-family-variant" style="background:#9AA8B5;--tone-fg:rgba(8,14,18,0.9);--tone-soft:rgba(8,14,18,0.42)">
+            <div>Within family</div>
+            <strong>#9AA8B5</strong>
+            <div>type tone</div>
+          </div>
+          <div class="semantic-family-variant" style="background:#84929F;--tone-fg:rgba(255,255,255,0.82);--tone-soft:rgba(255,255,255,0.38)">
+            <div>Within family</div>
+            <strong>#84929F</strong>
+            <div>value tone</div>
+          </div>
+        </div>
+        <div class="semantic-family-usage">
+          <span class="semantic-family-usage-label">Carries</span>
+          Amount · PolicyHolder · number · 0
+          <span class="semantic-family-usage-subtle">name anchor first, type/value tones nested underneath</span>
+        </div>
+      </div>
+
+      <div class="semantic-family-card semantic-family-card--rule">
+        <div class="semantic-family-card__head">
+          <div>
+            <div class="semantic-family-card__name">Rule</div>
+            <div class="semantic-family-card__meta">Gold · 45°</div>
+          </div>
+          <div class="semantic-family-card__count">1 tone</div>
+        </div>
+        <div class="semantic-family-swatch" style="background:#FBBF24;--tone-fg:rgba(20,12,0,0.9);--tone-soft:rgba(20,12,0,0.5)">
+          <div>Family anchor</div>
+          <strong>#FBBF24</strong>
+          <div>message payloads</div>
+        </div>
+        <div class="semantic-family-note">Single-shade family</div>
+        <div class="semantic-family-usage">
+          <span class="semantic-family-usage-label">Carries</span>
+          because / reject strings only
+          <span class="semantic-family-usage-subtle">the explanation is warm; enforcement keywords stay in Structure</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="color-system-bridge">
+    <div class="color-system-kicker">Outside authored identity</div>
+    <p>Comments annotate authored content. Verdicts report runtime evaluation. Chrome/support holds the surface together. Each lane is adjacent to the semantic families, but none of them rewrite or expand the family model.</p>
+  </div>
+
+  <div class="color-lane-grid">
+    <div class="color-lane">
+      <div class="color-lane-label">Annotation lane</div>
+      <h3>Comments</h3>
+      <p>Editorial annotation inside authored content. Subdued, italic, and separate from both semantic families and generic chrome.</p>
+      <div class="annotation-tone">
+        <div>Annotation tone</div>
+        <strong>#9096A6</strong>
+        <div>italic sideband context</div>
+      </div>
+    </div>
+
+    <div class="color-lane">
+      <div class="color-lane-label">Runtime register</div>
+      <h3>Engine verdicts</h3>
+      <p>Verdict hues answer what the engine just concluded. They overlay runtime surfaces only and never enter syntax or authored identity.</p>
+      <div class="verdict-register" aria-label="Runtime verdict register">
+        <div class="verdict-register-item" style="--verdict:#34D399;--verdict-soft:rgba(52,211,153,0.56);--verdict-bg:rgba(52,211,153,0.06)">
+          <span>Allowed</span>
+          <strong>#34D399</strong>
+          <em>runtime only</em>
+        </div>
+        <div class="verdict-register-item" style="--verdict:#F87171;--verdict-soft:rgba(248,113,113,0.56);--verdict-bg:rgba(248,113,113,0.06)">
+          <span>Blocked</span>
+          <strong>#F87171</strong>
+          <em>runtime only</em>
+        </div>
+        <div class="verdict-register-item" style="--verdict:#FDE047;--verdict-soft:rgba(253,224,71,0.56);--verdict-bg:rgba(253,224,71,0.06)">
+          <span>Warning</span>
+          <strong>#FDE047</strong>
+          <em>runtime only</em>
+        </div>
+      </div>
+    </div>
+
+    <div class="color-lane">
+      <div class="color-lane-label">Support layer</div>
+      <h3>Chrome / support</h3>
+      <p>Canvas, panels, text, and dividers hold the surface together. Their palette is complementary infrastructure, not semantic meaning.</p>
+      <div class="support-token-stack" aria-label="Chrome and support tokens">
+        <div class="support-token">
+          <span class="support-token-swatch" style="--swatch:var(--bg)"></span>
+          <span class="support-token-name">Canvas</span>
+          <span class="support-token-value">#040506</span>
+        </div>
+        <div class="support-token">
+          <span class="support-token-swatch" style="--swatch:var(--panel)"></span>
+          <span class="support-token-name">Panel</span>
+          <span class="support-token-value">#090B0E</span>
+        </div>
+        <div class="support-token">
+          <span class="support-token-swatch" style="--swatch:var(--muted)"></span>
+          <span class="support-token-name">Reading text</span>
+          <span class="support-token-value">#A7AFBB</span>
+        </div>
+        <div class="support-token">
+          <span class="support-token-swatch" style="--swatch:var(--line)"></span>
+          <span class="support-token-name">Divider</span>
+          <span class="support-token-value">line token</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rule channels -->
+  <div class="channels-grid" style="margin-top:1px">
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Every color has a fixed meaning.</h3>
+      <p>Nothing is aesthetic. If a new surface uses color, it must map to an existing semantic family. Local tonal variants may clarify hierarchy inside a family, but they do not create new semantic lanes. Decorative use of any palette color corrupts the signal.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Color says kind. Italic says constrained.</h3>
+      <p>Constraint pressure is expressed through typography, not extra hues. Constrained states, events, and guarded fields are italic within their own family color — same hue, italic only.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Verdicts are runtime only.</h3>
+      <p>Emerald, coral, and yellow appear only when the engine has evaluated something. They are never used in static surfaces, syntax highlighting, or any authoring-time annotation.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Comments are outside the palette.</h3>
+      <p>Dusk #9096A6 in italic keeps comments legible but structurally separate from the five semantic families. Never repurpose a family color for editorial annotation.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 05 · CONSTRUCTS                                     -->
+<!-- ═══════════════════════════════════════════════ -->
+<section class="section" id="constructs">
+  <div class="section-head">
+    <div class="eyebrow">05 · Constructs</div>
     <h2>Five constructs, one grammar</h2>
     <p>The five constructs are the primary reveal. Each gallery establishes the canonical pair first — Definition (how the construct appears as a syntax token in authored code) and Runtime (how it appears as a rendered component) — then shows the channel signals and semantic modifiers that build on top of that base. All five constructs use the same composed structure.</p>
   </div>
@@ -2146,394 +2927,6 @@ pre {
 </section>
 
 <!-- ═══════════════════════════════════════════════════ -->
-<!-- 04 · TYPOGRAPHY                               -->
-<!-- ═══════════════════════════════════════════════════ -->
-<section class="section" id="typography">
-  <div class="section-head">
-    <div class="eyebrow">04 · Typography</div>
-    <h2>Two faces. One rule each.</h2>
-    <p>Once the five constructs are legible as a system, typography governs how identity, prose, and semantic pressure are read. Geist Mono carries structural identity. Geist carries reading prose. No serifs. Italic marks semantic pressure, not emphasis.</p>
-  </div>
-
-  <div class="concepts-grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
-    <div class="concept-cell">
-      <h3>Geist Mono — identity &amp; structure</h3>
-      <p>Used for: wordmark, section headings, labels, chips, nav, construct names, table headers, eyebrows, inline tokens, and all code specimens. Geist Mono is the face of governed structure. When text needs to read as authored or systematic, it is in Geist Mono.</p>
-      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">
-        <div style="font-family:var(--mono);font-size:clamp(28px,4vw,56px);line-height:1;letter-spacing:0.14em;font-variant:small-caps;color:var(--text)">Precept</div>
-        <div style="font-family:var(--mono);font-size:18px;margin-top:12px;color:var(--text)">Semantic Visual System</div>
-        <div style="font-family:var(--mono);font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--soft);margin-top:10px">Structure · State · Event · Data · Rule</div>
-      </div>
-    </div>
-    <div class="concept-cell">
-      <h3>Geist — reading prose</h3>
-      <p>Used for: body paragraphs, concept descriptions, surface notes, and any text longer than a label that needs sustained reading. Geist sits beside Geist Mono without competing. Segoe UI Variable and Segoe UI are the system fallbacks on Windows.</p>
-      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--sans);font-size:16px;line-height:1.76;color:var(--muted)">
-        Precept governs the integrity of a business entity's data across its lifecycle. The semantic visual system governs how that governance is communicated on screen.
-      </div>
-    </div>
-    <div class="concept-cell">
-      <h3>Wordmark treatment</h3>
-      <p>The identity display — <span style="font-family:var(--mono);font-variant:small-caps;letter-spacing:0.14em">Precept</span> in Geist Mono small caps — is reserved for the hero moment and deliberate brand callouts. Inline prose uses plain title case. Nav and labels are already all-caps mono and need no additional treatment. Scarcity is what makes the wordmark land.</p>
-    </div>
-    <div class="concept-cell">
-      <h3>Italic — semantic pressure only</h3>
-      <p>Italic belongs to constrained states, constrained events, invariant-guarded data names, and rule-adjacent annotation in code specimens. It marks that something is under explicit rule attention. It is not used for general emphasis, decorative headings, or editorial flourish. If a reader cannot trust italic to mean pressure, the second semantic channel has been wasted.</p>
-      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px">
-        <span style="font-family:var(--mono);font-size:13px;font-style:italic;color:var(--state)">Approved</span>
-        <span style="font-family:var(--mono);font-size:13px;font-style:italic;color:var(--event)">Submit</span>
-        <span style="font-family:var(--mono);font-size:13px;font-style:italic;color:var(--data)">PolicyHolder</span>
-        <span style="font-family:var(--mono);font-size:13px;font-style:italic;color:var(--soft)"># review required above 50k</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="channels-grid" style="margin-top:1px">
-    <div class="channel">
-      <span class="channel-name">Rule</span>
-      <h3>No serifs.</h3>
-      <p>Ever. The posture of this document and of Precept's surfaces is architectural, not editorial. Serifs are not part of the system.</p>
-    </div>
-    <div class="channel">
-      <span class="channel-name">Rule</span>
-      <h3>Mono for everything structural.</h3>
-      <p>If it governs, labels, names, or identifies — it is in Geist Mono. This includes headings. Geist Mono at display size reads as specification, not decoration.</p>
-    </div>
-    <div class="channel">
-      <span class="channel-name">Rule</span>
-      <h3>Governing keywords are bold.</h3>
-      <p>Semantic indigo keywords — <span style="font-family:var(--mono);font-weight:bold;color:var(--structure-d)">precept field state event from on set transition assert reject when</span> — render at font-weight 700. Grammar indigo stays normal for connective tokens and logical operators such as <span style="font-family:var(--mono);color:var(--structure)">as default == and or not</span>. Color identifies the family; weight distinguishes governing keywords from connective grammar.</p>
-    </div>
-    <div class="channel">
-      <span class="channel-name">Rule</span>
-      <h3>Sans for reading prose.</h3>
-      <p>Geist carries paragraphs. It does not appear in identity positions, labels, or code. The split is strict. Mono names and governs; sans explains.</p>
-    </div>
-    <div class="channel">
-      <span class="channel-name">Rule</span>
-      <h3>Italic means pressure.</h3>
-      <p>Not emphasis. Not decoration. Italic communicates that a construct is under rule attention. Spend it only where that meaning is true.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════ -->
-<!-- 05 · COLOR SYSTEM                               -->
-<!-- ═══════════════════════════════════════════════ -->
-<section class="section" id="colors">
-  <div class="section-head">
-    <div class="eyebrow">05 · Color System</div>
-    <h2>Five semantic families. Separate outer lanes.</h2>
-    <p>After the construct reveal and typographic split are established, color defines how authored meaning stays grouped into five families. Structure and Data keep their tonal variants nested inside the parent family. Comments sit in an annotation lane. Runtime verdicts sit in a separate evaluation register. Chrome/support scaffolds the surface around them without becoming a sixth family.</p>
-  </div>
-
-  <div class="color-system-band color-system-band--semantic">
-    <div class="color-system-kicker">Primary meaning</div>
-    <div class="color-system-header">
-      <div>
-        <h3>Semantic families are the first read.</h3>
-        <p>Lead with five grouped families, not a run of eight peers. Secondary tones stay physically nested inside Structure and Data so the model reads as authored identity first, tonal nuance second.</p>
-      </div>
-      <div class="color-system-summary" aria-label="Color system summary">
-        <div class="color-system-summary-item">
-          <span>Primary groups</span>
-          <strong>5 families</strong>
-          <small>Structure · State · Event · Data · Rule</small>
-        </div>
-        <div class="color-system-summary-item">
-          <span>Authored shades</span>
-          <strong>8 tones</strong>
-          <small>Five anchors plus three nested within-family variants</small>
-        </div>
-        <div class="color-system-summary-item">
-          <span>Separate lanes</span>
-          <strong>3 outer layers</strong>
-          <small>Annotation · Runtime verdicts · Chrome/support</small>
-        </div>
-      </div>
-    </div>
-
-    <div class="color-stage-grid" aria-label="Five semantic color families">
-      <div class="semantic-family-card semantic-family-card--structure">
-        <div class="semantic-family-card__head">
-          <div>
-            <div class="semantic-family-card__name">Structure</div>
-            <div class="semantic-family-card__meta">Indigo · 239–245°</div>
-          </div>
-          <div class="semantic-family-card__count">2 tones</div>
-        </div>
-        <div class="semantic-family-swatch" style="background:#4338CA;--tone-fg:#fff;--tone-soft:rgba(255,255,255,0.5)">
-          <div>Primary driver</div>
-          <strong>#4338CA</strong>
-          <div>governing keywords</div>
-        </div>
-        <div class="semantic-family-variants">
-          <div class="semantic-family-variant" style="background:#6366F1;--tone-fg:#fff;--tone-soft:rgba(255,255,255,0.42)">
-            <div>Within family</div>
-            <strong>#6366F1</strong>
-            <div>connective grammar</div>
-          </div>
-        </div>
-        <div class="semantic-family-usage">
-          <span class="semantic-family-usage-label">Carries</span>
-          precept · field · state · event · set · transition
-          <span class="semantic-family-usage-subtle">within family: as · default · == · and · or · not</span>
-        </div>
-      </div>
-
-      <div class="semantic-family-card semantic-family-card--state">
-        <div class="semantic-family-card__head">
-          <div>
-            <div class="semantic-family-card__name">State</div>
-            <div class="semantic-family-card__meta">Violet · 260°</div>
-          </div>
-          <div class="semantic-family-card__count">1 tone</div>
-        </div>
-        <div class="semantic-family-swatch" style="background:#A898F5;--tone-fg:rgba(15,8,40,0.9);--tone-soft:rgba(15,8,40,0.5)">
-          <div>Family anchor</div>
-          <strong>#A898F5</strong>
-          <div>state names</div>
-        </div>
-        <div class="semantic-family-note">Single-shade family</div>
-        <div class="semantic-family-usage">
-          <span class="semantic-family-usage-label">Carries</span>
-          Draft · Submitted · Approved
-          <span class="semantic-family-usage-subtle">italic marks constrained state, not a new hue</span>
-        </div>
-      </div>
-
-      <div class="semantic-family-card semantic-family-card--event">
-        <div class="semantic-family-card__head">
-          <div>
-            <div class="semantic-family-card__name">Event</div>
-            <div class="semantic-family-card__meta">Cyan · 195°</div>
-          </div>
-          <div class="semantic-family-card__count">1 tone</div>
-        </div>
-        <div class="semantic-family-swatch" style="background:#30B8E8;--tone-fg:rgba(0,18,28,0.9);--tone-soft:rgba(0,18,28,0.5)">
-          <div>Family anchor</div>
-          <strong>#30B8E8</strong>
-          <div>event names</div>
-        </div>
-        <div class="semantic-family-note">Single-shade family</div>
-        <div class="semantic-family-usage">
-          <span class="semantic-family-usage-label">Carries</span>
-          Open · Submit · Approve
-          <span class="semantic-family-usage-subtle">italic marks constrained event, not a second lane</span>
-        </div>
-      </div>
-
-      <div class="semantic-family-card semantic-family-card--data">
-        <div class="semantic-family-card__head">
-          <div>
-            <div class="semantic-family-card__name">Data</div>
-            <div class="semantic-family-card__meta">Bright slate · 215°</div>
-          </div>
-          <div class="semantic-family-card__count">3 tones</div>
-        </div>
-        <div class="semantic-family-swatch" style="background:#B0BEC5;--tone-fg:rgba(8,14,18,0.9);--tone-soft:rgba(8,14,18,0.5)">
-          <div>Primary anchor</div>
-          <strong>#B0BEC5</strong>
-          <div>field and argument names</div>
-        </div>
-        <div class="semantic-family-variants semantic-family-variants--double">
-          <div class="semantic-family-variant" style="background:#9AA8B5;--tone-fg:rgba(8,14,18,0.9);--tone-soft:rgba(8,14,18,0.42)">
-            <div>Within family</div>
-            <strong>#9AA8B5</strong>
-            <div>type tone</div>
-          </div>
-          <div class="semantic-family-variant" style="background:#84929F;--tone-fg:rgba(255,255,255,0.82);--tone-soft:rgba(255,255,255,0.38)">
-            <div>Within family</div>
-            <strong>#84929F</strong>
-            <div>value tone</div>
-          </div>
-        </div>
-        <div class="semantic-family-usage">
-          <span class="semantic-family-usage-label">Carries</span>
-          Amount · PolicyHolder · number · 0
-          <span class="semantic-family-usage-subtle">name anchor first, type/value tones nested underneath</span>
-        </div>
-      </div>
-
-      <div class="semantic-family-card semantic-family-card--rule">
-        <div class="semantic-family-card__head">
-          <div>
-            <div class="semantic-family-card__name">Rule</div>
-            <div class="semantic-family-card__meta">Gold · 45°</div>
-          </div>
-          <div class="semantic-family-card__count">1 tone</div>
-        </div>
-        <div class="semantic-family-swatch" style="background:#FBBF24;--tone-fg:rgba(20,12,0,0.9);--tone-soft:rgba(20,12,0,0.5)">
-          <div>Family anchor</div>
-          <strong>#FBBF24</strong>
-          <div>message payloads</div>
-        </div>
-        <div class="semantic-family-note">Single-shade family</div>
-        <div class="semantic-family-usage">
-          <span class="semantic-family-usage-label">Carries</span>
-          because / reject strings only
-          <span class="semantic-family-usage-subtle">the explanation is warm; enforcement keywords stay in Structure</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="color-system-bridge">
-    <div class="color-system-kicker">Outside authored identity</div>
-    <p>Comments annotate authored content. Verdicts report runtime evaluation. Chrome/support holds the surface together. Each lane is adjacent to the semantic families, but none of them rewrite or expand the family model.</p>
-  </div>
-
-  <div class="color-lane-grid">
-    <div class="color-lane">
-      <div class="color-lane-label">Annotation lane</div>
-      <h3>Comments</h3>
-      <p>Editorial annotation inside authored content. Subdued, italic, and separate from both semantic families and generic chrome.</p>
-      <div class="annotation-tone">
-        <div>Annotation tone</div>
-        <strong>#9096A6</strong>
-        <div>italic sideband context</div>
-      </div>
-    </div>
-
-    <div class="color-lane">
-      <div class="color-lane-label">Runtime register</div>
-      <h3>Engine verdicts</h3>
-      <p>Verdict hues answer what the engine just concluded. They overlay runtime surfaces only and never enter syntax or authored identity.</p>
-      <div class="verdict-register" aria-label="Runtime verdict register">
-        <div class="verdict-register-item" style="--verdict:#34D399;--verdict-soft:rgba(52,211,153,0.56);--verdict-bg:rgba(52,211,153,0.06)">
-          <span>Allowed</span>
-          <strong>#34D399</strong>
-          <em>runtime only</em>
-        </div>
-        <div class="verdict-register-item" style="--verdict:#F87171;--verdict-soft:rgba(248,113,113,0.56);--verdict-bg:rgba(248,113,113,0.06)">
-          <span>Blocked</span>
-          <strong>#F87171</strong>
-          <em>runtime only</em>
-        </div>
-        <div class="verdict-register-item" style="--verdict:#FDE047;--verdict-soft:rgba(253,224,71,0.56);--verdict-bg:rgba(253,224,71,0.06)">
-          <span>Warning</span>
-          <strong>#FDE047</strong>
-          <em>runtime only</em>
-        </div>
-      </div>
-    </div>
-
-    <div class="color-lane">
-      <div class="color-lane-label">Support layer</div>
-      <h3>Chrome / support</h3>
-      <p>Canvas, panels, text, and dividers hold the surface together. Their palette is complementary infrastructure, not semantic meaning.</p>
-      <div class="support-token-stack" aria-label="Chrome and support tokens">
-        <div class="support-token">
-          <span class="support-token-swatch" style="--swatch:var(--bg)"></span>
-          <span class="support-token-name">Canvas</span>
-          <span class="support-token-value">#040506</span>
-        </div>
-        <div class="support-token">
-          <span class="support-token-swatch" style="--swatch:var(--panel)"></span>
-          <span class="support-token-name">Panel</span>
-          <span class="support-token-value">#090B0E</span>
-        </div>
-        <div class="support-token">
-          <span class="support-token-swatch" style="--swatch:var(--muted)"></span>
-          <span class="support-token-name">Reading text</span>
-          <span class="support-token-value">#A7AFBB</span>
-        </div>
-        <div class="support-token">
-          <span class="support-token-swatch" style="--swatch:var(--line)"></span>
-          <span class="support-token-name">Divider</span>
-          <span class="support-token-value">line token</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Concept grid: one cell per family -->
-  <div class="concepts-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-top:1px">
-    <div class="concept-cell">
-      <h3>Structure · Indigo · 239–245°</h3>
-      <p>Scaffolding and control. Indigo is one family, not two. The darker indigo (#4338CA, bold) carries governing pressure. The lighter indigo (#6366F1) is a subordinate within-family grammar variant for connective tissue and operators like as, default, ==, and, or, and not. Same hue family, different job weight: primary identity first, local tonal distinction second.</p>
-      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mono);font-size:13px;line-height:2.0">
-        <span style="color:#4338CA;font-weight:700">precept</span> <span style="color:#FBBF24">LoanApplication</span><br>
-        <span style="color:#4338CA;font-weight:700">field</span> <span style="color:#B0BEC5">Amount</span> <span style="color:#6366F1">as</span> <span style="color:#9AA8B5">number</span><br>
-        <span style="color:#B0BEC5">Amount</span> <span style="color:#6366F1">&gt;</span> <span style="color:#84929F">0</span> <span style="color:#6366F1">and</span> <span style="color:#B0BEC5">PolicyHolder</span> != <span style="color:#84929F">null</span>
-        <div style="margin-top:8px;font-family:var(--sans);font-size:11px;color:var(--soft)">Lighter indigo stays inside the structure family as connective grammar, not a second structural lane.</div>
-      </div>
-    </div>
-    <div class="concept-cell">
-      <h3>States · Violet · 260°</h3>
-      <p>Nouns — where you are. One violet shade for all state names in all contexts. Constraint presence is shown with italic, not a different shade. Violet sits far enough from cyan to be instantly distinguishable, close enough to feel part of the same cool system.</p>
-      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mono);font-size:13px;line-height:2.2;display:flex;gap:20px;align-items:baseline;flex-wrap:wrap">
-        <span style="color:#A898F5">Draft</span>
-        <span style="color:#A898F5">Submitted</span>
-        <span style="color:#A898F5;font-style:italic">Approved</span>
-        <span style="font-size:11px;color:var(--soft);font-family:var(--sans)">italic = constrained</span>
-      </div>
-    </div>
-    <div class="concept-cell">
-      <h3>Events · Cyan · 195°</h3>
-      <p>Verbs — what happens. One cyan shade for all event names. Cyan is positioned 65° away from violet and 20° from slate, so events stay visually separate from states and data at a glance without requiring any hue context. Constraint italic applies here as well.</p>
-      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mono);font-size:13px;line-height:2.2;display:flex;gap:20px;align-items:baseline;flex-wrap:wrap">
-        <span style="color:#30B8E8">Open</span>
-        <span style="color:#30B8E8;font-style:italic">Submit</span>
-        <span style="color:#30B8E8">Approve</span>
-        <span style="font-size:11px;color:var(--soft);font-family:var(--sans)">italic = constrained</span>
-      </div>
-    </div>
-    <div class="concept-cell">
-      <h3>Data · Bright Slate · 215°</h3>
-      <p>Variables — what you know. Slate is one family with one anchor: field and argument names. Type keywords and literal values are subordinate within-family tones, not additional semantic families. The depth shift communicates data hierarchy without inventing a new hue lane. Names italic when guarded by an invariant.</p>
-      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mono);font-size:13px;line-height:2.0">
-        <span style="color:#B0BEC5">Amount</span> <span style="color:#6366F1">as</span> <span style="color:#9AA8B5">number</span> <span style="color:#6366F1">default</span> <span style="color:#84929F">0</span><br>
-        <span style="color:#B0BEC5;font-style:italic">PolicyHolder</span> <span style="color:#6366F1">as</span> <span style="color:#9AA8B5">string</span>
-        <span style="color:var(--soft);font-size:11px;font-family:var(--sans);margin-left:8px">italic = guarded</span><br>
-        <span style="color:var(--soft);font-size:11px;font-family:var(--sans)">Type and value tones stay clearly subordinate to the name anchor.</span>
-      </div>
-    </div>
-    <div class="concept-cell">
-      <h3>Rules · Gold · 45°</h3>
-      <p>The only warm hue in the authoring-time palette. Gold is reserved exclusively for human-readable message payloads inside <span style="font-family:var(--mono);color:#4338CA;font-weight:700">because</span> and <span style="font-family:var(--mono);color:#4338CA;font-weight:700">reject</span> strings. Rule enforcement keywords join semantic indigo. The warm interruption marks only the explanation, not the enforcement.</p>
-      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mono);font-size:13px;line-height:2.0">
-        <span style="color:#4338CA;font-weight:700">invariant</span> <span style="color:#B0BEC5">Amount</span> <span style="color:#6366F1">&gt;</span> <span style="color:#84929F">0</span> <span style="color:#4338CA;font-weight:700">because</span> <span style="color:#FBBF24">"Amount must be positive"</span>
-      </div>
-    </div>
-    <div class="concept-cell">
-      <h3>Verdicts · Runtime only</h3>
-      <p>Emerald, coral, and yellow appear only in runtime surfaces: the data form and state diagrams. Never in syntax highlighting or static surfaces. The separation ensures these hues carry a single clear meaning — the engine evaluated your inputs and here is the result.</p>
-      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-        <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.12em;color:#34D399">ENABLED</span>
-        <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.12em;color:#F87171">BLOCKED</span>
-        <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.12em;color:#FDE047">WARNING</span>
-        <span style="font-family:var(--sans);font-size:11px;color:var(--soft)">runtime only</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Rule channels -->
-  <div class="channels-grid" style="margin-top:1px">
-    <div class="channel">
-      <span class="channel-name">Rule</span>
-      <h3>Every color has a fixed meaning.</h3>
-      <p>Nothing is aesthetic. If a new surface uses color, it must map to an existing semantic family. Local tonal variants may clarify hierarchy inside a family, but they do not create new semantic lanes. Decorative use of any palette color corrupts the signal.</p>
-    </div>
-    <div class="channel">
-      <span class="channel-name">Rule</span>
-      <h3>Color says kind. Italic says constrained.</h3>
-      <p>Constraint pressure is expressed through typography, not extra hues. Constrained states, events, and guarded fields are italic within their own family color — same hue, italic only.</p>
-    </div>
-    <div class="channel">
-      <span class="channel-name">Rule</span>
-      <h3>Verdicts are runtime only.</h3>
-      <p>Emerald, coral, and yellow appear only when the engine has evaluated something. They are never used in static surfaces, syntax highlighting, or any authoring-time annotation.</p>
-    </div>
-    <div class="channel">
-      <span class="channel-name">Rule</span>
-      <h3>Comments are outside the palette.</h3>
-      <p>Dusk #9096A6 in italic keeps comments legible but structurally separate from the five semantic families. Never repurpose a family color for editorial annotation.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════ -->
 <!-- 06 · SURFACES                                   -->
 <!-- ═══════════════════════════════════════════════ -->
 <section class="section" id="surfaces">
@@ -2671,29 +3064,29 @@ pre {
 .doc-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-family: var(--mono);
   font-size: 11px;
-  letter-spacing: 0.08em;
-  padding: 3px 10px 3px 7px;
-  border-radius: 3px;
-  border: 1px solid currentColor;
-  opacity: 0.9;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
 }
 .doc-pill::before {
   content: '';
   display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
   background: currentColor;
   flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
 }
-.doc-pill.s  { color: var(--structure); background: rgba(99,102,241,0.08); }
-.doc-pill.st { color: var(--state);     background: rgba(168,152,245,0.08); }
-.doc-pill.ev { color: var(--event);     background: rgba(48,184,232,0.08); }
-.doc-pill.da { color: var(--data);      background: rgba(176,190,197,0.08); }
-.doc-pill.ru { color: var(--rule);      background: rgba(251,191,36,0.08); }
+.doc-pill.s  { color: var(--structure); }
+.doc-pill.st { color: var(--state); }
+.doc-pill.ev { color: var(--event); }
+.doc-pill.da { color: var(--data); }
+.doc-pill.ru { color: var(--rule); }
 
 /* ─ reference table ─ */
 .doc-table {
