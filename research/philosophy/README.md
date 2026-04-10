@@ -18,7 +18,7 @@ Philosophy research is distinct from language research. Language research inform
 ## What does NOT belong here
 
 - Sample rosters, corpus planning, or rewrite sequencing — those belong in `docs/research/sample-realism/`
-- Language syntax proposals or construct design — those belong in `docs/research/language/`
+- Language syntax proposals or construct design — those belong in `research/language/`
 - Brand voice or visual identity — those belong in `design/brand/`
 
 ## Relationship to `docs/philosophy.md`

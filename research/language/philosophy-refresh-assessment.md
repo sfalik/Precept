@@ -2,7 +2,7 @@
 
 **Author:** Frank (Lead/Architect & Language Designer)  
 **Date:** 2026-04-10  
-**Scope:** Full language research corpus under `docs/research/language/`, plus `docs/research/philosophy/` and `docs/research/security/`  
+**Scope:** Full language research corpus under `research/language/`, plus `research/philosophy/` and `research/security/`  
 **Assessed against:** `docs/philosophy.md` as of commits `dd14a4c` (entity-first rewrite) and `185e20b` (governance strengthening)
 
 ---

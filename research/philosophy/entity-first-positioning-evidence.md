@@ -202,6 +202,6 @@ The difference: in a rules engine, rules are external policy evaluated against a
 ## What this document is NOT
 
 - Not a sample roster or corpus plan — those belong in `docs/research/sample-realism/`
-- Not a language syntax proposal — those belong in GitHub issues and `docs/research/language/`
+- Not a language syntax proposal — those belong in GitHub issues and `research/language/`
 - Not an implementation plan — Issue #22 owns the stateless-precept technical spec
 - Not a brand or marketing document — it is evidence that informs the philosophy doc, not public-facing prose
