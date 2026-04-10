@@ -49,10 +49,10 @@ event AdvanceDay with DayNumber as number
 on AdvanceDay assert DayNumber >= 0 because "The day counter cannot be negative"
 
 event ReturnBook with Condition as string nullable default null
-on ReturnBook assert Condition == null || Condition != "" because "A supplied condition note cannot be blank"
+on ReturnBook assert Condition == null or Condition != "" because "A supplied condition note cannot be blank"
 
 event ReportLost with Note as string nullable default null
-on ReportLost assert Note == null || Note != "" because "A supplied loss note cannot be blank"
+on ReportLost assert Note == null or Note != "" because "A supplied loss note cannot be blank"
 
 event Shelve
 
@@ -60,10 +60,10 @@ event ResolveLoss
 
 from Available on Checkout -> set BookTitle = Checkout.Title -> set BorrowerId = Checkout.PatronId -> set CheckoutDay = CurrentDay -> set DueDay = CurrentDay + Checkout.LoanDays -> set RenewalCount = 0 -> set FineAmount = 0 -> set ConditionNote = null -> set LostReported = false -> transition CheckedOut
 
-from CheckedOut on Renew when RenewalCount < 2 && !LostReported && CurrentDay <= DueDay -> set DueDay = DueDay + Renew.ExtraDays -> set RenewalCount = RenewalCount + 1 -> no transition
+from CheckedOut on Renew when RenewalCount < 2 and not LostReported and CurrentDay <= DueDay -> set DueDay = DueDay + Renew.ExtraDays -> set RenewalCount = RenewalCount + 1 -> no transition
 from CheckedOut on Renew -> reject "Only active loans with remaining renewals can be renewed"
 
-from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay && AdvanceDay.DayNumber <= DueDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
+from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and AdvanceDay.DayNumber <= DueDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
 from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> set FineAmount = AdvanceDay.DayNumber - DueDay -> transition Overdue
 from CheckedOut on AdvanceDay -> reject "The day counter must move forward"
 

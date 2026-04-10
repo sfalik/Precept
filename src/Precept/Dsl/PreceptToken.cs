@@ -307,17 +307,17 @@ public enum PreceptToken
 
     [TokenCategory(TokenCategory.Operator)]
     [TokenDescription("Logical AND")]
-    [TokenSymbol("&&")]
+    [TokenSymbol("and")]
     And,
 
     [TokenCategory(TokenCategory.Operator)]
     [TokenDescription("Logical OR")]
-    [TokenSymbol("||")]
+    [TokenSymbol("or")]
     Or,
 
     [TokenCategory(TokenCategory.Operator)]
     [TokenDescription("Logical NOT")]
-    [TokenSymbol("!")]
+    [TokenSymbol("not")]
     Not,
 
     [TokenCategory(TokenCategory.Operator)]

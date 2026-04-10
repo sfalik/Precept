@@ -359,7 +359,7 @@ public class CatalogDriftTests
         //      (invariant/guard expressions are parsed inline by the combinator)
         ["C4"] = new("_unused_", "parse expression", DirectAction: () =>
         {
-            PreceptParser.ParseExpression("&&");
+            PreceptParser.ParseExpression("and");
         }),
 
         // C5: Invalid number literal — unreachable via normal tokenizer, test directly

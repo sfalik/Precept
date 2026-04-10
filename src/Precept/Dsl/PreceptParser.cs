@@ -270,7 +270,7 @@ public static class PreceptParser
     private static readonly TokenListParser<PreceptToken, PreceptExpression> Unary =
         Token.EqualTo(PreceptToken.Not)
             .IgnoreThen(Superpower.Parse.Ref(UnaryRef))
-            .Select(expr => (PreceptExpression)new PreceptUnaryExpression("!", expr))
+            .Select(expr => (PreceptExpression)new PreceptUnaryExpression("not", expr))
         .Try()
         .Or(
             Token.EqualTo(PreceptToken.Minus)
@@ -309,17 +309,17 @@ public static class PreceptParser
             Term,
             (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right));
 
-    // Level 1.5: Logical AND (&&)
+    // Level 1.5: Logical AND (and)
     private static readonly TokenListParser<PreceptToken, PreceptExpression> AndExpr =
         Superpower.Parse.Chain(
-            Token.EqualTo(PreceptToken.And).Value("&&"),
+            Token.EqualTo(PreceptToken.And).Value("and"),
             Comparison,
             (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right));
 
-    // Level 1: Logical OR (||)
+    // Level 1: Logical OR (or)
     private static readonly TokenListParser<PreceptToken, PreceptExpression> OrExpr =
         Superpower.Parse.Chain(
-            Token.EqualTo(PreceptToken.Or).Value("||"),
+            Token.EqualTo(PreceptToken.Or).Value("or"),
             AndExpr,
             (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right));
 

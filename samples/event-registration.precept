@@ -46,7 +46,7 @@ on UpdateSeats assert Seats > 0 because "Updated seat count must stay positive"
 event RecordPayment
 
 event Cancel with Reason as string nullable default null
-on Cancel assert Reason == null || Reason != "" because "If a cancellation reason is supplied, it cannot be blank"
+on Cancel assert Reason == null or Reason != "" because "If a cancellation reason is supplied, it cannot be blank"
 
 event CheckIn with Desk as string
 on CheckIn assert Desk != "" because "The check-in desk is required"

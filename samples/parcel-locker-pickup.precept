@@ -52,7 +52,7 @@ from AwaitingPickup on SendReminder -> reject "Reminders can only be sent once p
 from AwaitingPickup on PickUp when PickUp.Code == PickupCode -> transition PickedUp
 from AwaitingPickup on PickUp -> reject "The pickup code does not match"
 
-from AwaitingPickup on AdvanceDay when AdvanceDay.DayNumber > CurrentDay && AdvanceDay.DayNumber - LastReminderDay >= 3 -> set CurrentDay = AdvanceDay.DayNumber -> transition Returned
+from AwaitingPickup on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and AdvanceDay.DayNumber - LastReminderDay >= 3 -> set CurrentDay = AdvanceDay.DayNumber -> transition Returned
 from AwaitingPickup on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
 from AwaitingPickup on AdvanceDay -> reject "Days must advance forward"
 
