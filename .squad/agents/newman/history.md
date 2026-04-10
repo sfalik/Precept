@@ -13,6 +13,9 @@
 
 ## Learnings
 
+### 2026-04-10 — Issue #31 shipped
+- PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
+
 ### Issue #31 Slice 6 — Operator Inventory (2026-04-10)
 
 - `LanguageTool.cs` is fully catalog-driven via `PreceptTokenMeta.GetSymbol(token)`. When George updates token symbols in `PreceptToken.cs`, the `precept_language` operator inventory updates automatically — no MCP code changes required.

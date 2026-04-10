@@ -6,6 +6,51 @@
 
 ---
 
+### 2026-04-10T12:00:00Z: Issue #31 merged — keyword logical operators (and/or/not replace &&/||/!)
+**By:** George (Runtime Dev), Kramer (Tooling Dev), Newman (MCP/AI Dev), Soup Nazi (Tester), Frank (Lead/Architect), Coordinator
+**Status:** Merged — PR #50, main SHA `305ec03`
+
+`&&`/`||`/`!` have been removed from the Precept DSL and replaced with keyword forms `and`/`or`/`not` across all 8 slices. All 775 tests passing. Issue #31 closed.
+
+**Runtime (George — Slices 1-4 + Samples):**
+- `[TokenSymbol]` attributes on `PreceptToken.And`/`Or`/`Not` changed to `"and"`/`"or"`/`"not"`. Old operator entries removed from tokenizer steps 4-5. Keyword loop (step 7, `requireDelimiters: true`) handles them automatically — `android` cannot match `And`.
+- All operator string comparisons updated in: parser (AST strings), type-checker main switch, `ApplyNarrowing()` (~line 889, a critical second update site distinct from the main switch), and expression evaluator.
+- 17 of 24 sample files updated; 7 unchanged (no logical operators used).
+- Commit: `83497aa`.
+
+**Grammar + Language Server (Kramer — Slice 5):**
+- `and`/`or`/`not` added to `actionKeywords` alternation in grammar (same group as `contains` — expression-position, operator-category tokens).
+- Old `keyword.operator.logical.precept` block (`&&|\|\||!`) removed from grammar entirely; `!=` untouched.
+- `ExpressionOperatorItems` in `PreceptAnalyzer.cs` updated: `&&`/`||`/`!` `Operator` items replaced with `and`/`or`/`not` `Keyword` items. Global keyword discovery via `BuildKeywordItems()` auto-picks up `And`/`Or`/`Not` from enum — no explicit additions needed.
+- Semantic tokens handler unchanged — catalog-driven via `[TokenCategory(Operator)]`.
+- Commit: `8f3bdab`.
+
+**MCP Operator Inventory (Newman — Slice 6):**
+- Zero code changes to MCP tools. `LanguageTool.cs` is fully catalog-driven via `PreceptTokenMeta.GetSymbol(token)`. George's `[TokenSymbol]` attribute update automatically propagates to `precept_language` output.
+- `docs/McpServerDesign.md` already used `and` in expression examples — no doc changes needed.
+- New test: `LogicalOperatorsAreKeywordForms` — asserts `and`/`or`/`not` present in operator inventory, `&&`/`||` absent. Canonical dual-assertion pattern for operator renames.
+
+**Tests (Soup Nazi — Slice 7):**
+- 10 existing test files updated (symbol substitutions: `&&`→`and`, `||`→`or`, `!`→`not`).
+- New `PreceptKeywordLogicalOperatorTests.cs` (15 tests): basic parsing, precedence (`not > and > or`), null narrowing through `not (Field == null)`, `!=` unaffected, old symbols produce `InvalidOperationException`, compound expressions, invariant context.
+
+**Docs (Frank — Slice 8):**
+- `docs/PreceptLanguageDesign.md` fully synchronized: migration table heading updated ("Implemented"), "Until implementation…" paragraph removed, `and`/`or`/`not` added to reserved keywords list, nullability Pattern 1/2 code examples updated, "pending migration" annotations removed from expressions section, event asserts and Minimal Example updated.
+- `docs/research/language/references/cel-comparison.md` created: full Precept vs. CEL language-level comparison.
+
+**PR Review (Frank):**
+- APPROVED. All 8 slices verified. Architecture sound. Coverage complete.
+- Key architectural confirmation: `BuildKeywordDictionary()` uses `symbol.All(char.IsLetter)` — operator-to-keyword migration for alphabetic symbols requires only `[TokenSymbol]` attribute change; no tokenizer code changes. Correct pattern for future migrations.
+- Non-blocking: `LogicalOperatorsAreKeywordForms` does not assert `!` absent. Acceptable — `!` removed from tokenizer entirely, no path to operator inventory.
+
+**Coordinator final action:**
+- Added `NotContain("!")` assertion to `LogicalOperatorsAreKeywordForms`. Merged as 775th test.
+
+**Open item (deferred):**
+- Grammar group classification: `and`/`or`/`not` in `actionKeywords` is correct per current convention but a semantic visual system session should formally address whether expression-position operator-category tokens warrant a distinct scope token from structural action keywords. Deferred by Shane.
+
+---
+
 ### 2026-04-08T23:50:00Z: Soup Nazi exploratory MCP regression — methodology validated, 5 authoring corrections captured
 **By:** Soup Nazi (Tester)
 **Status:** Applied
