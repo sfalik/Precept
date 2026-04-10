@@ -2,6 +2,61 @@
 
 This document prioritizes the language research corpus by **domain**, not by individual issue. It is the execution plan for building durable research coverage before the next proposal and implementation wave.
 
+## Implementation Milestone Sequencing (2026-04-10)
+
+Based on the philosophy refresh assessment, three-agent strategic review (Frank, Steinbrenner, Peterman), and Shane sign-off, the research execution batches map to implementation milestones as follows:
+
+### Milestone 1: "Governed Integrity" (ship next)
+
+| Proposal | Domain | Research status |
+|----------|--------|----------------|
+| #31 Logical keywords | Expression expansion | ✅ Complete — ship first, touches every sample |
+| #22 Data-only precepts | Entity-modeling surface | ✅ Design locked, 12 Q&A decisions, PR #48 in progress |
+| #13 Field-level constraints | Constraint composition | ⚠️ Research adequate; constraint-zone architecture needs durable doc |
+
+**Why this is M1:** Proves the governed-integrity category claim. Data-only precepts demonstrate the full domain promise. Field constraints eliminate 60-70% of invariant boilerplate. Keyword modernization makes the language read as governance, not code.
+
+### Milestone 2: "Full Entity Surface" (near-term)
+
+| Proposal | Domain | Research status |
+|----------|--------|----------------|
+| #8 Named rules | Constraint composition | ✅ Research complete |
+| #14 Conditional invariants | Constraint composition | ✅ Research complete |
+| #29 Integer type | Type system expansion | ✅ Research complete |
+| #25 Choice type | Type system expansion | ✅ Research complete |
+| #11 Absorb shorthand | Event ingestion | ⚠️ Research thin — precedent survey needed before implementation |
+
+**Why this is M2:** Makes the language production-credible. Named rules + conditional guards complete constraint composition. Integer + choice solve the most urgent type gaps. Absorb collapses the #1 verbosity pattern.
+
+### Milestone 3: "Expression Power" (horizon)
+
+| Proposal | Domain | Research status |
+|----------|--------|----------------|
+| #26 Date type | Type system expansion | ✅ Research complete |
+| #27 Decimal type | Type system expansion | ✅ Research complete (needs #16 first) |
+| #16 Built-in functions | Expression expansion | ✅ Research complete |
+| #9 Conditional expressions | Expression expansion | ✅ Research complete |
+| #10 String .length | Expression expansion | ✅ Research complete |
+| #15 String .contains() | Expression expansion | ✅ Research complete |
+| #17 Computed fields | Entity-modeling surface | ✅ Research excellent (quality bar) |
+
+**Why this is M3:** Makes the language self-sufficient for complex business logic. Date/decimal close the last major type gaps. Functions provide the vocabulary. Computed fields eliminate derived-value drift.
+
+### Critical path
+
+```
+#31 → #22 → #13 → (#8+#14) → (#29+#25) → #11 → #16 → (#10,#15,#9) → (#26+#27) → #17
+```
+
+### Key dependencies
+
+- #13 (field constraints) must ship before type-specific constraints (#25, #27, #29)
+- #16 (built-in functions) must ship before #27 (decimal needs `round()`)
+- #22 (data-only) must ship before #17 (computed fields need stateless pipeline)
+- #22 must ship before any type expansion (brand constraint — Peterman)
+
+---
+
 ## Audit basis
 
 This plan was built from four inputs:

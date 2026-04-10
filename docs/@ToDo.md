@@ -54,6 +54,39 @@ CV 0-3 → Language D-H → CV 4-7 → Language I → MCP Redesign → Update To
 - ✅ [Phase 8](McpServerImplementationPlan.md#Phase-8-Agent-and-Skill-Content): drafted Precept Author agent (`precept-author.agent.md` — persona + tool restrictions), authoring skill (7-step creation workflow + Mermaid diagrams), debugging skill (compile → inspect → fire diagnosis + common patterns). Validated against agentskills.io spec (names match dirs, descriptions under 1024 chars, bodies under 500 lines).
 - ✅ [Phase 9](McpServerImplementationPlan.md#Phase-9-Documentation--Distribution): removed `registerMcpServerDefinitionProvider()` and `mcpServerDefinitionProviders` from extension, removed `publish:mcp` script, updated McpServerDesign.md to reflect `.claude-plugin/` format, verified copilot-instructions MCP sync section is accurate. Distribution (publish to marketplace) and remaining Phase 7/8 testing items are pending.
 
+## Language Expansion Milestones (from research refresh 2026-04-10)
+
+### Milestone 1: "Governed Integrity"
+
+- [ ] #31 — Logical keywords (`and`/`or`/`not`). Ship first — touches every sample.
+- [ ] #22 — Data-only precepts. PR #48 in progress (Slices 1-3 committed). Design locked (12 decisions).
+- [ ] #13 — Field-level constraints (`min`, `max`, `nonnegative`, `positive`). Constraint-zone architecture.
+
+### Milestone 2: "Full Entity Surface"
+
+- [ ] #8 — Named rule declarations (`rule Name when <expr>`)
+- [ ] #14 — Conditional invariants (`invariant ... when ...`)
+- [ ] #29 — `integer` type
+- [ ] #25 — `choice(...)` type
+- [ ] #11 — Event argument absorb shorthand (pending research pass)
+
+### Milestone 3: "Expression Power"
+
+- [ ] #16 — Built-in function library (`abs`, `round`, `floor`, `ceil`, `min`, `max`)
+- [ ] #9 — Conditional expressions (`if...then...else` in value positions)
+- [ ] #10 — String `.length` accessor
+- [ ] #15 — String `.contains()` method
+- [ ] #26 — `date` type
+- [ ] #27 — `decimal` type (requires #16)
+- [ ] #17 — Computed / derived fields (requires #9, benefits from #16)
+
+### Research still needed
+
+- [ ] Absorb (#11) — precedent survey, philosophy tension resolution
+- [ ] Null safety — standalone research doc for nullable semantics across new types
+- [ ] Built-in function architecture — function-call AST node integration with Superpower
+- [ ] Stateless constraint patterns — what patterns arise without states?
+
 ---
 
 ## Later
