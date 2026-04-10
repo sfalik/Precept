@@ -4,6 +4,8 @@
 **Author:** George (Runtime Dev)  
 **Relevance:** What PLT and statechart theory offer beyond Precept's current `from/on/transition` model
 
+This reference covers Precept's state machine capabilities. The philosophy also supports stateless entities with governed integrity but no state machine — those are outside this document's scope.
+
 ---
 
 ## Formal Concept
@@ -16,7 +18,7 @@ PLT distinguishes three generations of state machine formalism:
 | 2 | Extended FA (EFA/Mealy/Moore) | States + transitions + output actions; data guards |
 | 3 | Statecharts (Harel, 1987) | Hierarchy, orthogonality, broadcast events, history |
 
-Precept operates in **Generation 2** — it has states, transitions, guards, and output actions (mutations). This is correct for a domain integrity engine. Generation 3 features offer expressiveness, but each comes with semantic cost.
+Precept's state-machine component operates in **Generation 2** — it has states, transitions, guards, and output actions (mutations). This is the lifecycle-aware layer within a broader domain integrity engine that also governs stateless entities through the same field declarations, invariants, and constraint enforcement. Generation 3 features offer expressiveness, but each comes with semantic cost.
 
 ---
 

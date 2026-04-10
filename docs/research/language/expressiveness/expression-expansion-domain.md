@@ -25,6 +25,8 @@ The sample corpus makes the pain concrete:
 | `travel-reimbursement.precept` | `Miles * MileageRate` without rounding — `round()` (L5) needed for production accuracy |
 | All 21 samples | String fields with no length validation (L2); `&&`/`||`/`!` everywhere that `and`/`or`/`not` would read better |
 
+Expression expansion applies equally to stateless precepts. For data-only entities, where invariants and computed fields are the entire governance surface, expression gaps directly reduce the product's ability to deliver governed integrity — the principle that an entity's data satisfies its declared rules at every moment.
+
 ### Why these five proposals belong in one research pass
 
 Every decision in this domain changes the shape of the expression language authors see. The vocabulary surface — what counts as an operator, what counts as an accessor, what counts as a function, and what counts as a keyword — must be coherent across all five proposals. Researching them independently would produce contradictory naming conventions, inconsistent null policies, and an unpredictable vocabulary boundary. Treating them as one expression-expansion domain grounds all five decisions in the same precedent base, the same philosophy filter, and the same vocabulary taxonomy.
@@ -376,7 +378,7 @@ The expression expansion introduces new construct forms. Each must be scoped:
 | Functions (#16) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `and`/`or`/`not` (#31) | N/A (token swap) | ✓ | ✓ | ✓ | ✓ |
 
-All new constructs are valid in all expression positions. There is no "set RHS only" restriction for any of these additions. The audit's earlier suggestion to restrict ternary to `set` RHS only (§5 cross-cutting notes) is superseded — `if...then...else` yielding boolean is valuable in invariants (`invariant (if IsPremium then Score >= 700 else Score >= 600) because "..."`) and requires no special handling since both branches type-check.
+All new constructs are valid in all expression positions. There is no "set RHS only" restriction for any of these additions. All expression positions work identically in stateless precepts — none of the new constructs are state-dependent. The audit's earlier suggestion to restrict ternary to `set` RHS only (§5 cross-cutting notes) is superseded — `if...then...else` yielding boolean is valuable in invariants (`invariant (if IsPremium then Score >= 700 else Score >= 600) because "..."`) and requires no special handling since both branches type-check.
 
 ### 2. Precedence integration
 

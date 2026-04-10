@@ -162,6 +162,8 @@ The `MONEY` type lesson recurs in three systems: PostgreSQL `MONEY`, SQL Server 
 
 ## Philosophy Fit
 
+The type system expansion strengthens governed integrity by making domain-specific data semantics enforceable. For data-only entities — where field types and constraints are the entire governance surface — the expanded type system is arguably more important than for lifecycle entities. A stateless precept defining a Fee Schedule, Rate Card, or Patient Demographic needs `choice`, `date`, `decimal`, and `integer` types to enforce data integrity. Without them, the governance surface is limited to string equality and numeric comparison — insufficient for any real domain.
+
 The type system expansion fits Precept's philosophy under five explicit checks.
 
 **Prevention, not detection.** A `choice` type that rejects non-member values at compile time and at the runtime boundary is prevention. The current string-plus-invariant pattern checks at runtime, only on fire and update, only if the invariant is present. A `date` constructor that rejects `"2026-02-30"` at compile time is prevention. A `maxplaces 2` constraint that rejects `ClaimAmount = 0.001` at assignment is prevention. All four types move error detection earlier.

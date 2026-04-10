@@ -8,6 +8,8 @@ This file is durable research, not a proposal body. It captures why these three 
 
 ## Background and Problem
 
+Constraint composition supports governed integrity by enabling authors to express complex data rules — unconditionally or under declared guard conditions — that the runtime enforces structurally on every operation.
+
 Precept's constraint surface currently has three interconnected pressure points. Each is visible independently, but they share a root cause: the language treats every constraint as a standalone flat statement with no composition, no co-location, and no conditional applicability. Together they account for the largest authoring-friction category in the sample corpus.
 
 ### Pressure 1 — Basic shape constraints inflate every file
@@ -265,6 +267,8 @@ A `when` guard on an invariant or edit declaration references the same scope as 
 | `on <Event> assert` | No | Yes (that event's args) | No (scope mismatch) | No (event args are transient; `when` guard scope is field-only) |
 | Named rule definition | All fields | No | No (flat — no rule-to-rule) | N/A (the definition is the predicate itself) |
 | `when` guard in transition row | All fields + event args | Yes | Yes | N/A (the guard *is* the condition) |
+
+All three composition forms (field constraints, named rules, conditional guards) work identically in stateless precepts. The absence of states does not reduce the composition vocabulary — field-local and cross-field constraints remain available.
 
 ### How much suffix syntax is acceptable?
 

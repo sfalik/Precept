@@ -36,6 +36,12 @@ These files compare Precept against adjacent tools and systems. They are not pro
 | [polly.md](./polly.md) | Pipeline-style composition and conditional outcome pressure | Expression expansion |
 | [linq.md](./linq.md) | Value selection, conditional expressions, concise data-oriented syntax | Expression expansion |
 
+## External language comparisons
+
+| File | Comparative focus | Most useful for |
+|---|---|---|
+| [../references/cel-comparison.md](../references/cel-comparison.md) | Google CEL: expression model, type system, logical operators, extension model, safety guarantees | Expression expansion, keyword vs symbol surface |
+
 ## Cross-cutting analysis docs
 
 | File | Purpose |

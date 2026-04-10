@@ -29,6 +29,10 @@ That matters because it separates two different user needs:
 
 Need A can plausibly fit Precept as narrow sugar. Need B is where compactness turns into a mapping DSL.
 
+### Stateless Applicability
+
+Absorb is a transition-row action; it does not apply to stateless precepts, which have no events or transition rows. Stateless field population occurs through the Update API, which has no shorthand mechanism.
+
 ## Precedent Survey
 
 | Category | System | Hydration / update model | Precept implication |
@@ -64,7 +68,7 @@ That is the central design signal for Precept: a narrow shorthand for exact one-
 
 ## Philosophy Fit
 
-Event-ingestion shorthand fits Precept's philosophy only under a narrow contract.
+The product's unifying principle is governed integrity — the entity's data satisfies its declared rules at every moment. Event-ingestion shorthand fits Precept's philosophy only under a narrow contract.
 
 **Prevention, not detection.** Hidden writes are only acceptable if the runtime still validates the fully materialized post-mutation state before commit. `absorb` cannot be “special” in a way that bypasses ordinary `set` semantics or validation.
 

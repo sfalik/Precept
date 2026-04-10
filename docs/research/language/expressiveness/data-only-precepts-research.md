@@ -2,13 +2,17 @@
 
 Research grounding for [#22 — Data-only precepts](https://github.com/sfalik/Precept/issues/22).
 
-## The Mixed-Tooling Problem
+## Background
 
-Precept's original design required every precept to have a state machine. This means entities without workflow needs (reference data, configuration, simple domain objects) must be modeled in a separate tool (Zod, FluentValidation, JSON Schema). For domains where some entities have workflows and others don't, this creates:
+The test for whether an entity belongs in Precept is not "does it have a state machine?" but "does it need governed integrity?" — the guarantee that an entity's data satisfies its declared rules at every moment, through every operation, with no code path that bypasses the contract. The philosophy establishes a hierarchy: data and rules are the primary concern; states are the structural mechanism that makes data protection lifecycle-aware when lifecycle is present; workflow is one dimension, not the defining frame.
+
+Precept's original design required every precept to have a state machine. This forced entities without workflow needs (reference data, configuration, simple domain objects) into a separate tool (Zod, FluentValidation, JSON Schema) — even when those entities need governed integrity just as much as their lifecycle-driven counterparts. For domains where some entities have workflows and others don't, this creates:
 
 - Two languages, two runtimes, two mental models
 - No single source of truth for the domain
 - Adoption barrier: users evaluate Precept for their complex entities, then realize they need a second tool for everything else
+
+The philosophy makes the case concrete: "In every real business domain, data and reference entities outnumber workflow entities." A product that governs only the workflow side covers the minority.
 
 This problem was identified by Shane during backlog grooming (April 7, 2026).
 
@@ -43,6 +47,22 @@ Evans (2003) explicitly recognizes that a single domain contains both:
 - **Entities:** Identity, state, business rules, lifecycle
 
 A domain modeling language that only supports entities forces value objects into a different tool.
+
+## Philosophy Fit
+
+Data-only precepts evaluated against the seven core philosophy commitments:
+
+| Commitment | Stateful | Stateless | Assessment |
+|------------|----------|-----------|------------|
+| **Prevention, not detection** | Invalid configurations structurally impossible — transition rejected before commit | Same. `Update` rejects any field mutation that violates an invariant. No invalid configuration persists. | Full parity. The prevention guarantee is about data configurations, not lifecycle positions. |
+| **One-file completeness** | All fields, states, transitions, constraints in one `.precept` file | Same. All fields, invariants, editability declarations in one `.precept` file. | Full parity. No scattered logic across service layers. |
+| **Inspectability** | `Inspect` previews every event outcome from any state | `Inspect` returns `Undefined` for events (none exist). `Update` constraint checking is the primary operation surface. | Reduced but appropriate. Stateless entities have no transitions to preview — inspectability applies to the operation surface that exists. |
+| **Determinism** | Same definition + same data + same event = same outcome | Same definition + same data + same field edit = same outcome | Full parity. |
+| **Compile-time structural checking** | Unreachable states, type mismatches, constraint contradictions caught before runtime | Type mismatches, constraint contradictions, empty-precept checks caught before runtime | Full parity on the applicable surface. State-related checks (C13, C50) are gated on state presence. |
+| **AI readability** | Single file, declarative, deterministic — readable by human and AI alike | Same. Simpler structure may be *more* readable. | Full parity or better. |
+| **Governance, not validation** | Invariants enforced structurally on every operation — no bypass path | Same. Invariants enforced structurally on every `Update` — no bypass path. | Full parity. This is the core: governed integrity does not require a state machine. |
+
+All seven commitments hold for stateless precepts. The philosophy's hierarchy predicts this directly — data and rules are the primary concern, states are instrumental.
 
 ## Design Decisions
 
@@ -101,6 +121,8 @@ Frank argued the scenarios differ at the API level (`Fire()` requires `currentSt
 
 **Decision:** Precept has two entity tiers — **data** (fields + invariants + editability) and **behavioral** (fields + invariants + states + events + transitions). No middle tier.
 
+This maps directly to the philosophy's hierarchy of concepts: "Data and rules are the primary concern. States are the structural mechanism that makes data protection lifecycle-aware — when lifecycle is present." The data tier is entities where governed integrity suffices. The behavioral tier is entities where governed integrity *plus lifecycle awareness* is needed. States are not a prerequisite for governance — they are an additional structural dimension for entities that have one.
+
 **Why no "data + commands" middle tier:**
 
 | Problem | Impact |
@@ -119,7 +141,7 @@ Frank argued the scenarios differ at the API level (`Fire()` requires `currentSt
 ### "Close #22 — Out of Scope"
 
 The team initially recommended closing #22 (April 7, 2026). Arguments:
-- "Precept's identity is state machines" — but this framed Precept as a state machine tool, not a domain integrity platform
+- "Precept's identity is state machines" — but this framed Precept as a state machine tool, not a domain integrity engine
 - "All 20 samples are stateful" — circular: Precept doesn't support stateless, so no stateless samples can exist
 - "Better served by Zod/FluentValidation" — ignores the mixed-tooling adoption barrier
 

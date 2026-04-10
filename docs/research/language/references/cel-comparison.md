@@ -8,7 +8,7 @@
 
 ## Why CEL Is a Relevant Comparator
 
-CEL and Precept occupy different positions on the same spectrum — non-Turing-complete declarative languages with safety guarantees. CEL is an embeddable expression evaluator for policy/config (Google infrastructure — access control, routing, security policies). Precept is an entity lifecycle governance engine. Both are side-effect-free, terminating, and strongly-typed. Their contrasting design choices illuminate what matters at each position.
+CEL and Precept occupy different positions on the same spectrum — non-Turing-complete declarative languages with safety guarantees. CEL is an embeddable expression evaluator for policy/config (Google infrastructure — access control, routing, security policies). Precept is a domain integrity engine. Both are side-effect-free, terminating, and strongly-typed. Their contrasting design choices illuminate what matters at each position.
 
 ---
 
@@ -16,7 +16,7 @@ CEL and Precept occupy different positions on the same spectrum — non-Turing-c
 
 | Dimension | CEL | Precept |
 |-----------|-----|---------|
-| Category | Embeddable expression evaluator | Entity lifecycle governance engine |
+| Category | Embeddable expression evaluator | Domain integrity engine |
 | Expression surface | Rich (ternary, comprehensions, regex, functions) | Minimal — expanding via proposals #9-16 |
 | Type system | Gradual typing; int/uint/double/bytes/protobuf | Static; number/string/boolean |
 | Collection model | list/map with iteration macros | set/queue/stack with fixed accessors + mutation verbs |
@@ -118,6 +118,8 @@ Precept allows no extension. The vocabulary is fixed (~50 keywords, ~23 symbols)
 ---
 
 ## What Precept Has That CEL Doesn't
+
+The primary differentiator is governed integrity — structural prevention on every operation, not just the state machine. CEL evaluates an expression against a presented context; Precept ensures that no operation can produce an entity configuration that violates its declared rules.
 
 - State machines (`state`, `from...on...transition`)
 - Lifecycle-scoped constraints (`in`/`to`/`from` assert)

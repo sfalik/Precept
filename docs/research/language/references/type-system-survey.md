@@ -10,7 +10,7 @@
 
 ### What kind of type system is Precept extending?
 
-Precept's current type system is a **many-sorted first-order type system** with three base sorts: `string`, `number`, and `boolean`. Fields are typed at declaration time. Expressions are statically typed. There is no subtyping, no generics, no higher-kinded types, and no type inference beyond collection element types.
+Precept's current type system is a **many-sorted first-order type system** with three base sorts: `string`, `number`, and `boolean`. Fields are typed at declaration time. Expressions are statically typed. There is no subtyping, no generics, no higher-kinded types, and no type inference beyond collection element types. The type system operates identically in stateful and stateless precepts — all coercion, constraint, and comparison rules apply regardless of whether states are declared.
 
 The expansion adds four types. In formal terms these are:
 
