@@ -61,8 +61,9 @@ The immutable compiled engine. One `PreceptEngine` instance represents one workf
 | Property | Type | Description |
 |----------|------|-------------|
 | `Name` | `string` | Workflow name as declared with `precept`. |
-| `States` | `IReadOnlyList<string>` | All declared state names in declaration order. |
-| `InitialState` | `string` | The state marked `initial`. |
+| `States` | `IReadOnlyList<string>` | All declared state names in declaration order. Empty for stateless precepts. |
+| `InitialState` | `string?` | The state marked `initial`. `null` for stateless precepts. |
+| `IsStateless` | `bool` | `true` when the precept has no state declarations (`States.Count == 0`). |
 | `Events` | `IReadOnlyList<PreceptEvent>` | All declared events with their argument contracts. |
 | `Fields` | `IReadOnlyList<PreceptField>` | All scalar data fields. |
 | `CollectionFields` | `IReadOnlyList<PreceptCollectionField>` | All collection fields (`set<T>`, `queue<T>`, `stack<T>`). |
@@ -80,11 +81,13 @@ public PreceptInstance CreateInstance(
 
 Creates a new workflow instance, optionally pre-seeded with field data and starting in a custom state.
 
-- Uses `InitialState` when no `initialState` argument is provided.
+- `CreateInstance(data?)` — works for both stateful and stateless precepts. For stateful precepts, uses `InitialState`. For stateless precepts, creates an instance with `CurrentState = null`.
+- `CreateInstance(state, data?)` — throws `ArgumentException` for stateless precepts (`Precept '{Name}' is stateless. Use CreateInstance(instanceData) — the state argument is not valid.`).
 - Merges caller-supplied `instanceData` with declared field defaults. Callers only supply the fields they care about.
 - Collection fields must be supplied as any `IEnumerable` (not `string`); items are coerced to the declared `InnerType`.
 - Throws `InvalidOperationException` if `initialState` is not a known state, or if supplied `instanceData` violates the field type contract.
 - `instance.InstanceData` uses *clean keys*: collection fields appear under their declared field name (not an internal `__collection__` prefix), and their values are `List<object>`.
+- `instance.CurrentState` is `string?` — `null` for stateless instances.
 
 ### `Inspect` (per-event)
 
@@ -99,6 +102,7 @@ Non-mutating evaluation of a single event. Returns `EventInspectionResult`.
 
 **Semantics:**
 - Verifies schema compatibility via `CheckCompatibility` before evaluating. On failure, returns `Undefined`.
+- **Stateless precepts:** Returns `Undefined` immediately after compatibility check. Events have no transition surface on stateless precepts.
 - Evaluates the `when` precondition (if present) against instance data alone, before argument validation. If false, returns `Unmatched`.
 - Accepts calls with missing/partial event arguments — this is a discovery API. `RequiredEventArgumentKeys` on the result tells callers what is needed before `Fire`.
 - When event arguments are provided, validates them against the event's argument contract. Unknown keys are rejected.
@@ -119,7 +123,8 @@ Evaluates all events that have at least one transition from the instance's curre
 
 - Events are ordered by declaration position.
 - Each event is evaluated as `Inspect(instance, eventName)` with no event arguments (discovery mode).
-- `EditableFields` is `null` when no `in ... edit` declarations exist, or contains the union of all matching edit declarations for the current state.
+- **Stateless precepts:** All events return `Undefined` outcome (no transition surface). `EditableFields` is populated from root-level `edit` declarations if any exist.
+- `EditableFields` is `null` when no `in ... edit` declarations exist (stateful) or no root-level `edit` declarations exist (stateless), or contains the union of all matching edit declarations for the current state.
 - If the instance fails `CheckCompatibility`, returns a result with an empty events list.
 
 Use this as the primary API for rendering a state-machine inspector view.
@@ -138,7 +143,7 @@ Applies a hypothetical patch to a working copy of instance data, runs the full r
 public UpdateResult Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
 ```
 
-Atomically updates editable fields. Only fields declared in an `in <State> edit` block for the current state are mutable. Evaluation sequence: editability check → type check → atomic mutation on working copy → invariant/state-assert evaluation → commit or rollback. Returns `UpdateResult`.
+Atomically updates editable fields. For **stateful** precepts, only fields declared in an `in <State> edit` block for the current state are mutable. For **stateless** precepts, only fields declared in a root-level `edit` block are mutable (`CurrentState` is `null` throughout). Evaluation sequence: editability check → type check → atomic mutation on working copy → invariant/state-assert evaluation → commit or rollback. Returns `UpdateResult`.
 
 ### `Fire`
 
@@ -150,6 +155,8 @@ public FireResult Fire(
 ```
 
 Mutating event execution. Returns `FireResult`.
+
+**Stateless precepts:** Returns `Undefined` immediately after compatibility check. Events have no transition surface.
 
 **Evaluation stages (in order, with full rollback on any failure):**
 
@@ -178,7 +185,7 @@ public PreceptCompatibilityResult CheckCompatibility(PreceptInstance instance)
 Validates that an externally loaded or deserialized instance is compatible with this compiled engine:
 
 1. `WorkflowName` matches `Name`.
-2. `CurrentState` is a known state.
+2. For stateful precepts: `CurrentState` is a known declared state. For stateless precepts: `CurrentState` must be `null`.
 3. `InstanceData` satisfies the field type contract (no unknown fields with wrong types).
 4. All data rules (field rules + top-level rules) and the current state's entry rules pass.
 
@@ -268,7 +275,7 @@ public enum TransitionOutcome
 ```csharp
 public sealed record EventInspectionResult(
     TransitionOutcome Outcome,
-    string CurrentState,
+    string? CurrentState,
     string EventName,
     string? TargetState,           // null unless Outcome is Transition or NoTransition
     IReadOnlyList<string> RequiredEventArgumentKeys,
@@ -279,19 +286,19 @@ public sealed record EventInspectionResult(
 }
 ```
 
-Returned by the per-event `Inspect` overload. `TargetState` is populated for `Transition` (the transition target) and `NoTransition` (same as `CurrentState`).
+Returned by the per-event `Inspect` overload. `TargetState` is populated for `Transition` (the transition target) and `NoTransition` (same as `CurrentState`). `CurrentState` is `null` for stateless instances.
 
 ### `InspectionResult`
 
 ```csharp
 public sealed record InspectionResult(
-    string CurrentState,
+    string? CurrentState,
     IReadOnlyDictionary<string, object?> InstanceData,
     IReadOnlyList<EventInspectionResult> Events,
     IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null)
 ```
 
-Returned by the aggregate `Inspect(instance)` overload. `InstanceData` is the same clean dictionary as `instance.InstanceData`. `EditableFields` is `null` when no `in ... edit` declarations exist, or contains the effective editable field set for the current state.
+Returned by the aggregate `Inspect(instance)` overload. `InstanceData` is the same clean dictionary as `instance.InstanceData`. `CurrentState` is `null` for stateless instances. `EditableFields` is `null` when no `in ... edit` declarations exist (stateful) or no root-level `edit` declarations exist (stateless), or contains the effective editable field set for the current state.
 
 ### `PreceptEditableFieldInfo`
 
@@ -340,7 +347,7 @@ public enum UpdateOutcome
 ```csharp
 public sealed record FireResult(
     TransitionOutcome Outcome,
-    string PreviousState,
+    string? PreviousState,
     string EventName,
     string? NewState,
     IReadOnlyList<ConstraintViolation> Violations,

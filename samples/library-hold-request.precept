@@ -67,7 +67,7 @@ from OnShelf on AdvanceDay -> reject "The day counter must move forward"
 from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
 from CheckedOut on AdvanceDay -> reject "The day counter must move forward"
 
-from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay && AdvanceDay.DayNumber <= PickupExpiryDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
-from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay && HoldQueue.count > 0 -> set CurrentDay = AdvanceDay.DayNumber -> dequeue HoldQueue into PromotedPatron -> set ReadyPatron = PromotedPatron -> set PickupCode = "READY" -> set PickupExpiryDay = AdvanceDay.DayNumber + 3 -> no transition
+from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and AdvanceDay.DayNumber <= PickupExpiryDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
+from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and HoldQueue.count > 0 -> set CurrentDay = AdvanceDay.DayNumber -> dequeue HoldQueue into PromotedPatron -> set ReadyPatron = PromotedPatron -> set PickupCode = "READY" -> set PickupExpiryDay = AdvanceDay.DayNumber + 3 -> no transition
 from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> transition OnShelf
 from HoldReady on AdvanceDay -> reject "The day counter must move forward"

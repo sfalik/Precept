@@ -23,6 +23,7 @@
 
 ## How I Work
 
+- Follow `CONTRIBUTING.md` for implementation workflow — PR structure, slice order, checkbox hygiene, and doc sync rules.
 - Build language server: `dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server`
 - Build extension: `npm run compile` from `tools/Precept.VsCode/`
 - Install extension locally: VS Code task `extension: install` (or `npm run loop:local`)

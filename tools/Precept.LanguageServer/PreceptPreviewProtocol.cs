@@ -30,8 +30,8 @@ internal sealed record PreceptPreviewResponse(
 
 internal sealed record PreceptPreviewSnapshot(
     string WorkflowName,
-    string CurrentState,
-    string InitialState,
+    string? CurrentState,
+    string? InitialState,
     IReadOnlyList<string> States,
     IReadOnlyList<PreceptPreviewTransition> Transitions,
     IReadOnlyList<PreceptPreviewEventStatus> Events,

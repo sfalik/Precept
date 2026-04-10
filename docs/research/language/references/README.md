@@ -1,20 +1,41 @@
-# Language Theory References — README
+# Language Theory and Reference Research
 
-**Maintained by:** George (Runtime Dev)  
-**Last updated:** 2026-04-05  
-**Purpose:** Formal grounding for evaluating DSL feature proposals
+This directory is the theory and reference companion to the domain packets in `../expressiveness/`.
 
----
+Use it when you need formal grounding, precedent from language theory, or a principled boundary for what should stay out of scope.
 
-## What's Here
+## Reference index
 
-This directory contains language-theory research relevant to potential Precept language changes. Each document covers a specific PLT topic, grounded in formal references and calibrated to Precept's current design constraints.
+| File | Domain grounded | Open proposals | Why it matters |
+|---|---|---|---|
+| [type-system-survey.md](./type-system-survey.md) | Type system expansion and type-system follow-ons | `#25`, `#26`, `#27`, `#29` | Formal type-model, coercion, scalar semantics, and cross-system precedent for the expanded type surface. |
+| [constraint-composition.md](./constraint-composition.md) | Constraint composition | `#8`, `#13`, `#14` | Predicate-combinator theory, scope boundaries, and desugaring model for rules and field constraints. |
+| [conditional-invariant-survey.md](./conditional-invariant-survey.md) | Constraint composition | `#14` | Why guarded declarations should read as positive conditions instead of formal implication syntax. |
+| [expression-evaluation.md](./expression-evaluation.md) | Expression expansion and computed-field semantics | `#9`, `#10`, `#15`, `#16`, `#17`, `#31` | Decidability map for expression growth and bounded-function design. |
+| [expression-compactness.md](./expression-compactness.md) | Event ingestion shorthand and future compactness work | `#11` | Desugaring and shorthand boundaries for keeping compact syntax inspectable. |
+| [multi-event-shorthand.md](./multi-event-shorthand.md) | Transition shorthand | — | Formal basis for multi-event `on` and related event-set sugar. |
+| [state-machine-expressiveness.md](./state-machine-expressiveness.md) | Transition shorthand | — | Statechart and state-machine precedent for what Precept should and should not borrow. |
+| [static-reasoning-expansion.md](./static-reasoning-expansion.md) | Static reasoning expansion | — | Horizon-domain grounding for contradiction detection, deadlock analysis, and interval-first reasoning. |
+| [cel-comparison.md](./cel-comparison.md) | Expression expansion, keyword vs symbol surface | `#9`, `#10`, `#15`, `#16`, `#31` | Full language-level comparison against Google CEL — validates conditional expression priority, small string function surface, and deterministic logical operator semantics. |
+| [governance-vs-validation.md](./governance-vs-validation.md) | Governance architecture, philosophy positioning | `#22` | Defines the governance-vs-validation distinction, surveys cross-system enforcement architectures, catalogs validation failure modes governance prevents. |
 
-These are **research documents, not proposals.** They exist to give the team principled grounding when evaluating GitHub proposal issues, so proposal bodies do not need to carry all theoretical rationale inline.
+## Pairing guide
 
----
+If you start from a domain packet, pair it with the reference docs below.
 
-## Document Index
+| Domain packet | Pair with |
+|---|---|
+| [../expressiveness/type-system-domain-survey.md](../expressiveness/type-system-domain-survey.md) | [type-system-survey.md](./type-system-survey.md) |
+| [../expressiveness/event-ingestion-shorthand.md](../expressiveness/event-ingestion-shorthand.md) | [expression-compactness.md](./expression-compactness.md) |
+| [../expressiveness/constraint-composition-domain.md](../expressiveness/constraint-composition-domain.md) | [constraint-composition.md](./constraint-composition.md), [conditional-invariant-survey.md](./conditional-invariant-survey.md) |
+| [../expressiveness/expression-expansion-domain.md](../expressiveness/expression-expansion-domain.md) | [expression-evaluation.md](./expression-evaluation.md), [cel-comparison.md](./cel-comparison.md) |
+| [../expressiveness/entity-modeling-surface.md](../expressiveness/entity-modeling-surface.md) | [expression-evaluation.md](./expression-evaluation.md) |
+| [../expressiveness/data-only-precepts-research.md](../expressiveness/data-only-precepts-research.md) | [governance-vs-validation.md](./governance-vs-validation.md) |
+| [../expressiveness/transition-shorthand.md](../expressiveness/transition-shorthand.md) | [multi-event-shorthand.md](./multi-event-shorthand.md), [state-machine-expressiveness.md](./state-machine-expressiveness.md) |
+| [../expressiveness/type-system-follow-ons.md](../expressiveness/type-system-follow-ons.md) | [type-system-survey.md](./type-system-survey.md) |
+| Horizon compile-time analysis work | [static-reasoning-expansion.md](./static-reasoning-expansion.md) |
+
+## Reference doc characteristics
 
 | File | Topic | PLT Concept | Relevance to Language Proposals |
 |------|-------|-------------|---------------------------------|
@@ -25,53 +46,35 @@ These are **research documents, not proposals.** They exist to give the team pri
 | [`expression-evaluation.md`](./expression-evaluation.md) | Principled expression system expansion while keeping semantics decidable | Many-sorted FOL fragments, symbolic finite automata, type narrowing | **High** — String predicates, bounded built-ins, and derived-value proposals all depend on this footing. |
 | [`type-system-survey.md`](./type-system-survey.md) | What data types business rule engines and expression languages need | Cross-system survey: DMN/FEEL, Cedar, Drools, NRules, BPMN, SQL | **High** — Direct evidence base for Proposal #25 (choice and date types). Confirms date and enum are universal consensus. |
 
----
+## Open proposal grounding from this folder
 
-## Reading Guide
+| Issue | Focus | Theory grounding |
+|---|---|---|
+| `#8` | Named rule declarations | [constraint-composition.md](./constraint-composition.md) |
+| `#9` | Conditional expressions in value positions | [expression-evaluation.md](./expression-evaluation.md) |
+| `#10` | String `.length` accessor | [expression-evaluation.md](./expression-evaluation.md) |
+| `#11` | Event argument absorb shorthand | [expression-compactness.md](./expression-compactness.md) |
+| `#13` | Field-level range / basic constraints | [constraint-composition.md](./constraint-composition.md) |
+| `#14` | Conditional invariants / guarded declarations | [constraint-composition.md](./constraint-composition.md), [conditional-invariant-survey.md](./conditional-invariant-survey.md) |
+| `#15` | String `.contains()` | [expression-evaluation.md](./expression-evaluation.md) |
+| `#16` | Built-in function library | [expression-evaluation.md](./expression-evaluation.md) |
+| `#17` | Computed / derived fields | [expression-evaluation.md](./expression-evaluation.md) |
+| `#22` | Data-only precepts | [governance-vs-validation.md](./governance-vs-validation.md), [../expressiveness/entity-modeling-surface.md](../expressiveness/entity-modeling-surface.md) |
+| `#25` | `choice` type | [type-system-survey.md](./type-system-survey.md) |
+| `#26` | `date` type | [type-system-survey.md](./type-system-survey.md) |
+| `#27` | `decimal` type | [type-system-survey.md](./type-system-survey.md) |
+| `#29` | `integer` type | [type-system-survey.md](./type-system-survey.md) |
+| `#31` | Logical keyword forms (`and` / `or` / `not`) | [expression-evaluation.md](./expression-evaluation.md), [cel-comparison.md](./cel-comparison.md) |
 
-### For evaluating a specific GitHub proposal issue
+## Theory-first domains with no proposal yet
 
-1. Identify which PLT category the issue falls into (derived form, predicate combinator, new operator sort, accessor, built-in function).
-2. Read the relevant document's implementation-cost and semantic-risk sections.
-3. Verify the proposal still fits Precept's design principles: flat structure, AI readability, deterministic evaluation, and configuration-like readability.
+These docs are here so future proposal work starts from grounding that already exists.
 
-### For understanding what is already established
+- [multi-event-shorthand.md](./multi-event-shorthand.md)
+- [state-machine-expressiveness.md](./state-machine-expressiveness.md)
+- [static-reasoning-expansion.md](./static-reasoning-expansion.md)
 
-The existing shorthand inventory (from `expression-compactness.md`):
-- Multi-state `from` → desugars to N rows
-- `from any` → desugars to one row per declared state  
-- Multi-name `event`, `state`, `field` declarations → desugar to N individual declarations
-- These establish the **desugaring pattern** any new shorthand should follow
+## Related indexes
 
-### Priority ranking for future investigation (observations only)
-
-Based purely on research findings — these are observations, not proposals:
-
-1. **Multi-event `on` clause (no-arg form)**: Highest value for lowest cost. Direct extension of existing pattern. `from any on Cancel, Withdraw -> transition Cancelled` would eliminate 2–4 rows in many samples.
-2. **String predicates** (`startsWith`, `endsWith`, `length`) and bounded numeric helpers: low cost, low decidability risk, strong practical utility.
-3. **Named rule reuse**: Medium cost, high impact on long `when` guards. Biggest authoring win for complex domain rules.
-4. **Catch-all `on any` row**: Low-medium cost, but with semantic risks around masking `Undefined` outcomes that currently surface as analysis warnings.
-5. **State machine hierarchy**: High cost, not recommended for Precept's domain model. The flat self-contained row model is a feature, not a limitation.
-
----
-
-## Notes for Future Research
-
-The following topics were identified during this research pass but are not yet covered by dedicated docs here:
-
-- **Error recovery and resugaring** — how to preserve diagnostic quality through desugaring (especially for multi-event expansion). Relevant to any new shorthand addition.
-- **Constraint propagation beyond nullable narrowing** — interval analysis on numeric comparisons, enabling the type checker to prove constraints satisfiable/unsatisfiable without runtime evaluation.
-- **Named invariant composition** — the formal semantics of named rule references in different scope contexts (field scope vs. event arg scope vs. global scope).
-- **Temporal assertions** — `before`/`after` event ordering constraints, analogous to TLA+ temporal operators. High semantic cost; not currently in scope.
-
----
-
-## Cross-References
-
-- Start here index: `docs/research/language/README.md`
-- Expressiveness research: `docs/research/language/expressiveness/README.md`
-- DSL spec: `docs/PreceptLanguageDesign.md`
-- Runtime design: `docs/RuntimeApiDesign.md`  
-- Rules design: `docs/RulesDesign.md`
-- Parser implementation: `src/Precept/Dsl/PreceptParser.cs`
-- Expression evaluator: `src/Precept/Dsl/PreceptExpressionEvaluator.cs`
+- [../README.md](../README.md) — master domain index and issue map
+- [../expressiveness/README.md](../expressiveness/README.md) — domain packets and comparative research index

@@ -462,7 +462,7 @@ internal static class PreceptDocumentIntellisense
                     var name = nameMatch.Value;
                     if (StateKeywords.Contains(name))
                         continue;
-                    var isInitial = model is not null && string.Equals(model.InitialState.Name, name, StringComparison.Ordinal);
+                    var isInitial = model is not null && string.Equals(model.InitialState?.Name, name, StringComparison.Ordinal);
                     var nameStart = restStart + nameMatch.Index;
                     var symbol = new PreceptDeclaredSymbol(
                         name,

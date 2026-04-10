@@ -8,6 +8,10 @@
 
 ---
 
+Expression limitations affect both stateful and stateless precepts. For data-only entities, where invariants and field constraints are the entire governance surface, expression gaps directly reduce the product's ability to deliver governed integrity — the principle that an entity's data satisfies its declared rules at every moment.
+
+---
+
 ## Purpose
 
 This audit catalogues what Precept's expression language can and cannot express today. The goal is not to propose implementations — that requires an approved design doc — but to give proposal authors a rigorous, implementation-grounded inventory of where the expression system is limiting real business logic, so GitHub proposal issues are built on facts, not intuition.
@@ -175,7 +179,7 @@ invariant Description.length <= 500 because "Description must not exceed 500 cha
 on Submit assert Submit.Comment.length <= 1000 because "Comments are limited to 1000 characters"
 ```
 
-**Affected domains:** Any sample with a freeform text field (all 21 samples have at least one `string` field). Insurance claims, work orders, helpdesk tickets, and reimbursement notes are specifically affected because they accept user-authored text that real implementations would cap.
+**Affected domains:** Any sample with a freeform text field (all 21 samples have at least one `string` field). Insurance claims, work orders, helpdesk tickets, and reimbursement notes are specifically affected because they accept user-authored text that real implementations would cap. For stateless data-only entities — patient demographics, counterparty identities, product catalog entries — string length constraints are even more critical because field constraints and invariants are the *entire* governance surface.
 
 **Implementation notes:**  
 Mirror the collection accessor pattern exactly. In the type checker, inject `FieldName.length` as `StaticValueKind.Number` for every `string` and `string | null` field in `BuildSymbolKinds` and `ValidateRules`. In the evaluator, add a `.length` branch to the `EvaluateIdentifier` method alongside the collection property switch. The evaluator looks up the string value from context and returns its `.Length` cast to `double`. For nullable strings: return `0` when null (mirrors `.count` returning `0` for empty collections) or fail — this is a type policy decision, but `0` is more useful for guards like `.length >= 1`. No new AST node needed; `PreceptIdentifierExpression` with `Member = "length"` is already parseable; only the evaluator and type checker symbol tables need updating.

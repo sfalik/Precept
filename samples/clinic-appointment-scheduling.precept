@@ -41,11 +41,11 @@ on Reschedule assert MinuteOfDay % 15 == 0 because "Appointments must start on a
 event SendReminder
 
 event CheckIn with Note as string nullable default null
-on CheckIn assert Note == null || Note != "" because "A supplied check-in note cannot be blank"
+on CheckIn assert Note == null or Note != "" because "A supplied check-in note cannot be blank"
 
 event CompleteVisit
 event Cancel with Reason as string nullable default null
-on Cancel assert Reason == null || Reason != "" because "A supplied cancellation reason cannot be blank"
+on Cancel assert Reason == null or Reason != "" because "A supplied cancellation reason cannot be blank"
 
 from Draft on Schedule -> set PatientName = Schedule.Name -> set ScheduledDay = Schedule.DayNumber -> set ScheduledMinute = Schedule.MinuteOfDay -> transition Scheduled
 

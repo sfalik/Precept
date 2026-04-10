@@ -83,7 +83,7 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
 |---|---|---|
 | `ControlKeywords` | `Control` | `state`, `in`, `to`, `from`, `on`, `when` |
 | `DeclarationKeywords` | `Declaration` | `precept`, `field`, `invariant`, `event`, `assert`, `edit` |
-| `GrammarKeywords` | `Grammar` | `as`, `with`, `nullable`, `default`, `because`, `any`, `of`, `into`, `initial` |
+| `GrammarKeywords` | `Grammar` | `as`, `with`, `nullable`, `default`, `because`, `any`, `all`, `of`, `into`, `initial` |
 | `ActionKeywords` | `Action` | `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear` |
 | `OutcomeKeywords` | `Outcome` | `transition`, `no`, `reject` |
 | `TypeKeywords` | `Type` | `set`, `string`, `number`, `boolean`, `queue`, `stack` |
@@ -110,6 +110,7 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
 ```json
 {
   "valid": true,
+  "isStateless": false,
   "name": "BugTracker",
   "initialState": "Triage",
   "stateCount": 7,
@@ -144,6 +145,7 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
 ```json
 {
   "valid": false,
+  "isStateless": false,
   "name": "BugTracker",
   "initialState": "Triage",
   "stateCount": 7,
@@ -172,6 +174,29 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
 
 **Implementation:** Calls `PreceptCompiler.CompileFromText(text)` — a composed pipeline that runs parse → structured validation → compile. Returns the full model projection when parsing succeeds (even with type errors), diagnostics only when parsing fails. Graph analysis findings (C48–C53) appear as warning/hint-severity diagnostics alongside any type errors. The tool is a thin projection of the core result into JSON.
 
+**`isStateless` field:** `true` when the precept has no `state` declarations. When `isStateless: true`, `initialState` is `null`, `states` is `[]`, and `stateCount` is `0`.
+
+**Stateless example output:**
+```json
+{
+  "valid": true,
+  "isStateless": true,
+  "name": "CustomerProfile",
+  "initialState": null,
+  "stateCount": 0,
+  "eventCount": 0,
+  "states": [],
+  "fields": [
+    { "name": "Name", "type": "string", "nullable": false, "default": "" },
+    { "name": "Email", "type": "string", "nullable": false, "default": "" }
+  ],
+  "collectionFields": [],
+  "events": [],
+  "transitions": [],
+  "diagnostics": []
+}
+```
+
 ---
 
 ### 3. `precept_inspect`
@@ -195,6 +220,8 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
   }
 }
 ```
+
+The `currentState` parameter is `string?` — pass `null` for stateless precepts. When `currentState` is `null`, all events return `Undefined` outcome (no transition surface). The `data` and `eventArgs` fields behave identically for stateless and stateful precepts.
 
 The `eventArgs` field is optional. When provided, the specified args are used for the named events during evaluation — the tool re-inspects those events individually with the supplied args. Events not listed in `eventArgs` are inspected without args, and the engine reports the actual outcome (which may be `MissingRequiredArguments` if args are needed).
 
@@ -247,7 +274,17 @@ The `eventArgs` field is optional. When provided, the specified args are used fo
 }
 ```
 
-The response echoes the resolved instance snapshot (`currentState` + `data` with defaults applied), so Copilot can see what defaults were filled in and confirm the starting point matches intent. Events appear in declaration order (no sorting). The `editableFields` array lists fields that have `in <State> edit` declarations for the current state.
+The response echoes the resolved instance snapshot (`currentState` + `data` with defaults applied), so Copilot can see what defaults were filled in and confirm the starting point matches intent. For stateless precepts, `currentState` is `null` in the response. Events appear in declaration order (no sorting). The `editableFields` array lists fields that have `in <State> edit` declarations for the current state (stateful) or root-level `edit` declarations (stateless).
+
+**Stateless precept behavior summary:**
+
+| Operation | Stateless result |
+|-----------|------------------|
+| `precept_compile` | `isStateless: true`, `initialState: null`, `states: []` |
+| `precept_inspect` with `currentState: null` | All events return `Undefined`; `currentState: null` in response; `editableFields` from root `edit` declarations |
+| `precept_inspect` (event) with `currentState: null` | Returns `Undefined` |
+| `precept_fire` with `currentState: null` | Returns `Undefined` |
+| `precept_update` with `currentState: null` | Works on root-editable fields; `currentState: null` in response |
 
 Each event reports:
 - `outcome` — the engine's actual `TransitionOutcome` string (e.g. `Transition`, `NoTransition`, `ConstraintFailure`, `Rejected`, `MissingRequiredArguments`, `Undefined`, `Unmatched`)
@@ -266,7 +303,7 @@ Each event reports:
 **Purpose:** Fire a single event against a precept from a given state and data snapshot. Returns the execution outcome — the new state, updated data, and any constraint violations. Lets Copilot verify that a specific action actually works at runtime. Named to match the core API (`engine.Fire()`).
 
 Unlike `precept_inspect` (which previews all events read-only), `precept_fire` executes one event and returns its concrete result. Copilot chains sequential calls to trace multi-step scenarios, feeding each result’s state+data into the next call.
-
+The `currentState` parameter is `string?` — pass `null` for stateless precepts. When `currentState` is `null`, fire always returns `Undefined` outcome.
 **Input:**
 ```json
 {
@@ -336,7 +373,9 @@ The response echoes the resolved data snapshot (with defaults applied), matching
 
 ### 5. `precept_update`
 
-**Purpose:** Apply a direct field edit to a precept instance from a given state and data snapshot. Returns the update outcome — whether the edit succeeded, was rejected (uneditable field, constraint failure, invalid input), and the resulting data. Lets Copilot test `in <State> edit` declarations without firing events.
+**Purpose:** Apply a direct field edit to a precept instance from a given state and data snapshot. Returns the update outcome — whether the edit succeeded, was rejected (uneditable field, constraint failure, invalid input), and the resulting data. Lets Copilot test `in <State> edit` declarations (stateful) or root-level `edit` declarations (stateless) without firing events.
+
+The `currentState` parameter is `string?` — pass `null` for stateless precepts. When `currentState` is `null`, `Update` applies to root-editable fields declared with `edit all` or `edit Field1, Field2`.
 
 **Input:**
 ```json
@@ -415,17 +454,24 @@ Fields: `line` (1-based), `column` (0-based, optional), `message`, `code` (optio
 
 ```json
 {
-  "message": "Active requires assignee",
+  "message": "Approved total cannot exceed requested total",
   "source": {
-    "kind": "state-assertion",
-    "stateName": "Active",
-    "anchor": "in",
-    "expressionText": "Assignee != null",
-    "reason": "Active requires assignee",
-    "sourceLine": 14
+    "kind": "invariant",
+    "stateName": null,
+    "anchor": null,
+    "expressionText": "ApprovedTotal <= RequestedTotal",
+    "reason": "Approved total cannot exceed requested total",
+    "sourceLine": 18
   },
   "targets": [
-    { "kind": "field", "fieldName": "Assignee" }
+    { "kind": "field", "fieldName": "ApprovedTotal" },
+    { "kind": "field", "fieldName": "RequestedTotal" },
+    { "kind": "field", "fieldName": "LodgingTotal" },
+    { "kind": "field", "fieldName": "MealsTotal" },
+    { "kind": "field", "fieldName": "MileageTotal" },
+    { "kind": "field", "fieldName": "Miles" },
+    { "kind": "field", "fieldName": "Rate" },
+    { "kind": "definition" }
   ]
 }
 ```
@@ -433,7 +479,9 @@ Fields: `line` (1-based), `column` (0-based, optional), `message`, `code` (optio
 `ViolationDto` is a full projection of core `ConstraintViolation`:
 
 - **`source`** — projects `ConstraintSource` (4 subtypes: `invariant`, `state-assertion`, `event-assertion`, `transition-rejection`). Each subtype carries its relevant fields (expression text, reason, state name, anchor, event name, source line).
-- **`targets`** — projects `ConstraintTarget[]` (5 subtypes: `field`, `event-arg`, `event`, `state`, `definition`). Each subtype carries its relevant identifiers.
+- **`targets`** — projects `ConstraintTarget[]` (5 subtypes: `field`, `event-arg`, `event`, `state`, `definition`). Each subtype carries its relevant identifiers. For field-based rule violations, `targets` represents the full semantic dependency set, not just the field names written literally in the rule text: if a violated invariant or state assertion reads a computed field, the violation includes that computed field and every transitive field input beneath it, while still carrying the normal scope target.
+
+This means `precept_inspect`, `precept_fire`, and `precept_update` report the entity data the violated rule actually depends on, explicitly and implicitly, so AI and UI consumers can attribute the failure to the real editable surface without reconstructing the computed-field graph themselves.
 
 This preserves the full structured violation model from core without information loss.
 

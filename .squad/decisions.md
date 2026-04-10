@@ -6,9 +6,240 @@
 
 ---
 
+### 2026-04-10T12:00:00Z: Issue #31 merged — keyword logical operators (and/or/not replace &&/||/!)
+**By:** George (Runtime Dev), Kramer (Tooling Dev), Newman (MCP/AI Dev), Soup Nazi (Tester), Frank (Lead/Architect), Coordinator
+**Status:** Merged — PR #50, main SHA `305ec03`
+
+`&&`/`||`/`!` have been removed from the Precept DSL and replaced with keyword forms `and`/`or`/`not` across all 8 slices. All 775 tests passing. Issue #31 closed.
+
+**Runtime (George — Slices 1-4 + Samples):**
+- `[TokenSymbol]` attributes on `PreceptToken.And`/`Or`/`Not` changed to `"and"`/`"or"`/`"not"`. Old operator entries removed from tokenizer steps 4-5. Keyword loop (step 7, `requireDelimiters: true`) handles them automatically — `android` cannot match `And`.
+- All operator string comparisons updated in: parser (AST strings), type-checker main switch, `ApplyNarrowing()` (~line 889, a critical second update site distinct from the main switch), and expression evaluator.
+- 17 of 24 sample files updated; 7 unchanged (no logical operators used).
+- Commit: `83497aa`.
+
+**Grammar + Language Server (Kramer — Slice 5):**
+- `and`/`or`/`not` added to `actionKeywords` alternation in grammar (same group as `contains` — expression-position, operator-category tokens).
+- Old `keyword.operator.logical.precept` block (`&&|\|\||!`) removed from grammar entirely; `!=` untouched.
+- `ExpressionOperatorItems` in `PreceptAnalyzer.cs` updated: `&&`/`||`/`!` `Operator` items replaced with `and`/`or`/`not` `Keyword` items. Global keyword discovery via `BuildKeywordItems()` auto-picks up `And`/`Or`/`Not` from enum — no explicit additions needed.
+- Semantic tokens handler unchanged — catalog-driven via `[TokenCategory(Operator)]`.
+- Commit: `8f3bdab`.
+
+**MCP Operator Inventory (Newman — Slice 6):**
+- Zero code changes to MCP tools. `LanguageTool.cs` is fully catalog-driven via `PreceptTokenMeta.GetSymbol(token)`. George's `[TokenSymbol]` attribute update automatically propagates to `precept_language` output.
+- `docs/McpServerDesign.md` already used `and` in expression examples — no doc changes needed.
+- New test: `LogicalOperatorsAreKeywordForms` — asserts `and`/`or`/`not` present in operator inventory, `&&`/`||` absent. Canonical dual-assertion pattern for operator renames.
+
+**Tests (Soup Nazi — Slice 7):**
+- 10 existing test files updated (symbol substitutions: `&&`→`and`, `||`→`or`, `!`→`not`).
+- New `PreceptKeywordLogicalOperatorTests.cs` (15 tests): basic parsing, precedence (`not > and > or`), null narrowing through `not (Field == null)`, `!=` unaffected, old symbols produce `InvalidOperationException`, compound expressions, invariant context.
+
+**Docs (Frank — Slice 8):**
+- `docs/PreceptLanguageDesign.md` fully synchronized: migration table heading updated ("Implemented"), "Until implementation…" paragraph removed, `and`/`or`/`not` added to reserved keywords list, nullability Pattern 1/2 code examples updated, "pending migration" annotations removed from expressions section, event asserts and Minimal Example updated.
+- `docs/research/language/references/cel-comparison.md` created: full Precept vs. CEL language-level comparison.
+
+**PR Review (Frank):**
+- APPROVED. All 8 slices verified. Architecture sound. Coverage complete.
+- Key architectural confirmation: `BuildKeywordDictionary()` uses `symbol.All(char.IsLetter)` — operator-to-keyword migration for alphabetic symbols requires only `[TokenSymbol]` attribute change; no tokenizer code changes. Correct pattern for future migrations.
+- Non-blocking: `LogicalOperatorsAreKeywordForms` does not assert `!` absent. Acceptable — `!` removed from tokenizer entirely, no path to operator inventory.
+
+**Coordinator final action:**
+- Added `NotContain("!")` assertion to `LogicalOperatorsAreKeywordForms`. Merged as 775th test.
+
+**Open item (deferred):**
+- Grammar group classification: `and`/`or`/`not` in `actionKeywords` is correct per current convention but a semantic visual system session should formally address whether expression-position operator-category tokens warrant a distinct scope token from structural action keywords. Deferred by Shane.
+
+---
+
+### 2026-04-08T23:50:00Z: Soup Nazi exploratory MCP regression — methodology validated, 5 authoring corrections captured
+**By:** Soup Nazi (Tester)
+**Status:** Applied
+
+Exploratory MCP regression rounds 1+2 executed against the data-only precepts implementation (feature/issue-22-data-only-precepts). All probes synthesized from scratch using `precept_language` as vocabulary reference.
+
+**Round 1 (18 compile probes):** 15/18 passed as authored. Three were test-plan syntax errors:
+1. Multi-line action chains not supported — full transition row must be on one line.
+2. `when` guard must precede the first `->`: correct form is `from S on E when Guard -> outcome`.
+3. `dequeue`/`pop` require `into <field>` target; bare form is invalid.
+
+Additional corrections: Probe 16 used wrong diagnostic code (PRECEPT008, not C13/PRECEPT013). Probe 17 had wrong expectation (zero-row terminal state produces no C50 diagnostic — C50 fires only when a state has rows that still can't reach another state). All corrected probes passed.
+
+**Round 2 (7 outcome kinds):** All confirmed across three synthesized shapes (Approval flow, FeatureGate, RangeGuard): Transition, NoTransition, Rejected, ConstraintFailure, UneditableField, Update, Undefined.
+
+**Verdict:** PASS (engine). Five test-plan authoring corrections promoted to Soup Nazi charter `## MCP Regression Testing` skill section.
+
+**Report:** `.squad/decisions/inbox/soup-nazi-mcp-regression-exploratory.md` (merged).
+
+---
+
+### 2026-04-08T22:30:00Z: Soup Nazi MCP regression pass for PR #48 — PASS
+**By:** Soup Nazi (Tester)
+**Status:** Applied
+
+Full 4-round MCP regression against PR #48 (data-only precepts).
+
+- **Round 1 (24 sample compiles):** 24/24 valid, 0 error diagnostics. Three new stateless samples (`customer-profile`, `fee-schedule`, `payment-method`) all return `isStateless: true`.
+- **Round 2 (stateful E2E — maintenance-work-order):** Draft→Open transition fired correctly; UneditableField and Update outcomes both confirmed.
+- **Round 3 (stateless E2E — customer-profile, fee-schedule):** `edit all` expands to all fields; selective edit blocks locked fields with `UneditableField "(stateless)"`; invariant ConstraintFailure triggered correctly; Fire on stateless precept → Undefined with "stateless" message.
+- **Round 4 (diagnostic edge cases):** C12, C55, C49, and parse-failure all behave exactly per spec.
+
+**Verdict:** PASS. PR #48 clear to merge (pending docs gate — see Frank's review below).
+
+**Report:** `.squad/decisions/inbox/soup-nazi-mcp-regression.md` (merged).
+
+---
+
+### 2026-04-08T22:00:00Z: Frank PR #48 review — CHANGES REQUESTED (docs sync missing)
+**By:** Frank (Lead/Architect)
+**Status:** Blocking — awaiting Slice 8 (docs + samples)
+
+PR #48 (feature/issue-22-data-only-precepts, Slices 1–7) reviewed. Architecture is sound; all 12 design Q&A decisions faithfully executed. One blocking gap: docs sync requirement unmet.
+
+**Blocking items (Slice 8):**
+1. `docs/PreceptLanguageDesign.md` — not updated. Missing: stateless precept form, root `edit` grammar rule, C12 redefinition, C13 conditionalization, C55 new constraint, `in State edit all` validity for stateful.
+2. `docs/RuntimeApiDesign.md` — not updated. Missing: `IsStateless` property, nullable `InitialState`/`CurrentState`, `CreateInstance(data)` stateless behavior, `CreateInstance(state, data)` throws `ArgumentException` on stateless.
+3. `docs/McpServerDesign.md` — not updated. Missing: `IsStateless` in CompileResult DTO, nullable `currentState` for Inspect/Fire/Update, stateless null-passing notes.
+4. Sample files — Decision 11 placeholder samples (`customer-profile.precept`, `fee-schedule.precept`, `payment-method.precept`) not present in Slices 1–7.
+
+**Non-blocking notes:** Minor nullable lie on `model.InitialState!` (safe in practice); `TryValidateScalarValue out string error` signature nit; stateful `in State edit all` not in design docs (intentional expansion without coverage).
+
+**Report:** `.squad/decisions/inbox/frank-pr48-review.md` (merged).
+
+---
+
+### 2026-04-08: Uncle Leo security survey — 4 attack surfaces identified, recommendations pending
+**By:** Uncle Leo (Security Champion)
+**Status:** Pending action — recommendations require owner review
+
+Initial security survey of MCP server (5 tools), language server (LSP/stdio), core DSL runtime, and public C# API surface.
+
+**Attack surfaces ranked:**
+| Surface | Risk | Summary |
+|---|---|---|
+| Unbounded `text` input | High | No size limits before tokenization — DoS via oversized DSL text |
+| MCP output echoes DSL content | High | `ExpressionText`, `Reason`, `BranchDto.Guard`, `DiagnosticDto.Message` echo raw user input — indirect prompt injection vector |
+| Unvalidated `data`/`fields`/`args` dicts | Medium | Unknown keys accepted silently — no allowlist against declared field/arg names |
+| No auth on MCP tools | Medium | stdio-only today; assumption not explicitly documented |
+| LS document size (keystroke path) | Medium | Same parser on every change, no size limits |
+| JSON object handling (`ToNative` fallback) | Low | Objects/arrays stringify silently — confusing, not exploitable |
+
+**Clean:** No RCE gadget paths found. No file I/O, process spawning, or unsafe deserialization.
+
+**Top recommended actions (ordered):** (1) Input size limits on `text` parameter. (2) Sanitize MCP output fields that echo DSL content. (3) Add invocation logging to MCP server. (4) Audit `PreceptAnalyzer.cs` regexes for ReDoS.
+
+**External frameworks referenced:** OWASP Input Validation Cheat Sheet, OWASP LLM01:2025 Prompt Injection, OWASP MCP Security Cheat Sheet, OWASP Deserialization Cheat Sheet, Microsoft .NET Security.
+
+**Report:** `.squad/decisions/inbox/uncle-leo-security-survey.md` (merged).
+
+---
+
+### 2026-04-08: Issue #22 semantic rules rewrite — warning model and binary taxonomy
+**By:** Shane (owner decision), with Frank (research/analysis) and George (runtime evidence)
+**Status:** Decided
+
+Issue #22's "States, events, and transitions forbidden in stateless precepts" semantic rule was decomposed and rewritten:
+
+1. **"States forbidden" dropped** — tautological. The absence of states IS what makes a precept stateless; it's definitional, not prohibitive.
+2. **"Transitions forbidden" dropped** — structurally impossible. C54 already rejects transition rows referencing undeclared states.
+3. **Events-without-states = warning, not error.** Events declared but without any routing surface (states) can never fire. Severity set to warning for consistency with C49 (orphaned event).
+4. **C50 upgraded from hint to warning.** A non-terminal state where all outgoing rows dead-end (reject or no-transition) is "probably wrong," not just "FYI." Hint was too lenient. Consistency with C49 and the events-without-states warning.
+5. **Binary taxonomy confirmed:** data tier (fields/invariants/editability) or behavioral tier (fields/invariants/states/events/transitions). No middle tier. The "middle tier" (data + events, no states) is a category error.
+
+**Research base:** `.squad/decisions/inbox/frank-stateless-event-boundary.md` (deep analysis), `.squad/decisions/inbox/frank-warning-model-research.md` (diagnostic infrastructure audit + external precedent), `.squad/decisions/inbox/frank-issue22-semantic-rule-rewrite.md` (decomposition recommendation).
+
+---
+
+### 2026-04-08: No temporary local files for GitHub issue editing
+**By:** Shane (owner directive)
+**Status:** Standing policy
+
+When composing or editing GitHub issue bodies, use the GitHub API directly (MCP tools or `gh` CLI). Do not create temporary local markdown files as intermediate drafts — they create confusion, clutter the workspace, and drift from the actual issue content. Compose the content in memory and post it in one step.
+
+This applies to all agents. The decisions inbox (`.squad/decisions/inbox/`) is for team decisions, not for staging issue text.
+
+---
+
+### 2026-04-08T18:53:22Z: Broadened target model for computed-field rule violations
+**By:** Scribe, recording review consensus from Shane
+**Status:** Captured
+
+Shane chose the broadened target model for field-based rule violations involving computed fields.
+
+**Decision:**
+- Target sets for a violated rule should include all entity data the rule semantically depends on, whether the dependency is explicit or implicit.
+- When a violated rule depends on a computed field, the target set should include the computed field's transitive underlying inputs, not just the surface computed field reference.
+- Runtime and MCP wording for inspect and fire should align to this dependency-aware target model.
+
+**Recorded drafting state:**
+- Frank drafted replacement Issue #17 rationale allowing computed-field constraints.
+- George drafted replacement runtime contract text for dependency-aware targets.
+- Newman drafted matching MCP and output text for inspect and fire under the broadened target model.
+
+**Why:**
+- The chosen target model follows the violated rule's real semantic dependencies, including transitive inputs beneath computed fields.
+
+### 2026-04-08T13:37:07Z: Issue #17 wording clarification for computed fields vs. constraints
+**By:** Scribe, recording review consensus from Shane
+**Status:** Captured
+
+Issue #17 does not contain a semantic contradiction between "field-level constraints do not apply to computed fields" and "computed fields remain readable in guards, invariants, and state asserts."
+
+**Decision:**
+- Treat the problem as wording ambiguity, not as a semantic conflict.
+- Use "field-level constraints" only for declaration-level constraints attached directly to a field.
+- Keep guards, invariants, and state asserts described as boolean rule expressions that may read computed fields.
+- Make the wording explicit that computed fields cannot carry field-level constraint declarations, but remain readable anywhere rule expressions evaluate instance state.
+
+**Why:**
+- The current proposal wording overloads "constraints" for two different concepts: declaration-level field constraints and boolean rule expressions.
+- Computed fields remain part of readable instance state, so rule expressions can depend on them without implying that declaration-level field constraints attach to computed fields.
+
+### 2026-04-08T13:29:23Z: Language research corpus complete + Squad closeout
+**By:** Scribe, recording the completed corpus state from Frank, George, and Steinbrenner
+**Status:** Applied
+
+The language research corpus on `squad/language-research-corpus` is complete. Batch 1 landed in `54a77da`, Batch 2 landed in `48860ae`, and the final corpus plus index sweep landed in `3cc5343`.
+
+**Closeout decisions:**
+- Treat `3cc5343` as the finishing corpus checkpoint for this branch.
+- Keep `docs/research/language/domain-map.md` as the canonical domain-first map and the language indexes as the discovery surface.
+- Preserve the standing user constraints through closeout: no proposal-body edits, `computed-fields.md` as the quality bar, horizon domains retained, and commit-after-batch discipline.
+- Merge the remaining `.squad/decisions/inbox/` backlog into this ledger, skipping superseded duplicates and clearing the inbox.
+
+**Recorded state:**
+- Batch 1 landed in `54a77da`
+- Batch 2 landed in `48860ae`
+- Final corpus + indexes landed in `3cc5343`
+- Merged 61 inbox entries; skipped 2 superseded and 0 already-recorded duplicates
+- Remaining local changes in this pass are `.squad/` bookkeeping only
+
+---
+### 2026-04-08T07:16:23Z: Language Research Corpus Structure & Batch Discipline
+**By:** Frank (Lead/Architect), Steinbrenner (PM), with George's Batch 1/2 type-system work recorded
+**Status:** Applied
+
+The language-research corpus stays organized by **domain**, not by individual proposal, and the canonical map remains `docs/research/language/domain-map.md`.
+
+**Decision:**
+- Keep `docs/research/language/domain-map.md` as the single durable map of the language research corpus.
+- Treat alternate map filenames as disposable experiments, not parallel sources of truth.
+- Preserve the standing corpus guardrails during research curation:
+  - no proposal-body edits
+  - `docs/research/language/expressiveness/computed-fields.md` remains the quality bar
+  - include horizon domains even when no proposal exists yet
+  - close each completed batch with its own commit
+- Keep the three-batch execution plan from `docs/research/language/domain-research-batches.md`, with **Batch 1 regrouped** to include constraint composition alongside the rest of the validator/rule/declaration lane.
+
+**Recorded state:**
+- Batch 1 landed in `54a77da`
+- Batch 2 landed in `48860ae`
+- Batch 3 research and the final README/index sweep are still outstanding
+
+---
+
 ### 2026-05-18T00:25:00Z: README DSL Hero Image Width Contract
-**By:** Elaine (UX), Kramer (Tooling), with Frank's sizing analysis preserved  
-**Status:** Applied  
+**By:** Elaine (UX), Kramer (Tooling), with Frank's sizing analysis preserved
+**Status:** Applied
 
 The README DSL hero remains an image-based branded treatment, but it must now be sized against GitHub's actual repo-view image ceiling instead of the wider article frame.
 
@@ -28,8 +259,8 @@ The README DSL hero remains an image-based branded treatment, but it must now be
 ---
 
 ### 2026-04-07T23:30:44Z: README Contract Image & DSL Copyable Block Cleanup
-**By:** J. Peterman (Brand/DevRel)  
-**Status:** Decided  
+**By:** J. Peterman (Brand/DevRel)
+**Status:** Decided
 
 README.md Quick Example section refactored to remove explanatory hedge, copyable DSL block, and replace markdown image syntax with fixed-width HTML img tag for consistent GitHub rendering.
 
@@ -45,8 +276,8 @@ README.md Quick Example section refactored to remove explanatory hedge, copyable
 ---
 
 ### 2026-04-07T23:20:00Z: PR #34 Merge — Squad Upgrade + README Image Fix
-**By:** Frank  
-**Status:** Merged  
+**By:** Frank
+**Status:** Merged
 
 Merged PR #34 (chore: upgrade Squad configuration and fix README image links) to `main` using merge commit strategy.
 
@@ -72,7 +303,7 @@ Merged PR #34 (chore: upgrade Squad configuration and fix README image links) to
 ---
 
 ### 2026-04-07T23:16:55Z: User directive — Branch retention for future work
-**By:** shane (via Copilot)  
+**By:** shane (via Copilot)
 **Status:** Captured
 
 Keep the `chore/upgrade-squad-latest` branch open for other work — user request captured for team memory.
@@ -158,7 +389,7 @@ Use the dsl-compactness label as the categorization tag for the current language
 ---
 
 ### Decision: Use dsl-compactness for language compactness proposals (2026-04-05)
-**Filed by:** Steinbrenner  
+**Filed by:** Steinbrenner
 **Status:** Applied
 
 Use the GitHub label dsl-compactness as the categorization tag for the current language improvement proposal issues focused on making the DSL more compact.
@@ -204,8 +435,8 @@ Gold already carries this meaning in syntax highlighting: every `because` and `r
 
 
 ### Design Gate: Peterman Brand Compliance Review (2026-04-04)
-**Filed by:** Coordinator (via Shane)  
-**Status:** LOCKED  
+**Filed by:** Coordinator (via Shane)
+**Status:** LOCKED
 
 The design gate for technical surfaces now requires Peterman's brand compliance review as a formal step between Elaine's UX spec and Frank's architecture review.
 
@@ -222,7 +453,7 @@ The design gate for technical surfaces now requires Peterman's brand compliance 
 ---
 
 ### Decision: README Syntax Highlighting for Precept DSL (2026-04-05)
-**Filed by:** Kramer (Tooling Dev)  
+**Filed by:** Kramer (Tooling Dev)
 **Status:** No Change Required
 
 README already uses the correct approach: ` ```precept ` fence for DSL code samples.
@@ -244,7 +475,7 @@ README already uses the correct approach: ` ```precept ` fence for DSL code samp
 ---
 
 ### Decision: How We Got Here API Evolution Clarification (2026-04-05)
-**Filed by:** J. Peterman  
+**Filed by:** J. Peterman
 **Status:** COMPLETE
 
 `docs/HowWeGotHere.md` now states the product's authoring progression explicitly inside the chronology:
@@ -262,8 +493,8 @@ README already uses the correct approach: ` ```precept ` fence for DSL code samp
 ---
 
 ### Brand-Spec Restructure: Surface-First Organization (2026-04-04)
-**Filed by:** J. Peterman  
-**Status:** COMPLETE  
+**Filed by:** J. Peterman
+**Status:** COMPLETE
 
 `brand/brand-spec.html` restructured from 10-section (color-category-first) to 3-section (visual-surfaces-first) structure.
 
@@ -283,7 +514,7 @@ README already uses the correct approach: ` ```precept ` fence for DSL code samp
 
 ### Visual Surfaces Draft: Five UX Specifications (2026-04-04)
 **Filed by:** Elaine
-**Status:** DRAFT FOR REVIEW  
+**Status:** DRAFT FOR REVIEW
 **File:** `brand/visual-surfaces-draft.html`
 
 Five surfaces drafted with UX descriptions covering purpose, visual concerns, color application, typography, accessibility, and AI-first notes:
@@ -311,7 +542,7 @@ Five surfaces drafted with UX descriptions covering purpose, visual concerns, co
 
 ### Inspector Panel Design Review: Brand Color Drift Found (2026-04-04)
 **Filed by:** Elaine
-**Status:** PENDING FIX  
+**Status:** PENDING FIX
 **File:** `brand/inspector-panel-review.md`
 
 Kramer's inspector panel is functionally complete but diverges from brand system:
@@ -327,14 +558,14 @@ Kramer's inspector panel is functionally complete but diverges from brand system
 | Error | `#FF2A57` | Rose `#F87171` |
 | Font | Segoe UI | Cascadia Cove monospace |
 
-**Owner:** Kramer (implementation)  
+**Owner:** Kramer (implementation)
 **Gate:** Elaine review → Peterman brand compliance → Frank → Shane sign-off
 
 ---
 
 ### Charter Updates: Peterman + Elaine Design Governance (2026-04-04)
-**Filed by:** Coordinator  
-**Status:** LOCKED  
+**Filed by:** Coordinator
+**Status:** LOCKED
 
 Two charter amendments formalize design gate participation:
 
@@ -353,8 +584,8 @@ Two charter amendments formalize design gate participation:
 ---
 
 ### Color System Audit: Open Decisions (2026-04-04)
-**Filed by:** J. Peterman  
-**Status:** FINDINGS FOR REVIEW  
+**Filed by:** J. Peterman
+**Status:** FINDINGS FOR REVIEW
 
 Four open brand decisions pending Shane approval:
 
@@ -444,15 +675,15 @@ Two new <h3> blocks within the existing §2.2 card:
 ---
 
 ## CRITICAL SYNC RULE: Grammar-Completions Drift
-**Priority:** HIGH — NON-NEGOTIABLE  
-**Owner:** Kramer (Tooling), Frank (Architecture)  
+**Priority:** HIGH — NON-NEGOTIABLE
+**Owner:** Kramer (Tooling), Frank (Architecture)
 **From:** kramer-tooling-review.md
 
 The DSL parser and VS Code tooling are loosely coupled via regex patterns in `PreceptAnalyzer.cs` and `syntaxes/precept.tmLanguage.json`. No automated drift detection exists.
 
 **Finding:** When the parser syntax changes, both files MUST be updated in the same PR or the tooling drifts silently. Example: `NewFieldDeclRegex`, `NewCollectionFieldRegex`, `NewEventWithArgsRegex` are hand-written and not derived from the parser grammar.
 
-**Action:** 
+**Action:**
 1. Add a documented checklist comment to `PreceptAnalyzer.cs` header:
    ```csharp
    // ⚠️ GRAMMAR SYNC REQUIRED: If DSL syntax changes, update these regexes:
@@ -495,7 +726,7 @@ The DSL parser and VS Code tooling are loosely coupled via regex patterns in `Pr
 ### 4. Edit Mode Protocol Complexity
 **Risk:** `PreceptPreviewProtocol` carries typed field data, edit metadata, and bidirectional graphs collapsed to index arrays. Well-designed but brittle; future changes could require careful migration.
 
-**Recommendation:** 
+**Recommendation:**
 - Document protocol version in `PreceptPreviewProtocol.cs` file header: `// Protocol version: 2 (2026-04-06, adds EditableFields)`
 - Establish stability pledge: "Breaking changes require major version bump and migration guide."
 - Add protocol changelog as comments in the file.
@@ -585,7 +816,7 @@ invariant Items.count > 0
 ---
 
 ## Rule Analyzer Diagnostic Gaps
-**From:** soup-nazi-rule-analyzer-gaps.md  
+**From:** soup-nazi-rule-analyzer-gaps.md
 **Priority:** MEDIUM (UX/DX, not correctness)
 
 ### Problem
@@ -729,8 +960,8 @@ This should be treated as a blocking item for any launch-facing work.
 
 # Decision: TimeMachine Hero Concept (Candidate I)
 
-**Proposed by:** J. Peterman  
-**Date:** 2026-04-04  
+**Proposed by:** J. Peterman
+**Date:** 2026-04-04
 **Status:** Proposed — awaiting team review
 
 ---
@@ -828,8 +1059,8 @@ Should candidate I be promoted as the third shortlisted hero candidate alongside
 
 **Decision:** The Precept hero snippet domain is **Subscription**.
 
-**Requested by:** shane  
-**PM:** Steinbrenner  
+**Requested by:** shane
+**PM:** Steinbrenner
 **Status:** Final — execute against `steinbrenner-hero-sample-brief.md`
 
 ---
@@ -859,8 +1090,8 @@ Should candidate I be promoted as the third shortlisted hero candidate alongside
 
 # Hero Example Spec — TimeMachine Replacement
 
-**Status:** Spec — ready for J. Peterman to execute  
-**Requested by:** shane  
+**Status:** Spec — ready for J. Peterman to execute
+**Requested by:** shane
 **PM:** Steinbrenner
 
 ---
@@ -920,8 +1151,8 @@ Structural budget at 15 lines (±1):
 
 ## Hero Domain Selection: Subscription Billing
 
-**Date:** 2026-05-01  
-**Author:** J. Peterman  
+**Date:** 2026-05-01
+**Author:** J. Peterman
 **Status:** Decided
 
 ### Decision
@@ -1099,8 +1330,8 @@ Avoid: anything that requires 3+ fields to make the domain legible (kills the li
 
 # Spec Review Findings — Inbox
 
-**Date:** 2026-03-27  
-**From:** Steinbrenner (PM)  
+**Date:** 2026-03-27
+**From:** Steinbrenner (PM)
 **Artifacts:** `.squad/agents/steinbrenner/spec-brief.md` (27KB comprehensive inventory)
 
 ---
@@ -1166,7 +1397,7 @@ The language is ready. Hero examples are ready. Timing is now a business/marketi
 
 ### 2. CLI Implementation Priority
 
-**Decision needed:** The design exists. Do we implement it now, or defer to post-launch? 
+**Decision needed:** The design exists. Do we implement it now, or defer to post-launch?
 
 Trade-off: CLI gives standalone access (good for automation, testing, CI/CD). But MCP already covers programmatic use and the extension covers interactive use. CLI is nice-to-have, not blocking.
 
@@ -1197,7 +1428,7 @@ Trade-off: Catching contradictions at compile time is powerful and differentiati
 
 1. **Land the hero example in the next sprint.** Language is done. Choose a domain, write the precept, put it in the README, use it for all marketing. This is the single best way to communicate what Precept does.
 
-2. **Keep type safety + constraint violations on the radar.** These are what differentiate Precept from other state machine DSLs. Document them. Show them off. 
+2. **Keep type safety + constraint violations on the radar.** These are what differentiate Precept from other state machine DSLs. Document them. Show them off.
 
 3. **Mark CLI as "next phase" not "blocking."** MCP + extension cover the current use cases. Revisit after launch if demand justifies.
 
@@ -1248,7 +1479,7 @@ This section consolidates inbox items from Phase 1 research agents:
 
 ### 2026-04-04: User directive — docs terminology + ownership
 **By:** Shane (via Copilot)
-**What:** 
+**What:**
 - Do NOT call it "docs site". It is just "docs".
 - Docs are internal team artifacts owned by the team.
 - README is the only public-facing exception right now.
@@ -1269,9 +1500,9 @@ This section consolidates inbox items from Phase 1 research agents:
 
 # Decision: Color Usage Roles for 8+3 System
 
-**Date:** 2026-07-12  
-**Filed by:** Elaine (UX Designer)  
-**Status:** LOCKED  
+**Date:** 2026-07-12
+**Filed by:** Elaine (UX Designer)
+**Status:** LOCKED
 **Affects:** brand-spec.html §1.4, §1.4.1; README revamp; all product surfaces
 
 ## Summary
@@ -1351,8 +1582,8 @@ This decision record is the direct input for:
 # Palette Mapping Visual Unification
 
 **Filed by:** Elaine
-**Date:** 2026-04-04  
-**Status:** COMPLETE  
+**Date:** 2026-04-04
+**Status:** COMPLETE
 **Scope:** `brand/brand-spec.html` — Sections 2.1 and 2.2
 
 ## Summary
@@ -1416,8 +1647,8 @@ The `.spm-*` system is intentionally general. When §2.3 (Inspector), §2.4 (Doc
 
 # README UX Requirements (Elaine)
 
-**Date:** 2026-04-04  
-**Source:** UX/IA review of Peterman and Steinbrenner's README research  
+**Date:** 2026-04-04
+**Source:** UX/IA review of Peterman and Steinbrenner's README research
 **Status:** Inbox — awaiting incorporation into README restructure proposal
 
 ---
@@ -1726,7 +1957,7 @@ These are **constraints**, not suggestions. The proposal can refine the executio
 
 # Elaine — Reviewer Corrections Applied to Brand Spec
 
-**Date:** 2026-04-04  
+**Date:** 2026-04-04
 **Status:** All corrections applied, ready for integration
 
 ---
@@ -1815,7 +2046,7 @@ All corrections applied to:
 
 ---
 
-**Signed:** Elaine  
+**Signed:** Elaine
 **Date:** 2026-04-04
 
 ---
@@ -1824,9 +2055,9 @@ All corrections applied to:
 
 # Visual Surfaces UX Specifications — Incorporated into Brand Spec
 
-**Date:** 2026-04-04  
-**Author:** Elaine (UX Designer)  
-**Status:** Locked  
+**Date:** 2026-04-04
+**Author:** Elaine (UX Designer)
+**Status:** Locked
 **Affects:** `brand/brand-spec.html` §2.3, §2.4, §2.5; `brand/explorations/visual-language-exploration.html`
 
 ## Decision
@@ -1921,7 +2152,7 @@ The brand marks were using a color outside this system. The replacements bring t
 
 ---
 
-**Locked by:** Shane (via Elaine)  
+**Locked by:** Shane (via Elaine)
 **Locked on:** 2026-04-04
 
 ---
@@ -1972,10 +2203,10 @@ PENDING — awaiting Shane sign-off.
 
 # Decision: README Restructure Proposal — Architectural Approval
 
-**Filed by:** Frank (Lead/Architect)  
-**Date:** 2026-04-06  
-**Status:** APPROVED WITH REQUIRED CHANGES — Pending Shane sign-off  
-**Proposal:** `brand/references/readme-restructure-proposal.md`  
+**Filed by:** Frank (Lead/Architect)
+**Date:** 2026-04-06
+**Status:** APPROVED WITH REQUIRED CHANGES — Pending Shane sign-off
+**Proposal:** `brand/references/readme-restructure-proposal.md`
 **Full review:** `brand/references/readme-restructure-review-frank.md`
 
 ---
@@ -2179,11 +2410,11 @@ Per charter, this qualifies as a non-design-gated fix because it's a small proto
 
 # Runtime Review: README Restructure Proposal — Three Required Changes
 
-**Filed by:** George (Runtime Dev)  
-**Date:** 2026-04-06  
-**Type:** Required changes — gates on rewrite begin  
-**Full review:** `brand/references/readme-restructure-review-george.md`  
-**Proposal:** `brand/references/readme-restructure-proposal.md`  
+**Filed by:** George (Runtime Dev)
+**Date:** 2026-04-06
+**Type:** Required changes — gates on rewrite begin
+**Full review:** `brand/references/readme-restructure-review-george.md`
+**Proposal:** `brand/references/readme-restructure-proposal.md`
 **Frank's review:** `brand/references/readme-restructure-review-frank.md`
 
 ---
@@ -2202,8 +2433,8 @@ Frank's RC-1 fix direction is correct but contains a factual error that must be 
 
 ## G1: Remove `RestoreInstance` — It Doesn't Exist
 
-**Corrects:** Frank's RC-1 addendum  
-**Severity:** Must fix before copy brief is issued  
+**Corrects:** Frank's RC-1 addendum
+**Severity:** Must fix before copy brief is issued
 
 Frank's RC-1 fix reads: "Include `RestoreInstance` as an alternative to `CreateInstance`." This is wrong. `RestoreInstance` is not a real method. It does not exist in `PreceptEngine` or anywhere in the public API.
 
@@ -2219,8 +2450,8 @@ The correct restore pattern is `engine.CreateInstance(savedState, savedData)`. T
 
 ## G2: Add .NET SDK Prerequisite to Getting Started
 
-**New finding**  
-**Severity:** Must fix before rewrite — first-run correctness gap  
+**New finding**
+**Severity:** Must fix before rewrite — first-run correctness gap
 
 The VS Code language server is a .NET 10 process. A developer who installs the VS Code extension without .NET installed gets no language features — no diagnostics, no completions, no hover. No error message. Silent failure.
 
@@ -2234,8 +2465,8 @@ Steinbrenner's research requires a working first-run path. A developer who follo
 
 ## G3: Soften "Replacing Three Separate Libraries" in the Hook
 
-**New finding**  
-**Severity:** Required before rewrite — adoption expectation risk  
+**New finding**
+**Severity:** Required before rewrite — adoption expectation risk
 
 The proposed hook reads: "Precept unifies state machines, validation, and business rules into a single DSL — **replacing three separate libraries with one contract**."
 
@@ -2461,9 +2692,9 @@ Key things to review:
 ---
 
 # Decision: Brand-Spec § 1.4 Palette Structure Reorganization
-**Filed by:** J. Peterman  
-**Date:** 2026-04-06  
-**Status:** RECOMMENDATION — pending Shane sign-off  
+**Filed by:** J. Peterman
+**Date:** 2026-04-06
+**Status:** RECOMMENDATION — pending Shane sign-off
 **Reference:** `brand/references/brand-spec-palette-structure-review-peterman.md`
 
 ---
@@ -2510,7 +2741,7 @@ Three issues:
 
 # J. Peterman — Final Brand-Spec Cleanup Pass
 
-**Date:** 2026-04-04  
+**Date:** 2026-04-04
 **Scope:** `brand/brand-spec.html` final palette consistency cleanup
 
 ## Decision
@@ -2543,9 +2774,9 @@ One item still requires Shane sign-off before the brand spec can be considered f
 
 # Decision: README Restructure Proposal Filed
 
-**Filed by:** J. Peterman  
-**Date:** 2026-04-05  
-**Status:** PROPOSED — awaiting Shane review  
+**Filed by:** J. Peterman
+**Date:** 2026-04-05
+**Status:** PROPOSED — awaiting Shane review
 **Artifact:** `brand/references/readme-restructure-proposal.md`
 
 ---
@@ -2589,8 +2820,8 @@ All 16 constraints from Elaine's UX/IA review are documented as non-negotiables 
 
 # Decision: README Badge Cleanup + Sample Catalog Count
 
-**Author:** Kramer  
-**Date:** 2026-04-05  
+**Author:** Kramer
+**Date:** 2026-04-05
 **Requested by:** Shane
 
 ---
@@ -2598,19 +2829,19 @@ All 16 constraints from Elaine's UX/IA review are documented as non-negotiables 
 ## Decisions Made
 
 ### 1. Remove Build Status badge
-**Decision:** Removed the Build Status badge entirely.  
+**Decision:** Removed the Build Status badge entirely.
 **Rationale:** No `build.yml` (or any CI build workflow) exists in `.github/workflows/`. The badge used placeholder owner `OwnerName` and would have permanently shown "unknown" status. No CI build pipeline to link to — the badge was misleading noise.
 
 ### 2. Remove VS Code Extension marketplace badge
-**Decision:** Removed the VS Code Marketplace badge entirely.  
+**Decision:** Removed the VS Code Marketplace badge entirely.
 **Rationale:** `tools/Precept.VsCode/package.json` has `"publisher": "local"` — a local development placeholder. The extension has not been published to the VS Code Marketplace. The badge would permanently fail to resolve against the marketplace API.
 
 ### 3. Fix `AuthorName.precept-vscode` placeholder in Quick Start
-**Decision:** Updated to `sfalik.precept-vscode`.  
+**Decision:** Updated to `sfalik.precept-vscode`.
 **Rationale:** GitHub remote is `https://github.com/sfalik/Precept.git`, so the owner/publisher is `sfalik`. This is consistent but still provisional until the extension is actually published with a confirmed publisher ID.
 
 ### 4. Update sample count 20 → 21 and add `crosswalk-signal.precept`
-**Decision:** Updated README sample catalog to include `crosswalk-signal.precept` and corrected count to 21.  
+**Decision:** Updated README sample catalog to include `crosswalk-signal.precept` and corrected count to 21.
 **Rationale:** `crosswalk-signal.precept` existed in `samples/` but was absent from the README sample catalog table and all feature coverage matrix rows. The count claim ("20 workflows") was factually wrong.
 
 ---
@@ -2629,9 +2860,9 @@ Searched README for claims about number of DSL constructs, catalog items, or lan
 
 # Decision: Restore "Two Surfaces + 3 Brand Marks" to brand-spec.html § 1.3
 
-**Date:** 2026-04-05  
-**Owner:** J. Peterman (Brand/DevRel)  
-**Status:** COMPLETED  
+**Date:** 2026-04-05
+**Owner:** J. Peterman (Brand/DevRel)
+**Status:** COMPLETED
 **File:** `brand/brand-spec.html`
 
 ---
@@ -2646,15 +2877,15 @@ The brand-spec lost content from explorations: the "two surfaces" (DSL Code + St
 
 Expanded the "Brand mark form" card to display three size variants in a horizontal flex layout:
 
-- **Full (64px)** — NuGet, GitHub, VS Code extension icon  
+- **Full (64px)** — NuGet, GitHub, VS Code extension icon
   - Existing SVG maintained at full scale (80px display, 64px viewBox)
   - Use case: "NuGet, GitHub, VS Code"
 
-- **Badge (32px)** — sidebar, compact contexts  
+- **Badge (32px)** — sidebar, compact contexts
   - Same SVG scaled to 40px display (64px viewBox)
   - Use case: "Sidebar, compact"
 
-- **Micro (16px)** — favicon, status bar  
+- **Micro (16px)** — favicon, status bar
   - Simplified SVG (32px viewBox) showing only indigo circle + emerald arrow
   - Destination circle removed for legibility at micro scale
   - Use case: "Favicon, status bar"
@@ -2665,7 +2896,7 @@ All three shown with label and use-case note beneath. Color key simplified to fo
 
 Added a new card immediately after the brand mark form card, showing the two locked DSL surfaces side-by-side:
 
-**Title:** "Brand in system: the two primary surfaces"  
+**Title:** "Brand in system: the two primary surfaces"
 **Subtitle:** *"DSL code and state diagram. One palette. Every precept file becomes a brand moment."*
 
 **Layout:** Two-column grid (`grid-template-columns: 1fr 1fr`)
@@ -2718,9 +2949,9 @@ The two-surfaces card adapted from `brand/explorations/visual-language-explorati
 
 # Decision: Replace README Hero with TimeMachine
 
-**Date:** 2026-07-11  
-**Author:** J. Peterman (Brand/DevRel)  
-**Requested by:** Shane  
+**Date:** 2026-07-11
+**Author:** J. Peterman (Brand/DevRel)
+**Requested by:** Shane
 **Status:** Implemented
 
 ---
@@ -2765,9 +2996,9 @@ This is the correct register for a hero example.
 
 # Decision: Indigo Overview Card Format in § 1.4
 
-**Date:** 2026-05-01  
-**Requested by:** Shane  
-**Agent:** J. Peterman  
+**Date:** 2026-05-01
+**Requested by:** Shane
+**Agent:** J. Peterman
 **Status:** Implemented
 
 ## Decision
@@ -2871,10 +3102,10 @@ The in-context examples (badge, syntax, diagram) demonstrate the palette in the 
 
 # Decision: Voice & Tone — Wit Integration into Brand Spec
 
-**Date:** 2026-XX-XX  
-**Owner:** J. Peterman, Brand & DevRel  
-**Status:** Implemented  
-**Files:** `brand/brand-spec.html` (§1.2)  
+**Date:** 2026-XX-XX
+**Owner:** J. Peterman, Brand & DevRel
+**Status:** Implemented
+**Files:** `brand/brand-spec.html` (§1.2)
 
 ## Problem
 
@@ -2936,28 +3167,28 @@ Compare: "Say goodbye to bugs forever!" (performative) vs. "If you've been writi
 
 # Decision: README Restructure Proposal — Editorial Review Complete
 
-**Date:** 2026-04-06  
-**Author:** Uncle Leo (Copy/Editorial)  
-**Verdict:** Approve with required changes  
-**Input artifact:** `brand/references/readme-restructure-proposal.md`  
+**Date:** 2026-04-06
+**Author:** Uncle Leo (Copy/Editorial)
+**Verdict:** Approve with required changes
+**Input artifact:** `brand/references/readme-restructure-proposal.md`
 **Full review:** `brand/references/readme-restructure-review-uncle-leo.md`
 
 ---
 
 ## Required Changes Before Rewrite
 
-**RC-1 — Section map / hero label conflict**  
+**RC-1 — Section map / hero label conflict**
 The Recommended Section Order block uses H3 markers (`### The Contract`, `### The Execution`) but the Hero Treatment section specifies bold inline labels, not H3 headings. The rewrite will get conflicting signals. The section map must be corrected to match the Hero Treatment spec (bold inline labels, not subheadings).
 
-**RC-2 — Getting Started context reminder is missing, not implicit**  
+**RC-2 — Getting Started context reminder is missing, not implicit**
 The proposal claims Elaine's required one-sentence context reminder is "implicit" in step 1's benefit copy. It is not. The context reminder (re-anchoring non-linear readers to what Precept is) must be written explicitly before or within step 1. This was a hard requirement in Elaine's research.
 
 ---
 
 ## Wording Concerns (addressable during rewrite)
 
-- WC-1: "Badge walls signal maintenance anxiety" — editorializing; suggest "add visual noise without adding signal at the awareness stage"  
-- WC-2: AI tooling "lead with / don't bury" argument conflates two separate points; suggest splitting  
+- WC-1: "Badge walls signal maintenance anxiety" — editorializing; suggest "add visual noise without adding signal at the awareness stage"
+- WC-2: AI tooling "lead with / don't bury" argument conflates two separate points; suggest splitting
 - WC-3: Closing tagline "One file. Every rule. Prove it in 30 seconds." is ambiguous — proposal flourish or proposed README copy? Label it.
 
 ---
@@ -2978,9 +3209,9 @@ Blocked on RC-1 and RC-2. Frank's four required changes are separate and not dup
 
 # README Revamp — Scope & Priority Recommendation
 
-**From:** Steinbrenner (PM)  
-**Date:** 2026-04-04  
-**Context:** Parallel research to Peterman's brand/copy work. This is the product/adoption strategy for the README revamp.  
+**From:** Steinbrenner (PM)
+**Date:** 2026-04-04
+**Context:** Parallel research to Peterman's brand/copy work. This is the product/adoption strategy for the README revamp.
 **Research Document:** `brand/references/readme-research-steinbrenner.md`
 
 ---
@@ -3001,28 +3232,28 @@ This recommendation outlines the minimum viable README revamp scope from a produ
 ## Critical Gaps in Current README
 
 ### 1. **No Problem Statement**
-**Current:** README opens with "Precept is a DSL for defining domain integrity constraints..."  
-**Issue:** Developers don't know what "domain integrity" is or why they need it.  
+**Current:** README opens with "Precept is a DSL for defining domain integrity constraints..."
+**Issue:** Developers don't know what "domain integrity" is or why they need it.
 **Fix:** Lead with the problem: "Your validation is scattered across controllers, your state machine is split from your business rules, and your constraints are duplicated in code and tests. Precept unifies all three into one executable contract."
 
 ### 2. **No Quickstart Path**
-**Current:** README has installation instructions but no "first working example" flow.  
-**Issue:** Developers can't evaluate time-to-value without seeing the quickstart friction.  
+**Current:** README has installation instructions but no "first working example" flow.
+**Issue:** Developers can't evaluate time-to-value without seeing the quickstart friction.
 **Fix:** 3-step quickstart: Install extension → Create Order.precept → Get real-time diagnostics. Or: `dotnet add package Precept` → 10-line example → 3-line C# usage.
 
 ### 3. **No Category Education**
-**Current:** README assumes you know what "domain integrity" means.  
-**Issue:** We're establishing a new category, not implementing a known pattern.  
+**Current:** README assumes you know what "domain integrity" means.
+**Issue:** We're establishing a new category, not implementing a known pattern.
 **Fix:** Add "What is Domain Integrity?" section that explains the unified state+data+rules model.
 
 ### 4. **Tooling Story Buried**
-**Current:** VS Code extension, MCP server, language server mentioned in passing.  
-**Issue:** This is Precept's strongest differentiator vs. xstate/FluentValidation — and it's hidden.  
+**Current:** VS Code extension, MCP server, language server mentioned in passing.
+**Issue:** This is Precept's strongest differentiator vs. xstate/FluentValidation — and it's hidden.
 **Fix:** Lead with tooling: "Precept is a domain integrity DSL with AI-native tooling. Write .precept files, get real-time diagnostics in VS Code, and let Claude reason about your domain model through MCP."
 
 ### 5. **No Developer Journey Mapping**
-**Current:** Sections appear in implementation order (what we built), not evaluation order (what developers need to decide).  
-**Issue:** Developers evaluate tools through a 4-stage journey (Awareness → Evaluation → Trial → Adoption). Section order must match this journey.  
+**Current:** Sections appear in implementation order (what we built), not evaluation order (what developers need to decide).
+**Issue:** Developers evaluate tools through a 4-stage journey (Awareness → Evaluation → Trial → Adoption). Section order must match this journey.
 **Fix:** Restructure to optimal adoption order (see Section Order proposal below).
 
 ---
@@ -3083,7 +3314,7 @@ This recommendation outlines the minimum viable README revamp scope from a produ
 
 **Goal:** Match section order to developer evaluation journey.
 
-**Current order:** Installation → Building → Testing → Documentation → Contributing  
+**Current order:** Installation → Building → Testing → Documentation → Contributing
 **Optimal order:** Problem → Differentiation → Quickstart → "What is DI?" → Features → Docs → Community
 
 **Changes:**
@@ -3267,9 +3498,9 @@ Full analysis: `brand/references/readme-research-steinbrenner.md`
 
 ## Model Policy: Use Latest Available Versions
 
-**Filed by:** User (via Copilot)  
-**Date:** 2026-04-04T20:30:36Z  
-**Status:** ACTIVE  
+**Filed by:** User (via Copilot)
+**Date:** 2026-04-04T20:30:36Z
+**Status:** ACTIVE
 
 Always use the latest version of an available model rather than older pinned model versions. Global `defaultModel` constraint removed from `.squad/config.json` to enable automatic routing. Agent-specific overrides (Frank, Uncle Leo) remain intact.
 
@@ -3277,9 +3508,9 @@ Always use the latest version of an available model rather than older pinned mod
 
 ## Agent Model Override: Elaine → claude-sonnet-4.6
 
-**Filed by:** User (via Copilot)  
-**Date:** 2026-04-04T20:38:09Z  
-**Status:** ACTIVE  
+**Filed by:** User (via Copilot)
+**Date:** 2026-04-04T20:38:09Z
+**Status:** ACTIVE
 
 For design and polish work, pin Elaine to Claude Sonnet 4.6 (latest available Sonnet). Applied to `.squad/config.json` via `agentModelOverrides.elaine`.
 
@@ -3289,9 +3520,9 @@ For design and polish work, pin Elaine to Claude Sonnet 4.6 (latest available So
 
 ## Decision: Mapping Table Visual Unification
 
-**Author:** Elaine  
-**Date:** 2026-04-05  
-**Status:** Proposed  
+**Author:** Elaine
+**Date:** 2026-04-05
+**Status:** Proposed
 **Category:** UX Design
 
 Convert all three mapping tables in `brand/brand-spec.html` (§2.1 Reserved Verdict Colors, §2.2 Static Elements Compile-Time, §2.2 Runtime Verdict Overlay) to use identical `.sf-palette` component structure from §1.4:
@@ -3397,9 +3628,9 @@ Icons are abstractions, but they still speak the spec's locked visual language. 
 
 # Decision: Gold Brand Mark Exception
 
-**Date:** 2026-04-04  
-**By:** Elaine (UX Designer)  
-**Status:** Implemented — pending Shane sign-off  
+**Date:** 2026-04-04
+**By:** Elaine (UX Designer)
+**Status:** Implemented — pending Shane sign-off
 
 ## Decision
 
@@ -3432,8 +3663,8 @@ Gold already carries this meaning in syntax highlighting: every `because` and `r
 
 # Decision: Brand Mark Color Revision — Gold Judicious + Emerald Arrows
 
-**Date:** 2026-04-05  
-**Author:** Elaine (UX Designer)  
+**Date:** 2026-04-05
+**Author:** Elaine (UX Designer)
 **Requested by:** Shane
 
 ## What Changed
@@ -3474,9 +3705,9 @@ The brand mark color key now shows Emerald as a fifth entry (Transition #34D399)
 
 # Decision: Elaine's Direct Contribution Role in README Rewrite
 
-**Author:** Elaine (UX Designer)  
-**Date:** 2026-04-07  
-**Status:** Guidance — not yet implemented  
+**Author:** Elaine (UX Designer)
+**Date:** 2026-04-07
+**Status:** Guidance — not yet implemented
 **Context:** Peterman holds primary ownership of the README rewrite. This document defines where Elaine contributes directly vs. where she reviews.
 
 ---
@@ -3582,9 +3813,9 @@ Elaine owns the formatting of the Contributing section:
 
 # Decision: Elaine's Gate Role in README Rewrite Flow
 
-**Date:** 2026-04-07  
-**By:** Elaine (UX Designer)  
-**Status:** Recommendation — pending Shane acknowledgment  
+**Date:** 2026-04-07
+**By:** Elaine (UX Designer)
+**Status:** Recommendation — pending Shane acknowledgment
 
 ---
 
@@ -3655,8 +3886,8 @@ Elaine's constraints were treated as hard non-negotiables in the proposal precis
 
 # Decision: README Form/Shape Pass
 
-**Author:** Elaine (UX)  
-**Date:** 2026-04-07  
+**Author:** Elaine (UX)
+**Date:** 2026-04-07
 **Status:** Applied
 
 ## What Changed
@@ -3693,8 +3924,8 @@ The previous draft had good content but felt dense. Each section competed for at
 # Decision: Shape-First README Pass — Elaine's Position
 
 **Filed by:** Elaine
-**Date:** 2026-04-08  
-**Status:** Recommendation — Pending Shane sign-off  
+**Date:** 2026-04-08
+**Status:** Recommendation — Pending Shane sign-off
 **Context:** Shane asked whether Elaine should produce a form/shape skeleton before Peterman writes the README copy.
 
 ---
@@ -3789,9 +4020,9 @@ Both paths are valid. The scaffold path prevents one class of hero-related rewor
 
 # Decision: Gold — Judicious Use, Tablet Mark Inclusion, Emerald Transition Arrows
 
-**Date:** 2026-04-07  
-**By:** J. Peterman (Brand/DevRel)  
-**Status:** Implemented — Shane sign-off requested  
+**Date:** 2026-04-07
+**By:** J. Peterman (Brand/DevRel)
+**Status:** Implemented — Shane sign-off requested
 
 ## Summary
 
@@ -3878,8 +4109,8 @@ Until the usability review says otherwise, the current README Order example is t
 
 # Decision: README Rewrite Execution Path
 
-**Author:** J. Peterman  
-**Date:** 2026-07-14  
+**Author:** J. Peterman
+**Date:** 2026-07-14
 **Status:** Awaiting Shane sign-off on one gating decision
 
 ---
@@ -3969,10 +4200,10 @@ All required changes from Frank, George, and Uncle Leo are incorporated into the
 
 # Decision: README Restructure Proposal — Shane Feedback Revision
 
-**Author:** J. Peterman  
-**Date:** 2026-04-07  
-**Source:** Shane's feedback pass on `brand/references/readme-restructure-proposal.md`  
-**Status:** Inbox — awaiting Shane sign-off  
+**Author:** J. Peterman
+**Date:** 2026-04-07
+**Source:** Shane's feedback pass on `brand/references/readme-restructure-proposal.md`
+**Status:** Inbox — awaiting Shane sign-off
 
 ---
 
@@ -4139,9 +4370,9 @@ Ready for Shane sign-off. README is near-signoff state: structure locked by Elai
 
 # Decision: README Proposal Review Gap Pass — All Required Changes Applied
 
-**Author:** J. Peterman  
-**Date:** 2026-04-07  
-**Status:** Applied — ready for Shane sign-off  
+**Author:** J. Peterman
+**Date:** 2026-04-07
+**Status:** Applied — ready for Shane sign-off
 **File modified:** `brand/references/readme-restructure-proposal.md`
 
 ---
@@ -4187,9 +4418,9 @@ The proposal is ready for Shane's sign-off. The rewrite can begin.
 
 # Decision: README Restructure Trim Summary Added to Proposal
 
-**Filed by:** J. Peterman  
-**Date:** 2026-04-06  
-**Status:** Proposed — pending Shane review  
+**Filed by:** J. Peterman
+**Date:** 2026-04-06
+**Status:** Proposed — pending Shane review
 
 ---
 
@@ -4226,9 +4457,9 @@ The trim summary is a reference artifact for whoever executes the rewrite. It fu
 
 # Decision: README Collaboration Order — Shape-First vs. Draft-First
 
-**Filed by:** J. Peterman  
-**Date:** 2026-04-08  
-**Status:** Recommendation — Pending Shane sign-off  
+**Filed by:** J. Peterman
+**Date:** 2026-04-08
+**Status:** Recommendation — Pending Shane sign-off
 **Context:** Shane asked whether Elaine should produce a form/shape skeleton before Peterman writes the README copy.
 
 ---
@@ -4343,8 +4574,8 @@ All future references to these colors — in docs, copy, surface specs, and team
 
 # Decision: spm-* layout blocks must not add horizontal padding when parent spm-group already provides it
 
-**Date:** 2026-04-04  
-**Author:** J. Peterman  
+**Date:** 2026-04-04
+**Author:** J. Peterman
 **Status:** Resolved
 
 ## Context
@@ -4497,7 +4728,7 @@ A rewriter working from this proposal needs one thing: the hero sample. Everythi
 
 # Decision Inbox Merge — 2026-04-05T02:00:30Z
 
-**Merged by:** Scribe  
+**Merged by:** Scribe
 **Source:** .squad/decisions/inbox/
 ---
 
@@ -5204,7 +5435,7 @@ That is the real decision gate. Once those are approved, SVG execution becomes c
 
 # Decision Inbox Merge — 2026-04-05T02:32:19Z
 
-**Merged by:** Scribe  
+**Merged by:** Scribe
 **Source:** .squad/decisions/inbox/
 
 ---
@@ -5670,10 +5901,10 @@ The team should create a keep/defer/archive list before trunk consolidation, the
 
 # UX Decision: In-Diagram Transitions Exploration
 
-**Filed by:** Elaine (UX Designer)  
-**Date:** 2026-04-07  
-**Status:** Exploration — pending Shane review  
-**Artifact:** `tools/Precept.VsCode/mockups/preview-inspector-in-diagram-transitions-mockup.html`  
+**Filed by:** Elaine (UX Designer)
+**Date:** 2026-04-07
+**Status:** Exploration — pending Shane review
+**Artifact:** `tools/Precept.VsCode/mockups/preview-inspector-in-diagram-transitions-mockup.html`
 **Comparison baseline:** `tools/Precept.VsCode/mockups/preview-inspector-redesign-mockup.html`
 
 ---
@@ -5745,7 +5976,7 @@ I'd want Shane to look at both mockups side by side and judge whether the spatia
 
 # Inspector review refresh decision
 
-**Date:** 2026-04-05  
+**Date:** 2026-04-05
 **Author:** Elaine
 
 ## Decision
@@ -5773,9 +6004,9 @@ For PRD and redesign work, treat the inspector as a **combined preview surface**
 
 # UX Decision: Preview/Inspector Redesign Mockup v1
 
-**Author:** Elaine (UX Designer)  
-**Date:** 2026-04-07  
-**Issue:** #7 — Create UX mockups for preview/inspector redesign  
+**Author:** Elaine (UX Designer)
+**Date:** 2026-04-07
+**Issue:** #7 — Create UX mockups for preview/inspector redesign
 **Artifact:** `tools/Precept.VsCode/mockups/preview-inspector-redesign-mockup.html`
 
 ---
@@ -5843,8 +6074,8 @@ The mockup includes a tab switcher to show both the Active state (two enabled ev
 
 # Preview/Inspector Panel Audit
 
-**Author:** Kramer (Tooling Dev)  
-**Date:** 2026-04-05  
+**Author:** Kramer (Tooling Dev)
+**Date:** 2026-04-05
 **For:** PRD authoring — Shane / coordinator
 
 ---
@@ -5989,9 +6220,9 @@ Before PRD authoring proceeds, the following open questions should be resolved:
 
 # UX Decision: Preview Reimagined — Phase 2 (Five More Directions)
 
-**Author:** Elaine (UX Designer)  
-**Date:** 2026-04-07  
-**Status:** EXPLORATION — awaiting Shane review  
+**Author:** Elaine (UX Designer)
+**Date:** 2026-04-07
+**Status:** EXPLORATION — awaiting Shane review
 **Artifacts:** `tools/Precept.VsCode/mockups/preview-reimagined-index.html` (updated index with all ten)
 
 ---
@@ -6005,7 +6236,7 @@ Shane loved the first five reimagined preview concepts and asked for five more t
 ## The Five New Concepts
 
 ### 06 — Dual-Pane Diff
-**File:** `preview-reimagined-06-dual-pane-diff.html`  
+**File:** `preview-reimagined-06-dual-pane-diff.html`
 **Metaphor:** Compare any two states side by side.
 
 Pick two states (or two history moments) and see what differs: events, data, rules. Like a code diff but for state-machine snapshots.
@@ -6025,7 +6256,7 @@ Pick two states (or two history moments) and see what differs: events, data, rul
 ---
 
 ### 07 — Rule Pressure Map
-**File:** `preview-reimagined-07-rule-pressure-map.html`  
+**File:** `preview-reimagined-07-rule-pressure-map.html`
 **Metaphor:** Constraints as the organizing principle.
 
 Every rule/invariant/assertion is a tile with health status, pressure indicators, driving fields, and "what would violate this?" scenarios.
@@ -6045,7 +6276,7 @@ Every rule/invariant/assertion is a tile with health status, pressure indicators
 ---
 
 ### 08 — Graph Canvas
-**File:** `preview-reimagined-08-graph-canvas.html`  
+**File:** `preview-reimagined-08-graph-canvas.html`
 **Metaphor:** The diagram IS the interface.
 
 A full-bleed, zoomable, pannable 2D canvas with interactive state nodes and event edge labels. Direct manipulation: click to enter, click to fire, drag to rearrange.
@@ -6065,7 +6296,7 @@ A full-bleed, zoomable, pannable 2D canvas with interactive state nodes and even
 ---
 
 ### 09 — Storyboard / Scenario Builder
-**File:** `preview-reimagined-09-storyboard-scenarios.html`  
+**File:** `preview-reimagined-09-storyboard-scenarios.html`
 **Metaphor:** Build and replay named event sequences.
 
 A vertical storyboard where each step is a card showing event, args, outcome, and data snapshot. Save/name/replay scenarios. Coverage bar shows what paths you haven't tested yet.
@@ -6086,7 +6317,7 @@ A vertical storyboard where each step is a card showing event, args, outcome, an
 ---
 
 ### 10 — Dashboard / Control Room
-**File:** `preview-reimagined-10-dashboard-control-room.html`  
+**File:** `preview-reimagined-10-dashboard-control-room.html`
 **Metaphor:** All signals at once.
 
 Multiple independently useful widgets: state summary, event heatmap, field value sparklines, constraint health, and an activity feed. An instrument panel for complex precepts.
@@ -6164,9 +6395,9 @@ All first-five mockups are preserved. Shared CSS unchanged.
 
 # UX Decision: Preview Reimagined — Five Alternative Directions
 
-**Author:** Elaine (UX Designer)  
-**Date:** 2026-04-07  
-**Status:** EXPLORATION — awaiting Shane review  
+**Author:** Elaine (UX Designer)
+**Date:** 2026-04-07
+**Status:** EXPLORATION — awaiting Shane review
 **Artifacts:** `tools/Precept.VsCode/mockups/preview-reimagined-index.html` (index linking all five)
 
 ---
@@ -6186,7 +6417,7 @@ All five concepts serve the same core jobs:
 ## The Five Concepts
 
 ### 01 — Timeline Debugger
-**File:** `preview-reimagined-01-timeline-debugger.html`  
+**File:** `preview-reimagined-01-timeline-debugger.html`
 **Metaphor:** Time is the primary axis.
 
 A horizontal timeline of fired events dominates the top. Click any point to see state + data at that moment. Below: a split view of data diffs (what changed) and available next actions.
@@ -6206,7 +6437,7 @@ A horizontal timeline of fired events dominates the top. Click any point to see 
 ---
 
 ### 02 — Conversational REPL
-**File:** `preview-reimagined-02-conversational-repl.html`  
+**File:** `preview-reimagined-02-conversational-repl.html`
 **Metaphor:** Type events, read results.
 
 A scrolling command log replaces the diagram. State + data live in a compact sidebar. You type event commands and the system responds with structured outcome blocks.
@@ -6226,7 +6457,7 @@ A scrolling command log replaces the diagram. State + data live in a compact sid
 ---
 
 ### 03 — Decision Matrix
-**File:** `preview-reimagined-03-decision-matrix.html`  
+**File:** `preview-reimagined-03-decision-matrix.html`
 **Metaphor:** Every outcome in one table.
 
 State × Event truth table. Rows = states, columns = events, cells = outcomes. Click a cell to inspect detail in a side panel.
@@ -6246,7 +6477,7 @@ State × Event truth table. Rows = states, columns = events, cells = outcomes. C
 ---
 
 ### 04 — Focus / Spotlight
-**File:** `preview-reimagined-04-focus-spotlight.html`  
+**File:** `preview-reimagined-04-focus-spotlight.html`
 **Metaphor:** One thing at a time, large and clear.
 
 Current state name is massive, center-screen. Available transitions radiate outward as interactive cards. Data orbits beneath. Minimal chrome.
@@ -6266,7 +6497,7 @@ Current state name is massive, center-screen. Available transitions radiate outw
 ---
 
 ### 05 — Notebook / Report
-**File:** `preview-reimagined-05-notebook-report.html`  
+**File:** `preview-reimagined-05-notebook-report.html`
 **Metaphor:** A live, scrollable document.
 
 Vertical card-based sections: contract overview, current state, data, events, rules, mini diagram. Progressive disclosure via expand/collapse.
@@ -6360,7 +6591,7 @@ Reviewed issues `#8` through `#13` and added architectural comments directly on 
 
 # Steinbrenner — Language Proposal Intake
 
-**Date:** 2026-04-05  
+**Date:** 2026-04-05
 **Requested by:** Shane
 
 ## Framing
@@ -6413,7 +6644,7 @@ Merged from `.squad/decisions/inbox/`.
 
 # Steinbrenner — expand language proposal issue bodies
 
-**Date:** 2026-04-05  
+**Date:** 2026-04-05
 **Requested by:** Shane
 
 ## Decision
@@ -6445,8 +6676,8 @@ All proposed DSL snippets in issue bodies must be labeled as hypothetical / not 
 
 # Decision Record: Language Proposal Issues #11, #12, #13 — Body Expansion
 
-**Author:** Frank (Lead/Architect)  
-**Date:** 2026-04-05  
+**Author:** Frank (Lead/Architect)
+**Date:** 2026-04-05
 **Status:** Documented — no implementation authorized
 
 ---
@@ -6569,8 +6800,8 @@ Concept 11 is a solid addition to the exploration set. It's the most intuitive c
 
 # PR #35 Merge: README Cleanup and Squad Decision Recording
 
-**Date:** 2026-04-07T23:40:00Z  
-**Actor:** Frank (Lead/Architect)  
+**Date:** 2026-04-07T23:40:00Z
+**Actor:** Frank (Lead/Architect)
 **Outcome:** MERGED to main
 
 ## Summary
@@ -6583,7 +6814,7 @@ Merged PR #35 containing README Quick Example refactoring and Squad orchestratio
   - Updated `.squad/agents/frank/history.md` with PR #34 learnings
   - Recorded decisions in `.squad/decisions.md` (Squad config + README image fix outcome, user directive to keep branch open)
   - Cleaned up merged inbox entries
-  
+
 - **Commit 3798d92:** .squad merge J. Peterman README contract cleanup decision
   - Updated `.squad/agents/j-peterman/history.md` with team update
   - Merged `j-peterman-readme-contract.md` decision into `.squad/decisions.md`
@@ -6608,10 +6839,3398 @@ Merged PR #35 containing README Quick Example refactoring and Squad orchestratio
 
 ## Scope Verification
 
-✓ Zero scope creep — only the README cleanup commits from the branch were included  
-✓ No unrelated code changes  
-✓ Co-authored-by trailer included in original commits  
+✓ Zero scope creep — only the README cleanup commits from the branch were included
+✓ No unrelated code changes
+✓ Co-authored-by trailer included in original commits
 
 ## Next Steps
 
 Branch `chore/upgrade-squad-latest` is available for additional Squad upgrade work. Main now carries the finalized README Quick Example refactoring and complete orchestration record.
+
+
+## MERGED INBOX BACKLOG — 2026-04-08T13:29:23Z
+
+
+---
+
+### 2026-04-05T17:17:10Z: User directive
+**By:** shane (via Copilot)
+**What:** Treat `deferred` as a general issue state, not a proposal-only status.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-05T23:29:46Z: User directive
+**By:** shane (via Copilot)
+**What:** For preview UX mockups, Elaine should build her own mockups directly instead of handing them to Kramer first. The UX direction should stay less radical unless explicitly requested, and revisions should preserve useful prior structure such as tile-based layouts when that better serves review.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-06T00:59:52-04:00: User directive
+**By:** Shane Falik (via Copilot)
+**What:** Mockup/UI refinement work should be routed through Elaine rather than handled inline by the coordinator.
+**Why:** User expects UX-facing mockup changes to stay with Elaine's design ownership.
+
+---
+
+### 2026-04-06T03:08:24.1183672-04:00: User directive
+**By:** shane (via Copilot)
+**What:** Keep the small dot inside the new rounded card shape for the brand mark.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-06T08:05:19.9729098-04:00: User directive
+**By:** shane (via Copilot)
+**What:** In the brand mark, the two state shapes should be the same size and square shaped.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-06T08:09:46.6698857-04:00: User directive
+**By:** shane (via Copilot)
+**What:** Center the dot everywhere it is used. When combined with text, shift the dot left so it precedes the text, keep the dot vertically centered, and never wrap; widen the box as needed so the pattern reads like "dot + label" on one line.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-06T11:15:40.0468360-04:00: User directive
+**By:** shane (via Copilot)
+**What:** Delete both live design HTML documents and restart them from scratch. Elaine creates and maintains both `design/brand/brand-spec.html` and `design/system/foundations/semantic-visual-system.html` as the visual and creative owner, with explicit emphasis on beauty, consistency, and a strong shared visual system. Peterman remains brand owner, provides brand and semantic-system input based on his research, and collaborates so the brand spec leverages the design system to showcase the brand beautifully.
+**Why:** User wants a cleaner ownership model where visual execution is centralized under Elaine while brand authority still informs the work through Peterman collaboration.
+
+---
+
+### 2026-04-08T06:22:34Z: User directive
+**By:** shane (via Copilot)
+**What:** Build a durable language research corpus organized by domain rather than issue number; use `computed-fields.md` as the quality bar; do not edit proposal bodies in `temp/issue-body-rewrites/`; create and expand research docs only; include domains with no current proposal if they are clearly on the horizon; maximize parallel agent utilization; commit research files after each batch completes; update the language research indexes so every open proposal points to its grounding and every research doc lists the proposals it informs.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-05T18:05:14Z: User directive
+**By:** shane (via Copilot)
+**What:** Keep mockup / UX work in its own PR separate from the workflow closeout work.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-05T18:21:47Z: User directive
+**By:** shane (via Copilot)
+**What:** Bundle all remaining work on the current branch into a PR, push it, and leave the branch ready to delete so new tasks can start from a clean place.
+**Why:** User request — captured for team memory
+
+---
+
+# Decision: Interactive Journey Prototype (Concept 17)
+
+**Filed by:** Elaine (UX Designer)
+**Date:** 2026-05-02
+**Status:** Proposed — awaiting Shane review
+
+## Decision
+
+Created **Concept 17 — Interactive Journey** as the first clickable prototype in the mockup series. This is a playable synthesis of Concepts 14 (Contract Explorer), 15 (Journey), and 16 (Navigator) that lets Shane click through the full InsuranceClaim lifecycle in the browser.
+
+## What It Does
+
+- **Fire events**: Click "Fire ▶" on any available event to advance the simulation. Events accept typed arguments (text inputs, number inputs, boolean dropdowns).
+- **State transitions**: The precept transitions between Draft → Submitted → UnderReview → Approved/Denied → Paid, exactly matching the `insurance-claim.precept` definition.
+- **History accumulation**: Each fired event appends to the Past trail with step number, event name, arguments, and data deltas (field before→after values).
+- **Data provenance**: Current state's data grid shows "← set at #N" annotations connecting each field's value to the step that set it. Recently-changed fields glow green.
+- **Guard enforcement**: Approve is guarded by `(!PoliceReportRequired || MissingDocuments.count == 0) && Amount ≤ ClaimAmount`. Invalid fires show toast rejection messages.
+- **Edit-in-place**: FraudFlag is toggleable in UnderReview state via inline toggle, matching the `in UnderReview edit FraudFlag` declaration.
+- **Undo/Reset**: Undo reverses one step with full data restoration. Reset returns to Draft initial state.
+- **Topology rail**: Left rail shows all 6 states with visited/current/unvisited visual layers and step badges.
+- **Breadcrumb trail**: Header tracks the unique-state path through the machine.
+- **Terminal states**: Denied and Paid show completion summaries with journey statistics.
+
+## Interaction Patterns Established
+
+1. **Fire-and-observe**: The core loop is "fill args → click Fire ▶ → watch Past grow + Present update + Future recalculate." This should be the primary interaction pattern for any production implementation.
+2. **Toast feedback**: Transitions show green toasts ("▶ Submit → Submitted"), self-loops show muted toasts ("↻ stayed in UnderReview"), rejections show red toasts ("✕ guard message"). Quick, non-modal feedback.
+3. **Temporal scroll**: Past section grows upward from the origin, Present is the hero in the middle, Future shows what's next. The scroll naturally centers on Present after each step.
+4. **Data provenance as micro-annotation**: "← set at #N" is a low-cost annotation that connects current field values to their causal step without requiring a separate history view. This pattern should carry into any production implementation.
+5. **Undo as time travel**: Single-step undo with full data restoration. Not scrubbing — just "oops, let me try a different path."
+
+## Files
+
+- `tools/Precept.VsCode/mockups/preview-reimagined-17-interactive-journey.html` — the interactive prototype
+- `tools/Precept.VsCode/mockups/preview-reimagined-index.html` — updated to 17 concepts with interactive prototype at the top
+
+## Suggested Play-Through
+
+1. **Submit**(Claimant: "Jane Doe", Amount: 5000) → Submitted
+2. **AssignAdjuster**(Name: "Bob Smith") → UnderReview
+3. **RequestDocument**(Name: "Police Report") → stays in UnderReview
+4. Try **Approve**(Amount: 4500) — rejected! MissingDocuments not empty
+5. **ReceiveDocument**(Name: "Police Report") → stays, MissingDocuments clears
+6. **Approve**(Amount: 4500, Note: "Approved after review") → Approved
+7. **PayClaim** → Paid (terminal, journey complete)
+
+Alternative path at step 6: **Deny**(Note: "Insufficient evidence") → Denied
+
+## Relationship to Existing Concepts
+
+- **14 (Contract Explorer)** remains the leading direction for static preview design — it has pipeline trace depth and what-if that this prototype doesn't replicate.
+- **15 (Journey)** provided the temporal layout pattern (Past/Present/Future).
+- **16 (Navigator)** provided the topology rail with visited/current/unvisited layers.
+- **17 combines** these into the first prototype that can be *experienced*, not just *viewed*.
+
+## Next Steps
+
+- Shane plays through the prototype and provides feedback on the interaction feel.
+- If the fire-and-observe pattern feels right, it validates the Journey-style layout for the production implementation.
+- The topology rail interaction (clicking rail nodes to jump to states) could be a future enhancement.
+
+---
+
+# Re-Review: Computed Fields (#17) — Teachability & UX Clarity
+
+**Reviewer:** Elaine (UX Designer)
+**Date:** 2026-04-08
+**Trigger:** Shane requested re-review after comprehensive 24-system research document was completed
+**Inputs reviewed:**
+- `temp/issue-body-rewrites/17.md` — proposal body
+- `docs/research/language/expressiveness/computed-fields.md` — research doc (24 systems)
+- `samples/travel-reimbursement.precept`, `samples/loan-application.precept`, `samples/insurance-claim.precept`, `samples/event-registration.precept` — existing DSL reading patterns
+- George's prior feasibility review findings (session context)
+
+---
+
+## Verdict: APPROVE WITH REQUIRED CHANGES
+
+The core design — bare `->` for derivation, read-only semantics, field-local scope — is teachable. The 24-system research strongly validates the syntax choice. The concept maps cleanly onto mental models users already have (spreadsheet formulas, database generated columns, C# expression-bodied properties). The required changes below are about making the proposal *self-teaching* rather than requiring readers to have read background material.
+
+---
+
+## Required Changes (Learnability Improvements)
+
+### 1. Add a "How to Read This" callout with the `->` dual-use explanation
+
+The `->` token appears in two contexts: action chains (`-> set X = Y -> transition Z`) and field derivation (`field Total as number -> A + B`). Both share Principle 11 ("results in"), but a first-time reader hitting `->` in a field declaration after seeing it in transition rows will momentarily stall. The proposal needs a 3-line callout:
+
+> **Reading guide:** `->` always means "results in." In a transition row, `-> set X = Y` means "this action results in X becoming Y." In a field declaration, `-> A + B` means "this field results in A + B." A derived field is a formula that always results in a value — which is why it's read-only.
+
+This is the single most important learnability addition. Without it, users must infer the connection themselves.
+
+### 2. Show a realistic before/after using the travel-reimbursement sample
+
+The motivation section shows the problem (manual synchronization), and the examples section shows computed field syntax — but they're disconnected. Add a single side-by-side before/after block using `RequestedTotal` from `travel-reimbursement.precept`:
+
+**Before:** `field RequestedTotal as number default 0` plus `-> set RequestedTotal = Submit.Lodging + Submit.Meals + (Submit.Miles * Submit.Rate)` repeated in every relevant transition row.
+
+**After:** `field RequestedTotal as number -> LodgingTotal + MealsTotal + MileageTotal` — declared once, always correct.
+
+This is more persuasive than abstract examples because a reader can look at the existing sample file and see the pain firsthand.
+
+### 3. Show computed fields interleaved with regular fields (realistic reading context)
+
+The proposal's examples section shows computed fields in isolation. But in a real `.precept` file, they'll be interleaved:
+
+```precept
+field LodgingTotal as number default 0
+field MealsTotal as number default 0
+field MileageTotal as number default 0
+field RequestedTotal as number -> LodgingTotal + MealsTotal + MileageTotal
+field ApprovedTotal as number default 0
+```
+
+A new reader scanning this block needs to immediately distinguish "this one is different." The `default X` → `-> expression` visual shift is clear enough *with syntax highlighting* (where `->` and the expression would be colored differently). But in plain text — documentation, code review diffs, chat messages — the `->` is small and easy to miss compared to the longer `default` keyword. The proposal should acknowledge this and confirm that:
+- Language server hover will show "Computed: LodgingTotal + MealsTotal + MileageTotal" (already in acceptance criteria — good)
+- Syntax highlighting will visually distinguish derived fields (confirm with grammar sync)
+
+### 4. Specify teachable error messages for all invalid combinations
+
+The proposal lists 5+ invalid combinations as compile errors but doesn't show what a user would *see*. Error messages are the primary learning surface for constraint discovery. Add example diagnostics:
+
+| Invalid code | Error message |
+|---|---|
+| `field X as number default 0 -> Y + Z` | "A field cannot have both a default value and a derivation. Use `default` for user-set fields or `->` for computed fields, not both." |
+| `field X as number nullable -> Y + Z` | "Computed fields always produce a value and cannot be nullable. Remove `nullable` or remove the derivation." |
+| `field X as number -> Y + Z` with `nonnegative` | "Field-level constraints apply to user-entered data. Computed fields are read-only derivations — use an `invariant` to validate the result instead." |
+| `-> set TotalCost = 50` (set targeting computed) | "TotalCost is a computed field and cannot be assigned. Its value is always derived from: Quantity * UnitPrice." |
+| `edit TotalCost` block | "TotalCost is a computed field and cannot appear in edit declarations. Computed fields are read-only." |
+| `field A -> B` / `field B -> A` | "Circular dependency detected: A → B → A. Computed fields cannot reference each other in a cycle." |
+
+These don't need to be locked to exact wording, but the *shape* of the message matters. Notice: the best messages explain *why* something is wrong and *what to do instead*. The constraint-exclusion message is especially important — it redirects to invariants, which is the correct alternative.
+
+### 5. Surface the unique positioning claim in the proposal body
+
+The research doc's strongest finding — "No system in the survey combines field-level derivation with lifecycle-aware constraint enforcement" — is buried in the cross-category pattern section. This should appear in the proposal's Motivation section, because it answers the implicit reader question: "Why would Precept add computed fields when databases/spreadsheets already have them?"
+
+One sentence is enough: "Existing systems that support derivation (databases, spreadsheets, enterprise platforms) lack lifecycle-aware constraint enforcement. Precept would be the first to combine declared derivations with state-guarded invariants, ensuring computed values are always fresh when guards and assertions evaluate."
+
+### 6. Clarify the null-safety learning path for users
+
+George's review identified that the null-safety type checking rule is unspecified. From a teachability perspective, this matters because a user's *first* computed field is likely to reference a nullable field (common in the sample set — `EmployeeName`, `AdjusterName`, `DecisionNote` are all nullable). The error they see must be immediately understandable:
+
+> "Computed field expression references nullable field 'EmployeeName'. Computed fields must always produce a value — use only non-nullable fields or collection accessors that guarantee a result."
+
+The proposal should add this to the error message table and note that broader nullable-input support (e.g., null-coalescing operators) is explicitly deferred to a future proposal.
+
+### 7. Add a one-line "mental model" sentence to the summary
+
+The proposal's summary says "fields whose values are calculated from other fields and re-evaluated automatically." This is accurate but mechanical. Add one sentence that gives the reader an instant mental model:
+
+> "Think of computed fields as spreadsheet formulas: you declare the formula once, and the value is always current."
+
+Spreadsheets are the most universally understood precedent from the research survey, and the analogy is exact.
+
+---
+
+## Non-Blocking Observations
+
+- **Research strengthens the `->` choice.** The 24-system survey shows every derivation system converges on "declared once, read-only, auto-recomputed." The bare `->` is compact and consistent with Precept's existing vocabulary. No competing system uses a cleaner syntax for the same concept. The research fully justifies not adding a `computed` keyword.
+
+- **DSL reading flow is good.** Looking at `travel-reimbursement.precept` and `loan-application.precept`, computed fields would reduce the longest transition rows (the Submit rows with 6-7 chained `set` actions) without changing the reading order of the file. Field declarations stay at the top; transitions stay at the bottom. The file's narrative structure is preserved.
+
+- **AI agent audience is well-served.** A computed field is easier for an AI agent to parse and reason about than a duplicated formula across multiple transition rows. The compile-time diagnostics (cycle detection, null-safety, exclusion rules) give agents clear, actionable error signals. The inspect/fire MCP tools should show computed values — proposal already covers this.
+
+---
+
+## Summary
+
+The proposal's core design is sound and the research comprehensively validates the syntax choice. The required changes are all about making the proposal a better *teaching document* — the kind of spec a new user could read without needing supplementary material. The most impactful additions are: the "how to read `->` " callout (#1), the before/after example (#2), and the error message table (#4). Together, these three changes transform the proposal from an implementer's specification into a user-facing design document.
+
+---
+
+### 2026-04-05: Dockable preview workbench pattern
+**By:** Shane (via Elaine)
+**What:** Treat Data, Topology, and Timeline as persistent panel identities that can move between docks without changing what each panel means. Docking, collapse, ordering, and resizing belong to the workbench chrome, while axis changes belong only to Topology and Timeline.
+**Why:** The preview needs to support different reading modes without forcing a single privileged arrangement or making users relearn the simulation itself.
+
+---
+
+# UX Decision: Interactive Guidance System for Journey Prototype
+
+**Author:** Elaine · UX Designer
+**Date:** 2026-05-02
+**Scope:** Concept 17 (Interactive Journey) mockup
+**Status:** Proposed — needs Shane sign-off
+
+## Context
+
+Concept 17 is the first fully clickable prototype in the mockup series. Shane requested that clickable controls be visually obvious and that the experience include lightweight guidance for first-time users.
+
+The prototype already had functional interactivity (fire events, undo, reset, toggle edits) but the controls blended into the layout — a first-time visitor couldn't immediately tell what was clickable or where to start.
+
+## Decision
+
+Added three layers of interactive guidance, each independently dismissible:
+
+### 1. Visual Emphasis on Interactive Controls
+
+- **Fire ▶ buttons** get a soft pulse-ring animation (2.4s cycle, ~45% opacity peak). The pulse is CSS-only, lightweight, and draws the eye without being distracting.
+- **Suggested-next event cards** get a cyan glow border + faster pulse on their Fire button + a "▶ suggested next" badge. This traces the golden path without preventing exploration.
+- **Input fields** get a subtle indigo border lift and focus ring (box-shadow on `:focus`).
+- **Edit toggles** show a ✎ cursor hint on hover.
+- **Undo/Reset buttons** get a press-scale (96%) for tactile feedback.
+
+### 2. Coach Mark Tour (5 Steps)
+
+A spotlight-and-card overlay that walks through the five core interactive surfaces:
+
+1. **Journey Layout** — Past/Present/Future temporal flow
+2. **Fire an Event** — arg fields + Fire ▶ button
+3. **Topology Rail** — visited-state tracking on the left
+4. **Undo & Reset** — header controls
+5. **Blue Hints** — the suggested-next badge system
+
+Accessible from: welcome banner ("🎓 Take the tour") and status bar ("🎓 Tour"). Dismissible at any point via "Skip tour." Step indicators show progress as dots.
+
+### 3. Contextual Step Hints
+
+After each event fires, a lightweight "Suggested next: …" hint appears above the journey content, pointing to the next event in the golden path. Dismissible with ✕ and stays dismissed for the session.
+
+The golden path: Submit → AssignAdjuster → RequestDocument → ReceiveDocument → Approve → PayClaim.
+
+### 4. Welcome Banner
+
+On first load (before any events are fired), a welcome banner explains the interaction model and shows the suggested journey as a visual breadcrumb trail. Two CTAs: "Got it — let me explore" (dismiss) and "🎓 Take the tour" (start coach marks).
+
+## Design Principles Applied
+
+- **Progressive disclosure:** Welcome banner → step hints → explore freely. Each layer peels away as the user gains confidence.
+- **Non-blocking:** Every guidance element is dismissible. The prototype is fully functional with all guidance hidden.
+- **Visual hierarchy:** Pulse animations use low opacity (never above 50%) and cool colors (cyan for suggestion, indigo for focus). They draw attention without competing with the content.
+- **Prototype-appropriate:** No localStorage persistence, no analytics, no complex state machines for the guidance itself. Session-scoped dismissal only.
+
+## Patterns Established
+
+1. **Pulse-ring for interactive controls** — CSS `::after` pseudo-element with border animation. Reusable on any clickable element in future surfaces.
+2. **Suggested-next badge** — cyan chip with "▶ suggested next" label. Could be generalized to any guided flow in the extension.
+3. **Coach mark overlay** — spotlight (box-shadow trick) + positioned card. Pattern could be extracted to shared CSS for other mockups.
+4. **Golden path hinting** — data-driven suggested journey that maps state → next event. Decoupled from the simulation logic.
+
+## What This Doesn't Do
+
+- No user tracking or persistence — guidance resets on page reload (appropriate for a prototype).
+- No forced linearity — the golden path is a suggestion, not a rail. Users can fire any event at any time.
+- No complex animation library — everything is CSS keyframes + simple JS DOM manipulation.
+- No accessibility degradation — coach marks are keyboard-dismissible, all text is screen-reader visible, no content is hidden behind hover-only interactions.
+
+## Files Modified
+
+- `tools/Precept.VsCode/mockups/preview-reimagined-17-interactive-journey.html` — CSS additions + JS guidance system
+- `tools/Precept.VsCode/mockups/preview-reimagined-index.html` — updated Concept 17 description to mention guided tour
+
+---
+
+# Decision: History + Inspection Hybrid Concepts (15–16)
+
+**Filed by:** Elaine (UX Designer)
+**Date:** 2026-05-02
+**Status:** Proposed — awaiting Shane review
+
+## Context
+
+Shane observed that Timeline (01) is strongest for production UI, but there's value in a hybrid that combines:
+- **History** — where we came from (states visited, events fired, data deltas)
+- **Inspection** — where we can go next (available events, outcomes, args)
+- A **present-focused developer workflow** rather than a production-monitoring workflow
+
+This is adjacent to Concept 13 (Flow Cards) and Concept 14 (Contract Explorer) but adds a temporal dimension none of the existing concepts have.
+
+## Two Approaches Explored
+
+### Concept 15: Journey — Temporal Narrative
+
+Organizes by **time**: Past → Present → Future as a single vertical scroll.
+
+- **Past section**: compact trail of steps taken. Each step shows event fired, state entered, and key data deltas (before→after). One row per step — works with even 1–3 steps.
+- **Present section**: hero card with full data snapshot. "Recently changed" markers on data fields connect current values to the step that set them (e.g., "← set at #1"). Full rules, violations, editable fields.
+- **Future section**: available events as action cards grouped by outcome type (transitions first, self-loops next, blocked last). Closes with "also reachable" topology hints.
+
+**Strength**: reads as a narrative grounding the developer in their simulation. Answers "how did I get here?" without requiring deep history. The outcome grouping in the Future section makes "what should I do next?" immediately scannable.
+
+**Limitation**: doesn't show the full topology — you only see visited states, the current state, and available next events. The "also reachable" section is a lightweight nod to topology but doesn't give the complete picture.
+
+### Concept 16: Navigator — Flow Cards with Memory
+
+Organizes by **topology** (like Flow Cards 13) but **threads history through it**.
+
+- **Visited cards**: warm styling, step numbers, mini data-delta strips showing what changed when we passed through.
+- **Current card**: full spotlight with "← set at #N" provenance annotations on changed fields.
+- **Unvisited cards**: dimmed but present, showing event hints of what's ahead.
+- **Traced edges**: transition edges that were actually taken are visually distinguished from available-but-not-taken edges. Step numbers on traced edges.
+- **Rail**: visited nodes filled with step badges, traced path highlighted.
+
+**Strength**: preserves the whole-machine context from Flow Cards while making the developer's path visible. The three-layer visual hierarchy (visited/current/unvisited) immediately answers "where have I been and what's left?"
+
+**Limitation**: more complex than Journey — additional visual states to learn. The unvisited future cards show hints but no data (since we don't know what data will look like when we arrive).
+
+## Relationship to Contract Explorer (14)
+
+These are not replacements for Concept 14. They explore a dimension 14 doesn't have — history awareness. The strongest synthesis may be **Contract Explorer with Navigator's history layer**: the same feature-complete preview, but with visited/current/unvisited visual states and data provenance annotations.
+
+## Files Created
+
+- `tools/Precept.VsCode/mockups/preview-reimagined-15-journey.html` — Concept 15 mockup
+- `tools/Precept.VsCode/mockups/preview-reimagined-16-navigator.html` — Concept 16 mockup
+- `tools/Precept.VsCode/mockups/preview-reimagined-index.html` — Updated with Phase 7, new concept cards, and revised recommendation
+
+## Recommendation
+
+Review 14, 15, and 16 side by side. The choice axis is:
+- **14 (Contract Explorer)**: feature-complete contract exploration, no history awareness
+- **15 (Journey)**: temporal narrative, lightweight, present-focused, no full topology
+- **16 (Navigator)**: topology + history hybrid, full machine visible, richest context
+
+A synthesis of 14 + 16 may be the strongest final form — Contract Explorer's feature completeness with Navigator's history layer.
+
+---
+
+# Decision: Preview Concept Recombination — Flow Cards
+
+**Author:** Elaine (UX Designer)
+**Date:** 2026-05-02
+**Status:** Proposed — awaiting Shane review
+
+## Context
+
+Shane observed that Timeline/history is a stronger fit for production UI than for the dev preview panel, since manual simulation rarely builds deep event history. He asked whether the large-card approach from Concept 04 (Focus/Spotlight) could be expanded to show the entire flow.
+
+## Decision
+
+Created **Concept 13: Flow Cards** — a recombination of the best ideas from the concept set:
+
+- **From Concept 04 (Focus/Spotlight):** The large-card aesthetic — generous spacing, big state names, minimal chrome, radial path cards. The current state is THE visual anchor.
+- **From Concept 05 (Notebook):** Vertical scrolling, progressive disclosure, card-based layout that works at any width.
+- **From Concept 11 (Kanban):** The whole-flow metaphor — seeing the full lifecycle from initial to terminal, not just the current state.
+- **New:** Left-rail mini-diagram for spatial context. Transition edges between cards carrying event names and guard summaries. Branch sections for alternate paths.
+
+## Key Changes
+
+1. **Timeline (01) reclassified** from Tier 1 (primary) to a production-UI pattern. Still the best history-debugging concept, but history isn't deeply useful in dev preview.
+2. **Flow Cards (13) is now the top recommendation** for dev preview — it answers "what does this machine look like, where am I, and what can I do?" in a single scrollable view.
+3. **Notebook (05) remains strong** as a secondary "full report" mode.
+4. **First complex-sample mockup:** Uses InsuranceClaim (6 states, 7 events, collections) instead of Subscription (3 states, 2 events), validating the layout at real-world scale.
+
+## Artifacts
+
+- `tools/Precept.VsCode/mockups/preview-reimagined-13-flow-cards.html` — the new mockup
+- `tools/Precept.VsCode/mockups/preview-reimagined-index.html` — updated with Concept 13 and revised recommendation
+- `tools/Precept.VsCode/mockups/preview-concepts-deep-analysis.md` — addendum with Concept 13 analysis and revised tier ranking
+
+## Tradeoffs
+
+- Flow Cards is state-centric; Notebook is facet-centric. For precepts where the developer wants a "report" view (all data, all rules, all events separately), Notebook is still better. Both should exist as switchable modes.
+- Non-current cards are compact by default. For a 7-state precept, the developer may need to expand cards to understand states they haven't visited yet. The expand interaction isn't yet prototyped.
+- The branch section for alternate paths (UnderReview → Denied) is a simple labeled divider. More complex branching patterns (3-way splits, cycles) need further design.
+
+---
+
+# Decision: Contract Explorer (Concept 14) as Leading Preview Direction
+
+**Filed by:** Elaine
+**Date:** 2026-05-02
+**Status:** Proposed — awaiting Shane review
+
+## Decision
+
+Concept 14 — **Contract Explorer** — is the leading direction for the Precept preview panel. It refines Flow Cards (Concept 13) into a shipping-candidate shape by integrating:
+
+1. **Inline Execution Trace** (from Concept 12) — expand any event to see the 6-stage fire pipeline with expression evaluation, guard matching, and mutation chains. The "microscope" for debugging.
+2. **Structured violation detail** — source-kind badges (transition-rejection, invariant, etc.), expression text, because-reason, and clickable target-field links.
+3. **Edit-in-place** — editable fields show inline toggles/inputs directly in the data grid.
+4. **What-if bar** — hypothetically change a field and see all event outcomes re-evaluate instantly, without committing the change.
+5. **All 6 outcome kinds** with distinct visual treatments: Transition, NoTransition, Rejected, ConstraintFailure, Undefined, Unmatched.
+6. **Mode tabs** (Flow / Matrix / Notebook) — acknowledges that secondary views serve different jobs.
+
+## Why This Over Alternatives
+
+- **vs. Flow Cards (13):** Same layout, but now addresses the cross-cutting gaps identified in the deep analysis — pipeline visibility, all outcome kinds, violations, and edit mode.
+- **vs. Notebook (05):** State-centric organization is more natural for the primary dev question ("I'm in state X, what can I do?") vs. facet-centric ("show me all events"). Notebook remains a strong secondary tab.
+- **vs. Timeline (01):** Timeline is stronger for production UI; manual simulation in dev preview rarely builds deep history. Contract Explorer shows the whole contract now.
+
+## What's New in the Mockup
+
+- `preview-reimagined-14-contract-explorer.html` — full mockup using InsuranceClaim (6 states, 7 events, 8 fields, 1 set collection, 3 invariants, 2 state asserts).
+- `preview-reimagined-index.html` — reorganized into three tiers: Leading Direction → Strong Secondary Modes → Exploration Archive.
+- Concept 12 (Execution Trace) is now marked "✓ Integrated" in the index since its pipeline debugger ships inline within Concept 14.
+
+## Product Shape Summary
+
+The preview panel is a **state-centric card scroll with inline dev tools**:
+
+- **Header:** precept name, file path, mode tabs (Flow / Matrix / Notebook), Edit Data, Reset
+- **What-if bar:** hypothetical field changes with instant re-evaluation
+- **Left rail:** compact mini-diagram for spatial context
+- **Card flow:** one card per state, connected by transition edges with event labels
+- **Current state card (spotlight):** large name, data grid (with edit-in-place), event dock (with pipeline trace expansion, fire buttons, arg inputs, outcome badges, violation detail), rule chips
+- **Other state cards:** compact with expand affordance
+- **Status bar:** invariant count, structural stats, breadcrumb trail
+
+## Open Questions
+
+1. **Pipeline trace data model:** The trace currently shows a static mockup of expression evaluation. The real implementation needs the fire API to return stage-by-stage detail. Does this require a new `precept_fire_trace` API, or can the existing fire result be enriched?
+2. **What-if performance:** Hypothetical field changes re-evaluate all events via inspect. With 7+ events and complex guards, this should be fast (it's stateless evaluation), but needs profiling.
+3. **Responsive at sidebar width:** The mockup collapses the rail and reduces card size at 500px. Is this enough, or does sidebar placement need a fundamentally different layout?
+
+## Next Steps
+
+- Shane reviews Concept 14 mockup and decides whether this is the shape to build toward.
+- If approved, Kramer scopes the webview implementation and identifies the runtime API changes needed for pipeline trace data.
+- Notebook (05) and Matrix (03) need refined mockups using InsuranceClaim data to validate them as secondary tabs.
+
+---
+
+### 2026-04-05: MaintenanceWorkOrder layout probes
+**By:** Shane (via Elaine)
+**What:** Seed the new mockups at the Scheduled state with real MaintenanceWorkOrder tension already present: urgent is true, parts are not approved, and the first meaningful question is whether the user can read why StartWork is blocked before firing it.
+**Why:** The richer mid-flow seed exposes state diagram context, guard friction, and field provenance immediately, so each layout can differentiate itself without spending the first interaction on empty-state setup.
+
+---
+
+### Decision: Right-rail animated state diagram for Interactive Journey (Concept 17)
+
+**Filed by:** Elaine
+**Status:** Implemented — awaiting Shane review
+
+**What changed:**
+The Interactive Journey prototype now includes a right-hand SVG state diagram that tracks the user's simulation path through the InsuranceClaim lifecycle. The diagram is purely topological — nodes, edges, arrowheads, self-loop indicators, and tiny event-name labels. No data, no guards, no rules. It's a spatial minimap, not a duplicate of the journey scroll.
+
+**Key design decisions:**
+1. **Non-duplicative scope** — the diagram shows only state topology + traversal state. All detail (data fields, guards, mutations, provenance) lives in the journey scroll.
+2. **Animation model** — newly-traversed edges flash green → violet (900ms). Self-loops flash green. Current node has a pulsing glow ring (2.4s cycle). Animations are CSS keyframes triggered by DOM re-creation on each render.
+3. **Fork layout** — UnderReview branches diagonally to Approved (left) and Denied (right), with Paid below Approved. Terminal states use dashed strokes. Initial state has a small violet dot above.
+4. **Progressive visibility** — edge labels and arrowheads are dim by default and brighten when their edge has been traced. Visited nodes brighten progressively.
+5. **Responsive collapse** — diagram hidden at ≤700px, left rail hidden at ≤500px. Prototype degrades gracefully to 2-column then 1-column.
+6. **Coach tour integration** — new step 4 ("The State Diagram") added to the 6-step tour, using a new `position: 'left'` coach card placement.
+
+**Why this approach:**
+The diagram answers "where am I in the machine?" at a glance, which the vertical journey scroll cannot — the scroll is temporal, not spatial. Keeping it simple (no data, no guards) avoids the information-density problem that derailed Graph Canvas (Concept 08). The 200px right rail fits comfortably alongside the 56px left rail and fluid journey content.
+
+**Files changed:**
+- `tools/Precept.VsCode/mockups/preview-reimagined-17-interactive-journey.html` — state diagram CSS, HTML container, JS render function, coach step, responsive breakpoint
+- `tools/Precept.VsCode/mockups/preview-reimagined-index.html` — concept 17 card description and tags updated
+
+---
+
+### 2026-04-08: Computed Fields (#17) — Re-Review After Research Expansion
+
+**By:** Frank (Lead/Architect & Language Designer)
+**Requested by:** Shane
+**Verdict:** REQUIRED CHANGES — Research grounds the feature; proposal needs targeted updates before implementation.
+
+---
+
+## Review Summary
+
+The expanded research document (`docs/research/language/expressiveness/computed-fields.md`) is a strong piece of work — 24 systems across all 7 philosophy positioning categories, with honest precedent mapping and explicit contract identification. It adequately grounds the **feature concept** and strengthens most of the proposal's locked design decisions. The proposal itself has not been updated since the initial review round, and the gaps identified by George and Kramer in the first pass are still present.
+
+The research does not change my verdict from the first review (REQUIRED CHANGES), but it narrows the remaining work to precise, enumerable updates. No new blocking risks surfaced. The feature remains correctly positioned.
+
+---
+
+## Research Assessment
+
+### Does the 24-system precedent survey adequately ground the proposal?
+
+**Yes, for the feature concept. No, for the syntax choice.**
+
+The survey demonstrates overwhelming cross-category convergence on the core derivation contract: read-only, declared once, automatically recomputed, distinct from defaults. This grounds every locked design decision except #1 (the bare `->` syntax). The research surveys what derivation *means* in 24 systems; it does not survey what derivation *looks like* syntactically. That said, the syntax choice is adequately grounded by Principle 11 (`->` means "results in") — external syntax precedent was never the right anchor for that decision. The research is correctly scoped.
+
+### Cross-category pattern analysis
+
+The research's strongest finding: "No system in the survey combines field-level derivation with lifecycle-aware constraint enforcement." This is the positioning claim that matters. Computed fields would not duplicate a capability from any adjacent category — they fill a gap every category leaves open. That strengthens Precept's positioning, not just the proposal's.
+
+### Dead ends
+
+All 5 dead ends in the research (event-arg coupling, lazy evaluation, writable computed fields, silent defaults, cross-precept derivation) are already reflected in the proposal's locked decisions or explicit exclusions. No new dead ends surfaced. The "silent default fallbacks" risk connects directly to the unresolved nullability contract (see below).
+
+---
+
+## Semantic Contract Coverage
+
+The research identifies 6 semantic contracts that must be explicit before implementation. Here is the current proposal's coverage:
+
+| # | Contract | Coverage | Notes |
+|---|---|---|---|
+| 1 | **Scope Boundary** | **COVERED** | Proposal locked decision #6: fields + collection accessors only, no event args, no cross-precept refs. Acceptance criteria include "Event argument reference produces compile error." |
+| 2 | **Recomputation Timing** | **PARTIALLY COVERED** | Proposal specifies Fire timing ("after mutations, before invariant checks") but is silent on Update pipeline and Inspect preview. Research correctly identifies this as the most important contract. The first review (George's findings #3, #5) flagged the same gap. Still unaddressed. |
+| 3 | **Nullability and Accessor Safety** | **NOT COVERED** | Proposal says "Cannot be `nullable`" but that's about the computed field itself, not its inputs. What if the derivation expression references a nullable field? What do `.peek`/`.min`/`.max` return on empty collections? The research frames this as an open decision. George's findings #1 and #2 flagged it. Still unaddressed. This is the single largest type-safety gap. |
+| 4 | **Dependency Ordering and Cycles** | **COVERED** | Topological sort at compile time, cycle diagnostics with path. Acceptance criteria include both. MySQL ordering precedent supports the approach. |
+| 5 | **Writeability and External Input** | **PARTIALLY COVERED** | Proposal covers `edit` and `set` restrictions (locked decisions #5). But the API surface is unspecified: what happens if a caller passes a computed field value in `CreateInstance`, `Update`, hydration, or MCP payloads? Ignored? Rejected? George's finding #4 flagged this. Still unaddressed. |
+| 6 | **Tooling and Serialization Surface** | **PARTIALLY COVERED** | Proposal mentions hover and MCP serialization at headline level. No concrete specs: what does hover show (formula? value? dependencies?)? What shape does the MCP compile output take? How do Inspect and Update outputs surface computed values? Kramer's findings #1, #2, #5 flagged this. Still unaddressed. |
+
+**Score: 2 COVERED, 3 PARTIALLY COVERED, 1 NOT COVERED.**
+
+---
+
+## DSL Philosophy Filter (7 Questions)
+
+| # | Question | Pass? | Rationale |
+|---|---|---|---|
+| 1 | **Domain integrity** | **YES** | Computed fields eliminate manual synchronization — the formula drift and single-source-of-truth loss documented in the research are real integrity risks. The `travel-reimbursement.precept` sample demonstrates the pain: `RequestedTotal` is manually recomputed in every row that changes its inputs. |
+| 2 | **Determinism** | **YES** | Pure field-to-field derivation is deterministic by construction. The research correctly rejects lazy/cached evaluation and event-arg coupling as anti-deterministic. Proposal excludes both. |
+| 3 | **Keyword clarity** | **PASS WITH CAVEAT** | The bare `->` reuses an existing symbol with a new semantic role (derivation vs. action). Principle 11 covers it: `->` means "results in." But today `->` always follows a context (state/event/guard) and introduces an *action*. In `field X as number -> Expr`, it follows a type and introduces a *definition*. This is context-disambiguated at the parser level (after `as Type` = derivation; after `when Expr` = action), but it creates a new visual pattern that authors must learn. The research does not address this directly. I note it as a learning-curve cost, not a blocking concern — Principle 11 is broad enough to absorb both uses. |
+| 4 | **Truth boundaries** | **YES** | Computed fields are data truth (like invariants), computed from persistent entity state. They don't blur the data/movement distinction. |
+| 5 | **Locality** | **YES** | Maximum locality — the formula lives on the field declaration itself. Stronger locality than the current workaround (formulas scattered across transition rows). |
+| 6 | **Compile-time soundness** | **CONDITIONAL** | Cycle detection, mutual exclusion rules, and type checking are all compile-time. But the null-safety gap (Contract #3) means the type checker cannot currently prove a computed expression is total if it references nullable inputs. Until the proposal specifies the conservative rejection rule, compile-time soundness is incomplete. |
+| 7 | **Alias creep / AI legibility** | **YES** | The `->` extension is natural for AI parsing — field declarations are already keyword-anchored, and the arrow is a recognizable derivation marker. The research's point about formula-bearing fields being universally understood as declared derivations supports AI readability. |
+
+**Philosophy verdict: Passes 5/7 cleanly, passes 2/7 conditionally. No failures.**
+
+---
+
+## Required Proposal Updates
+
+The following updates are needed before the proposal is implementation-ready. Numbered for tracking.
+
+### Must-fix (blocks implementation)
+
+1. **Specify recomputation timing for all three pipelines.** The proposal must state explicitly:
+   - **Fire:** recompute after ALL mutations (exit actions → row actions → entry actions), before invariant/assert evaluation. One recomputation pass after Stage 5 (entry actions), not after Stage 4 (row mutations). George's finding #5 was correct — entry actions can mutate dependency fields.
+   - **Update:** recompute after field edits are applied, before invariant/assert evaluation.
+   - **Inspect:** preview output must reflect post-recomputation values. Add acceptance criteria for Inspect output.
+
+2. **Specify the nullable input rule.** The proposal must add: "The type checker conservatively rejects computed field expressions that could produce null. Expressions may reference only non-nullable scalar fields and collection accessors that are guaranteed to return a value (`.count`). Accessors that are undefined on empty collections (`.min`, `.max`, `.peek`) are not permitted in computed field expressions." This is the conservative starting point. A future null-coalescing operator (if added) can relax this constraint.
+
+3. **Specify the external input contract.** Add: "Computed field values supplied by external callers — in `CreateInstance` data, `Update` patches, hydration payloads, or MCP tool arguments — are rejected with a diagnostic. The runtime does not silently ignore them." Align with Terraform's `Computed` attribute precedent (reject, don't ignore).
+
+### Should-fix (blocks quality implementation)
+
+4. **Add Update pipeline acceptance criteria.** Currently all AC items test Fire-path behavior. Add: "Update(instance, patch) recomputes dependent computed fields before constraint evaluation" and "Inspect output includes fresh computed values."
+
+5. **Specify hover content.** "Hover on a computed field shows: the derivation expression, the result type, and the list of dependency fields." This gives the LS team a concrete spec.
+
+6. **Specify MCP serialization shape.** `precept_compile` output should include `isComputed: true` and `expression: "<source text>"` on computed field entries. `precept_inspect` and `precept_fire` outputs should include computed field values in the instance data snapshot, marked with their source expression.
+
+7. **Add acceptance criterion for event-arg compile error.** The semantic rule says "no event args in computed expressions" but the AC list doesn't include: "Event argument reference in computed field expression produces compile error." Add it.
+
+### Nice-to-have (strengthens proposal)
+
+8. **Link the research document.** The "Research and rationale links" section should reference `docs/research/language/expressiveness/computed-fields.md` for the 24-system precedent survey.
+
+9. **Add a note on the `->` dual-use visual cost.** Under locked decision #1, acknowledge that the arrow now has two syntactic roles (action introducer in transitions, derivation operator in fields) and that context disambiguation at the parser level resolves any ambiguity. This is an honest design note, not a design concern.
+
+---
+
+## Research Sufficiency
+
+**The research is sufficient to ground implementation.** No additional external research is needed. The 24-system survey covers all 7 philosophy categories, the cross-category gap analysis is correctly stated, and the 6 semantic contracts are the right set. What remains is proposal editing, not more research.
+
+---
+
+## Locked Decision Strength After Research
+
+| # | Decision | Research Effect |
+|---|---|---|
+| 1 | Bare `->` syntax | Neutral (research grounds feature, not syntax; Principle 11 anchors syntax) |
+| 2 | Mutually exclusive with `default` | **Strengthened** (PostgreSQL, every database in the survey separates generated from default) |
+| 3 | Cannot be `nullable` | Unchanged (research raises the input-nullability question the proposal still hasn't answered) |
+| 4 | Constraints excluded | **Strengthened** (enterprise platforms don't apply field-level validation to formula fields) |
+| 5 | Edit and set restrictions | **Strongly strengthened** (universal read-only contract across all systems that support derivation) |
+| 6 | Event arg scope excluded | **Strengthened** (research correctly frames as scope boundary; dead-end analysis confirms) |
+| 7 | Topological sort | **Strengthened** (MySQL explicit ordering precedent) |
+| 8 | Recomputation timing | Strengthened but reveals gaps (Update and Inspect pipelines unspecified) |
+
+---
+
+# Decision: Constraint Composition Is One Research Domain
+
+**By:** Frank (Language Designer)
+**Date:** 2026-05-18
+**Status:** Decided
+
+## Decision
+
+Treat named rules (#8), field-level constraints (#13), and conditional (guarded) declarations (#14) as **one research domain** — "Constraint Composition" — rather than three separate issue-first efforts. Research documents are organized by domain, not by proposal number.
+
+## Rationale
+
+1. All three proposals stem from the same root gap: Precept's constraint surface has no composition layer between individual boolean expressions and the flat statement model.
+2. They share scope rules, grammar positions (suffix zones), and desugaring targets (invariants/asserts). Designing them independently risks inconsistent answers to "where does this constraint live?"
+3. The domain-research-batches plan already grouped them as one effort under "Constraint Composition." This decision formalizes that grouping in the research corpus.
+
+## Structural Changes
+
+- **New domain doc:** `docs/research/language/expressiveness/constraint-composition-domain.md` covers all three features as one domain pass — background, precedent survey (all philosophy categories + databases, languages, platforms, end-user tools), philosophy fit, locality boundaries, semantic contracts, dead ends, and proposal implications.
+- **Expanded reference doc:** `docs/research/language/references/constraint-composition.md` upgraded from C-grade to full theory/reference coverage — formal foundations (Boolean lattice, Specification pattern, scope theory, desugaring semantics), expanded system examples (Alloy, Zod, FluentValidation, Drools, OCL, FHIR), implementation cost matrix, and resolved design decisions.
+- **No proposal edits.** Issue bodies (#8, #13, #14) remain as-is per task scope.
+
+## Sequencing Implication
+
+The research confirms: #13 and #14 together in Wave 2, #8 in Wave 4 after expression surface (#9, #31) settles. This aligns with the existing batch plan.
+
+---
+
+### 2026-04-06: Decimal scale constraint semantics
+**By:** Frank (Lead/Architect)
+**What:** `scale <N>` constraints on `decimal` fields **reject** values with too many decimal places — they never silently round. Scale is checked only at the field assignment boundary, not on intermediate subexpressions. This matches Precept's constraint philosophy (reject invalid states, don't fix them) and aligns with FEEL/Cedar (rule-engine peers) rather than SQL (storage peer). A future `round()` function is deferred until real-world usage demonstrates the need.
+
+### 2026-04-06: decimal / decimal → decimal (corrected)
+**By:** Frank (Lead/Architect)
+**What:** The coercion rule for `decimal / decimal` was corrected from `number` (IEEE 754) to `decimal`. .NET's `System.Decimal` division operator returns `decimal`, not `double`. The proposal's coercion table now matches actual .NET behavior. All 11 coercion rules verified against .NET System.Decimal.
+
+---
+
+# Decision: Drop `unless` keyword from Precept
+
+**Date:** 2026-04-06
+**Author:** Frank (Lead/Architect & Language Designer)
+**Status:** Accepted
+**Scope:** Language surface — #14 (conditional invariants and edit eligibility)
+
+## Decision
+
+Precept will **not** add an `unless` keyword. Negative guards use `when not`, which becomes available after #31 (`not` keyword) lands.
+
+## Rationale
+
+1. **Precedent:** 7-to-3 against across 10 comparable systems. Only FluentValidation, Alloy, and Ruby offer `unless`-style constructs; FluentValidation's `Unless()` is rarely used in practice.
+2. **Compound condition breakdown:** `unless A and B` triggers De Morgan confusion — does the negation distribute? `when not (A and B)` is unambiguous.
+3. **One canonical form:** Precept's design principle of one way to say each thing. Two negation forms (`unless X` vs `when not X`) would violate this.
+4. **Zero new grammar:** `when not` composes from existing keywords — no parser changes, no grammar additions, no new token type beyond what #31 already delivers.
+
+## What changed
+
+- **Issue #14** — rewritten to remove all `unless` references; examples use `when not`; "Add `unless` keyword" section removed; acceptance criteria updated; new "Why not `unless`?" section added.
+- **`docs/research/language/expressiveness/conditional-logic-strategy.md`** — Resolution section updated; `unless` dropped from approved syntax; rationale added.
+- **`docs/research/language/README.md`** — Issue map entry for #14 updated to reflect scope.
+
+## References
+
+- `docs/research/language/expressiveness/conditional-logic-strategy.md` — full precedent survey and audit
+- GitHub Issue #14 — canonical proposal
+- GitHub Issue #31 — `not` keyword dependency
+
+---
+
+# Decision: Expression expansion domain research completed
+
+**Filed by:** Frank (Lead/Architect)
+**Date:** 2026-04-08
+**Status:** Research complete — awaiting Shane review
+
+## What was produced
+
+Completed the Batch 2 Expression Expansion research effort as a single domain-first pass covering all five open proposals (#9 conditional expressions, #10 string `.length`, #15 string `.contains()`, #16 built-in function library, #31 logical keywords).
+
+### Deliverables
+
+1. **`docs/research/language/expressiveness/expression-expansion-domain.md`** — primary domain research at `computed-fields.md` quality bar. Covers: background/problem grounded in samples, cross-category precedent survey (25+ systems across 9 categories), philosophy fit per design principle, vocabulary boundary taxonomy (operators vs accessors vs methods vs functions), null safety policy, string surface specification, semantic contracts, 10+ dead ends and rejected directions, and proposal sequencing implications.
+
+2. **`docs/research/language/references/expression-evaluation.md`** (expanded) — formal/theory companion now covers: vocabulary taxonomy with formal properties, conditional expression type rules and null narrowing, function-call semantics in constrained DSLs (static dispatch, compile-time constraints, totality), string predicate theory from symbolic automata, and expanded null safety framework.
+
+## Key structural recommendations
+
+### Vocabulary boundary taxonomy
+
+The expression surface introduces four distinct vocabulary categories, each with different formal properties and extension costs:
+
+- **Operators** — binary/unary infix tokens at defined precedence (`and`/`or`/`not`, existing `+`/`==`/`contains`)
+- **Accessors** — parameterless dotted reads (`.length`, `.count`) — no new AST node
+- **Methods** — dotted calls with arguments (`.contains(sub)`) — new grammar form
+- **Functions** — prefix calls (`abs(x)`, `round(x)`) — new AST node required
+
+This taxonomy is durable: every future expression-surface decision (accessor? method? function? operator?) should be classified against it.
+
+### Sequencing recommendation
+
+1. #31 (logical keywords) — pure token swap, zero semantic risk
+2. #10 (string `.length`) — single accessor, mirrors `.count`
+3. #9 (conditional expressions) — new AST node but well-understood
+4. #15 (string `.contains()`) — new method-call form, narrow scope
+5. #16 (built-in functions) — largest parser investment, but infrastructure for all future functions
+
+### Explicit exclusions locked
+
+- Regex: decidability risk, no blocking demand
+- User-defined functions: permanently excluded (breaks flat-identifier model)
+- Collection aggregates: deferred (no sample demand)
+- Varargs: deferred (nesting covers multi-argument `min`/`max`)
+- Method chaining: excluded (function composition via nesting instead)
+
+## Gate
+
+No implementation begins until Shane approves the specific proposal/wave. This research provides the evidence base for that decision.
+
+---
+
+---
+author: frank
+date: 2026-04-05
+status: proposed
+domain: proposal-workflow
+requires-sign-off: shane
+supersedes: frank-squad-project-compatibility.md
+---
+
+# Decision: Remove proposal status labels only after a board-first contract exists
+
+## Verdict
+
+**Unsafe for now.**
+
+Removing `needs-decision`, `decided`, and `deferred` today would take away proposal-state semantics before Squad has a replacement that is equally queryable, inspectable, and enforceable.
+
+It becomes **safe with changes** if proposal status moves to a single explicit project field and Squad's proposal workflow is updated to read that field instead of labels.
+
+## What I verified
+
+Current proposal workflow is split across three places:
+
+- GitHub labels include `proposal`, `language`, `needs-decision`, `decided`, and `deferred`
+- Project **Precept Language Improvements** contains the proposal issues
+- That project currently has only the built-in `Status` field with `Todo`, `In Progress`, and `Done`
+
+Current open proposal issues (`#8`-`#17`) are labeled `needs-decision`; closed proposal `#18` is labeled `decided` and sits in project `Done`.
+
+The repo automation workflows enforce `go:`, `release:`, `type:`, and `priority:` namespaces. They do **not** currently enforce proposal-status labels. That means this is mainly a **workflow-contract migration**, not a GitHub Actions migration.
+
+## What must remain true for Squad compatibility
+
+If proposal status labels go away, these invariants must still hold:
+
+1. **Proposal identity stays issue-native.**
+   - `proposal` remains required.
+   - Domain/slice labels remain taxonomy only.
+   - `squad:{member}` remains routing only.
+
+2. **Proposal lifecycle has one machine-readable source of truth.**
+   - No split between labels saying one thing and the board saying another.
+   - Queue state and decision state must not be inferred from ad hoc comments or tribal knowledge.
+
+3. **Active proposals are queryable without manual reading.**
+   - Squad must be able to answer "what still needs a decision?" deterministically.
+
+4. **Terminal outcomes stay distinguishable.**
+   - `Accepted`, `Rejected`, `Deferred`, and `Implemented` cannot collapse into one generic `Done`.
+
+5. **A proposal cannot be "off-board but still valid."**
+   - If the board becomes the lifecycle source, every proposal issue must be on that board.
+
+6. **Close-out discipline remains mandatory.**
+   - Closing a proposal still requires a decision comment with rationale and links to any `.squad/decisions/` artifact.
+
+## Required guardrails
+
+### 1. Add a dedicated project field
+
+Do **not** overload the built-in `Status` field. Add a separate single-select field such as `Proposal Status`.
+
+Minimum values:
+
+- `Needs Decision`
+- `In Review`
+- `Accepted`
+- `Rejected`
+- `Deferred`
+- `Implemented`
+
+`Todo / In Progress / Done` is execution flow. It is not proposal semantics.
+
+### 2. Make the project field authoritative
+
+If labels are removed, `Proposal Status` becomes the canonical lifecycle field for proposals. Do not keep a shadow status system.
+
+### 3. Keep issue-level auditability
+
+Each terminal move still needs a closing comment with a structured first line, e.g.:
+
+- `Decision: Accepted`
+- `Decision: Rejected`
+- `Decision: Deferred`
+
+The project field carries current status; the comment carries rationale and preserves issue-page inspectability.
+
+### 4. Enforce project membership
+
+Every `proposal` issue must be added to **Precept Language Improvements**. Orphan proposal issues are invalid under a label-free model.
+
+### 5. Keep routing orthogonal
+
+`squad:*` labels stay. Proposal status migration must not touch Squad ownership/routing labels.
+
+## Migration prerequisites
+
+Before removing any proposal-status labels:
+
+1. **Create and backfill `Proposal Status`** on the project for all existing proposal issues.
+2. **Decide visibility policy**:
+   - either make the project public,
+   - or explicitly accept that proposal status is an authenticated/internal surface.
+3. **Update Squad instructions and skills** that currently describe label-based proposal status:
+   - `.squad/templates/skills/architectural-proposals/SKILL.md`
+   - `.copilot/skills/architectural-proposals/SKILL.md`
+   - `docs/research/language/README.md`
+   - any coordinator guidance that tells agents to query proposal status by labels
+4. **Define the query contract** Squad will use:
+   - proposal discovery via issue labels (`proposal`, domain, `squad:*`)
+   - proposal lifecycle via `gh project` field reads
+5. **Add an enforcement check** so a `proposal` issue cannot be closed or deferred without:
+   - a populated `Proposal Status`
+   - a decision comment
+
+## Recommended migration shape
+
+### Phase 1 — prepare the board
+
+- Add `Proposal Status`
+- Backfill all current proposal issues
+- Keep existing labels temporarily during migration
+
+### Phase 2 — switch Squad's proposal contract
+
+- Update skills/docs/query recipes to use:
+  - issue labels for taxonomy/routing
+  - project field for lifecycle state
+
+### Phase 3 — remove status labels
+
+Only after Phases 1 and 2 are complete:
+
+- remove `needs-decision`
+- remove `decided`
+- remove `deferred`
+
+## Architecture judgment
+
+The safe end state is **not** "labels but less of them." The safe end state is:
+
+- **issues** hold proposal identity and rationale
+- **project field** holds proposal lifecycle
+- **routing labels** hold Squad ownership
+
+That is a clean separation of concerns.
+
+But we are **not there yet**. Right now the board cannot represent proposal outcomes cleanly, and the written Squad workflow still assumes label-based proposal status. So the correct call is:
+
+**unsafe now; proceed only as a staged migration with explicit guardrails.**
+
+---
+
+### 2026-04-06: Decimal precision constraint named `maxplaces`
+**By:** Frank (Lead/Architect)
+**What:** The constraint keyword for limiting decimal places on `decimal` fields is `maxplaces`, not `scale`. This follows Issue #13's `max{noun}` pattern (`maxlength`, `maxcount`, `maxplaces`). Alternatives rejected: `scale` (SQL jargon, breaks pattern), `places` (bare noun, breaks pattern), `maxdecimals` (verbose, redundant with type name), `precision` (wrong semantics — means total digits in SQL).
+**Why:** Same reasoning that chose `choice` over `enum`: Precept prefers plain-English configuration language over programming/database jargon. The `max{noun}` pattern is self-describing and discoverable via LS auto-complete.
+
+---
+
+# Decision: Issue #17 Computed Fields Proposal Revamp
+
+**Filed by:** Frank (Lead/Architect & Language Designer)
+**Date:** 2026-04-08
+**Status:** Complete
+**Category:** `dsl-expressiveness`
+
+---
+
+## Summary
+
+Revamped the computed fields proposal (`temp/issue-body-rewrites/17.md`) to incorporate ALL findings from the research document (`docs/research/language/expressiveness/computed-fields.md`) and ALL 7 team re-review decisions.
+
+## Gate Decisions Applied (Steinbrenner defaults)
+
+| Gate | Decision | Rationale |
+|------|----------|-----------|
+| Null-safety rule | Conservative rejection — type checker rejects any computed expression referencing a nullable field | Only sound option without null-coalescing operator |
+| Collection accessor safety | `.count` only — `.peek`/`.min`/`.max` excluded | Research dead-end "silent default fallbacks" rules out option (c); guard complexity rules out option (b) |
+| External input contract | Reject with error — Terraform model | Precept philosophy favors explicit errors over silent behavior |
+| Recomputation timing (Fire) | Single pass after ALL mutations (exit + row + entry actions), before validation | George's analysis: entry actions can mutate dependency fields, so recompute must happen after Stage 5 |
+
+## What Changed
+
+### New sections added
+- **Tooling surface** — hover content spec, MCP compile/inspect/fire/update specs, completions spec
+- **Teachable error messages** — 9 scenarios with realistic messages that explain why + what to do instead
+- **Before/after example** — travel-reimbursement `RequestedTotal` pain point → computed field solution
+- **Resolved decisions table** — maps all 6 research semantic contracts to locked decisions
+- **`->` reading guide callout** — explains arrow dual-use for first-time readers
+
+### Sections expanded
+- **Summary** — added spreadsheet mental model sentence
+- **Motivation** — added cross-category positioning claim from research
+- **Semantic rules** — added nullable input rejection, collection accessor safety, external input rejection, pipeline-specific recomputation timing, event argument reference rule
+- **Locked decisions** — expanded #8 to all pipelines; added #9 (nullable), #10 (external input), #11 (accessor restriction); added `->` dual-use note to #1; added precedent citations from research
+- **Explicit exclusions** — added silent default fallbacks, writable computed fields, null-coalescing, unsafe accessors; merged fixed-point with cycle detection
+- **Acceptance criteria** — expanded from 19 flat items to 37 categorized items
+- **Implementation scope** — expanded from 10 to 16 items
+- **Wave** — changed from "Wave 4: Compactness + Composition" to "Composition"
+- **Research links** — added research document link
+
+### Sections replaced
+- **Open Questions: "None"** → **Resolved decisions** table showing all 6 research contracts as locked
+
+## Review Coverage
+
+All 7 re-reviews were addressed:
+
+| Reviewer | Items | Addressed |
+|----------|-------|-----------|
+| Frank | 3 must-fix, 4 should-fix, 2 nice-to-have | All 9 |
+| George | 8 edits | All 8 |
+| Kramer | 6 missing items | All 6 |
+| Elaine | 7 improvements | All 7 |
+| Soup Nazi | 7 must-add ACs, 7 should-add ACs | All 14 |
+| Uncle Leo | 5 blocking, 8 advisory | All 13 |
+| Steinbrenner | 4 gate decisions, 11 edits | All 15 |
+
+## Next Steps
+
+Proposal is ready for Shane's sign-off. No further research needed. All semantic contracts resolved. All acceptance criteria testable.
+
+---
+
+# Decision: Rationale pass on computed fields proposal (#17)
+
+**Author:** Frank (Lead/Architect & Language Designer)
+**Date:** 2026-04-08
+**Status:** Complete — awaiting Shane review
+
+## What changed
+
+Added retroactive "Why" rationale to every locked design decision and key semantic rule in `temp/issue-body-rewrites/17.md`. The proposal previously stated WHAT was decided but not WHY.
+
+## Specific changes
+
+### All 11 locked decisions now include:
+- Alternatives considered and rejected (with reasons)
+- Precedent from the 24-system research survey
+- Tradeoff accepted
+- Philosophy principle served
+
+### Shane's 3 design points incorporated:
+
+1. **Locked decision #9 (nullable input rejection):** Documented that Precept is stricter than all 24 surveyed systems. Justified because those systems have null-handling operators (COALESCE, BLANKVALUE) that Precept lacks. Practical impact near zero — all numeric fields in 21 samples are non-nullable with defaults.
+
+2. **Locked decision #4 (constraints excluded):** Clarified that invariants already reference computed fields, covering output validation. Field-level constraints validate external input; computed fields have no external supply path. Determinism not threatened either way — the choice is about mechanism clarity, not correctness.
+
+3. **Locked decision #8 + semantic rules (Inspect recomputation):** Reworded to clarify Inspect operates on a clone. Recomputation is simulated on a working copy, consistent with how `set` mutations work during Inspect today. Skipping recomputation would make Inspect disagree with Fire on constraint evaluation.
+
+### Additional rationale added to:
+- Semantic rules section (nullable input rejection, collection accessor safety, field-level constraints, event argument exclusion, external input rejection)
+- Exclusions section (event argument references, recursive dependencies, lazy evaluation, cross-precept references)
+
+## Principle
+
+Per CONTRIBUTING.md: "A proposal that states WHAT without WHY is incomplete." The research document had all the evidence; the gap was in surfacing the key "because" statement at each decision point in the proposal itself.
+
+---
+
+# Decision: Mandatory Per-Decision Rationale in Proposals
+
+**Author:** Frank (Lead/Architect & Language Designer)
+**Date:** 2026-04-08
+**Trigger:** Shane feedback — design proposals cover the "how" but not enough of the "why."
+
+## Decision
+
+All proposal and design-process documentation now requires explicit per-decision rationale. Every locked design decision must include: why this choice, what alternatives were rejected, what precedent grounds it, and what tradeoff is accepted. A proposal that states WHAT without WHY is incomplete.
+
+## What Changed
+
+### 1. `CONTRIBUTING.md` — Proposal lifecycle
+
+- Added a rationale checklist after the proposal contents list: each locked decision must carry why, alternatives rejected, precedent, and tradeoff accepted.
+- Added a completeness gate: proposals without rationale are sent back before advancing to Ready.
+- Updated the "Where Things Live" table to clarify that rationale lives in BOTH the issue body (per-decision "why") and `docs/research/` (full evidence base).
+- Added a quality bar note pointing to `docs/research/language/expressiveness/computed-fields.md` and Issue #17 as the reference standard for rationale depth.
+
+### 2. `.github/copilot-instructions.md` — AI agent instructions
+
+- Added a "Per-Decision Rationale Requirement" subsection under "Proposal Philosophy Capture" with the four-point checklist (rationale, alternatives, precedent, tradeoff).
+- Added an incompleteness flag: agents must flag proposals that state WHAT without WHY.
+
+### 3. Frank's charter (`.squad/agents/frank/charter.md`)
+
+- Added rationale enforcement to the Design Gate section: I now explicitly require the four-point rationale checklist on every locked design decision and send back proposals that lack it.
+
+## Rationale
+
+Design decisions made without captured rationale are effectively lost after the session ends. When the team revisits a decision later, they can see WHAT was decided but not WHY — making it impossible to evaluate whether the reasoning still holds. Baking rationale into the process at every gate (proposal authoring, AI agent review, architectural sign-off) ensures the "why" is never optional.
+
+---
+
+### 2026-04-06: round() promoted to in-scope for decimal proposal
+**By:** Frank (Lead/Architect)
+**What:** `round(decimal, N)` is the first expression function in Precept and is IN SCOPE for Issue #27 (not deferred). Uses banker's rounding (`MidpointRounding.ToEven`). Only accepts `decimal` expressions; second arg must be a non-negative integer literal. Valid in `set`, `when`, and `invariant` positions.
+**Why:** The reject-on-assignment semantics of `maxplaces` create a catch-22 without explicit rounding — mixed-precision arithmetic (e.g., `UnitPrice maxplaces 4 × Quantity → LineTotal maxplaces 2`) has no clean solution. Every surveyed rule engine provides rounding; omitting it would be the only gap. Scope is intentionally narrow: only `round()` in v1; `abs()`, `floor()`, `ceil()` defer to future evidence.
+**Implications:** Parser must handle `FunctionCall` AST node. `round` is a built-in function name, not a keyword. The parser matches `round` specifically — no general-purpose function-call mechanism. No user-defined functions.
+
+---
+
+# Frank Decision — Separate Closeout Lanes
+
+Date: 2026-04-05
+Requested by: Shane
+
+## Decision
+
+Do **not** sweep the current worktree into one closeout. Split it into three lanes:
+
+1. **Trunk-closeout now:** only the governance/workflow normalization files that collectively move Squad from the old `untriaged` / `go:*` model to the new `Backlog` + project-status + `blocked` / `deferred` model.
+2. **UX/mockup lane:** preview/inspector PRD, audit, and mockup exploration stay on their own path.
+3. **Hold back as unrelated/noisy:** research-tree reorganization, agent-history churn, and stray artifacts.
+
+## Why
+
+These edits are not one change. They are three unrelated narratives sharing a dirty worktree:
+
+- **Workflow normalization** changes live automation and the docs/templates that operators will read.
+- **Preview redesign** is product/UX exploration with mockups and a PRD.
+- **Research-tree churn** is documentation topology work and currently overlaps awkwardly with other guidance.
+
+Bundling them would make review sloppy and rollback miserable.
+
+## Safe lane contents
+
+### Lane 1 — trunk-closeout now
+
+Operational workflow files:
+
+- `.github/workflows/sync-squad-labels.yml`
+- `.github/workflows/squad-triage.yml`
+- `.github/workflows/squad-heartbeat.yml`
+- `.github/agents/squad.agent.md`
+- `.squad/templates/issue-lifecycle.md`
+- `.squad/routing.md`
+- `.squad/templates/routing.md`
+- `.squad/templates/ralph-triage.js`
+- `.squad/templates/squad.agent.md`
+- `.squad/templates/workflows/sync-squad-labels.yml`
+- `.squad/templates/workflows/squad-triage.yml`
+- `.squad/templates/workflows/squad-heartbeat.yml`
+- `.squad/templates/workflows/squad-label-enforce.yml`
+
+### Lane 2 — UX/mockup lane
+
+- `brand/inspector-panel-review.md`
+- `docs/PreviewInspectorRedesignPrd.md`
+- `tools/Precept.VsCode/mockups/preview-reimagined-index.html`
+- `tools/Precept.VsCode/mockups/preview-reimagined-17-interactive-journey.html`
+- the rest of the untracked `tools/Precept.VsCode/mockups/preview-*` exploration files and shared CSS
+
+### Lane 3 — do not sweep into closeout
+
+- `.copilot/skills/architectural-proposals/SKILL.md`
+- `.squad/templates/skills/architectural-proposals/SKILL.md`
+- `.squad/agents/frank/charter.md`
+- `.squad/agents/george/charter.md`
+- `.squad/agents/j-peterman/charter.md`
+- `.squad/agents/newman/charter.md`
+- `.squad/agents/steinbrenner/charter.md`
+- `.squad/agents/elaine/history.md`
+- `.squad/agents/frank/history.md`
+- `.squad/agents/steinbrenner/history.md`
+- `.squad/skills/issue-workflow-normalization/SKILL.md`
+- `.squad/skills/unified-issue-workflow/SKILL.md`
+- `docs/research/README.md`
+- everything under new `docs/research/language/`
+- the deleted `docs/research/dsl-expressiveness/*` and `docs/research/language-references/*` set
+- `package-lock.json`
+
+## Recommended landing order
+
+1. **Land Lane 1 core automation first** — label sync, triage, heartbeat, and label-enforcement template changes.
+2. **Then land Lane 1 guidance/docs** — agent instructions, lifecycle template, routing docs, and mirrored Squad templates.
+3. **Validate the workflow behavior on GitHub** before touching anything UX-related.
+4. **After that, review Lane 2 as a standalone UX/design package** with product sign-off.
+5. **Do not include Lane 3** in closeout. Revisit it as separate documentation/process cleanup only if someone explicitly wants that scope.
+
+## Architectural note
+
+There is a live inconsistency already hiding in the noisy lane: proposal-storage policy changes are being mixed with a research-tree relocation, while some guidance still points at the old research paths. That is exactly why this material stays out of closeout until it gets its own deliberate review.
+
+---
+
+# Frank Decision — Standardized GitHub Issue Workflow
+
+## Decision
+
+Adopt one issue workflow for the whole repo. Stop using proposal-specific status labels as lifecycle state.
+
+Separate the model into four distinct layers:
+
+1. **Routing labels** — who should handle it
+2. **Taxonomy labels** — what kind of work it is
+3. **Project Status** — where it is in the workflow
+4. **Issue open/closed** — whether the issue is still live
+
+That split is the whole game. Anything else is duplication.
+
+## Required routing labels
+
+- `squad` — team inbox; triage required
+- `squad:{member}` — exactly one active owner label when routed to a specific member
+
+These are the only routing labels Squad truly needs.
+
+## Useful taxonomy labels
+
+Keep type/domain labels because they help filtering and reporting:
+
+- Type: `proposal`, `bug`, `feature`, `chore`, `ux`, `docs`, `research`
+- Domain/slice labels as needed: `language`, `runtime`, `mcp`, `plugin`, `tooling`, `extension`, etc.
+
+Taxonomy labels must never carry lifecycle state.
+
+## Project status model
+
+Use one compact `Status` field in GitHub Projects:
+
+- `Inbox` — new, not yet triaged
+- `Ready` — triaged, approved to proceed, waiting pickup
+- `In Progress` — active execution, investigation, or drafting
+- `In Review` — awaiting review, decision, sign-off, or merge
+- `Blocked` — cannot proceed due to an external dependency
+- `Done` — optional short-lived terminal board state before archive/removal
+
+## Open/closed semantics
+
+- **Open** means the issue still has a live next action
+- **Closed** means the issue’s purpose is complete or intentionally ended
+
+Close issues when they are:
+
+- implemented
+- rejected
+- deferred / not now
+- duplicate
+- superseded
+
+Closure reason belongs in the final comment, not in a status label.
+
+## Proposal handling
+
+Proposals follow the exact same workflow:
+
+- `proposal` + relevant domain labels
+- routed through `squad` / `squad:frank` as needed
+- `In Review` while awaiting architectural or Shane sign-off
+- closed once the decision is recorded
+
+If implementation follows, open linked implementation issue(s). Do not keep the proposal issue open as a fake execution tracker.
+
+## Migration direction
+
+1. Freeze creation of `needs-decision`, `decided`, and `deferred`.
+2. Create or standardize a single project `Status` field with the states above.
+3. Remap open issues from labels to project status based on the real next action.
+4. Backfill proposal closing comments before removing old status labels from closed items.
+5. Update templates, skills, and Ralph/Squad guidance so automation reads project status instead of proposal-status labels.
+
+## Risks
+
+1. **Decision ambiguity on closed proposals** — mitigated by a required closing comment template: `Decision`, `Why`, `Next step`.
+2. **One issue trying to be both proposal and implementation tracker** — mitigated by splitting execution into follow-on issues after approval.
+3. **Teams sneaking workflow back into labels** — mitigated by a hard rule: labels classify, project status tracks progress.
+
+---
+
+# Decision: Transition Shorthand Research Recommendation
+
+**Filed by:** Frank (Lead/Architect & Language Designer)
+**Date:** 2026-05-18
+**Status:** Research complete — recommendation for sequencing
+
+## Context
+
+Completed the Batch 3 Transition Shorthand domain research as `docs/research/language/expressiveness/transition-shorthand.md`. This covers multi-event `on` clauses, catch-all event routing, and row-count reduction across the 21-sample corpus.
+
+## Structural Recommendation
+
+**Multi-event `on` should be the next shorthand added after the current proposal queue clears.** The no-arg subset (events with no argument references in guards or mutations) is the right Phase 1: low parser cost, high consistency with existing multi-state `from` expansion, and formally justified by CSP event-set abstraction.
+
+**Catch-all routing (`from any on any` or `from State on any`) should remain rejected.** The diagnostic cost — silencing `Undefined` outcomes and C49/C51/C52 warnings — exceeds the compactness benefit. No sample in the corpus uses defensive reject-only rows for unrouted pairs, and the `Undefined` signal is architecturally valuable.
+
+**Guard-pair `else reject` is a higher-impact compactness mechanism than multi-event `on`.** It should be tracked as an independent design domain. The verbosity analysis shows ~39 reject rows in 196 total rows (~20%), with 20–35% being pure fallthrough pairs. An inline `else reject "..."` suffix on guarded rows would halve the header cost for all conditional transitions.
+
+## Sequencing
+
+1. Guard-pair `else reject` (separate proposal — highest impact)
+2. Multi-event `on`, no-arg subset (next shorthand after current queue)
+3. Multi-event `on`, shared-arg subset (requires arg-compatibility checker)
+4. Scoped catch-all (only if diagnostic masking is solved)
+
+No proposal should be opened for any of these until Batches 1 and 2 (type system, expression, entity modeling) are resolved.
+
+---
+
+### Decision: Type system expansion proposal filed (2026-04-05)
+**Filed by:** Frank
+**Status:** Proposed — awaiting Shane sign-off
+
+Filed a comprehensive GitHub issue proposal for expanding the Precept type system beyond `string`, `number`, `boolean`, and collections. Proposal tracked under `dsl-expressiveness`.
+
+**Recommended additions (v1):**
+- `choice` type — constrained value sets (`field Severity as choice("Low", "Medium", "High")`). Replaces the pattern of `number` + paired `invariant >= / <=` bounds, and `set of string` used as enumerated document/service lists. High confidence — strong corpus evidence, clean parser integration, no philosophy violations.
+- `date` type — calendar dates with day-level granularity, no time-of-day or timezone. Replaces the `number` day-counter pattern used in 4+ samples. Medium confidence — needs careful operator design to stay inspectable and deterministic.
+
+**Explicitly excluded (with rationale):**
+- `datetime` / `timestamp` — timezone semantics violate deterministic inspectability. Precept is a domain integrity DSL, not a scheduling runtime. If wall-clock time matters, inject it as a `date` event arg.
+- `enum` keyword — rejected in favor of `choice` for readability; `enum` carries programming-language connotation.
+- Structured / record types — violate Precept's flat-field design invariant.
+- Duration arithmetic beyond day-level — keeps the evaluator simple and avoids floating-point time math.
+
+**Dependency notes:**
+- `choice` is independent of all other proposals (#8–#17) and could ship first.
+- `date` interacts with the numeric function proposal (#16) for potential date-arithmetic helpers, but can be scoped independently with basic `+` / `-` day arithmetic.
+
+**Gate:** No implementation begins until Shane approves the specific proposal.
+
+---
+
+# Decision: Type system survey — external evidence for Proposal #25
+
+**Filed by:** Frank
+**Date:** 2026-04-05
+**Status:** Research complete — evidence supports Proposal #25 as drafted
+
+## Context
+
+Shane asked for real-world evidence beyond our own sample files before proceeding with Proposal #25 (type system expansion — choice and date types). The concern: our samples were built to demo DSL features, not stress-test the type system.
+
+## Research performed
+
+Surveyed 6 systems via web documentation:
+- **DMN/FEEL** — the OMG standard for business rule expression languages
+- **Cedar** — AWS authorization policy language (minimal-by-design comparator)
+- **Drools DRL** — dominant open-source Java business rule engine
+- **NRules** — primary .NET business rule engine
+- **BPMN** — business process modeling standard
+- **SQL DDL** — universal data type baseline
+
+Full research at `docs/research/language/references/type-system-survey.md`.
+
+## Key findings
+
+1. **`date` is universal consensus** — all 6 systems include a date type. Date-only at day granularity is viable (Cedar's `datetime("2024-10-15")` proves it).
+2. **`enum`/`choice` is table stakes for enterprise rules** — Drools, NRules, SQL all have it. FEEL and Cedar lack it and users work around the absence.
+3. **Proposal #25's rejections are validated** — `datetime` (timezone non-determinism per SQL cautionary tale), structured types (breaks flat model), overengineered duration (day-count suffices) are all confirmed as correct architectural calls.
+4. **Constructor function pattern is standard** — FEEL and Cedar both use `type("literal")` constructors for temporal types.
+5. **Decimal/money is growth-phase, not v1** — all systems have it but Precept's `number` already handles decimals.
+
+## Decision
+
+The external evidence **strongly supports** Proposal #25 as drafted. `choice` and `date` are the two highest-value type additions by cross-system consensus. No changes to the proposal framing are indicated by the research.
+
+**Next step:** Shane sign-off on Proposal #25 to authorize implementation planning.
+
+---
+
+# Decision: Type System Semantic Contracts
+
+**Filed by:** Frank (Lead/Architect & Language Designer)
+**Date:** 2026-06-12
+**Status:** Research captured — awaiting Shane sign-off
+**Grounding:** `docs/research/language/references/type-system-survey.md`
+
+## Recommendation
+
+The type-system survey identifies 7 semantic contracts that should be locked before any of #25, #26, #27, or #29 moves to implementation:
+
+1. **No silent coercion.** Widening (`integer → decimal`, `integer → number`) is implicit because it's value-preserving. Narrowing always requires an explicit function. `decimal ↔ number` mixing is a type error.
+
+2. **Unambiguous literal parsing.** `42` → `integer`, `3.14` → `number`, `date("...")` → `date`. No context-dependent inference.
+
+3. **Static operator validity.** Every operator combination resolves at compile time. No runtime type dispatch.
+
+4. **Choice is a closed type.** Not decorated string. Cross-field choice-type incompatibility even with identical value sets.
+
+5. **Date is naive calendar day.** No timezone, no time-of-day. Deterministic by construction.
+
+6. **Decimal means exact arithmetic.** `maxplaces` is a constraint (reject violations), not a coercion (silently round).
+
+7. **Integer is semantically distinct from decimal.** Different division behavior, different representation, different coercion paths.
+
+## Why This Matters Now
+
+All four proposals already cite this survey document. If these contracts are not reviewed before implementation starts, each proposal will independently reinvent type-boundary rules, producing inconsistencies between `choice`, `date`, `decimal`, and `integer` that would have to be reconciled after the fact.
+
+## Non-goals Confirmed
+
+The survey explicitly locks out: `datetime`/timezone, `money` scalar, parameterized types, records/maps, `any`/dynamic, host-type leakage, implicit boolean conversion from numerics, and string ordering.
+
+## Action Requested
+
+Shane to review and approve the 7 contracts as the shared semantic foundation for Wave 3 implementation.
+
+---
+
+# Frank — workflow migration surfaces
+
+## Decision
+
+Precept should standardize all issue-process guidance and automation on one lifecycle:
+
+`Backlog -> Ready -> In Progress -> In Review -> Done`
+
+Use `blocked` and `deferred` only as exception labels. Keep `squad` and `squad:{member}` as the routing surface. Keep taxonomy labels separate from status. Remove proposal-specific status-label guidance (`needs-decision`, `decided`) and the older triage-verdict/status-label layer (`go:*`, `squad:untriaged`, `next-up`) anywhere it is being used as workflow state.
+
+## Migration surfaces
+
+### Active repo surfaces
+- `.github/workflows/sync-squad-labels.yml`
+- `.github/workflows/squad-triage.yml`
+- `.github/agents/squad.agent.md`
+
+### Repo governance / skill surfaces
+- `.squad/templates/issue-lifecycle.md`
+- `.squad/skills/unified-issue-workflow/SKILL.md`
+- `.squad/skills/issue-workflow-normalization/SKILL.md`
+
+### Template / future-project source copies
+- `.squad/templates/workflows/sync-squad-labels.yml`
+- `.squad/templates/workflows/squad-triage.yml`
+- `.squad/templates/workflows/squad-label-enforce.yml`
+- `.squad/templates/squad.agent.md`
+- `.squad/templates/skills/architectural-proposals/SKILL.md`
+
+## Guidance
+
+1. Stop simulating board status with labels.
+2. If a workflow only assigns routing, let it assign routing only.
+3. If future automation needs to move project status, add dedicated Projects-v2 automation rather than reintroducing status labels.
+4. Keep proposal issues on the same workflow as bugs/features/docs; proposal-ness is taxonomy, not lifecycle.
+
+---
+
+# George — Computed Fields Re-Review (Issue #17)
+
+**Date:** 2026-04-08
+**Requested by:** Shane
+**Input:** Proposal (`temp/issue-body-rewrites/17.md`), research doc (24-system precedent survey), language design, runtime engine code
+**Prior review:** Session findings identified 3 gaps — recomputation timing, nullable handling, dependency ordering
+
+---
+
+## Verdict: `feasible-with-caveats`
+
+The research strengthens the case rather than weakening it. The 24-system precedent survey shows extremely consistent convergence on the exact contract Precept would implement: read-only, declared once, automatically recomputed, direct assignment rejected. No system in the survey combines field-level derivation with lifecycle-aware constraint enforcement — that gap is precisely what Precept occupies. Implementation risk is unchanged from the first review; the caveats are specification precision, not design flaws.
+
+---
+
+## Per-Contract Assessment
+
+### Contract 1: Scope Boundary
+**Research recommendation:** Fields + safe collection accessors only; no event args, no cross-precept.
+**Proposal says:** "Can only reference fields and collection accessors. Event arguments not in scope."
+**Implementation difficulty:** Low
+**Proposal precision:** Sufficient
+
+The proposal matches the research recommendation exactly. The expression evaluator already has context-scoping infrastructure — rejecting event arg references at type-check time is a straightforward addition. No proposal edits needed for this contract.
+
+### Contract 2: Recomputation Timing
+**Research recommendation:** Enumerate Fire, Update, AND Inspect pipelines separately.
+**Proposal says:** "After field mutations, before invariant checks" (single generic statement).
+**Implementation difficulty:** Low
+**Proposal precision:** Insufficient — needs pipeline-specific language
+
+Having read the engine code, the actual insertion points are clear:
+
+| Pipeline | Insert recomputation after | Before |
+|---|---|---|
+| **Fire (transition)** | `CommitCollections` (after exit actions + row mutations + entry actions) | Stage 6 validation |
+| **Fire (no-transition)** | `CommitCollections` (after row mutations) | Invariants + in-state asserts |
+| **Update** | `CommitCollections` (after patch application) | Stage 4 rules evaluation |
+| **Inspect** | Same position as Fire simulation | Constraint check |
+
+All four paths follow the same pattern: **after CommitCollections, before any constraint evaluation**. This is important because collection accessors (`.count`, etc.) need committed collection state to return correct values. The proposal's "after field mutations" is directionally correct but doesn't account for the CommitCollections boundary — and it omits Update and Inspect entirely.
+
+### Contract 3: Nullability and Accessor Safety
+**Research recommendation:** Decide how nullable inputs and empty-collection accessors interact with "always produce a value."
+**Proposal says:** "Cannot be `nullable`" (forbids `nullable` keyword on the field itself).
+**Implementation difficulty:** Medium
+**Proposal precision:** Insufficient — conflates field nullability with expression nullability
+
+The proposal's non-nullable rule is correct but incomplete. Two sub-problems:
+
+**3a. Nullable field references in expressions.** If `field OptionalName as string nullable` exists, what happens with `field NameLen as number -> OptionalName.length` (hypothetical) or even just `field Echo as string -> OptionalName`? The DSL has no null-coalescing operator. The type checker must conservatively reject computed expressions that reference nullable fields. This is a type-system rule, not just a syntax rule.
+
+**3b. Collection accessor safety.** `.count` always returns a number (safe). `.peek`, `.min`, `.max` on empty collections are undefined. The proposal says collection accessors work in computed expressions but doesn't specify empty-collection behavior. Until these accessors have guaranteed non-null semantics (or until the language gains null-coalescing), computed field expressions using them on potentially-empty collections must either be rejected or the accessors must be defined to return a typed default.
+
+Current practical impact: `.count` is the only collection accessor that's unambiguously safe. A computed field like `field RejectionCount as number -> AllRejections.count` works. A computed field like `field LastEntry as string -> Queue.peek` does not — and the proposal doesn't say that.
+
+### Contract 4: Dependency Ordering and Cycles
+**Research recommendation:** Compile-time dependency graph, topological sort, cycle diagnostics with readable path.
+**Proposal says:** "Topological sort at compile time; circular references produce compile error with cycle path."
+**Implementation difficulty:** Medium
+**Proposal precision:** Sufficient
+
+This is new infrastructure (dependency graph construction, Kahn's algorithm or DFS-based topo sort, cycle path extraction, DiagnosticCatalog expansion) but it's well-understood CS. MySQL's precedent — generated columns may reference earlier generated columns in declared order — is exactly the model. No ambiguity in what to implement. The medium difficulty rating is for code volume, not conceptual risk.
+
+### Contract 5: Writeability and External Input
+**Research recommendation:** Explicitly state behavior across all mutation surfaces — `edit`, `set`, CreateInstance, Update, hydration, MCP payloads.
+**Proposal says:** "Cannot appear in `edit` blocks. Cannot be target of `set`."
+**Implementation difficulty:** Low
+**Proposal precision:** Insufficient — silent on API-boundary behavior
+
+The proposal covers DSL-surface restrictions (edit blocks, set actions) but not API-surface behavior. What happens when a caller passes a computed field value in:
+- `CreateInstance(instanceData: { "TotalCost": 99 })`?
+- `Update(patch => patch.Set("TotalCost", 99))`?
+- MCP `precept_fire` with a data payload including computed fields?
+
+Terraform's precedent is clear: **reject, don't ignore.** Silent ignoring creates debug confusion. The proposal should say: "Caller-provided values for computed fields are rejected at the API boundary with a descriptive error. They are not silently dropped."
+
+### Contract 6: Tooling and Serialization Surface
+**Research recommendation:** Specify what tools expose — formula, result, or both.
+**Proposal says:** "Hover shows computed expression" and "MCP tools serialize computed fields correctly."
+**Implementation difficulty:** Low
+**Proposal precision:** Borderline — implementation scope lists items but doesn't spec output shape
+
+The implementation scope mentions hover, MCP serialization, and completions. These are followable but could be more precise. Specifically:
+- `precept_compile` should include the derivation expression in the field model.
+- `precept_inspect` / `precept_fire` output should show the current computed value alongside other field data (not hidden or separate).
+- Hover should show `computed: Quantity * UnitPrice` (formula) and ideally the resolved type.
+
+This is not a blocker — it's standard LS/MCP work — but the acceptance criteria should include "computed field values visible in inspect/fire output."
+
+---
+
+## Does the Research Change Implementation Cost or Risk?
+
+**Cost:** Unchanged. The research validated the same contract my first review identified. No new runtime mechanisms are needed beyond what the proposal already describes. The implementation breaks down to:
+- Parser: low (one new optional combinator in field declaration)
+- Type checker: medium (null-safety validation + cycle detection = new infrastructure)
+- Runtime: low (one recomputation call after CommitCollections in each pipeline path)
+- LS/MCP: low (standard additions)
+
+**Risk:** Slightly reduced. The 24-system survey provides extremely strong precedent convergence. Every system that supports derivation converges on the same read-only, auto-recompute, reject-writes contract. This is not a novel design — it's a well-understood pattern being applied to Precept's specific lifecycle model. The risk is in specification precision (addressed below), not in the concept.
+
+---
+
+## Specific Proposal Edits Needed
+
+1. **Replace the single recomputation timing sentence** with pipeline-specific language: "Computed fields are recomputed in all pipelines after CommitCollections and before constraint evaluation: Fire (after exit actions + row mutations + entry actions are committed), Update (after patch operations are committed), and Inspect (mirrors Fire simulation). Guards and invariants always see fresh computed values."
+
+2. **Add a nullable-input type-checking rule** under Semantic Rules: "Computed field expressions that reference nullable fields produce a compile error. The type checker conservatively rejects any expression path that could produce null. A future null-coalescing operator may relax this restriction."
+
+3. **Add an acceptance criterion for nullable field reference rejection:** "Expression referencing a nullable field produces compile error."
+
+4. **Specify empty-collection accessor behavior** under Semantic Rules: "Only collection accessors with guaranteed non-null return types may appear in computed expressions. `.count` is always safe. `.peek`, `.min`, and `.max` on potentially-empty collections are rejected unless the language gains a null-safe accessor or null-coalescing operator."
+
+5. **Add acceptance criterion for empty-collection accessor rejection:** "Expression using `.peek`/`.min`/`.max` on a collection in a computed field produces compile error (no guaranteed non-null return)."
+
+6. **Add API-boundary rejection rule** under Semantic Rules: "Caller-provided values for computed fields in CreateInstance, Update, or MCP payloads are rejected with a descriptive error, not silently dropped."
+
+7. **Add acceptance criteria for API-boundary rejection:** "CreateInstance with computed field value in instanceData produces error. Update patch targeting computed field produces error. MCP tool payload with computed field value produces error."
+
+8. **Add acceptance criterion for inspect/fire output visibility:** "Computed field values appear in `precept_inspect` and `precept_fire` output alongside other field data."
+
+---
+
+## Summary
+
+The research doc is excellent — it covers the right systems, draws the right conclusions, and identifies the right contracts. The proposal's core design (read-only, field-local, auto-recompute, `->` syntax) is validated by overwhelming precedent. The remaining caveats are all specification-precision issues, not design flaws. Once the 8 edits above are applied, I can implement this with confidence. The largest single piece of new infrastructure is the dependency graph + topological sort in the type checker, which is well-understood and bounded.
+
+---
+
+# Static Reasoning Expansion — George
+
+**Date:** 2026-05-30
+**Author:** George (Runtime Dev)
+
+## Summary
+
+Executed the Batch 3 Static Reasoning Expansion research pass. Created a comprehensive durable research doc covering contradiction detection, deadlock detection, satisfiability analysis, and range propagation as a coherent horizon domain.
+
+## Deliverable
+
+`docs/research/language/references/static-reasoning-expansion.md` — covers background anchored in C4/C5 implementation status, per-philosophy-category precedent survey (formal specification languages, validators, decision/policy engines, enterprise platforms, state machines, type systems, databases, orchestrators), philosophy fit, AST reducibility contracts, dead ends, summary table, and activation criteria.
+
+## Key findings
+
+### 1. C4/C5 are the right first target and the right scope boundary
+
+Same-preposition contradiction (C4) and cross-preposition deadlock (C5) are already in the design spec and already spec'd correctly: per-field interval analysis on the expression AST, cross-field expressions assumed satisfiable, no false positives. The research confirms this is the correct fragment. DMN table overlap analysis (Camunda) and Cedar shadow analysis are the closest commercial precedents — both operate on per-input interval analysis, and both stop at the same cross-field boundary Precept already drew.
+
+### 2. The interval reduction pass is the key infrastructure item
+
+C4, C5, and any future global invariant satisfiability check all require the same per-field interval reducer over the expression AST. The AST reducibility table (in the research doc) is the core engineering contract — which expression forms reduce to intervals and which get assumed satisfiable (returned as ⊤). That reducer is the shared foundation; everything else in this lane is a caller.
+
+### 3. Global invariant satisfiability is the natural C4/C5 companion
+
+C4/C5 check per-state assertion sets. The obvious companion check is per-definition: if the full set of `invariant` declarations produces an empty per-field domain, no valid entity instance can ever be created. Same algorithm as C4 (interval intersection), different scope (all invariants instead of one state's asserts). Same severity (Error). This should be designed and implemented in the same wave as C4/C5 — not a separate proposal.
+
+### 4. Range propagation through guards is explicitly not recommended for near-term
+
+TypeScript and Kotlin both declined numeric range propagation after active compiler investment. The value for Precept is low because the inspector already catches data-dependent violations by simulation. This lane is deferred, not rejected permanently.
+
+### 5. Full SMT and cross-field LP analysis are permanently rejected for the first wave
+
+Not because they're technically intractable — they're decidable. But the diagnostic quality (author-opaque infeasibility witnesses), the native binary dependency (Z3), and the performance risk on always-on compile paths all cut against the product's identity. Cedar validates that SMT is commercially viable for authorization policy sets; it also shows why Precept's scalar entity fragment doesn't need it.
+
+## Implementation sequencing recommendation
+
+1. Implement C4/C5 after Batch 1 and Batch 2 language lanes have settled (type system, expression expansion).
+2. Design global invariant satisfiability in the same proposal as C4/C5 — same algorithm, same implementation wave.
+3. Do not design a range-propagation-through-guards proposal until C4/C5 are shipped and the interval reduction pass performance is known.
+4. Do not open a cross-field satisfiability proposal at all without new evidence from author pain reports.
+
+## No design gate issues
+
+All four items above are research findings, not design decisions requiring immediate sign-off. The activation criteria in the research doc define when a proposal should be opened. No current proposal is ready.
+
+---
+
+# George — Type System Semantics Recommendations
+
+**Date:** 2026-05-18
+**Requested by:** Shane
+**Status:** Recommendations for team review — not yet accepted
+
+---
+
+## Context
+
+After completing the theory/semantics expansion of `docs/research/language/references/type-system-survey.md`, the following durable semantic recommendations emerge from the cross-system evidence. These apply to the four current proposals (#25, #26, #27, #29) and to any future type-system work.
+
+---
+
+## Recommendations
+
+### R1: Maintain the three-way numeric split permanently
+
+`integer`, `decimal`, and `number` serve three distinct semantic domains (counting, exact measurement, approximation). The survey confirms that every major database and enterprise platform maintains all three. The MONEY anti-pattern in PostgreSQL is the strongest evidence that conflating these domains produces systems that cannot be trusted. This split is not a v1 compromise — it is the correct permanent model.
+
+**No cross-domain implicit coercion.** `decimal + number` must remain a type error now and in all future waves. Widening paths: `integer → decimal` and `integer → number` only.
+
+### R2: `.count` accessor return type should be `integer`, not `number`
+
+`.count` returns a count of elements — a whole number by definition. The current `number` return type is a backward-compatibility compromise for a language that didn't have `integer`. When `integer` ships (#29), `.count` should be refined to return `integer`. This is not breaking: `integer` widens to `number`, so `collection.count > 0` (where `0` is now inferred as `integer`) remains valid. The refinement should be part of the #29 acceptance criteria.
+
+### R3: `date - date → integer` (not a duration type)
+
+The `date - date` operation should return `integer` (day count), not a `duration` type, in v1. This is consistent with C#'s `DateOnly` (`DayNumber` difference), aligns with the `integer` proposal's acceptance criteria, and avoids the FEEL two-duration-type complexity until there is domain evidence that duration types are needed. When duration is eventually added, `date - date → duration` can replace `date - date → integer` — but only after a dedicated `duration` type design is complete.
+
+### R4: Integer literals infer as `integer`; decimal-point literals infer as `number`
+
+`5` should be inferred as `integer`; `5.0` as `number`. This is the universal convention across C#, Java, Python, and Cedar. It affects how mixed-type expressions resolve. For example, `date + 5` (where `5` is `integer`) is a valid date arithmetic expression; `date + 5.0` (where `5.0` is `number`) should be a type error. This literal inference rule should be included in the #29 parser specification.
+
+### R5: Banker's rounding is the only rounding mode for `round()`
+
+`round(decimal, N)` uses `MidpointRounding.ToEven` (banker's rounding). No other rounding mode in v1. If future proposals require different modes (half-up for display formatting, for example), they should be explicit parameters: `round(amount, 2, "halfUp")`. The default being banker's rounding is correct — it is statistically neutral and matches C# and Python defaults.
+
+### R6: `set of choice(...)` is typed at the element level, not via invariant
+
+`add CollectionField "NotAMember"` should be a compile-time error, not a runtime constraint violation, for a `set of choice(...)` field. The element type of the collection is the choice type; membership is enforced by the type checker on `add` operations. This is functionally equivalent to `Set<DocumentType>` in C# — wrong element type is a compile error. The acceptance criteria for #25 should explicitly include this compile-time enforcement for collection `add` operations.
+
+### R7: `maxplaces` fires at assignment only; intermediate arithmetic is unconstrained
+
+The `maxplaces N` constraint applies when a value is assigned to a field — not during intermediate subexpressions. `UnitPrice * Quantity` may produce a result with more than `maxplaces` decimal places; the constraint fires when the result is assigned to a `LineTotal as decimal maxplaces 2` field. This matches SQL `DECIMAL(p,s)` behavior (stored-value precision is enforced; intermediate computation precision is broader). The `round()` function is the author's explicit tool to bring a computed value within the `maxplaces` constraint before assignment.
+
+---
+
+## What These Recommendations Do NOT Change
+
+- The core type vocabulary for #25–#29 (choice, date, decimal, integer) — already locked in proposal bodies
+- The `decimal + number → type error` rule — already locked in #27
+- The `ordered` opt-in for choice comparisons — already locked in #25
+- The constructor form for date literals — already locked in #26
+- The `maxplaces` rejection-not-rounding semantics — already locked in #27
+
+These recommendations clarify implementation details and add future-proofing language to the acceptance criteria. They are refinements, not new design directions.
+
+---
+
+# Type System Research Complete — George
+
+**Date:** 2026-05-14
+**Author:** George (Runtime Dev)
+
+## Summary
+
+Executed the Batch 1 type-system expansion research pass. Created two durable research docs covering `choice` (#25), `date` (#26), `decimal` (#27), and `integer` (#29) as a coherent domain.
+
+## Deliverables
+
+- `docs/research/language/expressiveness/type-system-domain-survey.md` — domain-level survey: sample corpus analysis (21 files), 10-domain 100-field count, cross-category precedent table (databases, languages, enterprise platforms, end-user tools, rule engines), philosophy fit, semantic contracts, dead ends, proposal implications.
+- `docs/research/language/references/type-system-survey.md` — formal grounding and per-system deep-dives: PostgreSQL, SQL Server, MySQL, C#, TypeScript, Kotlin, F#, Rust, Python, Salesforce, Dynamics 365, ServiceNow, Excel, Google Sheets, Notion, FEEL, Cedar, Drools/NRules, Pydantic, Zod. Non-goals section and cross-system pattern summary table.
+
+## Key findings for the team
+
+1. **`money` type is permanently ruled out.** PostgreSQL, SQL Server, and Salesforce all tried it; all have community guidance against it. Precept's `decimal` + `choice(...)` currency-code pattern is the correct model across all surveyed systems.
+
+2. **Dataverse named the same three numeric concepts.** Dataverse calls them Whole Number, Decimal Number, and Floating Point Number. Precept calls them `integer`, `decimal`, and `number`. The concepts are identical. Enterprise platforms have already validated this three-way split for entity modeling.
+
+3. **`date` without timezone is the unanimous v1 call.** Every database system has a day-only type (`DATE`, `DateOnly`, `glide_date`). Every system that includes timezone produces well-documented footguns. The v1 deferral of `time` and `duration` is confirmed by FEEL's two-duration-type split — that complexity is not for v1.
+
+4. **`choice` is universally recognized.** MySQL `ENUM`, Salesforce Picklist, Dataverse Choice, ServiceNow choice, Notion Select, Zod `z.enum(...)` — the concept exists at every level of the stack. The `ordered` opt-in is a Precept improvement over MySQL's implicit declaration-order ordering.
+
+5. **Coercion hierarchy is the highest-risk semantic contract.** `decimal + number → type error` must hold unconditionally. Any implicit mixing of exact and approximate arithmetic defeats the precision guarantee. This is the one rule with no exceptions.
+
+6. **Implementation sequencing:** `integer` before `decimal` (the mixed arithmetic rules depend on both being present), then `choice` and `date` independently.
+
+## No design gate issues
+
+All four proposals have existing issue bodies with locked design decisions. The research confirms those decisions. No new design concerns found that would require Frank's review before implementation begins.
+
+## Kramer notification
+
+The grammar and completions implications are in the domain survey (Proposal Implications section). Kramer will need:
+- New type keywords: `choice`, `date`, `decimal`, `integer`
+- New constraint keywords: `ordered`, `maxplaces`
+- `choice(...)` syntax form for the grammar
+- Date accessor patterns: `.year`, `.month`, `.day`, `.dayOfWeek`
+- `round(...)` function call syntax
+
+These are documented in the proposal bodies for #25, #26, #27, #29. The research docs provide context for why these are the correct surface choices.
+
+---
+
+# Kramer: Computed Fields Re-Review (Issue #17) — Tooling Feasibility
+
+**Date:** 2026-04-08
+**Requested by:** Shane
+**Input:** `temp/issue-body-rewrites/17.md`, `docs/research/language/expressiveness/computed-fields.md` (§6), current grammar and analyzer
+
+---
+
+## Verdict: Medium-Effort
+
+The syntax is a clean extension of the existing `fieldScalarDeclaration` grammar rule, completions cost is moderate (one new context position plus suppression rules), and hover/semantic tokens need minor additions. The main effort is in getting the new expression context right in completions and making hover show both formula and value.
+
+---
+
+## Tooling Breakdown
+
+### 1. TextMate Grammar (`precept.tmLanguage.json`) — Low Effort
+
+**Current state:** `fieldScalarDeclaration` matches `field Name as Type (nullable) (default Value)` with the tail captured as group 9 and recursed through `declarationKeywords`, `booleanNull`, `numbers`, `strings`.
+
+**Required change:** Extend the `fieldScalarDeclaration` regex to recognize `->` after the type keyword as an alternative to `nullable`/`default`. Two approaches:
+
+- **(A) Extend group 9 inner patterns** to include `#arrowOperator`, `#operators`, `#identifierReference`, `#numbers`, `#booleanNull`, `#collectionMemberAccess`. This is the minimal-diff option — the tail after `as Type` already captures everything after the type; we'd just add expression-related patterns to the inner list.
+- **(B) Add a dedicated `fieldComputedDeclaration` pattern** before `fieldScalarDeclaration` that matches `field Name as Type -> Expr`. This gives better semantic specificity (separate scope name like `meta.field-declaration.computed.precept`) but is slightly more work.
+
+**Recommendation:** Option B. It gives us a distinct scope name that semantic tokens and themes can target, and it keeps the regex cleaner. The `->` in field declarations is structurally different from `->` in action chains.
+
+The `arrowOperator` pattern already matches `->` globally. No new keyword entry needed. The arrow in a field declaration will get `punctuation.separator.arrow.precept` scope from the existing rule, which is correct.
+
+**Risk:** None. No ambiguity — the arrow is syntactically distinguishable from action chains because it appears after `as Type` in a field declaration line.
+
+### 2. Completions (`PreceptAnalyzer.cs`) — Medium Effort
+
+**Current state:** After `field Name as Type `, the analyzer offers `nullable` and `default`. After `field Name as Type nullable `, it offers `default`. No expression-context completions exist for field declarations.
+
+**Required changes:**
+
+1. **After `field Name as Type `** — add `->` to the suggestion list alongside `nullable` and `default`. This is a one-line addition to the existing regex branch.
+
+2. **After `field Name as Type -> `** — new regex branch that triggers **expression completions** using `BuildDataExpressionCompletions(dataFields, collectionKinds)`. This matches the invariant expression context (field names + collection accessors, no event args). This is a ~5-line addition.
+
+3. **Suppression: `-> ` must NOT suggest `nullable`, `default`, or constraint keywords.** The existing field-declaration completions must not fire once `->` has been typed. The new regex for `-> ` should be checked *before* existing field-tail completions.
+
+4. **`edit` block suppression:** Computed fields must be excluded from `edit` block suggestions. This requires reading the parsed model to identify computed fields and filtering them out of `BuildItems(dataFields, ...)` in the edit context. Medium complexity — requires threading `computedFields` through the intellisense info.
+
+5. **`set` target suppression:** Similarly, computed fields should be filtered out of `set` target completions. Same mechanism as #4.
+
+**Risk (medium):** Items 4 and 5 require the intellisense infrastructure to track which fields are computed. Today `PreceptDocumentIntellisense.Analyze()` does not distinguish computed from regular fields. The `PreceptDocumentInfo` record will need a new `ComputedFields` set, populated by detecting `->` in the field declaration line. This isn't hard, but it touches several methods.
+
+### 3. Semantic Tokens (`PreceptSemanticTokensHandler.cs`) — Low Effort
+
+**Current state:** Tokens are catalog-driven via `[TokenCategory]` attributes on `PreceptToken` enum values. Field names get `preceptFieldName` semantic type.
+
+**Required change:** No new semantic token type needed. Computed fields are still fields — they should get the `preceptFieldName` token. However, a **semantic modifier** like `readonly` (or the existing `preceptConstrained`) could be applied to distinguish computed fields visually. This would require:
+
+- The semantic tokens handler to detect when a field name token belongs to a computed field
+- Emitting the modifier alongside the base type
+
+**Recommendation:** Use the existing `preceptConstrained` modifier or introduce a new `preceptComputed` modifier. Low cost either way — it's adding one modifier lookup in the field-context branch.
+
+### 4. Hover (`PreceptDocumentIntellisense.cs`) — Medium Effort
+
+**Current state:** `BuildFieldMarkdown()` shows `field Name as Type (default Value)`. For computed fields, it should show the derivation formula.
+
+**Required changes:**
+
+1. **`BuildFieldMarkdown` must detect computed fields** and render the formula:
+   ```
+   ```precept
+   field TotalCost as number -> Quantity * UnitPrice
+   ```
+   Computed from: `Quantity * UnitPrice`
+   ```
+
+2. **The `PreceptField` model** currently has no property for the derivation expression. The parser must populate something (e.g., `PreceptExpression? DerivedExpression` or `string? DerivedExpressionText`) on `PreceptField`. The hover handler needs to render it.
+
+3. **At runtime (inspect/update):** The hover should ideally show the **current computed value** alongside the formula when previewing. This is a stretch goal — it requires the preview webview to feed computed values back into hover context.
+
+**Risk:** Hover quality depends on the `PreceptField` model carrying the expression text. If the parser only stores a parsed AST, the hover handler will need to reconstruct readable text from the AST or store the raw expression string.
+
+### 5. MCP Tool Surface — Low Effort (but proposal must specify)
+
+Computed fields must appear in:
+- **`precept_compile` output:** Show the field with its derivation expression. Low effort — serialize the new field property.
+- **`precept_inspect` / `precept_fire` output:** Show the current computed value in data snapshots. Low effort — the runtime already produces field values.
+- **`precept_update` output:** Computed fields should be excluded from updateable fields. The MCP layer should reject or ignore them. Low effort.
+
+---
+
+## What the Proposal Currently Specifies vs. What's Missing
+
+### Currently specified (adequate for tooling):
+- ✅ Syntax: `field <Name> as <Type> -> <Expression>`
+- ✅ Cannot be target of `set` (compile error)
+- ✅ Cannot appear in `edit` blocks (compile error)
+- ✅ Mutually exclusive with `default` and `nullable`
+- ✅ "Hover shows computed expression" (acceptance criteria)
+- ✅ "MCP tools serialize computed fields correctly" (acceptance criteria)
+
+### Missing from proposal (needed for tooling clarity):
+
+1. **Compile output contract:** The proposal says "MCP tools serialize computed fields correctly" but doesn't specify *what* that means. Should `precept_compile` output show the derivation expression text, a parsed AST, or just a `isComputed: true` flag? Tooling needs the expression text for hover, completions documentation, and MCP output.
+
+2. **Inspect/update output contract:** §6 of the research asks whether inspect/update show computed values. The proposal's acceptance criteria don't cover this. Should `precept_inspect` previews show the computed value in the data snapshot? Should `precept_update` reject computed field names in the `fields` input or silently skip them?
+
+3. **Hover spec: formula vs. value vs. both.** The proposal says "hover shows computed expression" but doesn't say whether hover also shows the *current value* (which depends on instance state). For a static DSL file without runtime context, showing the formula is sufficient. But the preview panel has runtime context — should hover there show `→ 150.00 (from Quantity * UnitPrice)`?
+
+4. **Completions filtering in `edit` and `set` contexts.** The proposal specifies compile errors but doesn't mention that completions should proactively *exclude* computed fields from `edit` and `set` suggestion lists. This is a UX quality gap — users shouldn't see suggestions the compiler will reject.
+
+5. **Semantic token modifier.** Should computed fields be visually distinguishable from regular fields in the editor? The proposal doesn't specify. A subtle visual distinction (e.g., italic via a semantic modifier) would aid readability.
+
+6. **Expression text preservation.** The proposal doesn't specify whether the model stores the raw expression text or only a parsed AST. Tooling (hover, MCP compile output, diagnostics) benefits greatly from having the original expression text available, not just a reconstructed form.
+
+---
+
+## Risk Flags
+
+- **Arrow ambiguity: NONE.** The `->` in `field X as number -> Expr` is unambiguous in the grammar because it appears after `as Type` in a field declaration line, not after a `from/on` header or action verb. TextMate line-level matching handles this cleanly.
+
+- **Completion conflict: LOW.** The new `->` completion after `as Type` is additive. The only ordering risk is ensuring the computed-expression completions regex fires *before* the existing `nullable`/`default` branch once `->` is present.
+
+- **Hover gap: MEDIUM.** Without the raw expression text on `PreceptField`, hover is limited to `(computed)` with no formula. This is the one place where a parser-level decision (store expression text or not) directly affects tooling quality. Flag this as a parser requirement.
+
+- **Edit/set filtering: LOW-MEDIUM.** Requires threading a `ComputedFields` set through `PreceptDocumentInfo`. Not hard, but easy to forget. Should be an explicit acceptance criterion.
+
+---
+
+## Summary
+
+| Surface | Effort | Notes |
+|---------|--------|-------|
+| TextMate grammar | Low | New `fieldComputedDeclaration` pattern, ~20 lines |
+| Completions | Medium | New `->` suggestion + expression context + edit/set filtering |
+| Semantic tokens | Low | Optional modifier, ~5 lines |
+| Hover | Medium | Formula display depends on expression text in model |
+| MCP tools | Low | Serialize new field property, filter update input |
+| **Overall** | **Medium** | |
+
+---
+
+# Decision: Retire Legacy Proposal Labels via Sync Workflow
+
+**Agent:** Kramer
+**Date:** 2026-04-05
+**Requested by:** Shane (workflow closeout)
+
+## Decision
+
+Added `needs-decision` and `decided` to the `RETIRED_LABELS` array in both the active workflow (`.github/workflows/sync-squad-labels.yml`) and the template copy (`.squad/templates/workflows/sync-squad-labels.yml`).
+
+On next workflow run, those labels will be deleted from the repo. The 404-ignore guard is already in place, so the deletion is safe if either label doesn't exist yet.
+
+## Rationale
+
+The unified issue workflow (approved) replaces proposal-specific status labels with board state. `needs-decision` and `decided` were the last proposal-state labels not yet covered by the retirement list. The workflow was already cleaning up `go:*` and `squad:untriaged`; this finishes that pass.
+
+## Impact
+
+- No change to the five-stage workflow model
+- No new labels added
+- Only addition: two label names to an existing deletion list
+- Template kept in sync so new repos provisioned from the template start clean
+
+---
+
+# Decision: Proposal Governance Finalized
+
+**Author:** Newman
+**Date:** 2026-04-05
+**Status:** Applied
+
+## Decision
+
+Proposal storage policy is now uniformly enforced across all team charters and both copies of the `architectural-proposals` skill.
+
+**Canonical rule:**
+- **GitHub issues** are the proposal surface. All structured asks for Shane's sign-off go as issues.
+- **`docs/` markdown** is for research, rationale, and implementation design support — the artifacts that explain *why* a decision was made and *how* to implement it.
+- **`docs/proposals/`** is not a recognized location. It should not be created or used.
+
+## What Changed
+
+### Charters Updated
+
+All five charters now include an explicit **Proposal Storage Policy** section:
+- `frank/charter.md` — added policy to "How I Work" area
+- `george/charter.md` — added policy to "How I Work" area
+- `steinbrenner/charter.md` — updated "Research-to-proposal pipeline" to name GitHub issues explicitly
+- `j-peterman/charter.md` — added policy to "How I Work" area
+- `newman/charter.md` — added policy to "How I Work" area
+
+### Skill Files Updated (both copies)
+
+- `.squad/templates/skills/architectural-proposals/SKILL.md`
+- `.copilot/skills/architectural-proposals/SKILL.md`
+
+Changes in both:
+- Frontmatter `tools`: replaced `create` (docs/proposals/) entry with `github` (create issue) entry
+- Section heading: `Proposal Structure (docs/proposals/)` → `Proposal Structure (GitHub Issue)`
+- Context paragraph: added explicit policy statement — proposals are GitHub issues, not markdown files
+- Examples: removed `docs/proposals/squad-interactive-shell.md` reference; noted proposal lives in the issue
+
+## Rationale
+
+A prior patch to propagate this policy failed partway through. The inconsistency created ambiguity: agents reading the skill files could reasonably conclude that `docs/proposals/` was the intended workflow, even if individual charters didn't endorse it. With all surfaces now aligned, there is a single, unambiguous answer regardless of which file an agent reads first.
+
+The policy distinction is real and load-bearing: GitHub issues are discoverable, reviewable, linkable, and trackable. Markdown files in `docs/proposals/` are not proposals — they are documentation. Conflating the two creates governance gaps (proposals without issues, issues without rationale docs). Keeping them separate preserves both.
+
+---
+
+---
+author: newman
+date: 2026-05-14
+status: proposed
+domain: proposal-workflow
+requires-sign-off: shane
+supersedes: newman-project-workflow-recommendation.md
+---
+
+# Decision: Label-Free Proposal Status — Squad Compatibility Analysis
+
+## What Shane Asked
+
+Remove status labels (`needs-decision`, `decided`, `deferred`) from proposal issues, in a way that still works with Squad.
+
+---
+
+## What Squad Currently Assumes About Labels
+
+The key assumptions baked into the current Squad system:
+
+| Assumption | Where It Lives |
+|---|---|
+| Proposal decision state is readable by querying `label:needs-decision` / `label:decided` / `label:deferred` | `squad.agent.md` coordinator instructions, `architectural-proposals` SKILL.md, `docs/research/language/README.md` |
+| Open proposals are surfaced by `gh issue list --label "squad:{member}"` alongside any label-based filters | `squad.agent.md` — Ralph's work-check cycle |
+| `state:closed label:decided` distinguishes accepted/rejected from deferred | SKILL.md closing workflow |
+| `label:deferred` is the only way to identify intentionally parked proposals | Implied throughout — no project-field alternative exists today |
+
+The MCP GitHub tools (`list_issues`, `search_issues`) operate on issue API fields: state, labels, assignees, title, body. **Project Status fields live in the Projects v2 GraphQL layer.** They are not exposed by any current MCP GitHub server tool. An agent cannot query `Proposal Status = Deferred` without a GraphQL query it does not have.
+
+---
+
+## The Three Status Labels, Analyzed Individually
+
+### `needs-decision`
+
+**Verdict: Redundant. Safe to drop.**
+
+`state:open label:proposal` is an exact substitute. Every open proposal issue is, by definition, awaiting a decision. Adding `needs-decision` on top adds noise without adding information. Any AI agent query that currently reads `label:needs-decision` can be mechanically replaced with `state:open label:proposal`.
+
+### `decided`
+
+**Verdict: Redundant. Safe to drop.**
+
+A closed proposal issue with a decision comment in its thread IS decided. The label restates what the close event and comment already express. Any agent query reading `label:decided state:closed` becomes `state:closed label:proposal` (excluding `deferred`). The only caveat: a closed proposal with no `deferred` label must be assumed decided, not merely abandoned — the close-out discipline (required decision comment before closing) is the enforcement mechanism here.
+
+### `deferred`
+
+**Verdict: Carries unique semantic. NOT safe to drop — yet.**
+
+A deferred proposal is intentionally parked and potentially revisitable. Its GitHub state is `closed`. Without the `deferred` label, it is indistinguishable from a decided-and-resolved issue. No issue-API-visible field encodes this distinction today.
+
+The only alternative that works for AI agent discoverability is a `Proposal Status` single-select field on the project board — but that field does not yet exist, the project is currently private, and no MCP GitHub tool can query project fields. Until all three of those conditions are resolved, removing `deferred` silently drops a semantic that agents currently rely on.
+
+---
+
+## Is Label-Free Viable Today?
+
+**Partially.** A two-thirds migration is viable now:
+
+- ✅ Drop `needs-decision` immediately
+- ✅ Drop `decided` immediately
+- ❌ Cannot drop `deferred` until a queryable replacement exists
+
+**Full label-free is not viable today** due to three hard blockers:
+
+1. **No `Proposal Status` field on the project** — the `Precept Language Improvements` board has only the generic `Todo / In Progress / Done` Status field. It cannot represent `Deferred` as a distinct outcome.
+2. **The project is private** — even if the field existed, human repo viewers (and agents operating without project access) could not see it.
+3. **No MCP project field query** — the GitHub MCP server does not expose Projects v2 GraphQL fields. AI agents cannot query `Proposal Status = Deferred` via any available MCP tool.
+
+---
+
+## What Full Label-Free Requires (Minimum Changes)
+
+To reach a state where all three status labels can be removed without breaking Squad:
+
+| # | Change | Owner | Blocker? |
+|---|---|---|---|
+| 1 | Add `Proposal Status` single-select field to **Precept Language Improvements** project | Shane | No — do immediately |
+| 2 | Add values: `Needs Decision`, `In Review`, `Accepted`, `Rejected`, `Deferred` | Shane | No — do immediately |
+| 3 | Make **Precept Language Improvements** project public | Shane | This unblocks human discoverability |
+| 4 | GitHub MCP server exposes Projects v2 field queries | External (GitHub) | This unblocks AI discoverability — not in our control |
+| 5 | Update Squad queries in `squad.agent.md` from label-based to project-field-based (or hybrid) | Newman | Depends on 4 |
+| 6 | Update SKILL.md files to remove status-label requirements | Newman | Depends on 4 |
+| 7 | Update `docs/research/language/README.md` proposal tracking section | Newman | Depends on 4 |
+
+**The external blocker (item 4) is the constraint.** Steps 1–3 can be done now and will improve the human workflow and project board. But AI agent discoverability — the part Squad depends on — remains label-driven until the GitHub MCP server exposes project fields.
+
+---
+
+## Recommended Architecture for Precept
+
+### Phase 1 — Do Now (no risk)
+
+Drop `needs-decision` and `decided`. These carry no information that `state:open label:proposal` and `state:closed label:proposal` don't already express. Update the following surfaces in the same pass:
+
+**Updated label set (proposal workflow):**
+
+| Label | Keep? | Reason |
+|---|---|---|
+| `proposal` | ✅ Keep | Type marker. Essential for all filtering. |
+| `language`, `runtime`, `mcp`, etc. | ✅ Keep | Domain taxonomy. |
+| `dsl-compactness`, `dsl-expressiveness` | ✅ Keep | Slice taxonomy. |
+| `squad:frank`, `squad:george`, etc. | ✅ Keep | Owner routing. Non-negotiable. |
+| `needs-decision` | ❌ Drop | Redundant with `state:open label:proposal`. |
+| `decided` | ❌ Drop | Redundant with closed state + decision comment. |
+| `deferred` | ✅ Keep (for now) | Unique semantic — not yet expressible elsewhere. |
+
+**Updated query equivalents for Squad:**
+
+| Intent | Old query | New query |
+|---|---|---|
+| All active proposals | `label:needs-decision` | `state:open label:proposal` |
+| All decided proposals | `label:decided state:closed` | `state:closed label:proposal` (excludes deferred) |
+| All deferred proposals | `label:deferred` | `label:deferred` (unchanged) |
+
+**Files to update:**
+- `.copilot/skills/architectural-proposals/SKILL.md` — remove `needs-decision`/`decided` from required labels
+- `.squad/templates/skills/architectural-proposals/SKILL.md` — same
+- `docs/research/language/README.md` — update proposal tracking workflow section
+- `squad.agent.md` instructions for Ralph's work-check cycle (if label-specific queries are hardcoded)
+
+### Phase 2 — Prepare the project board (do now, pays off later)
+
+Add a `Proposal Status` single-select field to **Precept Language Improvements** with values: `Needs Decision`, `In Review`, `Accepted`, `Rejected`, `Deferred`. Mirror the `deferred` label by setting the project field to `Deferred` when an issue gets the label. This makes the board semantically useful for humans even before AI tooling can query it.
+
+Optionally make the project public. Public projects allow human contributors to see proposal state without repo access.
+
+### Phase 3 — Drop `deferred` (when external blocker lifts)
+
+When the GitHub MCP server exposes Projects v2 field queries (or when an alternative project-field query path exists), drop the `deferred` label. At that point:
+- AI agents query `Proposal Status = Deferred` on the project board
+- The project field is the sole source of truth for deferred state
+- The label namespace is fully clean: `proposal`, domain labels, slice labels, squad routing only
+
+---
+
+## AI/Discoverability Impact Summary
+
+Phase 1 loses zero discoverability. Phase 2 adds human visibility at no AI cost. Phase 3 completes the label-free model but requires an external dependency. The safe move is Phase 1 + 2 now, Phase 3 when the tooling catches up.
+
+---
+
+## Why Not Skip `deferred` Now
+
+Two proposals in this queue (`deferred` is not yet applied to any, but the mechanism exists) represent the "intentionally parked" category. If we drop `deferred` today:
+- A closed proposal with a "parking" comment looks identical to a decided-and-closed proposal
+- An agent asked "what's been deferred?" has no queryable answer
+- Re-opening a deferred proposal has no prior state marker to restore
+
+The cost of keeping `deferred` is one label. The cost of dropping it prematurely is invisible state for the AI layer. Keep it.
+
+---
+
+## Open Questions for Shane
+
+1. **Make the project public?** Needed for Phase 2 to benefit humans. No impact on AI until Phase 3.
+2. **Add the `Proposal Status` field now?** I recommend yes — sets up the migration path and makes the board more useful immediately.
+3. **Apply Phase 1 now (drop `needs-decision` and `decided`)?** I recommend yes — zero risk, cleaner label taxonomy today.
+
+---
+
+---
+author: newman
+date: 2026-05-14
+status: proposed
+domain: proposal-workflow
+---
+
+# Decision: Proposal Tagging and Workflow
+
+## Context
+
+The `architectural-proposals` skill described creating proposals as markdown files under `docs/proposals/`. In practice, the repo never used that directory. Instead, proposal work happened entirely in GitHub issues — which have labels, project placement, workflow state (open/closed, project column/status), and direct linkability. The `docs/research/` tree grew as the evidence base, with issue bodies linking to it.
+
+The mismatch created ambiguity: agents following the skill would create markdown files that no one would find or triage, bypassing the actual workflow infrastructure.
+
+## Decision
+
+**GitHub issues are the canonical home for proposals. Markdown files in `docs/proposals/` are not a valid proposal artifact.**
+
+Rationale:
+- Issues carry workflow state (open, closed, in-progress) without extra tooling.
+- Labels (`proposal`, `language`, `design`, `needs-decision`, etc.) make proposals filterable and discoverable.
+- Project board placement gives proposals a lane (e.g., Backlog → In Review → Decided).
+- Issue bodies support the full required section structure — they aren't structurally limited.
+- Research evidence lives in `docs/research/` and is linked from the issue body; it isn't duplicated in the proposal itself.
+
+## Workflow (adopted pattern)
+
+### When opening a proposal issue
+
+1. **Title format:** `[Proposal] <short imperative description>` — e.g., `[Proposal] Named rule declarations`
+2. **Labels (required):**
+   - `proposal` — marks it as a proposal, not a bug or task
+   - Domain label: `language`, `runtime`, `mcp`, `plugin`, `tooling`, or `docs` — one required
+   - Status label: `needs-decision` (open), `decided` (closed with resolution), or `deferred` (explicitly parked)
+3. **Project placement:** Add to the relevant project board column (typically `Backlog` or `In Review`)
+4. **Body structure:** Use the full required section format (see `architectural-proposals` skill) as the issue body
+5. **Research link:** Under a `## Research corpus consulted` section, link the relevant `docs/research/` files
+
+### Closing a proposal issue
+
+- Close with a comment stating the decision reached and the rationale (1–3 sentences)
+- Apply `decided` or `deferred` label before closing
+- If the decision lands in `.squad/decisions.md` or as a `.squad/decisions/inbox/` record, link it in the closing comment
+
+### What stays in docs
+
+- `docs/research/` — evidence, audits, formal references that *support* proposals. Not proposals themselves.
+- `docs/PreceptLanguageDesign.md` and other spec files — updated *after* a proposal is decided, not during proposal phase.
+
+## What This Replaces
+
+- The `create` tool step in `architectural-proposals` SKILL.md that said "Create proposal in docs/proposals/" — removed.
+- Any mental model that proposals are private markdown files. They are tracked, labeled, linked GitHub issues.
+
+## Impact
+
+- `architectural-proposals` SKILL.md updated to reflect issue-first workflow.
+- `docs/research/language/README.md` already aligned — no change needed.
+- No `docs/proposals/` directory to clean up (it was never created).
+
+---
+
+# Soup Nazi — Computed Fields (#17) Re-Review: Testability Assessment
+
+**Date:** 2026-04-08
+**Requested by:** Shane
+**Input artifacts:** `temp/issue-body-rewrites/17.md` (proposal), `docs/research/language/expressiveness/computed-fields.md` (research)
+**Prior reviews referenced:** George (feasibility, Findings 1–3), Kramer (tooling, F1–F5)
+
+---
+
+## Verdict: MANAGEABLE
+
+The test surface is large (~70 cases) but structurally well-organized. Existing test patterns in all three suites cover analogous feature categories (edit blocks, constraints, type checking, MCP tools). The **blocking issue** is not test complexity — it's **7 acceptance criteria gaps** where the proposal leaves behavior undefined, making tests unspecifiable until the proposal is amended.
+
+---
+
+## Estimated Test Case Breakdown
+
+| Suite | Category | Count | Notes |
+|-------|----------|-------|-------|
+| **Precept.Tests** | Parser | 8 | Arrow syntax, mutual exclusions, precedence |
+| **Precept.Tests** | Type Checker | 20 | Null-safety, cycles, dependency graphs, mutual exclusions, scope validation |
+| **Precept.Tests** | Runtime | 22 | Recomputation timing (Fire + Update + entry/exit actions), guards, invariants, collection accessors, CreateInstance |
+| **Precept.LanguageServer.Tests** | Completions + Hover + Tokens | 10 | Completion context after `->`, hover spec, semantic tokens, diagnostics |
+| **Precept.Mcp.Tests** | All 5 tools | 10 | Compile output shape, fire/inspect/update computed values, update rejection |
+| | **Total** | **~70** | |
+
+---
+
+## Acceptance Criteria Coverage Analysis
+
+### Research §1 (Scope Boundary) — COVERED
+- "Event argument reference produces compile error" ✓
+- "Can only reference fields and collection accessors" ✓
+- Cross-precept exclusion documented in out-of-scope ✓
+
+### Research §2 (Recomputation Timing) — MAJOR GAPS
+
+The proposal says "Re-evaluated after every mutation, before invariant checks." The research demands explicit contracts for **three distinct pipelines**. Current AC only covers Fire implicitly.
+
+**Missing AC items:**
+1. **Update pipeline recomputation.** `PreceptEngine.Update()` applies edits to fields that computed fields depend on. Must recompute before rules evaluation. Zero coverage in current AC.
+2. **Inspect pipeline preview.** `PreceptEngine.Inspect()` must show post-recomputation values in preview output. Zero coverage in current AC.
+3. **Entry/exit action timing.** Fire pipeline Stage 5 (entry actions) can mutate dependency fields AFTER Stage 4 (row mutations). If recomputation happens only once after Stage 4, entry action mutations produce stale computed values. The research says recompute after "all mutations in the chosen path, including exit actions, row actions, and entry actions." Proposal is ambiguous — "after every mutation" could mean one pass or per-stage. Must be explicit.
+
+**Test scenarios blocked:** ~8 runtime tests + ~4 MCP tests cannot be written until these are specified.
+
+### Research §3 (Nullability) — SIGNIFICANT GAPS
+
+The proposal says "Cannot be nullable" and has AC for `nullable + ->` mutual exclusion. But:
+
+**Missing AC items:**
+4. **Nullable field references in computed expressions.** `field OptName as string nullable` + `field Bad as string -> OptName` — is this a compile error? The research and George's Finding 1 both flag this. Current type checker rejects nullable-to-non-nullable assignment (C42) but only in `set` context. Must add: "Computed expression referencing nullable field produces compile error."
+5. **Empty collection accessor safety.** `.count` is always safe (returns 0). `.peek`/`.min`/`.max` on empty collections are undefined. Must state whether computed expressions using these are compile errors, runtime rejections, or produce default values. Research §3 explicitly requires this decision.
+
+**Test scenarios blocked:** ~4 type checker tests + ~3 runtime tests cannot be written until these are specified.
+
+### Research §4 (Dependency Ordering) — MOSTLY COVERED
+
+AC says "Topological sort correct for linear chains and DAGs" and "Circular dependency produces compile error with cycle path." This is testable.
+
+**Recommended additions (not blocking, but improve coverage):**
+- Computed field depending on another computed field (multi-hop chain)
+- Diamond dependency: A→{B,C}, B→D, C→D
+- Self-referencing field: A→A (degenerate cycle)
+- Cycle path error message format verification (e.g., "A → B → C → A")
+
+### Research §5 (Writeability) — SIGNIFICANT GAPS
+
+AC covers `edit` and `set` restrictions. But:
+
+**Missing AC items:**
+6. **CreateInstance behavior.** If caller passes `{"TotalCost": 42}` where `TotalCost` is computed, does `CreateInstance` ignore it, reject it, or overwrite it? Terraform precedent says reject. Proposal is silent. This directly affects `PreceptEngine.CreateInstance()` and MCP `precept_fire` (which calls CreateInstance implicitly).
+7. **Hydration/serialization contract.** Are computed fields included in `InstanceData` after Fire/Update? If yes, they're serialized and visible to callers. If no, callers can't read computed values. Research §5 and Kramer's F5 both flag this.
+
+**Test scenarios blocked:** ~4 runtime tests + ~3 MCP tests cannot be written.
+
+### Research §6 (Tooling and Serialization) — PARTIALLY COVERED
+
+AC says "Hover shows computed expression" and "MCP tools serialize computed fields correctly." But:
+
+**Missing specification (not blocking tests, but blocking LS implementation):**
+- Hover content: expression text only? Type annotation? Dependency list?
+- Compile output: `PreceptField` gains `IsComputed` + `DerivedExpression`? New DTO?
+- Inspect/Fire output: computed field values appear in `InstanceData`? Separate section?
+
+Kramer's F1–F5 cover these tooling gaps thoroughly. Deferring to his findings for LS/MCP spec.
+
+---
+
+## Dead Ends vs. Proposal Coverage
+
+| Dead End (Research §) | Proposal Coverage | Test Need |
+|------------------------|-------------------|-----------|
+| Event-argument-derived fields | AC: "Event argument reference produces compile error" ✓ | ✓ Covered |
+| Lazy/cached evaluation | Implicit in "recomputation timing" design decision | No test needed — it's a design choice, not a runtime behavior |
+| Writable computed fields | AC: `edit` + `set` restrictions ✓ | Partially covered — CreateInstance/Update/hydration gaps remain |
+| Silent default fallbacks | **NOT ADDRESSED** | Need AC for what happens when expression would produce null |
+| Cross-precept derivations | Explicit exclusion in out-of-scope ✓ | No test needed |
+
+---
+
+## Acceptance Criteria That MUST Be Added
+
+Based on research findings cross-referenced with existing AC:
+
+### Must-Add (Blocks Test Specification)
+
+| # | Acceptance Criterion | Source |
+|---|---------------------|--------|
+| A1 | Update path: computed fields recomputed after direct field edits, before rules evaluation | Research §2, George F3 |
+| A2 | Inspect preview: computed field values reflect post-recomputation state for both fire and update previews | Research §2, Kramer F1 |
+| A3 | Entry/exit action mutations: computed fields recompute after ALL mutation phases (exit actions + row actions + entry actions), not just row mutations | Research §2, George F5 |
+| A4 | Computed expression referencing nullable field produces compile error | Research §3, George F1 |
+| A5 | Computed expression using `.peek`/`.min`/`.max` on potentially empty collection: behavior specified (compile error, runtime error, or safe default) | Research §3, George F2 |
+| A6 | `CreateInstance` with computed field value in data dict: behavior specified (ignore silently, reject with error, or overwrite) | Research §5 |
+| A7 | Computed field values appear in `InstanceData` after Fire/Update (serialization contract) | Research §5, §6, Kramer F5 |
+
+### Should-Add (Improves Coverage, Not Blocking)
+
+| # | Acceptance Criterion | Source |
+|---|---------------------|--------|
+| B1 | Computed field depending on another computed field evaluates in correct dependency order | Research §4 |
+| B2 | Diamond dependency (A depends on B and C, both depend on D) resolves correctly | Research §4 |
+| B3 | Self-referencing computed field (A → A) produces cycle error | Research §4 |
+| B4 | Cycle path error message includes full cycle (e.g., "A → B → C → A") | Research §4 (already partially in AC) |
+| B5 | Completions after `->` in field declaration offer field names, exclude event arguments | Kramer F1 |
+| B6 | MCP `precept_compile` output includes computed field metadata (expression, dependencies) | Kramer F5 |
+| B7 | MCP `precept_update` with computed field in patch returns rejection | Research §5 |
+
+---
+
+## Edge Cases Surfaced by Research Not in Proposal
+
+1. **Computed field depends on field mutated only by entry action** — recomputation timing matters at a granularity the proposal doesn't specify.
+2. **Computed field referencing another computed field that references a nullable field** — transitive null safety. Conservative rejection cascades.
+3. **Computed field that produces a value violating an invariant at CreateInstance time** — e.g., `field Total as number -> X + Y` with `invariant Total > 0` when X=0, Y=0. Is this a constraint failure at creation?
+4. **All computed fields have no inputs yet (all dependencies at default values)** — what's the initial computed value? Evaluated once at creation? Or only on first mutation?
+5. **Computed field referencing a collection that's modified via `add`/`remove` in a transition row** — collection commit timing vs. recomputation timing.
+6. **Multiple computed fields with overlapping dependencies but different types** — type checker must trace type through dependency chain.
+7. **MCP `precept_fire`/`precept_update` returning computed field values in `data` dict** — if the value changes, does the output reflect pre- or post-recomputation state?
+8. **Computed field with parenthesized sub-expressions** — parser must handle `field X as number -> (A + B) * C`.
+
+---
+
+## Risk Assessment
+
+| Risk | Level | Mitigation |
+|------|-------|-----------|
+| 7 AC gaps block ~19 test scenarios | **HIGH** | Amend proposal before implementation |
+| Dependency graph + topological sort is new infrastructure | **MEDIUM** | Well-understood algorithm; test patterns exist in PreceptTypeCheckerTests |
+| Three-pipeline recomputation (Fire/Update/Inspect) | **MEDIUM** | Each pipeline already has test coverage for existing features; computed field recomputation follows same insertion points |
+| Parser arrow ambiguity (field `->` vs. transition `->`) | **LOW** | Context-disambiguated; parser tests will catch regressions |
+| Regression risk to existing tests | **LOW** | Computed fields are additive; no existing syntax changes |
+
+**Overall regression risk: LOW.** Computed fields are purely additive — no existing syntax or behavior changes. The 666 existing tests should pass unchanged.
+
+---
+
+## Recommendation
+
+**Amend the proposal** with the 7 must-add ACs (A1–A7) before implementation begins. Once amended, the test plan is straightforward: ~70 tests across well-understood categories using established patterns from `PreceptEditTests`, `PreceptTypeCheckerTests`, `NewSyntaxRuntimeTests`, `UpdateToolTests`, and `InspectToolTests`.
+
+The research document is excellent — it surfaced contracts that would have become test-time ambiguities or post-release bugs. Every semantic contract from the research maps to a testable behavior. The dead ends are well-documented and mostly already covered by existing AC.
+
+**No code soup for you until those 7 ACs are in the proposal.**
+
+---
+
+# Decision: Computed Fields (#17) — PM Gate Re-Review (2026-04-08)
+
+**Filed by:** Steinbrenner (PM)
+**Status:** Proposed — awaiting Shane review
+**Category:** `dsl-expressiveness`
+**Input artifacts:** `temp/issue-body-rewrites/17.md`, `docs/research/language/expressiveness/computed-fields.md`, `docs/@ToDo.md`
+
+---
+
+## Verdict: NEEDS REVISIONS FIRST
+
+The research is strong — 24 systems across all 7 philosophy positioning categories, with a clear cross-category finding that no existing system combines field-level derivation with lifecycle-aware constraint enforcement. The proposal's core design (read-only, field-local, topologically ordered, auto-recomputed) is sound and well-grounded. But three semantic contracts are unresolved, six acceptance criteria are missing, and the wave label is stale. These are bounded tightening edits, not a rethink.
+
+---
+
+## Philosophy Filter
+
+| Dimension | Assessment |
+|-----------|-----------|
+| **User need** | **Strong.** Manual synchronization pain is real and visible in 12+ of 21 samples. Formula drift, single-source-of-truth loss, and review friction are recurring problems. Not speculative. |
+| **External precedent** | **Exceptionally strong.** 24 systems surveyed. Every system that supports derivation converges on the same contract: read-only, declared once, auto-recomputed. PostgreSQL, SQL Server, MySQL, Salesforce, Dynamics 365, ServiceNow, Pydantic, spreadsheets — all align. |
+| **Philosophy fit** | **Good under narrow contract.** Computed fields strengthen prevention (auto-recompute eliminates drift), one-file completeness (formula lives at field declaration), determinism (pure expressions, topological order), and inspectability (formula + value visible). The research correctly identifies the narrow contract boundary. |
+| **Non-goals** | **No violations.** Proposal explicitly excludes event-arg scope, cross-precept refs, lazy eval, writable computed fields, silent default fallbacks. All of these would violate philosophy. |
+
+**Philosophy Filter: PASS.**
+
+---
+
+## Wave Placement Recommendation
+
+**Proposed by issue:** Wave 4: Compactness + Composition
+**Recommended:** Reclassify as **Composition** — not compactness.
+
+The research's cross-category finding reframes this: computed fields are not about writing fewer characters (compactness). They are about composing derivation with lifecycle-aware constraint enforcement — a combination no surveyed system provides. That places this squarely in **composition** territory.
+
+Practically, the roadmap (Groups 1-4c) is fully complete. All infrastructure is in place: DiagnosticCatalog, structured constraint violations, MCP 5-tool surface, graph analysis. Computed fields would be the first new language feature after foundational work. There is no blocking dependency. The proposal should drop the wave label and instead state its position as "first post-foundation feature" or adopt whatever sequencing model replaces waves.
+
+---
+
+## Gate-Before-Start Decisions (Shane must decide)
+
+These are the semantic contracts that cannot be deferred to implementation. Each has an explicit default-if-skipped.
+
+### 1. Null-safety rule for computed expressions
+**Options:**
+- **(a) Conservative rejection** — type checker rejects any computed expression that references a nullable field. Computed fields can only depend on non-nullable fields and safe collection accessors (`.count`). This blocks some practical use cases but is sound.
+- **(b) Permissive with future null-coalescing** — allow nullable refs but defer to a future `??` operator for null handling. Unsound until that operator ships.
+
+**Default if skipped:** (a) Conservative rejection. It's the only option that preserves "computed fields always produce a value" without new language surface.
+
+### 2. Collection accessor behavior on empty collections
+**Options:**
+- **(a) Exclude `.peek`/`.min`/`.max` from computed expressions** — only `.count` (always safe) is allowed. Simplest, most restrictive.
+- **(b) Allow but require non-empty guard** — type checker requires a `when Collection.count > 0` guard or similar before allowing unsafe accessors. Complex; may not fit computed field context.
+- **(c) Define default values for empty accessors** — `.peek` returns type default, `.min`/`.max` return 0/empty string. Violates "no silent default fallbacks" dead end.
+
+**Default if skipped:** (a) Exclude unsafe accessors. The research's "Dead Ends" section explicitly rejects silent defaults, so (c) is out. (b) adds guard complexity inappropriate for first pass. (a) is clean and expandable later.
+
+### 3. External input contract (CreateInstance/Update/hydration/MCP)
+**Options:**
+- **(a) Reject** — providing a computed field value in CreateInstance, Update, or MCP payloads is an error. Follows Terraform precedent.
+- **(b) Ignore** — silently drop computed field values from external input. Convenient but hides caller mistakes.
+
+**Default if skipped:** (a) Reject. The research cites Terraform's model; Precept's philosophy favors explicit errors over silent behavior.
+
+### 4. Recomputation timing in Fire pipeline
+**Options:**
+- **(a) Single pass after all mutations** — recompute once after exit actions + row mutations + entry actions (after Stage 5), before validation (Stage 6).
+- **(b) Two passes** — recompute after row mutations (Stage 4) and again after entry actions (Stage 5). More correct but more expensive.
+
+**Default if skipped:** (a) Single pass after all mutations, before validation. Prior review (George) flagged that entry actions can mutate dependency fields, so the recompute must happen *after* entry actions, not between row mutations and entry actions.
+
+---
+
+## In-Flight Decisions (Executor resolves)
+
+These do not need Shane's attention. The implementing agent resolves them during the PR:
+
+1. **DiagnosticCatalog code allocation** — new codes for nullable+derived, default+derived, constraints+derived, cycle detection, event-arg-in-derived, set-target-derived, edit-target-derived. Follow existing catalog pattern.
+2. **Hover content format** — show expression text + resolved type. Dependencies optional for first pass.
+3. **MCP compile output DTO shape** — extend `PreceptField` with `IsComputed` flag and `Expression` property, or introduce a dedicated shape. Follow existing DTO conventions.
+4. **Completion trigger patterns** — add `->` as completion option after type keyword in field declarations. Build a `BuildComputedFieldExpressionCompletions` that excludes event args.
+5. **Grammar pattern ordering** — `->` in field context vs. action context. Context-disambiguated by surrounding patterns.
+6. **Test organization** — follow existing xUnit/FluentAssertions conventions.
+7. **Sample selection** — which 1-2 samples to add or retrofit.
+
+---
+
+## Out of Scope for First Pass
+
+1. Null-coalescing operator (`??`) — future feature; computed fields launch with conservative null-safety
+2. Unsafe collection accessors (`.peek`/`.min`/`.max`) in computed expressions — deferred pending null-safety story
+3. Cross-precept field references
+4. Conditional derivation (`if` expressions in computed fields) — only if `if` expressions already exist
+5. Computed fields referencing event arguments
+6. Recursive or fixed-point evaluation
+
+---
+
+## Specific Proposal Edits Required Before Shane Review
+
+### Must-fix (blocks sign-off)
+
+1. **Replace "Open questions: None"** with the 4 Gate-Before-Start decisions above, each with options and Shane's chosen resolution once decided.
+
+2. **Add Update pipeline recomputation** to "Recomputation timing" semantic rule. Current text says "After field mutations, before invariant checks" — must explicitly state this applies to both Fire and Update pipelines.
+
+3. **Add Inspect API integration** to semantic rules and acceptance criteria: "Inspect output includes fresh computed values reflecting hypothetical state for both event-inspect and update-inspect."
+
+4. **Add null-safety rule** to semantic rules: specify that computed expressions may only reference non-nullable fields and safe collection accessors (per Gate decision #1).
+
+5. **Add collection accessor safety** to semantic rules: specify which accessors are allowed in computed expressions (per Gate decision #2).
+
+6. **Add external input contract** to semantic rules: specify reject behavior for computed field values in CreateInstance/Update/hydration/MCP (per Gate decision #3).
+
+7. **Add 6 missing acceptance criteria:**
+   - Expression referencing nullable field produces compile error
+   - Update path: computed fields recomputed before rules evaluation
+   - Inspect output includes fresh computed values
+   - CreateInstance/Update with computed field value produces error
+   - Unsafe collection accessors (`.peek`/`.min`/`.max`) in computed expressions produce compile error
+   - Entry action mutations reflected in computed field values before validation
+
+### Should-fix (improves quality)
+
+8. **Update wave label** — drop "Wave 4: Compactness + Composition" and replace with composition framing or "first post-foundation feature."
+
+9. **Add hover spec** — state what hover shows: expression text, resolved type, and (optionally) dependency list.
+
+10. **Add MCP serialization shape** — state whether `precept_compile` output includes `IsComputed` flag and `Expression` on field DTOs.
+
+11. **Add recomputation timing to Fire pipeline** — clarify single pass happens after entry actions (Stage 5), not after row mutations (Stage 4).
+
+---
+
+## Research Adequacy
+
+The research document is **implementation-ready** for the core design. It covers:
+- 24 systems across all 7 philosophy positioning categories (complete)
+- Cross-category gap analysis with clear finding (strong)
+- 6 semantic contracts identified with options (thorough)
+- 5 dead ends documented with reasoning (thorough)
+- Philosophy fit analysis against all core commitments (good)
+
+**No additional research needed.** The research identifies the right questions; the proposal just needs to answer them.
+
+---
+
+## Summary
+
+The computed fields feature is well-motivated, thoroughly researched, and philosophically sound. The proposal needs a tightening pass: resolve 4 semantic contracts (null-safety, accessor safety, external input, recomputation timing), add 6 missing acceptance criteria, and update the wave label. Once those edits land, this is ready for Shane's sign-off.
+
+---
+
+# Entity-Modeling Surface — Positioning Decision
+
+**Author:** Steinbrenner (PM)
+**Date:** 2026-04-08
+**Status:** Research complete — ready for team review
+**Related:** Proposal #17 (computed / derived fields), Proposal #22 (data-only precepts)
+
+## Decision needed
+
+Confirm the category line for Precept's entity-modeling surface:
+
+- Precept should stay **one language for governed entities** across two explicit axes:
+  1. **lifecycle-heavy ↔ lifecycle-light**, and
+  2. **stored facts ↔ derived facts**.
+
+## Key findings
+
+1. **Computed fields and data-only precepts are the same category question.** One asks whether derived facts belong inside the entity contract; the other asks whether lifecycle-light entities belong inside the same contract language. The answer to both is yes when the governing unit is the entity.
+
+2. **Adjacent systems split along only one axis at a time.** Databases, spreadsheets, and enterprise platforms support stored-vs-derived values well, but they do not provide Precept's lifecycle-aware integrity contract. Validators support lifecycle-light definitions, but not structural prevention. State machines support lifecycle, but not entity data governance. Precept's category is the join.
+
+3. **The product boundary stays explicit.** Derived values must remain declared, read-only, entity-local, and visibly recomputed. Stateless definitions must remain governed, not downgraded into optional validation passes.
+
+4. **Non-goals are now clearer.** Hidden recomputation, workflow bypass, cross-entity magic, and orchestrator-style process logic all dilute the category instead of extending it.
+
+## Evidence
+
+Primary synthesis: `docs/research/language/expressiveness/entity-modeling-surface.md`
+Supporting research: `docs/research/language/expressiveness/computed-fields.md`, `docs/research/language/expressiveness/data-only-precepts-research.md`
+
+## Recommendation
+
+Treat #17 and #22 as one **entity-modeling surface** lane in planning and review. The durable PM framing should be:
+
+> Precept governs business entities whether their integrity depends on lifecycle state, derived values, both, or neither — but always through explicit, inspectable, one-file contracts.
+
+---
+
+# Steinbrenner — finish language cleanup
+
+## Decision
+
+The language-research tree now uses a hard split:
+
+- `docs/research/` stores research, audits, references, and rationale only.
+- GitHub issues are the canonical home for proposal bodies, status, and acceptance discussion.
+- `docs/research/language/expressiveness/expression-feature-proposals.md` is retired and should not be recreated.
+
+## Why
+
+The repo had entered an ambiguous state where research markdown still looked canonical even after proposal issues #8-#18 existed. That ambiguity would slow review, create drift between markdown and GitHub, and make it unclear where proposal status lives.
+
+## Required follow-through
+
+1. Keep research docs evidence-oriented.
+2. Link research files to the relevant GitHub issue instead of embedding proposal bundles.
+3. Add new proposal framing in GitHub first, then back-link to research in `docs/research/language/`.
+4. Treat `expression-language-audit.md` and the library comparisons as supporting evidence, not shadow proposal specs.
+
+---
+
+# Steinbrenner — index sweep for language research
+
+## Decision
+
+Lock the language-research README structure to a **domain-first navigation model**:
+
+- `docs/research/language/README.md` is the master entry point and serves **both** as the domain index and the open-issue map.
+- `docs/research/language/expressiveness/README.md` is organized around **domain packets first**, then comparative studies, then cross-cutting audits.
+- `docs/research/language/references/README.md` is organized around **theory companions by domain**, including horizon domains with no active proposal.
+
+## Why
+
+The corpus has reached the point where proposal-by-proposal navigation would hide the actual structure of the work. The durable asset is the domain packet, not the current issue body. Future proposal authors need one obvious answer to "where does this idea live?" before they start drafting or re-drafting issues.
+
+## Guardrails preserved
+
+1. Research docs remain organized by domain, not by proposal body.
+2. Proposal bodies stay untouched in GitHub issues.
+3. Horizon domains stay visible even when no proposal exists yet.
+4. Every open proposal should be discoverable from the indexes through its research grounding, not through copied proposal prose.
+
+---
+
+---
+author: steinbrenner
+date: 2026-04-05
+status: recommended
+domain: proposal-workflow
+---
+
+# Decision: Project-first status for the language proposal queue
+
+## Decision
+
+For Precept's language proposal queue, use the GitHub Project as the primary workflow-status system, not issue labels.
+
+- Keep labels for durable classification: `proposal`, `language`, owner labels, and slice labels such as `dsl-expressiveness` / `dsl-compactness`.
+- Add a dedicated single-select project field named `Proposal Status` on **Precept Language Improvements**.
+- Use the built-in project `Status` field only for execution flow (`Todo`, `In Progress`, `Done`), not proposal-decision meaning.
+- Because the current project is private, do **not** drop public status signals immediately. Keep the existing status labels as a temporary bridge until the board is public or another public status surface exists.
+
+## Recommended field values
+
+`Proposal Status` should carry the proposal lifecycle:
+
+- `Needs decision`
+- `In review`
+- `Accepted`
+- `Deferred`
+- `Rejected`
+- `Implemented`
+
+## Why
+
+Precept's current queue is double-tracking the same information in two weak forms:
+
+- open proposal issues are labeled `needs-decision`
+- those same items sit in project `Status = Todo`
+
+That gives us duplication without better reporting. The project is not yet carrying the proposal states that actually matter.
+
+Current GitHub guidance points the other way:
+
+- Projects are designed to be the customizable planning surface, with custom fields, views, automation, and insights.
+- GitHub explicitly recommends a single source of truth and shows single-select fields as the right place for workflow metadata.
+- Labels are repository-scoped and better suited to classification than to mutually-exclusive workflow state.
+
+GitHub's own public roadmap is the clearest precedent: it uses a project board for roadmap placement while labels carry durable metadata such as release phase, feature area, and SKU. That is a split by **dimension**, not a label-only workflow.
+
+## Tradeoffs
+
+### Discoverability
+
+- **Labels win** in the repository issue list and search UI.
+- **Projects win** once someone is working inside the queue.
+
+Because Precept's language project is currently private, labels still provide better public discoverability today. That is the only strong argument for keeping status labels in the short term.
+
+### Filtering and scaling
+
+- A single-select project field scales cleanly to `In review`, `Deferred`, and `Rejected`.
+- Labels become noisier as the state model grows and are easier to misapply in combinations that make no sense.
+
+### Automation
+
+- Projects support built-in workflows, custom-field automations, and insights.
+- Labels can drive Actions, but they are a weaker fit for structured lifecycle movement.
+
+### Multi-project membership
+
+- Project fields are per-project, which is exactly what we want if one proposal appears in both a language queue and a release-planning board.
+- Labels are global to the repo, so one label must pretend to mean the same thing everywhere.
+
+### Auditability
+
+The durable audit trail should be:
+
+1. issue body
+2. closing or decision comment
+3. open/closed state
+4. project field history / charts
+
+Do not rely on label history alone as the record of why a proposal was accepted, deferred, or rejected.
+
+## Recommendation for Precept
+
+**Short term:** keep the current labels because the board is private and we should not hide queue state from repo-only viewers.
+
+**Preferred end state:** once the project is public, or once we are comfortable making the project the internal source of truth, retire `needs-decision` / `decided` / `deferred` as routine status labels and move that meaning into `Proposal Status`.
+
+That leaves labels for taxonomy and keeps workflow state where GitHub Projects is strongest.
+
+## Follow-through if approved
+
+1. Make **Precept Language Improvements** public, or explicitly accept that project-first status is internal-only.
+2. Add the `Proposal Status` single-select field.
+3. Create filtered views for `Needs decision`, `In review`, and terminal outcomes.
+4. Keep a required decision comment when closing or deferring a proposal.
+5. Remove proposal-status labels after migration, or keep only a minimal public fallback if the board stays private.
+
+---
+
+---
+author: steinbrenner
+date: 2026-04-05
+status: recommended
+domain: proposal-workflow
+---
+
+# Decision: Remove proposal status labels via project-first workflow
+
+## Decision
+
+Precept should retire proposal-status labels (`needs-decision`, `decided`, `deferred`) and move proposal state into **Precept Language Improvements** as project metadata.
+
+Use this split:
+
+- **Labels stay for taxonomy only:** `proposal`, domain (`language`, later `runtime` / `mcp` / `tooling`), owner labels (`squad:*`), slice labels (`dsl-expressiveness`, `dsl-compactness`), and release labels when implementation work is actually scheduled.
+- **Project fields carry workflow state:** add a single-select field named `Proposal State`.
+- **Issue open/closed state carries activeness:** open issues are active proposals; closed issues are decided, deferred, or rejected proposals with a decision comment.
+
+## Current state observed
+
+- The repo currently has three proposal-status labels: `needs-decision`, `decided`, `deferred`.
+- All 11 proposal issues are already in **Precept Language Improvements**.
+- The project is currently **private** and only has the built-in `Status` field (`Todo`, `In Progress`, `Done`).
+- In practice, the queue is duplicating state today: open proposals are `needs-decision` **and** `Status = Todo`.
+
+That duplication is the part to remove.
+
+## Recommended project model
+
+### 1. Add `Proposal State` (single select)
+
+Recommended values:
+
+- `Needs decision` — triaged, waiting for PM / architecture call
+- `In review` — actively being discussed or revised
+- `Accepted` — decision made; implementation should move to normal execution issues
+- `Deferred` — parked intentionally, with a revisit trigger or date
+- `Rejected` — decision made not to pursue
+
+Do **not** add `Implemented` here. Implementation is a delivery workflow, not a proposal workflow.
+
+### 2. Keep built-in `Status`, but demote it
+
+Use built-in `Status` only as a coarse progress signal:
+
+- `Todo` — `Needs decision`
+- `In Progress` — `In review`
+- `Done` — `Accepted`, `Deferred`, or `Rejected`
+
+That preserves GitHub's built-in automation value without forcing board columns to pretend all "done" outcomes mean the same thing.
+
+### 3. Add one date field for parked work
+
+Add `Revisit On` (date).
+
+Only deferred proposals need it. This gives PM a clean "what should come back up?" filter without inventing another label.
+
+## Reviewer day-to-day workflow
+
+### Opening a proposal
+
+1. Create the GitHub issue with the normal proposal structure.
+2. Apply only durable labels:
+   - `proposal`
+   - one domain label (`language`)
+   - owner label (`squad:frank` today)
+   - optional slice label (`dsl-expressiveness` or `dsl-compactness`)
+3. Add it to **Precept Language Improvements**.
+4. Set `Proposal State = Needs decision`.
+
+### Active review
+
+- PM or architecture moves the item to `In review` when it becomes an active conversation.
+- Review happens in issue comments, not in project notes.
+- If the proposal needs iteration, it stays open and stays in `In review`.
+
+### Decision handling
+
+For every terminal decision, require a short comment at the end of the issue:
+
+- first line: `Decision: Accepted`, `Decision: Deferred`, or `Decision: Rejected`
+- 1-3 sentence rationale
+- link to any follow-up issue, decision record, or research note
+
+Then:
+
+- **Accepted** → set `Proposal State = Accepted`, set project `Status = Done`, close the issue, and open/link normal execution issue(s)
+- **Deferred** → set `Proposal State = Deferred`, fill `Revisit On` if known, set project `Status = Done`, close the issue with a clear revisit rationale
+- **Rejected** → set `Proposal State = Rejected`, set project `Status = Done`, close the issue with the rejection rationale
+
+If a deferred proposal comes back, reopen the issue and move `Proposal State` back to `Needs decision` or `In review`.
+
+## Views and filtering
+
+### Project views
+
+Create these saved views on **Precept Language Improvements**:
+
+1. **Active proposals** — filter `Proposal State:Needs decision,In review`
+2. **Review now** — filter `Proposal State:In review`
+3. **Deferred queue** — filter `Proposal State:Deferred`, show `Revisit On`
+4. **Decisions log** — filter `Proposal State:Accepted,Rejected,Deferred`
+
+Use a board grouped by `Proposal State` for human scanning. Use a table view for sorting/filtering.
+
+### Repo issue filtering after label removal
+
+The repo issue list remains usable:
+
+- active proposals: `is:issue is:open label:proposal`
+- active language proposals: `is:issue is:open label:proposal label:language`
+- expressiveness slice: add `label:dsl-expressiveness`
+- compactness slice: add `label:dsl-compactness`
+- resolved proposals: `is:issue is:closed label:proposal`
+
+The repo list no longer answers "deferred vs rejected" by label alone; that distinction lives in the project and in the decision comment. That is an acceptable trade once the project is the canonical workflow surface.
+
+## Why this still works with squad
+
+- Squad agents can still discover proposal issues by `label:proposal` plus domain/slice labels.
+- Owner labels remain intact, so team routing does not change.
+- The project becomes the only place that answers workflow questions like "what needs review now?" or "what was deferred for revisit?"
+- Closing comments become the durable human-readable audit trail, which is better than relying on historical label changes.
+
+## Key tradeoff
+
+The only serious downside is discoverability while the project remains private.
+
+If the board stays private forever, removing status labels means repo-only viewers lose a public status signal. That is survivable for the squad, but it is worse for casual repository browsing.
+
+## Migration path
+
+### Phase 1 — prepare, do not remove labels yet
+
+1. Add `Proposal State`
+2. Add `Revisit On`
+3. Create the four saved views
+4. Backfill all existing proposal issues from labels into `Proposal State`
+5. Update squad instructions/templates to say project field is the source of truth
+
+### Phase 2 — dual run for one review cycle
+
+For one review cycle:
+
+- update both the project field and the old status label
+- confirm reviewers are actually using project views
+- confirm deferred/rejected decisions remain clear from closing comments
+
+### Phase 3 — remove status labels
+
+Once the project workflow is proven:
+
+1. Stop applying `needs-decision`, `decided`, `deferred`
+2. Remove those labels from existing proposal issues
+3. Update repo docs/templates that still instruct people to use status labels
+
+### Optional gate before Phase 3
+
+If public repo discoverability matters, make **Precept Language Improvements** public before removing the labels. If not, accept project-first status as an internal squad workflow and proceed anyway.
+
+## Recommendation
+
+Adopt the phased migration, not an all-at-once cutover.
+
+The project already contains the full proposal queue, so Precept is structurally ready for label-free proposal state. The missing piece is one explicit `Proposal State` field plus a short period where humans and squad agents prove they will actually use the project as the canonical review surface.
+
+---
+
+---
+author: steinbrenner
+date: 2026-04-05
+status: applied
+domain: proposal-workflow
+---
+
+# Decision: Language Proposal Workflow Cleanup
+
+## Decision
+
+Language proposals belong in the GitHub Project v2 board **Precept Language Improvements**.
+
+Use this label stack for proposal-stage language work:
+
+- `proposal`
+- `language`
+- exactly one of `needs-decision`, `decided`, or `deferred`
+- the normal owner label (currently `squad:frank`)
+- thematic slice labels such as `dsl-expressiveness` and `dsl-compactness`
+
+## Applied cleanup
+
+- Added proposal labels `proposal`, `language`, `needs-decision`, `decided`, and `deferred`
+- Put issues `#14`-`#18` onto **Precept Language Improvements**, joining the earlier queue items
+- Marked open language proposals as `needs-decision`
+- Closed `#18` as a decided rejection, labeled it `decided`, and moved its project item to `Done`
+- Tightened thematic tagging so ceremony-reduction proposals carry `dsl-compactness` where that is the real slice
+
+## Operating rule
+
+Use GitHub issues for proposal bodies and decision state. Use `docs/research/` for evidence only.
+
+The project board supplies queue movement (`Todo`, `In Progress`, `Done`). The issue labels supply proposal state (`needs-decision`, `decided`, `deferred`) because the current project field set does not expose decision-specific columns.
+
+---
+
+---
+author: steinbrenner
+date: 2026-04-05
+status: recommended
+domain: issue-workflow
+requires-sign-off: shane
+---
+
+# Decision: Standardize on one GitHub issue workflow for all work types
+
+## Decision
+
+Precept should stop treating proposals as a special workflow class and standardize on one issue lifecycle for proposals, bugs, features, chores, UX work, docs, and research:
+
+`Inbox` -> `Ready` -> `In Progress` -> `In Review` -> `Done`
+
+Use the project board as the main workflow surface. Use labels for durable taxonomy only:
+
+- exactly one **issue type** label (`proposal`, `bug`, `feature`, `chore`, `ux`, `docs`, `research`)
+- one **primary domain** label (`language`, `runtime`, `tooling`, `mcp`, `plugin`, `docs`, `ux`, `roadmap`, etc.)
+- one **owner/routing** label (`squad:{member}`)
+- optional **slice** labels (`dsl-expressiveness`, `dsl-compactness`, release themes)
+
+Keep only two optional cross-cutting exception labels:
+
+- `blocked` — open work that cannot move until an external dependency clears
+- `deferred` — intentionally parked work; close the issue with a defer rationale and reopen when revived
+
+Retire proposal-only status labels as routine workflow labels.
+
+## Why this is the right model
+
+The current proposal queue duplicates meaning:
+
+- issue labels say `needs-decision`
+- the project says `Todo`
+
+That split does not scale to bugs, chores, docs, or research. A single lifecycle works better because every issue ultimately moves through the same questions:
+
+1. Has it been triaged?
+2. Is it ready to be worked?
+3. Is someone actively doing it?
+4. Is it waiting on review or sign-off?
+5. Is it complete?
+
+That is the stable workflow axis. Issue type and domain are separate axes and should stay labels.
+
+## Shared status definitions
+
+### Inbox
+
+New issue. Not yet triaged. Missing at least one of: type, domain, owner, priority, or next action.
+
+### Ready
+
+Triaged, scoped enough to act on, unblocked, and has a clear owner plus next action.
+
+Examples:
+- proposal: decision question framed, research linked, owner known
+- bug: repro and expected behavior written
+- feature: acceptance outcome and dependency call made
+- research: question, deliverable, and consumer identified
+
+### In Progress
+
+Someone is actively working it now. Only move here when there is current ownership and live execution, not merely intent.
+
+### In Review
+
+Execution is complete for this pass and the issue is waiting on an external verdict:
+- PR review
+- PM/architect decision
+- UX review
+- human sign-off
+
+### Done
+
+The issue reached its terminal outcome:
+- code/docs merged and verified
+- decision recorded
+- research delivered and accepted
+- issue closed as completed
+
+## Triage and prioritization rules
+
+At triage, do five things in one pass:
+
+1. assign exactly one issue type label
+2. assign one primary domain label
+3. assign the `squad:{member}` owner label
+4. set priority based on user value x urgency x dependency order x implementation cost
+5. choose one path: `Ready`, `Deferred`, or close as duplicate/declined
+
+Priority guidance:
+
+- **P0** — release blocker, broken core path, or hard external deadline
+- **P1** — high user value or key dependency for upcoming work
+- **P2** — worthwhile but not on current critical path
+- **P3** — nice-to-have, cleanup, or backlog exploration
+
+Dependency order breaks ties. Foundational work ships before polish.
+
+## Label guidance
+
+### Issue type labels
+
+Use exactly one. They answer: *what kind of work is this?*
+
+- `proposal`
+- `bug`
+- `feature`
+- `chore`
+- `ux`
+- `docs`
+- `research`
+
+If an item starts as research and ends by asking for a decision, keep the original issue typed as `research` and open a follow-on `proposal` or execution issue if needed. Do not overload one issue with multiple types.
+
+### Domain labels
+
+Use one primary domain label to answer: *where does this belong and who should look first?*
+
+Examples:
+- `language`
+- `runtime`
+- `tooling`
+- `mcp`
+- `plugin`
+- `docs`
+- `ux`
+- `roadmap`
+
+Add a secondary slice label only when it supports durable filtering across many issues. Do not stack domain labels casually.
+
+## Why `blocked` and `deferred` should remain
+
+These two labels carry cross-cutting semantics that ordinary status does not.
+
+### `blocked`
+
+Keep it.
+
+It tells the team: this issue should be moving, but cannot. It needs:
+- a blocker comment
+- the owner of the unblock
+- the trigger for resuming
+
+### `deferred`
+
+Keep it.
+
+It tells the team: this issue is intentionally parked, not finished and not rejected. The clean rule is:
+
+- close the issue with `deferred`
+- comment with why it was cut and what would bring it back
+- reopen the same issue if it returns to scope
+
+That gives a searchable parking lot without abusing normal workflow status.
+
+## Migration steps
+
+1. **Freeze the taxonomy.** Lock the issue type list, domain label list, owner labels, and exception labels (`blocked`, `deferred`).
+2. **Backfill the board.** Put all active issues on one project and map them to `Inbox`, `Ready`, `In Progress`, `In Review`, or `Done`.
+3. **Retire proposal-only status labels.** Convert `needs-decision` items to `Ready` or `In Review`; convert `decided` items to `Done`; keep `deferred` only where the issue is truly parked.
+4. **Update triage practice.** Require one-pass triage: type, domain, owner, priority, status, and next action before an issue leaves `Inbox`.
+5. **Run one review cycle, then enforce.** Audit for drift after one cycle and then treat multiple type labels, missing owners, and unlabeled domains as process bugs.
+
+## Failure modes to avoid
+
+1. **Using labels as a second status system.** Once workflow lives on the board, do not recreate `ready`, `review`, or proposal-only state labels.
+2. **Applying multiple issue types.** `proposal + research + feature` on one issue makes routing and reporting useless.
+3. **Using `blocked` or `deferred` as a graveyard.** Every blocked/deferred issue needs a reason and a re-entry condition, or it is just hidden backlog.
+
+## Recommendation
+
+Adopt the single lifecycle and treat proposals as one issue type within it, not as a separate operating system.
+
+That is the cleanest way to make the repo understandable day-to-day, scalable across work types, and less dependent on label folklore.
+
+---
+
+# Decision: Static Reasoning Expansion stays interval-first and horizon-scoped
+
+**Filed by:** Steinbrenner (PM)
+**Status:** Proposed — awaiting Shane + Frank review
+**Category:** `language-research`
+
+## Context
+
+Static reasoning expansion is now documented as a horizon-domain research lane covering contradiction detection, deadlock detection, satisfiability analysis, and range propagation beyond current null narrowing.
+
+The key scope question is whether this lane should open as a broad solver-backed proposal soon, or stay narrowed to a smaller proof fragment until the surrounding language surface settles.
+
+## Decision
+
+Keep static reasoning expansion as **horizon research**, not active proposal work, and frame the likely first implementation shape as:
+
+- null-fact propagation plus
+- interval reasoning for numbers plus
+- finite-set reasoning for booleans / choice-like domains,
+
+with **sound-but-incomplete** diagnostics and **solver-backed satisfiability explicitly deferred**.
+
+## Rationale
+
+1. **This matches Precept's trust model.** Error diagnostics should only appear when emptiness or impossibility is proven in a fragment authors can understand from the message.
+2. **It builds on what Precept already has.** Today's null narrowing is the seed; interval/set facts are a natural extension.
+3. **It avoids outrunning the language surface.** Type-system and field-constraint work should settle before Precept promises deeper value-domain reasoning.
+4. **It keeps compile-path cost bounded.** A small abstract domain is much more plausible for always-on language-server and MCP compile use than a solver-first pipeline.
+
+## Implication
+
+Do not open proposal work for this lane until the fragment, diagnostic contract, and performance budget are explicit and the type/constraint lanes have stabilized enough to define what values the analyzer is actually reasoning about.
+
+---
+
+# Decision: Type System Domain Sequencing (2026-04-08)
+
+**Filed by:** Steinbrenner (PM)
+**Status:** Proposed
+**Category:** `dsl-expressiveness`
+
+## Context
+
+Batch 1 research now treats choice, date, decimal, and integer as one shared type-system domain. The research packet is unified, but implementation ordering still matters because this lane has the widest parser/runtime/tooling blast radius in the language roadmap.
+
+## Decision
+
+Keep one shared research packet, but preserve a staged implementation order:
+
+1. **choice first**
+2. **date second**
+3. **decimal third**
+4. **integer fourth**
+
+## Rationale
+
+- **choice** closes the cleanest expressiveness gap: bounded vocabularies are currently typo-prone strings, and enterprise-platform precedent is unanimous.
+- **date** is the next strongest fit because current samples simulate calendar logic with numeric day counters; a day-only date type improves readability without importing timezone complexity.
+- **decimal** and **integer** are valid, but both are more sensitive to constraint and coercion design. They should land only once explicit mixed-type and assignment contracts are settled.
+- Bundling the research avoids duplicate precedent work. Staging implementation limits blast radius.
+
+## Guardrails
+
+- Do not reopen datetime/timestamp, records/maps, dynamic typing, host-language leakage, or silent coercion as part of this lane.
+- Treat `money` as `decimal + currency choice`, not as a standalone scalar in this wave.
+
+---
+
+# Type System Domain Survey — Research Findings
+
+**Author:** Steinbrenner (PM)
+**Date:** 2026-04-05
+**Status:** Research complete — ready for team review
+**Related:** Proposal #25 (type system expansion — choice and date types)
+
+## Decision needed
+
+Confirm that proposal #25's scope (choice + date) is correct based on the domain evidence, and decide sequencing relative to Wave 1 expression proposals (#8, #10).
+
+## Key findings
+
+1. **Choice (enum) is universal.** 41/100 modeled fields across 10 business domains are choice-typed. All three entity-definition platforms (ServiceNow, Salesforce, Dataverse) have it as a first-class type. The `string` workaround provides zero compile-time safety — guard typos like `"Approvd"` compile and run silently.
+
+2. **Date is universal.** 30/100 modeled fields across 10 domains. 4/5 surveyed platforms support dedicated date types (ServiceNow, Salesforce, Dataverse, Camunda 7). Without a date type, Precept cannot express temporal business logic meaningfully.
+
+3. **Integer and currency are deferrable.** No domain field is *blocked* by Precept's `number` type. The gap is precision metadata, not modeling capability. 4/5 platforms distinguish integer from float, but `number` is a tolerable workaround.
+
+4. **Proposal #25 scope is exact.** The evidence validates choice + date as the two types that close real gaps. No scope expansion needed.
+
+5. **Precept is an entity-definition system, not a workflow orchestrator.** This aligns it with ServiceNow/Salesforce/Dataverse (all have choice + date) rather than Camunda 8/Temporal (delegate typing to host language).
+
+## Evidence
+
+Full research document: `docs/research/language/expressiveness/type-system-domain-survey.md`
+
+## Recommendation
+
+Ship choice first (highest typo-safety impact), then date. Maintain the previously scoped sequencing position of Wave 2/2.5, after #10 (string .length) and #8 (named rules) land.
+
+---
+
+# Decision: Type System Expansion — PM Scoping (2026-04-05)
+
+**Filed by:** Steinbrenner (PM)
+**Status:** Proposed — awaiting Shane + Frank review
+**Category:** `dsl-expressiveness`
+
+## Context
+
+Shane requested a new proposal for expanding the Precept type system beyond `string`, `number`, `boolean`, and collections (`set<T>`, `queue<T>`, `stack<T>`). This decision records the PM scoping section that Frank should incorporate into or append to the technical language design proposal.
+
+## Key PM Positions
+
+1. **Enum/value-set type is the highest-value addition.** It addresses a genuine expressiveness gap (authors cannot declare bounded value domains), has strong external precedent across all comparable systems, and fits Precept's philosophy of explicit, compile-time-verifiable constraints. Recommend as the primary type-system expansion candidate.
+
+2. **Integer subtype has value but is not urgent.** The `number`-as-integer workaround plus `% 1 == 0` or invariant constraints is tolerable. Defer unless enum work reveals a natural implementation path.
+
+3. **Date/duration is the most ambiguous.** Four samples use day-counter numbers. Whether Precept should own temporal semantics or treat time as a host-injected concern is an open philosophical question. Recommend parking this behind enum and revisiting after Wave 2 completion.
+
+4. **Record/struct is a non-goal for v1.** The only sample evidence is trafficlight's string concatenation. This conflicts with Precept's flat-field design and adds structural complexity that breaks keyword-anchored flat statements.
+
+5. **Field-level range constraints (proposal #13) partially overlaps with constrained-number use cases.** The type-system proposal should not duplicate #13's territory. If enum lands first, #13's remaining value shrinks to numeric ranges only.
+
+6. **Sequencing: this proposal belongs in Wave 2 or Wave 2.5.** It depends on Wave 1 expression foundations (#10 string .length, #8 named rules) being stable. It unlocks cleaner field-level constraints (#13) and the `in [literal, ...]` membership feature (audit item L8).
+
+## Downstream Impact
+
+- **Blast radius:** parser (new type keywords), type checker (new `StaticValueKind` flags), evaluator (new value handling), grammar (new type tokens), language server completions (new type suggestions), MCP tools (new type serialization in DTOs), runtime API (new field value types).
+- **Samples affected:** 14 of 21 samples would benefit from at least one new type (enum: 6+, integer: 8+, date: 6).
+
+## Linked Artifacts
+
+- PM scoping section: delivered inline in the task response
+- Research evidence: `docs/research/language/expressiveness/expression-language-audit.md` (L7 constrained types, L8 set membership)
+- Existing proposals: #13 field-level constraints (overlap zone)
+- External precedent: Cedar (datetime, decimal, duration extensions), Zod/Valibot (enum, literal unions), xstate (TypeScript context typing), FluentValidation (built-in validators for ranges/enums), SQL DDL (INTEGER, DATE, ENUM, CHECK constraints)
+
+---
+
+---
+author: steinbrenner
+date: 2026-04-05
+status: recommended
+domain: issue-workflow
+requires-sign-off: shane
+---
+
+# Decision: workflow migration surfaces for the shared issue flow
+
+## Decision
+
+Standardize repo and template operations on one project workflow:
+
+`Backlog -> Ready -> In Progress -> In Review -> Done`
+
+Policy rules:
+
+- `blocked` and `deferred` are optional exception labels only, not routine workflow states
+- do not use proposal-specific status labels
+- proposals follow the same flow as bugs, features, docs, chores, research, and UX work
+- issue `open` / `closed` answers whether work is still live; project status answers where open work sits in the flow
+
+## Migration map
+
+### 1. Core workflow policy docs
+
+- `.squad/skills/unified-issue-workflow/SKILL.md`
+  - Replace `Inbox` with `Backlog`
+  - Make `blocked` / `deferred` explicitly exception labels, not workflow stages
+  - Add the open-vs-project-status rule directly to the core pattern section
+- `.squad/skills/issue-workflow-normalization/SKILL.md`
+  - Replace the current compact model (`Inbox`, `Blocked`, optional `Done`) with `Backlog -> Ready -> In Progress -> In Review -> Done`
+  - Remove any suggestion that `Blocked` is a board column
+  - Keep `blocked` / `deferred` as exception overlays only
+
+### 2. Proposal-specific operational guidance
+
+- `.copilot/skills/architectural-proposals/SKILL.md`
+- `.squad/templates/skills/architectural-proposals/SKILL.md`
+  - Remove required status labels `needs-decision` / `decided`
+  - Change project placement from `Backlog or In Review` shorthand to the shared flow
+  - Say proposals open in the same board flow as other work, and close with a decision comment rather than a proposal-status label
+  - Reserve `deferred` only for intentionally parked work
+- `docs/research/language/README.md`
+  - Rewrite the proposal tracking workflow section so proposals use board status, not proposal-status labels
+  - Clarify that issue closure records the terminal decision; it is not the same thing as project status
+
+### 3. Repo routing and lifecycle templates
+
+- `.squad/routing.md`
+- `.squad/templates/routing.md`
+  - Replace "inbox / untriaged" wording with `Backlog`
+  - Clarify that `squad:{member}` means owner/routing, not automatic `In Progress`
+- `.squad/templates/issue-lifecycle.md`
+  - Rewrite the GitHub / ADO / Planner normalization tables away from `untriaged`, `assigned`, `needsReview`, `readyToMerge`, `changesRequested`, and `ciFailure`
+  - Remove obsolete label guidance like `squad:untriaged`, `go:needs-research`, and `next-up`
+  - Add a clean definition of board status vs issue open/closed vs exception labels
+
+### 4. Label automation
+
+- `.github/workflows/sync-squad-labels.yml`
+- `.squad/templates/workflows/sync-squad-labels.yml`
+  - Stop syncing `go:yes`, `go:no`, and `go:needs-research`
+  - Ensure `blocked` and `deferred` exist as exception labels
+  - Keep synced labels focused on routing, taxonomy, priority, and durable slices
+- `.squad/templates/workflows/squad-label-enforce.yml`
+  - Remove `go:` exclusivity and the `go:yes` / `go:no` release automation
+  - If this workflow remains, it should enforce only durable label namespaces and exception-label rules
+
+### 5. Triage and work-monitor automation
+
+- `.github/workflows/squad-triage.yml`
+- `.squad/templates/workflows/squad-triage.yml`
+  - Stop auto-applying `go:needs-research`
+  - Triage should assign owner/routing and comment on next action, while board status reflects `Backlog` or `Ready`
+- `.github/workflows/squad-issue-assign.yml`
+  - Change assignment copy so owner assignment does not imply the issue has entered `In Progress`
+- `.github/workflows/squad-heartbeat.yml`
+- `.squad/templates/workflows/squad-heartbeat.yml`
+- `.squad/templates/ralph-triage.js`
+  - Replace `untriaged` language with `Backlog`
+  - Reframe Ralph's monitoring around `Backlog`, `Ready`, `In Progress`, `In Review`, and `Done`
+  - Treat `blocked` / `deferred` as overlays, not primary state buckets
+
+### 6. Agent operating instructions
+
+- `.github/agents/squad.agent.md`
+- `.squad/templates/squad.agent.md`
+  - Replace Ralph board categories like `Untriaged`, `Ready = approved PR`, and other legacy state terms with the new workflow
+  - Clarify that review-ready code and decision-ready proposals both sit in `In Review`
+  - Make open/closed semantics explicit so closed issues are terminal outcomes, not active board states
+
+## Supersession note
+
+This decision supersedes older `Inbox` wording in:
+
+- `.squad/agents/steinbrenner/history.md`
+- `.squad/decisions/inbox/steinbrenner-standard-issue-workflow.md`
+
+Those files are useful history, but they should not be treated as the current operating model once the migration lands.
+
+---
+
+# Uncle Leo — Computed Fields (#17) Quality Gate Re-Review
+
+**Date:** 2026-04-08
+**Reviewer:** Uncle Leo (Code Reviewer)
+**Requested by:** Shane
+**Artifacts reviewed:**
+- `temp/issue-body-rewrites/17.md` (proposal body)
+- `docs/research/language/expressiveness/computed-fields.md` (research document)
+- `docs/PreceptLanguageDesign.md` (language design principles)
+- Prior session findings (George's feasibility review, Kramer's tooling review)
+
+**Verdict: REQUIRED CHANGES**
+
+The proposal and research are substantively aligned on core design — syntax choice (`->`), locked decision rationale, dead-end rejections, and philosophical grounding are all clean. But the research explicitly identifies 6 semantic contracts the proposal "must state directly" and warns that "leaving them implicit would shift product design into implementation guesswork." The proposal fails to make 3 of those 6 explicit, and its "Open Questions: None" claim directly contradicts the research's own conclusion section.
+
+---
+
+## Findings
+
+### Finding 1 — Update Pipeline Recomputation Missing (BLOCKING)
+
+**Research says:** Semantic Contract #2 requires recomputation timing be explicit for **Fire**, **Update**, and **Inspect** — called "the most important semantic contract."
+**Proposal says:** "Recomputation timing: After field mutations, before invariant checks" and Locked Decision #8 says "After all `set` actions in mutation phase."
+**Discrepancy:** The proposal addresses only the Fire pipeline. Update pipeline (direct field edits via `edit` declarations) is completely absent. If a computed field depends on an editable field and the user edits that field, the computed value would go stale before invariant checks without explicit recomputation in the Update path.
+**What should change:** Add explicit statement: "Computed fields are recomputed in both Fire (after all mutations in the chosen path) and Update (after field edits are applied) pipelines, before any constraint evaluation." Add acceptance criterion: "Update path: computed fields recomputed before rules evaluation."
+
+### Finding 2 — Inspect Pipeline Recomputation Missing (BLOCKING)
+
+**Research says:** Contract #2 states "preview output should reflect post-recomputation values, or the preview becomes misleading."
+**Proposal says:** Nothing — Inspect is never mentioned.
+**Discrepancy:** Precept's product promise includes inspectability. If `precept_inspect` shows stale computed values in its preview output, it undermines the entire inspect-before-commit model.
+**What should change:** Add to Semantic Rules: "Inspect previews reflect post-recomputation values." Add acceptance criterion: "Inspect output includes fresh computed values reflecting hypothetical mutations."
+
+### Finding 3 — Nullable Input Handling Unspecified (BLOCKING)
+
+**Research says:** Contract #3 requires the proposal to "choose and document whether expressions that reference nullable fields are rejected conservatively." Explicitly frames this as an open proposal decision.
+**Proposal says:** "Cannot be `nullable`" (Locked Decision #3) — but this only forbids the `nullable` keyword on the computed field itself.
+**Discrepancy:** The proposal is silent on what happens when a computed expression *references* a nullable field. Example: `field OptionalName as string nullable` / `field NameLen as number -> OptionalName.length` — is the expression conservatively rejected? The current DSL has no null-coalescing operator, so the type checker must reject, but the proposal doesn't say so.
+**What should change:** Add explicit rule: "Type checker conservatively rejects computed expressions that could produce null (i.e., that reference nullable fields or unsafe collection accessors)." Add acceptance criterion: "Expression referencing nullable field produces compile error."
+
+### Finding 4 — Empty Collection Accessor Safety Undefined (BLOCKING)
+
+**Research says:** Contract #3 asks "what happens when `.peek`, `.min`, or `.max` touch an empty collection" and "whether those accessor cases are compile-time errors, runtime rejections, or default-bearing semantics."
+**Proposal says:** "Collection accessors work in computed expressions" (acceptance criterion) — no safety specification.
+**Discrepancy:** `.count` is always safe (returns 0), but `.peek`, `.min`, `.max` are undefined on empty collections. If they can return null, they violate the "computed fields always produce a value" guarantee. The proposal assumes safety without specifying it.
+**What should change:** Specify which collection accessors are safe for computed fields. At minimum: "`.count` is always safe. Computed expressions using `.peek`/`.min`/`.max` are deferred until accessor null-safety semantics are specified (or conservatively rejected)."
+
+### Finding 5 — "Open Questions: None" Contradicts Research (BLOCKING)
+
+**Research says:** The "Proposal Implications" section explicitly identifies 4 areas the proposal must clarify: (1) Fire/Update/Inspect timing, (2) nullable inputs + empty accessors, (3) external-input and serialization contract, (4) cycle diagnostics + inspect output + update recomputation + tooling visibility.
+**Proposal says:** "Open questions: None."
+**Discrepancy:** Three of the four research-identified clarification areas are not resolved in the proposal (Findings 1–4 above). Claiming "None" is factually incorrect and sends a false "ready for implementation" signal.
+**What should change:** Populate "Open questions" with the unresolved items from Findings 1–4 and 6. Alternatively, resolve them as locked decisions — but they cannot remain unacknowledged.
+
+### Finding 6 — External Input Behavior Unspecified (ADVISORY)
+
+**Research says:** Contract #5 asks: "may callers provide [computed fields] in `CreateInstance`, `Update`, hydration, or MCP payloads? If callers do provide them, is that ignored or rejected?" Cites Terraform's reject-don't-ignore precedent.
+**Proposal says:** Covers `edit` and `set` restrictions but is silent on external API callers.
+**Discrepancy:** The API surface matters. If `CreateInstance(data)` is called with a computed field value, the runtime needs a defined response. Silently ignoring it would hide caller mistakes; rejecting it enforces the read-only contract.
+**What should change:** Add locked decision or semantic rule: "External API calls (CreateInstance, Update, hydration, MCP payloads) that provide values for computed fields produce [reject / ignore — decide]."
+
+### Finding 7 — Dead End "Silent Default Fallbacks" Missing from Exclusions (ADVISORY)
+
+**Research identifies 5 dead ends.** Proposal lists 4 exclusions. "Silent Default Fallbacks" — the research's warning against quietly substituting `0`/`""`/`false` for null or empty cases — is missing from the exclusions section.
+**What should change:** Add exclusion: "Silent default fallback values for null or empty inputs (use explicit declarations or future null-coalescing operators instead)."
+
+### Finding 8 — Dead End "Writable Computed Fields" Not in Exclusions (ADVISORY)
+
+**Research dead end #3:** Writable computed fields defeat single-source-of-truth.
+**Proposal coverage:** Covered in Locked Decision #5 (edit/set restrictions) but missing from "Explicit exclusions."
+**What should change:** Add to exclusions for cross-reference clarity with the research document, or note that Locked Decision #5 covers this.
+
+### Finding 9 — Exclusion "Recursive Fixed-Point Evaluation" Has No Research Backing (ADVISORY)
+
+**Proposal exclusion:** "Recursive field dependencies requiring fixed-point evaluation."
+**Research:** This term doesn't appear. The research covers dependency cycles (Contract #4, well-addressed in Locked Decision #7) but "fixed-point evaluation" is a different computational concept.
+**What should change:** Either ground this exclusion in the research or merge it into the cycle detection locked decision. Currently it reads as an orphan exclusion.
+
+### Finding 10 — Research Document Not Referenced (ADVISORY)
+
+**Proposal's "Research and rationale links"** references `PreceptLanguageDesign.md`, sample files, and principle alternatives — but does NOT reference `docs/research/language/expressiveness/computed-fields.md`, the primary research document created specifically for this proposal.
+**What should change:** Add link: `docs/research/language/expressiveness/computed-fields.md` — comprehensive precedent survey, semantic contracts, and dead-end analysis.
+
+### Finding 11 — MCP Serialization Shape Undefined (ADVISORY)
+
+**Research Contract #6:** "whether compile output shows the derivation expression, whether inspect/update output shows the current computed value."
+**Proposal:** Implementation scope says "Serialize computed fields in precept_compile output" — no shape defined.
+**What should change:** Specify minimum DTO expectations: does `PreceptField` gain `IsComputed` and `Expression` properties? Does inspect output include post-recomputation values?
+
+### Finding 12 — Hover Specification Too Vague (ADVISORY)
+
+**Research Contract #6:** "whether hover/completions surface the formula, the result, or both."
+**Proposal:** "Hover shows derived expression."
+**What should change:** Clarify: does hover show the formula text, the last computed value, the dependency list, or a combination?
+
+### Finding 13 — Entry Action Timing Ambiguity (ADVISORY)
+
+**Proposal Locked Decision #8:** "After all `set` actions in mutation phase."
+**Research Contract #2:** "after all mutations in the chosen path, including exit actions, row actions, and entry actions."
+**Discrepancy:** The proposal's phrasing ("mutation phase") could be read as only row mutations, excluding entry actions which also execute `set` statements. If entry actions mutate a dependency field, one recomputation pass after row mutations would produce stale values.
+**What should change:** Clarify: recomputation occurs after ALL mutation sources in the Fire pipeline (exit + row + entry actions), not just after row actions.
+
+---
+
+## Scoring Summary
+
+| # | Finding | Severity | Category |
+|---|---------|----------|----------|
+| 1 | Update pipeline recomputation missing | **Blocking** | Semantic Contract #2 gap |
+| 2 | Inspect pipeline recomputation missing | **Blocking** | Semantic Contract #2 gap |
+| 3 | Nullable input handling unspecified | **Blocking** | Semantic Contract #3 gap |
+| 4 | Empty collection accessor safety undefined | **Blocking** | Semantic Contract #3 gap |
+| 5 | "Open Questions: None" contradicts research | **Blocking** | Internal consistency |
+| 6 | External input behavior unspecified | Advisory | Semantic Contract #5 gap |
+| 7 | Silent default fallbacks missing from exclusions | Advisory | Dead-end coverage gap |
+| 8 | Writable computed fields not in exclusions | Advisory | Dead-end coverage gap |
+| 9 | Fixed-point exclusion has no research backing | Advisory | Orphan exclusion |
+| 10 | Research document not referenced | Advisory | Documentation sync |
+| 11 | MCP serialization shape undefined | Advisory | Semantic Contract #6 gap |
+| 12 | Hover specification too vague | Advisory | Semantic Contract #6 gap |
+| 13 | Entry action timing ambiguity | Advisory | Semantic Contract #2 precision |
+
+**5 blocking findings, 8 advisory findings.**
+
+All 5 blocking findings trace directly to semantic contracts the research document explicitly flagged as "must be stated directly." These are not new concerns — they are the research's own conclusions that the proposal hasn't absorbed yet.
+
+---
+
+## Recommendation
+
+The proposal is close. The core design is sound, the syntax is well-grounded, and the locked decisions are solid. What's missing is the second half of the research's output — the semantic contracts and open questions section. A single editing pass addressing Findings 1–5 would resolve all blocking issues. The advisory findings can be addressed in the same pass or during implementation.

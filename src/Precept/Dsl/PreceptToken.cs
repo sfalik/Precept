@@ -155,6 +155,11 @@ public enum PreceptToken
     Any,
 
     [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Quantifier for all declared fields")]
+    [TokenSymbol("all")]
+    All,
+
+    [TokenCategory(TokenCategory.Grammar)]
     [TokenDescription("Collection inner-type separator")]
     [TokenSymbol("of")]
     Of,
@@ -302,17 +307,17 @@ public enum PreceptToken
 
     [TokenCategory(TokenCategory.Operator)]
     [TokenDescription("Logical AND")]
-    [TokenSymbol("&&")]
+    [TokenSymbol("and")]
     And,
 
     [TokenCategory(TokenCategory.Operator)]
     [TokenDescription("Logical OR")]
-    [TokenSymbol("||")]
+    [TokenSymbol("or")]
     Or,
 
     [TokenCategory(TokenCategory.Operator)]
     [TokenDescription("Logical NOT")]
-    [TokenSymbol("!")]
+    [TokenSymbol("not")]
     Not,
 
     [TokenCategory(TokenCategory.Operator)]

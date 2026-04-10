@@ -99,6 +99,18 @@ invariant Password == PasswordConfirmation because "Passwords must match"
 
 ---
 
+## Category Distinction: Governance vs. Validation
+
+The most important framing for this comparison is the philosophy's governance-vs-validation distinction.
+
+FluentValidation **validates when called.** A FluentValidation rule runs when you invoke the validator — on a request boundary, before a save, wherever the developer remembers to wire it up. Any code path that skips the validator call skips the rules.
+
+Precept **governs structurally.** A Precept invariant holds because the runtime prevents any operation from producing a result that violates it. There is no call site to forget, no code path that bypasses the contract. The engine enforces every declared rule on every operation — fire, update, or create — before the result is committed.
+
+This is not a difference of degree (more rules, better messages). It is a difference of category. Validation checks data at a moment in time. Governance declares what the data is allowed to become and enforces that declaration structurally, with no bypass.
+
+---
+
 ## Gap Analysis
 
 ### What's equal
@@ -155,6 +167,12 @@ But `in <State>` is about a **named state** — you can't use an arbitrary boole
 **State-time discrimination:** FluentValidation has no concept of lifecycle state. All rules apply uniformly at validation time. Precept's `in <State> assert`, `to <State> assert`, and `from <State> assert` apply rules at specific lifecycle moments — entry, exit, and in-place. This is a significant expressiveness advantage for workflow entities that FluentValidation cannot match without manual state-checking code.
 
 **Event-scoped validation:** `on <Event> assert` validates event argument integrity before any mutation. FluentValidation has no event/mutation model — validation is always against current object state. Precept's separation of event-arg validation from field invariants is structurally richer.
+
+### Where Precept directly competes: stateless precepts and data-only entities
+
+A stateless precept — a precept with no states, no transitions, just fields and invariants — is the direct competitor to FluentValidation. Same data-shape validation use case, but with structural prevention instead of invoked checking.
+
+Data-only entities (address records, fee schedules, policy configurations, patient demographics) are where FluentValidation and Precept compete head-to-head. In every real business domain, data and reference entities outnumber workflow entities. For these entities, the comparison is not "state machine vs. validator" — it is "governed integrity vs. invoked checking" on the same shape of data. The test for whether an entity belongs in Precept is not "does it have a state machine?" but "does it need governed integrity?"
 
 ---
 

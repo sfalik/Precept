@@ -155,11 +155,11 @@ public static class DiagnosticCatalog
         "No statements are allowed after an outcome statement in a transition row.",
         "Transition row for event '{eventName}': no statements are allowed after an outcome statement.");
 
-    /// <summary>At least one state must be declared.</summary>
+    /// <summary>At least one field or state must be declared.</summary>
     public static readonly LanguageConstraint C12 = Register(
         "C12", "parse",
-        "At least one state must be declared.",
-        "At least one state must be declared.");
+        "At least one field or state must be declared.",
+        "At least one field or state must be declared.");
 
     /// <summary>Exactly one state must be marked initial.</summary>
     public static readonly LanguageConstraint C13 = Register(
@@ -406,7 +406,7 @@ public static class DiagnosticCatalog
         "C50", "compile",
         "Non-terminal state has outgoing rows but none can reach another state.",
         "State '{State}' has outgoing transitions but all reject or no-transition — no path forward.",
-        ConstraintSeverity.Hint);
+        ConstraintSeverity.Warning);
 
     /// <summary>Every transition row for a state/event pair rejects, so the event can never succeed there.</summary>
     public static readonly LanguageConstraint C51 = Register(
@@ -434,4 +434,10 @@ public static class DiagnosticCatalog
         "C54", "parse",
         "Transition rows must reference declared states (both source and target).",
         "Undeclared state '{stateName}' referenced in transition row.");
+
+    /// <summary>Root-level 'edit' declaration is not valid when states are declared.</summary>
+    public static readonly LanguageConstraint C55 = Register(
+        "C55", "compile",
+        "Root-level 'edit' is not valid when states are declared.",
+        "Root-level `edit` is not valid when states are declared. Use `in any edit all` or `in <State> edit <Fields>` instead.");
 }

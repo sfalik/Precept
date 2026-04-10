@@ -2,7 +2,7 @@
 
 **Studied:** 2026-05-01  
 **Source:** https://xstate.js.org/docs/ + Stately docs on guards, transitions  
-**Relevance:** xstate is the canonical JavaScript/TypeScript state machine library. It handles the same problem domain as Precept (states, events, transitions, guards) and has been through multiple design iterations. Comparing guard patterns and transition composition directly maps to Precept's `from ... on ... when` model.
+**Relevance:** xstate is the canonical JavaScript/TypeScript state machine library. It overlaps with the lifecycle-governance dimension of Precept (states, events, transitions, guards), but Precept's scope is broader: it governs entity integrity — lifecycle transitions, field constraints, editability rules, or any combination — including entities with no lifecycle at all. Comparing guard patterns and transition composition directly maps to Precept's `from ... on ... when` model.
 
 ---
 
@@ -169,7 +169,19 @@ on: {
 
 xstate supports hierarchical states (substates within states). Precept is strictly flat — no state nesting. For complex UIs with modal sub-states (a checkout flow inside an order), this is a real limitation.
 
-**Verdict:** Out of scope for Precept's domain. Precept targets backend entity lifecycle (order, subscription, loan), not UI state machines. Flat states are appropriate and correct for the target domain.
+**Verdict:** Hierarchical states serve UI state machines with deeply nested interaction modes. Precept governs entity integrity — lifecycle transitions, field constraints, and data rules — where flat states are appropriate and correct. The target domain is business entities that need governed integrity, not UI interaction trees.
+
+### The pure state machine failure mode
+
+The core gap in xstate — and any pure state machine library — is not the pipeline model or the syntax. It is that **an entity can pass through every valid transition and still hold corrupted field values.** xstate has no declared field model, no invariants, no data integrity enforcement. A `CancelledOrder` in the right state but with `Total > 0` is a valid xstate configuration — because no rule required otherwise.
+
+Precept combines the lifecycle structure of a state machine with the data enforcement of a constraint engine. The transition that would produce an invalid data configuration is rejected before it commits. Fields, invariants, and assertions are first-class declared constructs, not runtime action code the developer must remember to write.
+
+### What xstate cannot serve: data-only entities
+
+Precept also governs entities with no lifecycle at all — address records, fee schedules, policy configurations, patient demographics. These are data-only entities that need governed integrity (field constraints, cross-field invariants, editability rules) but have no state machine.
+
+xstate cannot serve these entities. It has no model for a stateless entity with declared fields and structural constraint enforcement. In every real business domain, data and reference entities outnumber workflow entities. The test for whether an entity belongs in Precept is not "does it have a state machine?" but "does it need governed integrity?"
 
 ---
 

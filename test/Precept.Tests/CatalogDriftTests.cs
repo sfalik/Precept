@@ -359,7 +359,7 @@ public class CatalogDriftTests
         //      (invariant/guard expressions are parsed inline by the combinator)
         ["C4"] = new("_unused_", "parse expression", DirectAction: () =>
         {
-            PreceptParser.ParseExpression("&&");
+            PreceptParser.ParseExpression("and");
         }),
 
         // C5: Invalid number literal — unreachable via normal tokenizer, test directly
@@ -391,8 +391,8 @@ public class CatalogDriftTests
         // C11: Statements after outcome — set action follows the outcome
         ["C11"] = new(H + "field X as number default 0\n" + S2 + "event Go\nfrom A on Go -> transition B -> set X = 1\n", "after an outcome"),
 
-        // C12: No states declared
-        ["C12"] = new(H, "At least one state"),
+        // C12: No states or fields declared
+        ["C12"] = new(H, "At least one field or state"),
 
         // C13: No initial state
         ["C13"] = new(H + "state A\n", "initial"),
@@ -509,6 +509,9 @@ public class CatalogDriftTests
         // C54: Undeclared state in transition row
         ["C54"] = new(H + S + "event Go\nfrom A on Go -> transition Nowhere\n", "Undeclared state"),
 
+        // C55: Root-level edit with states declared
+        ["C55"] = new(H + "field Priority as number default 1\n" + S + "edit Priority\n", "Root-level"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state
@@ -553,7 +556,7 @@ public class CatalogDriftTests
         ["C39"] = new(H + "field X as number default 0\n" + S2 + "event Go\nfrom A on Go -> set X = \"text\" -> transition B\n", "PRECEPT039"),
 
         // C40: Unary operator type error
-        ["C40"] = new(H + "field X as boolean default false\nfield Y as string default \"\"\n" + S2 + "event Go\nfrom A on Go -> set X = !Y -> transition B\n", "PRECEPT040"),
+        ["C40"] = new(H + "field X as boolean default false\nfield Y as string default \"\"\n" + S2 + "event Go\nfrom A on Go -> set X = not Y -> transition B\n", "PRECEPT040"),
 
         // C41: Binary operator type error
         ["C41"] = new(H + "field X as number default 0\nfield Y as string default \"\"\n" + S2 + "event Go\nfrom A on Go -> set X = Y - 1 -> transition B\n", "PRECEPT041"),

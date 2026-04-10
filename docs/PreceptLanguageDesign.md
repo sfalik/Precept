@@ -139,18 +139,16 @@ More keyword-dominant than C#/TypeScript, but without the verbosity of COBOL or 
 | Symbols | ~23 | Math, comparison, assignment, `->`, punctuation |
 | Ratio | ~2 : 1 | Keyword-dominant by design |
 
-### Logical operator migration (Implementation Pending — [#31](https://github.com/sfalik/Precept/issues/31))
+### Logical operator migration (Implemented — [#31](https://github.com/sfalik/Precept/issues/31))
 
-The following changes are decided but not yet implemented:
-
-| Current (symbolic) | Target (keyword) | Status |
-|-------------------|-----------------|--------|
-| `!` (unary NOT) | `not` | Pending — [#31](https://github.com/sfalik/Precept/issues/31) |
-| `&&` (logical AND) | `and` | Pending — [#31](https://github.com/sfalik/Precept/issues/31) |
-| `\\|\\|` (logical OR) | `or` | Pending — [#31](https://github.com/sfalik/Precept/issues/31) |
+| Symbolic form | Keyword form | Status |
+|--------------|-------------|--------|
+| `!` (unary NOT) | `not` | Implemented |
+| `&&` (logical AND) | `and` | Implemented |
+| `\\|\\|` (logical OR) | `or` | Implemented |
 | `!=` (inequality) | `!=` (no change) | Stays as-is |
 
-Until implementation, the runtime accepts `!`, `&&`, `||`. After implementation, the runtime will accept `not`, `and`, `or` as keywords, and `!`, `&&`, `||` will be removed.
+The runtime accepts `not`, `and`, `or` as keywords. `!`, `&&`, `||` have been removed.
 
 ---
 ## File Structure (Locked)
@@ -225,8 +223,10 @@ PushAction         := "push" Identifier Expr
 PopAction          := "pop" Identifier ("into" Identifier)?
 ClearAction        := "clear" Identifier
 
-EditDecl           := "in" StateTarget "edit" FieldList
-FieldList          := Identifier ("," Identifier)*
+EditDecl           := StateEditDecl | RootEditDecl
+StateEditDecl      := "in" StateTarget "edit" FieldTarget
+RootEditDecl       := "edit" FieldTarget
+FieldTarget        := "all" | Identifier ("," Identifier)*
 
 EventDecl          := "event" Identifier ("," Identifier)* ("with" ArgList)?
 ArgList            := ArgDecl ("," ArgDecl)*
@@ -270,6 +270,56 @@ Notes:
 - **Compile-time error (contradiction):** multiple asserts with the same preposition on the same state whose conjoined per-field domains are empty (e.g. two `in Open` asserts that require contradictory values for the same field).
 - **Compile-time error (deadlock):** `in`/`to` vs `from` asserts on the same state whose conjoined per-field domains are empty — the state is provably unexitable.
 - All domain checks use interval/set analysis on the expression AST. Expressions involving `contains` or cross-field relationships that cannot be reduced to per-field domains are assumed satisfiable (no false positives).
+- **Stateless precept** — a precept with no `state` declarations. Only `field`, `invariant`, and root-level `edit` declarations are valid. C12 requires at least one `field` or `state`. C55 rejects root-level `edit` when states are declared. C49 warns per event declared in a stateless precept (events have no transition surface).
+
+---
+
+## Stateless Precepts (Locked)
+
+A precept without any `state` declarations is a **stateless precept** — it represents a domain object governed by data rules and editability constraints, but without a lifecycle or routing surface.
+
+### When to use stateless precepts
+
+Use a stateless precept when the entity has fields and integrity rules but no meaningful lifecycle phases. Common cases: configuration objects, profile records, pricing tables, stored payment methods, and any object where "what the data must be" matters but "what stage the process is in" does not.
+
+### Syntax
+
+A stateless precept omits all `state`, `event`, and `from ... on ...` declarations. Valid declarations are:
+
+- `field` — scalar and collection field declarations
+- `invariant` — data integrity rules (always enforced)
+- `edit` (root-level) — which fields are directly editable; see [Root-level editability](#root-level-editability-stateless-precepts)
+
+```precept
+precept CustomerProfile
+
+field Name as string default ""
+field Email as string default ""
+field Phone as string nullable
+field PreferredContactMethod as string default "email"
+field MarketingOptIn as boolean default false
+
+invariant Name != "" because "Name cannot be empty"
+
+edit all
+```
+
+### Constraints
+
+- **C12 (parse):** At least one `field` or `state` must be declared. A `precept` header alone is not valid.
+- **C55 (compile):** Root-level `edit` is not valid when states are declared. Use `in <State> edit` instead.
+- **C49 (compile, Warning):** Event declared in a stateless precept is unreachable — no transition surface exists.
+- C13 ("Exactly one state must be initial") is suppressed for stateless precepts — no states means no initial state required.
+
+### Runtime behavior
+
+- `PreceptEngine.IsStateless` is `true`; `InitialState` is `null`.
+- `CreateInstance(data?)` — works for both stateful and stateless. For stateless, creates an instance with `CurrentState = null`.
+- `CreateInstance(state, data?)` — throws `ArgumentException` for stateless precepts.
+- `Fire` on a stateless instance — returns `Undefined` outcome. Events have no transition surface.
+- `Inspect(instance, event)` on stateless — returns `Undefined` outcome.
+- `Inspect(instance)` on stateless — returns all events as `Undefined`; `EditableFields` reflects root-editable fields.
+- `Update` on stateless — applies to root-editable fields; `CurrentState` is `null`.
 
 ---
 
@@ -348,12 +398,11 @@ Full reserved keyword list:
 
 `precept`, `field`, `as`, `nullable`, `default`, `invariant`, `because`,
 `state`, `initial`, `event`, `with`, `assert`, `edit`,
-`in`, `to`, `from`, `on`, `when`, `any`, `of`,
+`in`, `to`, `from`, `on`, `when`, `any`, `all`, `of`,
 `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `into`,
 `transition`, `no`, `reject`,
-`string`, `number`, `boolean`, `true`, `false`, `null`, `contains`
-
-**Pending additions ([#31](https://github.com/sfalik/Precept/issues/31)):** `and`, `or`, `not` — replacing symbolic `&&`, `||`, `!` for logical operators. See [Keyword vs Symbol Design Framework](#keyword-vs-symbol-design-framework-locked).
+`string`, `number`, `boolean`, `true`, `false`, `null`, `contains`,
+`and`, `or`, `not`
 
 ### Dual-use: `set`
 
@@ -497,30 +546,30 @@ Appending `nullable` to a field or event argument declaration makes it nullable.
 
 Authors must prove non-null before use. There are three standard patterns.
 
-**Pattern 1 — Inline `&&` (test and use in the same guard):**
+**Pattern 1 — Inline `and` (test and use in the same guard):**
 
 ```precept
 from Active on Evaluate
-  -> if Score != null && Score >= 80
+  -> if Score != null and Score >= 80
        -> set RiskTier = "Low"
        -> transition Approved
      else
        -> reject "Score unavailable or below threshold"
 ```
 
-The right-hand side of `&&` is only reached when the left side is `true`. The language server narrows `Score` to non-nullable for `Score >= 80` and for any `set` expressions in that branch. Removing the `Score != null &&` prefix causes a diagnostic on `Score >= 80`.
+The right-hand side of `and` is only reached when the left side is `true`. The language server narrows `Score` to non-nullable for `Score >= 80` and for any `set` expressions in that branch. Removing the `Score != null and` prefix causes a diagnostic on `Score >= 80`.
 
-**Pattern 2 — Inline `||` (short-circuit the null case):**
+**Pattern 2 — Inline `or` (short-circuit the null case):**
 
 ```precept
 from Active on Retry
-  -> if RetryCount == null || RetryCount > 0
+  -> if RetryCount == null or RetryCount > 0
        -> transition Retry
      else
        -> reject "Retry limit reached"
 ```
 
-The right-hand side of `||` is only reached when the left side is `false` (i.e. `RetryCount != null`). The language server narrows `RetryCount` to non-nullable for the `RetryCount > 0` comparison.
+The right-hand side of `or` is only reached when the left side is `false` (i.e. `RetryCount != null`). The language server narrows `RetryCount` to non-nullable for the `RetryCount > 0` comparison.
 
 **Pattern 3 — Early-exit null rejection, then use freely across all following branches:**
 
@@ -719,6 +768,22 @@ This is LL(2) at most — the parser sees `in` → state list → `assert` or `e
 - **Independence from events:** Edit declarations and event transitions are orthogonal. A field can be both editable and modified by event `set` assignments.
 - **No terminal state exclusion:** `in any edit` includes terminal states. To exclude specific states, list states explicitly.
 
+### Root-level editability (stateless precepts)
+
+Stateless precepts (no `state` declarations) use a root-level `edit` form without the `in <StateTarget>` prefix:
+
+```
+edit all
+edit Field1, Field2
+```
+
+- `edit all` — declares all declared fields as editable. The `all` sentinel is stored as `["all"]` in `FieldNames` and expanded to all scalar and collection field names at engine construction via `ExpandEditFieldNames()`.
+- `edit Field1, Field2` — declares specific named fields as editable.
+
+Root-level `edit` is only valid on stateless precepts. Using it alongside `state` declarations produces **C55 (Error)**: `"Root-level \`edit\` is not valid when states are declared. Use \`in any edit all\` or \`in <State> edit <Fields>\` instead."`
+
+At runtime, `Update` on a stateless instance pulls the editable field set from `_rootEditableFields` (the internal set built from root edit blocks). The `BuildEditableFieldInfosForStateless()` method is used by `Inspect(instance)` to surface root-editable fields for stateless instances.
+
 ### Compile-time checks
 
 | Check | Severity |
@@ -727,6 +792,7 @@ This is LL(2) at most — the parser sees `in` → state list → `assert` or `e
 | State name not declared | Error |
 | Duplicate field in same `edit` statement | Warning |
 | Empty field list | Error |
+| Root-level `edit` while states are declared (C55) | Error |
 
 ### Model
 
@@ -810,7 +876,7 @@ Semantics (Locked ordering):
 
 Example:
 
-- `on SubmitOrder assert items.count > 0 && paymentToken != null because "Order must include items and payment"`
+- `on SubmitOrder assert items.count > 0 and paymentToken != null because "Order must include items and payment"`
 
 Focused example:
 
@@ -826,8 +892,8 @@ on Cancel assert reason != "" because "Cancel requires a reason"
 The expression language supports:
 
 - arithmetic: `+`, `-`, `*`, `/`, `%`
-- unary: `-` (numeric negation), `!` (logical not) — **pending migration to `not` keyword per [#31](https://github.com/sfalik/Precept/issues/31)**
-- logical: `&&`, `||` — **pending migration to `and`, `or` keywords per [#31](https://github.com/sfalik/Precept/issues/31)**
+- unary: `-` (numeric negation), `not` (logical not)
+- logical: `and`, `or`
 - comparisons: `==`, `!=`, `>`, `>=`, `<`, `<=`
 - membership: `contains`
 - parentheses
@@ -1028,7 +1094,7 @@ from any on Prioritize -> set Priority = Prioritize.Level -> no transition
 # Complex with collection mutations
 from Signing on RecordSignature
     when PendingSignatories contains RecordSignature.SignatoryName
-        && PendingSignatories.count == 1
+        and PendingSignatories.count == 1
     -> remove PendingSignatories RecordSignature.SignatoryName
     -> add CollectedSignatures RecordSignature.SignatoryName
     -> transition FullySigned
@@ -1065,7 +1131,7 @@ to Submitted assert Items.count > 0 because "Must have items to submit"
 in Submitted assert Email != null because "Email must remain set while submitted"
 
 event SubmitOrder with items as set of string, paymentToken as string nullable
-on SubmitOrder assert items.count > 0 && paymentToken != null because "Order must include items and payment"
+on SubmitOrder assert items.count > 0 and paymentToken != null because "Order must include items and payment"
 
 event Cancel with reason as string
 on Cancel assert reason != "" because "Cancel requires a reason"

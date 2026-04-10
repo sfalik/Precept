@@ -31,7 +31,7 @@ public class NewSyntaxParserTests
 
         model.Name.Should().Be("Minimal");
         model.States.Should().HaveCount(1);
-        model.InitialState.Name.Should().Be("Idle");
+        model.InitialState!.Name.Should().Be("Idle");
     }
 
     [Fact]
@@ -767,14 +767,14 @@ public class NewSyntaxParserTests
             state A initial
             state B
             event Go
-            from A on Go when X > 5 && X < 20 -> transition B
+            from A on Go when X > 5 and X < 20 -> transition B
             """;
 
         var model = PreceptParser.Parse(dsl);
 
         var guard = model.TransitionRows![0].WhenGuard as PreceptBinaryExpression;
         guard.Should().NotBeNull();
-        guard!.Operator.Should().Be("&&");
+        guard!.Operator.Should().Be("and");
     }
 
     [Fact]
@@ -826,14 +826,14 @@ public class NewSyntaxParserTests
             state A initial
             state B
             event Go
-            from A on Go when !Active -> transition B
+            from A on Go when not Active -> transition B
             """;
 
         var model = PreceptParser.Parse(dsl);
 
         var guard = model.TransitionRows![0].WhenGuard as PreceptUnaryExpression;
         guard.Should().NotBeNull();
-        guard!.Operator.Should().Be("!");
+        guard!.Operator.Should().Be("not");
     }
 
     [Fact]
@@ -1041,7 +1041,7 @@ public class NewSyntaxParserTests
         model.States[0].Name.Should().Be("A");
         model.States[1].Name.Should().Be("B");
         model.States[2].Name.Should().Be("C");
-        model.InitialState.Name.Should().Be("A");
+        model.InitialState!.Name.Should().Be("A");
     }
 
     [Fact]
@@ -1055,7 +1055,7 @@ public class NewSyntaxParserTests
         var model = PreceptParser.Parse(dsl);
 
         model.States.Should().HaveCount(3);
-        model.InitialState.Name.Should().Be("B");
+        model.InitialState!.Name.Should().Be("B");
     }
 
     [Fact]
@@ -1069,7 +1069,7 @@ public class NewSyntaxParserTests
         var model = PreceptParser.Parse(dsl);
 
         model.States.Should().HaveCount(3);
-        model.InitialState.Name.Should().Be("A");
+        model.InitialState!.Name.Should().Be("A");
     }
 
     [Fact]
@@ -1083,7 +1083,7 @@ public class NewSyntaxParserTests
         var model = PreceptParser.Parse(dsl);
 
         model.States.Should().HaveCount(3);
-        model.InitialState.Name.Should().Be("C");
+        model.InitialState!.Name.Should().Be("C");
     }
 
     [Fact]

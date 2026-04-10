@@ -54,7 +54,7 @@ from Screening on PassScreen when PendingInterviewers.count > 0 -> transition In
 from Screening on PassScreen -> reject "At least one interviewer must be assigned before the interview loop begins"
 from Screening on RejectCandidate -> set FinalNote = RejectCandidate.Note -> transition Rejected
 
-from InterviewLoop on RecordInterviewFeedback when PendingInterviewers contains RecordInterviewFeedback.Interviewer && PendingInterviewers.count == 1 -> remove PendingInterviewers RecordInterviewFeedback.Interviewer -> set FeedbackCount = FeedbackCount + 1 -> transition Decision
+from InterviewLoop on RecordInterviewFeedback when PendingInterviewers contains RecordInterviewFeedback.Interviewer and PendingInterviewers.count == 1 -> remove PendingInterviewers RecordInterviewFeedback.Interviewer -> set FeedbackCount = FeedbackCount + 1 -> transition Decision
 from InterviewLoop on RecordInterviewFeedback when PendingInterviewers contains RecordInterviewFeedback.Interviewer -> remove PendingInterviewers RecordInterviewFeedback.Interviewer -> set FeedbackCount = FeedbackCount + 1 -> no transition
 from InterviewLoop on RecordInterviewFeedback -> reject "Only assigned interviewers can submit feedback"
 from InterviewLoop on RejectCandidate -> set FinalNote = RejectCandidate.Note -> transition Rejected

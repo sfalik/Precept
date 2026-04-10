@@ -2,13 +2,17 @@
 
 Research grounding for [#22 — Data-only precepts](https://github.com/sfalik/Precept/issues/22).
 
-## The Mixed-Tooling Problem
+## Background
 
-Precept's original design required every precept to have a state machine. This means entities without workflow needs (reference data, configuration, simple domain objects) must be modeled in a separate tool (Zod, FluentValidation, JSON Schema). For domains where some entities have workflows and others don't, this creates:
+The test for whether an entity belongs in Precept is not "does it have a state machine?" but "does it need governed integrity?" — the guarantee that an entity's data satisfies its declared rules at every moment, through every operation, with no code path that bypasses the contract. The philosophy establishes a hierarchy: data and rules are the primary concern; states are the structural mechanism that makes data protection lifecycle-aware when lifecycle is present; workflow is one dimension, not the defining frame.
+
+Precept's original design required every precept to have a state machine. This forced entities without workflow needs (reference data, configuration, simple domain objects) into a separate tool (Zod, FluentValidation, JSON Schema) — even when those entities need governed integrity just as much as their lifecycle-driven counterparts. For domains where some entities have workflows and others don't, this creates:
 
 - Two languages, two runtimes, two mental models
 - No single source of truth for the domain
 - Adoption barrier: users evaluate Precept for their complex entities, then realize they need a second tool for everything else
+
+The philosophy makes the case concrete: "In every real business domain, data and reference entities outnumber workflow entities." A product that governs only the workflow side covers the minority.
 
 This problem was identified by Shane during backlog grooming (April 7, 2026).
 
@@ -44,6 +48,22 @@ Evans (2003) explicitly recognizes that a single domain contains both:
 
 A domain modeling language that only supports entities forces value objects into a different tool.
 
+## Philosophy Fit
+
+Data-only precepts evaluated against the seven core philosophy commitments:
+
+| Commitment | Stateful | Stateless | Assessment |
+|------------|----------|-----------|------------|
+| **Prevention, not detection** | Invalid configurations structurally impossible — transition rejected before commit | Same. `Update` rejects any field mutation that violates an invariant. No invalid configuration persists. | Full parity. The prevention guarantee is about data configurations, not lifecycle positions. |
+| **One-file completeness** | All fields, states, transitions, constraints in one `.precept` file | Same. All fields, invariants, editability declarations in one `.precept` file. | Full parity. No scattered logic across service layers. |
+| **Inspectability** | `Inspect` previews every event outcome from any state | `Inspect` returns `Undefined` for events (none exist). `Update` constraint checking is the primary operation surface. | Reduced but appropriate. Stateless entities have no transitions to preview — inspectability applies to the operation surface that exists. |
+| **Determinism** | Same definition + same data + same event = same outcome | Same definition + same data + same field edit = same outcome | Full parity. |
+| **Compile-time structural checking** | Unreachable states, type mismatches, constraint contradictions caught before runtime | Type mismatches, constraint contradictions, empty-precept checks caught before runtime | Full parity on the applicable surface. State-related checks (C13, C50) are gated on state presence. |
+| **AI readability** | Single file, declarative, deterministic — readable by human and AI alike | Same. Simpler structure may be *more* readable. | Full parity or better. |
+| **Governance, not validation** | Invariants enforced structurally on every operation — no bypass path | Same. Invariants enforced structurally on every `Update` — no bypass path. | Full parity. This is the core: governed integrity does not require a state machine. |
+
+All seven commitments hold for stateless precepts. The philosophy's hierarchy predicts this directly — data and rules are the primary concern, states are instrumental.
+
 ## Design Decisions
 
 ### Editability: `edit all` / `edit Field1, Field2`
@@ -63,6 +83,12 @@ A domain modeling language that only supports entities forces value objects into
 
 **Graduation path:** Root-level `edit` is a compile error when states are declared. Compiler tells the user to use `in any edit all` or `in <State> edit ...`. No silent behavioral change.
 
+### Constraint Changes: C12 Redefined, C13 Conditional
+
+**Decision:** C12 redefined from "At least one state must be declared" to "Precept requires at least one field or state." C13 conditional on `States.Count > 0`. Same diagnostic codes, broadened/gated semantics.
+
+**Why redefine, not remove:** Reusing C12 keeps the diagnostic catalog stable — no gaps in the code sequence, no new unnumbered constraint needed. The check still fires for empty precepts (neither fields nor states), which is the degenerate case worth catching. The semantics broaden from "must have states" to "must have structure."
+
 ### API: Nullable CurrentState, Undefined Results
 
 **Decision:** `CurrentState` = null for stateless instances. `Fire()`/`Inspect(event)` return `Undefined` (not throw).
@@ -73,12 +99,49 @@ A domain modeling language that only supports entities forces value objects into
 
 **Decision:** No stateless preview rendering in current panel. Deferred to the full preview panel redesign.
 
+### Event-State Boundary: Warning, Not Error
+
+**Decision:** Events declared in a stateless precept trigger a **warning** (not a compile error). C50 (dead-end state) severity upgraded from hint to warning for consistency.
+
+**Background:** The original proposal framed "states, events, and transitions forbidden in stateless precepts" as a single compile-error rule. Shane's review (April 8, 2026) identified three problems:
+
+1. **States forbidden** — tautological. Adding a state makes it stateful by definition. Not a prohibition.
+2. **Transitions forbidden** — structurally impossible. C54 (undefined state reference) already catches this.
+3. **Events forbidden** — the only real design decision. Events parse fine without states (parser has zero state dependencies for event declarations), so this requires a deliberate type-checker rule.
+
+**Why warning over error:** The single-state escape hatch (`state Active initial` + events + `no transition`) produces a structurally parallel pattern — events that dispatch but never change state. C50 flagged this as a hint. Shane's consistency argument: if single-state+events+no-transitions gets a hint, zero-states+events should not get a hard error — the severity should match for structurally parallel diagnostics.
+
+Frank argued the scenarios differ at the API level (`Fire()` requires `currentState` — with zero states events are unaddressable, with one state events fire and mutate fields). Shane heard the argument and made a different call: consistency wins. Both upgraded to warning.
+
+**Severity alignment:** "Events that dispatch to nowhere" is structurally closer to C49 (orphaned event — warning) than to C53 (empty precept — hint). C50-as-hint was too lenient — upgraded to warning as a correction.
+
+**No sample impact:** Verified that no canonical sample triggers C50.
+
+### Stateless Event Boundary: Binary Taxonomy
+
+**Decision:** Precept has two entity tiers — **data** (fields + invariants + editability) and **behavioral** (fields + invariants + states + events + transitions). No middle tier.
+
+This maps directly to the philosophy's hierarchy of concepts: "Data and rules are the primary concern. States are the structural mechanism that makes data protection lifecycle-aware — when lifecycle is present." The data tier is entities where governed integrity suffices. The behavioral tier is entities where governed integrity *plus lifecycle awareness* is needed. States are not a prerequisite for governance — they are an additional structural dimension for entities that have one.
+
+**Why no "data + commands" middle tier:**
+
+| Problem | Impact |
+|---------|--------|
+| Syntax: What replaces `from State on Event`? | New statement form — parallel dispatch path, not simplification |
+| Vocabulary: `on Event assert` guards movement truth — what does it guard without transitions? | Data-truth/movement-truth vocabulary breaks down |
+| Grammar: Every transition feature needs "stateless-with-events?" branching | Maintenance surface doubles |
+| Inspect: All events shown as always-available from no state | Semantically empty noise |
+
+**Precedent confirming the binary:** Terraform data sources can't have lifecycle hooks. DDD value objects don't process commands. SQL tables with CHECK constraints don't have inline triggers. No surveyed system provides "data entity with named commands but no lifecycle."
+
+**The single-state pattern is legitimate, not ceremonial:** `state Active initial` communicates a true fact — "single behavioral mode." Events fire, actions execute, fields mutate. The entity *does something*. One line of honest structural declaration for the behavioral tier.
+
 ## Dead Ends Explored
 
 ### "Close #22 — Out of Scope"
 
 The team initially recommended closing #22 (April 7, 2026). Arguments:
-- "Precept's identity is state machines" — but this framed Precept as a state machine tool, not a domain integrity platform
+- "Precept's identity is state machines" — but this framed Precept as a state machine tool, not a domain integrity engine
 - "All 20 samples are stateful" — circular: Precept doesn't support stateless, so no stateless samples can exist
 - "Better served by Zod/FluentValidation" — ignores the mixed-tooling adoption barrier
 

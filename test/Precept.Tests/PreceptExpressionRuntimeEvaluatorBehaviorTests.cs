@@ -85,7 +85,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
         var fire = FireForSet(
             "boolean IsEnabled\nboolean IsDisabled",
             "IsDisabled",
-            "!IsEnabled",
+            "not IsEnabled",
             new Dictionary<string, object?>
             {
                 ["IsEnabled"] = true,
@@ -133,7 +133,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     [Fact]
     public void Fire_Set_BooleanAndWithNonBooleanOperand_IsRejected()
     {
-        var dsl = BuildDslForSet("boolean Flag\nnumber Count\nboolean Result", "Result", "Flag && Count");
+        var dsl = BuildDslForSet("boolean Flag\nnumber Count\nboolean Result", "Result", "Flag and Count");
         var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
         ex.Message.Should().Contain("PRECEPT041");
     }
@@ -141,7 +141,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     [Fact]
     public void Fire_Set_BooleanAnd_WithNonBooleanLeftOperand_IsRejected()
     {
-        var dsl = BuildDslForSet("number Count\nboolean Flag\nboolean Result", "Result", "Count && Flag");
+        var dsl = BuildDslForSet("number Count\nboolean Flag\nboolean Result", "Result", "Count and Flag");
         var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
         ex.Message.Should().Contain("PRECEPT041");
     }
@@ -211,7 +211,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     public void Inspect_Guard_LogicalAnd_ShortCircuits_WhenLeftFalse()
     {
         var inspect = InspectForGuard(
-            "Flag && MissingFlag",
+            "Flag and MissingFlag",
             new Dictionary<string, object?>
             {
                 ["Flag"] = false
@@ -225,7 +225,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     public void Inspect_Guard_LogicalOr_ShortCircuits_WhenLeftTrue()
     {
         var inspect = InspectForGuard(
-            "Flag || MissingFlag",
+            "Flag or MissingFlag",
             new Dictionary<string, object?>
             {
                 ["Flag"] = true
@@ -239,7 +239,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     public void Inspect_Guard_LogicalAnd_EvaluatesRight_WhenLeftTrue()
     {
         var inspect = InspectForGuard(
-            "Flag && OtherFlag",
+            "Flag and OtherFlag",
             new Dictionary<string, object?>
             {
                 ["Flag"] = true,
@@ -254,7 +254,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     public void Inspect_Guard_LogicalOr_EvaluatesRight_WhenLeftFalse()
     {
         var inspect = InspectForGuard(
-            "Flag || OtherFlag",
+            "Flag or OtherFlag",
             new Dictionary<string, object?>
             {
                 ["Flag"] = false,
@@ -277,7 +277,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     public void Inspect_Guard_MissingIdentifier_WhenEvaluated_IsRejectedWithConfiguredReason()
     {
         var inspect = InspectForGuard(
-            "Flag && MissingFlag",
+            "Flag and MissingFlag",
             new Dictionary<string, object?>
             {
                 ["Flag"] = true
@@ -290,7 +290,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     [Fact]
     public void Fire_Set_UnaryNot_WithNonBooleanOperand_IsRejected()
     {
-        var dsl = BuildDslForSet("number Input\nboolean Result", "Result", "!Input");
+        var dsl = BuildDslForSet("number Input\nboolean Result", "Result", "not Input");
         var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
         ex.Message.Should().Contain("PRECEPT040");
     }
@@ -306,7 +306,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     [Fact]
     public void Fire_Set_BooleanOr_WithNonBooleanLeftOperand_IsRejected()
     {
-        var dsl = BuildDslForSet("number Count\nboolean Flag\nboolean Result", "Result", "Count || Flag");
+        var dsl = BuildDslForSet("number Count\nboolean Flag\nboolean Result", "Result", "Count or Flag");
         var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
         ex.Message.Should().Contain("PRECEPT041");
     }
@@ -314,7 +314,7 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
     [Fact]
     public void Fire_Set_BooleanOr_WithNonBooleanRightOperand_IsRejected()
     {
-        var dsl = BuildDslForSet("boolean Flag\nnumber Count\nboolean Result", "Result", "Flag || Count");
+        var dsl = BuildDslForSet("boolean Flag\nnumber Count\nboolean Result", "Result", "Flag or Count");
         var ex = Assert.Throws<InvalidOperationException>(() => PreceptCompiler.Compile(PreceptParser.Parse(dsl)));
         ex.Message.Should().Contain("PRECEPT041");
     }

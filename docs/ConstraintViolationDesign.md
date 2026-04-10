@@ -21,7 +21,7 @@ Make the runtime the source of truth for "which constraint was violated and what
 
 ## Design Principles
 
-1. **The runtime reports on the subjects the constraint references, not on what caused them to change.** If an invariant on `Balance` fails after `set Balance = Balance - Pay.Amount`, the violation targets `Field("Balance")`, not `EventArg("Pay", "Amount")`. No reverse-mapping through mutations.
+1. **The runtime reports the semantic subjects a violated rule is about, not just the literal tokens it mentions and not the operation inputs that happened to feed them.** Directly referenced stored fields remain targets. If a rule references a computed field, that computed field is also a target, and the runtime expands it transitively to the concrete stored fields it depends on. This broadens targeting from direct syntax to dependency-aware subject attribution while preserving the same non-goal as today: the runtime does not reverse-map through mutations or blame event arguments for a post-mutation field rule unless the rule itself is an event assertion.
 
 2. **The consumer decides rendering.** The runtime provides targets. The consumer knows what its current inputs are and can trivially check: "is this target one of my inputs? → inline. Otherwise → banner."
 
@@ -55,7 +55,7 @@ invariant Balance >= 0 because "Balance cannot go negative"
 - **Scope:** Fields only.
 - **When checked:** Post-mutation, pre-commit. Always — every fire and every update.
 - **Author-supplied reason:** Yes (`because`).
-- **Targets:** Expression-referenced field(s) + `Definition()`.
+- **Targets:** Directly referenced field(s), any transitive field dependencies beneath referenced computed fields, + `Definition()`.
 
 ### C. State asserts
 
@@ -68,7 +68,7 @@ to Submitted assert Items.count > 0 because "Must have items to submit"
 - **Scope:** Fields only.
 - **When checked:** Post-mutation, pre-commit. Temporally scoped by preposition (`in` = while residing, `to` = entering, `from` = leaving).
 - **Author-supplied reason:** Yes (`because`).
-- **Targets:** Expression-referenced field(s) + `State(name, anchor)`.
+- **Targets:** Directly referenced field(s), any transitive field dependencies beneath referenced computed fields, + `State(name, anchor)`.
 
 ### D. Transition row `reject`
 
@@ -97,13 +97,13 @@ from Signing on RecordSignature
 
 ### Constraint Summary
 
-Every scoped constraint includes its scope alongside its expression-referenced subjects:
+Every scoped constraint includes its scope alongside its semantic subjects:
 
 | Source | Targets |
 |---|---|
 | Event assertion | Expression-referenced arg(s) + `Event(name)` |
-| Invariant | Expression-referenced field(s) + `Definition()` |
-| State assertion | Expression-referenced field(s) + `State(name, anchor)` |
+| Invariant | Directly referenced field(s) + transitive dependencies beneath referenced computed fields + `Definition()` |
+| State assertion | Directly referenced field(s) + transitive dependencies beneath referenced computed fields + `State(name, anchor)` |
 | Transition rejection | `Event(name)` |
 
 ## Runtime Model
@@ -196,18 +196,21 @@ for each violation:
 
 ### Compile-time subject extraction
 
-At compile time, walk each constraint's expression AST to record which fields and args it references:
+At compile time, walk each constraint's expression AST to record two layers of subject data: the direct subjects named by the expression itself, and the expanded subjects produced by walking any referenced computed fields through the computed-field dependency graph.
 
 ```csharp
 public sealed record ExpressionSubjects(
-    IReadOnlyList<string> FieldReferences,
+    IReadOnlyList<string> DirectFieldReferences,
+    IReadOnlyList<string> ExpandedFieldReferences,
     IReadOnlyList<(string Event, string Arg)> ArgReferences);
 ```
 
-- `PreceptIdentifierExpression` with no dot → field reference (or arg name inside event assert scope).
-- `PreceptIdentifierExpression` with dot (`Event.Arg`) → arg reference.
+- `PreceptIdentifierExpression` with no dot in field scope → direct field reference.
+- `PreceptIdentifierExpression` with no dot in event-assert scope → event arg reference for that event.
+- `PreceptIdentifierExpression` with dot (`Event.Arg`) → explicit event arg reference.
+- Any directly referenced computed field contributes itself to the direct subject set and contributes its full transitive stored-field dependency closure to the expanded field set.
 
-This is computed once in `PreceptCompiler` and stored alongside each invariant, state assert, event assert, and transition row's `WhenGuard`. At inspect time, the runtime looks up the precomputed subjects — no expression re-parsing needed.
+This is computed once in `PreceptCompiler` and stored alongside each invariant, state assert, event assert, and transition row's `WhenGuard`. At inspect time, the runtime looks up the precomputed subjects and returns a de-duplicated union of direct and expanded subjects in stable dependency order, then appends the scope target — no expression re-parsing needed.
 
 ### Outcome enums
 
@@ -510,7 +513,7 @@ Both fields appear as targets because the expression references both. The runtim
 
 Same invariant fails, same violation, same targets. The consumer can now attach the violation to both inputs.
 
-**Rule:** The runtime always returns the full set of expression-referenced targets. All Inspect paths behave identically — no filtering by patch, event, or overload. The consumer decides how to render based on what it knows about its own inputs.
+**Rule:** The runtime always returns the full semantic dependency target set for the violated rule. All Inspect paths behave identically — no filtering by patch, event, or overload. For field-based rules, that means directly referenced fields plus any transitive field dependencies beneath referenced computed fields; for event assertions, it remains the expression-referenced event args. The consumer decides how to render based on what it knows about its own inputs.
 
 ### Scenario 8: Mixed `when` guard (fields + args)
 
@@ -625,3 +628,20 @@ Three approaches were evaluated:
 3. **Middle-ground** — keep `Precept` on types whose bare names are too generic for C#; drop it on domain-specific types
 
 The middle-ground was chosen. Types that keep `Precept`: `PreceptField`, `PreceptState`, `PreceptEvent`, `PreceptInstance`, `PreceptDefinition`, `PreceptRuntime`, `PreceptEngine`, `PreceptCompiler`, `PreceptInvariant`, `PreceptTransitionRow`, `PreceptEditableFieldInfo`. Types that drop it: `FireResult`, `EventInspectionResult`, `ConstraintViolation`, `TransitionOutcome`, `AssertAnchor`, `StateAssertion`, `EventAssertion`, `Rejection`, `StateTransition`, `NoTransition`, `ValidationResult`, etc.
+
+---
+
+## Compile-Phase Diagnostics for Structural Constraints
+
+Compile-phase and parse-phase diagnostics (DSL validity checks) use a separate vocabulary from runtime `ConstraintViolation` objects. They are registered in `DiagnosticCatalog` and reported as structured `ParseDiagnostic` entries. The following codes are relevant to data-only (stateless) precepts:
+
+| Code | Phase | Severity | Rule |
+|------|-------|----------|------|
+| C12 / PRECEPT012 | parse | Error | At least one `field` or `state` must be declared. A `precept` header alone with neither a field nor a state is invalid. |
+| C49 / PRECEPT049 | compile | Warning | Event declared but never referenced in any transition row. On a stateless precept, every declared event is structurally orphaned \u2014 no state routing surface exists. Emitted per event. |
+| C50 / PRECEPT050 | compile | Warning | Non-terminal state has outgoing rows but none can reach another state. Upgraded from `Hint` to `Warning` (2026-04-08). Rationale: a state where every outgoing path dead-ends is a structural smell that warrants author attention, not just an informational note. Consistent with the severity model for C49 (same kind of structural quality problem). |
+| C55 / PRECEPT055 | compile | Error | Root-level `edit` is not valid when states are declared. Message: `"Root-level \`edit\` is not valid when states are declared. Use \`in any edit all\` or \`in <State> edit <Fields>\` instead."` |
+
+**Distinction from runtime violations:** These are compile-time diagnostics, not runtime `ConstraintViolation` objects. They are reported during `PreceptCompiler.CompileFromText()` and surfaced via the language server (squiggles), MCP `precept_compile`, and CLI. They do not produce `ConstraintViolation` instances.
+
+**C12 redefinition history:** The original C12 rule was "At least one state must be declared." It was broadened to include fields as part of the data-only precepts feature \u2014 a precept with only fields (no states) is now valid (a stateless precept), so the minimum requirement is at least one field OR at least one state.

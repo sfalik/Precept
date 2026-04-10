@@ -833,7 +833,7 @@ public class NewSyntaxRuntimeTests
             state A initial
             state B
             event Go
-            from A on Go when X > 0 && Y > 0 -> transition B
+            from A on Go when X > 0 and Y > 0 -> transition B
             from A on Go -> no transition
             """;
 

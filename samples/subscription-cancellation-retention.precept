@@ -34,11 +34,11 @@ on MakeSaveOffer assert DiscountPercent <= 100 because "Save offers cannot excee
 event AcceptOffer
 
 event DeclineOffer with Note as string nullable default null
-on DeclineOffer assert Note == null || Note != "" because "A supplied decline note cannot be blank"
+on DeclineOffer assert Note == null or Note != "" because "A supplied decline note cannot be blank"
 
 from Active on RequestCancellation -> set SubscriberName = RequestCancellation.Name -> set PlanName = RequestCancellation.Plan -> set MonthlyPrice = RequestCancellation.Price -> set CancellationReason = RequestCancellation.Reason -> set SaveOfferAccepted = false -> transition RetentionReview
 
-from RetentionReview on MakeSaveOffer when !SaveOfferAccepted && RetentionDiscount == 0 -> set RetentionDiscount = MakeSaveOffer.DiscountPercent -> no transition
+from RetentionReview on MakeSaveOffer when not SaveOfferAccepted and RetentionDiscount == 0 -> set RetentionDiscount = MakeSaveOffer.DiscountPercent -> no transition
 from RetentionReview on MakeSaveOffer -> reject "Only one outstanding save offer can exist at a time"
 
 from RetentionReview on AcceptOffer -> set SaveOfferAccepted = true -> set CancellationReason = null -> transition Active

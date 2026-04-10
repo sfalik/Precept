@@ -36,6 +36,35 @@ internal static class PreceptAnalysis
         var events = definition.Events ?? Array.Empty<PreceptEvent>();
         var transitionRows = definition.TransitionRows ?? Array.Empty<PreceptTransitionRow>();
 
+        // Stateless precepts: no graph analysis needed.
+        // All declared events are structurally orphaned (no state routing surface) → C49 per event.
+        // C53 (no events) is suppressed for stateless — having no events is the expected data-only case.
+        if (definition.IsStateless)
+        {
+            var statelessOrphans = events
+                .Select(evt => new OrphanedEventIssue(evt.Name, evt.SourceLine))
+                .ToArray();
+            foreach (var orphan in statelessOrphans)
+            {
+                // SYNC:CONSTRAINT:C49
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C49,
+                    DiagnosticCatalog.C49.FormatMessage(("Event", orphan.EventName)),
+                    orphan.SourceLine));
+            }
+            return new AnalysisResult(
+                diagnostics,
+                [],
+                [],
+                [],
+                [],
+                [],
+                statelessOrphans,
+                [],
+                false);
+        }
+
+        // Stateful path continues below...
         var allStateNames = states.Select(static state => state.Name).ToArray();
         var statesByName = states.ToDictionary(static state => state.Name, StringComparer.Ordinal);
         var graph = allStateNames.ToDictionary(static state => state, static _ => new HashSet<string>(StringComparer.Ordinal), StringComparer.Ordinal);
@@ -66,7 +95,7 @@ internal static class PreceptAnalysis
         }
 
         var reachable = new HashSet<string>(StringComparer.Ordinal);
-        if (!string.IsNullOrWhiteSpace(definition.InitialState.Name) && graph.ContainsKey(definition.InitialState.Name))
+        if (!string.IsNullOrWhiteSpace(definition.InitialState!.Name) && graph.ContainsKey(definition.InitialState!.Name))
         {
             var queue = new Queue<string>();
             queue.Enqueue(definition.InitialState.Name);

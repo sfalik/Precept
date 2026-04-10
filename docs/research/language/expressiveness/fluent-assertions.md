@@ -114,4 +114,6 @@ FluentAssertions lets you name and reuse assertion bundles (`BeActivePremiumUser
 
 ## Takeaway for Hero Sample
 
+The deeper distinction is governance vs validation: FluentAssertions checks assertions when the test runs. Precept's invariants hold structurally — the runtime prevents any operation from producing a result that violates them, not because someone called an assertion method.
+
 No change needed. The `invariant` + `on ... assert` pattern already matches FluentAssertions' expressiveness for the validation use cases a hero sample would demonstrate. The hero should show `invariant` and `on ... assert` together to demonstrate the data-truth vs. movement-truth distinction — a concept FluentAssertions conflates.

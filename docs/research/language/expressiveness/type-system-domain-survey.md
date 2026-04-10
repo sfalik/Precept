@@ -1,687 +1,272 @@
 # Type System Domain Survey
 
-**Date:** 2026-04-05  
-**Source:** 5 workflow platforms (ServiceNow, Salesforce, Dataverse/Power Apps, Camunda, Temporal) + 10 business-domain modeling exercises  
-**Relevance:** Validates proposal #25 (type system expansion — choice and date types) with real-world evidence. Directly feeds the type system sequencing decisions from the PM scoping session.
+**Research date:** 2026-05-14
+**Author:** George (Runtime Dev)
+**Relevance:** Domain evidence grounding for `choice` (#25), `date` (#26), `decimal` (#27), and `integer` (#29) — treated as one coherent type-system expansion pass.
 
 ---
 
-## Angle 1: Domain Modeling Exercise
+## Background and Problem
 
-For each domain, we list fields a real entity would need and map them to Precept's current type system. A **gap** means the field cannot be faithfully modeled with `string | number | boolean`.
+Precept's current scalar vocabulary is `string`, `number`, and `boolean`. That set is enough to compile almost any business domain, but it forces authors to encode semantic precision using runtime constraints and comments rather than in the type system. The result is a pattern that appears in nearly every sample file: `number` doing the work of three to five distinct concepts at once.
 
-### 1. Insurance Underwriting
+The pain has four distinct faces.
 
-| Field | Natural type | Precept today | Gap |
-|---|---|---|---|
-| policyType | choice (auto, home, life, health) | string | **choice** |
-| coverageLevel | choice (basic, standard, premium) | string | **choice** |
-| annualPremium | currency / decimal | number | — |
-| applicationDate | date | string | **date** |
-| effectiveDate | date | string | **date** |
-| riskScore | integer | number | — |
-| isHighRisk | boolean | boolean | — |
-| priorClaimCount | integer | number | — |
-| underwriterDecision | choice (approve, decline, refer) | string | **choice** |
+**Typo-vulnerable enumerations.** When a field holds one of a known set of values — document types, priority levels, status codes, departments — the only current option is `string` paired with invariants. The type checker has no knowledge of the allowed value set. `add MissingDocuments "Passportt"` compiles and fires; the typo is silent. Every domain survey confirms this: enumerable value sets are not an edge case. They are the majority of string fields in production entity models.
 
-### 2. Clinical Trials
+**Temporal logic via integer arithmetic.** Scheduling, due dates, expiry windows, and renewal tracking all require calendar reasoning. Precept's samples address this with `number` fields named `ScheduledDay`, `DueDay`, `CurrentDay`, and `PickupExpiryDay`. These are day-offset integers that authors mentally convert. Arithmetic like `DueDay - CurrentDay > 3` is semantically correct but loses the date domain entirely at the language level: no ISO 8601 format safety, no accessor for year or month components, no self-documenting type.
 
-| Field | Natural type | Precept today | Gap |
-|---|---|---|---|
-| trialPhase | choice (Phase I, Phase II, Phase III, Phase IV) | string | **choice** |
-| enrollmentDate | date | string | **date** |
-| dosageLevel | choice (low, medium, high, placebo) | string | **choice** |
-| adverseEventCount | integer | number | — |
-| participantAge | integer | number | — |
-| consentSigned | boolean | boolean | — |
-| targetEnrollment | integer | number | — |
-| actualEnrollment | integer | number | — |
-| completionDate | date | string | **date** |
-| outcomeCategory | choice (positive, negative, inconclusive) | string | **choice** |
+**Financial precision loss.** Precept's `number` type is IEEE 754 double-precision floating point. For comparisons and most arithmetic this is adequate. For financial values it silently introduces precision errors: `0.1 + 0.2` evaluates to `0.30000000000000004` at runtime. The corpus has more than a dozen monetary fields — `ClaimAmount`, `ApprovedAmount`, `LodgingTotal`, `MealsTotal`, `RequestedTotal`, `FineAmount` — all typed as `number`. Any equality check or summation against a `maxplaces 2` expectation is quietly wrong.
 
-### 3. Loan Servicing
+**Whole-number semantics on a fractional type.** Many fields are semantically discrete: `FeedbackCount`, `ReopenCount`, `RenewalCount`, `SeatsReserved`, `CreditScore`, `TripDays`. Typing these as `number` allows `set FeedbackCount = 2.7`, which violates the obvious intent. The absence of `integer` means no division-truncation contract, no narrowing-safety story, and no clean integration with collection `.count` results.
 
-| Field | Natural type | Precept today | Gap |
-|---|---|---|---|
-| loanType | choice (mortgage, auto, personal, student) | string | **choice** |
-| principalAmount | currency / decimal | number | — |
-| interestRate | decimal / percent | number | — |
-| originationDate | date | string | **date** |
-| maturityDate | date | string | **date** |
-| paymentFrequency | choice (monthly, biweekly, weekly) | string | **choice** |
-| daysDelinquent | integer | number | — |
-| delinquencyBucket | choice (current, 30, 60, 90, 120+) | string | **choice** |
-| isInDefault | boolean | boolean | — |
-| creditScore | integer | number | — |
-
-### 4. Supply Chain / Procurement
-
-| Field | Natural type | Precept today | Gap |
-|---|---|---|---|
-| orderDate | date | string | **date** |
-| expectedDelivery | date | string | **date** |
-| actualDelivery | date | string | **date** |
-| priority | choice (standard, expedited, critical) | string | **choice** |
-| quantity | integer | number | — |
-| unitPrice | currency / decimal | number | — |
-| supplierRating | choice (preferred, approved, probationary) | string | **choice** |
-| inspectionResult | choice (pass, fail, conditional) | string | **choice** |
-| isHazmat | boolean | boolean | — |
-| shipmentMethod | choice (ground, air, sea, rail) | string | **choice** |
-
-### 5. Employee Onboarding
-
-| Field | Natural type | Precept today | Gap |
-|---|---|---|---|
-| hireDate | date | string | **date** |
-| startDate | date | string | **date** |
-| department | choice (engineering, sales, marketing, ops, hr, finance) | string | **choice** |
-| employmentType | choice (full-time, part-time, contractor, intern) | string | **choice** |
-| backgroundCheckPassed | boolean | boolean | — |
-| salaryBand | choice (L1, L2, L3, L4, L5) | string | **choice** |
-| badgeIssued | boolean | boolean | — |
-| itProvisioningComplete | boolean | boolean | — |
-| probationEndDate | date | string | **date** |
-| relocating | boolean | boolean | — |
-
-### 6. SaaS Billing
-
-| Field | Natural type | Precept today | Gap |
-|---|---|---|---|
-| planTier | choice (free, starter, pro, enterprise) | string | **choice** |
-| billingCycle | choice (monthly, annual) | string | **choice** |
-| monthlyAmount | currency / decimal | number | — |
-| trialStartDate | date | string | **date** |
-| trialEndDate | date | string | **date** |
-| seatCount | integer | number | — |
-| paymentMethod | choice (credit-card, invoice, ACH) | string | **choice** |
-| isDelinquent | boolean | boolean | — |
-| lastPaymentDate | date | string | **date** |
-| discountPercent | decimal / percent | number | — |
-
-### 7. Real Estate Closing
-
-| Field | Natural type | Precept today | Gap |
-|---|---|---|---|
-| propertyType | choice (single-family, condo, multi-family, commercial) | string | **choice** |
-| listingDate | date | string | **date** |
-| offerDate | date | string | **date** |
-| closingDate | date | string | **date** |
-| salePrice | currency / decimal | number | — |
-| escrowAmount | currency / decimal | number | — |
-| inspectionStatus | choice (pending, passed, failed, waived) | string | **choice** |
-| financingType | choice (conventional, FHA, VA, cash) | string | **choice** |
-| titleClear | boolean | boolean | — |
-| appraisalComplete | boolean | boolean | — |
-
-### 8. Regulatory Compliance (Financial)
-
-| Field | Natural type | Precept today | Gap |
-|---|---|---|---|
-| reportingPeriod | choice (Q1, Q2, Q3, Q4, annual) | string | **choice** |
-| filingDeadline | date | string | **date** |
-| submissionDate | date | string | **date** |
-| jurisdiction | choice (federal, state, EU, UK) | string | **choice** |
-| complianceStatus | choice (compliant, non-compliant, remediation) | string | **choice** |
-| findingCount | integer | number | — |
-| penaltyAmount | currency / decimal | number | — |
-| auditorAssigned | boolean | boolean | — |
-| remediationDeadline | date | string | **date** |
-| isMaterialWeakness | boolean | boolean | — |
-
-### 9. Manufacturing Quality Control
-
-| Field | Natural type | Precept today | Gap |
-|---|---|---|---|
-| batchDate | date | string | **date** |
-| inspectionType | choice (incoming, in-process, final, audit) | string | **choice** |
-| defectCategory | choice (cosmetic, functional, safety, dimensional) | string | **choice** |
-| defectCount | integer | number | — |
-| sampleSize | integer | number | — |
-| toleranceMin | decimal | number | — |
-| toleranceMax | decimal | number | — |
-| measuredValue | decimal | number | — |
-| dispositionDecision | choice (accept, rework, scrap, hold) | string | **choice** |
-| passRate | decimal / percent | number | — |
-
-### 10. Legal Case Management
-
-| Field | Natural type | Precept today | Gap |
-|---|---|---|---|
-| caseType | choice (civil, criminal, family, corporate, IP) | string | **choice** |
-| filingDate | date | string | **date** |
-| trialDate | date | string | **date** |
-| courtType | choice (district, appellate, supreme, arbitration) | string | **choice** |
-| claimedAmount | currency / decimal | number | — |
-| billedHours | decimal | number | — |
-| priority | choice (low, normal, high, urgent) | string | **choice** |
-| discoveryDeadline | date | string | **date** |
-| isProBono | boolean | boolean | — |
-| caseDisposition | choice (settled, dismissed, verdict, ongoing) | string | **choice** |
-
-### Domain Modeling Summary
-
-Across 100 fields modeled in 10 domains:
-
-| Gap type | Occurrences | Domains affected |
-|---|---|---|
-| **choice** (enum/picklist) | **41** | 10/10 |
-| **date** | **30** | 10/10 |
-| integer (subtype of number) | 0 explicit gaps (number works) | — |
-| currency/decimal | 0 explicit gaps (number works) | — |
-
-**Every single domain** requires both choice and date. The `string` workaround survives at runtime but provides zero compile-time validation — a guard like `when status = "Approvd"` (typo) compiles and runs without error.
+The internal research supports this diagnosis. `expression-language-audit.md` section 1.5 documents the type system limits as a root cause of expression verbosity. `internal-verbosity-analysis.md` identifies the non-negative invariant boilerplate as the third-largest verbosity smell in the corpus; with properly typed fields, many of those invariants move into field-level constraint suffixes or disappear entirely.
 
 ---
 
-## Angle 2: Workflow Platform Survey
+## Sample Corpus Analysis
 
-### ServiceNow
+The 21 sample files contain 127 unique field declarations. This section classifies each mistyped `number` field by the type it should carry under an expanded type system, and identifies `string` fields whose value sets are clearly enumerable.
 
-**Source:** ServiceNow GlideRecord API documentation, platform field type reference
+### Fields that should become `integer`
 
-| Platform type | Precept equivalent | Notes |
+| Field | Sample | Why |
 |---|---|---|
-| String | string | — |
-| Boolean (True/False) | boolean | — |
-| Integer | number | Dedicated integer type |
-| Decimal | number | Separate from integer |
-| Floating Point Number | number | IEEE 754 |
-| GlideDate | **none** | Date-only type |
-| GlideDateTime | **none** | Date + time type |
-| GlideDuration | **none** | Duration type |
-| Choice | **none** | Enumerated picklist |
-| Currency | number | Dedicated currency type |
-| Reference | **none** | FK to another table |
-| Encrypted Text | string | — |
+| `CreditScore as number default 0` | loan-application, apartment-rental-application | Integer scoring scale (300-850) |
+| `HouseholdSize as number default 1` | apartment-rental-application | Discrete count of persons |
+| `LowestRequestedFloor as number default 0` | building-access-badge-request | Floor number, whole only |
+| `HighestRequestedFloor as number default 0` | building-access-badge-request | Floor number, whole only |
+| `ScheduledMinute as number default 0` | clinic-appointment-scheduling | Minute-of-day, whole only |
+| `CycleCount as number default 0` | crosswalk-signal | Cycle counter |
+| `CountdownSeconds as number default 0` | crosswalk-signal | Timer, whole seconds |
+| `SeatsReserved as number default 0` | event-registration | Seat count |
+| `TicketsIssued as number default 0` | event-registration | Ticket count |
+| `FeedbackCount as number default 0` | hiring-pipeline | Interview feedback count |
+| `Severity as number default 3` | it-helpdesk-ticket | Ordinal severity level (1-5) |
+| `ReopenCount as number default 0` | it-helpdesk-ticket | Reopen event counter |
+| `RenewalCount as number default 0` | library-book-checkout | Renewal counter |
+| `TripDays as number default 1` | travel-reimbursement | Duration in whole days |
+| `DispatchRound as number default 0` | utility-outage-report | Dispatch round counter |
+| `VehiclesWaiting as number default 0` | restaurant-waitlist | Vehicle count |
+| `EstimatedCustomers as number default 0` | restaurant-waitlist | Customer count |
+| `ReminderCount as number default 0` | library-hold-request | Reminder counter |
+| `EstimatedHours as number default 0` | maintenance-work-order | Duration in whole hours |
+| `ActualHours as number default 0` | maintenance-work-order | Duration in whole hours |
+| `ApprovedWorkCount as number default 0` | maintenance-work-order | Work item count |
 
-**Key insight:** ServiceNow treats date, datetime, and duration as three separate types. Choice is a first-class field type with platform-enforced validation.
+**Count: 21 fields** across 14 sample files — roughly 17 percent of all field declarations.
 
-### Salesforce
+### Fields that should become `decimal`
 
-**Source:** Salesforce Field Types reference (developer.salesforce.com)
-
-| Platform type | Precept equivalent | Notes |
+| Field | Sample | Why |
 |---|---|---|
-| string | string | — |
-| boolean | boolean | — |
-| int | number | — |
-| double | number | — |
-| date | **none** | Date-only |
-| dateTime | **none** | Date + time |
-| currency | number | With locale formatting |
-| picklist | **none** | Single-select enumeration |
-| multipicklist | **none** | Multi-select enumeration |
-| email | string | Validated string format |
-| phone | string | Validated string format |
-| url | string | Validated string format |
-| percent | number | Display-only distinction |
-| reference (ID) | **none** | FK to another object |
-| address | **none** | Compound type |
-| location | **none** | Geolocation (lat/long) |
+| `ClaimAmount as number default 0` | insurance-claim | Financial amount — precision required |
+| `ApprovedAmount as number default 0` | insurance-claim, loan-application | Financial amount |
+| `RequestedAmount as number default 0` | loan-application | Financial amount |
+| `AnnualIncome as number default 0` | loan-application | Income — exact comparison required |
+| `ExistingDebt as number default 0` | loan-application | Debt — exact comparison required |
+| `LodgingTotal as number default 0` | travel-reimbursement | Financial subtotal |
+| `MealsTotal as number default 0` | travel-reimbursement | Financial subtotal |
+| `MileageTotal as number default 0` | travel-reimbursement | Financial subtotal |
+| `MileageRate as number default 0.67` | travel-reimbursement | Per-mile rate — exact |
+| `RequestedTotal as number default 0` | travel-reimbursement | Financial total |
+| `ApprovedTotal as number default 0` | travel-reimbursement | Financial total |
+| `MonthlyIncome as number default 0` | apartment-rental-application | Income amount |
+| `RequestedRent as number default 0` | apartment-rental-application | Rent amount |
+| `AmountDue as number default 0` | event-registration | Payment amount |
+| `FineAmount as number default 0` | library-book-checkout | Library fine — exact arithmetic |
+| `OfferAmount as number default 0` | hiring-pipeline | Salary offer |
+| `MonthlyPrice as number default 0` | subscription-cancellation-retention | Subscription price |
+| `RetentionDiscount as number default 0` | subscription-cancellation-retention | Discount amount |
+| `InvoiceTotal as number default 0` | warranty-repair-request | Invoice amount |
 
-**Key insight:** Salesforce distinguishes picklist (single-select) from multipicklist (multi-select). Both are first-class types with platform-enforced values. Date and dateTime are separate types.
+**Count: 19 fields** across 11 sample files — 15 percent of all field declarations.
 
-### Dataverse / Power Apps
+### Fields that should become `date` (after `date` type lands)
 
-**Source:** Microsoft Dataverse types-of-fields documentation
-
-| Platform type | Precept equivalent | Notes |
+| Field | Sample | Why |
 |---|---|---|
-| Text / Multiline Text | string | — |
-| Yes/No (Boolean) | boolean | — |
-| Whole Number | number | Dedicated integer |
-| Decimal Number | number | — |
-| Floating Point Number | number | — |
-| Currency | number | With currency metadata |
-| Date Only | **none** | Date without time |
-| Date and Time | **none** | Full datetime |
-| Duration | **none** | Time span |
-| Choice (picklist) | **none** | Single-select enum |
-| Choices (multi-select) | **none** | Multi-select enum |
-| Status / Status Reason | **none** | Special state enum |
-| Lookup | **none** | FK reference |
-| Email / Phone / URL | string | Validated formats |
-| File / Image | **none** | Binary data |
-| Big Integer | number | 64-bit integer |
-| Timezone / Language | **none** | Specialized enums |
+| `ScheduledDay as number default 0` | clinic-appointment-scheduling | Calendar appointment date |
+| `CurrentDay as number default 0` | library-book-checkout, library-hold-request | Today's date anchor |
+| `CheckoutDay as number default 0` | library-book-checkout | Checkout date |
+| `DueDay as number default 0` | library-book-checkout | Due date |
+| `PickupExpiryDay as number default 0` | library-hold-request | Expiry date |
+| `LastReminderDay as number default 0` | library-hold-request | Last reminder sent date |
 
-**Key insight:** Dataverse has a dedicated Status + Status Reason pair — effectively a state machine type built into the platform. Choice and Choices are separate types. Date Only vs Date and Time are separate.
+**Count: 6 fields** (some overlap with the integer column above — the day-offset pattern is a pre-`date` workaround that will migrate to `date` after #26 lands).
 
-### Camunda
+### Fields that should become `choice`
 
-**Source:** Camunda 7 Process Engine (docs.camunda.org), Camunda 8/Zeebe (docs.camunda.io)
+The sample set deliberately avoids enumerations because `choice` does not yet exist. Several fields are semantically constrained value sets nonetheless:
 
-**Camunda 7 (classic):**
-
-| Platform type | Precept equivalent | Notes |
+| Field | Sample | Likely values |
 |---|---|---|
-| string | string | — |
-| boolean | boolean | — |
-| integer | number | java.lang.Integer |
-| short | number | java.lang.Short |
-| long | number | java.lang.Long |
-| double | number | java.lang.Double |
-| date | **none** | java.util.Date |
-| null | — | Null reference |
-| bytes | **none** | Raw byte array |
-| file | **none** | File with metadata |
-| object | **none** | Serialized Java object |
+| `Severity as number default 3` | it-helpdesk-ticket | `choice("Low","Medium","High","Critical") ordered` |
+| `Department as string nullable` | building-access-badge-request | Organization-specific set |
+| `MissingDocuments as set of string` | insurance-claim | `set of choice("ID","ProofOfAddress","PoliceReport","MedicalRecord")` |
 
-**Camunda 8 (Zeebe):**
-
-| Platform type | Precept equivalent | Notes |
-|---|---|---|
-| String | string | JSON string |
-| Number | number | JSON number (int or float) |
-| Boolean | boolean | JSON boolean |
-| Array | **none** | JSON array |
-| Object | **none** | JSON object |
-| Null | — | JSON null |
-
-**Key insight:** Camunda 8's radical simplification to JSON-native types proves that a minimal type system can work for workflow orchestration. However, Camunda 8 pushes type complexity to the host language and external systems — it deliberately does *not* validate field values at the process definition level. Camunda 7's richer type set (with `date`, `integer`, `long`) reflects what business processes actually need when the engine does perform type checking.
-
-### Temporal
-
-**Source:** Temporal TypeScript SDK documentation (docs.temporal.io)
-
-| Platform type | Precept equivalent | Notes |
-|---|---|---|
-| (any serializable value) | — | No platform-level types |
-
-**Key insight:** Temporal has **no type system at the variable level**. Workflow and Activity parameters must be "serializable" (JSON by default), and all typing is delegated to the host language (TypeScript, Go, Java, Python). This is the opposite end of the spectrum from ServiceNow/Salesforce/Dataverse.
-
-Temporal's approach works because it is a *workflow orchestrator*, not a *business entity definition system*. Precept is the latter — it defines entity contracts — so delegating all typing to the host would defeat its purpose.
-
-### Platform Survey Summary
-
-| Type concept | ServiceNow | Salesforce | Dataverse | Camunda 7 | Camunda 8 | Temporal | Count |
-|---|---|---|---|---|---|---|---|
-| **Choice / Enum** | ✓ | ✓ | ✓ | — | — | — | **3/5** (all entity-centric) |
-| **Date** | ✓ | ✓ | ✓ | ✓ | — | — | **4/5** |
-| **Integer** | ✓ | ✓ | ✓ | ✓ | — | — | **4/5** |
-| **Decimal / Float** | ✓ | ✓ | ✓ | ✓ | — | — | **4/5** |
-| **Currency** | ✓ | ✓ | ✓ | — | — | — | **3/5** |
-| **Duration** | ✓ | — | ✓ | — | — | — | **2/5** |
-| String | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | 6/6 |
-| Boolean | ✓ | ✓ | ✓ | ✓ | ✓ | — | 5/6 |
-| Number (untyped) | — | — | — | — | ✓ | ✓ | 2/6 |
-| Reference / Lookup | ✓ | ✓ | ✓ | — | — | — | 3/5 |
-
-The three platforms that define business entities (ServiceNow, Salesforce, Dataverse) **all** have choice/enum and date as first-class types. The two platforms that are pure workflow orchestrators (Camunda 8, Temporal) rely on the host language for typing.
-
-Precept is an entity-definition system, not a workflow orchestrator. This places it squarely in the ServiceNow/Salesforce/Dataverse category, where choice and date are non-negotiable.
+The domain-level evidence for `choice` comes from the broader 10-domain exercise below, not these three examples. The samples are conservative because authors cannot yet write `choice(...)`.
 
 ---
 
-## Synthesis
+## 10-Domain Field Count Survey
 
-### Type tiers
+This consolidates the field surveys from proposal bodies for #25, #26, #27, and #29 into one durable table. The survey covers 100 fields across 10 business domains: insurance underwriting, clinical trials, loan servicing, supply chain, employee onboarding, SaaS billing, real estate closing, regulatory compliance, manufacturing quality control, and legal case management.
 
-| Tier | Type | Evidence strength | Recommendation |
+| Type | Fields (of 100) | Domains that need it | Example fields |
 |---|---|---|---|
-| **Universal** | choice (enum/picklist) | 41/100 domain fields; 3/3 entity platforms | **Must add.** Ship first. |
-| **Universal** | date | 30/100 domain fields; 4/5 platforms (including Camunda 7) | **Must add.** Ship with or immediately after choice. |
-| **Common** | integer (subtype of number) | 4/5 platforms distinguish it; 0 domain fields *blocked* by `number` | **Defer.** `number` workaround is tolerable. Revisit if expression expansion (#16 numeric functions) needs integer semantics. |
-| **Common** | currency / decimal | 3/5 platforms; 0 domain fields blocked | **Defer.** Same position as integer — `number` works. |
-| **Nice-to-have** | duration | 2/5 platforms; 0 domain fields in our 10 domains | **Defer indefinitely.** Can model as `number` (minutes) or `string` (ISO 8601). |
-| **Non-goal** | reference / lookup | 3/3 entity platforms; but requires cross-precept linking | **Out of scope.** Precept defines single entities; cross-entity references belong to the hosting system. |
-| **Non-goal** | record / struct | 0 platforms use it as a field type (objects are runtime-only in Camunda 8) | **Confirmed non-goal.** Conflicts with flat-field philosophy. |
+| `choice` | 41 | 10 of 10 | document type, priority level, status code, department, currency code, claim category |
+| `date` | 30 | 10 of 10 | filing date, enrollment date, due date, contract end date, payment date, decision date |
+| `decimal` | 16 | 9 of 10 | premium amount, loan balance, unit price, penalty rate, billing amount, manufacturing tolerance |
+| `integer` | 11 | 7 of 10 | participant count, adverse event count, seat count, days delinquent, credit score, risk score |
+| `string` | ~15 | — | free text, names, identifiers, notes |
+| `boolean` | ~10 | — | flags, binary status indicators |
+| `number` | ~3 | — | computed ratios, floating-point measurements (sensor values, scientific readings) |
+| collections | ~5 | — | document queues, step stacks, multi-value attributes |
 
-### Revised recommendation for Precept
-
-1. **Choice (enum) is the #1 priority.** It appears in every domain, and the `string` workaround provides zero compile-time safety. A typo in a guard value (`"Approvd"` vs `"Approved"`) is currently invisible. Choice would enable the type checker to catch these at compile time.
-
-2. **Date is the #2 priority.** It appears in every domain and cannot be meaningfully manipulated as a `string`. Without a date type, Precept cannot express guards like "when daysOverdue > 30" where `daysOverdue` depends on the current date and a stored date field.
-
-3. **Integer and currency remain deferred.** The `number` type covers the domain adequately. No sample file or domain exercise produced a field that *could not be modeled* with `number`. The gap is precision semantics, not modeling capability.
-
-4. **Proposal #25 (choice + date) is fully validated.** The domain survey confirms that these are the exact two types needed. The proposal scope does not need to expand.
-
-### Key finding: the "string enum" problem
-
-The most impactful finding is not about dates — it's about **choice fields and typo safety**. Consider a Precept guard:
-
-```
-from Pending on Approve
-  when status = "Approvd"    ← typo: compiles, runs, never matches
-  transition Approved
-```
-
-With a `choice` type, the type checker could flag `"Approvd"` as not a valid member of the choice set. This is the same value proposition that TypeScript enums, Salesforce picklists, and Dataverse choices provide — and it's the gap most likely to cause real production bugs in Precept definitions today.
+After the type expansion, `number` drops from the type of roughly 98 numeric fields to the type of approximately 3 floating-point-appropriate fields. This is the most significant single shift in Precept's type model.
 
 ---
 
-## Methodology notes
+## Cross-Category Precedent Survey
 
-- **Domain modeling:** Fields chosen by analyzing what a real-world entity of each type would need at its state transitions, not what a UI form would display. We focused on fields that appear in guards, mutations, or invariants.
-- **Platform survey:** Data gathered from official documentation. ServiceNow data supplemented from GlideRecord API reference.
-- **Gap counting:** A "gap" means Precept's current type cannot provide compile-time validation that the host platform's native type provides. `number` covering both integer and decimal is counted as "no gap" because the workaround loses no modeling capability (only precision metadata).
-
----
-
-## Beyond v1 — Domain-Driven Type Needs
-
-**Date:** 2026-04-05  
-**Context:** v1 type system expansion ships `choice` and `date`. This section looks at the longer horizon — what types will real business domains eventually demand beyond those two?
-
-### Domain Deep Dive (Post-Choice, Post-Date)
-
-For each of the 10 original domains, we now ask: **which fields still can't be expressed well** even after `choice` and `date` ship? We examine the residual gaps across eight cross-cutting patterns.
-
-#### 1. Insurance Underwriting
-
-| Field | Natural type | Precept after v1 | Residual gap |
-|---|---|---|---|
-| annualPremium | currency (USD 1,247.50) | number | **currency** — loses currency code, precision semantics |
-| applicantEmail | email | string | **formatted string** — no format validation |
-| applicantPhone | phone | string | **formatted string** |
-| proofDocuments | attachment ref list | — | **attachment/external ref** — no way to reference external artifacts |
-| riskAssessmentNotes | long text | string | — (string is adequate) |
-| coveragePeriod | duration (12 months) | number | **duration** — "12 months" vs "365 days" distinction lost |
-
-#### 2. Clinical Trials
-
-| Field | Natural type | Precept after v1 | Residual gap |
-|---|---|---|---|
-| participantAge | integer | number | **integer** — fractional ages nonsensical |
-| adverseEventCount | integer | number | **integer** |
-| dosageMg | decimal with unit | number | **unit-bearing numeric** — mg vs mcg distinction |
-| principalInvestigatorEmail | email | string | **formatted string** |
-| consentDocumentRef | attachment ref | — | **attachment/external ref** |
-| washoutPeriod | duration (14 days) | number | **duration** |
-
-#### 3. Loan Servicing
-
-| Field | Natural type | Precept after v1 | Residual gap |
-|---|---|---|---|
-| principalAmount | currency (USD) | number | **currency** — precision (2 decimal places) and currency code |
-| interestRate | percentage (4.75%) | number | **percentage** — semantic: is 4.75 the rate or is 0.0475? |
-| monthlyPayment | currency | number | **currency** |
-| daysDelinquent | integer | number | **integer** — fractional days impossible |
-| gracePeriod | duration (15 days) | number | **duration** |
-| borrowerEmail | email | string | **formatted string** |
-| borrowerPhone | phone | string | **formatted string** |
-
-#### 4. Supply Chain / Procurement
-
-| Field | Natural type | Precept after v1 | Residual gap |
-|---|---|---|---|
-| unitPrice | currency | number | **currency** |
-| totalOrderValue | currency | number | **currency** |
-| quantity | integer | number | **integer** — 2.7 boxes nonsensical |
-| supplierWebsite | URL | string | **formatted string** |
-| deliveryAddress | structured address | string | **structured data** — street, city, state, zip as flat string |
-| transitTime | duration (3-5 business days) | number | **duration** |
-| packingSlipRef | attachment ref | — | **attachment/external ref** |
-
-#### 5. Employee Onboarding
-
-| Field | Natural type | Precept after v1 | Residual gap |
-|---|---|---|---|
-| annualSalary | currency | number | **currency** |
-| probationLength | duration (90 days) | number | **duration** |
-| contactEmail | email | string | **formatted string** |
-| contactPhone | phone | string | **formatted string** |
-| emergencyContactPhone | phone | string | **formatted string** |
-| signedOfferLetterRef | attachment ref | — | **attachment/external ref** |
-| seatCount | integer | number | **integer** |
-
-#### 6. SaaS Billing
-
-| Field | Natural type | Precept after v1 | Residual gap |
-|---|---|---|---|
-| monthlyAmount | currency | number | **currency** |
-| discountPercent | percentage (15%) | number | **percentage** |
-| seatCount | integer | number | **integer** |
-| billingContactEmail | email | string | **formatted string** |
-| invoiceDocumentRef | attachment ref | — | **attachment/external ref** |
-| trialDuration | duration (14 days) | number | **duration** |
-| accountPortalUrl | URL | string | **formatted string** |
-
-#### 7. Real Estate Closing
-
-| Field | Natural type | Precept after v1 | Residual gap |
-|---|---|---|---|
-| salePrice | currency | number | **currency** |
-| escrowAmount | currency | number | **currency** |
-| earnestMoneyDeposit | currency | number | **currency** |
-| commissionPercent | percentage (6%) | number | **percentage** |
-| propertyAddress | structured address | string | **structured data** |
-| inspectionReportRef | attachment ref | — | **attachment/external ref** |
-| titleDocumentRef | attachment ref | — | **attachment/external ref** |
-| buyerEmail | email | string | **formatted string** |
-
-#### 8. Regulatory Compliance (Financial)
-
-| Field | Natural type | Precept after v1 | Residual gap |
-|---|---|---|---|
-| penaltyAmount | currency | number | **currency** |
-| findingCount | integer | number | **integer** |
-| complianceRate | percentage | number | **percentage** |
-| regulatorEmail | email | string | **formatted string** |
-| filingDocumentRef | attachment ref | — | **attachment/external ref** |
-| remediationWindow | duration (60 days) | number | **duration** |
-| regulatorPortalUrl | URL | string | **formatted string** |
-
-#### 9. Manufacturing Quality Control
-
-| Field | Natural type | Precept after v1 | Residual gap |
-|---|---|---|---|
-| defectCount | integer | number | **integer** |
-| sampleSize | integer | number | **integer** |
-| passRate | percentage (98.5%) | number | **percentage** |
-| toleranceMin | decimal (4 places) | number | — (number is fine) |
-| toleranceMax | decimal (4 places) | number | — |
-| batchCertificateRef | attachment ref | — | **attachment/external ref** |
-| shiftDuration | duration (8 hours) | number | **duration** |
-
-#### 10. Legal Case Management
-
-| Field | Natural type | Precept after v1 | Residual gap |
-|---|---|---|---|
-| claimedAmount | currency | number | **currency** |
-| billedHours | decimal | number | — |
-| hourlyRate | currency | number | **currency** |
-| clientEmail | email | string | **formatted string** |
-| clientPhone | phone | string | **formatted string** |
-| courtFilingRef | attachment ref | — | **attachment/external ref** |
-| discoveryPeriod | duration (90 days) | number | **duration** |
-| settlementPercent | percentage | number | **percentage** |
-
-### Residual Gap Summary (Post-v1)
-
-| Gap pattern | Occurrences | Domains affected | Current workaround | Workaround quality |
-|---|---|---|---|---|
-| **currency** | 16 | 9/10 | `number` | Tolerable — loses currency code and precision guarantee |
-| **integer** | 11 | 7/10 | `number` | Tolerable — no way to prevent fractional assignment |
-| **formatted string** (email/phone/URL) | 19 | 10/10 | `string` | Tolerable — zero format validation |
-| **attachment / external ref** | 12 | 10/10 | not expressible | **No workaround** — Precept has no way to reference external artifacts |
-| **duration** | 10 | 10/10 | `number` | Tolerable — loses unit semantics ("days" vs "months" vs "hours") |
-| **percentage** | 7 | 6/10 | `number` | Tolerable — ambiguous whether 4.75 means 4.75% or 0.0475 |
-| **structured data** (address) | 2 | 2/10 | `string` | Poor — flattened into one string field or spread across multiple strings |
-
-### Platform Pattern Analysis (Post-v1)
-
-#### ServiceNow — Types Beyond choice + date
-
-| Platform type | Status in Precept post-v1 | Usage frequency | Notes |
-|---|---|---|---|
-| Currency | Not covered | High — every financial record | Separate type with currency code metadata |
-| GlideDuration | Not covered | Medium — SLA management | ISO 8601 duration; distinct from date/datetime |
-| Reference (FK) | Not covered | Very high | FK to another table — core relational concept |
-| Encrypted Text | Not relevant | Low | Security concern, not type semantics |
-| Email | `string` | Medium | Validated format |
-| Phone Number | `string` | Medium | Validated format |
-| URL | `string` | Medium | Validated format |
-| IP Address | `string` | Low | Validated format |
-| Journal / Journal Input | `string` | Medium | Append-only audit log — actually a **log-type** |
-
-**New finding:** ServiceNow's **Journal** type is an append-only text field used for work notes and comments. It represents a pattern we haven't considered: **append-only audit/log fields** that accumulate over time rather than being overwritten.
-
-#### Salesforce — Types Beyond choice + date
-
-| Platform type | Status in Precept post-v1 | Usage frequency | Notes |
-|---|---|---|---|
-| currency | Not covered | High | Double with CurrencyIsoCode linked field |
-| percent | Not covered | Medium | Display distinction; stored as double |
-| email | `string` | High | First-class validated format |
-| phone | `string` | High | First-class validated format |
-| url | `string` | Medium | First-class validated format |
-| reference (ID) | Not covered | Very high | FK to another Salesforce object |
-| address | Not covered | Medium | **Compound type**: Street, City, State, PostalCode, Country |
-| location | Not covered | Low | Geolocation (latitude/longitude pair) |
-| multipicklist | Partially covered (choice is single-select) | Medium | Multi-select enumeration — `set<choice>` equivalent |
-| textarea | `string` | Medium | Long text (no WHERE clause filtering) |
-| calculated (formula) | Not applicable | High | Derived field — computed, not stored |
-| combobox | Not covered | Low | Picklist + freeform — hybrid pattern |
-| encryptedstring | `string` | Low | Security, not type semantics |
-| anyType | Not applicable | Internal | Polymorphic — used for history tracking |
-
-**New finding:** Salesforce's **multipicklist** is interesting because it's a multi-select version of picklist. In Precept post-v1, `set<choice>` could potentially model this if `choice` is allowed as a collection inner type. Salesforce also has **calculated/formula fields** which are derived at read-time — a concept Precept doesn't have and shouldn't add (Precept fields are always explicitly mutated by events).
-
-#### Dataverse / Power Apps — Types Beyond choice + date
-
-| Platform type | Status in Precept post-v1 | Usage frequency | Notes |
-|---|---|---|---|
-| Currency | Not covered | High | With currency metadata and transaction currency lookups |
-| Duration | Not covered | Medium | Time span — used heavily in scheduling and SLA |
-| Choices (multi-select) | Partially covered | Medium | Multi-select picklist, parallel to Salesforce multipicklist |
-| Lookup | Not covered | Very high | FK reference to another entity |
-| File | Not covered | Medium | Binary file with metadata |
-| Image | Not covered | Medium | Image with thumbnail generation |
-| Status / Status Reason | Covered (this IS Precept's state model) | N/A | Precept's state machine is natively stronger |
-| Big Integer | `number` | Low | 64-bit integer |
-| Timezone | Not covered | Low | Specialized enum (same as choice) |
-| Language | Not covered | Low | Specialized enum (same as choice) |
-| Auto Number | Not applicable | Medium | System-generated sequential identifiers |
-
-**New finding:** Dataverse's **Status / Status Reason** is precisely what Precept already models with its state machine. This is a strong validation signal: Precept's core abstraction replaces what other platforms encode as a special field type.
-
-**New finding:** Dataverse has **Auto Number** — system-generated sequential identifiers. This is an anti-pattern for Precept because precept definitions are stateless contracts; ID generation belongs to the hosting system.
-
-#### Camunda 8 (FEEL) — Types Beyond choice + date
-
-Camunda's FEEL expression language (confirmed via live docs) actually has a richer type system than Camunda 8's process variable types:
-
-| FEEL type | Status in Precept post-v1 | Notes |
-|---|---|---|
-| date | Covered (v1) | `date("2017-03-10")` or `@"2017-03-10"` |
-| time | Not covered | Local or zoned time without date |
-| date-time | Not covered | Combined date + time |
-| days-time-duration | Not covered | Based on seconds: `duration("P4D")`, `@"PT2H"` |
-| years-months-duration | Not covered | Calendar-based: `duration("P1Y6M")` |
-| list | Partially covered | Precept has `set`, `queue`, `stack` — but not general-purpose lists |
-| context | Not covered | Key-value map — Precept doesn't have maps |
-
-**New finding:** FEEL distinguishes **two kinds of duration**: days-time-duration (based on seconds/hours/days) and years-months-duration (based on calendar months/years). This distinction matters for business rules: "30 days" and "1 month" are different periods depending on which month. If Precept ever adds duration, this design choice will need resolution.
-
-#### Temporal — Types Beyond choice + date
-
-Temporal remains type-agnostic; all typing is delegated to the host language (TypeScript, Go, Java, Python). No new types to report beyond the initial survey.
-
-**Key observation:** Temporal's approach of "serialize anything" works because it is a workflow orchestrator that deliberately pushes business logic to application code. Precept is the opposite — it **encodes** business rules in the definition. This reaffirms that Precept needs a richer type system than Temporal, closer to the ServiceNow/Salesforce/Dataverse tier.
-
-### Platform Survey Summary (Beyond v1)
-
-| Type concept | ServiceNow | Salesforce | Dataverse | Camunda FEEL | Temporal | Platform count |
+| Category | System | Constrained-value model | Calendar-date model | Exact-numeric model | Whole-number model | Precept implication |
 |---|---|---|---|---|---|---|
-| **Currency** | ✓ | ✓ | ✓ | — | — | **3/5** (all entity platforms) |
-| **Duration** | ✓ | — | ✓ | ✓ (two kinds) | — | **3/5** |
-| **Email** (validated string) | ✓ | ✓ | ✓ | — | — | **3/5** |
-| **Phone** (validated string) | ✓ | ✓ | ✓ | — | — | **3/5** |
-| **URL** (validated string) | ✓ | ✓ | ✓ | — | — | **3/5** |
-| **Reference / Lookup** | ✓ | ✓ | ✓ | — | — | **3/5** |
-| **Address** (compound) | — | ✓ | — | — | — | **1/5** |
-| **Location** (geolocation) | — | ✓ | — | — | — | **1/5** |
-| **File / Image** | — | — | ✓ | — | — | **1/5** |
-| **Multipicklist** | — | ✓ | ✓ | — | — | **2/5** |
-| **Time** (without date) | — | — | — | ✓ | — | **1/5** |
-| **Integer** (distinct) | ✓ | ✓ | ✓ | — | — | **3/5** |
-| **Percentage** | — | ✓ | — | — | — | **1/5** |
-| **Journal / audit log** | ✓ | — | — | — | — | **1/5** |
-| **Calculated / formula** | — | ✓ | — | — | — | **1/5** |
+| **Databases** | PostgreSQL | `CREATE TYPE AS ENUM` — closed universe, ordering via `USING` clause, `=ANY(ARRAY[...])` membership. [Docs](https://www.postgresql.org/docs/current/datatype-enum.html) | `DATE` (day only), `TIME`, `TIMESTAMP`, `TIMESTAMPTZ` — tz-naive and tz-aware are separate types. [Docs](https://www.postgresql.org/docs/current/datatype-datetime.html) | `DECIMAL(p,s)` / `NUMERIC(p,s)` exact base-10. `MONEY` exists but community guidance says do not use it: rounding behavior is locale-dependent. [Docs](https://www.postgresql.org/docs/current/datatype-numeric.html) | `INTEGER` (32-bit), `BIGINT` (64-bit). Float and integer are distinct. | Enum as closed universe confirms `choice`. Separate `DATE` without time confirms v1 day-only scope. `DECIMAL` without `MONEY` directly supports Precept's naming decision. |
+| **Databases** | SQL Server | No `ENUM` type; constrained strings use `CHECK` constraints or lookup tables. | `DATE` (day only), `DATETIME2`, `DATETIMEOFFSET` (tz-aware). Separate types for separate needs. [Docs](https://learn.microsoft.com/en-us/sql/t-sql/data-types/date-transact-sql) | `DECIMAL(p,s)` / `NUMERIC(p,s)`. `MONEY` / `SMALLMONEY` exist; documentation recommends `DECIMAL` for financial calculations to avoid division rounding issues. [Docs](https://learn.microsoft.com/en-us/sql/t-sql/data-types/decimal-and-numeric-transact-sql) | `INT` (32-bit), `BIGINT` (64-bit), `TINYINT`, `SMALLINT`. [Docs](https://learn.microsoft.com/en-us/sql/t-sql/data-types/int-bigint-smallint-and-tinyint-transact-sql) | SQL Server's choice to omit a first-class enum and rely on CHECK constraints is the pattern Precept is improving upon. `DATE` without time validates the v1 design. |
+| **Databases** | MySQL | `ENUM('v1','v2',...)` — inline closed set, stored as integer index. Values are ordered by declaration position. [Docs](https://dev.mysql.com/doc/refman/8.0/en/enum.html) | `DATE` (YYYY-MM-DD), `DATETIME`, `TIMESTAMP` (tz-aware). [Docs](https://dev.mysql.com/doc/refman/8.0/en/date-and-time-types.html) | `DECIMAL(p,s)` / `NUMERIC(p,s)`. [Docs](https://dev.mysql.com/doc/refman/8.0/en/numeric-types.html) | `INT`, `BIGINT`, `TINYINT`. | MySQL's inline `ENUM` is the closest structural precedent for Precept's inline `choice(...)` declaration form. The `ordered` opt-in is a cleaner design than MySQL's implicit declaration-order ordering. |
+| **Languages** | C# / .NET | `enum` keyword — nominal type, integer-backed, compile-time membership checking. Cast required to go in/out. [Docs](https://learn.microsoft.com/en-us/csharp/language-reference/builtin-types/enum) | `System.DateOnly` — day-granularity date without time component. [Docs](https://learn.microsoft.com/en-us/dotnet/api/system.dateonly) | `System.Decimal` — 128-bit, 28-29 significant digits, exact base-10. Used universally for financial values in .NET. [Docs](https://learn.microsoft.com/en-us/dotnet/api/system.decimal) | `System.Int64` (`long`) — 64-bit signed. Used in `checked` contexts for overflow safety. [Docs](https://learn.microsoft.com/en-us/dotnet/api/system.int64) | Precept's runtime is .NET; `System.DateOnly`, `System.Decimal`, and `System.Int64` are the natural backing types. C# widening coercion rules (int to long to decimal, not int to double) are the right model for Precept's coercion hierarchy. |
+| **Languages** | TypeScript | String literal union types — `type Status = "Draft" \| "Active" \| "Closed"`. Compile-time membership, no runtime overhead, no ordered semantics. [Docs](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#union-types) | No built-in `Date` without time; `Temporal.PlainDate` (TC39 proposal) is day-only. No native date type that maps to `DateOnly`. | No native decimal; BigDecimal proposals exist (TC39) but are not standardized. Authors use `number` everywhere or pull `decimal.js` / `big.js`. | `number` (64-bit float). No `integer` type. Authors rely on `Math.trunc()`. | TypeScript's string literal union is the closest language analog to `choice`. Its absence of exact numeric and integer types is a known pain point — validates Precept adding them. |
+| **Languages** | Kotlin | `enum class` — nominal, methods and properties, ordinal and name properties. Sealed classes for richer variants. [Docs](https://kotlinlang.org/docs/enum-classes.html) | `java.time.LocalDate` — day only. `ZonedDateTime` for tz-aware. Day-only and time-aware are separate in `java.time`. | `BigDecimal` from Java — arbitrary precision, explicit scale. | `Int` (32-bit), `Long` (64-bit). Smart casting narrows type after null-check. | Kotlin's sealed-class approach is more powerful than Precept needs; `choice` with `ordered` is a narrower, flat-syntax analog. The `LocalDate` / `ZonedDateTime` split validates keeping `date` and future `datetime` distinct. |
+| **Languages** | F# | Discriminated unions — `type Status = Draft \| Active \| Closed`. Pattern matching required. [Docs](https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/discriminated-unions) | `System.DateOnly` same as C#. | `decimal` same as C#. Units of measure (`[<Measure>]`) provide dimensional type safety that has no equivalent in Precept yet. [Docs](https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/units-of-measure) | `int`, `int64` same as C#. | F# discriminated unions are the formal analog for sum types. `choice(...)` is a restricted sum type — string-valued, closed, no payload. F# units of measure are a long-horizon research area for Precept but outside Batch 1 scope. |
+| **Languages** | Rust | `enum` — algebraic data type, pattern-match exhaustiveness checked at compile time. No integer backing by default. [Docs](https://doc.rust-lang.org/book/ch06-01-defining-an-enum.html) | `chrono::NaiveDate` — no timezone. `chrono::DateTime<Tz>` for tz-aware. | `rust_decimal::Decimal` crate — not in stdlib; common for financial Rust code. | `i64` (64-bit signed). No implicit conversion between integer widths — explicit `as` cast required. | Rust's `enum` exhaustiveness checking is the gold standard for compile-time closed-universe enforcement. Precept's `choice` membership checking at compile time is the same design goal. The `NaiveDate` pattern validates timezone-free `date`. |
+| **Languages** | Python | `enum.Enum` — string or integer backed, `.value` accessor, membership testing, ordering via `IntEnum`. [Docs](https://docs.python.org/3/library/enum.html) | `datetime.date` — day only, ISO 8601 `fromisoformat()`. [Docs](https://docs.python.org/3/library/datetime.html) | `decimal.Decimal` — IEEE 754-2008 decimal arithmetic. Context-controlled precision. [Docs](https://docs.python.org/3/library/decimal.html) | `int` — arbitrary precision. No separate integer type; Python `int` and `float` are distinct classes. | Python's `datetime.date` vs `datetime.datetime` split — with explicit `fromisoformat()` — matches Precept's `date("YYYY-MM-DD")` constructor design exactly. `decimal.Decimal` validates the Precept approach. |
+| **Enterprise platforms** | Salesforce | Picklist fields — closed value set, ordered, admin-managed. Formula fields reference picklist values by string. API enforces membership on write. [Docs](https://help.salesforce.com/s/articleView?id=sf.fields_about_picklist_values.htm&type=5) | `Date` field type — day only (YYYY-MM-DD). `DateTime` is a separate type with time. | `Currency` field — fixed precision, currency ISO code stored separately. No general decimal; currency is domain-specific. | `Number` with decimal places set to 0. No dedicated integer type — decimal places are a field property. | Salesforce's picklist is the clearest enterprise analog for `choice`. Its `Date` vs `DateTime` separation validates Precept's v1 `date`. Salesforce's use of a separate currency code (ISO 4217) aligns with Precept using `choice("USD","EUR","GBP")` alongside `decimal`. |
+| **Enterprise platforms** | Dynamics 365 / Dataverse | Choice column — a named option set or inline local values with integer keys and display strings. [Docs](https://learn.microsoft.com/en-us/power-apps/maker/data-platform/types-of-fields) | Date Only vs Date and Time — distinct column behaviors. Date Only has no time component and avoids timezone conversion. | Currency column — uses Decimal internally; amount stored with organization-configured precision. | Whole Number column — `Int32`. Distinct from Decimal Number and Floating Point Number. | Dataverse's three-way numeric split (Whole Number, Decimal Number, Floating Point) maps almost directly to Precept's `integer`, `decimal`, `number`. The naming `Whole Number` is less precise than `integer` but the concept is identical. |
+| **Enterprise platforms** | ServiceNow | Choice field — inline or referenced choice list. String values with display labels. Supports dependent choices. | `glide_date` (date only) — stored as YYYY-MM-DD. `glide_date_time` is separate. | `decimal` field — database-backed decimal. `currency` field uses locale-specific display. | `integer` field — 32-bit. `long integer` available separately. | ServiceNow mirrors every Precept type category with near-identical naming: choice, date, decimal, integer. The consistent categorization across three major enterprise platforms is strong product-placement confirmation. |
+| **End-user tools** | Excel | Data Validation lists — user selects from a defined list. Can enforce membership. [Docs](https://support.microsoft.com/en-us/office/apply-data-validation-to-cells-29fecbcc-d1b9-42c1-9d76-eff3ce5f7249) | Date cells — format YYYY-MM-DD or locale. Stored as serial number internally; displayed as date. [Docs](https://support.microsoft.com/en-us/office/format-numbers-as-dates-or-times-418bd3fe-0577-47c8-8caa-b4d30c528309) | Number with Accounting / Currency format — display precision, not type precision. No exact decimal type; all numbers are IEEE 754. | No integer type; `INT()` truncates. | Excel's lack of a true decimal type causes the same financial precision problems Precept is solving. End-user tools that avoid exact arithmetic validate why Precept needs to be explicit about it. |
+| **End-user tools** | Google Sheets | Data Validation with dropdown — same concept as Excel. [Docs](https://support.google.com/docs/answer/186103) | Date value type — ISO 8601 display, serial number internally. Same underlying model as Excel. | No exact decimal. All values are IEEE 754 double. | No integer type. | Same pattern as Excel. End-user tools outsource precision to formatting, not to the data model. Precept's type system gives the missing guarantee. |
+| **End-user tools** | Notion | Select property — closed value set, colored labels, membership enforced. [Docs](https://www.notion.so/help/database-properties) | Date property — day or date-time, ISO 8601. | Number property — IEEE 754 only. No decimal. | No integer type. | Notion's `Select` property is functionally identical to Precept's `choice`: closed value set, author-declared, membership enforced. The naming alignment (`Select` vs `choice`) reinforces that this is a well-understood end-user concept. |
+| **Rule / decision engines** | FEEL (DMN) | No first-class enum; authors use string value lists in decision tables. No membership type. | `date` — ISO 8601, day only. `date and time` — combined. Two duration types. [Docs](https://docs.camunda.io/docs/components/modeler/feel/language-guide/feel-data-types/) | `number` — backed by `java.BigDecimal`; arbitrary precision. No separate decimal type; `number` IS exact. | `number` only — no separate integer type. Whole-number behavior implicit. | FEEL's absence of a first-class enum is a known expressiveness gap. Its `number` IS arbitrary precision (BigDecimal), so FEEL does not need a `decimal` type. Precept has a different split: `number` for IEEE 754, `decimal` for exact — which is more honest about what `number` actually is. |
+| **Rule / decision engines** | Cedar (AWS) | No enum type; constrained values done via policy conditions. | `datetime` — combined date-time with offset (RFC 3339). No day-only type. [Docs](https://docs.cedarpolicy.com/policies/syntax-datatypes.html) | `decimal` extension — fixed 4 decimal places. Not part of core type system; loaded as extension. | `Long` — 64-bit integer. Cedar's only numeric type. | Cedar's `Long`-only numeric model is the opposite of FEEL's: integers only, no floating point in core. Precept's three-way numeric split is between these extremes. Cedar's `decimal` as extension (fixed 4 places) is weaker than Precept's `maxplaces N` constraint model. |
+| **Rule / decision engines** | Drools | Inherits all Java types. `enum` via Java enum. `BigDecimal` for financial. `LocalDate` for dates. | `java.time.LocalDate`, `LocalDateTime`, `ZonedDateTime` — full Java time library. | `java.math.BigDecimal` — arbitrary precision. | `int`, `long` Java primitives. | Drools defers to the host language for all type decisions. This is the opposite design philosophy to Precept; validates that Precept's explicit type system is filling a gap that Drools leaves to the programmer. |
+| **State machines** | XState | Context is a TypeScript object — types come from the host language. No constrained field model. | No date model. Host language handles dates. | No numeric model. | No integer model. | State machines define transitions, not data types. This is the canonical evidence that Precept's type system is solving a problem that pure state machines cannot. |
 
-### Synthesis
+### Cross-category pattern
 
-#### 1. Phase 2 Candidates — Evaluate Right After v1 Ships
+The sweep across all positioning categories reveals a consistent structural pattern. Every system that governs entities with typed fields — databases, enterprise platforms, end-user tools — has all four of these type categories. Systems that lack them — state machines, rule engines with dynamic contexts — push the problem to the host language or to runtime validation. No system studied combines governed entity types with lifecycle enforcement. That is the gap Precept fills, and the type system expansion brings Precept's field model into line with every comparable system in the governed-entity category.
 
-These types have strong domain evidence and are present on multiple entity-definition platforms.
+The `MONEY` type lesson recurs in three systems: PostgreSQL `MONEY`, SQL Server `MONEY/SMALLMONEY`, and Salesforce `Currency`. All three are specialized numeric types that encode domain semantics (currency) into the type rather than the field model. All three come with caveats: locale-dependent rounding, precision surprises, or API limitations. The consensus across all three systems is the same: use `DECIMAL` for financial values and track currency as a separate attribute. Precept's decision to use `decimal` plus a `choice("USD","EUR","GBP")` field is the precise pattern the enterprise platform world has converged on independently.
 
-| Type | Evidence strength | Domain count | Platform count | Key value proposition |
-|---|---|---|---|---|
-| **integer** | 11 fields across 7 domains | 7/10 | 3/5 | Prevents fractional assignment to count/quantity/score fields. Guards like `when seatCount > 5` gain type precision. Compile-time enforcement that `seatCount = 3.7` is invalid. |
-| **duration** | 10 fields across 10 domains, 3 platforms with native support | 10/10 | 3/5 | Enables guards like `when gracePeriod > 30 days`. Currently must store as raw number and lose unit semantics. Camunda FEEL's two-duration split (day-time vs year-month) shows the design space is nontrivial. |
+---
 
-**Phase 2 field examples:**
+## Philosophy Fit
 
-| Domain | Field | Type | Why number isn't enough |
-|---|---|---|---|
-| Clinical Trials | adverseEventCount | integer | 2.5 adverse events is nonsensical |
-| Supply Chain | quantity | integer | Ordering 3.7 units is invalid |
-| SaaS Billing | seatCount | integer | Can't have half a seat |
-| Employee Onboarding | probationLength | duration | "90 days" carries different semantics than "3 months" |
-| Loan Servicing | gracePeriod | duration | "15 calendar days" vs "15 business days" — units matter |
-| Legal | discoveryPeriod | duration | Court deadlines are in specific units |
+The type system expansion strengthens governed integrity by making domain-specific data semantics enforceable. For data-only entities — where field types and constraints are the entire governance surface — the expanded type system is arguably more important than for lifecycle entities. A stateless precept defining a Fee Schedule, Rate Card, or Patient Demographic needs `choice`, `date`, `decimal`, and `integer` types to enforce data integrity. Without them, the governance surface is limited to string equality and numeric comparison — insufficient for any real domain.
 
-#### 2. Phase 3 Candidates — Enterprise Domain Relevance
+The type system expansion fits Precept's philosophy under five explicit checks.
 
-These types appear in enterprise contexts but either overlap with the constraint system (#13) or introduce architectural complexity.
+**Prevention, not detection.** A `choice` type that rejects non-member values at compile time and at the runtime boundary is prevention. The current string-plus-invariant pattern checks at runtime, only on fire and update, only if the invariant is present. A `date` constructor that rejects `"2026-02-30"` at compile time is prevention. A `maxplaces 2` constraint that rejects `ClaimAmount = 0.001` at assignment is prevention. All four types move error detection earlier.
 
-| Type | Evidence | Architectural concern | Recommendation |
-|---|---|---|---|
-| **formatted strings** (email, phone, URL) | 19 fields, 10/10 domains, 3/5 platforms treat as first-class | Overlaps directly with field-level constraints (#13). `field email : string` + `constraint email matches /.+@.+\..+/` achieves the same compile-time guarantee without new types. | **Constraint, not type.** Evaluate only if #13 proves insufficient for regex/format validation. |
-| **currency** | 16 fields, 9/10 domains, 3/5 platforms | Currency is `number` + metadata (currency code, precision). Adding a currency type means either (a) a parameterized type `currency(USD, 2)` which is very heavy, or (b) a simple `currency` alias that is just `number` with different default precision — marginal value. | **Defer.** The real pain is precision, which a constraint like `constraint amount precision 2` would handle. Currency code belongs to the hosting system. |
-| **percentage** | 7 fields, 6/10 domains, only Salesforce treats as first-class | The semantic ambiguity (4.75 vs 0.0475) is a documentation problem, not a type problem. A constraint like `constraint rate range 0..100` catches invalid values. | **Constraint, not type.** |
-| **attachment / external reference** | 12 fields, 10/10 domains | Precept defines entity contracts, not data storage. Attachment references point to external systems. Adding an `attachment` or `ref` type would require Precept to know about the hosting system's storage layer. | **Phase 3 at earliest.** Consider a lightweight `ref` type that is opaque to Precept (treated as string for storage, validated by the host). |
+**One file, complete rules.** Type declarations live on the field line. The type is part of the field's complete definition — not a separate invariant that might be omitted or duplicated. A `field DocumentType as choice("ID","ProofOfAddress","PoliceReport")` is the complete rule. The current equivalent requires a field declaration plus a separate invariant expression. The type system expansion reduces the number of required declarations for the same correctness guarantee.
 
-**Phase 3 field examples:**
+**Compile-time structural checking.** `choice` membership checking, `date` constructor validation, `decimal + number` as a type error, and `integer` division semantics are all compile-time enforcements. They belong in the type checker, not the runtime evaluator. This is consistent with Precept's existing compile-time model.
 
-| Domain | Field | Type | Why it matters at enterprise scale |
-|---|---|---|---|
-| Insurance | proofDocuments | attachment ref | Regulators require evidence of document attachment at specific state transitions |
-| Real Estate | propertyAddress | structured | Address validation is a hard requirement for MLS compliance |
-| Legal | courtFilingRef | attachment ref | Court filings must be traceable to state transitions |
-| Regulatory | filingDocumentRef | attachment ref | Every finding requires attached evidence |
+**Determinism and inspectability.** Types make behavior deterministic by being explicit. `decimal` arithmetic is reproducible across machines and locales; IEEE 754 arithmetic is not, when precision matters. `date` without timezone is deterministic across locations. `integer` division truncates toward zero per platform-defined semantics. `choice` membership is static. All four types make the value's behavior inspectable without running the code.
 
-#### 3. Never-Add List
+**Flat, keyword-anchored syntax.** The proposed syntaxes — `choice(...)`, `date`, `decimal`, `integer` — are all inline type annotations on the field line. They do not introduce new block structures, hierarchical declarations, or control flow. The constraint zone suffixes (`ordered`, `maxplaces`) remain keyword-anchored and flat. This is consistent with Precept's authoring model.
 
-| Type | Offered by | Why Precept should NEVER add it |
-|---|---|---|
-| **reference / lookup (FK)** | ServiceNow, Salesforce, Dataverse | Precept defines **single entity** contracts. Cross-entity references belong to the hosting system's data layer. Adding FKs would require a relational model, breaking Precept's single-entity isolation principle. |
-| **record / struct / compound** | Camunda FEEL (context), Salesforce (address compound) | Directly conflicts with Precept's **flat-field philosophy**. Each field must be independently addressable by guards and mutations. Nested structures would require dot-access in expressions (`address.city`), fundamentally changing the expression evaluator and the flat-statement design. |
-| **calculated / formula field** | Salesforce | Precept fields are **explicitly mutated by events**. A calculated field that derives from other fields on read would be invisible to the state machine — its value could change without an event firing, breaking deterministic inspectability. |
-| **anyType / polymorphic** | Salesforce (anyType) | Destroys compile-time type checking. Precept's value is that the type checker catches errors before runtime. A polymorphic field would make guard validation impossible. |
-| **encrypted text** | ServiceNow, Salesforce | Security concern, not type semantics. Encryption belongs to the hosting system's storage layer, not the business rule definition. |
-| **auto-number / sequence** | Dataverse | ID generation is a hosting system concern. Precept definitions are stateless contracts; they don't manage identity. |
-| **journal / append-only log** | ServiceNow | Append-only semantics conflict with Precept's `set field = value` mutation model. An append-only field would need a different mutation verb and would blur the line between field state and event history. Event history belongs to the runtime, not the definition. |
-| **time-only** (without date) | Camunda FEEL | Extremely rare in business entity modeling. Time-of-day fields almost always appear with a date. The 10-domain survey produced zero time-only fields. |
-| **geolocation** | Salesforce | Compound type (lat/long pair) — falls into the struct anti-pattern. Also extremely niche for business process entities. |
+**AI-first legibility.** `field ClaimAmount as decimal maxplaces 2` is unambiguous for an AI agent reading the precept. The type and constraint are on one line, explicit, and vocabulary-grounded. An AI agent can reason about the allowed value set from `choice(...)` without needing to parse and interpret a separate invariant expression. Structured type metadata in `precept_compile` output — value sets for `choice`, `maxplaces` for `decimal`, accessor list for `date` — makes the type system machine-readable, not just human-readable.
 
-#### 4. Field Constraint vs. Type Boundary
+---
 
-This is the key architectural question. For each candidate, we assess whether the need is better served by a **new type** (type system change) or a **field constraint** (#13 style).
+## Semantic Contracts to Make Explicit
 
-| Candidate | New type? | Field constraint? | Verdict | Reasoning |
-|---|---|---|---|---|
-| **integer** | ✓ Yes | ✗ No | **Type** | Integer semantics affect the type checker and expression evaluator. A guard `when count > 5` has different evaluation semantics for integers vs decimals. Constraints can't change how the evaluator handles arithmetic. |
-| **duration** | ✓ Yes | ✗ No | **Type** | Duration requires its own literal syntax, comparison operators (is 30 days > 4 weeks?), and arithmetic (date + duration). A constraint on `number` can't provide this. |
-| **email** | ✗ No | ✓ Yes | **Constraint** | Email validation is regex-matchable: `constraint email matches /^[^@]+@[^@]+\.[^@]+$/`. No new expression semantics needed. Guards never compare email formats. |
-| **phone** | ✗ No | ✓ Yes | **Constraint** | Same as email — format validation only. |
-| **URL** | ✗ No | ✓ Yes | **Constraint** | Same as email — format validation only. |
-| **currency** | ✗ Probably not | ✓ Mostly | **Constraint** | A constraint like `constraint amount precision 2` handles precision. Currency code is hosting-system metadata. The rare case where you need `amount + tax` to respect precision could be handled by numeric precision constraints, not a new type. |
-| **percentage** | ✗ No | ✓ Yes | **Constraint** | `constraint rate range 0..100` captures the valid range. The 4.75-vs-0.0475 ambiguity is a convention, not a type error. |
-| **attachment ref** | ✓ Maybe | ✗ No | **Evaluate** | If the host needs Precept to enforce "document must be attached before transition to Approved," the definition needs some way to reference an external artifact. A simple opaque `ref` type (validated by host, opaque to Precept) could work. But this is Phase 3 territory. |
-| **address** | ✗ No | ✗ No | **Neither** | Flat-field philosophy says split into `street`, `city`, `state`, `zip` as separate `string` fields. Not a type system or constraint issue — it's a modeling pattern. |
+### 1. Coercion Hierarchy
 
-### Key Findings
+The four types form a partial numeric hierarchy: `integer` widens to `decimal` or to `number`; `decimal` and `number` do not mix. The contract must be explicit:
 
-1. **The constraint system (#13) absorbs most of the remaining type pressure.** Of the 7 residual gap patterns, 4 (email, phone, URL, percentage) and partially a 5th (currency) are better handled by field-level constraints than new types. This makes #13 the most impactful post-v1 language feature for business domain coverage.
+- `integer + integer` produces `integer`
+- `integer + decimal` produces `decimal` (exact widening)
+- `integer + number` produces `number` (approximate widening)
+- `decimal + number` is a type error — mixing exact and approximate arithmetic is never implicit
+- `decimal` field cannot receive a `number` expression (no narrowing)
+- `number` field cannot receive a `decimal` expression (no narrowing)
 
-2. **Integer and duration are the only strong Phase 2 type candidates.** Both require new expression semantics that constraints can't provide. Integer needs fractional-assignment prevention and potentially integer arithmetic. Duration needs its own literal syntax and date arithmetic.
+This hierarchy is the most important semantic contract in the entire expansion. Getting it wrong silently breaks the precision guarantee that `decimal` provides.
 
-3. **The most surprising finding: attachment/document references appear in every single domain.** 10 out of 10 business domains need some way to reference external documents at state transitions. This is a gap that neither types nor constraints currently address, and it represents the deepest architectural question for Phase 3 — how does Precept acknowledge the existence of artifacts it can't validate?
+### 2. Choice Cross-Field Incompatibility
 
-4. **Multipicklist (`set<choice>`) may already be solved.** If v1 ships `choice` as a type that can be used as a collection inner type, `set<choice>` handles Salesforce's multipicklist and Dataverse's multi-select Choices natively. Worth confirming during v1 implementation.
+Two `choice(...)` declarations with identical value sets are distinct types. `field A as choice("X","Y")` and `field B as choice("X","Y")` are incompatible for assignment. This prevents coincidental overlap from enabling silent cross-field assignment and keeps the type system structural rather than structural-and-nominal-mixed.
 
-5. **The platform data confirms Precept occupies the entity-definition tier** (ServiceNow, Salesforce, Dataverse), not the workflow-orchestration tier (Camunda 8, Temporal). This tier universally has 15-25 field types. Precept post-v1 will have 5 (`string`, `number`, `boolean`, `choice`, `date`). Even with Phase 2 additions (`integer`, `duration`), Precept would have 7 — deliberately minimal, with constraints filling the gap that enterprise platforms fill with type proliferation.
+### 3. `ordered` Semantics
+
+`ordered` is an opt-in constraint on `choice` fields. It enables `<`, `>`, `<=`, `>=` with declaration-order semantics (first declared value is the lowest). Without `ordered`, those operators are compile-time errors. The choice of declaration order (not lexicographic order) is explicit: reordering values in the field declaration changes comparison behavior. This is a contract between the author and the type system that must be documented prominently.
+
+### 4. `date` Constructor and Validation Timing
+
+`date("YYYY-MM-DD")` validates format at compile time (parser) and validates value feasibility at the compile step (Feb 30 is rejected). The runtime does not need to re-validate date strings — they arrive as `System.DateOnly` values after parsing. This contract ensures that `date` comparisons at runtime operate on already-validated values.
+
+### 5. `maxplaces` Fires at Assignment, Not During Intermediate Computation
+
+`decimal` fields with `maxplaces N` reject values at the assignment boundary. Intermediate arithmetic within a `set` expression can produce more decimal places than the target allows — the `round()` function is the author's explicit tool to reduce places before assignment. The constraint does not fire silently; it fires at the `set` statement with a clear diagnostic.
+
+### 6. `integer` Division Truncates Toward Zero
+
+`5 / 2 == 2`, `(-5) / 2 == -2`. This follows C# platform semantics. Division by zero is a runtime error, not a compile-time error — authors guard explicitly using `when Divisor != 0` in the transition guard.
+
+---
+
+## Dead Ends and Rejected Directions
+
+### `money` Type
+
+Every rule engine and database system surveyed has either tried a `money` type and regretted it or avoided it entirely. PostgreSQL `MONEY` is locale-dependent and the community says do not use it. SQL Server `MONEY` has rounding issues under division. Salesforce has `Currency` but warns about complex cross-currency scenarios. The universal lesson is: track currency code as a separate field; use exact-numeric arithmetic for the amount. Precept's answer is `decimal` for the amount and `choice("USD","EUR","GBP")` for the currency code. `money` as a type is not on the roadmap.
+
+### Parameterized `decimal(p,s)`
+
+SQL's `DECIMAL(p,s)` requires the author to specify both total precision and scale at declaration time. This is appropriate for schema-level database columns where storage efficiency matters. For an in-process entity model, `System.Decimal`'s 28-29 significant digits covers all practical business values. The `maxplaces N` constraint provides scale enforcement without parameterizing the type. A `precision N` constraint (total digits) was considered and rejected: no domain evidence found for it, and `System.Decimal` makes it unnecessary.
+
+### `datetime` and `timezone` in v1
+
+Time-of-day requires a timezone decision to be deterministic. `time("17:00")` in New York and `time("17:00")` in Sydney are not the same moment. Precept's inspectability promise breaks under timezone-aware time unless the definition includes a timezone reference. That reference couples the definition to deployment context, which violates one-file completeness. `date` without time avoids this entirely. `duration` (months/years arithmetic) is deferred for the same reason: month arithmetic requires a calendar-aware duration type. Both are Batch 3 research territory.
+
+### Integer Subtypes (`int32`, `int16`, `uint`)
+
+SQL Server has `TINYINT`, `SMALLINT`, `INT`, `BIGINT`. C# has `byte`, `short`, `int`, `long`, `uint`, `ulong`. None of this matters for business entity modeling: no domain field requires 16-bit storage, no business domain has unsigned-only semantics that would benefit from `uint`. `System.Int64` covers all practical business integers without overflow risk. Parameterized width is infrastructure complexity with zero user benefit.
+
+### Bit Operations on Integer
+
+`&`, `|`, `^`, `<<`, `>>` on `integer` were considered as a set. No domain evidence found for bit manipulation in business entity models. These are programming-level operations. Precept is a domain integrity language; bit masking is outside its scope.
+
+### Structural / Record Types
+
+`field Address as { Street as string, City as string }` — a structured field type with named sub-fields. Multiple systems support this (Pydantic, TypeScript, Dataverse complex types). The research found no compelling evidence that inline record types serve the one-file model better than flat top-level fields with naming conventions. More importantly, structured types create object-graph concerns: nullability, partial update semantics, accessor syntax, and serialization format. These are all design complications with no precedent in Precept's current surface. Rejected for now; the flat field model is the right default.
+
+### Dynamic / Open-Ended Value Sets
+
+`choice(...)` is a closed universe — the value set is declared in the source file. An open-ended or dynamically extended value set would require a separate data source, defeating one-file completeness. This is explicitly rejected. No runtime-extended membership; no external lookup tables; no dynamic choice sets.
+
+---
+
+## Proposal Implications
+
+### #25 — `choice` type
+
+The precedent survey validates both the `choice` keyword (over `enum`) and the inline declaration form. The cross-field incompatibility contract is the most important semantic boundary to hold: two identical-looking `choice(...)` declarations are distinct types. The `ordered` opt-in is correct — MySQL's implicit declaration-order ordering has surprised users; opt-in is safer. The proposal's v1 scope (no named shared `choiceset`) is appropriate: inline first, reuse later.
+
+### #26 — `date` type
+
+Day-only granularity in v1 is confirmed by every system surveyed: PostgreSQL `DATE`, SQL Server `DATE`, MySQL `DATE`, `datetime.date`, `System.DateOnly`, Salesforce `Date`, Dataverse `Date Only`, ServiceNow `glide_date`. The deferral of `time` and `duration` is confirmed by the timezone determinism argument. The ISO 8601 constructor form `date("YYYY-MM-DD")` is the right design — consistent with `choice(...)`, no bare string ambiguity.
+
+### #27 — `decimal` type
+
+System.Decimal is the right backing type. `maxplaces N` as constraint (not type parameter) is validated by Dataverse Decimal Number and ServiceNow decimal, both of which use a precision property on the field, not a parameterized type. The `round()` function is essential — without it, division and mixed-precision multiplication produce values that cannot be assigned to `maxplaces`-constrained fields. The `decimal + number` type error is the single most important rule in the coercion hierarchy.
+
+### #29 — `integer` type
+
+`System.Int64` universally. Widening to `decimal` and `number` is implicit. Narrowing is never implicit. The coercion rules follow C# semantics exactly, which is correct for a .NET runtime: no original language design, no implementation surprise. The `truncate`, `floor`, and `ceil` conversion functions (from #16) are the narrowing path.
+
+### Sequencing note
+
+`decimal` depends on `integer` being present (mixed arithmetic `integer + decimal`). `choice` and `date` are independent of each other and of the numeric types. The natural implementation order is: `integer` first, then `decimal`, then `choice` and `date` in either order.

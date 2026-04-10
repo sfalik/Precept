@@ -17,7 +17,7 @@
 | Kramer | Tooling Dev | `.squad/agents/kramer/charter.md` | 🟢 Active |
 | Newman | MCP/AI Dev | `.squad/agents/newman/charter.md` | 🟢 Active |
 | Soup Nazi | Tester | `.squad/agents/soup-nazi/charter.md` | 🟢 Active |
-| Uncle Leo | Code Reviewer | `.squad/agents/uncle-leo/charter.md` | 🟢 Active |
+| Uncle Leo | Security Champion | `.squad/agents/uncle-leo/charter.md` | 🟢 Active |
 | J. Peterman | Brand/DevRel | `.squad/agents/j-peterman/charter.md` | 🟢 Active |
 | Steinbrenner | PM | `.squad/agents/steinbrenner/charter.md` | 🟢 Active |
 | Elaine | UX Designer | `.squad/agents/elaine/charter.md` | 🟢 Active |

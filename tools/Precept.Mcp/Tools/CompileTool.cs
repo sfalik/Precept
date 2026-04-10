@@ -50,8 +50,9 @@ public static class CompileTool
 
         return new CompileResult(
             !result.HasErrors,
+            model.IsStateless,
             model.Name,
-            model.InitialState.Name,
+            model.InitialState?.Name,
             model.States.Count,
             model.Events.Count,
             states,
@@ -95,6 +96,7 @@ public static class CompileTool
 
 public sealed record CompileResult(
     bool Valid,
+    bool IsStateless,
     string? Name,
     string? InitialState,
     int StateCount,
@@ -107,7 +109,7 @@ public sealed record CompileResult(
     IReadOnlyList<DiagnosticDto> Diagnostics)
 {
     public static CompileResult DiagnosticsOnly(IReadOnlyList<DiagnosticDto> diagnostics) =>
-        new(false, null, null, 0, 0, null, null, null, null, null, diagnostics);
+        new(false, false, null, null, 0, 0, null, null, null, null, null, diagnostics);
 }
 
 public sealed record DiagnosticDto(int Line, int Column, string Message, string? Code, string Severity);

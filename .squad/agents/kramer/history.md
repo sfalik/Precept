@@ -23,6 +23,16 @@
 - Key file paths: `tools/Precept.VsCode/webview/inspector-preview.html` (source of truth), `tools/Precept.VsCode/src/extension.ts` (host/protocol).
 - Decision inbox: `.squad/decisions/inbox/kramer-preview-audit.md`
 
+### 2026-04-08 - Slice 5 — Grammar, completions, semantic tokens (issue-22 data-only precepts)
+
+- Grammar (`precept.tmLanguage.json`): added `all` to `controlKeywords` alternation (sibling of `any`).
+- Grammar: added `rootEditDeclaration` repository pattern — matches `edit all` and `edit Field1, Field2` at line start; highlights `edit` as `keyword.other`, `all` as `keyword.control`, fields as `variable.other.field`; inserted before `controlKeywords` catch-all for correct priority.
+- Completions (`PreceptAnalyzer.cs`): new root-level `edit` branch suggests `all` + field names (stateless precept context).
+- Completions: updated `in State edit` branch to also suggest `all` (supports `in any edit all`).
+- Semantic tokens: no changes — `PreceptToken.All` auto-picked up via `[TokenCategory(Grammar)]` from Slice 1.
+- Both builds green: LS 0 errors, npm compile clean.
+- Key learning: always check `node_modules` before running `npm run compile` — directory may not exist on a fresh checkout.
+
 ### 2026-04-05 - Retired legacy proposal labels in sync workflow
 
 - Added `needs-decision` and `decided` to `RETIRED_LABELS` in both the active workflow (`.github/workflows/sync-squad-labels.yml`) and the template copy (`.squad/templates/workflows/sync-squad-labels.yml`).
@@ -38,6 +48,19 @@
 - Split README sizing research into two separate ceilings: the broader repo/article layout (`~1280px` shell, `~1012px` article) and the actual repo-view README image display cap (`~830px`) that governs the DSL hero asset.
 - Recorded the reusable audit workflow at `.squad/skills/github-readme-width-audit/SKILL.md` and preserved the merged sizing outcome in `.squad/decisions.md`.
 - Key learning: for README hero images, composition guidance and final image-display limits are different measurements; size the shipped asset to the image cap, not the wider article container.
+
+### 2026-04-10 — Issue #31 shipped
+- PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
+
+### 2026-04-10 - Slice 5: Grammar + Language Server (issue #31 — and/or/not keywords)
+
+- Grammar (`precept.tmLanguage.json`): added `and`, `or`, `not` to `actionKeywords` alternation (same group as `contains`) — these are operator-category tokens used in expression positions, so they fit naturally alongside `contains`.
+- Grammar: removed the `keyword.operator.logical.precept` block (`&&|\\|\\||!`) from `operators` entirely; `!=` lives in the comparison block and was untouched.
+- Completions (`PreceptAnalyzer.cs`): replaced `&&`, `||`, `!` `Operator` items with `and`, `or`, `not` `Keyword` items in `ExpressionOperatorItems` — the static list consumed by `BuildGuardCompletions`, `BuildExpressionCompletions`, and `BuildDataExpressionCompletions`.
+- Global `KeywordItems` required no change — `BuildKeywordItems()` auto-discovers `And`/`Or`/`Not` from `PreceptToken` enum via `[TokenCategory(Operator)]` + alphabetic symbol filter.
+- Semantic tokens: verified `BuildSemanticTypeMap()` iterates all enum values; `TokenCategory.Operator → "preceptKeywordGrammar"` covers `And`/`Or`/`Not` automatically. Zero handler changes.
+- Build: 0 errors. Tests: 87/87 pass.
+- Commit: `8f3bdab` — "feat(#31): grammar and language server — and/or/not keywords (slice 5)"
 
 ## Learnings
 

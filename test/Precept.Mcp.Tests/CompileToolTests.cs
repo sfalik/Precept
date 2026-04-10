@@ -205,7 +205,7 @@ public class CompileToolTests
         var result = CompileTool.Run(text);
 
         result.Valid.Should().BeTrue();
-        result.Diagnostics.Should().Contain(d => d.Code == "PRECEPT050" && d.Severity == "hint");
+        result.Diagnostics.Should().Contain(d => d.Code == "PRECEPT050" && d.Severity == "warning");
     }
 
     [Fact]
