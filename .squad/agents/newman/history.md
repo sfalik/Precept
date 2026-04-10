@@ -9,6 +9,10 @@
 - MCP contract changes should be additive when possible and preserve existing consumer shapes.
 - Catalog-driven vocabulary is the preferred path for exposing DSL keywords/types; non-token constructs need explicit catalog registration.
 - Label/automation removals should be staged through sync workflows and disabled notices, not silent deletion.
+### 2026-04-10 — Issue #31 shipped
+- PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
+
+### Issue #31 Slice 6 — Operator Inventory (2026-04-10)
 
 ## Recent Updates
 
