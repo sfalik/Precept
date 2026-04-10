@@ -50,6 +50,7 @@ These files compare Precept against adjacent tools and systems. They are not pro
 | [internal-verbosity-analysis.md](./internal-verbosity-analysis.md) | Corpus evidence for compactness and ceremony-reduction pressure. |
 | [conditional-logic-strategy.md](./conditional-logic-strategy.md) | Shared guidance for `when`, conditional shapes, and related guard vocabulary. |
 | [expression-tracking-notes.md](./expression-tracking-notes.md) | Labeling and tracking guidance for `dsl-expressiveness` vs `dsl-compactness`. |
+| [type-system-domain-survey.md](./type-system-domain-survey.md) | Real-world domain and platform evidence validating proposal #25 (`choice`, `date`, and follow-on scalar pressure). |
 
 ## Proposal grounding map
 

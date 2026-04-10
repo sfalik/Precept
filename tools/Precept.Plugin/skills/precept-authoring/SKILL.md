@@ -146,3 +146,13 @@ Set a nullable field to `null` to clear it.
 ```
 from FlashingRed on ClearEmergency -> set EmergencyReason = null -> transition Red
 ```
+
+## Language Evolution — Designing New Syntax
+
+When proposing syntax for a new DSL construct (not just authoring within existing syntax), apply these heuristics in order:
+
+1. **Reuse before invention.** Check whether existing DSL tokens already carry the needed semantic. `->` means "results in" (broadly: context → consequence). Don't introduce new keywords for relationships that existing tokens already express.
+2. **Subtract before adding.** Start from the minimal unambiguous form and justify each added token. If removing a keyword changes nothing for the parser or reader, it's ceremony.
+3. **Read principles broadly.** Design principles describe intent, not specific constructs. Extend them to new constructs rather than working around them.
+4. **Test against rhythm.** Paste the proposed syntax into an actual sample file. Does it blend with existing `field`, `state`, `event`, and `from...on` declarations?
+5. **Generate from principles, don't enumerate options.** Ask: what relationship does this express? Which existing token means that? What's the minimal sequence? The answer IS the proposal.

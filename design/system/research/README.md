@@ -14,4 +14,4 @@ Do not use this folder for raw source captures, prototype files, or finalized sp
 
 - Source material belongs in `../references/`.
 - Artifact critique belongs in `../reviews/`.
-- Durable approved rules belong in `../foundations/`, `../surfaces/`, or other canonical system specs.
+- Durable approved rules belong in `../foundations/` or other canonical system specs.

@@ -13,6 +13,13 @@
 
 - Team update (2026-04-04T23:02:22Z): Hero snippet source of truth now lives in brand/brand-spec.html section 2.6, mirrors the README verbatim, stays TEMPORARY, and treats plaintext reuse as canonical across README, VS Code Marketplace, NuGet, Claude Marketplace, and AI contexts. Decision by J. Peterman.
 
+### 2026-04-06 - "carrier" renamed to "signal" throughout semantic-visual-system.html
+- Replaced all 21 instances of "carrier/carriers/Carrier/Carriers" with "signal/signals/Signal/Signals" per team decision 2026-04-06.
+- Hero conviction updated: "Carriers may adapt." → "Forms may adapt." (signal is stable; form adapts).
+- Stance-words definition updated: "carrier = visual form inside that context" → "signal = visual mechanism inside that context".
+- Nav href="#carriers" updated to href="#signals"; section id updated to match.
+- Three non-task-list instances also caught and corrected: "Carrier medium" (inheritance checklist), "Carrier rules" (boundary note card), footer footnote.
+
 ### 2026-04-07 - README Form/Shape Pass Applied
 - Removed visual noise from the title block, tightened the quick example layout, simplified Getting Started, and reduced section heading density.
 - Preserved Peterman's content ownership while making the README easier to scan on GitHub and small viewports.
@@ -32,6 +39,14 @@
 
 ## Learnings
 
+- 2026-04-06 — The semantic visual system page should frame itself as Precept's strongest live expression of the visual system: still canonical and disciplined, but explicitly allowed to be beautiful enough to prove the system rather than merely police it.
+- 2026-04-06 — On semantic-system foundation pages, the typography contract should be explicit as a role map: Cascadia for identity and system-facing UI, Segoe UI Variable Text for paragraph reading, and italic reserved for semantic pressure rather than generic emphasis.
+- 2026-04-06 — Canonical design-system pages for Precept work best as black-field editorial systems: sticky left rail, stacked spec sections, disciplined indigo linework, and one strong specimen block instead of multiple floating hero treatments.
+- 2026-04-06 — Design-system foundation pages that define Precept surface semantics should stay on a near-solid black field with restrained indigo structure cues. Atmospheric gradients and blur read as off-brand for Precept's editor-adjacent identity.
+- 2026-04-06 — On semantic-system foundation pages, the type system should split cleanly: Cascadia for identity, headings, labels, and tables; a restrained sans reading face for paragraph-length prose. All-mono long-form copy feels unfinished, but serif pushes the system away from Precept's editor-adjacent character.
+- 2026-04-06 — The right typography hierarchy for system-spec pages is Cascadia-led throughout: mono labels, mono section heads, and a small-caps display moment only where a real Precept wordmark/display treatment is warranted.
+- 2026-04-06 — In design-system language, "surface" must explicitly include editorial/public carriers like the website, docs, and README examples, not just operational product UI. The distinction to preserve is operational vs. explanatory, not product vs. non-product.
+- 2026-04-06 — For long-form system-spec pages, shared section-heading clamps and shared card/body paragraph sizes need to stay conservative. Big mono headings and enlarged explanatory copy make the document feel louder than the content needs; calmer scales work better when the hierarchy is carried by spacing, panel rhythm, and contrast.
 - 2026-04-05 — `brand/inspector-panel-review.md` stayed right about brand drift but had gone stale on surface scope. Current source of truth for inspector/preview UX is the combination of `brand/brand-spec.html § 2.3`, `tools/Precept.VsCode/webview/inspector-preview.html`, and `docs/archive/InteractiveInspectorMockup.md`.
 - 2026-04-05 — The preview surface is a combined shell, not a standalone inspector: header shell, diagram canvas with in-canvas data lane, and bottom event dock. PRD work should preserve that triad unless Shane approves a structural change.
 - 2026-04-07 — Created first redesign mockup at `tools/Precept.VsCode/mockups/preview-inspector-redesign-mockup.html` for issue #7. Key decisions: current-state violet pill in header chrome, field type as secondary metadata row, gold constraint messages (not red), event outcome text inline in dock rows, title changed to "Precept Preview." UX decision record at `.squad/decisions/inbox/elaine-issue-7-mockup.md`.
@@ -144,6 +159,10 @@
 - Updated index page: description updated to mention state diagram, tag added (violet "state diagram"), helper text updated to "6 quick steps."
 - Key design decision: the diagram intentionally does NOT duplicate data, events, or rule detail from the journey scroll. It shows only topology + traversal state — reinforcing spatial awareness without information overload.
 - 2026-05-03 — For linked UX issues #1 and #7, the working branch is `squad/1-7-inspector-preview-redesign` off `main`. Preserve unrelated in-flight notes such as `.squad/agents/frank/history.md` when branching so setup work stays non-destructive.
+- 2026-04-06 — Canonical design-system hero copy should describe the system as a user-facing meaning layer, not as document governance. Lead with what the system does, then explain the recognition and cognitive-load benefits of consistent signals across authoring, diagram, and preview surfaces.
+- 2026-04-06 — In semantic-system guidance, "surface" is the user-facing context and "carrier" is the visual form used within that context. Canonical overview copy should name both usability benefits and the brand outcome: the system must make Precept easier to read and more visibly, proudly itself.
+- 2026-04-06 — Canonical system-foundation pages work best as black-field editorial control surfaces: one manifesto block, one semantic specimen, a sticky rule rail, and sharp section rhythm so the page reads as operating grammar rather than generic dark-mode documentation.
+- 2026-04-06 — For system-foundation prose, Segoe UI Variable Text with Segoe UI fallback is the right reading companion to Cascadia: same Microsoft lineage, calmer in paragraphs, and technical without turning corporate or soft.
 
 - 2026-05-17 — README hero DSL text sizing: image-based approaches (PNG or SVG) are fundamentally brittle for text-alongside-text on GitHub — the image and page text live in disconnected scaling contexts. `<font color>` inside `<pre>` is a potential middle ground (native text + syntax color) but depends on deprecated HTML and needs dual-theme testing. Fenced code block is the only guaranteed-consistent approach. Long-term path is Linguist registration for native `` `precept `` highlighting.
 - 2026-05-17 — Frank's architectural analysis of the PNG sizing problem is thorough and correct on the core constraint. His recommendation (fenced code block) is the same as mine, and that tradeoff is now preserved in `.squad/decisions.md`.
