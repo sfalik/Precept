@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Semantic Visual System Posture C</title>
+<style>
+  :root {
+    --bg: #050608;
+    --panel: rgba(10, 13, 18, 0.84);
+    --panel-strong: rgba(13, 16, 22, 0.94);
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.14);
+    --text: #f4f5f9;
+    --muted: #b8bfca;
+    --soft: #768094;
+    --structure: #6f74ff;
+    --state: #afa5f0;
+    --event: #56c6ef;
+    --data: #d1d8de;
+    --rule: #f3c86d;
+    --glow-a: rgba(111, 116, 255, 0.24);
+    --glow-b: rgba(86, 198, 239, 0.18);
+    --glow-c: rgba(243, 200, 109, 0.18);
+    --mono: "Cascadia Cove", "Cascadia Code", Consolas, monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    --shadow: 0 26px 90px rgba(0, 0, 0, 0.42);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--text);
+    font-family: var(--serif);
+    background:
+      radial-gradient(circle at 18% 14%, var(--glow-a), transparent 25%),
+      radial-gradient(circle at 82% 12%, var(--glow-b), transparent 22%),
+      radial-gradient(circle at 54% 80%, var(--glow-c), transparent 26%),
+      linear-gradient(180deg, #040507 0%, #07090d 44%, #050608 100%);
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+    background-size: 64px 64px;
+    opacity: 0.8;
+  }
+
+  .page {
+    width: min(1320px, calc(100vw - 34px));
+    margin: 0 auto;
+    padding: 26px 0 92px;
+    position: relative;
+  }
+
+  .eyebrow,
+  .tag,
+  .plate-label,
+  .surface-label,
+  .mini {
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .hero,
+  .section,
+  .tile,
+  .plate,
+  .surface,
+  .halo {
+    border: 1px solid var(--line);
+    border-radius: 28px;
+    background: var(--panel);
+    backdrop-filter: blur(18px);
+    box-shadow: var(--shadow);
+  }
+
+  .hero {
+    position: relative;
+    overflow: hidden;
+    padding: 24px;
+  }
+
+  .hero::after {
+    content: "";
+    position: absolute;
+    right: -80px;
+    top: -60px;
+    width: 340px;
+    height: 340px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.06), transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 34px;
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+    gap: 22px;
+    align-items: stretch;
+  }
+
+  .hero-copy {
+    display: grid;
+    gap: 22px;
+    position: relative;
+  }
+
+  .hero-mark {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: clamp(34px, 8vw, 90px);
+    line-height: 0.9;
+    font-weight: 700;
+    font-variant: small-caps;
+    letter-spacing: 0.14em;
+  }
+
+  .hero-title {
+    margin: 0;
+    font-size: clamp(44px, 5.8vw, 82px);
+    line-height: 0.94;
+    letter-spacing: -0.04em;
+    max-width: 11ch;
+  }
+
+  .hero-copy p,
+  .section p,
+  .tile p,
+  .surface p,
+  .plate p,
+  li {
+    margin: 0;
+    color: var(--muted);
+    font-size: 17px;
+    line-height: 1.72;
+  }
+
+  .halo {
+    position: relative;
+    overflow: hidden;
+    padding: 22px;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
+      radial-gradient(circle at 22% 18%, rgba(111, 116, 255, 0.14), transparent 40%),
+      radial-gradient(circle at 80% 72%, rgba(243, 200, 109, 0.10), transparent 38%),
+      rgba(12, 15, 20, 0.95);
+  }
+
+  .halo-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  .halo-band {
+    padding: 14px 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .halo-band strong {
+    display: block;
+    margin-bottom: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+
+  .halo-band.structure strong { color: var(--structure); }
+  .halo-band.state strong { color: var(--state); }
+  .halo-band.event strong { color: var(--event); }
+  .halo-band.data strong { color: var(--data); }
+  .halo-band.rule strong { color: var(--rule); }
+
+  main {
+    margin-top: 28px;
+    display: grid;
+    gap: 28px;
+  }
+
+  .section {
+    padding: 28px;
+  }
+
+  .section-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 20px;
+    align-items: end;
+    margin-bottom: 24px;
+  }
+
+  .section-head h2 {
+    margin: 0;
+    font-size: clamp(30px, 4.5vw, 58px);
+    line-height: 0.98;
+    letter-spacing: -0.04em;
+  }
+
+  .tile-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr 0.9fr;
+    gap: 14px;
+  }
+
+  .tile {
+    padding: 18px;
+    min-height: 220px;
+  }
+
+  .tile h3,
+  .surface h3,
+  .plate h3 {
+    margin: 0 0 12px;
+    font-family: var(--mono);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+
+  .tile.hero-tile {
+    grid-row: span 2;
+    background:
+      radial-gradient(circle at 72% 18%, rgba(86, 198, 239, 0.10), transparent 30%),
+      rgba(14, 18, 25, 0.96);
+  }
+
+  .tile.data,
+  .tile.rule {
+    background: rgba(16, 20, 28, 0.98);
+  }
+
+  .tile.structure h3 { color: var(--structure); }
+  .tile.state h3 { color: var(--state); }
+  .tile.event h3 { color: var(--event); }
+  .tile.data h3 { color: var(--data); }
+  .tile.rule h3 { color: var(--rule); }
+
+  .plate-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 0.94fr);
+    gap: 18px;
+  }
+
+  .plate {
+    padding: 22px;
+    background: var(--panel-strong);
+  }
+
+  .plate-top,
+  .surface-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  pre {
+    margin: 0;
+    overflow: auto;
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.86;
+    color: #edf2f8;
+  }
+
+  .s { color: var(--structure); }
+  .st { color: var(--state); }
+  .ev { color: var(--event); }
+  .da { color: var(--data); }
+  .ru { color: var(--rule); }
+  .so { color: var(--soft); }
+
+  .plate-cluster {
+    display: grid;
+    gap: 14px;
+  }
+
+  .plate-card {
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .plate-card.data-card {
+    transform: translateX(-10px);
+  }
+
+  .plate-card.rule-card {
+    transform: translateX(18px);
+  }
+
+  .plate-card h3 {
+    margin-bottom: 10px;
+  }
+
+  .surface-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .surface {
+    padding: 20px;
+  }
+
+  .surface-line {
+    padding: 14px 0;
+    margin: 14px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.82;
+  }
+
+  @media (max-width: 1160px) {
+    .hero-grid,
+    .section-head,
+    .tile-grid,
+    .plate-grid,
+    .surface-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .tile.hero-tile {
+      grid-row: auto;
+    }
+
+    .plate-card.data-card,
+    .plate-card.rule-card {
+      transform: none;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .page {
+      width: min(100vw - 18px, 1320px);
+      padding-top: 10px;
+    }
+
+    .hero,
+    .section,
+    .plate,
+    .surface,
+    .tile,
+    .halo {
+      padding: 18px;
+    }
+
+    .hero-copy p,
+    .section p,
+    .tile p,
+    .surface p,
+    .plate p,
+    li {
+      font-size: 15px;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div class="hero-top eyebrow">
+        <span>Precept semantic visual system</span>
+        <span>Posture study C · richer expressive variant</span>
+      </div>
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="hero-mark">Precept</p>
+          <h1 class="hero-title">A controlled expressive field where the semantic grammar still governs every flourish.</h1>
+          <p>This option keeps the same black-field codex baseline, but allows a little more atmosphere, layering, and glow. It should feel more magnetic than A and less hard-edged than B while staying under disciplined control.</p>
+          <p>The comparison to make is whether this extra visual charge deepens memorability without loosening the sense of governed integrity.</p>
+        </div>
+        <aside class="halo">
+          <div class="plate-label">Same semantic payload</div>
+          <div class="halo-grid">
+            <div class="halo-band structure"><strong>Structure</strong><span>The outer frame remains codex-like and legible.</span></div>
+            <div class="halo-band state"><strong>State</strong><span>Lifecycle remains present but never allowed to monopolize the image.</span></div>
+            <div class="halo-band event"><strong>Event</strong><span>Motion reads as controlled activation, not spectacle.</span></div>
+            <div class="halo-band data"><strong>Data</strong><span>The fields stay materially central to the reading.</span></div>
+            <div class="halo-band rule"><strong>Rule</strong><span>The reason glows a little more, but still behaves like law.</span></div>
+          </div>
+        </aside>
+      </div>
+    </header>
+
+    <main>
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Specimen constellation</div>
+            <h2>One semantic cluster, arranged with more rhythm and a little more seduction.</h2>
+          </div>
+          <p>This variant differentiates itself mainly through overlap, aura, and staggered massing. The construct wording stays almost identical to the other studies so the comparison stays aesthetic.</p>
+        </div>
+        <div class="tile-grid">
+          <article class="tile hero-tile structure">
+            <h3>Structure</h3>
+            <p>The page still behaves like a codex artifact: framed, registered, and composed around a governing field rather than a product shell.</p>
+            <p style="margin-top: 16px;">Within that field, Structure keeps the semantic system intelligible enough for the richer treatment to remain disciplined instead of decorative.</p>
+          </article>
+          <article class="tile state">
+            <h3>State</h3>
+            <p>Draft and Reviewed read as position and activation, not as the sole protagonist of the page.</p>
+          </article>
+          <article class="tile event">
+            <h3>Event</h3>
+            <p>Submit remains the asking gesture that activates motion and assertion.</p>
+          </article>
+          <article class="tile data">
+            <h3>Data</h3>
+            <p>RequestedAmount, CoverageLimit, and Rationale get slightly richer material presence because they are what governance protects.</p>
+          </article>
+          <article class="tile rule">
+            <h3>Rule</h3>
+            <p>The reason is given more warmth and glow, but it still reads as binding language rather than ornament.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Hybrid semantic plate</div>
+            <h2>The same coverage specimen, but with a more layered and atmospheric reading.</h2>
+          </div>
+          <p>The specimen stays fixed: a compact coverage review with one event, two states, governed values, and explicit reason text. The page simply lets those parts resonate more visibly.</p>
+        </div>
+        <div class="plate-grid">
+          <div class="plate">
+            <div class="plate-top plate-label">
+              <span>Authoring surface</span>
+              <span>CoverageReview.precept</span>
+            </div>
+            <pre><span class="s">precept</span> <span class="so">CoverageReview</span>
+
+<span class="s">field</span> <span class="da">RequestedAmount</span> <span class="s">as</span> <span class="so">number</span> <span class="s">default</span> <span class="so">0</span>
+<span class="s">field</span> <span class="da">CoverageLimit</span> <span class="s">as</span> <span class="so">number</span> <span class="s">default</span> <span class="so">0</span>
+<span class="s">field</span> <span class="da">Rationale</span> <span class="s">as</span> <span class="so">string nullable</span>
+
+<span class="ru">invariant</span> RequestedAmount &lt;= CoverageLimit <span class="ru">because</span> <span class="ru">"A decision cannot exceed coverage"</span>
+
+<span class="st">state</span> Draft <span class="st">initial</span>
+<span class="st">state</span> Reviewed
+
+<span class="ev">event</span> Submit <span class="s">with</span> Reason <span class="s">as</span> string
+<span class="ev">on</span> Submit <span class="ru">assert</span> Reason != <span class="ru">""</span> <span class="ru">because</span> <span class="ru">"A reason is required"</span>
+
+<span class="s">from</span> Draft <span class="ev">on</span> Submit -&gt; <span class="s">set</span> Rationale = Submit.Reason -&gt; <span class="s">transition</span> Reviewed</pre>
+          </div>
+          <div class="plate plate-cluster">
+            <div class="plate-card data-card">
+              <h3>Data plate</h3>
+              <p>RequestedAmount 1420</p>
+              <p>CoverageLimit 1500</p>
+              <p>Rationale Inside contractual band</p>
+            </div>
+            <div class="plate-card">
+              <h3>State and event</h3>
+              <p>Draft receives Submit, then resolves to Reviewed with reason attached to the stored field.</p>
+            </div>
+            <div class="plate-card rule-card">
+              <h3>Reason plate</h3>
+              <p style="color: var(--rule);">A decision cannot exceed coverage.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Cross-surface translation</div>
+            <h2>Translation with more resonance, still one grammar.</h2>
+          </div>
+          <p>All three surfaces keep the same semantic subject matter. This variant simply lets the documentation-facing expression carry a little more beauty before it would become too lush for the system's personality.</p>
+        </div>
+        <div class="surface-grid">
+          <article class="surface">
+            <div class="surface-top surface-label">
+              <span>Surface 01</span>
+              <span>DSL editor</span>
+            </div>
+            <h3>Authored contract</h3>
+            <div class="surface-line">field RequestedAmount<br>event Submit<br>invariant because "A decision cannot exceed coverage"</div>
+            <p>The editor surface still reads as crisp authored law, with a touch more atmosphere around the frame.</p>
+          </article>
+          <article class="surface">
+            <div class="surface-top surface-label">
+              <span>Surface 02</span>
+              <span>Inspection plate</span>
+            </div>
+            <h3>Governed configuration</h3>
+            <div class="surface-line">Reviewed<br>1420 of 1500<br>Reason visible alongside verdict</div>
+            <p>The inspection surface makes data and rule feel present enough to become memorable, not merely legible.</p>
+          </article>
+          <article class="surface">
+            <div class="surface-top surface-label">
+              <span>Surface 03</span>
+              <span>Public explanation</span>
+            </div>
+            <h3>Narrated semantic world</h3>
+            <div class="surface-line">CoverageReview advances only with an explicit reason and only while the governed amount remains inside coverage.</div>
+            <p>The explanatory surface becomes more poetic, but it still holds onto the exact same semantic grammar.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

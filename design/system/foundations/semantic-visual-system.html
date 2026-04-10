@@ -550,6 +550,7 @@ pre {
   <span class="nav-section-meta" style="margin-top:6px"></span>
   <a class="nav-item"        href="#typography" data-sec="typography">Typography</a>
   <a class="nav-item"        href="#colors"     data-sec="colors">Colors</a>
+  <a class="nav-item"        href="#docs"       data-sec="docs">Docs</a>
   <div class="nav-font-status" id="nav-font-status"></div>
 </nav>
 
@@ -636,12 +637,12 @@ pre {
   font-size: 9px;
   letter-spacing: 0.26em;
   text-transform: uppercase;
-  color: rgba(103,114,129,0.50);
+  color: var(--muted);
 }
 .cov-z-note {
   font-family: var(--sans);
   font-size: 12px;
-  color: rgba(103,114,129,0.45);
+  color: var(--soft);
 }
 /* ─ constructs band ─ */
 .cov-constructs {
@@ -771,7 +772,7 @@ pre {
   font-size: 9px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: rgba(103,114,129,0.35);
+  color: var(--soft);
 }
 .cov-ch-name {
   font-family: var(--mono);
@@ -787,31 +788,76 @@ pre {
   color: var(--soft);
 }
 /* ─ concept annotations ─ */
+/* ─ concept annotations ─ */
 .cov-concepts {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1px;
-  background: var(--line);
-  border: 1px solid var(--line);
   margin-top: 32px;
+  border: 1px solid var(--line-strong);
+  display: grid;
+  gap: 0;
 }
-.cov-concept {
-  padding: 28px;
+/* Foundation concept — full width, two-column */
+.cov-concept--foundation {
+  padding: 30px 32px 28px;
   background: var(--panel);
+  border-left: 2px solid var(--structure);
+  border-bottom: 1px solid var(--line-strong);
+  display: grid;
+  grid-template-columns: 200px minmax(0,1fr);
+  gap: 28px;
+  align-items: start;
+}
+.cov-concept-left {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding-top: 3px;
+}
+.cov-concept-role {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--structure);
+  opacity: 0.65;
+  display: block;
 }
 .cov-concept-lbl {
   font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text);
+  display: block;
+  line-height: 1.4;
+}
+/* Derived concepts — row of three */
+.cov-concepts-derived {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--line);
+}
+.cov-concepts-derived .cov-concept {
+  padding: 24px 22px;
+  background: var(--bg);
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+.cov-concepts-derived .cov-concept-lbl {
   font-size: 9px;
   letter-spacing: 0.22em;
-  text-transform: uppercase;
   color: var(--soft);
-  margin-bottom: 10px;
-  display: block;
+  opacity: 0.85;
 }
 .cov-concept p {
-  font-size: 15px;
-  line-height: 1.75;
+  font-size: 13px;
+  line-height: 1.72;
   color: var(--muted);
+}
+.cov-concept--foundation p {
+  font-size: 14px;
+  line-height: 1.76;
 }
 /* ─ responsive ─ */
 @media (max-width: 960px) {
@@ -819,7 +865,8 @@ pre {
   .cov-registers  { grid-template-columns: 1fr; }
   .cov-reg--rt .cov-surfaces { grid-template-columns: 1fr; }
   .cov-channels   { grid-template-columns: repeat(2, 1fr); }
-  .cov-concepts   { grid-template-columns: 1fr; }
+  .cov-concept--foundation { grid-template-columns: 1fr; }
+  .cov-concepts-derived { grid-template-columns: 1fr; }
 }
 </style>
 
@@ -940,22 +987,34 @@ pre {
 
   <!-- Concept definitions ─────────────────────── -->
   <div class="cov-concepts">
-    <div class="cov-concept">
-      <span class="cov-concept-lbl">Semantic Identity</span>
-      <p>Each construct carries a stable type classification that persists regardless of surface. Structure is always indigo, State always violet, Event always cyan, Data always steel, Rule always amber. Moving from code editor to diagram to data form to timeline, the same construct speaks in the same visual register&thinsp;—&thinsp;the medium adapts, the identity does not.</p>
+
+    <!-- Foundation concept -->
+    <div class="cov-concept cov-concept--foundation">
+      <div class="cov-concept-left">
+        <span class="cov-concept-role">Foundation</span>
+        <span class="cov-concept-lbl">Semantic Identity</span>
+      </div>
+      <div class="cov-concept-body">
+        <p>Each construct carries a stable type classification that persists regardless of surface. Structure is always indigo, State always violet, Event always cyan, Data always steel, Rule always amber. Moving from code editor to diagram to data form to timeline, the same construct speaks in the same visual register&thinsp;—&thinsp;the medium adapts, the identity does not.</p>
+      </div>
     </div>
-    <div class="cov-concept">
-      <span class="cov-concept-lbl">Authored vs Runtime Meaning</span>
-      <p>Definition captures what a construct <em>is</em>&thinsp;—&thinsp;its place in the governed schema, independent of any live instance. Runtime captures what is <em>happening</em> to it now&thinsp;—&thinsp;current lifecycle position, field values, evaluation results. These two readings are formally distinct. The same construct identity underlies both; the register changes, the identity holds.</p>
+
+    <!-- Derived concepts -->
+    <div class="cov-concepts-derived">
+      <div class="cov-concept">
+        <span class="cov-concept-lbl">Authored vs Runtime Meaning</span>
+        <p>Definition captures what a construct <em>is</em>&thinsp;—&thinsp;its place in the governed schema, independent of any live instance. Runtime captures what is <em>happening</em> to it now&thinsp;—&thinsp;current lifecycle position, field values, evaluation results. These two readings are formally distinct. The same construct identity underlies both; the register changes, the identity holds.</p>
+      </div>
+      <div class="cov-concept">
+        <span class="cov-concept-lbl">Additive Modifiers &amp; Runtime Overlays</span>
+        <p>Runtime state and constraint status are expressed as signals layered onto the base depiction&thinsp;—&thinsp;never as replacements. A blocked transition marks the event; it does not erase it. A violated rule flags the field row; it does not suppress it. Evaluation output&thinsp;—&thinsp;allowed, blocked, warning&thinsp;—&thinsp;is drawn on top. Overlay reveals; it does not displace.</p>
+      </div>
+      <div class="cov-concept">
+        <span class="cov-concept-lbl">Cross-Surface Translation</span>
+        <p>Moving from code editor to diagram to data form to timeline, a construct adopts different visual conventions appropriate to each medium. What remains invariant is its semantic identity: colour family, name form, and the modifier logic that applies to it. The system defines what stays constant so nothing needs to be relearned as surfaces change.</p>
+      </div>
     </div>
-    <div class="cov-concept">
-      <span class="cov-concept-lbl">Additive Modifiers &amp; Runtime Overlays</span>
-      <p>Runtime state and constraint status are expressed as signals layered onto the base depiction&thinsp;—&thinsp;never as replacements. A blocked transition marks the event; it does not erase it. A violated rule flags the field row; it does not suppress it. Evaluation output&thinsp;—&thinsp;allowed, blocked, warning&thinsp;—&thinsp;is drawn on top. Overlay reveals; it does not displace.</p>
-    </div>
-    <div class="cov-concept">
-      <span class="cov-concept-lbl">Cross-Surface Translation</span>
-      <p>Moving from code editor to diagram to data form to timeline, a construct adopts different visual conventions appropriate to each medium. What remains invariant is its semantic identity: colour family, name form, and the modifier logic that applies to it. The system defines what stays constant so nothing needs to be relearned as surfaces change.</p>
-    </div>
+
   </div>
 
 </section>
@@ -1131,7 +1190,7 @@ pre {
   <div class="section-head">
     <div class="eyebrow">03 · System</div>
     <h2>Five constructs, one grammar</h2>
-    <p>Each gallery shows two base depictions — Definition (how the construct appears as a syntax token in authored code) and Runtime (how it appears as a rendered component) — followed by semantic modifiers. All five constructs use the same composed structure.</p>
+    <p>Each gallery shows two base depictions — Definition (how the construct appears as a syntax token in authored code) and Runtime (how it appears as a rendered component) — followed by channel signals and then semantic modifiers. All five constructs use the same composed structure.</p>
   </div>
 
   <!-- STRUCTURE ─────────────────────────────────── -->
@@ -1152,14 +1211,14 @@ pre {
           </div>
           <div class="specimen-half-inner">
             <div class="cg-focal-strip"><span class="cg-focal-label">Structure keywords &middot; <span class="s">precept &middot; field &middot; state &middot; event &middot; in &middot; from&hellip;on &middot; set &middot; transition</span></span></div>
-            <pre><span class="s">precept</span> WorkItem
+            <pre><span class="s">precept</span> Task
 
 <span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
 
 <span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
 
 <span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
-  <span class="s">because</span> <span class="ru">"Closed items must be done"</span>
+  <span class="s">because</span> <span class="ru">"Closed means done"</span>
 
 <span class="s">event</span> <span class="ev">Close</span>
 
@@ -1178,7 +1237,7 @@ pre {
           <div class="specimen-half-inner">
             <div style="border:1px solid rgba(99,102,241,0.45);">
               <div style="padding:9px 14px;border-bottom:1px solid rgba(99,102,241,0.2);display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--structure)">WorkItem</span>
+                <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--structure)">Task</span>
                 <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.20em;text-transform:uppercase;color:rgba(99,102,241,0.35)">precept</span>
               </div>
               <div style="padding:32px 16px;display:flex;align-items:center;justify-content:center;">
@@ -1241,14 +1300,14 @@ pre {
           </div>
           <div class="specimen-half-inner">
             <div class="cg-focal-strip"><span class="cg-focal-label">State names &middot; <span class="st">Open &middot; Closed</span></span></div>
-            <pre><span class="s">precept</span> WorkItem
+            <pre><span class="s">precept</span> Task
 
 <span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
 
 <span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
 
 <span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
-  <span class="s">because</span> <span class="ru">"Closed items must be done"</span>
+  <span class="s">because</span> <span class="ru">"Closed means done"</span>
 
 <span class="s">event</span> <span class="ev">Close</span>
 
@@ -1275,17 +1334,6 @@ pre {
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div>
-        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
-        <div class="construct-modifiers">
-          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.35);display:inline-flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--structure);display:inline-block;flex-shrink:0;"></span>initial &mdash; origin dot</span>
-          <span class="modifier-tag st" style="border-width:2px;border-color:rgba(168,152,245,0.5);box-shadow:inset 0 0 0 2px rgba(168,152,245,0.14);">terminal &mdash; double border</span>
-          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.45);background:rgba(168,152,245,0.10);">current &mdash; active fill</span>
-          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.2);opacity:0.65;">reachable &mdash; dim highlight</span>
-          <span class="modifier-tag" style="font-style:italic;color:var(--state);border-color:rgba(168,152,245,0.2);">constrained &mdash; italic name</span>
         </div>
       </div>
 
@@ -1320,6 +1368,17 @@ pre {
         </div>
       </div>
 
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
+        <div class="construct-modifiers">
+          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.35);display:inline-flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--structure);display:inline-block;flex-shrink:0;"></span>initial &mdash; origin dot</span>
+          <span class="modifier-tag st" style="border-width:2px;border-color:rgba(168,152,245,0.5);box-shadow:inset 0 0 0 2px rgba(168,152,245,0.14);">terminal &mdash; double border</span>
+          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.45);background:rgba(168,152,245,0.10);">current &mdash; active fill</span>
+          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.2);opacity:0.65;">reachable &mdash; dim highlight</span>
+          <span class="modifier-tag" style="font-style:italic;color:var(--state);border-color:rgba(168,152,245,0.2);">constrained &mdash; italic name</span>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1341,14 +1400,14 @@ pre {
           </div>
           <div class="specimen-half-inner">
             <div class="cg-focal-strip"><span class="cg-focal-label">Event name &middot; <span class="ev">Close</span></span></div>
-            <pre><span class="s">precept</span> WorkItem
+            <pre><span class="s">precept</span> Task
 
 <span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
 
 <span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
 
 <span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
-  <span class="s">because</span> <span class="ru">"Closed items must be done"</span>
+  <span class="s">because</span> <span class="ru">"Closed means done"</span>
 
 <span class="s">event</span> <span class="ev">Close</span>
 
@@ -1373,17 +1432,6 @@ pre {
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div>
-        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
-        <div class="construct-modifiers">
-          <span class="modifier-tag ev" style="border-color:rgba(48,184,232,0.35);">&rarr; transition &mdash; directional arrow</span>
-          <span class="modifier-tag ev" style="border-color:rgba(48,184,232,0.2);opacity:0.7;">&empty; no-transition &mdash; no destination</span>
-          <span class="modifier-tag ev" style="font-style:italic;border-color:rgba(48,184,232,0.22);color:var(--event);">guarded &mdash; italic name</span>
-          <span class="modifier-tag no" style="border-style:dashed;border-color:rgba(248,113,113,0.45);">blocked &mdash; dashed violated border</span>
-          <span class="modifier-tag" style="color:var(--warn);border-color:rgba(253,224,71,0.3);">unmatched &mdash; warning colour</span>
         </div>
       </div>
 
@@ -1418,6 +1466,17 @@ pre {
         </div>
       </div>
 
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
+        <div class="construct-modifiers">
+          <span class="modifier-tag ev" style="border-color:rgba(48,184,232,0.35);">&rarr; transition &mdash; directional arrow</span>
+          <span class="modifier-tag ev" style="border-color:rgba(48,184,232,0.2);opacity:0.7;">&empty; no-transition &mdash; no destination</span>
+          <span class="modifier-tag ev" style="font-style:italic;border-color:rgba(48,184,232,0.22);color:var(--event);">guarded &mdash; italic name</span>
+          <span class="modifier-tag no" style="border-style:dashed;border-color:rgba(248,113,113,0.45);">blocked &mdash; dashed violated border</span>
+          <span class="modifier-tag" style="color:var(--warn);border-color:rgba(253,224,71,0.3);">unmatched &mdash; warning colour</span>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1439,14 +1498,14 @@ pre {
           </div>
           <div class="specimen-half-inner">
             <div class="cg-focal-strip"><span class="cg-focal-label">Field token &middot; <span class="da">Done</span> &middot; <span class="dt">boolean</span> &middot; <span class="dv">false</span></span></div>
-            <pre><span class="s">precept</span> WorkItem
+            <pre><span class="s">precept</span> Task
 
 <span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
 
 <span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
 
 <span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
-  <span class="s">because</span> <span class="ru">"Closed items must be done"</span>
+  <span class="s">because</span> <span class="ru">"Closed means done"</span>
 
 <span class="s">event</span> <span class="ev">Close</span>
 
@@ -1477,31 +1536,6 @@ pre {
               </tbody>
             </table>
           </div>
-        </div>
-      </div>
-
-      <div>
-        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
-        <div class="tonal-demo">
-          <div class="tonal-cell">
-            <span class="tonal-cell-lbl">Name</span>
-            <span class="da">Done</span>
-          </div>
-          <div class="tonal-cell">
-            <span class="tonal-cell-lbl">Type</span>
-            <span class="dt">boolean</span>
-          </div>
-          <div class="tonal-cell">
-            <span class="tonal-cell-lbl">Value</span>
-            <span class="dv">false</span>
-          </div>
-        </div>
-        <div class="construct-modifiers" style="padding-top:0;">
-          <span class="modifier-tag ok" style="border-color:rgba(52,211,153,0.3);">valid &mdash; check mark</span>
-          <span class="modifier-tag no" style="border-color:rgba(248,113,113,0.3);">violated &mdash; mark</span>
-          <span class="modifier-tag da" style="font-style:italic;border-color:rgba(176,190,197,0.25);">constrained &mdash; italic name</span>
-          <span class="modifier-tag" style="color:var(--soft);">editable</span>
-          <span class="modifier-tag" style="color:rgba(255,255,255,0.22);">locked</span>
         </div>
       </div>
 
@@ -1536,6 +1570,31 @@ pre {
         </div>
       </div>
 
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
+        <div class="tonal-demo">
+          <div class="tonal-cell">
+            <span class="tonal-cell-lbl">Name</span>
+            <span class="da">Done</span>
+          </div>
+          <div class="tonal-cell">
+            <span class="tonal-cell-lbl">Type</span>
+            <span class="dt">boolean</span>
+          </div>
+          <div class="tonal-cell">
+            <span class="tonal-cell-lbl">Value</span>
+            <span class="dv">false</span>
+          </div>
+        </div>
+        <div class="construct-modifiers" style="padding-top:0;">
+          <span class="modifier-tag ok" style="border-color:rgba(52,211,153,0.3);">valid &mdash; check mark</span>
+          <span class="modifier-tag no" style="border-color:rgba(248,113,113,0.3);">violated &mdash; mark</span>
+          <span class="modifier-tag da" style="font-style:italic;border-color:rgba(176,190,197,0.25);">constrained &mdash; italic name</span>
+          <span class="modifier-tag" style="color:var(--soft);">editable</span>
+          <span class="modifier-tag" style="color:rgba(255,255,255,0.22);">locked</span>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1556,15 +1615,15 @@ pre {
             <span class="specimen-half-tag">authored &middot; syntax token</span>
           </div>
           <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">Rule string &middot; <span class="ru">"Closed items must be done"</span></span></div>
-            <pre><span class="s">precept</span> WorkItem
+            <div class="cg-focal-strip"><span class="cg-focal-label">Rule string &middot; <span class="ru">"Closed means done"</span></span></div>
+            <pre><span class="s">precept</span> Task
 
 <span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
 
 <span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
 
 <span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
-  <span class="s">because</span> <span class="ru">"Closed items must be done"</span>
+  <span class="s">because</span> <span class="ru">"Closed means done"</span>
 
 <span class="s">event</span> <span class="ev">Close</span>
 
@@ -1582,21 +1641,9 @@ pre {
           </div>
           <div class="specimen-half-inner">
             <div style="display:grid;gap:4px;">
-              <div style="padding:11px 14px;border-left:3px solid var(--valid);background:rgba(52,211,153,0.04);font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--valid);">&checkmark; Closed items must be done <span style="color:rgba(52,211,153,0.45);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;">&mdash; satisfied</span></div>
+              <div style="padding:11px 14px;border-left:3px solid var(--valid);background:rgba(52,211,153,0.04);font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--valid);">&checkmark; Closed means done <span style="color:rgba(52,211,153,0.45);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;">&mdash; satisfied</span></div>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div>
-        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
-        <div class="construct-modifiers">
-          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35);">assert / because &mdash; rule keyword</span>
-        </div>
-        <div style="margin-top:8px;display:grid;gap:4px;">
-          <div class="callout-demo callout-demo--satisfied">&checkmark; satisfied &mdash; condition met, transition allowed</div>
-          <div class="callout-demo callout-demo--violated">&oslash; violated &mdash; condition failed, transition blocked</div>
-          <div class="callout-demo callout-demo--warn">&#9889; unmatched &mdash; guard not evaluated for current state</div>
         </div>
       </div>
 
@@ -1613,7 +1660,7 @@ pre {
           <div class="cg-channel">
             <div class="cg-channel-name">Typography</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><code class="ru">"Closed items must be done"</code><span>Mono &middot; quoted string &middot; interrupt</span></div>
+              <div class="cg-channel-signal"><code class="ru">"Closed means done"</code><span>Mono &middot; quoted string &middot; interrupt</span></div>
             </div>
           </div>
           <div class="cg-channel">
@@ -1628,6 +1675,18 @@ pre {
               <div class="cg-channel-signal"><span>Appears below the triggering field or event</span></div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
+        <div class="construct-modifiers">
+          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35);">assert / because &mdash; rule keyword</span>
+        </div>
+        <div style="margin-top:8px;display:grid;gap:4px;">
+          <div class="callout-demo callout-demo--satisfied">&checkmark; satisfied &mdash; condition met, transition allowed</div>
+          <div class="callout-demo callout-demo--violated">&oslash; violated &mdash; condition failed, transition blocked</div>
+          <div class="callout-demo callout-demo--warn">&#9889; unmatched &mdash; guard not evaluated for current state</div>
         </div>
       </div>
 
@@ -1999,6 +2058,953 @@ pre {
       <p>Dusk #9096A6 in italic keeps comments legible but structurally separate from the five semantic families. Never repurpose a family color for editorial annotation.</p>
     </div>
   </div>
+</section>
+
+<!-- 07 · DOCS                                       -->
+<!-- ═══════════════════════════════════════════════════ -->
+<style>
+/* ── § 07 DOCS · representation in documentation ──────────────────────── */
+
+/* ─ inline construct references ─ */
+.doc-ref {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  padding: 0.05em 0.35em;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+.doc-ref.s  { color: var(--structure); }
+.doc-ref.st { color: var(--state); }
+.doc-ref.ev { color: var(--event); }
+.doc-ref.da { color: var(--data); }
+.doc-ref.ru { color: var(--rule); }
+
+/* ─ construct pills ─ */
+.doc-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 3px 10px 3px 7px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  opacity: 0.9;
+}
+.doc-pill::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.doc-pill.s  { color: var(--structure); background: rgba(99,102,241,0.08); }
+.doc-pill.st { color: var(--state);     background: rgba(168,152,245,0.08); }
+.doc-pill.ev { color: var(--event);     background: rgba(48,184,232,0.08); }
+.doc-pill.da { color: var(--data);      background: rgba(176,190,197,0.08); }
+.doc-pill.ru { color: var(--rule);      background: rgba(251,191,36,0.08); }
+
+/* ─ reference table ─ */
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.doc-table th {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+  text-align: left;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--bg);
+}
+.doc-table td {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  vertical-align: middle;
+}
+.doc-table tr:last-child td { border-bottom: none; }
+.doc-table .doc-name {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.doc-table .doc-desc {
+  font-family: var(--sans);
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ─ chrome token strip ─ */
+.doc-tokens {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line-strong);
+}
+.doc-token {
+  padding: 16px 14px;
+  display: grid;
+  gap: 5px;
+  align-content: start;
+}
+.doc-token-name {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.doc-token-value {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.doc-token-role {
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--soft);
+}
+
+/* ─ font assignment ─ */
+.doc-font-assign {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line-strong);
+}
+.doc-fa-cell {
+  padding: 24px 26px;
+  background: var(--panel);
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.doc-fa-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.doc-fa-specimen { line-height: 1.3; color: var(--text); }
+.doc-fa-uses {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.doc-fa-rule {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--soft);
+  line-height: 1.5;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+/* ─ heading scale ─ */
+.doc-heading-scale { border: 1px solid var(--line-strong); overflow: hidden; }
+.doc-hs-row {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 220px;
+  align-items: center;
+  gap: 24px;
+  padding: 18px 28px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.doc-hs-row:last-child { border-bottom: none; }
+.doc-hs-meta { text-align: right; display: grid; gap: 3px; }
+.doc-hs-level {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.doc-hs-spec { font-family: var(--mono); font-size: 11px; color: var(--muted); opacity: 0.6; }
+
+/* ─ product name ─ */
+.doc-precept-name {
+  font-family: var(--mono);
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.12em;
+  color: var(--text);
+}
+
+/* ─ callouts ─ */
+.doc-callout {
+  display: grid;
+  grid-template-columns: 4px minmax(0,1fr);
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+.doc-callout:last-child { border-bottom: none; }
+.doc-callout-body {
+  padding: 14px 20px;
+  background: var(--panel);
+  display: grid;
+  gap: 7px;
+  align-content: start;
+}
+.doc-callout-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+.doc-callout p { font-family: var(--sans); font-size: 14px; line-height: 1.65; color: var(--muted); margin: 0; }
+.doc-callout--note    .doc-callout-accent { background: var(--structure); }
+.doc-callout--note    .doc-callout-label  { color: var(--structure); }
+.doc-callout--tip     .doc-callout-accent { background: var(--valid); }
+.doc-callout--tip     .doc-callout-label  { color: var(--valid); }
+.doc-callout--caution .doc-callout-accent { background: var(--warn); }
+.doc-callout--caution .doc-callout-label  { color: var(--warn); }
+.doc-callout--warn    .doc-callout-accent { background: var(--violated); }
+.doc-callout--warn    .doc-callout-label  { color: var(--violated); }
+.doc-callout--note    .doc-callout-body { background: rgba(99,102,241,0.04); }
+.doc-callout--tip     .doc-callout-body { background: rgba(52,211,153,0.04); }
+.doc-callout--caution .doc-callout-body { background: rgba(253,224,71,0.04); }
+.doc-callout--warn    .doc-callout-body { background: rgba(248,113,113,0.04); }
+
+/* ─ code block ─ */
+.doc-code-block { border: 1px solid var(--line-strong); overflow: hidden; }
+.doc-code-header {
+  padding: 8px 18px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.doc-code-lang {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+pre.doc-code-body {
+  background: var(--panel-2);
+  margin: 0;
+  padding: 20px 24px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.9;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* ─ page specimen ─ */
+.doc-specimen-frame {
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.doc-specimen-chrome {
+  background: var(--bg);
+  border-bottom: 1px solid var(--line-strong);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.doc-specimen-dot { width:10px;height:10px;border-radius:50%; }
+.doc-specimen-url {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 3px 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--soft);
+  flex: 1;
+  max-width: 360px;
+}
+.doc-specimen-body {
+  display: grid;
+  grid-template-columns: 240px minmax(0,1fr) 180px;
+  min-height: 640px;
+  background: var(--bg);
+}
+.doc-specimen-sidebar {
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  padding: 0;
+  display: grid;
+  align-content: start;
+  gap: 0;
+}
+.doc-sp-section {
+  padding: 6px 20px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-top: 16px;
+}
+.doc-sp-link {
+  padding: 6px 20px;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--muted);
+  display: block;
+  border-left: 2px solid transparent;
+}
+.doc-sp-link.active {
+  color: var(--text);
+  border-left-color: var(--structure);
+  background: rgba(99,102,241,0.06);
+}
+.doc-sp-link.child {
+  padding-left: 32px;
+  font-size: 12px;
+  color: var(--soft);
+}
+.doc-specimen-sidebar-header {
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--line-strong);
+  display: grid;
+  gap: 3px;
+}
+.doc-specimen-sidebar-ver {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+/* right-rail TOC */
+.doc-specimen-toc {
+  border-left: 1px solid var(--line);
+  padding: 28px 18px;
+  display: grid;
+  align-content: start;
+  gap: 0;
+  background: var(--bg);
+}
+.doc-sp-toc-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+.doc-sp-toc-link {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--soft);
+  display: block;
+  padding: 5px 4px 5px 10px;
+  border-left: 2px solid transparent;
+  line-height: 1.3;
+}
+.doc-sp-toc-link.active {
+  color: var(--muted);
+  border-left-color: var(--state);
+}
+.doc-specimen-content {
+  padding: 48px 52px;
+  display: grid;
+  gap: 32px;
+  align-content: start;
+  overflow: hidden;
+}
+
+/* type scale within specimen */
+.dsp-eyebrow {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: -20px;
+}
+.dsp-h1 {
+  font-family: var(--mono);
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.18;
+  color: var(--text);
+}
+.dsp-h2 {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--text);
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.dsp-h3 {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+  margin-bottom: -20px;
+}
+.dsp-p {
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--muted);
+  max-width: 62ch;
+}
+.dsp-lead {
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--muted);
+  max-width: 58ch;
+}
+
+/* diagram in specimen */
+.dsp-diagram {
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: var(--panel-2);
+  overflow-x: auto;
+}
+.dsp-flow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 14px 20px;
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+.dsp-flow + .dsp-flow {
+  border-top: 1px solid var(--line);
+}
+.dsp-flow-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  min-width: 68px;
+  flex-shrink: 0;
+  margin-right: 12px;
+  padding-right: 12px;
+  border-right: 1px solid var(--line);
+}
+.dsp-flow--allowed .dsp-flow-label { color: var(--valid); }
+.dsp-flow--blocked .dsp-flow-label { color: var(--violated); }
+.dsp-arrow--blocked .dsp-arrow-label { color: var(--violated); }
+.dsp-arrow--blocked .dsp-arrow-line  { color: var(--violated); }
+.dsp-arrow--blocked .dsp-arrow-shaft {
+  background: none;
+  height: 0;
+  border-top: 1px dashed var(--violated);
+  opacity: 0.6;
+}
+.dsp-reject-node {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--violated);
+  background: rgba(248,113,113,0.08);
+  border: 1px dashed rgba(248,113,113,0.3);
+  padding: 7px 14px;
+  border-radius: 3px;
+}
+.dsp-state {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 7px 14px;
+  border-radius: 3px;
+  border: 1px solid var(--state);
+  color: var(--state);
+  background: rgba(168,152,245,0.08);
+  white-space: nowrap;
+}
+.dsp-state.current {
+  background: rgba(168,152,245,0.18);
+  box-shadow: 0 0 0 1px var(--state);
+}
+.dsp-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 0 12px;
+}
+.dsp-arrow-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--event);
+}
+.dsp-arrow-line {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  color: var(--event);
+  font-size: 14px;
+}
+.dsp-arrow-shaft {
+  width: 36px;
+  height: 1px;
+  background: var(--event);
+  opacity: 0.6;
+}
+
+/* lists */
+.dsp-list {
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--muted);
+  padding-left: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  max-width: 64ch;
+}
+.dsp-list li { display: flex; gap: 10px; align-items: baseline; }
+.dsp-list li::before {
+  content: '—';
+  color: var(--soft);
+  font-family: var(--mono);
+  flex-shrink: 0;
+}
+.dsp-olist { counter-reset: dsp-ol; }
+.dsp-olist li::before {
+  counter-increment: dsp-ol;
+  content: counter(dsp-ol) '.';
+  color: var(--structure);
+  font-family: var(--mono);
+  font-size: 12px;
+  min-width: 18px;
+  flex-shrink: 0;
+}
+
+/* responsive */
+@media (max-width: 960px) {
+  .doc-tokens      { grid-template-columns: repeat(2, 1fr); }
+  .doc-font-assign { grid-template-columns: 1fr; }
+  .doc-hs-row      { grid-template-columns: 1fr; }
+  .doc-hs-meta     { text-align: left; }
+  .doc-specimen-body { grid-template-columns: 1fr; }
+  .doc-specimen-sidebar { display: none; }
+  .doc-specimen-toc { display: none; }
+  .doc-specimen-content { padding: 28px 24px; }
+}
+</style>
+
+<section class="section" id="docs">
+  <div class="section-head">
+    <div class="eyebrow">07 · Docs</div>
+    <h2>How Precept appears in writing</h2>
+    <p>Documentation surfaces — README files, guides, reference tables, conceptual explanations — have their own representational conventions. Construct names appear inline in prose, in comparison tables, and in annotated examples. These conventions keep semantic identity legible in text without requiring a rendered UI.</p>
+  </div>
+
+  <!-- Inline references -->
+  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none">
+    <span class="cov-z-label">Inline References</span>
+    <span class="cov-z-note">construct names embedded in prose</span>
+  </div>
+  <div style="border:1px solid var(--line-strong);padding:28px 32px;background:var(--panel)">
+    <p style="font-family:var(--sans);font-size:15px;line-height:2.0;color:var(--muted)">
+      When the <span class="doc-ref s">LoanApplication</span> precept enters the
+      <span class="doc-ref st">Draft</span> state, the
+      <span class="doc-ref ev">Submit</span> event becomes available. Firing it transitions the entity
+      to <span class="doc-ref st">Submitted</span>. The <span class="doc-ref da">Amount</span> field
+      must satisfy the <span class="doc-ref ru">minimum-amount</span> invariant before
+      <span class="doc-ref ev">Submit</span> is allowed.
+    </p>
+    <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--line);display:flex;gap:24px;align-items:baseline;flex-wrap:wrap">
+      <div style="display:grid;gap:6px;align-content:start">
+        <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.22em;text-transform:uppercase;color:var(--soft)">Convention</span>
+        <span style="font-family:var(--sans);font-size:13px;color:var(--muted)">Mono, construct family color, subtle background + border</span>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <span class="doc-ref s">structure</span>
+        <span class="doc-ref st">state</span>
+        <span class="doc-ref ev">event</span>
+        <span class="doc-ref da">data</span>
+        <span class="doc-ref ru">rule</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pills -->
+  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+    <span class="cov-z-label">Type Pills</span>
+    <span class="cov-z-note">compact identity badges for tables and reference lists</span>
+  </div>
+  <div style="border:1px solid var(--line-strong);padding:24px 32px;background:var(--panel);display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+    <span class="doc-pill s">Structure</span>
+    <span class="doc-pill st">State</span>
+    <span class="doc-pill ev">Event</span>
+    <span class="doc-pill da">Data</span>
+    <span class="doc-pill ru">Rule</span>
+  </div>
+
+  <!-- Reference table -->
+  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+    <span class="cov-z-label">Reference Table</span>
+    <span class="cov-z-note">anatomy of a construct reference row</span>
+  </div>
+  <div style="border:1px solid var(--line-strong);overflow:hidden">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th style="width:40%">Name</th>
+          <th style="width:15%">Kind</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="doc-name s">LoanApplication</span></td>
+          <td><span class="doc-pill s" style="font-size:10px">Structure</span></td>
+          <td class="doc-desc">The governing precept. Defines fields, states, events, and transition rules for a loan request.</td>
+        </tr>
+        <tr>
+          <td><span class="doc-name st">Draft</span></td>
+          <td><span class="doc-pill st" style="font-size:10px">State</span></td>
+          <td class="doc-desc">Initial state. The applicant can edit fields. <span class="doc-ref ev" style="font-size:0.88em">Submit</span> becomes available once required fields are valid.</td>
+        </tr>
+        <tr>
+          <td><span class="doc-name ev">Submit</span></td>
+          <td><span class="doc-pill ev" style="font-size:10px">Event</span></td>
+          <td class="doc-desc">Transitions from <span class="doc-ref st" style="font-size:0.88em">Draft</span> to <span class="doc-ref st" style="font-size:0.88em">Submitted</span>. Blocked if <span class="doc-ref da" style="font-size:0.88em">Amount</span> fails invariant.</td>
+        </tr>
+        <tr>
+          <td><span class="doc-name da">Amount</span></td>
+          <td><span class="doc-pill da" style="font-size:10px">Data</span></td>
+          <td class="doc-desc">Loan amount requested. Type <span class="doc-ref da" style="font-size:0.88em">number</span>. Must be greater than 0.</td>
+        </tr>
+        <tr>
+          <td><span class="doc-name ru">minimum-amount</span></td>
+          <td><span class="doc-pill ru" style="font-size:10px">Rule</span></td>
+          <td class="doc-desc">Invariant on <span class="doc-ref da" style="font-size:0.88em">Amount</span>. Enforced before any transition that reads the field.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Code blocks -->
+  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+    <span class="cov-z-label">Code Blocks</span>
+    <span class="cov-z-note">DSL snippets as they appear in documentation</span>
+  </div>
+  <div class="doc-code-block">
+    <div class="doc-code-header">
+      <span class="doc-code-lang">precept</span>
+    </div>
+    <pre class="doc-code-body"><span style="color:var(--structure);font-weight:bold">precept</span> <span style="color:var(--rule)">LoanApplication</span>
+  <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">Amount</span>       <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">number</span>
+  <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">Applicant</span>    <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">string</span>
+
+  <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Draft</span>        <span style="color:var(--structure);font-weight:bold">initial</span>
+  <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Submitted</span>
+
+  <span style="color:var(--structure);font-weight:bold">on</span>     <span style="color:var(--event)">Submit</span>   <span style="color:var(--structure)">from</span> <span style="color:var(--state)">Draft</span>
+    <span style="color:var(--structure);font-weight:bold">rule</span>  <span style="color:var(--data)">Amount</span> <span style="color:var(--structure)">&gt;</span> <span style="color:var(--data-v)">0</span>  <span style="color:var(--structure);font-weight:bold">because</span> <span style="color:var(--rule)">&quot;Amount must be positive&quot;</span>
+    <span style="color:var(--structure);font-weight:bold">transition</span> <span style="color:var(--structure)">to</span> <span style="color:var(--state)">Submitted</span></pre>
+  </div>
+  <div style="padding:12px 18px;background:var(--panel);border:1px solid var(--line-strong);border-top:none">
+    <span style="font-family:var(--sans);font-size:13px;color:var(--soft)">Code blocks carry full syntax coloring — same as the editor. Language tab identifies the dialect. Background is <code style="font-family:var(--mono);font-size:0.88em;color:var(--muted)">--panel-2</code>. Never strip coloring for documentation use.</span>
+  </div>
+
+  <!-- Callouts -->
+  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+    <span class="cov-z-label">Callouts</span>
+    <span class="cov-z-note">notes, tips, cautions, and warnings</span>
+  </div>
+  <div style="border:1px solid var(--line-strong);overflow:hidden">
+    <div class="doc-callout doc-callout--note">
+      <div class="doc-callout-accent"></div>
+      <div class="doc-callout-body">
+        <span class="doc-callout-label">Note</span>
+        <p>Precept does not evaluate transitions at author time. The <span class="doc-ref ev">Submit</span> event only executes when explicitly fired via the runtime API or MCP tool.</p>
+      </div>
+    </div>
+    <div class="doc-callout doc-callout--tip">
+      <div class="doc-callout-accent"></div>
+      <div class="doc-callout-body">
+        <span class="doc-callout-label">Tip</span>
+        <p>Use <span class="doc-ref ev">precept_inspect</span> to preview all available transitions for a given state without modifying any data.</p>
+      </div>
+    </div>
+    <div class="doc-callout doc-callout--caution">
+      <div class="doc-callout-accent"></div>
+      <div class="doc-callout-body">
+        <span class="doc-callout-label">Caution</span>
+        <p>Field values passed to <span class="doc-ref ev">precept_fire</span> must match declared field types. Type mismatches are caught at evaluation time, not authoring time.</p>
+      </div>
+    </div>
+    <div class="doc-callout doc-callout--warn">
+      <div class="doc-callout-accent"></div>
+      <div class="doc-callout-body">
+        <span class="doc-callout-label">Warning</span>
+        <p>Removing a state referenced by an active transition causes a compile error. All references must be updated before the precept can be re-evaluated.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chrome tokens -->
+  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+    <span class="cov-z-label">Chrome Tokens</span>
+    <span class="cov-z-note">text, surface, and line variables for doc surfaces</span>
+  </div>
+  <div class="doc-tokens">
+    <div class="doc-token" style="background:var(--panel-2)">
+      <span class="doc-token-name">--text</span>
+      <span class="doc-token-value" style="color:var(--text)">#f1f3f6</span>
+      <span class="doc-token-role">Primary prose &amp; labels</span>
+    </div>
+    <div class="doc-token" style="background:var(--panel-2)">
+      <span class="doc-token-name">--muted</span>
+      <span class="doc-token-value" style="color:var(--muted)">#a7afbb</span>
+      <span class="doc-token-role">Descriptions &amp; body copy</span>
+    </div>
+    <div class="doc-token" style="background:var(--panel-2)">
+      <span class="doc-token-name">--soft</span>
+      <span class="doc-token-value" style="color:var(--soft)">#687281</span>
+      <span class="doc-token-role">Eyebrows, captions, tertiary labels</span>
+    </div>
+    <div class="doc-token" style="background:var(--panel-2)">
+      <span class="doc-token-name">--line</span>
+      <span class="doc-token-value" style="color:var(--muted)">rgba(255,255,255,0.08)</span>
+      <span class="doc-token-role">Dividers &amp; row borders</span>
+      <div style="margin-top:10px;height:1px;background:var(--line)"></div>
+    </div>
+    <div class="doc-token" style="background:var(--bg);border:1px solid var(--line)">
+      <span class="doc-token-name">--bg</span>
+      <span class="doc-token-value" style="color:var(--muted)">#040506</span>
+      <span class="doc-token-role">Base canvas</span>
+    </div>
+    <div class="doc-token" style="background:var(--panel)">
+      <span class="doc-token-name">--panel</span>
+      <span class="doc-token-value" style="color:var(--muted)">#090b0e</span>
+      <span class="doc-token-role">Cards &amp; inset blocks</span>
+    </div>
+    <div class="doc-token" style="background:var(--panel-2)">
+      <span class="doc-token-name">--panel-2</span>
+      <span class="doc-token-value" style="color:var(--muted)">#0d1014</span>
+      <span class="doc-token-role">Elevated cells &amp; specimens</span>
+    </div>
+    <div class="doc-token" style="background:var(--panel-2)">
+      <span class="doc-token-name">--line-strong</span>
+      <span class="doc-token-value" style="color:var(--muted)">rgba(255,255,255,0.16)</span>
+      <span class="doc-token-role">Section borders &amp; strong dividers</span>
+      <div style="margin-top:10px;height:1px;background:var(--line-strong)"></div>
+    </div>
+  </div>
+
+  <!-- Page specimen -->
+  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+    <span class="cov-z-label">Page Specimen</span>
+    <span class="cov-z-note">realistic docs page in context&thinsp;·&thinsp;headings, prose, diagram, lists, callout, code, table</span>
+  </div>
+  <div class="doc-specimen-frame">
+
+    <!-- browser chrome -->
+    <div class="doc-specimen-chrome">
+      <div class="doc-specimen-dot" style="background:#F87171;opacity:0.7"></div>
+      <div class="doc-specimen-dot" style="background:#FDE047;opacity:0.7"></div>
+      <div class="doc-specimen-dot" style="background:#34D399;opacity:0.7"></div>
+      <div class="doc-specimen-url">precept.dev/docs/guides/defining-precepts</div>
+    </div>
+
+    <div class="doc-specimen-body">
+
+      <!-- sidebar nav -->
+      <div class="doc-specimen-sidebar">
+        <div class="doc-specimen-sidebar-header">
+          <span class="doc-precept-name" style="font-size:14px">Precept</span>
+          <span class="doc-specimen-sidebar-ver">v1 &middot; Documentation</span>
+        </div>
+        <span class="doc-sp-section">Getting Started</span>
+        <a class="doc-sp-link" href="#">Installation</a>
+        <a class="doc-sp-link" href="#">Quick Start</a>
+        <span class="doc-sp-section">Guides</span>
+        <a class="doc-sp-link active" href="#">Defining Precepts</a>
+        <a class="doc-sp-link child" href="#">Fields</a>
+        <a class="doc-sp-link child" href="#">States</a>
+        <a class="doc-sp-link child" href="#">Events &amp; Transitions</a>
+        <a class="doc-sp-link child" href="#">Rules &amp; Invariants</a>
+        <a class="doc-sp-link" href="#">Runtime API</a>
+        <a class="doc-sp-link" href="#">MCP Tools</a>
+        <span class="doc-sp-section">Reference</span>
+        <a class="doc-sp-link" href="#">Language</a>
+        <a class="doc-sp-link" href="#">API</a>
+      </div>
+
+      <!-- page content -->
+      <div class="doc-specimen-content">
+
+        <div>
+          <div class="dsp-eyebrow">Guide</div>
+          <h1 class="dsp-h1">Defining Precepts</h1>
+        </div>
+
+        <p class="dsp-lead">A precept is a governed schema that defines what a business entity is allowed to become. It declares fields, names the states it can occupy, and specifies which events drive transitions between them. Everything the entity can do &thinsp;—&thinsp; and everything it cannot &thinsp;—&thinsp; is declared here.</p>
+
+        <!-- H2 + prose -->
+        <div style="display:grid;gap:14px">
+          <h2 class="dsp-h2">States</h2>
+          <p class="dsp-p">A state is a named position in the entity’s lifecycle. Every precept has at least one state marked <span class="doc-ref s">initial</span> &thinsp;—&thinsp; this is where a new instance begins. States are declared with the <span class="doc-ref s">state</span> keyword and a name drawn from the <span class="doc-ref st">State</span> construct family.</p>
+          <p class="dsp-p">Nothing happens to an entity unless an event fires. States are inert until an event arrives. This is what makes Precept deterministic: the current state and the fired event fully determine the outcome.</p>
+        </div>
+
+        <!-- Diagram -->
+        <div style="display:grid;gap:10px">
+          <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.22em;text-transform:uppercase;color:var(--soft)">State diagram &thinsp;·&thinsp; LoanApplication lifecycle</span>
+          <div class="dsp-diagram">
+            <!-- Allowed path row -->
+            <div class="dsp-flow dsp-flow--allowed">
+              <span class="dsp-flow-label">Allowed</span>
+              <div class="dsp-state">Draft</div>
+              <div class="dsp-arrow">
+                <span class="dsp-arrow-label">Submit</span>
+                <div class="dsp-arrow-line"><div class="dsp-arrow-shaft"></div><span>&#x203a;</span></div>
+              </div>
+              <div class="dsp-state current">Submitted</div>
+              <div class="dsp-arrow">
+                <span class="dsp-arrow-label">Approve</span>
+                <div class="dsp-arrow-line"><div class="dsp-arrow-shaft"></div><span>&#x203a;</span></div>
+              </div>
+              <div class="dsp-state">Approved</div>
+            </div>
+            <!-- Guard-blocked row -->
+            <div class="dsp-flow dsp-flow--blocked">
+              <span class="dsp-flow-label">Blocked</span>
+              <div class="dsp-state">Draft</div>
+              <div class="dsp-arrow dsp-arrow--blocked">
+                <span class="dsp-arrow-label">Submit</span>
+                <div class="dsp-arrow-line"><div class="dsp-arrow-shaft"></div><span>&#x203a;</span></div>
+              </div>
+              <div class="dsp-reject-node">&#x2715; Amount = 0</div>
+            </div>
+          </div>
+          <span style="font-family:var(--sans);font-size:12px;color:var(--soft)">Outlined ring = current state&thinsp;&middot;&thinsp;Blocked row shows guard failure when <span class="doc-ref ru" style="font-size:0.90em">Amount</span> = 0.</span>
+        </div>
+
+        <!-- H2 + H3 + list -->
+        <div style="display:grid;gap:14px">
+          <h2 class="dsp-h2">Events &amp; Transitions</h2>
+          <p class="dsp-p">Events are the only mechanism that advances state. An event declared under a specific source state can only fire from that state. Attempting to fire it from any other state has no effect &thinsp;—&thinsp; Precept does not throw; it simply finds no matching transition.</p>
+          <h3 class="dsp-h3">What a transition block does</h3>
+          <ul class="dsp-list">
+            <li>Evaluates all <span class="doc-ref ru">rule</span> guards in declaration order &thinsp;—&thinsp; first failure blocks the whole event</li>
+            <li>Applies all <span class="doc-ref s">set</span> expressions to produce the next field snapshot</li>
+            <li>Moves the entity to the target state declared by <span class="doc-ref s">transition to</span></li>
+            <li>Returns the outcome: <span class="doc-ref ev">allowed</span>, <span class="doc-ref ru">blocked</span>, or <span class="doc-ref st">rejected</span></li>
+          </ul>
+        </div>
+
+        <!-- Callout -->
+        <div class="doc-callout doc-callout--note" style="border:1px solid var(--line)">
+          <div class="doc-callout-accent"></div>
+          <div class="doc-callout-body">
+            <span class="doc-callout-label">Note</span>
+            <p>Rules inside a transition block are scoped to that event. Invariants declared at the precept level are evaluated on every transition, regardless of which event fired.</p>
+          </div>
+        </div>
+
+        <!-- H2 + code -->
+        <div style="display:grid;gap:14px">
+          <h2 class="dsp-h2">A minimal precept</h2>
+          <p class="dsp-p">The following declares a <span class="doc-ref s">LoanApplication</span> with two states, one field, and one transition. It is the smallest complete example that demonstrates the full structure.</p>
+          <div class="doc-code-block">
+            <div class="doc-code-header"><span class="doc-code-lang">precept</span></div>
+            <pre class="doc-code-body"><span style="color:var(--structure);font-weight:bold">precept</span> <span style="color:var(--rule)">LoanApplication</span>
+  <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">Amount</span>   <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">number</span>
+
+  <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Draft</span>    <span style="color:var(--structure);font-weight:bold">initial</span>
+  <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Submitted</span>
+
+  <span style="color:var(--structure);font-weight:bold">on</span>  <span style="color:var(--event)">Submit</span>  <span style="color:var(--structure)">from</span> <span style="color:var(--state)">Draft</span>
+    <span style="color:var(--structure);font-weight:bold">rule</span>  <span style="color:var(--data)">Amount</span> <span style="color:var(--structure)">&gt;</span> <span style="color:var(--data-v)">0</span>  <span style="color:var(--structure);font-weight:bold">because</span> <span style="color:var(--rule)">&quot;Amount must be positive&quot;</span>
+    <span style="color:var(--structure);font-weight:bold">transition</span>  <span style="color:var(--structure)">to</span> <span style="color:var(--state)">Submitted</span></pre>
+          </div>
+        </div>
+
+        <!-- H2 + table -->
+        <div style="display:grid;gap:14px">
+          <h2 class="dsp-h2">Transition reference</h2>
+          <div style="border:1px solid var(--line-strong);overflow:hidden">
+            <table class="doc-table">
+              <thead>
+                <tr>
+                  <th style="width:22%">Event</th>
+                  <th style="width:20%">From</th>
+                  <th style="width:20%">To</th>
+                  <th>Guards</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="doc-name ev">Submit</span></td>
+                  <td><span class="doc-name st">Draft</span></td>
+                  <td><span class="doc-name st">Submitted</span></td>
+                  <td class="doc-desc"><span class="doc-ref da" style="font-size:0.88em">Amount</span> &gt; 0</td>
+                </tr>
+                <tr>
+                  <td><span class="doc-name ev">Approve</span></td>
+                  <td><span class="doc-name st">Submitted</span></td>
+                  <td><span class="doc-name st">Approved</span></td>
+                  <td class="doc-desc">None</td>
+                </tr>
+                <tr>
+                  <td><span class="doc-name ev">Decline</span></td>
+                  <td><span class="doc-name st">Submitted</span></td>
+                  <td><span class="doc-name st">Declined</span></td>
+                  <td class="doc-desc">None</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Next steps -->
+        <div style="display:grid;gap:12px;padding:20px 24px;background:var(--panel);border:1px solid var(--line)">
+          <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.22em;text-transform:uppercase;color:var(--soft)">Next</span>
+          <ol class="dsp-list dsp-olist" style="margin:0">
+            <li>Add invariants to enforce field constraints across all transitions</li>
+            <li>Use <span class="doc-ref ev">precept_inspect</span> to preview what events are available from any state</li>
+            <li>Connect the precept to a host application via the Runtime API</li>
+          </ol>
+        </div>
+
+      </div><!-- /.doc-specimen-content -->
+
+      <!-- right-rail TOC -->
+      <div class="doc-specimen-toc">
+        <span class="doc-sp-toc-label">On this page</span>
+        <a class="doc-sp-toc-link" href="#">States</a>
+        <a class="doc-sp-toc-link active" href="#">Events &amp; Transitions</a>
+        <a class="doc-sp-toc-link" href="#">A minimal precept</a>
+        <a class="doc-sp-toc-link" href="#">Transition reference</a>
+      </div>
+
+    </div><!-- /.doc-specimen-body -->
+  </div><!-- /.doc-specimen-frame -->
+
 </section>
 
 <script>
