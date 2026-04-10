@@ -6,6 +6,9 @@
 
 ## Recent Updates
 
+### 2026-04-10 — Issue #31 shipped
+- PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
+
 ### 2026-04-10 - Issue #31 Slice 7: keyword logical operator tests
 - Updated 9 existing test files (8 in `test/Precept.Tests/`, 1 in `test/Precept.LanguageServer.Tests/`) to replace DSL symbols `&&` → `and`, `||` → `or`, `!` → `not` in all `.precept` string literals and operator assertions.
 - Created new `test/Precept.Tests/PreceptKeywordLogicalOperatorTests.cs` covering: basic keyword parsing (not/and/or), precedence validation (not > and > or), null narrowing through `not (Field == null)`, `!=` operator unaffected, old symbols `&&`/`||`/`!` produce parse errors, compound expression parse/evaluate, invariant context (or/and).

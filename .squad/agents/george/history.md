@@ -7,6 +7,9 @@
 
 ## Recent Updates
 
+### 2026-04-10 — Issue #31 shipped
+- PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
+
 ### 2026-04-10 - Issue #31 Slices 1-4 + Samples (keyword logical operators)
 - **Token names found:** `And`, `Or`, `Not` — already existed in `PreceptToken` enum with old `[TokenSymbol("&&")]`, `[TokenSymbol("||")]`, `[TokenSymbol("!")]`. Changed to `[TokenSymbol("and")]`, `[TokenSymbol("or")]`, `[TokenSymbol("not")]`. Both `TokenCategory.Operator` attributes were correct; no category changes needed.
 - **Tokenizer protection:** `requireDelimiters: true` on keyword registration (step 7 in `Build()`) is the mechanism that prevents `android` from matching `And` + `roid`. The operator entries (`&&`, `||`, `!`) were in steps 4-5 (plain span/character matches without delimiters) — removing them from those sections was sufficient, since `And`/`Or`/`Not` are now registered as keywords via the keyword loop.
