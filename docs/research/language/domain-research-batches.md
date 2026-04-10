@@ -11,7 +11,7 @@ Based on the philosophy refresh assessment, three-agent strategic review (Frank,
 | Proposal | Domain | Research status |
 |----------|--------|----------------|
 | #31 Logical keywords | Expression expansion | ✅ Complete — ship first, touches every sample |
-| #22 Data-only precepts | Entity-modeling surface | ✅ Design locked, 12 Q&A decisions, PR #48 in progress |
+| #22 Data-only precepts | Entity-modeling surface | ✅ **Completed** — design locked, 12 Q&A decisions, PR #48 merged |
 | #13 Field-level constraints | Constraint composition | ⚠️ Research adequate; constraint-zone architecture needs durable doc |
 
 **Why this is M1:** Proves the governed-integrity category claim. Data-only precepts demonstrate the full domain promise. Field constraints eliminate 60-70% of invariant boilerplate. Keyword modernization makes the language read as governance, not code.

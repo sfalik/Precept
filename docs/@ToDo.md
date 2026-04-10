@@ -59,7 +59,7 @@ CV 0-3 → Language D-H → CV 4-7 → Language I → MCP Redesign → Update To
 ### Milestone 1: "Governed Integrity"
 
 - [ ] #31 — Logical keywords (`and`/`or`/`not`). Ship first — touches every sample.
-- [ ] #22 — Data-only precepts. PR #48 in progress (Slices 1-3 committed). Design locked (12 decisions).
+- [x] #22 — Data-only precepts. ✅ Completed (PR #48 merged).
 - [ ] #13 — Field-level constraints (`min`, `max`, `nonnegative`, `positive`). Constraint-zone architecture.
 
 ### Milestone 2: "Full Entity Surface"
