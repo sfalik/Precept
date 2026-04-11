@@ -339,10 +339,10 @@
       ]
     },
     "collectionMemberAccess": {
-      "comment": "Collection.count, Collection.min, etc.",
+      "comment": "Dotted member accessors: collection (.count, .min, .max, .peek) and string (.length).",
       "patterns": [
         {
-          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)(count|min|max|peek)\\b",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)(count|min|max|peek|length)\\b",
           "captures": {
             "1": { "name": "variable.other.field.precept" },
             "2": { "name": "punctuation.accessor.precept" },

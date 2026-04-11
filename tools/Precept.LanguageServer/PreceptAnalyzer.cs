@@ -119,6 +119,9 @@ internal sealed class PreceptAnalyzer
             var colName = collectionMemberPrefixMatch.Groups["col"].Value;
             if (collectionFields.Contains(colName, StringComparer.Ordinal))
                 return BuildCollectionMemberItems(colName, collectionKinds.TryGetValue(colName, out var kind) ? kind : null);
+            // String member prefix: e.g. "Notes." → suggest .length
+            if (info.FieldTypeKinds.TryGetValue(colName, out var fieldKind) && (fieldKind & StaticValueKind.String) != 0)
+                return BuildStringMemberItems(colName, isNullable: (fieldKind & StaticValueKind.Null) != 0);
         }
 
         var eventMemberPrefixMatch = EventMemberPrefixRegex.Match(beforeCursor);
@@ -736,6 +739,23 @@ internal sealed class PreceptAnalyzer
         }
 
         return items;
+    }
+
+    private static IReadOnlyList<CompletionItem> BuildStringMemberItems(string fieldName, bool isNullable)
+    {
+        var doc = isNullable
+            ? "Returns the string's character count (UTF-16 code units). Use 'field != null && field.length ...' for nullable strings."
+            : "Returns the string's character count (UTF-16 code units).";
+        return
+        [
+            new CompletionItem
+            {
+                Label = fieldName + ".length",
+                Kind = CompletionItemKind.Property,
+                Detail = "number",
+                Documentation = new StringOrMarkupContent(doc)
+            }
+        ];
     }
 
     private static IReadOnlyList<CompletionItem> BuildCollectionMemberItems(string collectionName, PreceptCollectionKind? kind)

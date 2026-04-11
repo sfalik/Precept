@@ -440,4 +440,10 @@ public static class DiagnosticCatalog
         "C55", "compile",
         "Root-level 'edit' is not valid when states are declared.",
         "Root-level `edit` is not valid when states are declared. Use `in any edit all` or `in <State> edit <Fields>` instead.");
+
+    /// <summary>Member access on nullable string requires explicit null guard before '.length'.</summary>
+    public static readonly LanguageConstraint C56 = Register(
+        "C56", "compile",
+        "Member access on nullable string requires explicit null guard before '.length'.",
+        "'{field}.length' requires a null check — '{field}' is nullable. Use '{field} != null && {field}.length ...' or '{field} == null || {field}.length ...'.");
 }

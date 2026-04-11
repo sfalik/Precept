@@ -316,6 +316,12 @@ internal static class PreceptTypeChecker
                     baseSymbols[$"{col.Name}.peek"] = innerKind;
             }
 
+            foreach (var field in model.Fields)
+            {
+                if (field.Type == PreceptScalarType.String)
+                    baseSymbols[$"{field.Name}.length"] = StaticValueKind.Number;
+            }
+
             scopes.Add(new PreceptTypeScopeInfo(
                 action.SourceLine,
                 "state-action",
@@ -374,6 +380,12 @@ internal static class PreceptTypeChecker
 
             if (col.CollectionKind is PreceptCollectionKind.Queue or PreceptCollectionKind.Stack)
                 dataSymbols[$"{col.Name}.peek"] = innerKind;
+        }
+
+        foreach (var field in model.Fields)
+        {
+            if (field.Type == PreceptScalarType.String)
+                dataSymbols[$"{field.Name}.length"] = StaticValueKind.Number;
         }
 
         scopes.Add(new PreceptTypeScopeInfo(1, "data-rules", new Dictionary<string, StaticValueKind>(dataSymbols, StringComparer.Ordinal)));
@@ -524,6 +536,12 @@ internal static class PreceptTypeChecker
                 symbols[$"{col.Name}.peek"] = innerKind;
         }
 
+        foreach (var pair in dataFieldKinds)
+        {
+            if (HasFlag(pair.Value, StaticValueKind.String))
+                symbols[$"{pair.Key}.length"] = StaticValueKind.Number;
+        }
+
         return symbols;
     }
 
@@ -615,6 +633,19 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C38,
                         $"unknown identifier '{key}'.",
+                        0);
+                    return false;
+                }
+
+                // C56: .length on a nullable string requires an explicit null guard before access.
+                // SYNC:CONSTRAINT:C56
+                if (identifier.Member == "length" &&
+                    symbols.TryGetValue(identifier.Name, out var baseKind) &&
+                    HasFlag(baseKind, StaticValueKind.Null))
+                {
+                    diagnostic = new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C56,
+                        DiagnosticCatalog.C56.FormatMessage(("field", identifier.Name)),
                         0);
                     return false;
                 }

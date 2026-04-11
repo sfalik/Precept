@@ -512,6 +512,9 @@ public class CatalogDriftTests
         // C55: Root-level edit with states declared
         ["C55"] = new(H + "field Priority as number default 1\n" + S + "edit Priority\n", "Root-level"),
 
+        // C56: .length on nullable string without null guard
+        ["C56"] = new(H + "field Note as string nullable\n" + S + "event Go\nfrom A on Go when Note.length > 0 -> no transition\n", "requires a null check"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state

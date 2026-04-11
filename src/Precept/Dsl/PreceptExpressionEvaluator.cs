@@ -54,6 +54,17 @@ internal static class PreceptExpressionRuntimeEvaluator
                     _ => EvaluationResult.Fail($"unknown collection property '{identifier.Member}'.")
                 };
             }
+
+            // Handle string .length accessor: returns UTF-16 code unit count (matches .NET string.Length).
+            if (identifier.Member == "length")
+            {
+                if (!context.TryGetValue(identifier.Name, out var strObj))
+                    return EvaluationResult.Fail($"data key '{identifier.Name}' was not provided.");
+                if (strObj is null)
+                    return EvaluationResult.Fail($"'{identifier.Name}.length' failed: field is null.");
+                if (strObj is string str)
+                    return EvaluationResult.Ok((double)str.Length);
+            }
         }
 
         var key = identifier.Member is null ? identifier.Name : $"{identifier.Name}.{identifier.Member}";

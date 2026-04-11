@@ -472,6 +472,29 @@ Design rule: writes are lenient where they can be safely idempotent; reads that 
 
 ---
 
+### String accessors
+
+`string` fields expose a single parameterless accessor:
+
+- `<Field>.length` — returns the **UTF-16 code unit count** of the string value as `number`. This matches .NET's `string.Length` and is O(1). Note: characters outside the Basic Multilingual Plane (e.g. emoji) count as 2 code units. Example: `"💀".length == 2`.
+
+**Scope:** valid in `invariant`, `in`/`to`/`from` state assert, `when` guard, and `set` RHS — the same scopes as collection accessors.
+
+**Null handling:** `.length` does not coerce `null` to `0`. Using `.length` on a nullable `string` field without first narrowing it to non-null is a type error (diagnostic `C56`). Null-check before access using one of:
+
+```
+# Non-null minimum length check (invariant)
+invariant Name.length >= 2 because "Names require at least 2 characters"
+
+# Nullable max length (field may be null or short)
+invariant Note == null or Note.length <= 500 because "Notes cannot exceed 500 characters"
+
+# Post-narrowing in a when guard (AccessReason narrowed to non-null by prior condition)
+from Draft on Submit when EmployeeName != null and AccessReason != null and AccessReason.length >= 5 -> transition Submitted
+```
+
+---
+
 ## Fields (Mostly locked)
 
 ### Field declarations
@@ -1177,18 +1200,18 @@ This matches the broader design direction of explicit null handling and determin
 
 | Expression position | Expected type | Symbol scope |
 |---|---|---|
-| `when` guard | boolean | data fields + event args + collection accessors |
-| `set` assignment RHS | target field type | data fields + event args + collection accessors (narrowed by prior `when`) |
-| `add`/`remove`/`push`/`enqueue` value | collection inner type | data fields + event args + collection accessors |
+| `when` guard | boolean | data fields + event args + collection accessors + string `.length` |
+| `set` assignment RHS | target field type | data fields + event args + collection accessors + string `.length` (narrowed by prior `when`) |
+| `add`/`remove`/`push`/`enqueue` value | collection inner type | data fields + event args + collection accessors + string `.length` |
 | `dequeue`/`pop into` target | collection inner type assignable to target field | data fields only |
-| `invariant` expression | boolean | data fields + collection accessors |
-| `in`/`to`/`from` state assert | boolean | data fields + collection accessors |
+| `invariant` expression | boolean | data fields + collection accessors + string `.length` |
+| `in`/`to`/`from` state assert | boolean | data fields + collection accessors + string `.length` |
 | `on` event assert | boolean | event args only |
-| State action `set`/mutations | same as transition rows | data fields + collection accessors (no event args) |
+| State action `set`/mutations | same as transition rows | data fields + collection accessors + string `.length` (no event args) |
 
 ### Null-flow narrowing
 
-Nullable fields (`string nullable`, `number nullable`) carry a `T|null` union kind. Assigning a nullable value to a non-nullable target is a type error unless the value has been narrowed.
+Nullable fields (`string nullable`, `number nullable`) carry a `T|null` union kind. Assigning a nullable value to a non-nullable target is a type error unless the value has been narrowed. Accessing `.length` on a nullable string without narrowing is also a type error (C56).
 
 Narrowing sources:
 - **`when` guard:** `when Field != null` narrows `Field` from `T|null` to `T` for the row's action scope.
