@@ -30,6 +30,17 @@
 
 ## Recent Updates
 
+### 2026-04-11 — Issue #14 Slice 9b: Runtime tests for when guards (Forms 1–4)
+
+- **17 new tests total:** 8 Forms 1–3 runtime tests in `NewSyntaxRuntimeTests.cs`, 9 Form 4 guarded edit tests in new `GuardedEditTests.cs`.
+- **All 17 pass.** Full suite: 1,078 tests (883 core + 128 LS + 67 MCP), zero regressions.
+- **Key discoveries during test authoring:**
+  - `CheckCompatibility` evaluates invariants/state asserts at instance creation time. Creating an instance with data that violates a guarded invariant (guard=true, body=false) makes Fire return `Undefined`. Tests must use data where all constraints pass at creation, then fire events that cause violations.
+  - Event assert `when` guards are limited to event arg scope (C69 enforced). Entity fields cannot be used in event assert guards. Tests use `on Submit assert Amount > 0 when Priority > 1` where `Priority` is an event arg, not a field.
+  - PRECEPT046 rejects nullable boolean guards at compile time (`boolean|null`). Runtime fail-closed path for guard evaluation errors is unreachable via normal API. Test converted to verify type checker enforcement.
+  - `when not Active` with `Active default false` → guard is true at defaults → compile-time check applies → PRECEPT029 if body fails. Tests adjusted to use `Active default true` so `not Active` is false at defaults.
+- **Test categories:** guarded invariant true/false (2), guarded state assert true/false (2), guarded event assert true/false (2), multiple guarded invariants collect-all (1), `when not` semantics (1), guarded edit true/false (2), nullable guard compile rejection (1), unconditional+guarded union (1), inspect editable list true/false (2), `in any when` expansion (1), state filter (1), data-driven guard flip (1).
+
 ### 2026-04-11 — Issue #14: `when` guard testability assessment
 - Probed all 4 guard forms via precept_compile: invariant, state assert, event assert, conditional edit — ALL are parse errors today. `when` is recognized only in transition rows.
 - PRECEPT029/030 compile-time violation check must also evaluate the guard at default field values — if guard is false at defaults, no spurious pre-compile error. This is EC-3 and the first correctness gate.
