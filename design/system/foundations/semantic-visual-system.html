@@ -111,12 +111,24 @@ body {
 }
 .nav-item:hover { color: var(--text); }
 .nav-item.active { color: var(--structure); }
+.nav-item--child {
+  padding-left: 18px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: rgba(167,175,187,0.82);
+}
+.nav-item--child.active {
+  color: var(--text);
+}
 .nav-section-meta {
   font-size: 9px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: rgba(103,114,129,0.55);
   padding: 14px 8px 4px;
+}
+.toc-anchor {
+  scroll-margin-top: 24px;
 }
 .nav-font-status {
   margin-top: auto;
@@ -545,20 +557,36 @@ pre {
   <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation" title="Toggle navigation">&#8250;</button>
   <div class="nav-wordmark">Precept</div>
   <a class="nav-item active" href="#intro"     data-sec="intro">Intro</a>
-  <a class="nav-item"        href="#concepts"  data-sec="concepts">Concepts</a>
+  <a class="nav-item"        href="#concepts"  data-sec="concepts">Architecture</a>
+  <a class="nav-item nav-item--child" href="#architecture-identity" data-sec="architecture-identity">Identity</a>
+  <a class="nav-item nav-item--child" href="#architecture-registers" data-sec="architecture-registers">Registers</a>
+  <a class="nav-item nav-item--child" href="#architecture-channels" data-sec="architecture-channels">Channels</a>
   <a class="nav-item"        href="#typography" data-sec="typography">Typography</a>
-  <a class="nav-item"        href="#colors"     data-sec="colors">Colors</a>
+  <a class="nav-item nav-item--child" href="#typography-roles" data-sec="typography-roles">Roles</a>
+  <a class="nav-item nav-item--child" href="#typography-rules" data-sec="typography-rules">Rules</a>
+  <a class="nav-item"        href="#colors"     data-sec="colors">Color</a>
+  <a class="nav-item nav-item--child" href="#color-families" data-sec="color-families">Families</a>
+  <a class="nav-item nav-item--child" href="#color-outer-lanes" data-sec="color-outer-lanes">Outer Lanes</a>
   <a class="nav-item"        href="#constructs" data-sec="constructs">Constructs</a>
-  <span class="nav-section-meta">Families</span>
-  <a class="nav-item"        href="#structure" data-sec="structure" style="padding-left:18px">Structure</a>
-  <a class="nav-item"        href="#state"     data-sec="state"     style="padding-left:18px">State</a>
-  <a class="nav-item"        href="#event"     data-sec="event"     style="padding-left:18px">Event</a>
-  <a class="nav-item"        href="#data-c"    data-sec="data-c"    style="padding-left:18px">Data</a>
-  <a class="nav-item"        href="#rule"      data-sec="rule"      style="padding-left:18px">Rule</a>
-  <span class="nav-section-meta" style="margin-top:6px"></span>
+  <a class="nav-item nav-item--child" href="#structure" data-sec="structure">Structure</a>
+  <a class="nav-item nav-item--child" href="#state"     data-sec="state">State</a>
+  <a class="nav-item nav-item--child" href="#event"     data-sec="event">Event</a>
+  <a class="nav-item nav-item--child" href="#data-c"    data-sec="data-c">Data</a>
+  <a class="nav-item nav-item--child" href="#rule"      data-sec="rule">Rule</a>
   <a class="nav-item"        href="#surfaces"  data-sec="surfaces">Surfaces</a>
-  <span class="nav-section-meta" style="margin-top:6px"></span>
-  <a class="nav-item"        href="#docs"       data-sec="docs">Docs</a>
+  <a class="nav-item nav-item--child" href="#surface-code" data-sec="surface-code">Code Window</a>
+  <a class="nav-item nav-item--child" href="#surface-diagram" data-sec="surface-diagram">State Diagram</a>
+  <a class="nav-item nav-item--child" href="#surface-form" data-sec="surface-form">Data Form</a>
+  <a class="nav-item nav-item--child" href="#surface-timeline" data-sec="surface-timeline">Timeline</a>
+  <a class="nav-item nav-item--child" href="#surface-guide" data-sec="surface-guide">Guide Page</a>
+  <a class="nav-item"        href="#docs"       data-sec="docs">Documentation</a>
+  <a class="nav-item nav-item--child" href="#docs-inline" data-sec="docs-inline">Inline References</a>
+  <a class="nav-item nav-item--child" href="#docs-pills" data-sec="docs-pills">Type Pills</a>
+  <a class="nav-item nav-item--child" href="#docs-reference" data-sec="docs-reference">Reference Table</a>
+  <a class="nav-item nav-item--child" href="#docs-code" data-sec="docs-code">Code Blocks</a>
+  <a class="nav-item nav-item--child" href="#docs-callouts" data-sec="docs-callouts">Callouts</a>
+  <a class="nav-item nav-item--child" href="#docs-chrome" data-sec="docs-chrome">Chrome Tokens</a>
+  <a class="nav-item nav-item--child" href="#docs-specimen" data-sec="docs-specimen">Page Specimen</a>
   <div class="nav-font-status" id="nav-font-status"></div>
 </nav>
 
@@ -914,7 +942,7 @@ pre {
 <section class="section" id="concepts">
   <div class="section-head">
     <div class="eyebrow">02 · Concepts</div>
-    <h2>Five constructs&thinsp;·&thinsp;Two registers&thinsp;·&thinsp;Four channels</h2>
+    <h2>System Architecture</h2>
     <p>The system has four structural parts. Five semantic families form the identity substrate — the authored vocabulary that stays recognizable wherever it appears. Two depiction registers translate that identity into authored source (Definition) and rendered components (Runtime). A separate runtime verdict register reports evaluation without redefining type. A separate chrome/support layer carries canvas, panel, text, and line scaffolding so the surrounding palette can complement the semantic system without competing with it. Four signal channels encode meaning in both. Four surfaces provide the contexts in which all of this manifests.</p>
   </div>
 
@@ -923,8 +951,8 @@ pre {
     <div class="arch-diagram">
 
       <!-- Layer 1 · Constructs ─────────────────── -->
-      <div class="arch-layer">
-        <div class="arch-layer-label">Constructs <span>stable semantic identity across all registers and surfaces</span></div>
+      <div class="arch-layer toc-anchor" id="architecture-identity">
+        <div class="arch-layer-label">Identity <span>stable semantic type across all registers and surfaces</span></div>
         <div class="arch-constructs">
           <div class="arch-card" style="--card-color: var(--structure)">
             <div class="arch-card-swatch"></div>
@@ -955,7 +983,7 @@ pre {
       </div>
 
       <!-- Layer 2 · Registers ──────────────────── -->
-      <div class="arch-layer">
+      <div class="arch-layer toc-anchor" id="architecture-registers">
         <div class="arch-layer-label">Registers <span>same five constructs, two depiction modes</span></div>
         <div class="arch-registers">
           <div class="arch-reg">
@@ -995,7 +1023,7 @@ pre {
       </div>
 
       <!-- Layer 3 · Channels ──────────────────── -->
-      <div class="arch-layer">
+      <div class="arch-layer toc-anchor" id="architecture-channels">
         <div class="arch-layer-label">Channels <span>signal grammar spanning both registers</span></div>
         <div class="arch-channels">
           <div class="arch-ch">
@@ -1388,11 +1416,11 @@ pre {
 <section class="section" id="typography">
   <div class="section-head">
     <div class="eyebrow">03 · Typography</div>
-    <h2>Two faces. One rule each.</h2>
+    <h2>Type Roles</h2>
     <p>Typography governs how identity, prose, and semantic pressure are read across all five constructs. Geist Mono carries structural identity. Geist carries reading prose. No serifs. Italic marks semantic pressure, not emphasis.</p>
   </div>
 
-  <div class="typography-band">
+  <div class="typography-band toc-anchor" id="typography-roles">
     <div class="typography-kicker">Primary split</div>
     <div class="typography-header">
       <div>
@@ -1498,7 +1526,7 @@ pre {
     </div>
   </div>
 
-  <div class="typography-band typography-band--rules">
+  <div class="typography-band typography-band--rules toc-anchor" id="typography-rules">
     <div class="typography-kicker">Discipline</div>
     <div class="typography-rules-head">
       <div>
@@ -2150,11 +2178,11 @@ pre {
 <section class="section" id="colors">
   <div class="section-head">
     <div class="eyebrow">04 · Color System</div>
-    <h2>Five semantic families. Separate outer lanes.</h2>
+    <h2>Color Semantics</h2>
     <p>Color defines how authored meaning stays grouped into five families. Structure and Data keep their tonal variants nested inside the parent family. Comments sit in an annotation lane. Runtime verdicts sit in a separate evaluation register. Chrome/support scaffolds the surface around them without becoming a sixth family.</p>
   </div>
 
-  <div class="color-system-band color-system-band--semantic">
+  <div class="color-system-band color-system-band--semantic toc-anchor" id="color-families">
     <div class="color-system-kicker">Primary meaning</div>
     <div class="color-system-header">
       <div>
@@ -2305,7 +2333,7 @@ pre {
     </div>
   </div>
 
-  <div class="color-system-bridge">
+  <div class="color-system-bridge toc-anchor" id="color-outer-lanes">
     <div class="color-system-kicker">Outside authored identity</div>
     <p>Comments annotate authored content. Verdicts report runtime evaluation. Chrome/support holds the surface together. Each lane is adjacent to the semantic families, but none of them rewrite or expand the family model.</p>
   </div>
@@ -2405,7 +2433,7 @@ pre {
 <section class="section" id="constructs">
   <div class="section-head">
     <div class="eyebrow">05 · Constructs</div>
-    <h2>Five constructs, one grammar</h2>
+    <h2>Construct Vocabulary</h2>
     <p>The five constructs are the primary reveal. Each gallery establishes the canonical pair first — Definition (how the construct appears as a syntax token in authored code) and Runtime (how it appears as a rendered component) — then shows the channel signals and semantic modifiers that build on top of that base. All five constructs use the same composed structure.</p>
   </div>
 
@@ -2932,14 +2960,14 @@ pre {
 <section class="section" id="surfaces">
   <div class="section-head">
     <div class="eyebrow">06 · Surfaces</div>
-    <h2>Where the system lands</h2>
-    <p>Each surface realizes the same semantic vocabulary through its own conventions of density, layout, and workflow context. The meaning is fixed. The surface solves for its own needs.</p>
+    <h2>Surface Translation</h2>
+    <p>These are representative rendered surfaces. Each one translates the same semantic vocabulary into a different operational or editorial context. The meaning stays fixed; the surface adapts to its job.</p>
   </div>
 
   <div class="surfaces-grid">
 
     <!-- Surface 01: Code Window -->
-    <div class="surface-specimen">
+    <div class="surface-specimen toc-anchor" id="surface-code">
       <div class="surface-label">Surface 01</div>
       <div class="surface-h3">Code Window</div>
       <p class="sf-note">Syntax highlighting renders the full semantic palette. Governing structure words and connective grammar share indigo, with bold reserved for structural drivers and normal weight used for operators like <span class="sg">and</span> / <span class="sg">or</span> / <span class="sg">not</span>. States stay violet. Events stay cyan. Data stays slate. Rule messages stay gold.</p>
@@ -2961,7 +2989,7 @@ pre {
     </div>
 
     <!-- Surface 02: State Diagram -->
-    <div class="surface-specimen">
+    <div class="surface-specimen toc-anchor" id="surface-diagram">
       <div class="surface-label">Surface 02</div>
       <div class="surface-h3">State Diagram</div>
       <p class="sf-note">Shape before colour. States are equal hard rectangles distinguished by role modifier — initial origin dot, terminal double border. Events label transition arrows.</p>
@@ -2983,7 +3011,7 @@ pre {
     </div>
 
     <!-- Surface 03: Data Form -->
-    <div class="surface-specimen">
+    <div class="surface-specimen toc-anchor" id="surface-form">
       <div class="surface-label">Surface 03</div>
       <div class="surface-h3">Data Form</div>
       <p class="sf-note">The data form composes structure sections, editable data fields, a state badge, and available event buttons into one governed interaction surface.</p>
@@ -3003,7 +3031,7 @@ pre {
     </div>
 
     <!-- Surface 04: Timeline -->
-    <div class="surface-specimen">
+    <div class="surface-specimen toc-anchor" id="surface-timeline">
       <div class="surface-label">Surface 04</div>
       <div class="surface-h3">Operation Timeline</div>
       <p class="sf-note">Timeline orders events chronologically. Each entry shows the event (cyan), the transition outcome (state colours), and any rule evaluation result.</p>
@@ -3027,10 +3055,10 @@ pre {
     </div>
 
     <!-- Surface 05: Docs -->
-    <div class="surface-specimen">
+    <div class="surface-specimen toc-anchor" id="surface-guide">
       <div class="surface-label">Surface 05</div>
-      <div class="surface-h3">Explanatory Docs</div>
-      <p class="sf-note">Documentation uses the reading typeface for prose and mono for named constructs, with semantic colour in inline references and rule callouts.</p>
+      <div class="surface-h3">Guide Page</div>
+      <p class="sf-note">Editorial documentation is also a rendered surface. It uses the reading typeface for prose and mono for named constructs, with semantic colour in inline references and rule callouts.</p>
       <p style="font-size:14px;margin-bottom:10px">The <span class="ev">Submit</span> event transitions a <span class="st">Draft</span> loan to <span class="st">UnderReview</span>. Two rules govern the transition:</p>
       <div class="rule-callout" style="margin-bottom:6px"><p>on Submit assert ApplicantName != null</p></div>
       <div class="rule-callout"><p>on Submit assert RequestedAmount &gt; 0</p></div>
@@ -3595,12 +3623,12 @@ pre.doc-code-body {
 <section class="section" id="docs">
   <div class="section-head">
     <div class="eyebrow">07 · Docs</div>
-    <h2>How Precept appears in writing</h2>
-    <p>Documentation surfaces — README files, guides, reference tables, conceptual explanations — have their own representational conventions. Construct names appear inline in prose, in comparison tables, and in annotated examples. These conventions keep semantic identity legible in text without requiring a rendered UI.</p>
+    <h2>Documentation Conventions</h2>
+    <p>This section defines documentation notation rather than documentation as a surface mockup. Construct names appear inline in prose, in comparison tables, and in annotated examples. These conventions keep semantic identity legible in text without requiring a rendered UI.</p>
   </div>
 
   <!-- Inline references -->
-  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none">
+  <div class="cov-zone-hdr toc-anchor" id="docs-inline" style="border:1px solid var(--line-strong);border-bottom:none">
     <span class="cov-z-label">Inline References</span>
     <span class="cov-z-note">construct names embedded in prose</span>
   </div>
@@ -3629,7 +3657,7 @@ pre.doc-code-body {
   </div>
 
   <!-- Pills -->
-  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+  <div class="cov-zone-hdr toc-anchor" id="docs-pills" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
     <span class="cov-z-label">Type Pills</span>
     <span class="cov-z-note">compact identity badges for tables and reference lists</span>
   </div>
@@ -3642,7 +3670,7 @@ pre.doc-code-body {
   </div>
 
   <!-- Reference table -->
-  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+  <div class="cov-zone-hdr toc-anchor" id="docs-reference" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
     <span class="cov-z-label">Reference Table</span>
     <span class="cov-z-note">anatomy of a construct reference row</span>
   </div>
@@ -3686,7 +3714,7 @@ pre.doc-code-body {
   </div>
 
   <!-- Code blocks -->
-  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+  <div class="cov-zone-hdr toc-anchor" id="docs-code" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
     <span class="cov-z-label">Code Blocks</span>
     <span class="cov-z-note">DSL snippets as they appear in documentation</span>
   </div>
@@ -3710,7 +3738,7 @@ pre.doc-code-body {
   </div>
 
   <!-- Callouts -->
-  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+  <div class="cov-zone-hdr toc-anchor" id="docs-callouts" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
     <span class="cov-z-label">Callouts</span>
     <span class="cov-z-note">notes, tips, cautions, and warnings</span>
   </div>
@@ -3746,7 +3774,7 @@ pre.doc-code-body {
   </div>
 
   <!-- Chrome tokens -->
-  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+  <div class="cov-zone-hdr toc-anchor" id="docs-chrome" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
     <span class="cov-z-label">Chrome / Support Tokens</span>
     <span class="cov-z-note">separate support layer for text, surfaces, and line scaffolding</span>
   </div>
@@ -3799,7 +3827,7 @@ pre.doc-code-body {
   </div>
 
   <!-- Page specimen -->
-  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+  <div class="cov-zone-hdr toc-anchor" id="docs-specimen" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
     <span class="cov-z-label">Page Specimen</span>
     <span class="cov-z-note">realistic docs page in context&thinsp;·&thinsp;headings, prose, diagram, lists, callout, code, table</span>
   </div>
@@ -3993,7 +4021,7 @@ pre.doc-code-body {
 <script>
 (function () {
   var items = document.querySelectorAll(".nav-item[data-sec]");
-  var anchors = Array.from(document.querySelectorAll("section[id], .construct-gallery[id]")).filter(function(el){ return el.id !== ""; });
+  var anchors = Array.from(document.querySelectorAll("section[id], .construct-gallery[id], .toc-anchor[id]")).filter(function(el){ return el.id !== ""; });
 
   function update() {
     var active = anchors[0];
