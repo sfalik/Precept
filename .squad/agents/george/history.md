@@ -21,6 +21,12 @@ Complete spec written covering all 4 forms and 19 change sites across 5 files. F
 
 ### 2026-04-11 — Form 4 simplicity analysis (Issue #14 follow-up)
 
+### 2026-04-11 — Slice 4: Runtime engine guard pre-flight for Forms 1–3
+- Added guard pre-flight to `EvaluateInvariants`, `EvaluateStateAssertions`, and `EvaluateEventAssertions` in `PreceptRuntime.cs`.
+- Pattern: if `WhenGuard is not null`, evaluate against the same data dictionary as the body expression. If guard fails or evaluates to non-true, `continue` (skip the declaration). Collect-all semantics preserved — no caller changes needed.
+- Event assertions use `evaluationData` (field + arg data) for guard evaluation, matching the body expression scope. Invariants and state asserts use field-only `data`.
+- Build clean. All 850 tests pass — no existing tests use `when` guards, so zero regressions expected and confirmed.
+
 ## Learnings
 
 - **Full implementation scope for Issue #14 (all 4 forms, same-wave):** 19 change sites, ~162 lines, 5 files. Single PR is the recommendation, with a trivial prerequisite commit for the B1 narrowing fix (1 line in `BuildStateAssertNarrowings`).

@@ -1357,6 +1357,14 @@ public sealed class PreceptEngine
         var violations = new List<ConstraintViolation>();
         foreach (var assert in asserts)
         {
+            // Guard pre-flight: when guard is present and evaluates false, skip this assertion
+            if (assert.WhenGuard is not null)
+            {
+                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(assert.WhenGuard, evaluationData);
+                if (!guardResult.Success || guardResult.Value is not true)
+                    continue;
+            }
+
             var result = PreceptExpressionRuntimeEvaluator.Evaluate(assert.Expression, evaluationData);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
             {
@@ -1383,6 +1391,14 @@ public sealed class PreceptEngine
         var violations = new List<ConstraintViolation>();
         foreach (var inv in _invariants)
         {
+            // Guard pre-flight: when guard is present and evaluates false, skip this invariant
+            if (inv.WhenGuard is not null)
+            {
+                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(inv.WhenGuard, data);
+                if (!guardResult.Success || guardResult.Value is not true)
+                    continue;
+            }
+
             var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, data);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
             {
@@ -1413,6 +1429,14 @@ public sealed class PreceptEngine
         var violations = new List<ConstraintViolation>();
         foreach (var assert in asserts)
         {
+            // Guard pre-flight: when guard is present and evaluates false, skip this assertion
+            if (assert.WhenGuard is not null)
+            {
+                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(assert.WhenGuard, data);
+                if (!guardResult.Success || guardResult.Value is not true)
+                    continue;
+            }
+
             var result = PreceptExpressionRuntimeEvaluator.Evaluate(assert.Expression, data);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
             {
