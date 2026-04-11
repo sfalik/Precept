@@ -276,7 +276,252 @@ The event-level structural modifiers in this research (`entry`, `advancing`, `se
 
 ---
 
-## Precept Fit Analysis
+## Cross-Cutting Findings
+
+### Provability spans all entity types equivalently
+
+The modifier space is provable across all three entity types, each drawing on a different provability source:
+
+| Entity type | Compile-time provability source | Strongest candidates |
+|---|---|---|
+| **States** | Graph topology (reachability, degree, domination, incoming/outgoing rows) | `terminal`, `guarded` (incoming), `required`, `error` |
+| **Events** | Transition row structure (source states, outcome shapes, target states, reverse edges) | `entry`, `advancing`, `settling`, `isolated` |
+| **Fields** | Mutation analysis (which rows set which fields, reachability of setting rows, collection verb check) | `writeonce`, `sealed after`, `monotonic` (collections) |
+
+Events specifically have rich structural properties derivable from declared transition rows — not from firing history or execution traces. The boundary between "provable" and "not provable" falls between row-shape properties (`advancing`, `settling`) and firing-history properties (`once`, `idempotent`). The former are compile-time structural; the latter require runtime state.
+
+### Four distinct modifier roles require a clear scope position
+
+| Role | Example modifiers | Compile check? | Tooling impact? | Runtime impact? |
+|---|---|---|---|---|
+| **Structural constraint** | `terminal`, `advancing`, `settling`, `writeonce`, `sealed after` | Yes | Indirect | None |
+| **Intent declaration** | `entry`, `isolated`, `resting`, `decision` | Cross-check | Visual styling | None |
+| **Tooling directive** | `sensitive`, `audit`, `error` | None | Primary purpose | Metadata only |
+| **Feature gate** | `derived` | Yes (disables `set`/`edit`) | Completions filtered | New eval pass |
+
+`initial` already functions as a hybrid across all four roles simultaneously. The existing `nullable` and `default` field modifiers confirm that non-constraint roles are already part of the modifier system. Based on this precedent, the scope rule is: **a modifier must be either structurally verifiable or tooling-actionable**. Modifiers with no compile-time check AND no concrete tooling behavior belong in comments or future annotations. `sensitive` qualifies (MCP masking, preview masking). `audit` is borderline — it depends on host-application integration and should be evaluated as a host-application concern unless first-class platform tooling behavior is defined.
+
+### Modifier pairs form a declarative lifecycle vocabulary
+
+The strongest candidates form natural pairs and composites that together describe the lifecycle's structural properties:
+
+| Pair / chain | What it declares |
+|---|---|
+| `initial` + `terminal` | Lifecycle boundary frame — where the entity starts and ends |
+| `entry` + `completing` | Event boundary frame — which events open and close the lifecycle |
+| `advancing` + `settling` | Event outcome dichotomy — state-changing vs data-accumulating events |
+| `isolated` + `universal` | Event scope spectrum — single-state to all-state |
+| `writeonce` + `sealed after` | Field mutability lifecycle — when fields are first set and when they freeze |
+| `guarded` (state) + `to assert` | Entry safety layers — guards before entry, asserts after |
+| `terminal` + `error` | Endpoint taxonomy — success endpoints vs failure endpoints |
+
+These pairings suggest that modifiers are not isolated keywords but elements of a **declarative lifecycle vocabulary** — a way for the author to describe the lifecycle's structural properties without reading transition-row-level rules.
+
+### The `advancing`/`settling` split is the highest-leverage event modifier finding
+
+Any stateful workflow contains two fundamentally different kinds of events:
+- **Advancing events** that move the lifecycle forward: Submit, Approve, Deny, FundLoan, PayClaim
+- **Settling events** that accumulate data within the current state: VerifyDocuments, LogRepairStep, RequestDocument, AddInterviewer
+
+This is the event-side manifestation of Principle #5 (data truth vs movement truth). The distinction is invisible in the current DSL unless you read every transition row. Making it visible at the declaration level serves:
+- **Author comprehension:** scanning event declarations tells you the lifecycle's routing structure
+- **AI authoring:** AI knows whether to generate `transition` or `no transition` outcomes
+- **Diagram rendering:** settling events can be visually suppressed or grouped separately
+- **IntelliSense:** `transition` is not suggested as an outcome when authoring rows for a settling event
+
+---
+
+## Interaction with Existing Diagnostics
+
+### Summary table
+
+| Diagnostic | Current behavior | With `terminal` | With `required` | With `transient` |
+|---|---|---|---|---|
+| **C48** (unreachable) | Warning: state unreachable from initial | **No change.** Terminal + unreachable = definition problem | **No change.** Required + unreachable = contradictory declaration | **No change.** |
+| **C50** (dead-end) | Warning: non-terminal state has outgoing rows that all reject/no-transition | **Suppressed for terminal states.** **Strengthened for others** — "mark with `terminal` if intentional" | No direct change | **Upgraded to error** for transient states: transient dead-end is a proven contradiction |
+| **C51** (reject-only pair) | Warning: every row for (State, Event) rejects | No direct change | No change | No change |
+| **C52** (event never succeeds) | Warning: event can never succeed from any reachable state | No direct change | No change | No change |
+| **New diagnostic** | — | Error: terminal state has outgoing `transition` rows | Error: required state bypassed on initial→terminal path | Error: transient state has no successful outgoing transition |
+
+### C50 interaction with `terminal`
+
+With `terminal`:
+1. States marked `terminal` are validated to have **no outgoing `transition` outcomes** (new error diagnostic).
+2. States marked `terminal` are excluded from C50 analysis.
+3. Non-terminal dead-end states (C50) now get stronger diagnostic language: "State 'X' appears to be a dead end. If it is intentionally terminal, mark it with `terminal`. Otherwise, fix the outgoing transitions."
+
+### C48 + terminal: unreachable terminal
+
+A state that is both `terminal` and unreachable (C48) is a definition smell — the author declared a lifecycle endpoint that no execution path can reach. The simpler approach: let C48 stand as-is. The author sees both pieces of information. Compound diagnostics add interaction complexity with marginal benefit.
+
+### Potential new diagnostics
+
+| Code | Trigger | Severity | Message pattern |
+|---|---|---|---|
+| **C56** (tentative) | Terminal state has outgoing `transition` outcome | Error | "State '{State}' is marked terminal but has a transition to '{Target}' — terminal states may not have outgoing transitions" |
+| **C57** (tentative) | Required state bypassed on initial→terminal path | Error | "State '{State}' is marked required but path {Initial}→…→{Terminal} bypasses it" |
+| **C58** (tentative) | Transient state has no successful outgoing transition | Error | "State '{State}' is marked transient but has no outgoing transition that succeeds" |
+
+---
+
+## Recommendation Tiers
+
+### Tier 1 — Strong Candidates (propose)
+
+| Modifier | Entity | Provability | Key value |
+|---|---|---|---|
+| `terminal` | State | Full | Lifecycle boundary; `initial` parallel; C50 interaction |
+| `guarded` | State | Full | Entry safety; prevents unguarded high-value state entry |
+| `entry` | Event | Full | Intake event pattern; structural corollary of `initial` |
+| `advancing` | Event | Full | State-changing intent; routing vs mutation distinction |
+| `settling` | Event | Full | Data-only intent; complement to `advancing` |
+| `isolated` | Event | Full | Single-state scope; phase-specific action pattern |
+| `writeonce` | Field | Partial (overapprox) | Intake-data immutability; permanent-record semantics |
+| `sealed after <State>` | Field | Full | Lifecycle-phase immutability; freeze-point pattern |
+
+### Tier 2 — Interesting but Complex (explore further)
+
+| Modifier | Entity | Provability | Key blocker |
+|---|---|---|---|
+| `required` / `milestone` | State | Partial (dominator + overapprox) | Guard-dependent false positives; diagnostic clarity; needs `terminal` first |
+| `transient` | State | Partial | Weaker-than-expected guarantee; no time model |
+| `error` / `failure` | State | Limited | Primarily semantic/tooling; limited compile leverage |
+| `resting` | State | Partial (self-loop) | Primarily semantic/tooling |
+| `decision` | State | Full | Derivable from transition rows; primarily intent/tooling |
+| `irreversible` | Event | Graph (overapprox) | Guard-dependent; most useful for non-terminal targets |
+| `universal` | Event | Full | Overlap with `from any` mechanism |
+| `completing` | Event | Full (requires `terminal`) | Dependency chain; cross-row constraint |
+| `guarded` | Event | Full | Conflicts with idiomatic reject-fallback pattern; reject-row exemption design needed |
+| `total` | Event | Full (C51 inversion) | Incremental over existing C51 warning |
+| `identity` | Field | Same as `writeonce` | Superset of `writeonce`; subsumption design question |
+| `monotonic` | Field | Full (collections) / Partial (scalars) | Split provability; start with collections |
+| `sensitive` | Field | None (tooling-only) | Requires philosophical position on tooling-directive modifiers |
+| `immutable` | Field | Full | Narrow use case; const-vs-field design question |
+| `derived` | Field | Full (mutation ban) | Right entry point but deferred to proposal #17 |
+
+### Tier 3 — Reject or Defer
+
+| Modifier | Entity | Reason |
+|---|---|---|
+| `once` | Event | Requires runtime counter; achievable via boolean field + guard |
+| `idempotent` | Event | Undecidable in general; better as explicit guard patterns |
+| `symmetric` | Event | Niche domain applicability; most workflows are directional |
+| `convergent` | State | Limited utility; `terminal` + `error` covers the common case |
+| `absorbing` | State | Expressible as `terminal` + event handling; separate keyword marginal |
+| `audit` | Field | Tooling metadata best as host-application concern |
+
+---
+
+## Implementation Sequence
+
+If the project decides to implement modifiers, the recommended order is:
+
+1. **`terminal`** — Tier 1, lowest risk, highest certainty. Ships alone. Unblocks `completing`, `required`, and `sealed after`.
+2. **`entry` + `advancing` + `settling` + `isolated`** — Tier 1 event modifiers. Ship as a cohort (they form a coherent vocabulary). Low implementation cost (row-shape checks, no runtime changes).
+3. **`writeonce`** — Tier 1 field modifier. Ships independently. Requires row mutation analysis.
+4. **`sealed after <State>`** — Tier 1 field modifier. Ships after `terminal`. Requires reachability + row analysis.
+5. **`guarded` (state)** — Tier 1 state modifier. Ships independently. Incoming-row scan.
+6. **Tier 2 candidates** — evaluated after Tier 1 feedback from real usage.
+
+---
+
+## Where This Fits in the Research Taxonomy
+
+This research creates a new domain in the language research taxonomy. It is not a natural extension of any existing domain:
+
+- **Not constraint composition (#8, #13, #14)** — constraint composition is about value constraints (invariants, field-level bounds, named rules). Structural modifiers constrain graph topology, not field values.
+- **Not static reasoning expansion** — static reasoning is about proving properties from existing declarations (contradiction detection, satisfiability). Structural modifiers *add new declarations* that create new provable properties.
+- **Not entity-modeling surface (#17, #22)** — entity modeling is about what data an entity has (fields, computed values, statelessness). Structural modifiers are about what the lifecycle graph looks like.
+- **Closest relative: state machine expressiveness** — `state-machine-expressiveness.md` covers what graph features Precept could gain (hierarchy, parallelism). Structural modifiers are a different axis — they annotate existing graph features to enable stronger compile-time reasoning.
+
+**Recommended taxonomy placement:** Domain "Structural lifecycle modifiers" in the expressiveness research folder, with `state-machine-expressiveness.md` and `static-reasoning-expansion.md` as theory/reference companions.
+
+| Domain | Open proposals | Primary grounding | Theory / reference companion | Notes |
+|---|---|---|---|---|
+| Structural lifecycle modifiers | — | [expressiveness/structural-lifecycle-modifiers.md](./structural-lifecycle-modifiers.md) | [references/state-machine-expressiveness.md](../references/state-machine-expressiveness.md), [references/static-reasoning-expansion.md](../references/static-reasoning-expansion.md) | Horizon domain. `terminal` is the strong candidate. |
+
+---
+
+## Dead Ends and Rejected Directions
+
+### State-type system (rejected)
+
+**Idea:** Instead of keyword modifiers, make state categories a type system — `state Closed as terminal`, `state Processing as transient`, with a fixed set of state types that carry behavioral contracts.
+
+**Why rejected:** This turns states into typed entities with distinct behavioral contracts per type. The parser and type checker must track state types and enforce different rules per type. Architecturally invasive and breaks the current flat model where all states are structurally identical (just names). Keyword modifiers add information without changing the fundamental model. Types change the model.
+
+### Event lifecycle annotations (rejected)
+
+**Idea:** Full event lifecycle annotations — `event Approve preconditions [R1, R2]`, `event Close postconditions [in terminal]`.
+
+**Why rejected:** This is pre/postcondition specification on events, equivalent to attaching Hoare-logic contracts. Precept already has this: `on Event assert ...` is the precondition; state asserts and invariants are the postconditions. Adding more annotation layers duplicates existing constructs.
+
+### Temporal properties (deferred indefinitely)
+
+**Idea:** Time-bounded residency (`state Processing timeout 30m`), deadline states, SLA modifiers.
+
+**Why deferred:** Precept is event-driven with no clock model. Time-bounded properties require a runtime clock, a polling mechanism for timeout detection, and a new category of system-generated events (timeout events). This is a fundamental model extension, not a modifier. Workflow orchestrators (Temporal, Step Functions) handle time; Precept handles data integrity.
+
+### Hierarchical state modifiers (deferred indefinitely)
+
+**Idea:** Modifiers that reference other states — `state Review parent of TechnicalReview, LegalReview`.
+
+**Why deferred:** Precept's flat state model is a deliberate design choice (Principle #9, tooling-friendly; `state-machine-expressiveness.md` analysis: hierarchical states are HIGH cost). Modifiers that reference other states introduce hierarchy through the back door.
+
+### `absorbing` / `sink` as merged into `terminal` (reconsidered)
+
+**Earlier reasoning:** `absorbing` was initially considered identical to `terminal` ("terminal state with event handling"). On further analysis, `absorbing` (rows exist, none transition) is structurally distinct from `terminal` (no outgoing rows at all). The concept is valid but marginal — a `terminal` state can already have `no transition` and `reject` rows, making it effectively absorbing. Current resolution: Tier 3, pending evidence of real demand for the visual distinction in tooling.
+
+---
+
+## Open Questions for Proposal Phase
+
+If `terminal` advances to a proposal, these questions need answers:
+
+1. **Interaction with `edit` declarations:** Can a terminal state have `in Terminal edit` declarations? (Likely yes — a closed entity might still allow annotation updates.)
+
+2. **Interaction with state entry/exit actions:** Can a terminal state have `to Terminal -> set ClosedDate = ...` entry actions? (Likely yes — entry actions run when transitioning *into* the state.)
+
+3. **Grammar extension:** Does `terminal` go in the same modifier position as `initial` (after state name, before comma)? If a state can be both `initial` and `terminal` (edge case: single-state precept), what's the declaration order?
+
+4. **Stateless precepts:** Should `terminal` be rejected in stateless precepts (no states to modify)? (Yes — trivially, since there are no state declarations.)
+
+5. **C50 message upgrade:** Should C50's message text change when `terminal` is available in the language? ("Mark this state as `terminal` if this is intentional" as guidance.)
+
+6. **`sealed after` with multiple states:** Can a field be sealed after multiple states? E.g., `sealed after Approved, Denied` — meaning the field freezes when either state is entered. Consistent with existing multi-state syntax in `in S1, S2 assert ...`.
+
+7. **`guarded` (state) + `edit` interaction:** If a state is `guarded` (all incoming transitions require guards), does `edit` bypass this? Likely no — direct `edit` is a different operation from transition rows. Clarify whether `guarded` applies to transitions only.
+
+8. **`advancing` + `reject` row semantics:** `advancing` allows `reject` rows (the event is refused, but when it succeeds, it advances). Confirm this is the right semantics before proposal.
+
+---
+
+## Key References
+
+- Harel, "Statecharts: A visual formalism for complex systems" (1987)
+- UML Superstructure Spec, §14.2.3 FinalState, §14.2.3 InitialPseudostate
+- XState v5 — final states: https://stately.ai/docs/final-states
+- BPMN 2.0 — end events: https://www.omg.org/spec/BPMN/2.0.2/
+- AWS Step Functions — states: https://docs.aws.amazon.com/step-functions/latest/dg/concepts-amazon-states-language.html
+- Temporal workflows: https://docs.temporal.io/workflows
+- Lengauer & Tarjan, "A Fast Algorithm for Finding Dominators in a Flowgraph" (1979) — dominator analysis for `required`
+- Lamport, *Specifying Systems* (2002) — temporal properties (liveness, safety) for formal modifier semantics
+- `docs/PreceptLanguageDesign.md` — design principles numbered #1–#13
+- `src/Precept/Dsl/PreceptAnalysis.cs` — existing terminal/dead-end/unreachable analysis
+- `src/Precept/Dsl/DiagnosticCatalog.cs` — C48, C49, C50, C51, C52 diagnostics
+- `research/language/references/state-machine-expressiveness.md` — existing theory companion
+- `research/language/references/static-reasoning-expansion.md` — adjacent static-reasoning research
+- `research/language/expressiveness/constraint-composition-domain.md` — Frank's #13 keyword-vs-predicate taxonomy
+- `samples/insurance-claim.precept` — usage illustration source for `settling`, `advancing`, `writeonce`, `sealed after`
+- `samples/hiring-pipeline.precept` — usage illustration source for `isolated`, `settling`, `decision`, `monotonic`
+- `samples/loan-application.precept` — usage illustration source for `entry`, `guarded` state, `writeonce`
+- `samples/warranty-repair-request.precept` — usage illustration source for `resting`, `advancing`, `settling`
+- `samples/refund-request.precept` — usage illustration source for `advancing`, `sealed after`
+- `samples/customer-profile.precept` — stateless precept; confirms field modifiers are not state-machine-specific
+
+---
+
+## Detailed Modifier Analysis
 
 For each candidate modifier, the evaluation covers: design principle alignment, compile-time provability, runtime implications, and fit verdict.
 
@@ -909,245 +1154,3 @@ field DecisionNote as string nullable audit
 
 ---
 
-## Cross-Cutting Findings
-
-### Provability spans all entity types equivalently
-
-The modifier space is provable across all three entity types, each drawing on a different provability source:
-
-| Entity type | Compile-time provability source | Strongest candidates |
-|---|---|---|
-| **States** | Graph topology (reachability, degree, domination, incoming/outgoing rows) | `terminal`, `guarded` (incoming), `required`, `error` |
-| **Events** | Transition row structure (source states, outcome shapes, target states, reverse edges) | `entry`, `advancing`, `settling`, `isolated` |
-| **Fields** | Mutation analysis (which rows set which fields, reachability of setting rows, collection verb check) | `writeonce`, `sealed after`, `monotonic` (collections) |
-
-Events specifically have rich structural properties derivable from declared transition rows — not from firing history or execution traces. The boundary between "provable" and "not provable" falls between row-shape properties (`advancing`, `settling`) and firing-history properties (`once`, `idempotent`). The former are compile-time structural; the latter require runtime state.
-
-### Four distinct modifier roles require a clear scope position
-
-| Role | Example modifiers | Compile check? | Tooling impact? | Runtime impact? |
-|---|---|---|---|---|
-| **Structural constraint** | `terminal`, `advancing`, `settling`, `writeonce`, `sealed after` | Yes | Indirect | None |
-| **Intent declaration** | `entry`, `isolated`, `resting`, `decision` | Cross-check | Visual styling | None |
-| **Tooling directive** | `sensitive`, `audit`, `error` | None | Primary purpose | Metadata only |
-| **Feature gate** | `derived` | Yes (disables `set`/`edit`) | Completions filtered | New eval pass |
-
-`initial` already functions as a hybrid across all four roles simultaneously. The existing `nullable` and `default` field modifiers confirm that non-constraint roles are already part of the modifier system. Based on this precedent, the scope rule is: **a modifier must be either structurally verifiable or tooling-actionable**. Modifiers with no compile-time check AND no concrete tooling behavior belong in comments or future annotations. `sensitive` qualifies (MCP masking, preview masking). `audit` is borderline — it depends on host-application integration and should be evaluated as a host-application concern unless first-class platform tooling behavior is defined.
-
-### Modifier pairs form a declarative lifecycle vocabulary
-
-The strongest candidates form natural pairs and composites that together describe the lifecycle's structural properties:
-
-| Pair / chain | What it declares |
-|---|---|
-| `initial` + `terminal` | Lifecycle boundary frame — where the entity starts and ends |
-| `entry` + `completing` | Event boundary frame — which events open and close the lifecycle |
-| `advancing` + `settling` | Event outcome dichotomy — state-changing vs data-accumulating events |
-| `isolated` + `universal` | Event scope spectrum — single-state to all-state |
-| `writeonce` + `sealed after` | Field mutability lifecycle — when fields are first set and when they freeze |
-| `guarded` (state) + `to assert` | Entry safety layers — guards before entry, asserts after |
-| `terminal` + `error` | Endpoint taxonomy — success endpoints vs failure endpoints |
-
-These pairings suggest that modifiers are not isolated keywords but elements of a **declarative lifecycle vocabulary** — a way for the author to describe the lifecycle's structural properties without reading transition-row-level rules.
-
-### The `advancing`/`settling` split is the highest-leverage event modifier finding
-
-Any stateful workflow contains two fundamentally different kinds of events:
-- **Advancing events** that move the lifecycle forward: Submit, Approve, Deny, FundLoan, PayClaim
-- **Settling events** that accumulate data within the current state: VerifyDocuments, LogRepairStep, RequestDocument, AddInterviewer
-
-This is the event-side manifestation of Principle #5 (data truth vs movement truth). The distinction is invisible in the current DSL unless you read every transition row. Making it visible at the declaration level serves:
-- **Author comprehension:** scanning event declarations tells you the lifecycle's routing structure
-- **AI authoring:** AI knows whether to generate `transition` or `no transition` outcomes
-- **Diagram rendering:** settling events can be visually suppressed or grouped separately
-- **IntelliSense:** `transition` is not suggested as an outcome when authoring rows for a settling event
-
----
-
-## Interaction with Existing Diagnostics
-
-### Summary table
-
-| Diagnostic | Current behavior | With `terminal` | With `required` | With `transient` |
-|---|---|---|---|---|
-| **C48** (unreachable) | Warning: state unreachable from initial | **No change.** Terminal + unreachable = definition problem | **No change.** Required + unreachable = contradictory declaration | **No change.** |
-| **C50** (dead-end) | Warning: non-terminal state has outgoing rows that all reject/no-transition | **Suppressed for terminal states.** **Strengthened for others** — "mark with `terminal` if intentional" | No direct change | **Upgraded to error** for transient states: transient dead-end is a proven contradiction |
-| **C51** (reject-only pair) | Warning: every row for (State, Event) rejects | No direct change | No change | No change |
-| **C52** (event never succeeds) | Warning: event can never succeed from any reachable state | No direct change | No change | No change |
-| **New diagnostic** | — | Error: terminal state has outgoing `transition` rows | Error: required state bypassed on initial→terminal path | Error: transient state has no successful outgoing transition |
-
-### C50 interaction with `terminal`
-
-With `terminal`:
-1. States marked `terminal` are validated to have **no outgoing `transition` outcomes** (new error diagnostic).
-2. States marked `terminal` are excluded from C50 analysis.
-3. Non-terminal dead-end states (C50) now get stronger diagnostic language: "State 'X' appears to be a dead end. If it is intentionally terminal, mark it with `terminal`. Otherwise, fix the outgoing transitions."
-
-### C48 + terminal: unreachable terminal
-
-A state that is both `terminal` and unreachable (C48) is a definition smell — the author declared a lifecycle endpoint that no execution path can reach. The simpler approach: let C48 stand as-is. The author sees both pieces of information. Compound diagnostics add interaction complexity with marginal benefit.
-
-### Potential new diagnostics
-
-| Code | Trigger | Severity | Message pattern |
-|---|---|---|---|
-| **C56** (tentative) | Terminal state has outgoing `transition` outcome | Error | "State '{State}' is marked terminal but has a transition to '{Target}' — terminal states may not have outgoing transitions" |
-| **C57** (tentative) | Required state bypassed on initial→terminal path | Error | "State '{State}' is marked required but path {Initial}→…→{Terminal} bypasses it" |
-| **C58** (tentative) | Transient state has no successful outgoing transition | Error | "State '{State}' is marked transient but has no outgoing transition that succeeds" |
-
----
-
-## Recommendation Tiers
-
-### Tier 1 — Strong Candidates (propose)
-
-| Modifier | Entity | Provability | Key value |
-|---|---|---|---|
-| `terminal` | State | Full | Lifecycle boundary; `initial` parallel; C50 interaction |
-| `guarded` | State | Full | Entry safety; prevents unguarded high-value state entry |
-| `entry` | Event | Full | Intake event pattern; structural corollary of `initial` |
-| `advancing` | Event | Full | State-changing intent; routing vs mutation distinction |
-| `settling` | Event | Full | Data-only intent; complement to `advancing` |
-| `isolated` | Event | Full | Single-state scope; phase-specific action pattern |
-| `writeonce` | Field | Partial (overapprox) | Intake-data immutability; permanent-record semantics |
-| `sealed after <State>` | Field | Full | Lifecycle-phase immutability; freeze-point pattern |
-
-### Tier 2 — Interesting but Complex (explore further)
-
-| Modifier | Entity | Provability | Key blocker |
-|---|---|---|---|
-| `required` / `milestone` | State | Partial (dominator + overapprox) | Guard-dependent false positives; diagnostic clarity; needs `terminal` first |
-| `transient` | State | Partial | Weaker-than-expected guarantee; no time model |
-| `error` / `failure` | State | Limited | Primarily semantic/tooling; limited compile leverage |
-| `resting` | State | Partial (self-loop) | Primarily semantic/tooling |
-| `decision` | State | Full | Derivable from transition rows; primarily intent/tooling |
-| `irreversible` | Event | Graph (overapprox) | Guard-dependent; most useful for non-terminal targets |
-| `universal` | Event | Full | Overlap with `from any` mechanism |
-| `completing` | Event | Full (requires `terminal`) | Dependency chain; cross-row constraint |
-| `guarded` | Event | Full | Conflicts with idiomatic reject-fallback pattern; reject-row exemption design needed |
-| `total` | Event | Full (C51 inversion) | Incremental over existing C51 warning |
-| `identity` | Field | Same as `writeonce` | Superset of `writeonce`; subsumption design question |
-| `monotonic` | Field | Full (collections) / Partial (scalars) | Split provability; start with collections |
-| `sensitive` | Field | None (tooling-only) | Requires philosophical position on tooling-directive modifiers |
-| `immutable` | Field | Full | Narrow use case; const-vs-field design question |
-| `derived` | Field | Full (mutation ban) | Right entry point but deferred to proposal #17 |
-
-### Tier 3 — Reject or Defer
-
-| Modifier | Entity | Reason |
-|---|---|---|
-| `once` | Event | Requires runtime counter; achievable via boolean field + guard |
-| `idempotent` | Event | Undecidable in general; better as explicit guard patterns |
-| `symmetric` | Event | Niche domain applicability; most workflows are directional |
-| `convergent` | State | Limited utility; `terminal` + `error` covers the common case |
-| `absorbing` | State | Expressible as `terminal` + event handling; separate keyword marginal |
-| `audit` | Field | Tooling metadata best as host-application concern |
-
----
-
-## Implementation Sequence
-
-If the project decides to implement modifiers, the recommended order is:
-
-1. **`terminal`** — Tier 1, lowest risk, highest certainty. Ships alone. Unblocks `completing`, `required`, and `sealed after`.
-2. **`entry` + `advancing` + `settling` + `isolated`** — Tier 1 event modifiers. Ship as a cohort (they form a coherent vocabulary). Low implementation cost (row-shape checks, no runtime changes).
-3. **`writeonce`** — Tier 1 field modifier. Ships independently. Requires row mutation analysis.
-4. **`sealed after <State>`** — Tier 1 field modifier. Ships after `terminal`. Requires reachability + row analysis.
-5. **`guarded` (state)** — Tier 1 state modifier. Ships independently. Incoming-row scan.
-6. **Tier 2 candidates** — evaluated after Tier 1 feedback from real usage.
-
----
-
-## Where This Fits in the Research Taxonomy
-
-This research creates a new domain in the language research taxonomy. It is not a natural extension of any existing domain:
-
-- **Not constraint composition (#8, #13, #14)** — constraint composition is about value constraints (invariants, field-level bounds, named rules). Structural modifiers constrain graph topology, not field values.
-- **Not static reasoning expansion** — static reasoning is about proving properties from existing declarations (contradiction detection, satisfiability). Structural modifiers *add new declarations* that create new provable properties.
-- **Not entity-modeling surface (#17, #22)** — entity modeling is about what data an entity has (fields, computed values, statelessness). Structural modifiers are about what the lifecycle graph looks like.
-- **Closest relative: state machine expressiveness** — `state-machine-expressiveness.md` covers what graph features Precept could gain (hierarchy, parallelism). Structural modifiers are a different axis — they annotate existing graph features to enable stronger compile-time reasoning.
-
-**Recommended taxonomy placement:** Domain "Structural lifecycle modifiers" in the expressiveness research folder, with `state-machine-expressiveness.md` and `static-reasoning-expansion.md` as theory/reference companions.
-
-| Domain | Open proposals | Primary grounding | Theory / reference companion | Notes |
-|---|---|---|---|---|
-| Structural lifecycle modifiers | — | [expressiveness/structural-lifecycle-modifiers.md](./structural-lifecycle-modifiers.md) | [references/state-machine-expressiveness.md](../references/state-machine-expressiveness.md), [references/static-reasoning-expansion.md](../references/static-reasoning-expansion.md) | Horizon domain. `terminal` is the strong candidate. |
-
----
-
-## Dead Ends and Rejected Directions
-
-### State-type system (rejected)
-
-**Idea:** Instead of keyword modifiers, make state categories a type system — `state Closed as terminal`, `state Processing as transient`, with a fixed set of state types that carry behavioral contracts.
-
-**Why rejected:** This turns states into typed entities with distinct behavioral contracts per type. The parser and type checker must track state types and enforce different rules per type. Architecturally invasive and breaks the current flat model where all states are structurally identical (just names). Keyword modifiers add information without changing the fundamental model. Types change the model.
-
-### Event lifecycle annotations (rejected)
-
-**Idea:** Full event lifecycle annotations — `event Approve preconditions [R1, R2]`, `event Close postconditions [in terminal]`.
-
-**Why rejected:** This is pre/postcondition specification on events, equivalent to attaching Hoare-logic contracts. Precept already has this: `on Event assert ...` is the precondition; state asserts and invariants are the postconditions. Adding more annotation layers duplicates existing constructs.
-
-### Temporal properties (deferred indefinitely)
-
-**Idea:** Time-bounded residency (`state Processing timeout 30m`), deadline states, SLA modifiers.
-
-**Why deferred:** Precept is event-driven with no clock model. Time-bounded properties require a runtime clock, a polling mechanism for timeout detection, and a new category of system-generated events (timeout events). This is a fundamental model extension, not a modifier. Workflow orchestrators (Temporal, Step Functions) handle time; Precept handles data integrity.
-
-### Hierarchical state modifiers (deferred indefinitely)
-
-**Idea:** Modifiers that reference other states — `state Review parent of TechnicalReview, LegalReview`.
-
-**Why deferred:** Precept's flat state model is a deliberate design choice (Principle #9, tooling-friendly; `state-machine-expressiveness.md` analysis: hierarchical states are HIGH cost). Modifiers that reference other states introduce hierarchy through the back door.
-
-### `absorbing` / `sink` as merged into `terminal` (reconsidered)
-
-**Earlier reasoning:** `absorbing` was initially considered identical to `terminal` ("terminal state with event handling"). On further analysis, `absorbing` (rows exist, none transition) is structurally distinct from `terminal` (no outgoing rows at all). The concept is valid but marginal — a `terminal` state can already have `no transition` and `reject` rows, making it effectively absorbing. Current resolution: Tier 3, pending evidence of real demand for the visual distinction in tooling.
-
----
-
-## Open Questions for Proposal Phase
-
-If `terminal` advances to a proposal, these questions need answers:
-
-1. **Interaction with `edit` declarations:** Can a terminal state have `in Terminal edit` declarations? (Likely yes — a closed entity might still allow annotation updates.)
-
-2. **Interaction with state entry/exit actions:** Can a terminal state have `to Terminal -> set ClosedDate = ...` entry actions? (Likely yes — entry actions run when transitioning *into* the state.)
-
-3. **Grammar extension:** Does `terminal` go in the same modifier position as `initial` (after state name, before comma)? If a state can be both `initial` and `terminal` (edge case: single-state precept), what's the declaration order?
-
-4. **Stateless precepts:** Should `terminal` be rejected in stateless precepts (no states to modify)? (Yes — trivially, since there are no state declarations.)
-
-5. **C50 message upgrade:** Should C50's message text change when `terminal` is available in the language? ("Mark this state as `terminal` if this is intentional" as guidance.)
-
-6. **`sealed after` with multiple states:** Can a field be sealed after multiple states? E.g., `sealed after Approved, Denied` — meaning the field freezes when either state is entered. Consistent with existing multi-state syntax in `in S1, S2 assert ...`.
-
-7. **`guarded` (state) + `edit` interaction:** If a state is `guarded` (all incoming transitions require guards), does `edit` bypass this? Likely no — direct `edit` is a different operation from transition rows. Clarify whether `guarded` applies to transitions only.
-
-8. **`advancing` + `reject` row semantics:** `advancing` allows `reject` rows (the event is refused, but when it succeeds, it advances). Confirm this is the right semantics before proposal.
-
----
-
-## Key References
-
-- Harel, "Statecharts: A visual formalism for complex systems" (1987)
-- UML Superstructure Spec, §14.2.3 FinalState, §14.2.3 InitialPseudostate
-- XState v5 — final states: https://stately.ai/docs/final-states
-- BPMN 2.0 — end events: https://www.omg.org/spec/BPMN/2.0.2/
-- AWS Step Functions — states: https://docs.aws.amazon.com/step-functions/latest/dg/concepts-amazon-states-language.html
-- Temporal workflows: https://docs.temporal.io/workflows
-- Lengauer & Tarjan, "A Fast Algorithm for Finding Dominators in a Flowgraph" (1979) — dominator analysis for `required`
-- Lamport, *Specifying Systems* (2002) — temporal properties (liveness, safety) for formal modifier semantics
-- `docs/PreceptLanguageDesign.md` — design principles numbered #1–#13
-- `src/Precept/Dsl/PreceptAnalysis.cs` — existing terminal/dead-end/unreachable analysis
-- `src/Precept/Dsl/DiagnosticCatalog.cs` — C48, C49, C50, C51, C52 diagnostics
-- `research/language/references/state-machine-expressiveness.md` — existing theory companion
-- `research/language/references/static-reasoning-expansion.md` — adjacent static-reasoning research
-- `research/language/expressiveness/constraint-composition-domain.md` — Frank's #13 keyword-vs-predicate taxonomy
-- `samples/insurance-claim.precept` — usage illustration source for `settling`, `advancing`, `writeonce`, `sealed after`
-- `samples/hiring-pipeline.precept` — usage illustration source for `isolated`, `settling`, `decision`, `monotonic`
-- `samples/loan-application.precept` — usage illustration source for `entry`, `guarded` state, `writeonce`
-- `samples/warranty-repair-request.precept` — usage illustration source for `resting`, `advancing`, `settling`
-- `samples/refund-request.precept` — usage illustration source for `advancing`, `sealed after`
-- `samples/customer-profile.precept` — stateless precept; confirms field modifiers are not state-machine-specific
