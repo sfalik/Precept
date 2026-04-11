@@ -244,6 +244,115 @@ public class PreceptChoiceTypeTests
     }
 
     // ════════════════════════════════════════════════════════════════════
+    // TYPE CHECKER — C65 (ordinal operator on unordered choice)
+    //                C67 (cross-field ordinal comparison)
+    //
+    // These tests are written to FAIL against current behavior.
+    // Current: C41 is emitted (or thrown) for all >/</>=/<= on choice fields
+    //          regardless of ordered modifier or operand shape.
+    // Expected:
+    //   C65 — field is choice but missing 'ordered' modifier
+    //   C67 — both operands are choice fields (cross-field ordinal has no semantics)
+    //   equality (==) between two choice fields remains allowed (string comparison)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void TypeCheck_UnorderedChoiceField_GreaterThan_EmitsC65()
+    {
+        // Status has no 'ordered' modifier — ordinal operator should be C65, not C41
+        const string dsl = """
+            precept M
+            field Status as choice("Draft","Active","Closed") default "Draft"
+            state S initial
+            event Advance
+            from S on Advance when Status > "Active" -> no transition
+            """;
+
+        var result = PreceptCompiler.Validate(PreceptParser.Parse(dsl));
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C65",
+            because: "ordinal operator '>' requires the field to be declared 'ordered'");
+    }
+
+    [Fact]
+    public void TypeCheck_UnorderedChoiceField_LessThan_EmitsC65()
+    {
+        // '<' on a choice field without 'ordered' → C65
+        const string dsl = """
+            precept M
+            field Priority as choice("Low","Med","High") default "Low"
+            state S initial
+            event Check
+            from S on Check when Priority < "High" -> no transition
+            """;
+
+        var result = PreceptCompiler.Validate(PreceptParser.Parse(dsl));
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C65",
+            because: "ordinal operator '<' requires the field to be declared 'ordered'");
+    }
+
+    [Fact]
+    public void TypeCheck_OrderedChoice_CrossField_SameChoiceSet_EmitsC67()
+    {
+        // Both fields are ordered with the same values, but they are different fields.
+        // Cross-field ordinal comparison has no defined semantics → C67
+        const string dsl = """
+            precept M
+            field Priority as choice("Low","Med","High") default "Low" ordered
+            field Severity as choice("Low","Med","High") default "Low" ordered
+            state S initial
+            event Compare
+            from S on Compare when Priority > Severity -> no transition
+            """;
+
+        var result = PreceptCompiler.Validate(PreceptParser.Parse(dsl));
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C67",
+            because: "ordinal comparison between two choice fields is not defined, even when their value sets are identical");
+    }
+
+    [Fact]
+    public void TypeCheck_OrderedChoice_CrossField_DifferentChoiceSets_EmitsC67()
+    {
+        // Priority and Status are ordered choice fields with different value sets.
+        // Ordinal rank is field-local — comparing across fields has no meaning → C67
+        const string dsl = """
+            precept M
+            field Priority as choice("Low","Med","High") default "Low" ordered
+            field Status as choice("Draft","Active","Closed") default "Draft" ordered
+            state S initial
+            event Compare
+            from S on Compare when Priority > Status -> no transition
+            """;
+
+        var result = PreceptCompiler.Validate(PreceptParser.Parse(dsl));
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C67",
+            because: "ordinal comparison between two choice fields with incompatible value sets is not defined");
+    }
+
+    [Fact]
+    public void TypeCheck_OrderedChoice_CrossField_EqualityComparison_IsAllowed()
+    {
+        // == between two ordered choice fields is fine — both are strings at runtime,
+        // and equality does not depend on ordinal position
+        const string dsl = """
+            precept M
+            field Priority as choice("Low","Med","High") default "Low" ordered
+            field Severity as choice("Low","Med","High") default "Low" ordered
+            state S initial
+            event Check
+            from S on Check when Priority == Severity -> no transition
+            """;
+
+        var result = PreceptCompiler.Validate(PreceptParser.Parse(dsl));
+
+        result.Diagnostics.Should().NotContain(d => d.Constraint.Id == "C67",
+            because: "equality comparison between two choice fields is valid — it is a string equality check, not ordinal");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
     // RUNTIME — membership enforcement, equality comparison
     // ════════════════════════════════════════════════════════════════════
 
