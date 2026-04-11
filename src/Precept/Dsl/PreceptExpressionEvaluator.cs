@@ -102,9 +102,11 @@ internal static class PreceptExpressionRuntimeEvaluator
             "not" => operand.Value is bool b
                 ? EvaluationResult.Ok(!b)
                 : EvaluationResult.Fail("operator 'not' requires boolean operand."),
-            "-" => TryToNumber(operand.Value, out var number)
-                ? EvaluationResult.Ok(-number)
-                : EvaluationResult.Fail("unary '-' requires numeric operand."),
+            "-" => operand.Value is long l
+                ? EvaluationResult.Ok(-l)
+                : TryToNumber(operand.Value, out var number)
+                    ? EvaluationResult.Ok(-number)
+                    : EvaluationResult.Fail("unary '-' requires numeric operand."),
             _ => EvaluationResult.Fail($"unsupported unary operator '{unary.Operator}'.")
         };
     }
@@ -173,60 +175,97 @@ internal static class PreceptExpressionRuntimeEvaluator
                 if (leftOperand is string leftString && rightOperand is string rightString)
                     return EvaluationResult.Ok(leftString + rightString);
 
+                if (leftOperand is long la && rightOperand is long ra)
+                    return EvaluationResult.Ok(la + ra);
+
                 if (TryToNumber(leftOperand, out var leftNumberForAdd) && TryToNumber(rightOperand, out var rightNumberForAdd))
                     return EvaluationResult.Ok(leftNumberForAdd + rightNumberForAdd);
 
                 return EvaluationResult.Fail("operator '+' requires number+number or string+string.");
 
             case "-":
+                if (leftOperand is long ls && rightOperand is long rs)
+                    return EvaluationResult.Ok(ls - rs);
+
                 if (TryToNumber(leftOperand, out var leftNumberForSub) && TryToNumber(rightOperand, out var rightNumberForSub))
                     return EvaluationResult.Ok(leftNumberForSub - rightNumberForSub);
 
                 return EvaluationResult.Fail("operator '-' requires numeric operands.");
 
             case "*":
+                if (leftOperand is long lm && rightOperand is long rm)
+                    return EvaluationResult.Ok(lm * rm);
+
                 if (TryToNumber(leftOperand, out var leftNumberForMul) && TryToNumber(rightOperand, out var rightNumberForMul))
                     return EvaluationResult.Ok(leftNumberForMul * rightNumberForMul);
 
                 return EvaluationResult.Fail("operator '*' requires numeric operands.");
 
             case "/":
+                if (leftOperand is long ld && rightOperand is long rd)
+                {
+                    if (rd == 0L) return EvaluationResult.Fail("integer division by zero.");
+                    return EvaluationResult.Ok(ld / rd); // C# truncates toward zero
+                }
+
                 if (TryToNumber(leftOperand, out var leftNumberForDiv) && TryToNumber(rightOperand, out var rightNumberForDiv))
                     return EvaluationResult.Ok(leftNumberForDiv / rightNumberForDiv);
 
                 return EvaluationResult.Fail("operator '/' requires numeric operands.");
 
             case "%":
+                if (leftOperand is long lmod && rightOperand is long rmod)
+                {
+                    if (rmod == 0L) return EvaluationResult.Fail("integer modulo by zero.");
+                    return EvaluationResult.Ok(lmod % rmod);
+                }
+
                 if (TryToNumber(leftOperand, out var leftNumberForMod) && TryToNumber(rightOperand, out var rightNumberForMod))
                     return EvaluationResult.Ok(leftNumberForMod % rightNumberForMod);
 
                 return EvaluationResult.Fail("operator '%' requires numeric operands.");
 
             case "==":
+                if (TryToNumber(leftOperand, out var leftEq) && TryToNumber(rightOperand, out var rightEq))
+                    return EvaluationResult.Ok(leftEq == rightEq);
                 return EvaluationResult.Ok(Equals(leftOperand, rightOperand));
 
             case "!=":
+                if (TryToNumber(leftOperand, out var leftNeq) && TryToNumber(rightOperand, out var rightNeq))
+                    return EvaluationResult.Ok(leftNeq != rightNeq);
                 return EvaluationResult.Ok(!Equals(leftOperand, rightOperand));
 
             case ">":
+                if (leftOperand is long lgt && rightOperand is long rgt)
+                    return EvaluationResult.Ok(lgt > rgt);
+
                 if (TryToNumber(leftOperand, out var leftNumberForGt) && TryToNumber(rightOperand, out var rightNumberForGt))
                     return EvaluationResult.Ok(leftNumberForGt > rightNumberForGt);
 
                 return EvaluationResult.Fail("operator '>' requires numeric operands.");
 
             case ">=":
+                if (leftOperand is long lgte && rightOperand is long rgte)
+                    return EvaluationResult.Ok(lgte >= rgte);
+
                 if (TryToNumber(leftOperand, out var leftNumberForGte) && TryToNumber(rightOperand, out var rightNumberForGte))
                     return EvaluationResult.Ok(leftNumberForGte >= rightNumberForGte);
 
                 return EvaluationResult.Fail("operator '>=' requires numeric operands.");
 
             case "<":
+                if (leftOperand is long llt && rightOperand is long rlt)
+                    return EvaluationResult.Ok(llt < rlt);
+
                 if (TryToNumber(leftOperand, out var leftNumberForLt) && TryToNumber(rightOperand, out var rightNumberForLt))
                     return EvaluationResult.Ok(leftNumberForLt < rightNumberForLt);
 
                 return EvaluationResult.Fail("operator '<' requires numeric operands.");
 
             case "<=":
+                if (leftOperand is long llte && rightOperand is long rlte)
+                    return EvaluationResult.Ok(llte <= rlte);
+
                 if (TryToNumber(leftOperand, out var leftNumberForLte) && TryToNumber(rightOperand, out var rightNumberForLte))
                     return EvaluationResult.Ok(leftNumberForLte <= rightNumberForLte);
 

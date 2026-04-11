@@ -201,6 +201,26 @@ public static class PreceptParser
         throw DiagnosticCatalog.C5.ToException(("value", token.ToStringValue()));
     }
 
+    /// <summary>
+    /// Returns either a <see cref="long"/> (for whole-number literals like <c>42</c>) or
+    /// a <see cref="double"/> (for decimal/scientific literals like <c>3.14</c>, <c>1e5</c>).
+    /// The caller is responsible for updating <see cref="PreceptLiteralExpression"/> accordingly.
+    /// </summary>
+    private static object ToNumericLiteralValue(this Token<PreceptToken> token)
+    {
+        var text = token.ToStringValue();
+        // Whole-number literal → long (integer type in the DSL)
+        if (!text.Contains('.') && !text.Contains('e', StringComparison.OrdinalIgnoreCase))
+        {
+            if (long.TryParse(text, out var longVal))
+                return longVal;
+        }
+        if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
+            return d;
+        // SYNC:CONSTRAINT:C5
+        throw DiagnosticCatalog.C5.ToException(("value", text));
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // Expression Combinators
     // ═══════════════════════════════════════════════════════════════════
@@ -208,7 +228,7 @@ public static class PreceptParser
     // Level 5: Atoms
     private static readonly TokenListParser<PreceptToken, PreceptExpression> NumberAtom =
         Token.EqualTo(PreceptToken.NumberLiteral)
-            .Select(t => (PreceptExpression)new PreceptLiteralExpression(t.ToNumberValue()));
+            .Select(t => (PreceptExpression)new PreceptLiteralExpression(t.ToNumericLiteralValue()));
 
     private static readonly TokenListParser<PreceptToken, PreceptExpression> StringAtom =
         Token.EqualTo(PreceptToken.StringLiteral)
@@ -361,7 +381,8 @@ public static class PreceptParser
     private static readonly TokenListParser<PreceptToken, PreceptScalarType> ScalarType =
         Token.EqualTo(PreceptToken.StringType).Value(PreceptScalarType.String)
             .Or(Token.EqualTo(PreceptToken.NumberType).Value(PreceptScalarType.Number))
-            .Or(Token.EqualTo(PreceptToken.BooleanType).Value(PreceptScalarType.Boolean));
+            .Or(Token.EqualTo(PreceptToken.BooleanType).Value(PreceptScalarType.Boolean))
+            .Or(Token.EqualTo(PreceptToken.IntegerType).Value(PreceptScalarType.Integer));
 
     /// <summary>
     /// Parses a type reference: scalar type or collection type.
@@ -386,8 +407,9 @@ public static class PreceptParser
     private static readonly TokenListParser<PreceptToken, object?> ScalarLiteral =
         (from _ in Token.EqualTo(PreceptToken.Minus)
          from n in Token.EqualTo(PreceptToken.NumberLiteral)
-         select (object?)-n.ToNumberValue()).Try()
-        .Or(Token.EqualTo(PreceptToken.NumberLiteral).Select(t => (object?)t.ToNumberValue()))
+         let raw = n.ToNumericLiteralValue()
+         select (object?)(raw is long l ? (object?)-l : -(double)(raw))).Try()
+        .Or(Token.EqualTo(PreceptToken.NumberLiteral).Select(t => (object?)t.ToNumericLiteralValue()))
             .Try().Or(Token.EqualTo(PreceptToken.StringLiteral).Select(t => (object?)t.ToStringLiteralValue()))
             .Try().Or(Token.EqualTo(PreceptToken.True).Value((object?)true))
             .Try().Or(Token.EqualTo(PreceptToken.False).Value((object?)false))
@@ -592,6 +614,7 @@ public static class PreceptParser
             {
                 null => "null",
                 bool b => b ? "true" : "false",
+                long l => l.ToString(CultureInfo.InvariantCulture),
                 double d => d.ToString(CultureInfo.InvariantCulture),
                 string s => $"\"{s}\"",
                 _ => lit.Value.ToString() ?? "null"
@@ -1114,7 +1137,8 @@ public static class PreceptParser
             {
                 var ok = f.Type switch
                 {
-                    PreceptScalarType.Number => f.DefaultValue is double,
+                    PreceptScalarType.Number => f.DefaultValue is double || f.DefaultValue is long,
+                    PreceptScalarType.Integer => f.DefaultValue is long,
                     PreceptScalarType.String => f.DefaultValue is string,
                     PreceptScalarType.Boolean => f.DefaultValue is bool,
                     _ => true
@@ -1137,7 +1161,8 @@ public static class PreceptParser
                 {
                     var ok = arg.Type switch
                     {
-                        PreceptScalarType.Number => arg.DefaultValue is double,
+                        PreceptScalarType.Number => arg.DefaultValue is double || arg.DefaultValue is long,
+                        PreceptScalarType.Integer => arg.DefaultValue is long,
                         PreceptScalarType.String => arg.DefaultValue is string,
                         PreceptScalarType.Boolean => arg.DefaultValue is bool,
                         _ => true

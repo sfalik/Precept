@@ -37,7 +37,9 @@ public sealed record PreceptEventArg(
     bool IsNullable,
     bool HasDefaultValue = false,
     object? DefaultValue = null,
-    IReadOnlyList<FieldConstraint>? Constraints = null);
+    IReadOnlyList<FieldConstraint>? Constraints = null,
+    IReadOnlyList<string>? ChoiceValues = null,
+    bool IsOrdered = false);
 
 public sealed record PreceptField(
     string Name,
@@ -45,13 +47,16 @@ public sealed record PreceptField(
     bool IsNullable,
     bool HasDefaultValue = false,
     object? DefaultValue = null,
-    IReadOnlyList<FieldConstraint>? Constraints = null);
+    IReadOnlyList<FieldConstraint>? Constraints = null,
+    IReadOnlyList<string>? ChoiceValues = null,
+    bool IsOrdered = false);
 
 public sealed record PreceptCollectionField(
     string Name,
     PreceptCollectionKind CollectionKind,
     PreceptScalarType InnerType,
-    IReadOnlyList<FieldConstraint>? Constraints = null);
+    IReadOnlyList<FieldConstraint>? Constraints = null,
+    IReadOnlyList<string>? ChoiceValues = null);
 
 
 public enum PreceptCollectionKind
@@ -95,6 +100,9 @@ public abstract record FieldConstraint
 
     /// <summary>Collection count must be &lt;= <see cref="Value"/>.</summary>
     public sealed record Maxcount(int Value) : FieldConstraint;
+
+    /// <summary>Value must have at most <see cref="Places"/> decimal places. Decimal fields only.</summary>
+    public sealed record Maxplaces(int Places) : FieldConstraint;
 }
 
 public enum PreceptScalarType
@@ -102,7 +110,10 @@ public enum PreceptScalarType
     String,
     Number,
     Boolean,
-    Null
+    Null,
+    Integer,   // #29
+    Decimal,   // #27 (scaffold)
+    Choice,    // #25 (scaffold)
 }
 
 public abstract record PreceptExpression;

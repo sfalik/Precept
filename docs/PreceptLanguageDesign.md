@@ -970,10 +970,16 @@ The expression language supports:
 - parentheses
 - identifier expressions with optional dotted member access (`Name.member`)
 
-Collection accessor members carried forward conceptually:
-- `.count`
-- `.min`, `.max` (sets)
-- `.peek` (queue/stack)
+Dotted member accessors:
+
+| Form | Receiver | Returns | Notes |
+|---|---|---|---|
+| `Field.count` | `set<T>`, `queue<T>`, `stack<T>` | `number` | Total — empty collection → 0 |
+| `Field.min`, `Field.max` | `set<T>` (numeric inner) | inner type | Partial — error on empty set |
+| `Field.peek` | `queue<T>`, `stack<T>` | inner type | Partial — error on empty collection |
+| `Field.length` | `string` | `number` | UTF-16 code unit count. Null-unsafe — requires non-null narrowing first (C56). See [String accessors](#string-accessors). |
+| `EventName.ArgName` | event arg in transition row `when` guard | arg type | Required dotted form to avoid field shadowing. See [Expression scope in transitions](#expression-scope-in-transitions). |
+| `EventName.ArgName.length` | `string` event arg | `number` | Three-level form — combines arg dotted form with string `.length`. |
 
 Exact operator precedence and literal forms should align with the runtime expression parser.
 

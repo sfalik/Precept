@@ -530,6 +530,25 @@ public class CatalogDriftTests
         // C59: Default value violates constraint (0 is not positive)
         ["C59"] = new(H + "field Amount as number default 0 positive\n" + S, "violates constraint"),
 
+        // C60: Narrowing assignment — assigning a number literal (3.0) to an integer field
+        ["C60"] = new(H + "field Count as integer default 0\n" + S2 + "event Go\nfrom A on Go -> set Count = 3.0 -> no transition\n", "explicit conversion"),
+
+        // C61: maxplaces constraint on non-decimal field — constructed directly (maxplaces not yet a keyword)
+        ["C61"] = new("_unused_", "decimal fields", DirectAction: () =>
+        {
+            var model = new PreceptDefinition(
+                "Test",
+                [new PreceptState("A")],
+                new PreceptState("A"),
+                [],
+                [new PreceptField("Count", PreceptScalarType.Integer, false, true, 0L, [new FieldConstraint.Maxplaces(2)])],
+                [], null);
+            var result = PreceptCompiler.Validate(model);
+            var diag = result.Diagnostics.FirstOrDefault(d => d.Constraint.Id == "C61");
+            if (diag is null) throw new InvalidOperationException("C61 was not triggered");
+            throw new InvalidOperationException(diag.Message);
+        }),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state

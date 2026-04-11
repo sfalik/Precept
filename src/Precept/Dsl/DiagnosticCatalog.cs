@@ -468,4 +468,20 @@ public static class DiagnosticCatalog
         "C59", "compile",
         "Default value violates a declared constraint.",
         "Default value '{value}' violates constraint '{constraint}'. The default must satisfy all declared constraints.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Integer type diagnostics (C60–C61)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Narrowing assignment: cannot assign a non-integer numeric value to an integer field without explicit conversion.</summary>
+    public static readonly LanguageConstraint C60 = Register(
+        "C60", "compile",
+        "Narrowing assignment: cannot assign non-integer value to integer field without explicit conversion.",
+        "Narrowing assignment: cannot assign '{actual}' to integer field '{name}' without explicit conversion. Use truncate(), floor(), or ceil().");
+
+    /// <summary>'maxplaces' constraint applies only to decimal fields.</summary>
+    public static readonly LanguageConstraint C61 = Register(
+        "C61", "compile",
+        "'maxplaces' constraint applies only to decimal fields.",
+        "'maxplaces' constraint applies only to decimal fields. Integer fields cannot have fractional precision.");
 }

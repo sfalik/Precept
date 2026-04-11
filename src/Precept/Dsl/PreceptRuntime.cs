@@ -620,6 +620,7 @@ public sealed class PreceptEngine
         return contract.Type switch
         {
             PreceptScalarType.Number => CoerceToNumber(value),
+            PreceptScalarType.Integer => CoerceToInteger(value),
             PreceptScalarType.Boolean => CoerceToBoolean(value),
             PreceptScalarType.String => value?.ToString(),
             PreceptScalarType.Null => null,
@@ -632,13 +633,25 @@ public sealed class PreceptEngine
         return element.ValueKind switch
         {
             System.Text.Json.JsonValueKind.String => element.GetString(),
-            System.Text.Json.JsonValueKind.Number => element.GetDouble(),
+            // Distinguish integer vs floating-point JSON numbers
+            System.Text.Json.JsonValueKind.Number => element.TryGetInt64(out var l) ? (object?)l : element.GetDouble(),
             System.Text.Json.JsonValueKind.True => (object?)true,
             System.Text.Json.JsonValueKind.False => false,
             System.Text.Json.JsonValueKind.Null => null,
             System.Text.Json.JsonValueKind.Undefined => null,
             _ => element.GetRawText()
         };
+    }
+
+    private static object? CoerceToInteger(object value)
+    {
+        if (value is long) return value;
+        if (value is int i) return (long)i;
+        if (value is short s) return (long)s;
+        if (value is byte b) return (long)b;
+        if (value is sbyte sb) return (long)sb;
+        if (value is string str && long.TryParse(str, out var l)) return l;
+        return value;
     }
 
     private static object? CoerceToNumber(object value)
@@ -1685,6 +1698,7 @@ public sealed class PreceptEngine
             PreceptScalarType.String => value is string,
             PreceptScalarType.Boolean => value is bool,
             PreceptScalarType.Number => value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal,
+            PreceptScalarType.Integer => value is long or int or short or byte or sbyte,
             PreceptScalarType.Null => false,
             _ => false
         };

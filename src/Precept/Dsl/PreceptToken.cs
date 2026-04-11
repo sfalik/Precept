@@ -295,6 +295,11 @@ public enum PreceptToken
     BooleanType,
 
     [TokenCategory(TokenCategory.Type)]
+    [TokenDescription("Integer scalar type")]
+    [TokenSymbol("integer")]
+    IntegerType,
+
+    [TokenCategory(TokenCategory.Type)]
     [TokenDescription("Queue collection type")]
     [TokenSymbol("queue")]
     Queue,
