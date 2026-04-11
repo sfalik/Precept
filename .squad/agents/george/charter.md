@@ -103,6 +103,20 @@ If any of these are missing, **stop**. Do not start implementation. Write to `.s
 
 This applies to all implementation work — new features, behavior changes, refactors that affect public behavior. Bug fixes on clearly-understood behavior may proceed with lighter process, but still require Frank's sign-off.
 
+## Cross-Surface Sync Obligation
+
+**A language change is not done until it works across all three impact categories: Runtime, Tooling, and MCP.** See `language-surface-sync.instructions.md` for the full framework.
+
+When I add or modify a type keyword, constraint, operator, or expression form:
+
+1. **Runtime** — parser, type checker, evaluator, engine, diagnostics. This is my primary domain.
+2. **Tooling** — I notify Kramer and verify the change works in syntax highlighting (all positions: standalone, after `as`, after `of`), completions, and hover. If Kramer isn't available, I make the tooling changes myself.
+3. **MCP** — I notify Newman and verify `precept_compile` DTOs carry the new metadata. If Newman isn't available, I make the DTO changes myself.
+
+I do not mark a slice done until all three categories are addressed or explicitly marked N/A.
+
+**Design review participation.** When a language-surface proposal is under design review, I attend. Frank leads the impact analysis; I flag internal surfaces that need updating — parser combinators, type-check paths, collection handling, regex patterns in the language server. I know the implementation best; Frank shouldn't have to guess what breaks.
+
 ## Behavioral Completeness Obligation
 
 **A feature is not done when it parses and type-checks. It is done when every behavioral path can be exercised at runtime and has a test that proves it.**

@@ -159,4 +159,46 @@ public class PreceptIntellisenseNavigationTests
         var character = lastNewLine >= 0 ? prefix.Length - lastNewLine - 1 : prefix.Length;
         return (text, new Position(line, character));
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Type vocabulary drift — Tooling (hover)
+    //
+    // Every declarable scalar type must produce non-null hover content
+    // when the cursor is on a field declaration of that type.
+    // See language-surface-sync.instructions.md § Tooling Impact.
+    // ════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData("string", "\"\"")]
+    [InlineData("number", "0")]
+    [InlineData("boolean", "false")]
+    [InlineData("integer", "0")]
+    [InlineData("decimal", "0.0")]
+    public void Hover_EveryScalarType_ReturnsContent(string typeName, string defaultValue)
+    {
+        var text = $"precept M\nfield X$$Y as {typeName} default {defaultValue}\nstate A initial\n";
+
+        var (code, position) = ExtractPosition(text);
+        var info = PreceptDocumentIntellisense.Analyze(code);
+
+        var hover = PreceptDocumentIntellisense.CreateHover(info, position);
+
+        hover.Should().NotBeNull($"hover on a '{typeName}' field must return content");
+        hover!.Contents.ToString().Should().Contain("XY",
+            $"hover must show the field name for type '{typeName}'");
+    }
+
+    [Fact]
+    public void Hover_ChoiceType_ReturnsContent()
+    {
+        var text = "precept M\nfield X$$Y as choice(\"A\",\"B\") default \"A\"\nstate A initial\n";
+
+        var (code, position) = ExtractPosition(text);
+        var info = PreceptDocumentIntellisense.Analyze(code);
+
+        var hover = PreceptDocumentIntellisense.CreateHover(info, position);
+
+        hover.Should().NotBeNull("hover on a choice field must return content");
+        hover!.Contents.ToString().Should().Contain("XY");
+    }
 }

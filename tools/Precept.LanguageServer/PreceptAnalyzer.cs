@@ -16,7 +16,7 @@ internal sealed class PreceptAnalyzer
 
     // ── Regex patterns for new-syntax declarations ──────────────────────
     // Match `field Name[, Name, ...] as string|number|boolean` (scalar fields)
-    private static readonly Regex NewFieldDeclRegex = new("^\\s*field\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?:string|number|boolean)(?:\\s|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex NewFieldDeclRegex = new("^\\s*field\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?:string|number|boolean|integer|decimal|choice)(?:\\s|\\(|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     // Match `field Name[, Name, ...] as set|queue|stack of type` (collection fields)
     private static readonly Regex NewCollectionFieldRegex = new("^\\s*field\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?:set|queue|stack)\\s+of\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     // Match `event Name[, Name, ...] with ...` (inline event args)

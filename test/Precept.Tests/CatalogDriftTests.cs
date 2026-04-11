@@ -663,4 +663,144 @@ public class CatalogDriftTests
         }
         throw new InvalidOperationException("Could not find repo root (Precept.slnx)");
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Type vocabulary drift — Runtime + Grammar + MCP
+    //
+    // Every declarable scalar type must parse as a field type, as a
+    // collection inner type, compile through the MCP tool, and appear
+    // in the TextMate grammar's type-keyword pattern.
+    // See language-surface-sync.instructions.md § Impact Categories.
+    // ════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// All <see cref="PreceptScalarType"/> values that can appear in a
+    /// <c>field X as {type}</c> declaration. Null is internal-only.
+    /// Choice requires special syntax and is tested separately.
+    /// </summary>
+    private static readonly PreceptScalarType[] DeclarableScalarTypes =
+        Enum.GetValues<PreceptScalarType>()
+            .Where(t => t is not PreceptScalarType.Null and not PreceptScalarType.Choice)
+            .ToArray();
+
+    [Theory]
+    [MemberData(nameof(DeclarableScalarTypeData))]
+    public void EveryScalarType_ParsesAsFieldDeclaration(PreceptScalarType type)
+    {
+        var typeName = type.ToString().ToLowerInvariant();
+        var dsl = $"precept DriftTest\nfield X as {typeName} default {DefaultForType(type)}\nstate A initial\n";
+        var (model, diags) = PreceptParser.ParseWithDiagnostics(dsl);
+        diags.Should().BeEmpty($"'field X as {typeName}' must parse without errors");
+        model.Should().NotBeNull();
+    }
+
+    [Theory]
+    [MemberData(nameof(DeclarableScalarTypeData))]
+    public void EveryScalarType_ParsesAsCollectionInnerType(PreceptScalarType type)
+    {
+        var typeName = type.ToString().ToLowerInvariant();
+        var dsl = $"precept DriftTest\nfield Items as set of {typeName}\nstate A initial\n";
+        var (model, diags) = PreceptParser.ParseWithDiagnostics(dsl);
+        diags.Should().BeEmpty($"'set of {typeName}' must parse without errors");
+        model.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void ChoiceType_ParsesAsFieldDeclaration()
+    {
+        var dsl = "precept DriftTest\nfield X as choice(\"A\",\"B\") default \"A\"\nstate A initial\n";
+        var (model, diags) = PreceptParser.ParseWithDiagnostics(dsl);
+        diags.Should().BeEmpty("'field X as choice(...)' must parse without errors");
+        model.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void ChoiceType_ParsesAsCollectionInnerType()
+    {
+        var dsl = "precept DriftTest\nfield Items as set of choice(\"X\",\"Y\")\nstate A initial\n";
+        var (model, diags) = PreceptParser.ParseWithDiagnostics(dsl);
+        diags.Should().BeEmpty("'set of choice(...)' must parse without errors");
+        model.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void GrammarTypeKeywords_CoverAllDeclarableTypes()
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        File.Exists(grammarPath).Should().BeTrue("grammar file must exist");
+
+        var grammarText = File.ReadAllText(grammarPath);
+
+        // Extract the typeKeywords pattern match value
+        var typeKeywordMatch = Regex.Match(grammarText, @"""typeKeywords"".*?""match"":\s*""([^""]+)""", RegexOptions.Singleline);
+        typeKeywordMatch.Success.Should().BeTrue("typeKeywords pattern must exist in grammar");
+
+        var pattern = typeKeywordMatch.Groups[1].Value;
+
+        foreach (var type in DeclarableScalarTypes)
+        {
+            var typeName = type.ToString().ToLowerInvariant();
+            pattern.Should().Contain(typeName,
+                $"TextMate grammar typeKeywords must include '{typeName}'");
+        }
+
+        pattern.Should().Contain("choice",
+            "TextMate grammar typeKeywords must include 'choice'");
+    }
+
+    [Fact]
+    public void GrammarFieldScalarDeclaration_CoversAllSimpleScalarTypes()
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        var grammarText = File.ReadAllText(grammarPath);
+
+        // Extract the fieldScalarDeclaration pattern
+        var match = Regex.Match(grammarText, @"""fieldScalarDeclaration"".*?""match"":\s*""([^""]+)""", RegexOptions.Singleline);
+        match.Success.Should().BeTrue("fieldScalarDeclaration pattern must exist");
+
+        var pattern = match.Groups[1].Value;
+
+        foreach (var type in DeclarableScalarTypes)
+        {
+            var typeName = type.ToString().ToLowerInvariant();
+            pattern.Should().Contain(typeName,
+                $"grammar fieldScalarDeclaration must include '{typeName}' so 'field X as {typeName}' gets structured highlighting");
+        }
+    }
+
+    [Fact]
+    public void GrammarFieldCollectionDeclaration_CoversAllSimpleScalarTypes()
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        var grammarText = File.ReadAllText(grammarPath);
+
+        // Extract the fieldCollectionDeclaration pattern
+        var match = Regex.Match(grammarText, @"""fieldCollectionDeclaration"".*?""match"":\s*""([^""]+)""", RegexOptions.Singleline);
+        match.Success.Should().BeTrue("fieldCollectionDeclaration pattern must exist");
+
+        var pattern = match.Groups[1].Value;
+
+        foreach (var type in DeclarableScalarTypes)
+        {
+            var typeName = type.ToString().ToLowerInvariant();
+            pattern.Should().Contain(typeName,
+                $"grammar fieldCollectionDeclaration must include '{typeName}' so 'set of {typeName}' gets structured highlighting");
+        }
+    }
+
+    public static IEnumerable<object[]> DeclarableScalarTypeData()
+        => DeclarableScalarTypes.Select(t => new object[] { t });
+
+    private static string DefaultForType(PreceptScalarType type) => type switch
+    {
+        PreceptScalarType.String => "\"\"",
+        PreceptScalarType.Number => "0",
+        PreceptScalarType.Boolean => "false",
+        PreceptScalarType.Integer => "0",
+        PreceptScalarType.Decimal => "0.0",
+        _ => throw new ArgumentOutOfRangeException(nameof(type))
+    };
 }

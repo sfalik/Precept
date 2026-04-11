@@ -115,6 +115,20 @@ If a feature has no approved design, **do not write tests for it** — writing t
 
 Tests for bug fixes on existing, clearly-documented behavior are exempt from this gate.
 
+## Cross-Surface Drift Testing
+
+**I own the drift-detection tests that prevent silent divergence between Runtime, Tooling, and MCP.** See `language-surface-sync.instructions.md` for the impact framework.
+
+The `CatalogDriftTests` suite already catches diagnostic and construct catalog drift. I extend it to cover type-vocabulary drift and tooling sync:
+
+- **Type coverage:** Every `PreceptScalarType` enum value must parse in a `field X as {type}` declaration AND in a `field X as set of {type}` collection declaration. If it parses for the runtime but the grammar or LS doesn't handle it, that's drift.
+- **Completion coverage:** Completions after `field X as ` must include every type keyword the parser accepts. Completions after `field X as set of ` must include every valid inner type.
+- **Hover coverage:** Hovering on a field of any type must return non-null content.
+- **MCP coverage:** `precept_compile` must return the correct type string for every scalar type.
+- **Grammar coverage:** The TextMate grammar's type keyword pattern must match every type the parser accepts.
+
+When a new type, constraint, or operator ships, I verify the drift tests cover it. If they don't, I add the coverage before signing off. Drift tests are the safety net — they catch what design reviews and implementation checklists miss.
+
 ## Acceptance Criteria Coverage Gate
 
 **Before any PR is marked ready for review, I cross-check the test suite against every acceptance criterion checkbox in the linked issue.** This is a blocking gate — not advisory.
