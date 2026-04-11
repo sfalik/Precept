@@ -165,7 +165,8 @@
 
     "configurationDefaults": {
       "[precept]": {
-        "editor.semanticHighlighting.enabled": true
+        "editor.semanticHighlighting.enabled": true,
+        "editor.wordBasedSuggestions": "off"
       },
       "editor.semanticTokenColorCustomizations": {
         "rules": {
@@ -199,7 +200,7 @@
             { "scope": "constant.other.value.precept",           "settings": { "foreground": "#84929F" } },
             { "scope": "constant.language.precept",              "settings": { "foreground": "#84929F" } },
             { "scope": "constant.numeric.precept",               "settings": { "foreground": "#84929F" } },
-            { "scope": "entity.name.precept.message.precept",    "settings": { "foreground": "#FBBF24" } },
+            { "scope": "entity.name.precept.message.precept",    "settings": { "foreground": "#B0BEC5", "fontStyle": "bold" } },
             { "scope": "string.quoted.double.precept",           "settings": { "foreground": "#84929F" } },
             { "scope": "string.quoted.double.message.precept",   "settings": { "foreground": "#FBBF24" } },
             { "scope": "keyword.operator.comparison.precept",    "settings": { "foreground": "#6366F1" } },

@@ -87,6 +87,24 @@ internal sealed class PreceptAnalyzer
             ? lineText[..(int)position.Character]
             : lineText;
 
+        // ── Comment lines: suppress completions entirely ──
+        if (beforeCursor.TrimStart().StartsWith('#'))
+            return Array.Empty<CompletionItem>();
+
+        // ── Pre-precept scope: before any precept declaration, only offer 'precept' ──
+        var hasPreceptDecl = info.Lines.Any(static l => Regex.IsMatch(l, @"^\s*precept\s+", RegexOptions.IgnoreCase));
+        if (!hasPreceptDecl)
+        {
+            // If the user is on a line starting with 'precept', they're naming it — suppress
+            if (Regex.IsMatch(beforeCursor, @"^\s*precept\s+\S*$", RegexOptions.IgnoreCase))
+                return Array.Empty<CompletionItem>();
+
+            return
+            [
+                new CompletionItem { Label = "precept", Kind = CompletionItemKind.Keyword, Detail = "Top-level precept declaration" }
+            ];
+        }
+
         var states = info.States;
         var events = info.Events;
         var dataFields = info.Fields;
@@ -156,6 +174,13 @@ internal sealed class PreceptAnalyzer
             // After "add|remove|push|enqueue <Field> ", suggest expression (the value to add/push/remove)
             if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*(?:add|remove|push|enqueue)\\s+[A-Za-z_][A-Za-z0-9_]*\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             {
+                // If expression looks complete (ends with identifier/literal + space), offer -> for pipeline continuation.
+                // Only check after the value portion has started — the regex requires at least one non-space token
+                // past the field name to distinguish "add Field |" (needs value) from "add Field value |" (needs ->).
+                var valueMatch = Regex.Match(beforeCursor, "(?:^|->)\\s*(?:add|remove|push|enqueue)\\s+[A-Za-z_][A-Za-z0-9_]*\\s+(?<value>\\S.*)$", RegexOptions.IgnoreCase);
+                if (valueMatch.Success && EndsWithCompletedExpression(valueMatch.Groups["value"].Value))
+                    return [ArrowPipelineItem];
+
                 var typedItems = TryBuildTypedCollectionMutationExpressionCompletions(
                     text,
                     lines,
@@ -176,6 +201,10 @@ internal sealed class PreceptAnalyzer
 
         if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*set\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*[^\\n]*$", RegexOptions.IgnoreCase))
         {
+            // If expression looks complete (ends with identifier/literal + space), offer -> for pipeline continuation
+            if (EndsWithCompletedExpression(beforeCursor))
+                return [ArrowPipelineItem];
+
             var typedItems = TryBuildTypedSetExpressionCompletions(
                 text,
                 lines,
@@ -337,6 +366,10 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
             return [new CompletionItem { Label = "assert", Kind = CompletionItemKind.Keyword }];
 
+        // After "on " (typing or choosing event name) → suggest event names
+        if (Regex.IsMatch(beforeCursor, @"^\s*on\s+\w*$", RegexOptions.IgnoreCase))
+            return BuildItems(events, CompletionItemKind.Event);
+
         // After "in/to StateName " → suggest assert, ->, edit (in only)
         if (Regex.IsMatch(beforeCursor, "^\\s*in\\s+[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*\\s+$", RegexOptions.IgnoreCase))
             return
@@ -385,15 +418,18 @@ internal sealed class PreceptAnalyzer
                     .Concat(BuildItems(collectionFields, CompletionItemKind.Field)));
 
         // After "event Name with Arg as Type [nullable] [default Value] " → suggest delimiter / modifiers
-        // Split by type to include type-appropriate constraint keywords
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+number\\s+nullable\\s+$", RegexOptions.IgnoreCase))
+        // Split by type to include type-appropriate constraint keywords.
+        // The preceding-args pattern uses a broad type alternation to handle all scalar types + choice.
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:number|integer)\\s+nullable\\s+$", RegexOptions.IgnoreCase))
             return [DefaultItem, ..NumberConstraintItems, CommaItem];
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+string\\s+nullable\\s+$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+decimal\\s+nullable\\s+$", RegexOptions.IgnoreCase))
+            return [DefaultItem, ..DecimalConstraintItems, CommaItem];
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+string\\s+nullable\\s+$", RegexOptions.IgnoreCase))
             return [DefaultItem, ..StringConstraintItems, CommaItem];
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+boolean\\s+nullable\\s+$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:boolean|choice\\([^)]*\\))\\s+nullable\\s+$", RegexOptions.IgnoreCase))
             return [DefaultItem, CommaItem];
 
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null)\\s*$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null)\\s*$", RegexOptions.IgnoreCase))
             return [CommaItem];
 
         // After a comma in an event arg list, the user is starting the next arg name.
@@ -401,19 +437,21 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+.*\\,\\s*$", RegexOptions.IgnoreCase))
             return Array.Empty<CompletionItem>();
 
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+number\\s+$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:number|integer)\\s+$", RegexOptions.IgnoreCase))
             return [NullableItem, DefaultItem, ..NumberConstraintItems, CommaItem];
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+string\\s+$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+decimal\\s+$", RegexOptions.IgnoreCase))
+            return [NullableItem, DefaultItem, ..DecimalConstraintItems, CommaItem];
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+string\\s+$", RegexOptions.IgnoreCase))
             return [NullableItem, DefaultItem, ..StringConstraintItems, CommaItem];
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+boolean\\s+$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:boolean|choice\\([^)]*\\))\\s+$", RegexOptions.IgnoreCase))
             return [NullableItem, DefaultItem, CommaItem];
 
         // After "event Name with ArgName as " → suggest type keywords
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+\\w*$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+\\w*$", RegexOptions.IgnoreCase))
             return ScalarTypeItems;
 
         // After "event Name with ArgName " → suggest "as"
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
             return [AsItem];
 
         // After "event Name with " → user is typing arg name, no suggestions
@@ -433,7 +471,7 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, @"^\s*state\s+.*\binitial\s+$", RegexOptions.IgnoreCase))
             return [new CompletionItem { Label = ",", Kind = CompletionItemKind.Operator, Detail = "add another state name" }];
 
-        return DistinctAndSort(KeywordItems.Concat(GlobalSnippetItems));
+        return DistinctAndSort(TopLevelItems.Concat(GlobalSnippetItems));
     }
 
     internal IReadOnlyList<RejectOnlyStateEventIssue> GetRejectOnlyStateEventIssues(DocumentUri uri)
@@ -1000,7 +1038,7 @@ internal sealed class PreceptAnalyzer
             })
             .ToArray();
 
-    private static readonly IReadOnlyList<CompletionItem> KeywordItems = BuildKeywordItems();
+    internal static readonly IReadOnlyList<CompletionItem> KeywordItems = BuildKeywordItems();
 
     /// <summary>
     /// Builds the fallback keyword completion list from <see cref="PreceptTokenMeta"/> attributes.
@@ -1039,7 +1077,46 @@ internal sealed class PreceptAnalyzer
         return items;
     }
 
-    private static readonly IReadOnlyList<CompletionItem> ExpressionOperatorItems =
+    /// <summary>
+    /// Top-level declaration keywords appropriate for blank lines / statement start.
+    /// Excludes action keywords (set, add), outcome keywords (transition, reject),
+    /// grammar modifiers (as, nullable, because), and constraint keywords that only
+    /// make sense inside specific declaration contexts.
+    /// </summary>
+    private static readonly IReadOnlyList<CompletionItem> TopLevelItems = BuildTopLevelItems();
+
+    private static IReadOnlyList<CompletionItem> BuildTopLevelItems()
+    {
+        var topLevelCategories = new HashSet<TokenCategory>
+        {
+            TokenCategory.Declaration,
+            TokenCategory.Control
+        };
+
+        var items = new List<CompletionItem>();
+
+        foreach (var token in Enum.GetValues<PreceptToken>())
+        {
+            var category = PreceptTokenMeta.GetCategory(token);
+            var symbol = PreceptTokenMeta.GetSymbol(token);
+            var description = PreceptTokenMeta.GetDescription(token);
+
+            if (category is null || symbol is null) continue;
+            if (!symbol.All(char.IsLetter)) continue;
+            if (!topLevelCategories.Contains(category.Value)) continue;
+
+            items.Add(new CompletionItem
+            {
+                Label = symbol,
+                Kind = CompletionItemKind.Keyword,
+                Detail = description
+            });
+        }
+
+        return items;
+    }
+
+    internal static readonly IReadOnlyList<CompletionItem> ExpressionOperatorItems =
     [
         new CompletionItem { Label = "+", Kind = CompletionItemKind.Operator },
         new CompletionItem { Label = "-", Kind = CompletionItemKind.Operator },
@@ -1059,7 +1136,7 @@ internal sealed class PreceptAnalyzer
         SnippetItem("round(expr, N)", "round(${1:expr}, ${2:2})", "Round a decimal value to N places")
     ];
 
-    private static readonly IReadOnlyList<CompletionItem> LiteralItems =
+    internal static readonly IReadOnlyList<CompletionItem> LiteralItems =
     [
         new CompletionItem { Label = "true", Kind = CompletionItemKind.Constant },
         new CompletionItem { Label = "false", Kind = CompletionItemKind.Constant },
@@ -1084,15 +1161,18 @@ internal sealed class PreceptAnalyzer
     // ── New-syntax item lists ──────────────────────────────────────────
 
     /// <summary>Scalar type keywords for positions after "as" / "of" / event arg type.</summary>
-    private static readonly IReadOnlyList<CompletionItem> ScalarTypeItems =
+    internal static readonly IReadOnlyList<CompletionItem> ScalarTypeItems =
     [
         new CompletionItem { Label = "string", Kind = CompletionItemKind.TypeParameter },
         new CompletionItem { Label = "number", Kind = CompletionItemKind.TypeParameter },
-        new CompletionItem { Label = "boolean", Kind = CompletionItemKind.TypeParameter }
+        new CompletionItem { Label = "boolean", Kind = CompletionItemKind.TypeParameter },
+        new CompletionItem { Label = "integer", Kind = CompletionItemKind.TypeParameter, Detail = "Whole number (no decimal point)" },
+        new CompletionItem { Label = "decimal", Kind = CompletionItemKind.TypeParameter, Detail = "Exact base-10 decimal number" },
+        SnippetItem("choice(...)", "choice(\"${1:A}\", \"${2:B}\")", "Constrained value from a predefined set")
     ];
 
     /// <summary>All type keywords for positions after "field Name as" (scalar + collection).</summary>
-    private static readonly IReadOnlyList<CompletionItem> TypeItems =
+    internal static readonly IReadOnlyList<CompletionItem> TypeItems =
     [
         new CompletionItem { Label = "string", Kind = CompletionItemKind.TypeParameter },
         new CompletionItem { Label = "number", Kind = CompletionItemKind.TypeParameter },
@@ -1106,7 +1186,7 @@ internal sealed class PreceptAnalyzer
     ];
 
     /// <summary>Action/outcome keywords available after "->" in flat transition rows.</summary>
-    private static readonly IReadOnlyList<CompletionItem> ArrowItems =
+    internal static readonly IReadOnlyList<CompletionItem> ArrowItems =
     [
         new CompletionItem { Label = "set", Kind = CompletionItemKind.Keyword, Detail = "Data assignment" },
         new CompletionItem { Label = "transition", Kind = CompletionItemKind.Keyword, Detail = "Transition to state" },
@@ -1130,7 +1210,7 @@ internal sealed class PreceptAnalyzer
     private static readonly CompletionItem ArrowPipelineItem = new() { Label = "->", Kind = CompletionItemKind.Operator, Detail = "action/outcome pipeline" };
     private static readonly CompletionItem CommaItem = new() { Label = ",", Kind = CompletionItemKind.Operator, Detail = "Next event argument" };
 
-    private static readonly IReadOnlyList<CompletionItem> NumberConstraintItems =
+    internal static readonly IReadOnlyList<CompletionItem> NumberConstraintItems =
     [
         new CompletionItem { Label = "nonnegative", Kind = CompletionItemKind.Keyword, Detail = "number constraint", Documentation = new StringOrMarkupContent("Field must be >= 0") },
         new CompletionItem { Label = "positive",    Kind = CompletionItemKind.Keyword, Detail = "number constraint", Documentation = new StringOrMarkupContent("Field must be > 0") },
@@ -1138,21 +1218,21 @@ internal sealed class PreceptAnalyzer
         new CompletionItem { Label = "max",         Kind = CompletionItemKind.Keyword, Detail = "number constraint", Documentation = new StringOrMarkupContent("Field must be <= value") },
     ];
 
-    private static readonly IReadOnlyList<CompletionItem> StringConstraintItems =
+    internal static readonly IReadOnlyList<CompletionItem> StringConstraintItems =
     [
         new CompletionItem { Label = "notempty",   Kind = CompletionItemKind.Keyword, Detail = "string constraint", Documentation = new StringOrMarkupContent("Field must not be empty") },
         new CompletionItem { Label = "minlength",  Kind = CompletionItemKind.Keyword, Detail = "string constraint", Documentation = new StringOrMarkupContent("Field must have at least N characters") },
         new CompletionItem { Label = "maxlength",  Kind = CompletionItemKind.Keyword, Detail = "string constraint", Documentation = new StringOrMarkupContent("Field must have at most N characters") },
     ];
 
-    private static readonly IReadOnlyList<CompletionItem> CollectionConstraintItems =
+    internal static readonly IReadOnlyList<CompletionItem> CollectionConstraintItems =
     [
         new CompletionItem { Label = "notempty",  Kind = CompletionItemKind.Keyword, Detail = "collection constraint", Documentation = new StringOrMarkupContent("Collection must not be empty") },
         new CompletionItem { Label = "mincount",  Kind = CompletionItemKind.Keyword, Detail = "collection constraint", Documentation = new StringOrMarkupContent("Collection must have at least N items") },
         new CompletionItem { Label = "maxcount",  Kind = CompletionItemKind.Keyword, Detail = "collection constraint", Documentation = new StringOrMarkupContent("Collection must have at most N items") },
     ];
 
-    private static readonly IReadOnlyList<CompletionItem> DecimalConstraintItems =
+    internal static readonly IReadOnlyList<CompletionItem> DecimalConstraintItems =
     [
         new CompletionItem { Label = "nonnegative", Kind = CompletionItemKind.Keyword, Detail = "decimal constraint", Documentation = new StringOrMarkupContent("Field must be >= 0") },
         new CompletionItem { Label = "positive",    Kind = CompletionItemKind.Keyword, Detail = "decimal constraint", Documentation = new StringOrMarkupContent("Field must be > 0") },
@@ -1161,7 +1241,7 @@ internal sealed class PreceptAnalyzer
         SnippetItem("maxplaces N", "maxplaces ${1:2}", "Maximum decimal places"),
     ];
 
-    private static readonly IReadOnlyList<CompletionItem> ChoiceConstraintItems =
+    internal static readonly IReadOnlyList<CompletionItem> ChoiceConstraintItems =
     [
         new CompletionItem { Label = "ordered", Kind = CompletionItemKind.Keyword, Detail = "choice constraint", Documentation = new StringOrMarkupContent("Enables ordinal comparison of choice values") },
     ];

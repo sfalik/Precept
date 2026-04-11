@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using FluentAssertions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Precept;
 using Precept.LanguageServer;
 using Xunit;
 
@@ -929,6 +931,240 @@ public class PreceptAnalyzerCompletionTests
             because: ".length must not be offered after non-string identifiers");
     }
 
+    // ════════════════════════════════════════════════════════════════════
+    // Pre-precept scope: blank / new files without a precept declaration
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Completions_BlankFile_OnlyOffersPrecept()
+    {
+        const string text = """
+            $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().ContainSingle()
+            .Which.Should().Be("precept");
+    }
+
+    [Fact]
+    public void Completions_FileWithCommentOnly_OnlyOffersPrecept()
+    {
+        const string text = """
+            # This is a new precept file
+            $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().ContainSingle()
+            .Which.Should().Be("precept");
+    }
+
+    [Fact]
+    public void Completions_TypingPreceptName_SuppressesAll()
+    {
+        const string text = """
+            precept My$$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().BeEmpty(because: "user is naming the precept — no suggestions");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Gap fixes: pipeline continuation, on + events, top-level, comments,
+    //            scalar types, event arg types
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Completions_AfterCompletedSetExpression_SuggestsArrow()
+    {
+        const string text = """
+            precept M
+            field Count as number default 0
+            state A initial
+            state B
+            event Go
+            from A on Go -> set Count = 42 $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("->",
+            because: "after a completed set expression, the pipeline arrow should be offered");
+    }
+
+    [Fact]
+    public void Completions_AfterCompletedAddExpression_SuggestsArrow()
+    {
+        const string text = """
+            precept M
+            field Tags as set of string
+            state A initial
+            state B
+            event Go
+            from A on Go -> add Tags "important" $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("->",
+            because: "after a completed add expression, the pipeline arrow should be offered");
+    }
+
+    [Fact]
+    public void Completions_OnAtLineStart_SuggestsEventNames()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Submit
+            event Cancel
+            on $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Submit");
+        completions.Should().Contain("Cancel");
+        completions.Should().NotContain("set", because: "action keywords should not appear in event name position");
+    }
+
+    [Fact]
+    public void Completions_TopLevelBlankLine_OnlySuggestsDeclarationKeywords()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go
+            $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        // Top-level declarations should be present
+        completions.Should().Contain("field");
+        completions.Should().Contain("state");
+        completions.Should().Contain("event");
+        completions.Should().Contain("from");
+        completions.Should().Contain("invariant");
+
+        // Action/outcome/grammar keywords should NOT be at top level
+        completions.Should().NotContain("set", because: "set is an action keyword, not a top-level declaration");
+        completions.Should().NotContain("transition", because: "transition is an outcome keyword, not a top-level declaration");
+        completions.Should().NotContain("nullable", because: "nullable is a grammar modifier, not a top-level declaration");
+        completions.Should().NotContain("nonnegative", because: "constraint keywords should not appear at top level");
+    }
+
+    [Fact]
+    public void Completions_CommentLine_SuppressesAll()
+    {
+        const string text = """
+            precept M
+            state A initial
+            # This is a comment $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().BeEmpty(because: "comment lines should suppress all completions");
+    }
+
+    [Fact]
+    public void Completions_EventArgAsPosition_SuggestsAllScalarTypes()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go with Amount as $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("string");
+        completions.Should().Contain("number");
+        completions.Should().Contain("boolean");
+        completions.Should().Contain("integer");
+        completions.Should().Contain("decimal");
+        completions.Should().Contain(c => c.StartsWith("choice", StringComparison.Ordinal),
+            because: "choice type should be offered for event args");
+    }
+
+    [Fact]
+    public void Completions_EventArgIntegerType_SuggestsNumberConstraints()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go with Count as integer $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nonnegative");
+        completions.Should().Contain("positive");
+        completions.Should().Contain("min");
+        completions.Should().Contain("max");
+        completions.Should().Contain("nullable");
+        completions.Should().Contain(",");
+    }
+
+    [Fact]
+    public void Completions_EventArgDecimalType_SuggestsDecimalConstraints()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go with Amount as decimal $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nonnegative");
+        completions.Should().Contain("positive");
+        completions.Should().Contain("min");
+        completions.Should().Contain("max");
+        completions.Should().Contain(c => c.StartsWith("maxplaces", StringComparison.Ordinal),
+            because: "maxplaces must be offered for decimal event args");
+        completions.Should().Contain("nullable");
+        completions.Should().Contain(",");
+    }
+
+    [Fact]
+    public void Completions_CollectionOfPosition_SuggestsAllScalarTypes()
+    {
+        const string text = """
+            precept M
+            state A initial
+            field Items as set of $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("string");
+        completions.Should().Contain("number");
+        completions.Should().Contain("boolean");
+        completions.Should().Contain("integer");
+        completions.Should().Contain("decimal");
+        completions.Should().Contain(c => c.StartsWith("choice", StringComparison.Ordinal),
+            because: "choice type should be offered as collection inner type");
+    }
+
     private static (string text, Position position) ExtractPosition(string textWithMarker)
     {
         var index = textWithMarker.IndexOf("$$", StringComparison.Ordinal);
@@ -940,5 +1176,185 @@ public class PreceptAnalyzerCompletionTests
         var lastNewLine = prefix.LastIndexOf('\n');
         var character = lastNewLine >= 0 ? prefix.Length - lastNewLine - 1 : prefix.Length;
         return (text, new Position(line, character));
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Completions ↔ Token Catalog Drift Tests
+    // ════════════════════════════════════════════════════════════════════
+    //
+    // These tests enforce that the static completion lists in PreceptAnalyzer
+    // stay in sync with the PreceptToken enum. When someone adds a new token
+    // with [TokenCategory(Type)] or [TokenCategory(Constraint)] etc., these
+    // tests fail until the corresponding completion list is updated.
+
+    [Fact]
+    public void AllTypeTokens_AppearInTypeItems()
+    {
+        var typeSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Type)
+            .Select(t => PreceptTokenMeta.GetSymbol(t))
+            .Where(s => s is not null)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var completionLabels = PreceptAnalyzer.TypeItems
+            .Select(i => i.Label)
+            .ToHashSet(StringComparer.Ordinal);
+
+        // Snippet labels like "choice(...)" won't match the raw symbol "choice",
+        // so also check whether the label starts with the symbol.
+        var missing = typeSymbols
+            .Where(sym => !completionLabels.Contains(sym!)
+                && !completionLabels.Any(label => label.StartsWith(sym!, StringComparison.Ordinal)))
+            .ToList();
+
+        missing.Should().BeEmpty(
+            "every token with [TokenCategory(Type)] must appear in PreceptAnalyzer.TypeItems — "
+            + "add new type keywords there when extending the language");
+    }
+
+    [Fact]
+    public void AllConstraintTokens_AppearInAtLeastOneConstraintList()
+    {
+        var constraintSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Constraint)
+            .Select(t => PreceptTokenMeta.GetSymbol(t))
+            .Where(s => s is not null)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var allConstraintLabels = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in PreceptAnalyzer.NumberConstraintItems) allConstraintLabels.Add(item.Label);
+        foreach (var item in PreceptAnalyzer.StringConstraintItems) allConstraintLabels.Add(item.Label);
+        foreach (var item in PreceptAnalyzer.CollectionConstraintItems) allConstraintLabels.Add(item.Label);
+        foreach (var item in PreceptAnalyzer.DecimalConstraintItems) allConstraintLabels.Add(item.Label);
+        foreach (var item in PreceptAnalyzer.ChoiceConstraintItems) allConstraintLabels.Add(item.Label);
+
+        // Snippet labels like "maxplaces N" start with the symbol "maxplaces"
+        var missing = constraintSymbols
+            .Where(sym => !allConstraintLabels.Contains(sym!)
+                && !allConstraintLabels.Any(label => label.StartsWith(sym!, StringComparison.Ordinal)))
+            .ToList();
+
+        missing.Should().BeEmpty(
+            "every token with [TokenCategory(Constraint)] must appear in at least one constraint "
+            + "completion list (Number/String/Collection/Decimal/Choice) — add new constraint "
+            + "keywords to the appropriate list when extending the language");
+    }
+
+    [Fact]
+    public void AllActionTokens_AppearInArrowItems()
+    {
+        var actionSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Action)
+            .Select(t => PreceptTokenMeta.GetSymbol(t))
+            .Where(s => s is not null)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var arrowLabels = PreceptAnalyzer.ArrowItems
+            .Select(i => i.Label)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var missing = actionSymbols
+            .Where(sym => !arrowLabels.Contains(sym!))
+            .ToList();
+
+        missing.Should().BeEmpty(
+            "every token with [TokenCategory(Action)] must appear in PreceptAnalyzer.ArrowItems — "
+            + "add new action keywords there when extending the language");
+    }
+
+    [Fact]
+    public void AllOutcomeTokens_AppearInArrowItems()
+    {
+        var outcomeSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Outcome)
+            .Select(t => PreceptTokenMeta.GetSymbol(t))
+            .Where(s => s is not null)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var arrowLabels = PreceptAnalyzer.ArrowItems
+            .Select(i => i.Label)
+            .ToHashSet(StringComparer.Ordinal);
+
+        // "no" appears as the composite "no transition" in ArrowItems
+        var missing = outcomeSymbols
+            .Where(sym => !arrowLabels.Contains(sym!)
+                && !arrowLabels.Any(label => label.StartsWith(sym!, StringComparison.Ordinal)))
+            .ToList();
+
+        missing.Should().BeEmpty(
+            "every token with [TokenCategory(Outcome)] must appear in PreceptAnalyzer.ArrowItems — "
+            + "add new outcome keywords there when extending the language");
+    }
+
+    [Fact]
+    public void AllLiteralTokens_AppearInLiteralItems()
+    {
+        var literalSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Literal)
+            .Select(t => PreceptTokenMeta.GetSymbol(t))
+            .Where(s => s is not null)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var literalLabels = PreceptAnalyzer.LiteralItems
+            .Select(i => i.Label)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var missing = literalSymbols
+            .Where(sym => !literalLabels.Contains(sym!))
+            .ToList();
+
+        missing.Should().BeEmpty(
+            "every token with [TokenCategory(Literal)] must appear in PreceptAnalyzer.LiteralItems — "
+            + "add new literal keywords there when extending the language");
+    }
+
+    [Fact]
+    public void AllKeywordOperatorTokens_AppearInExpressionOperatorItems()
+    {
+        // Keyword operators (alphabetic symbols with Operator category) must be offered
+        // in expression contexts. Non-alphabetic operators (==, >=, etc.) are also there
+        // but this test focuses on the ones that could drift as new keyword operators are added.
+        var keywordOperatorSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Operator)
+            .Select(t => PreceptTokenMeta.GetSymbol(t))
+            .Where(s => s is not null && s.All(char.IsLetter))
+            .ToHashSet(StringComparer.Ordinal);
+
+        var operatorLabels = PreceptAnalyzer.ExpressionOperatorItems
+            .Select(i => i.Label)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var missing = keywordOperatorSymbols
+            .Where(sym => !operatorLabels.Contains(sym!))
+            .ToList();
+
+        missing.Should().BeEmpty(
+            "every keyword operator (alphabetic symbol with [TokenCategory(Operator)]) must appear "
+            + "in PreceptAnalyzer.ExpressionOperatorItems — add new keyword operators there "
+            + "when extending the language");
+    }
+
+    [Fact]
+    public void AllScalarTypeTokens_AppearInScalarTypeItems()
+    {
+        // ScalarTypeItems is used after "of" (collection inner type) and for event arg types.
+        // It must include every scalar type the parser accepts — excluding collection-only types
+        // (set, queue, stack) which are not valid as event arg types or collection inner types.
+        var collectionOnlySymbols = new HashSet<string>(StringComparer.Ordinal) { "set", "queue", "stack" };
+
+        var scalarTypeSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Type)
+            .Select(t => PreceptTokenMeta.GetSymbol(t))
+            .Where(s => s is not null && !collectionOnlySymbols.Contains(s))
+            .ToHashSet(StringComparer.Ordinal);
+
+        var scalarLabels = PreceptAnalyzer.ScalarTypeItems
+            .Select(i => i.Label)
+            .ToHashSet(StringComparer.Ordinal);
+
+        // Snippet labels like "choice(...)" won't match the raw symbol "choice",
+        // so also check whether the label starts with the symbol.
+        var missing = scalarTypeSymbols
+            .Where(sym => !scalarLabels.Contains(sym!)
+                && !scalarLabels.Any(label => label.StartsWith(sym!, StringComparison.Ordinal)))
+            .ToList();
+
+        missing.Should().BeEmpty(
+            "every scalar type token must appear in PreceptAnalyzer.ScalarTypeItems — "
+            + "this list is used for event arg types and collection inner types. "
+            + "Add new scalar type keywords there when extending the language");
     }
 }
