@@ -30,6 +30,16 @@
 
 ## Recent Updates
 
+### 2026-04-11 — Issue #14 Slice 9c: Completions, MCP, and semantic token tests for when guards
+
+- **16 new tests total:** 6 completion tests in `PreceptAnalyzerCompletionTests.cs`, 5 CompileTool DTO tests in `CompileToolTests.cs`, 2 InspectTool tests in `InspectToolTests.cs`, 3 semantic token constraint tests in `PreceptSemanticTokensConstraintTests.cs`.
+- **All 1,094 tests pass** (883 core + 137 LS + 74 MCP), zero failures, zero skipped.
+- **C69 CatalogDrift verified:** Trigger at line 596 already uses a real DSL trigger (invariant guard referencing `Go.Amount` — cross-scope event arg reference). No changes needed.
+- **Completions tests cover:** `when` offered after invariant expression, state assert expression, event assert expression, and `in State` position. Field names offered after `when` keyword in invariant guard. `because` offered after completed `when` guard in invariant.
+- **MCP CompileTool tests cover:** Guarded invariant/state-assert/event-assert/edit-block DTOs populate `When` field. Unguarded invariant has `When = null`.
+- **MCP InspectTool tests cover:** Guarded invariant with guard=false → no violation (transition succeeds). Guarded edit block with guard=true → field appears in `EditableFields`.
+- **Semantic token tests cover:** `ExtractConstraintSets` correctly includes states/events/fields from when-guarded state asserts, event asserts, and invariants (guard presence doesn't remove them from constraint highlighting sets).
+
 ### 2026-04-11 — Issue #14 Slice 9b: Runtime tests for when guards (Forms 1–4)
 
 - **17 new tests total:** 8 Forms 1–3 runtime tests in `NewSyntaxRuntimeTests.cs`, 9 Form 4 guarded edit tests in new `GuardedEditTests.cs`.

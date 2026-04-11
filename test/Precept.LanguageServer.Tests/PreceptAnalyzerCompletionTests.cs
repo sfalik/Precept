@@ -1357,4 +1357,118 @@ public class PreceptAnalyzerCompletionTests
             + "this list is used for event arg types and collection inner types. "
             + "Add new scalar type keywords there when extending the language");
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Slice 9c: when-guard completion contexts
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Completions_AfterInvariantExpression_OffersWhen()
+    {
+        const string text = """
+            precept M
+            field X as number default 0
+            invariant X > 0 $$
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("when");
+    }
+
+    [Fact]
+    public void Completions_AfterStateAssertExpression_OffersWhen()
+    {
+        const string text = """
+            precept M
+            field X as number default 0
+            state Open initial
+            in Open assert X > 0 $$
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("when");
+    }
+
+    [Fact]
+    public void Completions_AfterEventAssertExpression_OffersWhen()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Submit with Amount as number
+            on Submit assert Amount > 0 $$
+            from A on Submit -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("when");
+    }
+
+    [Fact]
+    public void Completions_InEditBlock_AfterInState_OffersWhen()
+    {
+        const string text = """
+            precept M
+            field X as number default 0
+            state Open initial
+            in Open $$
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("when");
+    }
+
+    [Fact]
+    public void Completions_AfterWhenKeyword_InInvariant_OffersFields()
+    {
+        const string text = """
+            precept M
+            field X as number default 0
+            field Active as boolean default true
+            invariant X > 0 when $$
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Active");
+        completions.Should().Contain("X");
+    }
+
+    [Fact]
+    public void Completions_AfterWhenGuard_InInvariant_OffersBecause()
+    {
+        const string text = """
+            precept M
+            field X as number default 0
+            field Active as boolean default true
+            invariant X > 0 when Active $$
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("because");
+    }
 }
