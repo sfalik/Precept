@@ -160,6 +160,29 @@
 
 ## Learnings
 
+### 2026-04-11 - Issue #14 final approval — all 4 forms as unified wave
+
+- Produced definitive unified design sign-off for all four `when <guard>` forms (invariants, state asserts, event asserts, conditional edit eligibility) as a single implementation wave. Filed at `.squad/decisions/inbox/frank-issue14-final-approval.md`.
+- **All 4 forms APPROVED.**
+- **Semantic tension between Forms 1–3 (constraint-skip) and Form 4 (permission-grant) is not an inconsistency.** The directionality difference follows from the nature of the two declaration types: constraints default to applying everywhere and are scoped downward; edit permissions default to denied everywhere and are granted upward. `when <guard>` means "conditional on this boolean" in all cases — what "conditional" implies operationally follows the declaration kind. Teaching model holds uniformly.
+- **Fail-closed is non-negotiable for Form 4 and must be explicitly contracted in the issue.** Guards on edit blocks are permission grants. Granting access on evaluation error = fail-open permission system = never acceptable. Must specify: guard evaluation error → treat as false → field not granted.
+- **Scope-inherited conditioning holds cleanly for all 4 forms.** Form 4 edit guards are definitionally field-scoped — there is no current event during `Update`, so event args cannot be referenced. The distinction does not blur anywhere. Type checker must emit diagnostic for any edit guard that references event-arg identifiers.
+- **New prerequisite identified for Form 4: Elaine coordination on dynamic editability.** With guarded edit blocks, the editable field set can change as data values change (guard truth changes). The preview inspector already handles dynamic field lists, but UX treatment of fields appearing/disappearing mid-edit must be explicitly designed before Form 4 ships.
+- **Hydration reorder (moving `HydrateInstanceData` to start of `Update` and `Inspect(patch)`) is the primary regression risk** when including Form 4. George's analysis confirms it's a structural rearrangement with no semantic change (pure read). Risk is bounded and acceptable.
+- **The deferral was scope-splitting, not design rejection.** Form 4 is the same design principle as Forms 1–3 — the same `when <guard>` conditional semantics applied to a different declaration kind. The additive approach (static dict unchanged, guarded blocks in separate structure evaluated at call time) dissolves the original structural obstacle. No new conceptual risks.
+
+### 2026-04-11 - Form 4 additive approach design review
+
+- Analyzed Shane's proposed additive approach for `in State when <guard> edit <fields>` (Form 4, Issue #14).
+- **Verdict: additive approach is semantically sound. No design-level concerns justify continued deferral.**
+- Conjunctive semantics (in-state AND guard-true) are preserved by the two-pass union: unconditional fields from static dict + guarded fields from per-call guard evaluation. Union doesn't undermine conjunct because state filter is applied before guard filter.
+- **Guard failure → fail-closed** is the correct default. Guards on edit blocks are permission grants, not constraint gates. Fail-open on error would be a broken permission system. Must be explicitly specified in the follow-on issue.
+- **`in any when <guard> edit`** — use the same construction-time expansion that unconditional `any` already uses. No sentinel handling needed at call sites. Consistent with existing pattern.
+- UneditableField message disambiguation (why the field is not editable: not-declared vs. wrong-state vs. guard-false) is an implementation quality decision, not a design requirement. Not a deferral criterion.
+- **The deferral was always implementation-scoping, not design.** Form 4 is semantically identical to Forms 1–3 — the same `when <guard>` conditional semantics applied to a different declaration kind. The static dict was the only structural obstacle; the additive approach removes it without touching the existing path.
+- Three spec requirements must appear in the follow-on issue: (1) fail-closed guard evaluation contract, (2) `any` pre-expansion strategy, (3) Elaine coordination on dynamic editability (fields appear/disappear with guard truth value — intended behavior, UX contract needs to handle it).
+- Filed: `.squad/decisions/inbox/frank-issue14-form4-design.md`.
+
 ### 2026-04-08 - Warning model research for structurally degenerate precepts
 - Audited the full diagnostic infrastructure: `ConstraintSeverity` enum (Error/Warning/Hint), `DiagnosticCatalog.cs` constraints C48–C53, `PreceptAnalysis.cs` graph analysis, and the language server's `MapValidationDiagnostic` severity mapping. All three tiers are fully wired and operational.
 - The type checker (`PreceptTypeChecker.cs`) does zero reachability analysis — all graph-level structural analysis lives in `PreceptAnalysis.cs` as a separate analysis phase.

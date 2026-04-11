@@ -7,6 +7,37 @@
 
 ## Recent Updates
 
+### 2026-04-11 — Issue #14 full implementation scope document
+
+Complete spec written covering all 4 forms and 19 change sites across 5 files. Filed to `.squad/decisions/inbox/george-issue14-implementation-scope.md`. Key determination: single implementable slice with a trivial prerequisite commit for the B1 narrowing fix.
+
+### 2026-04-11 — Form 4 simplicity analysis (Issue #14 follow-up)
+
+## Learnings
+
+- **Full implementation scope for Issue #14 (all 4 forms, same-wave):** 19 change sites, ~162 lines, 5 files. Single PR is the recommendation, with a trivial prerequisite commit for the B1 narrowing fix (1 line in `BuildStateAssertNarrowings`).
+- **Injection point for `EditDecl` guard is different from Forms 1–3.** Forms 1–3 inject `OptionalWhenGuardParser` between `BoolExpr` and `Because`. Form 4 injects it between `StateTarget` and `Edit` token. Both reuse the same `OptionalWhenGuardParser` static parser.
+- **Four model records need `WhenGuard?`/`WhenText?` tail params.** Pattern is identical to `PreceptTransitionRow`. Being optional/tail params makes the change non-breaking for all existing call sites.
+- **`StateAssertResult` and `EditResult` are private parser records** — they also need the guard fields threaded through to `AssembleModel`. `InvariantResult` wraps `PreceptInvariant` directly so guard passes through its constructor. `EventAssertResult` wraps `EventAssertion` directly — same.
+- **`CollectCompileTimeDiagnostics` lives in `PreceptRuntime.cs`, not `PreceptTypeChecker.cs`.** The C29/C30/C31 guard-skip changes are in `PreceptRuntime.cs` (~line 1904). Confirm before assigning.
+- **Guard evaluation against `BuildDefaultData` for C29/C30/C31:** `BuildDefaultData` only includes fields with explicit defaults; nullable-no-default fields are absent. Missing key → evaluator `Fail` → fail-closed → skip body check. This is correct EC-3 behavior.
+- **Nullable field guard behavior resolved:** Evaluator returns `EvaluationResult.Fail` (not throw) for all error conditions. Fail-closed means guard not satisfied → skip assertion. Safe for both absent-from-dict (field not in data) and present-with-null-value (null comparison evaluates correctly).
+- **`_guardedEditBlocks` contains only Form-4 guarded blocks** (blocks where `block.WhenGuard is not null`). Unconditional blocks continue to pre-populate `_editableFieldsByState` unchanged. The split happens in the constructor loop.
+- **Three `Update`/`Inspect`/`BuildEditableFieldInfos` call sites need the guarded edit second pass.** Pattern is identical across all three: filter by state, evaluate guard against hydrated data, merge passing fields into editable set.
+- **Hydration reorder in `Update` is safe:** `HydrateInstanceData` is a pure read (builds internal format dict from clean InstanceData). Moving it from Stage 3 to the top of `Update` has no behavioral effect on existing code paths (Stage 3 still mutates the resulting dict, but reads from it first is fine).
+- **C69 cross-scope guardian diagnostic:** C38 already fires for identifiers truly absent from scope. C69 is a better-message supplement for the case where the identifier exists in the "wrong" scope (e.g., dotted event arg in an invariant guard). Implemented as `CheckCrossScopeGuardIdentifiers` helper (~18 lines) called after each guard `ValidateExpression` call.
+- **`in any when <guard> edit` at zero states:** `ExpandStateTargets` with empty `states` list returns empty — zero `PreceptEditBlock` entries created. Silent parse success, but structurally no-op. Type checker would catch the semantic issue via existing C55 logic if applicable.
+
+- **`PreceptEditBlock` currently has NO `WhenGuard` field.** The model record is `(State, FieldNames, SourceLine)`. Form 4 requires adding `PreceptExpression? WhenGuard = null` as an optional parameter — identical pattern to how transition rows already carry `WhenGuard`.
+- **The "architectural mismatch" is real but not a rework.** `_editableFieldsByState` is a `Dictionary<string, HashSet<string>>` built at construction — cannot precompute guarded blocks. But the additive path avoids touching it entirely: a new `_guardedEditBlocks : IReadOnlyList<PreceptEditBlock>` field routes guarded blocks separately, evaluated at call time.
+- **Three engine call sites** need a second-pass guard evaluation loop (in order of how data flows): `Update` Stage 1, `Inspect(patch)` editability check, `BuildEditableFieldInfos`. All three already have instance data in scope (or adjacent) — the pattern is the same as `EvaluateInvariants`.
+- **Hydration ordering edge.** `Update` currently hydrates instance data at Stage 3, after the Stage 1 editability check. Guard evaluation needs hydrated data. The fix is to hydrate at Stage 1 when guarded blocks exist — functionally a no-op (hydration is a pure read), but a minor structural rearrangement. The cleanest approach: call `HydrateInstanceData` unconditionally at the top of `Update`. Already done in `Inspect(patch)` — the pattern exists.
+- **`GetEditableFieldNames` is `internal`, test-only.** Only the test suite calls it. No language server or MCP code references it. A signature addition (`data?` parameter) is entirely contained.
+- **Guard evaluation infrastructure is already in place.** `PreceptExpressionRuntimeEvaluator.Evaluate(expression, data)` is called today by `EvaluateInvariants`, `EvaluateStateAssertions`, and transition row first-match logic. Form 4 guard evaluation is the same call with no new evaluator changes.
+- **New type-checker concern: guard scope in edit blocks.** Edit guards must be field-only — no event arg references. A small type-checker addition is needed (roughly same as the C69 work flagged for cross-scope guard references). ~5 lines, one new diagnostic.
+- **`in any when <guard> edit <fields>` expansion.** Parser already emits one `PreceptEditBlock` per state for `any`. With guard, each block carries the same `WhenGuard` — runtime evaluates per state naturally. No special handling needed in the engine.
+- **Complexity tier vs. Forms 1–3.** Form 4 under the additive approach is roughly 1.5× the effort of a single Form 1–3 instance. The extra pieces over any one of Forms 1-3: one new engine field, constructor routing, hydration reorder in 2 methods, second-pass at 3 call sites. All well-defined and bounded. Same-wave is defensible; follow-on issue is also defensible as a PR-size preference rather than a technical necessity.
+
 ### 2026-04-11 — Slice 8: sample file updates (integer/decimal/choice)
 - **Commit:** `a7b4fb0` on `feature/wave3-integer-decimal-choice`.
 - **integer samples (3 files):**

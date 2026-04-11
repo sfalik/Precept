@@ -4,6 +4,21 @@
 - Samples and hero candidates should be validated against the real compiler/runtime before the team treats them as canonical.
 - Coverage work should record meaningful gaps, not just raw counts; behavior claims need executable proof.
 
+## Learnings
+
+### 2026-04-11 — Issue #14: Form 4 complete test matrix
+
+- Form 4 adds +42 tests across all layers: 5 parser, 7 type-checker, 22 runtime (new `GuardedEditTests.cs`), 3 LS completions, 4 MCP tools, 1 CatalogDrift. Total: ~154 (up from ~112 for Forms 1–3 only).
+- EC-3 (`Check_Invariant_WhenGuardFalse_AtDefaultData_NoPrecompileViolation`) is still the mandatory first test for all forms — gating gate before any implementation work.
+- `in any when <guard> edit` design question is resolved: pre-expansion to per-state guarded blocks at construction (Frank + George confirmed). Tests follow the same `in any edit` expansion contract.
+- Fail-closed is now explicit and tested: `Update_EditGuard_EvaluationError_FieldNotEditable` — guard eval error → `UneditableField`, not a throw.
+- Union semantics are well-defined: unconditional block + guarded block for same field → unconditional always grants. Two guarded blocks for same field → either True wins. Tests cover both directions.
+- **Regression hotspot 1:** `PreceptEditTests.cs` — hydration ordering change in `Update` and `Inspect(patch)` is the highest regression risk. All 48 existing edit tests must pass unchanged as the Phase 0 gate.
+- **Regression hotspot 2:** `PreceptStatelessTests.cs` — constructor routing must skip null-State guarded blocks for stateless precepts. `_rootEditableFields` path must be completely unaffected.
+- MCP Phase 8 tests are blocked on Newman's B2 `editBlocks` DTO prerequisite. Write stubs with TODO, activate after B2 merges.
+- `GetEditableFieldNames` (internal API) returns only the static unconditional set — intentionally. Existing `PreceptEditTests.cs` tests against this API remain valid without modification.
+- Full matrix filed: `.squad/decisions/inbox/soup-nazi-issue14-final-tests.md`.
+
 ## Recent Updates
 
 ### 2026-04-11 — Issue #14: `when` guard testability assessment

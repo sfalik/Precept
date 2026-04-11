@@ -80,6 +80,17 @@
 
 ## Learnings
 
+### 2026-04-11 — Issue #14 final tooling spec (all 4 forms)
+
+- Form 4 (`in State when guard edit`) has one unique intermediate step: "guard complete → suggest `edit`". Detected by `^\s*in\s+\w+\s+when\s+.+\s+$` + `EndsWithCompletedExpression`. This step fires ONLY when no `edit` is yet present on the line.
+- **Critical ordering**: `in State edit` branch (step 4) must stay BEFORE the new "guard complete → EditItem" branch (step 3). Reason: `EndsWithCompletedExpression` matches `edit ` because `edit` matches `[A-Za-z0-9_]+\s+$`. Without the ordering guard, step 3 incorrectly fires for `in Draft when X edit `.
+- Step 4 ("after edit → fields") is already handled by the existing `in State edit` branch with zero modification. Its broad regex (`^\s*in\s+[^\n]*\s+edit\s+[^\n]*$`) already matches Form 4 lines because `[^\n]*` consumes `when guard` in the middle.
+- `WhenItem` static does not yet exist. Must be added alongside `BecauseItem` before Forms 1–3 modifications can compile.
+- Scope differentiation for guards is free: invariant/state-assert guards reuse `BuildDataExpressionCompletions`; event-assert guards reuse `BuildEventAssertCompletions`. Both already embed the correct scope. No new helpers.
+- Grammar: zero changes for all 4 forms. `when` catch-all covers all positions. `rootEditDeclaration` is anchored to `edit` at line start — no conflict with `in State when guard edit`.
+- Final branch count: 7 new branches + 4 mods + 1 static + 0 grammar = ~33–40 lines total across `PreceptAnalyzer.cs`.
+- Findings filed: `.squad/decisions/inbox/kramer-issue14-final-tooling.md`
+
 ### 2026-04-11 — Issue #14 tooling feasibility: `when <guard>` on declaration forms
 
 - Grammar: `when` is already a global catch-all in `controlKeywords` (`\bwhen\b` → `keyword.control.precept`). Zero grammar changes needed for all four declaration forms (invariant, state assert, event assert, in-state edit).
