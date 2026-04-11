@@ -813,6 +813,8 @@ internal static class PreceptTypeChecker
             }
         }
 
+        // SYNC:CONSTRAINT:C69 — cross-scope guard references checked in Slice 3
+
         if (model.EventAsserts is not null)
         {
             foreach (var eventAssert in model.EventAsserts)
@@ -879,7 +881,7 @@ internal static class PreceptTypeChecker
             return result;
 
         foreach (var group in model.StateAsserts
-            .Where(static stateAssert => stateAssert.Anchor == AssertAnchor.In)
+            .Where(static stateAssert => stateAssert.Anchor == AssertAnchor.In && stateAssert.WhenGuard is null)
             .GroupBy(static stateAssert => stateAssert.State, StringComparer.Ordinal))
         {
             IReadOnlyDictionary<string, StaticValueKind> narrowed = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);

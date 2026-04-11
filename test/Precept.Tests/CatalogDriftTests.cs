@@ -592,6 +592,15 @@ public class CatalogDriftTests
         ["C68"] = new(H + "field Status as choice(\"Open\",\"Closed\") default \"Open\"\n" + S2 +
             "event Go\nfrom A on Go -> set Status = \"Invalid\" -> no transition\n", "not a member"),
 
+        // C69: cross-scope guard reference in when clause
+        ["C69"] = new("_unused_", "different scope", DirectAction: () =>
+        {
+            var msg = DiagnosticCatalog.C69.FormatMessage(("name", "SomeArg"));
+            if (!msg.Contains("different scope"))
+                throw new InvalidOperationException("Constraint C69 message template is broken");
+            throw new InvalidOperationException(msg);
+        }),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state

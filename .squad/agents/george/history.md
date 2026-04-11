@@ -11,6 +11,14 @@
 
 Complete spec written covering all 4 forms and 19 change sites across 5 files. Filed to `.squad/decisions/inbox/george-issue14-implementation-scope.md`. Key determination: single implementable slice with a trivial prerequisite commit for the B1 narrowing fix.
 
+### 2026-04-11 — PR #63 Slices 0, 1, 2: model + diagnostic + parser injection for `when` guards
+
+- **Slice 0:** Added `&& stateAssert.WhenGuard is null` filter to `BuildStateAssertNarrowings` in `PreceptTypeChecker.cs`. Prevents guarded assertions from participating in unconditional per-state type narrowing.
+- **Slice 1:** Added `WhenText`/`WhenGuard` optional tail parameters to `PreceptInvariant`, `StateAssertion`, `EventAssertion`, `PreceptEditBlock`. Added C69 diagnostic for cross-scope guard references.
+- **Slice 2:** Injected `OptionalWhenGuardParser` into `InvariantDecl`, `StateAssertDecl`, `EventAssertDecl`, and `EditDecl`. Updated `StateAssertResult` and `EditResult` private records to carry guard fields. Updated `AssembleModel` to thread guards through to model records. Updated construct descriptions to show `[when <Guard>]`.
+- **Build:** Clean (0 errors, 0 warnings). **Tests:** 849 passed, 0 failed.
+- **Key pattern:** `OptionalWhenGuardParser` injection point differs for edit blocks (between `StateTarget` and `Edit` token) vs. Forms 1–3 (between `BoolExpr` and `Because`). This was already documented in the implementation scope but confirmed in practice.
+
 ### 2026-04-11 — Form 4 simplicity analysis (Issue #14 follow-up)
 
 ## Learnings

@@ -192,7 +192,9 @@ public sealed record PreceptInvariant(
     PreceptExpression Expression,
     string Reason,
     int SourceLine = 0,
-    bool IsSynthetic = false);
+    bool IsSynthetic = false,
+    string? WhenText = null,
+    PreceptExpression? WhenGuard = null);
 
 /// <summary>
 /// A state-scoped assert: <c>in/to/from &lt;State&gt; assert &lt;expr&gt; because "reason"</c>.
@@ -204,7 +206,9 @@ public sealed record StateAssertion(
     string ExpressionText,
     PreceptExpression Expression,
     string Reason,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    string? WhenText = null,
+    PreceptExpression? WhenGuard = null);
 
 /// <summary>
 /// A state entry/exit action: <c>to/from &lt;State&gt; -&gt; &lt;actions&gt;</c>.
@@ -226,7 +230,9 @@ public sealed record EventAssertion(
     string ExpressionText,
     PreceptExpression Expression,
     string Reason,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    string? WhenText = null,
+    PreceptExpression? WhenGuard = null);
 
 /// <summary>
 /// A flat transition row: <c>from &lt;State&gt; on &lt;Event&gt; [when &lt;expr&gt;] [-&gt; actions]* -&gt; &lt;outcome&gt;</c>.
@@ -251,4 +257,6 @@ public sealed record PreceptTransitionRow(
 public sealed record PreceptEditBlock(
     string? State,
     IReadOnlyList<string> FieldNames,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    string? WhenText = null,
+    PreceptExpression? WhenGuard = null);
