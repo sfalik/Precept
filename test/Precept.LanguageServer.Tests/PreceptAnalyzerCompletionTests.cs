@@ -830,6 +830,46 @@ public class PreceptAnalyzerCompletionTests
         completions.Should().NotContain("nonnegative");
     }
 
+    // ── Choice field completions (issue #25) ──────────────────────────
+
+    [Fact]
+    public void Completions_ChoiceFieldAfterType_SuggestsNullableAndOrdered()
+    {
+        const string text = """
+            precept M
+            field Priority as choice("Low","High") $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable");
+        completions.Should().Contain("ordered",
+            because: "'ordered' is the choice-specific constraint and must be offered after choice(...)");
+        completions.Should().NotContain("nonnegative", "numeric constraints must not appear on choice fields");
+        completions.Should().NotContain("notempty", "string constraints must not appear on choice fields");
+    }
+
+    [Fact]
+    public void Completions_ChoiceFieldSetAssignment_OffersChoiceMemberLiterals()
+    {
+        const string text = """
+            precept M
+            field Status as choice("Draft","Active","Closed") default "Draft"
+            state A initial
+            event Go
+            from A on Go -> set Status = $$ -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("\"Draft\"",
+            because: "choice member literals must be offered as completions in set-assignment value position");
+        completions.Should().Contain("\"Active\"");
+        completions.Should().Contain("\"Closed\"");
+    }
+
     private static (string text, Position position) ExtractPosition(string textWithMarker)
     {
         var index = textWithMarker.IndexOf("$$", StringComparison.Ordinal);

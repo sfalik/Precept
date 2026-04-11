@@ -8,17 +8,18 @@
 |-------|-------|
 | **Trigger** | auto |
 | **When** | before |
-| **Condition** | multi-agent task involving 2+ agents modifying shared systems |
+| **Condition** | multi-agent task involving 2+ agents modifying shared systems, OR any language-surface change (new type, keyword, operator, constraint) |
 | **Facilitator** | lead |
-| **Participants** | all-relevant |
+| **Participants** | all-relevant (implementing devs MUST attend for language-surface changes) |
 | **Time budget** | focused |
 | **Enabled** | ✅ yes |
 
 **Agenda:**
 1. Review the task and requirements
-2. Agree on interfaces and contracts between components
-3. Identify risks and edge cases
-4. Assign action items
+2. **Impact analysis** — walk through Runtime, Tooling, and MCP impact categories (see `language-surface-sync.instructions.md`). Implementing devs flag gaps.
+3. Agree on interfaces and contracts between components
+4. Identify risks and edge cases
+5. Assign action items
 
 ---
 

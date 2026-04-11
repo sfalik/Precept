@@ -197,6 +197,7 @@ ConstraintSuffix   := "nonnegative" | "positive" | "notempty"
                     | "min" NumberLiteral | "max" NumberLiteral
                     | "minlength" IntegerLiteral | "maxlength" IntegerLiteral
                     | "mincount" IntegerLiteral | "maxcount" IntegerLiteral
+                    | "maxplaces" IntegerLiteral | "ordered"
 DefaultOpt         := ("default" LiteralOrList)?
 
 Invariant          := "invariant" BoolExpr "because" StringLiteral
@@ -246,7 +247,8 @@ NoTransition       := "no" "transition"
 RejectOutcome      := "reject" StringLiteral
 
 TypeRef            := ScalarType | CollectionType
-ScalarType         := "string" | "number" | "boolean"
+ScalarType         := "string" | "number" | "boolean" | "integer" | "decimal"
+                    | "choice" "(" StringLiteral ("," StringLiteral)* ")"
 CollectionType     := ("set" | "queue" | "stack") "of" ScalarType
 
 LiteralOrList      := ScalarLiteral | ListLiteral
@@ -405,7 +407,8 @@ Full reserved keyword list:
 `in`, `to`, `from`, `on`, `when`, `any`, `all`, `of`,
 `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `into`,
 `transition`, `no`, `reject`,
-`string`, `number`, `boolean`, `true`, `false`, `null`, `contains`,
+`string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `maxplaces`, `ordered`,
+`true`, `false`, `null`, `contains`,
 `and`, `or`, `not`
 
 ### Dual-use: `set`
@@ -425,6 +428,9 @@ No ambiguity in the token stream — the parser knows which meaning applies from
 - `string`
 - `number`
 - `boolean`
+- `integer` — whole number, no decimal component. Supports arithmetic and numeric range constraints (`nonnegative`, `positive`, `min`, `max`). Widens to `number` and `decimal` in mixed arithmetic. Integer division truncates toward zero.
+- `decimal` — exact base-10 decimal number. Supports the `maxplaces` constraint and the `round()` built-in function.
+- `choice("A","B","C")` — constrained string value set; the value must be one of the declared members. Supports the `ordered` constraint for ordinal comparison. At least one member required (C62). No duplicate members (C63). Default value must be a declared member (C64).
 
 ### Collection types
 
@@ -554,6 +560,8 @@ Constraint keywords may appear on field declarations and event argument declarat
 | `maxlength N` | string | `Field.length <= N` |
 | `mincount N` | collection | `Field.count >= N` |
 | `maxcount N` | collection | `Field.count <= N` |
+| `maxplaces N` | `decimal` | Caps the decimal value to at most N decimal places (runtime enforcement; not a desugared invariant expression) |
+| `ordered` | `choice` | Enables ordinal comparison operators (`<`, `<=`, `>`, `>=`); values compare in declaration order (not a desugared invariant expression) |
 
 **Nullable interaction:** When a nullable field carries a constraint, the desugared expression gains a null guard: `Field == null or Field >= N`. The constraint is only evaluated when the value is non-null.
 
@@ -561,6 +569,14 @@ Constraint keywords may appear on field declarations and event argument declarat
 - **C57** — constraint applied to an incompatible type (e.g. `notempty` on a number field, `nonnegative` on a string).
 - **C58** — contradictory constraints (`min 10 max 5`), duplicate constraints (`min 5 min 10`), or subsumed constraints (`nonnegative positive` — `positive` already implies `nonnegative`).
 - **C59** — the declared `default` value violates a constraint (`default -1` with `nonnegative`).
+- **C61** — `maxplaces` applied to a non-`decimal` field.
+- **C62** — `choice` type declared with no members.
+- **C63** — `choice` type contains a duplicate member value.
+- **C64** — the declared `default` value is not in the `choice` member set.
+- **C65** — Ordinal comparison operator (`<`, `<=`, `>`, `>=`) used on a `choice` field that lacks the `ordered` constraint.
+- **C66** — `ordered` constraint applied to a non-`choice` field.
+- **C67** — Ordinal comparison between two `choice` fields — ordinal rank is field-local and the two fields have independent orderings.
+- **C68** — Literal value assigned to a `choice` field (or added to a `choice` collection) is not a member of the declared value set.
 
 Examples:
 
@@ -970,10 +986,22 @@ The expression language supports:
 - parentheses
 - identifier expressions with optional dotted member access (`Name.member`)
 
-Collection accessor members carried forward conceptually:
-- `.count`
-- `.min`, `.max` (sets)
-- `.peek` (queue/stack)
+Dotted member accessors:
+
+| Form | Receiver | Returns | Notes |
+|---|---|---|---|
+| `Field.count` | `set<T>`, `queue<T>`, `stack<T>` | `number` | Total — empty collection → 0 |
+| `Field.min`, `Field.max` | `set<T>` (numeric inner) | inner type | Partial — error on empty set |
+| `Field.peek` | `queue<T>`, `stack<T>` | inner type | Partial — error on empty collection |
+| `Field.length` | `string` | `number` | UTF-16 code unit count. Null-unsafe — requires non-null narrowing first (C56). See [String accessors](#string-accessors). |
+| `EventName.ArgName` | event arg in transition row `when` guard | arg type | Required dotted form to avoid field shadowing. See [Expression scope in transitions](#expression-scope-in-transitions). |
+| `EventName.ArgName.length` | `string` event arg | `number` | Three-level form — combines arg dotted form with string `.length`. |
+
+Built-in functions:
+
+| Function | Valid in | Description |
+|---|---|---|
+| `round(expr, N)` | `set` RHS, `invariant`, `in`/`to`/`from` assert, `when` guard | Rounds a `decimal` expression to N decimal places using banker's rounding (MidpointRounding.ToEven). `expr` must resolve to `decimal`; `N` must be a non-negative integer literal. |
 
 Exact operator precedence and literal forms should align with the runtime expression parser.
 
@@ -1314,6 +1342,7 @@ Type checking for `from any` rows expands to per-state checking. Each state may 
 | C41 / PRECEPT041 | Binary operator type error (includes `contains` RHS mismatch) |
 | C42 / PRECEPT042 | Null-flow violation (assigning `T\|null` to `T` without narrowing) |
 | C43 / PRECEPT043 | Collection `pop`/`dequeue into` target type mismatch |
+| C60 / PRECEPT060 | Narrowing assignment: assigning a `number` or `decimal` value to an `integer` field requires an explicit integer-producing expression (no implicit truncation) |
 
 ### Design principle
 

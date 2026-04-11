@@ -252,4 +252,97 @@ public class CompileToolTests
         result.Diagnostics.Should().NotBeEmpty();
         result.Diagnostics[0].Line.Should().BeGreaterThan(0);
     }
+
+    [Fact]
+    public void IntegerField_SerializesAsIntegerType()
+    {
+        var text = """
+            precept Test
+            field Count as integer default 0
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.Fields.Should().Contain(f => f.Name == "Count" && f.Type == "integer");
+    }
+
+    [Fact]
+    public void DecimalField_SerializesAsDecimalType()
+    {
+        var text = """
+            precept Test
+            field Amount as decimal default 0
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.Fields.Should().Contain(f => f.Name == "Amount" && f.Type == "decimal");
+    }
+
+    [Fact]
+    public void ChoiceField_SerializesChoiceValuesAndType()
+    {
+        var text = """
+            precept Test
+            field Status as choice("Pending","Active","Closed") default "Pending"
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        var statusField = result.Fields!.FirstOrDefault(f => f.Name == "Status");
+        statusField.Should().NotBeNull();
+        statusField!.Type.Should().Be("choice");
+        statusField.ChoiceValues.Should().BeEquivalentTo(["Pending", "Active", "Closed"]);
+    }
+
+    [Fact]
+    public void OrderedChoiceField_SerializesIsOrdered()
+    {
+        var text = """
+            precept Test
+            field Priority as choice("Low","Medium","High") default "Low" ordered
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        var priorityField = result.Fields!.FirstOrDefault(f => f.Name == "Priority");
+        priorityField.Should().NotBeNull();
+        priorityField!.IsOrdered.Should().BeTrue();
+    }
+
+    [Fact]
+    public void NonOrderedChoiceField_IsOrderedIsNull()
+    {
+        var text = """
+            precept Test
+            field Status as choice("A","B") default "A"
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        var f = result.Fields!.FirstOrDefault(f => f.Name == "Status");
+        f.Should().NotBeNull();
+        f!.IsOrdered.Should().BeNull();
+    }
+
+    [Fact]
+    public void MaxplacesConstraint_SerializesWithPlaces()
+    {
+        var text = """
+            precept Test
+            field Amount as decimal default 0 maxplaces 2
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        var amountField = result.Fields!.FirstOrDefault(f => f.Name == "Amount");
+        amountField.Should().NotBeNull();
+        amountField!.Constraints.Should().Contain("maxplaces 2");
+    }
 }

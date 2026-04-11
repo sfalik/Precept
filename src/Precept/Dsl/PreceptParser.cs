@@ -201,6 +201,26 @@ public static class PreceptParser
         throw DiagnosticCatalog.C5.ToException(("value", token.ToStringValue()));
     }
 
+    /// <summary>
+    /// Returns either a <see cref="long"/> (for whole-number literals like <c>42</c>) or
+    /// a <see cref="double"/> (for decimal/scientific literals like <c>3.14</c>, <c>1e5</c>).
+    /// The caller is responsible for updating <see cref="PreceptLiteralExpression"/> accordingly.
+    /// </summary>
+    private static object ToNumericLiteralValue(this Token<PreceptToken> token)
+    {
+        var text = token.ToStringValue();
+        // Whole-number literal → long (integer type in the DSL)
+        if (!text.Contains('.') && !text.Contains('e', StringComparison.OrdinalIgnoreCase))
+        {
+            if (long.TryParse(text, out var longVal))
+                return longVal;
+        }
+        if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
+            return d;
+        // SYNC:CONSTRAINT:C5
+        throw DiagnosticCatalog.C5.ToException(("value", text));
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // Expression Combinators
     // ═══════════════════════════════════════════════════════════════════
@@ -208,7 +228,7 @@ public static class PreceptParser
     // Level 5: Atoms
     private static readonly TokenListParser<PreceptToken, PreceptExpression> NumberAtom =
         Token.EqualTo(PreceptToken.NumberLiteral)
-            .Select(t => (PreceptExpression)new PreceptLiteralExpression(t.ToNumberValue()));
+            .Select(t => (PreceptExpression)new PreceptLiteralExpression(t.ToNumericLiteralValue()));
 
     private static readonly TokenListParser<PreceptToken, PreceptExpression> StringAtom =
         Token.EqualTo(PreceptToken.StringLiteral)
@@ -270,6 +290,25 @@ public static class PreceptParser
         from _rp in Token.EqualTo(PreceptToken.RightParen)
         select (PreceptExpression)new PreceptParenthesizedExpression(inner);
 
+    // round(expr, N) — built-in rounding function; recognized by identifier name, not a keyword
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> RoundAtom =
+        (from kw in Token.EqualTo(PreceptToken.Identifier).Where(t => t.ToStringValue() == "round")
+         from _lp in Token.EqualTo(PreceptToken.LeftParen)
+         from val in Superpower.Parse.Ref(BoolExprRef)
+         from _c in Token.EqualTo(PreceptToken.Comma)
+         from n in Token.EqualTo(PreceptToken.NumberLiteral)
+         from _rp in Token.EqualTo(PreceptToken.RightParen)
+         let raw = n.ToNumericLiteralValue()
+         let places = raw is long l ? (int)l : (int)(double)raw
+         select (PreceptExpression)new PreceptRoundExpression(val, places))
+        .Try()
+        .Register(new ConstructInfo(
+            "round-function",
+            "round (<Expr>, <N>)",
+            "expression",
+            "Rounds a decimal expression to N decimal places (banker's rounding). Valid in set RHS and invariant/assert expressions.",
+            "from Idle on Apply -> set Rate = round(Apply.Amount, 2) -> no transition"));
+
     private static readonly TokenListParser<PreceptToken, PreceptExpression> Atom =
         NumberAtom
             .Try().Or(StringAtom)
@@ -277,6 +316,7 @@ public static class PreceptParser
             .Try().Or(FalseAtom)
             .Try().Or(NullAtom)
             .Try().Or(ParenExpr)
+            .Try().Or(RoundAtom)
             .Or(DottedIdentifier);
 
     // Level 4: Unary (! and unary -)
@@ -361,23 +401,40 @@ public static class PreceptParser
     private static readonly TokenListParser<PreceptToken, PreceptScalarType> ScalarType =
         Token.EqualTo(PreceptToken.StringType).Value(PreceptScalarType.String)
             .Or(Token.EqualTo(PreceptToken.NumberType).Value(PreceptScalarType.Number))
-            .Or(Token.EqualTo(PreceptToken.BooleanType).Value(PreceptScalarType.Boolean));
+            .Or(Token.EqualTo(PreceptToken.BooleanType).Value(PreceptScalarType.Boolean))
+            .Or(Token.EqualTo(PreceptToken.IntegerType).Value(PreceptScalarType.Integer))
+            .Or(Token.EqualTo(PreceptToken.DecimalType).Value(PreceptScalarType.Decimal));
 
     /// <summary>
-    /// Parses a type reference: scalar type or collection type.
+    /// Parses a scalar type or choice("A","B","C") reference.
+    /// Returns the scalar type and (for choice) the list of allowed values.
+    /// </summary>
+    private static readonly TokenListParser<PreceptToken, (PreceptScalarType Type, IReadOnlyList<string>? ChoiceValues)> ScalarTypeOrChoice =
+        (from _ in Token.EqualTo(PreceptToken.ChoiceType)
+         from _lp in Token.EqualTo(PreceptToken.LeftParen)
+         from values in Token.EqualTo(PreceptToken.StringLiteral)
+                            .Select(t => t.ToStringLiteralValue())
+                            .AtLeastOnceDelimitedBy(Token.EqualTo(PreceptToken.Comma))
+         from _rp in Token.EqualTo(PreceptToken.RightParen)
+         select (PreceptScalarType.Choice, (IReadOnlyList<string>?)(IReadOnlyList<string>)values.ToList()))
+        .Try()
+        .Or(ScalarType.Select(st => (st, (IReadOnlyList<string>?)null)));
+
+    /// <summary>
+    /// Parses a type reference: scalar type, choice type, or collection type.
     /// Collection types use "set of scalar", "queue of scalar", "stack of scalar".
     /// Dual-use 'set' keyword: after 'as' → if followed by 'of', it's a collection type.
     /// </summary>
-    private static readonly TokenListParser<PreceptToken, (bool IsCollection, PreceptScalarType ScalarType, PreceptCollectionKind? CollectionKind)> TypeRef =
-        // Collection types: set/queue/stack of <scalar>
+    private static readonly TokenListParser<PreceptToken, (bool IsCollection, PreceptScalarType ScalarType, PreceptCollectionKind? CollectionKind, IReadOnlyList<string>? ChoiceValues)> TypeRef =
+        // Collection types: set/queue/stack of <scalar-or-choice>
         (from kw in Token.EqualTo(PreceptToken.Set).Value(PreceptCollectionKind.Set)
              .Or(Token.EqualTo(PreceptToken.Queue).Value(PreceptCollectionKind.Queue))
              .Or(Token.EqualTo(PreceptToken.Stack).Value(PreceptCollectionKind.Stack))
          from _ in Token.EqualTo(PreceptToken.Of)
-         from inner in ScalarType
-         select (IsCollection: true, ScalarType: inner, CollectionKind: (PreceptCollectionKind?)kw))
+         from inner in ScalarTypeOrChoice
+         select (IsCollection: true, ScalarType: inner.Type, CollectionKind: (PreceptCollectionKind?)kw, ChoiceValues: inner.ChoiceValues))
         .Try()
-        .Or(ScalarType.Select(st => (IsCollection: false, ScalarType: st, CollectionKind: (PreceptCollectionKind?)null)));
+        .Or(ScalarTypeOrChoice.Select(st => (IsCollection: false, ScalarType: st.Type, CollectionKind: (PreceptCollectionKind?)null, ChoiceValues: st.ChoiceValues)));
 
     // ═══════════════════════════════════════════════════════════════════
     // Literal Parsers (for default values)
@@ -386,8 +443,9 @@ public static class PreceptParser
     private static readonly TokenListParser<PreceptToken, object?> ScalarLiteral =
         (from _ in Token.EqualTo(PreceptToken.Minus)
          from n in Token.EqualTo(PreceptToken.NumberLiteral)
-         select (object?)-n.ToNumberValue()).Try()
-        .Or(Token.EqualTo(PreceptToken.NumberLiteral).Select(t => (object?)t.ToNumberValue()))
+         let raw = n.ToNumericLiteralValue()
+         select (object?)(raw is long l ? (object?)-l : -(double)(raw))).Try()
+        .Or(Token.EqualTo(PreceptToken.NumberLiteral).Select(t => (object?)t.ToNumericLiteralValue()))
             .Try().Or(Token.EqualTo(PreceptToken.StringLiteral).Select(t => (object?)t.ToStringLiteralValue()))
             .Try().Or(Token.EqualTo(PreceptToken.True).Value((object?)true))
             .Try().Or(Token.EqualTo(PreceptToken.False).Value((object?)false))
@@ -441,9 +499,12 @@ public static class PreceptParser
         .Or((from _ in Token.EqualTo(PreceptToken.Mincount)
              from n in Token.EqualTo(PreceptToken.NumberLiteral)
              select (FieldConstraint)new FieldConstraint.Mincount((int)n.ToNumberValue())).Try())
-        .Or(from _ in Token.EqualTo(PreceptToken.Maxcount)
+        .Or((from _ in Token.EqualTo(PreceptToken.Maxcount)
+             from n in Token.EqualTo(PreceptToken.NumberLiteral)
+             select (FieldConstraint)new FieldConstraint.Maxcount((int)n.ToNumberValue())).Try())
+        .Or(from _ in Token.EqualTo(PreceptToken.Maxplaces)
             from n in Token.EqualTo(PreceptToken.NumberLiteral)
-            select (FieldConstraint)new FieldConstraint.Maxcount((int)n.ToNumberValue()));
+            select (FieldConstraint)new FieldConstraint.Maxplaces((int)n.ToNumberValue()));
 
     // ═══════════════════════════════════════════════════════════════════
     // State Target Parser
@@ -592,6 +653,7 @@ public static class PreceptParser
             {
                 null => "null",
                 bool b => b ? "true" : "false",
+                long l => l.ToString(CultureInfo.InvariantCulture),
                 double d => d.ToString(CultureInfo.InvariantCulture),
                 string s => $"\"{s}\"",
                 _ => lit.Value.ToString() ?? "null"
@@ -602,6 +664,7 @@ public static class PreceptParser
             PreceptUnaryExpression un => $"{un.Operator}{ReconstituteExpr(un.Operand)}",
             PreceptBinaryExpression bin => $"{ReconstituteExpr(bin.Left)} {bin.Operator} {ReconstituteExpr(bin.Right)}",
             PreceptParenthesizedExpression paren => $"({ReconstituteExpr(paren.Inner)})",
+            PreceptRoundExpression round => $"round({ReconstituteExpr(round.Value)}, {round.Places})",
             _ => expr.ToString() ?? ""
         };
 
@@ -622,7 +685,7 @@ public static class PreceptParser
                 "Names the workflow",
                 "precept BugTracker"));
 
-    // field <Name>[, <Name>, ...] as <Type> [nullable] [default <Value>] [constraint...]
+    // field <Name>[, <Name>, ...] as <Type> [nullable] [default <Value>] [constraint...] [ordered]
     private static readonly TokenListParser<PreceptToken, StatementResult> FieldDecl =
         (from kw in Token.EqualTo(PreceptToken.Field)
          from names in Token.EqualTo(PreceptToken.Identifier)
@@ -632,17 +695,20 @@ public static class PreceptParser
          from nullable in Token.EqualTo(PreceptToken.Nullable).Value(true).OptionalOrDefault(false)
          from dflt in OptionalDefault
          from constraints in ConstraintSuffix.Many()
+         from ordered in Token.EqualTo(PreceptToken.Ordered).Value(true).OptionalOrDefault(false)
          select typeRef.IsCollection
             ? (StatementResult)new CollectionFieldResult(
                 names.Select(n => new PreceptCollectionField(
                     n.ToText(), typeRef.CollectionKind!.Value, typeRef.ScalarType,
-                    constraints.Length > 0 ? constraints : null)).ToArray())
+                    constraints.Length > 0 ? constraints : null,
+                    typeRef.ChoiceValues)).ToArray())
             : new FieldResult(
                 names.Select(n => new PreceptField(
                     n.ToText(), typeRef.ScalarType, nullable,
                     dflt.Specified || nullable,
                     dflt.Specified ? dflt.Value : null,
-                    constraints.Length > 0 ? constraints : null)).ToArray()))
+                    constraints.Length > 0 ? constraints : null,
+                    typeRef.ChoiceValues, ordered)).ToArray()))
         .Named("field declaration")
             .Register(new ConstructInfo(
                 "field-declaration",
@@ -691,18 +757,20 @@ public static class PreceptParser
                 "state Idle initial"));
 
     // event <Name> [with <ArgList>]
-    // where ArgList = Name as Type [nullable] [default val] [constraint...] separated by commas
+    // where ArgList = Name as Type [nullable] [default val] [constraint...] [ordered] separated by commas
     private static readonly TokenListParser<PreceptToken, PreceptEventArg> EventArg =
         from name in Token.EqualTo(PreceptToken.Identifier)
         from _ in Token.EqualTo(PreceptToken.As)
-        from type in ScalarType
+        from typeRef in ScalarTypeOrChoice
         from nullable in Token.EqualTo(PreceptToken.Nullable).Value(true).OptionalOrDefault(false)
         from dflt in OptionalScalarDefault
         from constraints in ConstraintSuffix.Many()
-        select new PreceptEventArg(name.ToText(), type, nullable,
+        from ordered in Token.EqualTo(PreceptToken.Ordered).Value(true).OptionalOrDefault(false)
+        select new PreceptEventArg(name.ToText(), typeRef.Type, nullable,
             dflt.Specified,
             dflt.Specified ? dflt.Value : null,
-            constraints.Length > 0 ? constraints : null);
+            constraints.Length > 0 ? constraints : null,
+            typeRef.ChoiceValues, ordered);
 
     private static readonly TokenListParser<PreceptToken, StatementResult> EventDecl =
         (from kw in Token.EqualTo(PreceptToken.Event)
@@ -1114,7 +1182,8 @@ public static class PreceptParser
             {
                 var ok = f.Type switch
                 {
-                    PreceptScalarType.Number => f.DefaultValue is double,
+                    PreceptScalarType.Number => f.DefaultValue is double || f.DefaultValue is long,
+                    PreceptScalarType.Integer => f.DefaultValue is long,
                     PreceptScalarType.String => f.DefaultValue is string,
                     PreceptScalarType.Boolean => f.DefaultValue is bool,
                     _ => true
@@ -1137,7 +1206,8 @@ public static class PreceptParser
                 {
                     var ok = arg.Type switch
                     {
-                        PreceptScalarType.Number => arg.DefaultValue is double,
+                        PreceptScalarType.Number => arg.DefaultValue is double || arg.DefaultValue is long,
+                        PreceptScalarType.Integer => arg.DefaultValue is long,
                         PreceptScalarType.String => arg.DefaultValue is string,
                         PreceptScalarType.Boolean => arg.DefaultValue is bool,
                         _ => true
@@ -1308,6 +1378,25 @@ public static class PreceptParser
         string name, PreceptScalarType type, bool isNullable, FieldConstraint constraint)
     {
         if (type == PreceptScalarType.Number)
+        {
+            switch (constraint)
+            {
+                case FieldConstraint.Nonnegative:
+                    return MaybeNullGuard(name, isNullable, ">=", new PreceptLiteralExpression(0.0),
+                        $"{name} must be non-negative (nonnegative constraint)");
+                case FieldConstraint.Positive:
+                    return MaybeNullGuard(name, isNullable, ">", new PreceptLiteralExpression(0.0),
+                        $"{name} must be positive (positive constraint)");
+                case FieldConstraint.Min mn:
+                    return MaybeNullGuard(name, isNullable, ">=", new PreceptLiteralExpression(mn.Value),
+                        $"{name} minimum value is {mn.Value.ToString(CultureInfo.InvariantCulture)} (min constraint)");
+                case FieldConstraint.Max mx:
+                    return MaybeNullGuard(name, isNullable, "<=", new PreceptLiteralExpression(mx.Value),
+                        $"{name} maximum value is {mx.Value.ToString(CultureInfo.InvariantCulture)} (max constraint)");
+            }
+        }
+
+        if (type is PreceptScalarType.Integer or PreceptScalarType.Decimal)
         {
             switch (constraint)
             {

@@ -12,15 +12,19 @@ internal static class PreceptExpressionRuntimeEvaluator
         internal static EvaluationResult Fail(string error) => new(false, null, error);
     }
 
-    public static EvaluationResult Evaluate(PreceptExpression expression, IReadOnlyDictionary<string, object?> context)
+    public static EvaluationResult Evaluate(
+        PreceptExpression expression,
+        IReadOnlyDictionary<string, object?> context,
+        IReadOnlyDictionary<string, PreceptField>? fieldContracts = null)
     {
         return expression switch
         {
             PreceptLiteralExpression literal => EvaluationResult.Ok(literal.Value),
             PreceptIdentifierExpression identifier => EvaluateIdentifier(identifier, context),
-            PreceptParenthesizedExpression parenthesized => Evaluate(parenthesized.Inner, context),
+            PreceptParenthesizedExpression parenthesized => Evaluate(parenthesized.Inner, context, fieldContracts),
             PreceptUnaryExpression unary => EvaluateUnary(unary, context),
-            PreceptBinaryExpression binary => EvaluateBinary(binary, context),
+            PreceptBinaryExpression binary => EvaluateBinary(binary, context, fieldContracts),
+            PreceptRoundExpression round => EvaluateRound(round, context),
             _ => EvaluationResult.Fail("unsupported expression node.")
         };
     }
@@ -102,21 +106,26 @@ internal static class PreceptExpressionRuntimeEvaluator
             "not" => operand.Value is bool b
                 ? EvaluationResult.Ok(!b)
                 : EvaluationResult.Fail("operator 'not' requires boolean operand."),
-            "-" => TryToNumber(operand.Value, out var number)
-                ? EvaluationResult.Ok(-number)
-                : EvaluationResult.Fail("unary '-' requires numeric operand."),
+            "-" => operand.Value is long l
+                ? EvaluationResult.Ok(-l)
+                : TryToNumber(operand.Value, out var number)
+                    ? EvaluationResult.Ok(-number)
+                    : EvaluationResult.Fail("unary '-' requires numeric operand."),
             _ => EvaluationResult.Fail($"unsupported unary operator '{unary.Operator}'.")
         };
     }
 
-    private static EvaluationResult EvaluateBinary(PreceptBinaryExpression binary, IReadOnlyDictionary<string, object?> context)
+    private static EvaluationResult EvaluateBinary(
+        PreceptBinaryExpression binary,
+        IReadOnlyDictionary<string, object?> context,
+        IReadOnlyDictionary<string, PreceptField>? fieldContracts = null)
     {
         if (binary.Operator == "contains")
             return EvaluateContains(binary, context);
 
         if (binary.Operator == "and")
         {
-            var left = Evaluate(binary.Left, context);
+            var left = Evaluate(binary.Left, context, fieldContracts);
             if (!left.Success)
                 return left;
 
@@ -126,7 +135,7 @@ internal static class PreceptExpressionRuntimeEvaluator
             if (!leftBool)
                 return EvaluationResult.Ok(false);
 
-            var right = Evaluate(binary.Right, context);
+            var right = Evaluate(binary.Right, context, fieldContracts);
             if (!right.Success)
                 return right;
 
@@ -137,7 +146,7 @@ internal static class PreceptExpressionRuntimeEvaluator
 
         if (binary.Operator == "or")
         {
-            var left = Evaluate(binary.Left, context);
+            var left = Evaluate(binary.Left, context, fieldContracts);
             if (!left.Success)
                 return left;
 
@@ -147,7 +156,7 @@ internal static class PreceptExpressionRuntimeEvaluator
             if (leftBool)
                 return EvaluationResult.Ok(true);
 
-            var right = Evaluate(binary.Right, context);
+            var right = Evaluate(binary.Right, context, fieldContracts);
             if (!right.Success)
                 return right;
 
@@ -156,11 +165,11 @@ internal static class PreceptExpressionRuntimeEvaluator
                 : EvaluationResult.Fail("operator 'or' requires boolean operands.");
         }
 
-        var leftValue = Evaluate(binary.Left, context);
+        var leftValue = Evaluate(binary.Left, context, fieldContracts);
         if (!leftValue.Success)
             return leftValue;
 
-        var rightValue = Evaluate(binary.Right, context);
+        var rightValue = Evaluate(binary.Right, context, fieldContracts);
         if (!rightValue.Success)
             return rightValue;
 
@@ -173,68 +182,170 @@ internal static class PreceptExpressionRuntimeEvaluator
                 if (leftOperand is string leftString && rightOperand is string rightString)
                     return EvaluationResult.Ok(leftString + rightString);
 
+                if (leftOperand is long la && rightOperand is long ra)
+                    return EvaluationResult.Ok(la + ra);
+
                 if (TryToNumber(leftOperand, out var leftNumberForAdd) && TryToNumber(rightOperand, out var rightNumberForAdd))
                     return EvaluationResult.Ok(leftNumberForAdd + rightNumberForAdd);
 
                 return EvaluationResult.Fail("operator '+' requires number+number or string+string.");
 
             case "-":
+                if (leftOperand is long ls && rightOperand is long rs)
+                    return EvaluationResult.Ok(ls - rs);
+
                 if (TryToNumber(leftOperand, out var leftNumberForSub) && TryToNumber(rightOperand, out var rightNumberForSub))
                     return EvaluationResult.Ok(leftNumberForSub - rightNumberForSub);
 
                 return EvaluationResult.Fail("operator '-' requires numeric operands.");
 
             case "*":
+                if (leftOperand is long lm && rightOperand is long rm)
+                    return EvaluationResult.Ok(lm * rm);
+
                 if (TryToNumber(leftOperand, out var leftNumberForMul) && TryToNumber(rightOperand, out var rightNumberForMul))
                     return EvaluationResult.Ok(leftNumberForMul * rightNumberForMul);
 
                 return EvaluationResult.Fail("operator '*' requires numeric operands.");
 
             case "/":
+                if (leftOperand is long ld && rightOperand is long rd)
+                {
+                    if (rd == 0L) return EvaluationResult.Fail("integer division by zero.");
+                    return EvaluationResult.Ok(ld / rd); // C# truncates toward zero
+                }
+
                 if (TryToNumber(leftOperand, out var leftNumberForDiv) && TryToNumber(rightOperand, out var rightNumberForDiv))
                     return EvaluationResult.Ok(leftNumberForDiv / rightNumberForDiv);
 
                 return EvaluationResult.Fail("operator '/' requires numeric operands.");
 
             case "%":
+                if (leftOperand is long lmod && rightOperand is long rmod)
+                {
+                    if (rmod == 0L) return EvaluationResult.Fail("integer modulo by zero.");
+                    return EvaluationResult.Ok(lmod % rmod);
+                }
+
                 if (TryToNumber(leftOperand, out var leftNumberForMod) && TryToNumber(rightOperand, out var rightNumberForMod))
                     return EvaluationResult.Ok(leftNumberForMod % rightNumberForMod);
 
                 return EvaluationResult.Fail("operator '%' requires numeric operands.");
 
             case "==":
+                if (TryToNumber(leftOperand, out var leftEq) && TryToNumber(rightOperand, out var rightEq))
+                    return EvaluationResult.Ok(leftEq == rightEq);
                 return EvaluationResult.Ok(Equals(leftOperand, rightOperand));
 
             case "!=":
+                if (TryToNumber(leftOperand, out var leftNeq) && TryToNumber(rightOperand, out var rightNeq))
+                    return EvaluationResult.Ok(leftNeq != rightNeq);
                 return EvaluationResult.Ok(!Equals(leftOperand, rightOperand));
 
             case ">":
+                if (leftOperand is long lgt && rightOperand is long rgt)
+                    return EvaluationResult.Ok(lgt > rgt);
+
                 if (TryToNumber(leftOperand, out var leftNumberForGt) && TryToNumber(rightOperand, out var rightNumberForGt))
                     return EvaluationResult.Ok(leftNumberForGt > rightNumberForGt);
+
+                if (TryGetChoiceOrdinals(binary.Left, leftOperand, rightOperand, fieldContracts, out var liGt, out var riGt))
+                {
+                    if (liGt < 0) return EvaluationResult.Fail($"'{leftOperand}' is not a member of the ordered choice set.");
+                    if (riGt < 0) return EvaluationResult.Fail($"'{rightOperand}' is not a member of the ordered choice set.");
+                    return EvaluationResult.Ok(liGt > riGt);
+                }
 
                 return EvaluationResult.Fail("operator '>' requires numeric operands.");
 
             case ">=":
+                if (leftOperand is long lgte && rightOperand is long rgte)
+                    return EvaluationResult.Ok(lgte >= rgte);
+
                 if (TryToNumber(leftOperand, out var leftNumberForGte) && TryToNumber(rightOperand, out var rightNumberForGte))
                     return EvaluationResult.Ok(leftNumberForGte >= rightNumberForGte);
+
+                if (TryGetChoiceOrdinals(binary.Left, leftOperand, rightOperand, fieldContracts, out var liGte, out var riGte))
+                {
+                    if (liGte < 0) return EvaluationResult.Fail($"'{leftOperand}' is not a member of the ordered choice set.");
+                    if (riGte < 0) return EvaluationResult.Fail($"'{rightOperand}' is not a member of the ordered choice set.");
+                    return EvaluationResult.Ok(liGte >= riGte);
+                }
 
                 return EvaluationResult.Fail("operator '>=' requires numeric operands.");
 
             case "<":
+                if (leftOperand is long llt && rightOperand is long rlt)
+                    return EvaluationResult.Ok(llt < rlt);
+
                 if (TryToNumber(leftOperand, out var leftNumberForLt) && TryToNumber(rightOperand, out var rightNumberForLt))
                     return EvaluationResult.Ok(leftNumberForLt < rightNumberForLt);
+
+                if (TryGetChoiceOrdinals(binary.Left, leftOperand, rightOperand, fieldContracts, out var liLt, out var riLt))
+                {
+                    if (liLt < 0) return EvaluationResult.Fail($"'{leftOperand}' is not a member of the ordered choice set.");
+                    if (riLt < 0) return EvaluationResult.Fail($"'{rightOperand}' is not a member of the ordered choice set.");
+                    return EvaluationResult.Ok(liLt < riLt);
+                }
 
                 return EvaluationResult.Fail("operator '<' requires numeric operands.");
 
             case "<=":
+                if (leftOperand is long llte && rightOperand is long rlte)
+                    return EvaluationResult.Ok(llte <= rlte);
+
                 if (TryToNumber(leftOperand, out var leftNumberForLte) && TryToNumber(rightOperand, out var rightNumberForLte))
                     return EvaluationResult.Ok(leftNumberForLte <= rightNumberForLte);
+
+                if (TryGetChoiceOrdinals(binary.Left, leftOperand, rightOperand, fieldContracts, out var liLte, out var riLte))
+                {
+                    if (liLte < 0) return EvaluationResult.Fail($"'{leftOperand}' is not a member of the ordered choice set.");
+                    if (riLte < 0) return EvaluationResult.Fail($"'{rightOperand}' is not a member of the ordered choice set.");
+                    return EvaluationResult.Ok(liLte <= riLte);
+                }
 
                 return EvaluationResult.Fail("operator '<=' requires numeric operands.");
 
             default:
                 return EvaluationResult.Fail($"unsupported binary operator '{binary.Operator}'.");
         }
+    }
+
+    /// <summary>
+    /// Attempts to resolve declaration-position ordinal indices for an ordered choice field comparison.
+    /// Returns true when the left-side expression is an ordered choice field and both operands are strings.
+    /// </summary>
+    private static bool TryGetChoiceOrdinals(
+        PreceptExpression leftExpr,
+        object? leftOperand,
+        object? rightOperand,
+        IReadOnlyDictionary<string, PreceptField>? fieldContracts,
+        out int leftIdx,
+        out int rightIdx)
+    {
+        leftIdx = rightIdx = -1;
+        if (fieldContracts is null) return false;
+        if (leftOperand is not string leftStr) return false;
+        if (rightOperand is not string rightStr) return false;
+
+        // Strip parentheses to find the underlying identifier.
+        while (leftExpr is PreceptParenthesizedExpression p) leftExpr = p.Inner;
+        if (leftExpr is not PreceptIdentifierExpression { Member: null } leftId) return false;
+        if (!fieldContracts.TryGetValue(leftId.Name, out var field)) return false;
+        if (field.Type != PreceptScalarType.Choice || !field.IsOrdered) return false;
+        if (field.ChoiceValues is not { Count: > 0 } values) return false;
+
+        leftIdx = FindChoiceIndex(values, leftStr);
+        rightIdx = FindChoiceIndex(values, rightStr);
+        return true;
+    }
+
+    private static int FindChoiceIndex(IReadOnlyList<string> values, string target)
+    {
+        for (var i = 0; i < values.Count; i++)
+            if (string.Equals(values[i], target, StringComparison.Ordinal))
+                return i;
+        return -1;
     }
 
     private static EvaluationResult EvaluateContains(PreceptBinaryExpression binary, IReadOnlyDictionary<string, object?> context)
@@ -252,6 +363,35 @@ internal static class PreceptExpressionRuntimeEvaluator
             return rightResult;
 
         return EvaluationResult.Ok(collection.Contains(rightResult.Value));
+    }
+
+    private static EvaluationResult EvaluateRound(PreceptRoundExpression round, IReadOnlyDictionary<string, object?> context)
+    {
+        var valResult = Evaluate(round.Value, context);
+        if (!valResult.Success)
+            return valResult;
+
+        if (!TryToDecimal(valResult.Value, out var d))
+            return EvaluationResult.Fail("round() requires a numeric argument.");
+
+        var result = Math.Round(d, round.Places, MidpointRounding.ToEven);
+        return EvaluationResult.Ok(result);
+    }
+
+    private static bool TryToDecimal(object? value, out decimal d)
+    {
+        switch (value)
+        {
+            case decimal dec: d = dec; return true;
+            case double dbl: d = (decimal)dbl; return true;
+            case float flt: d = (decimal)flt; return true;
+            case long l: d = l; return true;
+            case int i: d = i; return true;
+            case short s: d = s; return true;
+            case byte b: d = b; return true;
+            case sbyte sb: d = sb; return true;
+            default: d = default; return false;
+        }
     }
 
     private static bool TryToNumber(object? value, out double number)

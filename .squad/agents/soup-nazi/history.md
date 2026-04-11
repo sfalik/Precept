@@ -6,6 +6,19 @@
 
 ## Recent Updates
 
+### 2026-04-11 — Issue #29 (Slice 7): integer type test suite written
+- Created `test/Precept.Tests/PreceptIntegerTypeTests.cs` — 34 tests: 31 passing, 3 skipped.
+- **Test categories:** parser (8: field declarations, long literal semantics, double vs long distinction, nullable, large literal, set/queue/stack of integer), type-checker coercion (8: C60 narrowing, C61 maxplaces, widening to number, no-error cases, Theory x3), runtime arithmetic (8: +/-/\*//, negative division truncation, %, ==, widened to number), runtime event args (2: long, coerce int→long), runtime guards (1: comparison routing), collections (1: set<integer> min/max via guard routing).
+- **3 tests skipped with TODO for George:** `nonnegative`, `positive`, and `min/max` constraints on integer fields do not get desugared to runtime invariants. `BuildScalarConstraintExpr` in `PreceptParser.cs` has branches only for `Number` and `String` types — `Integer` falls through to the no-op return. Constraints are parsed and type-checked but never enforced at runtime.
+- **Key patterns hardened:**
+  - Integer literals in DSL parse as `long`; decimal-point literals parse as `double`. Assert `5L` not `5.0`.
+  - For TypeCheck "BeEmpty" assertions: use `-> transition B` (not `-> no transition`) so B is reachable (no C48) and A doesn't become a dead-end (no C50).
+  - For TypeCheck "emits C60" assertions: same pattern — `-> transition B` isolates C60 as the only diagnostic, enabling `ContainSingle()`.
+  - C61 (maxplaces on integer) must be tested via `DirectAction` model construction — maxplaces is not yet a parseable DSL keyword. The model also emits C53 (no events), so assert `Contain(d => d.Constraint.Id == "C61")` not `ContainSingle()`.
+  - Integer divides as C# long truncation toward zero: `-5 / 2 = -2`, not `-3` (floor).
+  - `int` (32-bit) passed as event arg is coerced to `long` by `CoerceToInteger`.
+- **Gap filed:** `.squad/decisions/inbox/soup-nazi-integer-tests.md`.
+
 ### 2026-04-10 — Issue #13: field-level constraints test strategy + scaffold written
 - Created `test/Precept.Tests/FieldConstraintTests.cs` — 37 tests: 3 ready (pass now) + 34 stubs (NotImplementedException until George's implementation lands).
 - **3 baseline ready tests** confirm the desugar destination works today: invariant-expressed nonnegative/positive/min-max semantics already produce ConstraintFailure at runtime.

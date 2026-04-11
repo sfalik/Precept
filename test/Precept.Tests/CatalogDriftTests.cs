@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using FluentAssertions;
 using Precept;
@@ -92,6 +93,10 @@ public class CatalogDriftTests
 
             "transition-row" =>
                 $"{header}\n{string.Join("\n", states)}\nevent Submit\n{construct.Example}",
+
+            "round-function" =>
+                // round() needs a decimal field and an event to be valid in a transition context
+                $"{header}\nfield Rate as decimal default 0.0\n{string.Join("\n", states)}\nevent Apply with Amount as number\n{construct.Example}",
 
             _ =>
                 // Generic fallback: include everything
@@ -530,6 +535,63 @@ public class CatalogDriftTests
         // C59: Default value violates constraint (0 is not positive)
         ["C59"] = new(H + "field Amount as number default 0 positive\n" + S, "violates constraint"),
 
+        // C60: Narrowing assignment — assigning a number literal (3.0) to an integer field
+        ["C60"] = new(H + "field Count as integer default 0\n" + S2 + "event Go\nfrom A on Go -> set Count = 3.0 -> no transition\n", "explicit conversion"),
+
+        // C61: maxplaces constraint on non-decimal field — constructed directly (maxplaces not yet a keyword)
+        ["C61"] = new("_unused_", "decimal fields", DirectAction: () =>
+        {
+            var model = new PreceptDefinition(
+                "Test",
+                [new PreceptState("A")],
+                new PreceptState("A"),
+                [],
+                [new PreceptField("Count", PreceptScalarType.Integer, false, true, 0L, [new FieldConstraint.Maxplaces(2)])],
+                [], null);
+            var result = PreceptCompiler.Validate(model);
+            var diag = result.Diagnostics.FirstOrDefault(d => d.Constraint.Id == "C61");
+            if (diag is null) throw new InvalidOperationException("C61 was not triggered");
+            throw new InvalidOperationException(diag.Message);
+        }),
+
+        // C62: choice type with no values — constructed directly (parser enforces at least 1 value)
+        ["C62"] = new("_unused_", "at least one value", DirectAction: () =>
+        {
+            var model = new PreceptDefinition(
+                "Test",
+                [new PreceptState("A")],
+                new PreceptState("A"),
+                [],
+                [new PreceptField("Status", PreceptScalarType.Choice, false, false, null, null, [], false)],
+                [], null);
+            var result = PreceptCompiler.Validate(model);
+            var diag = result.Diagnostics.FirstOrDefault(d => d.Constraint.Id == "C62");
+            if (diag is null) throw new InvalidOperationException("C62 was not triggered");
+            throw new InvalidOperationException(diag.Message);
+        }),
+
+        // C63: duplicate value in choice set
+        ["C63"] = new(H + "field Status as choice(\"Open\",\"Open\",\"Closed\") default \"Open\"\n" + S, "Duplicate value"),
+
+        // C64: default value not in choice set
+        ["C64"] = new(H + "field Status as choice(\"Open\",\"Closed\") default \"Pending\"\n" + S, "not a member"),
+
+        // C65: ordinal operator on a choice field that lacks 'ordered'
+        ["C65"] = new(H + "field Status as choice(\"Draft\",\"Active\") default \"Draft\"\n" + S2 +
+            "event Go\nfrom A on Go when Status > \"Active\" -> no transition\n", "ordered' constraint"),
+
+        // C66: ordered on a non-choice type
+        ["C66"] = new(H + "field Name as string nullable ordered\n" + S, "applies only to choice"),
+
+        // C67: ordinal comparison between two choice fields — rank is field-local
+        ["C67"] = new(H + "field Priority as choice(\"Low\",\"High\") default \"Low\" ordered\n" +
+            "field Severity as choice(\"Low\",\"High\") default \"Low\" ordered\n" + S2 +
+            "event Go\nfrom A on Go when Priority > Severity -> no transition\n", "field-local"),
+
+        // C68: literal value not in choice set
+        ["C68"] = new(H + "field Status as choice(\"Open\",\"Closed\") default \"Open\"\n" + S2 +
+            "event Go\nfrom A on Go -> set Status = \"Invalid\" -> no transition\n", "not a member"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state
@@ -602,4 +664,423 @@ public class CatalogDriftTests
         }
         throw new InvalidOperationException("Could not find repo root (Precept.slnx)");
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Type vocabulary drift — Runtime + Grammar + MCP
+    //
+    // Every declarable scalar type must parse as a field type, as a
+    // collection inner type, compile through the MCP tool, and appear
+    // in the TextMate grammar's type-keyword pattern.
+    // See language-surface-sync.instructions.md § Impact Categories.
+    // ════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// All <see cref="PreceptScalarType"/> values that can appear in a
+    /// <c>field X as {type}</c> declaration. Null is internal-only.
+    /// Choice requires special syntax and is tested separately.
+    /// </summary>
+    private static readonly PreceptScalarType[] DeclarableScalarTypes =
+        Enum.GetValues<PreceptScalarType>()
+            .Where(t => t is not PreceptScalarType.Null and not PreceptScalarType.Choice)
+            .ToArray();
+
+    [Theory]
+    [MemberData(nameof(DeclarableScalarTypeData))]
+    public void EveryScalarType_ParsesAsFieldDeclaration(PreceptScalarType type)
+    {
+        var typeName = type.ToString().ToLowerInvariant();
+        var dsl = $"precept DriftTest\nfield X as {typeName} default {DefaultForType(type)}\nstate A initial\n";
+        var (model, diags) = PreceptParser.ParseWithDiagnostics(dsl);
+        diags.Should().BeEmpty($"'field X as {typeName}' must parse without errors");
+        model.Should().NotBeNull();
+    }
+
+    [Theory]
+    [MemberData(nameof(DeclarableScalarTypeData))]
+    public void EveryScalarType_ParsesAsCollectionInnerType(PreceptScalarType type)
+    {
+        var typeName = type.ToString().ToLowerInvariant();
+        var dsl = $"precept DriftTest\nfield Items as set of {typeName}\nstate A initial\n";
+        var (model, diags) = PreceptParser.ParseWithDiagnostics(dsl);
+        diags.Should().BeEmpty($"'set of {typeName}' must parse without errors");
+        model.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void ChoiceType_ParsesAsFieldDeclaration()
+    {
+        var dsl = "precept DriftTest\nfield X as choice(\"A\",\"B\") default \"A\"\nstate A initial\n";
+        var (model, diags) = PreceptParser.ParseWithDiagnostics(dsl);
+        diags.Should().BeEmpty("'field X as choice(...)' must parse without errors");
+        model.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void ChoiceType_ParsesAsCollectionInnerType()
+    {
+        var dsl = "precept DriftTest\nfield Items as set of choice(\"X\",\"Y\")\nstate A initial\n";
+        var (model, diags) = PreceptParser.ParseWithDiagnostics(dsl);
+        diags.Should().BeEmpty("'set of choice(...)' must parse without errors");
+        model.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void GrammarTypeKeywords_CoverAllDeclarableTypes()
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        File.Exists(grammarPath).Should().BeTrue("grammar file must exist");
+
+        var grammarText = File.ReadAllText(grammarPath);
+
+        // Extract the typeKeywords pattern match value
+        var typeKeywordMatch = Regex.Match(grammarText, @"""typeKeywords"".*?""match"":\s*""([^""]+)""", RegexOptions.Singleline);
+        typeKeywordMatch.Success.Should().BeTrue("typeKeywords pattern must exist in grammar");
+
+        var pattern = typeKeywordMatch.Groups[1].Value;
+
+        foreach (var type in DeclarableScalarTypes)
+        {
+            var typeName = type.ToString().ToLowerInvariant();
+            pattern.Should().Contain(typeName,
+                $"TextMate grammar typeKeywords must include '{typeName}'");
+        }
+
+        pattern.Should().Contain("choice",
+            "TextMate grammar typeKeywords must include 'choice'");
+    }
+
+    [Fact]
+    public void GrammarFieldScalarDeclaration_CoversAllSimpleScalarTypes()
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        var grammarText = File.ReadAllText(grammarPath);
+
+        // Extract the fieldScalarDeclaration pattern
+        var match = Regex.Match(grammarText, @"""fieldScalarDeclaration"".*?""match"":\s*""([^""]+)""", RegexOptions.Singleline);
+        match.Success.Should().BeTrue("fieldScalarDeclaration pattern must exist");
+
+        var pattern = match.Groups[1].Value;
+
+        foreach (var type in DeclarableScalarTypes)
+        {
+            var typeName = type.ToString().ToLowerInvariant();
+            pattern.Should().Contain(typeName,
+                $"grammar fieldScalarDeclaration must include '{typeName}' so 'field X as {typeName}' gets structured highlighting");
+        }
+    }
+
+    [Fact]
+    public void GrammarFieldCollectionDeclaration_CoversAllSimpleScalarTypes()
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        var grammarText = File.ReadAllText(grammarPath);
+
+        // Extract the fieldCollectionDeclaration pattern
+        var match = Regex.Match(grammarText, @"""fieldCollectionDeclaration"".*?""match"":\s*""([^""]+)""", RegexOptions.Singleline);
+        match.Success.Should().BeTrue("fieldCollectionDeclaration pattern must exist");
+
+        var pattern = match.Groups[1].Value;
+
+        foreach (var type in DeclarableScalarTypes)
+        {
+            var typeName = type.ToString().ToLowerInvariant();
+            pattern.Should().Contain(typeName,
+                $"grammar fieldCollectionDeclaration must include '{typeName}' so 'set of {typeName}' gets structured highlighting");
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Keyword / operator grammar drift — ALL token categories
+    //
+    // Every token that carries a category with a corresponding grammar
+    // pattern must appear in that pattern's regex.  Dual-category tokens
+    // (e.g. set = Action + Type) must appear in ALL their patterns.
+    // See language-surface-sync.instructions.md § Tooling Impact.
+    // ════════════════════════════════════════════════════════════════════
+
+    private static readonly (TokenCategory Category, string PatternName)[] CategoryGrammarMap =
+    [
+        (TokenCategory.Control, "controlKeywords"),
+        (TokenCategory.Declaration, "declarationKeywords"),
+        (TokenCategory.Grammar, "grammarKeywords"),
+        (TokenCategory.Action, "actionKeywords"),
+        (TokenCategory.Type, "typeKeywords"),
+        (TokenCategory.Constraint, "constraintKeywords"),
+        (TokenCategory.Operator, "operators"),
+        (TokenCategory.Outcome, "outcomeKeywords"),
+        (TokenCategory.Literal, "booleanNull"),
+    ];
+
+    private static readonly (TokenCategory Category, string PatternName)[] KeywordCategoryGrammarMap =
+        CategoryGrammarMap
+            .Where(m => m.PatternName != "operators")
+            .ToArray();
+
+    [Theory]
+    [MemberData(nameof(CategoryGrammarMappingData))]
+    public void Grammar_CategoryKeywords_CoverAllTokensWithThatCategory(
+        TokenCategory category, string grammarPatternName)
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        var grammarText = File.ReadAllText(grammarPath);
+
+        var patternMatches = ExtractGrammarMatchValues(grammarText, grammarPatternName);
+        patternMatches.Should().NotBeEmpty(
+            $"grammar pattern '{grammarPatternName}' must have at least one match value");
+
+        var combinedPattern = string.Join(" ", patternMatches);
+
+        var tokens = PreceptTokenMeta.GetByCategory(category).ToList();
+        tokens.Should().NotBeEmpty($"TokenCategory.{category} must have at least one token");
+
+        var missing = new List<string>();
+        foreach (var token in tokens)
+        {
+            var symbol = PreceptTokenMeta.GetSymbol(token);
+            if (symbol is null) continue;
+
+            if (!SymbolAppearsInPattern(symbol, combinedPattern))
+                missing.Add($"{token} (symbol: '{symbol}')");
+        }
+
+        missing.Should().BeEmpty(
+            $"every token with TokenCategory.{category} must appear in grammar pattern '{grammarPatternName}'");
+    }
+
+    public static IEnumerable<object[]> CategoryGrammarMappingData()
+        => CategoryGrammarMap.Select(m => new object[] { m.Category, m.PatternName });
+
+    [Theory]
+    [MemberData(nameof(KeywordCategoryGrammarMappingData))]
+    public void Grammar_KeywordPattern_ContainsOnlyTokensWithExpectedCategory(
+        TokenCategory category, string grammarPatternName)
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        var grammarText = File.ReadAllText(grammarPath);
+
+        var patternMatches = ExtractGrammarMatchValues(grammarText, grammarPatternName);
+        patternMatches.Should().NotBeEmpty(
+            $"grammar pattern '{grammarPatternName}' must have at least one match value");
+
+        var keywords = ExtractGrammarWordSymbols(patternMatches);
+        keywords.Should().NotBeEmpty(
+            $"grammar pattern '{grammarPatternName}' must contain at least one keyword");
+
+        var mismatches = new List<string>();
+        foreach (var keyword in keywords)
+        {
+            var matchingTokens = Enum.GetValues<PreceptToken>()
+                .Where(token => string.Equals(PreceptTokenMeta.GetSymbol(token), keyword, StringComparison.Ordinal))
+                .ToList();
+
+            if (matchingTokens.Any(token => PreceptTokenMeta.GetCategories(token).Contains(category)))
+                continue;
+
+            var actualCategories = matchingTokens.Count == 0
+                ? "no matching token"
+                : string.Join(" | ", matchingTokens.Select(token =>
+                    $"{token}: [{string.Join(", ", PreceptTokenMeta.GetCategories(token))}]"));
+
+            mismatches.Add($"'{keyword}' => {actualCategories}");
+        }
+
+        mismatches.Should().BeEmpty(
+            $"grammar pattern '{grammarPatternName}' must only contain symbols from TokenCategory.{category}");
+    }
+
+    public static IEnumerable<object[]> KeywordCategoryGrammarMappingData()
+        => KeywordCategoryGrammarMap.Select(m => new object[] { m.Category, m.PatternName });
+
+    /// <summary>
+    /// Extracts all "match" regex strings from a named grammar repository pattern.
+    /// Handles both single-pattern and multi-sub-pattern structures.
+    /// </summary>
+    private static List<string> ExtractGrammarMatchValues(string grammarJson, string patternName)
+    {
+        using var doc = JsonDocument.Parse(grammarJson);
+        var repo = doc.RootElement.GetProperty("repository");
+        var pattern = repo.GetProperty(patternName);
+        var patterns = pattern.GetProperty("patterns");
+
+        var matches = new List<string>();
+        foreach (var p in patterns.EnumerateArray())
+        {
+            if (p.TryGetProperty("match", out var matchProp))
+                matches.Add(matchProp.GetString()!);
+        }
+        return matches;
+    }
+
+    /// <summary>
+    /// Checks whether a token symbol appears in a combined grammar pattern text.
+    /// Strips regex metacharacters before matching to handle compound patterns
+    /// like \bno\s+transition\b where 'no' must be found.
+    /// Uses word-boundary matching for alphabetic symbols to avoid substring false positives
+    /// (e.g. "in" matching inside "initial").
+    /// </summary>
+    private static bool SymbolAppearsInPattern(string symbol, string patternText)
+    {
+        if (symbol.All(char.IsLetterOrDigit))
+        {
+            // Strip regex metacharacters so \bno\s+transition\b becomes "no transition"
+            var stripped = Regex.Replace(patternText, @"\\[bBdDwWsS+*?]", " ");
+            return Regex.IsMatch(stripped, $@"\b{Regex.Escape(symbol)}\b");
+        }
+        return patternText.Contains(symbol);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Reverse drift — grammar patterns must not contain phantom keywords
+    //
+    // Every word in a grammar keyword pattern must map back to a token in
+    // the PreceptToken enum.  Catches keywords added to the grammar but
+    // never implemented in the runtime (e.g. aspirational "if"/"else").
+    // ════════════════════════════════════════════════════════════════════
+
+    private static readonly string[] KeywordPatternNames =
+    [
+        "controlKeywords",
+        "declarationKeywords",
+        "grammarKeywords",
+        "actionKeywords",
+        "typeKeywords",
+        "constraintKeywords",
+        "outcomeKeywords",
+        "booleanNull",
+    ];
+
+    [Theory]
+    [MemberData(nameof(KeywordPatternNameData))]
+    public void Grammar_KeywordPattern_ContainsOnlyRecognizedTokens(string grammarPatternName)
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        var grammarText = File.ReadAllText(grammarPath);
+
+        var patternMatches = ExtractGrammarMatchValues(grammarText, grammarPatternName);
+        patternMatches.Should().NotBeEmpty(
+            $"grammar pattern '{grammarPatternName}' must have at least one match value");
+
+        var allKeywords = ExtractGrammarWordSymbols(patternMatches);
+
+        // Build the set of all known token symbols
+        var knownSymbols = Enum.GetValues<PreceptToken>()
+            .Select(PreceptTokenMeta.GetSymbol)
+            .Where(s => s is not null)
+            .ToHashSet();
+
+        var phantoms = allKeywords.Where(k => !knownSymbols.Contains(k)).ToList();
+
+        phantoms.Should().BeEmpty(
+            $"every keyword in grammar pattern '{grammarPatternName}' must correspond to a token in PreceptToken enum — " +
+            $"phantom keywords have no runtime backing");
+    }
+
+    public static IEnumerable<object[]> KeywordPatternNameData()
+        => KeywordPatternNames.Select(n => new object[] { n });
+
+    private static List<string> ExtractGrammarWordSymbols(IEnumerable<string> patternMatches)
+    {
+        var stripped = string.Join(" ", patternMatches
+            .Select(match => Regex.Replace(match, @"\\[bBdDwWsS+*?]", " ")));
+
+        return Regex.Matches(stripped, @"\b([a-z]+)\b")
+            .Cast<Match>()
+            .Select(match => match.Groups[1].Value)
+            .Distinct()
+            .ToList();
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Reverse drift — operator symbols
+    //
+    // The operators grammar pattern uses symbol characters, not words.
+    // Extract each distinct symbol/word operator and verify it maps to a
+    // token in the enum.
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Grammar_Operators_ContainOnlyRecognizedSymbols()
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        var grammarText = File.ReadAllText(grammarPath);
+
+        var patternMatches = ExtractGrammarMatchValues(grammarText, "operators");
+        patternMatches.Should().NotBeEmpty();
+
+        // Known token symbols from the enum
+        var knownSymbols = Enum.GetValues<PreceptToken>()
+            .Select(PreceptTokenMeta.GetSymbol)
+            .Where(s => s is not null)
+            .ToHashSet();
+
+        var phantoms = new List<string>();
+
+        foreach (var pattern in patternMatches)
+        {
+            // Extract word operators (e.g. and|or|not|contains)
+            foreach (Match m in Regex.Matches(pattern, @"\b([a-z]+)\b"))
+            {
+                var word = m.Groups[1].Value;
+                if (word != "b" && !knownSymbols.Contains(word))
+                    phantoms.Add(word);
+            }
+
+            // Extract multi-char symbol operators (e.g. ==, !=, >=, <=, ->)
+            foreach (Match m in Regex.Matches(pattern, @"([=!><]=|->)"))
+            {
+                if (!knownSymbols.Contains(m.Value))
+                    phantoms.Add(m.Value);
+            }
+
+            // Extract single-char operators from character classes [+\-*/%]
+            foreach (Match m in Regex.Matches(pattern, @"\[([^\]]+)\]"))
+            {
+                foreach (var ch in m.Groups[1].Value.Replace("\\", ""))
+                {
+                    var sym = ch.ToString();
+                    if (sym != "-" || !knownSymbols.Contains(sym)) // \- is escape
+                    {
+                        if (!knownSymbols.Contains(sym))
+                            phantoms.Add(sym);
+                    }
+                }
+            }
+
+            // Extract standalone single-char comparison operators (>|<)
+            foreach (Match m in Regex.Matches(pattern, @"^([><])\|([><])$"))
+            {
+                if (!knownSymbols.Contains(m.Groups[1].Value))
+                    phantoms.Add(m.Groups[1].Value);
+                if (!knownSymbols.Contains(m.Groups[2].Value))
+                    phantoms.Add(m.Groups[2].Value);
+            }
+
+            // Standalone single = (assignment)
+            if (Regex.IsMatch(pattern, @"^=$") && !knownSymbols.Contains("="))
+                phantoms.Add("=");
+        }
+
+        phantoms.Distinct().ToList().Should().BeEmpty(
+            "every operator in the grammar must correspond to a token in PreceptToken enum");
+    }
+
+    public static IEnumerable<object[]> DeclarableScalarTypeData()
+        => DeclarableScalarTypes.Select(t => new object[] { t });
+
+    private static string DefaultForType(PreceptScalarType type) => type switch
+    {
+        PreceptScalarType.String => "\"\"",
+        PreceptScalarType.Number => "0",
+        PreceptScalarType.Boolean => "false",
+        PreceptScalarType.Integer => "0",
+        PreceptScalarType.Decimal => "0.0",
+        _ => throw new ArgumentOutOfRangeException(nameof(type))
+    };
 }

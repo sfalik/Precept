@@ -93,7 +93,7 @@ public enum PreceptToken
     [TokenSymbol("because")]
     Because,
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Declares a state")]
     [TokenSymbol("state")]
     State,
@@ -125,22 +125,22 @@ public enum PreceptToken
 
     // ═══ Keywords: prepositions + modifiers ═══
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("While residing in a state")]
     [TokenSymbol("in")]
     In,
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Crossing into a state")]
     [TokenSymbol("to")]
     To,
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Crossing out of a state")]
     [TokenSymbol("from")]
     From,
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("When an event fires")]
     [TokenSymbol("on")]
     On,
@@ -211,6 +211,16 @@ public enum PreceptToken
     [TokenDescription("Constraint: maximum collection element count")]
     [TokenSymbol("maxcount")]
     Maxcount,
+
+    [TokenCategory(TokenCategory.Constraint)]
+    [TokenDescription("Constraint: maximum decimal places (decimal fields only)")]
+    [TokenSymbol("maxplaces")]
+    Maxplaces,
+
+    [TokenCategory(TokenCategory.Constraint)]
+    [TokenDescription("Constraint: ordinal ordering for choice fields")]
+    [TokenSymbol("ordered")]
+    Ordered,
 
     // ═══ Keywords: actions ═══
 
@@ -293,6 +303,21 @@ public enum PreceptToken
     [TokenDescription("Boolean scalar type")]
     [TokenSymbol("boolean")]
     BooleanType,
+
+    [TokenCategory(TokenCategory.Type)]
+    [TokenDescription("Integer scalar type")]
+    [TokenSymbol("integer")]
+    IntegerType,
+
+    [TokenCategory(TokenCategory.Type)]
+    [TokenDescription("Decimal scalar type — exact base-10 arithmetic")]
+    [TokenSymbol("decimal")]
+    DecimalType,
+
+    [TokenCategory(TokenCategory.Type)]
+    [TokenDescription("Choice type — constrained value set")]
+    [TokenSymbol("choice")]
+    ChoiceType,
 
     [TokenCategory(TokenCategory.Type)]
     [TokenDescription("Queue collection type")]

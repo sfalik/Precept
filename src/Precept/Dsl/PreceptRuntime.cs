@@ -359,7 +359,7 @@ public sealed class PreceptEngine
                 var instanceOnlyContext = BuildEvaluationData(internalData, eventName, null);
                 bool anyGuardPasses = preCheckRows.Any(r =>
                 {
-                    var whenResult = PreceptExpressionRuntimeEvaluator.Evaluate(r.WhenGuard!, instanceOnlyContext);
+                    var whenResult = PreceptExpressionRuntimeEvaluator.Evaluate(r.WhenGuard!, instanceOnlyContext, _fieldMap);
                     return whenResult.Success && whenResult.Value is true;
                 });
                 if (!anyGuardPasses)
@@ -620,8 +620,11 @@ public sealed class PreceptEngine
         return contract.Type switch
         {
             PreceptScalarType.Number => CoerceToNumber(value),
+            PreceptScalarType.Integer => CoerceToInteger(value),
+            PreceptScalarType.Decimal => CoerceToDecimal(value),
             PreceptScalarType.Boolean => CoerceToBoolean(value),
             PreceptScalarType.String => value?.ToString(),
+            PreceptScalarType.Choice => value?.ToString(),
             PreceptScalarType.Null => null,
             _ => value
         };
@@ -632,13 +635,25 @@ public sealed class PreceptEngine
         return element.ValueKind switch
         {
             System.Text.Json.JsonValueKind.String => element.GetString(),
-            System.Text.Json.JsonValueKind.Number => element.GetDouble(),
+            // Distinguish integer vs floating-point JSON numbers
+            System.Text.Json.JsonValueKind.Number => element.TryGetInt64(out var l) ? (object?)l : element.GetDouble(),
             System.Text.Json.JsonValueKind.True => (object?)true,
             System.Text.Json.JsonValueKind.False => false,
             System.Text.Json.JsonValueKind.Null => null,
             System.Text.Json.JsonValueKind.Undefined => null,
             _ => element.GetRawText()
         };
+    }
+
+    private static object? CoerceToInteger(object value)
+    {
+        if (value is long) return value;
+        if (value is int i) return (long)i;
+        if (value is short s) return (long)s;
+        if (value is byte b) return (long)b;
+        if (value is sbyte sb) return (long)sb;
+        if (value is string str && long.TryParse(str, out var l)) return l;
+        return value;
     }
 
     private static object? CoerceToNumber(object value)
@@ -659,6 +674,18 @@ public sealed class PreceptEngine
             if (string.Equals(s, "true", StringComparison.OrdinalIgnoreCase)) return true;
             if (string.Equals(s, "false", StringComparison.OrdinalIgnoreCase)) return false;
         }
+        return value;
+    }
+
+    private static object? CoerceToDecimal(object value)
+    {
+        if (value is decimal) return value;
+        if (value is double d) return (decimal)d;
+        if (value is float f) return (decimal)f;
+        if (value is long l) return (decimal)l;
+        if (value is int i) return (decimal)i;
+        if (value is string str && decimal.TryParse(str, System.Globalization.NumberStyles.Number,
+            System.Globalization.CultureInfo.InvariantCulture, out var parsed)) return parsed;
         return value;
     }
 
@@ -1072,7 +1099,7 @@ public sealed class PreceptEngine
         {
             if (row.WhenGuard is not null)
             {
-                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(row.WhenGuard, evaluationData);
+                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(row.WhenGuard, evaluationData, _fieldMap);
                 if (!guardResult.Success || guardResult.Value is not bool guardBool || !guardBool)
                 {
                     reasons.Add(row.WhenText is not null
@@ -1645,10 +1672,40 @@ public sealed class PreceptEngine
                 error = $"Event argument validation failed: {error}";
                 return false;
             }
+
+            // Choice membership check for event args
+            if (arg.Type == PreceptScalarType.Choice &&
+                value is string argStrVal &&
+                arg.ChoiceValues is not null &&
+                !arg.ChoiceValues.Contains(argStrVal, StringComparer.Ordinal))
+            {
+                error = $"Event argument validation failed: '{argStrVal}' is not a member of choice({string.Join(", ", arg.ChoiceValues.Select(v => $"\"{v}\""))}) for argument '{arg.Name}'.";
+                return false;
+            }
         }
 
         error = null;
         return true;
+    }
+
+    private static bool TryToDecimalValue(object? value, out decimal d)
+    {
+        switch (value)
+        {
+            case decimal dec: d = dec; return true;
+            case double dbl: d = (decimal)dbl; return true;
+            case float flt: d = (decimal)flt; return true;
+            case long l: d = l; return true;
+            case int i: d = i; return true;
+            default: d = default; return false;
+        }
+    }
+
+    private static bool ViolatesMaxplaces(decimal value, int places)
+    {
+        // Count actual decimal places by removing trailing zeros
+        var scale = (int)BitConverter.GetBytes(decimal.GetBits(value)[3])[2];
+        return scale > places;
     }
 
     private bool TryValidateAssignedValue(string dataFieldName, object? value, out string error)
@@ -1659,11 +1716,44 @@ public sealed class PreceptEngine
             return true;
         }
 
-        if (TryValidateScalarValue(contract.Name, contract.Type, contract.IsNullable, value, out error))
-            return true;
+        if (!TryValidateScalarValue(contract.Name, contract.Type, contract.IsNullable, value, out error))
+        {
+            error = $"Data assignment failed: {error}";
+            return false;
+        }
 
-        error = $"Data assignment failed: {error}";
-        return false;
+        if (value is null)
+        {
+            error = string.Empty;
+            return true;
+        }
+
+        // maxplaces constraint check for decimal fields
+        if (contract.Type == PreceptScalarType.Decimal && contract.Constraints is not null)
+        {
+            foreach (var c in contract.Constraints)
+            {
+                if (c is FieldConstraint.Maxplaces mp && TryToDecimalValue(value, out var dv) &&
+                    ViolatesMaxplaces(dv, mp.Places))
+                {
+                    error = $"Data assignment failed: '{contract.Name}' value exceeds maxplaces {mp.Places}.";
+                    return false;
+                }
+            }
+        }
+
+        // Choice membership check
+        if (contract.Type == PreceptScalarType.Choice &&
+            value is string strVal &&
+            contract.ChoiceValues is not null &&
+            !contract.ChoiceValues.Contains(strVal, StringComparer.Ordinal))
+        {
+            error = $"Data assignment failed: '{strVal}' is not a member of choice({string.Join(", ", contract.ChoiceValues.Select(v => $"\"{v}\""))}) for field '{contract.Name}'.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
     }
 
     private static bool TryValidateScalarValue(string name, PreceptScalarType type, bool isNullable, object? value, out string error)
@@ -1685,6 +1775,9 @@ public sealed class PreceptEngine
             PreceptScalarType.String => value is string,
             PreceptScalarType.Boolean => value is bool,
             PreceptScalarType.Number => value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal,
+            PreceptScalarType.Integer => value is long or int or short or byte or sbyte,
+            PreceptScalarType.Decimal => value is decimal or double or float or long or int or short or byte or sbyte,
+            PreceptScalarType.Choice => value is string,
             PreceptScalarType.Null => false,
             _ => false
         };

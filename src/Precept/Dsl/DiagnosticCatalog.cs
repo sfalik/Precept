@@ -468,4 +468,66 @@ public static class DiagnosticCatalog
         "C59", "compile",
         "Default value violates a declared constraint.",
         "Default value '{value}' violates constraint '{constraint}'. The default must satisfy all declared constraints.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Integer type diagnostics (C60–C61)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Narrowing assignment: cannot assign a non-integer numeric value to an integer field without explicit conversion.</summary>
+    public static readonly LanguageConstraint C60 = Register(
+        "C60", "compile",
+        "Narrowing assignment: cannot assign non-integer value to integer field without explicit conversion.",
+        "Narrowing assignment: cannot assign '{actual}' to integer field '{name}' without explicit conversion. An explicit integer conversion function is planned; see documentation.");
+
+    /// <summary>'maxplaces' constraint applies only to decimal fields.</summary>
+    public static readonly LanguageConstraint C61 = Register(
+        "C61", "compile",
+        "'maxplaces' constraint applies only to decimal fields.",
+        "'maxplaces' constraint applies only to decimal fields. Integer fields cannot have fractional precision.");
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Choice type diagnostics (C62–C68)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>choice type requires at least one value.</summary>
+    public static readonly LanguageConstraint C62 = Register(
+        "C62", "compile",
+        "choice type requires at least one value.",
+        "choice type on field '{name}' requires at least one value.");
+
+    /// <summary>Duplicate value in choice set.</summary>
+    public static readonly LanguageConstraint C63 = Register(
+        "C63", "compile",
+        "Duplicate value in choice set.",
+        "Duplicate value '{value}' in choice set for field '{name}'.");
+
+    /// <summary>Default value is not a member of the choice set.</summary>
+    public static readonly LanguageConstraint C64 = Register(
+        "C64", "compile",
+        "Default value is not a member of the choice set.",
+        "Default value '{value}' is not a member of choice({values}) for field '{name}'.");
+
+    /// <summary>Ordinal comparison requires the 'ordered' constraint on the choice field.</summary>
+    public static readonly LanguageConstraint C65 = Register(
+        "C65", "compile",
+        "Ordinal comparison requires the 'ordered' constraint on the choice field.",
+        "Ordinal comparison '{operator}' requires the 'ordered' constraint. Add 'ordered' to the field declaration, or use '==' / '!=' for unordered comparison.");
+
+    /// <summary>'ordered' constraint applies only to choice types.</summary>
+    public static readonly LanguageConstraint C66 = Register(
+        "C66", "compile",
+        "'ordered' constraint applies only to choice types.",
+        "'ordered' constraint applies only to choice types. Field '{name}' is '{type}', not a choice field.");
+
+    /// <summary>Ordinal comparison cannot be applied to two choice fields — ordinal rank is field-local.</summary>
+    public static readonly LanguageConstraint C67 = Register(
+        "C67", "compile",
+        "Ordinal comparison cannot be applied to two choice fields — ordinal rank is field-local.",
+        "Ordinal comparison '{operator}' cannot be applied to two choice fields. Ordinal rank is field-local — the two fields have independent orderings. Use '==' / '!=' to compare choice field values.");
+
+    /// <summary>Literal value is not a member of the choice set.</summary>
+    public static readonly LanguageConstraint C68 = Register(
+        "C68", "compile",
+        "Literal value is not a member of the choice set.",
+        "'{value}' is not a member of choice({values}) for '{name}'.");
 }

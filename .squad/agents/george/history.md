@@ -7,6 +7,24 @@
 
 ## Recent Updates
 
+### 2026-04-11 — Slice 8: sample file updates (integer/decimal/choice)
+- **Commit:** `a7b4fb0` on `feature/wave3-integer-decimal-choice`.
+- **integer samples (3 files):**
+  - `crosswalk-signal.precept`: `CycleCount` and `CountdownSeconds` → `integer`. Clean; `CountdownSeconds = 20/7/0` and `CycleCount + 1` are all integer literals.
+  - `hiring-pipeline.precept`: `FeedbackCount` → `integer`. `FeedbackCount + 1` and `FeedbackCount >= 2` are integer-compatible.
+  - `it-helpdesk-ticket.precept`: `ReopenCount` → `integer`; also added `Priority as choice("Low","Medium","High","Critical") default "Low"` + `in New edit Priority` (covers choice requirement in same file).
+- **decimal samples (3 files):**
+  - `insurance-claim.precept`: `ClaimAmount` and `ApprovedAmount` → `decimal maxplaces 2`. Event args `Submit.Amount` and `Approve.Amount` also updated to `decimal` to satisfy assignment type checking.
+  - `fee-schedule.precept`: `BaseFee`, `DiscountPercent`, `MinimumCharge` → `decimal maxplaces 2`; `TaxRate` → `decimal maxplaces 4` (rate precision differs from currency).
+  - `travel-reimbursement.precept`: `MileageTotal` → `decimal maxplaces 2`; `set MileageTotal = round(Submit.Miles * Submit.Rate, 2)` (second round() sample after event-registration).
+- **choice samples (2 files):**
+  - `customer-profile.precept`: `PreferredContactMethod` → `choice("email","phone","sms") default "email"`. Removed the now-redundant `!= ""` invariant (choice membership structurally enforces non-empty).
+  - `it-helpdesk-ticket.precept`: see above.
+- **Key learnings:**
+  - `truncate()` is NOT a valid expression in the parser despite appearing in the type-checker error hint text. Reverting `EstimatedWaitMinutes` to `number` in restaurant-waitlist was the right call.
+  - `number_literal * 10` (even when one operand is `integer`) produces `number` type because `10` literal is typed as `number`. Only direct integer+integer or integer assignments avoid widening.
+  - When changing a field to `decimal`, all event args that feed into that field via `set` must also be `decimal` (no implicit promotion from `number`).
+
 ### 2026-04-10 — Issue #31 shipped
 - PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
 

@@ -7,7 +7,7 @@ field EmployeeName as string nullable
 field TripDays as number default 1
 field LodgingTotal as number default 0
 field MealsTotal as number default 0
-field MileageTotal as number default 0
+field MileageTotal as decimal default 0 maxplaces 2
 field MileageRate as number default 0.67
 field RequestedTotal as number default 0
 field ApprovedTotal as number default 0
@@ -44,7 +44,7 @@ on Reject assert Note != "" because "A rejection note is required"
 event Pay
 
 # Average lodging per day is checked with division to keep the example realistic.
-from Draft on Submit when Submit.Lodging / Submit.Days <= 350 -> set EmployeeName = Submit.Employee -> set TripDays = Submit.Days -> set LodgingTotal = Submit.Lodging -> set MealsTotal = Submit.Meals -> set MileageTotal = Submit.Miles * Submit.Rate -> set MileageRate = Submit.Rate -> set RequestedTotal = Submit.Lodging + Submit.Meals + (Submit.Miles * Submit.Rate) -> transition Submitted
+from Draft on Submit when Submit.Lodging / Submit.Days <= 350 -> set EmployeeName = Submit.Employee -> set TripDays = Submit.Days -> set LodgingTotal = Submit.Lodging -> set MealsTotal = Submit.Meals -> set MileageTotal = round(Submit.Miles * Submit.Rate, 2) -> set MileageRate = Submit.Rate -> set RequestedTotal = Submit.Lodging + Submit.Meals + (Submit.Miles * Submit.Rate) -> transition Submitted
 from Draft on Submit -> reject "Average lodging per day exceeds the policy cap"
 
 from Submitted on Approve when Approve.Amount <= RequestedTotal -> set ApprovedTotal = Approve.Amount -> set FinanceNote = Approve.Note -> transition Approved
