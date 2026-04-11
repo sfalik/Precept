@@ -6,6 +6,13 @@
 
 ## Recent Updates
 
+### 2026-04-11 — Slices 6+7: Language server completions + grammar verification (conditional `when` guards)
+
+- **Slice 7 (grammar verification):** Confirmed `when` is already in `controlKeywords` in `precept.tmLanguage.json`. All LanguageServer tests pass. Zero grammar changes needed.
+- **Slice 6 (completions):** Added `WhenItem` static completion item in `PreceptAnalyzer.cs`. Updated 3 existing "completed expression" branches (invariant, event assert, state assert) to offer `[WhenItem, BecauseItem]` instead of just `[BecauseItem]`. Added 6 new guard-specific branches: `when` guard-complete → `[BecauseItem]` and `when` guard-in-progress → expression completions for all three assert forms. Added 3 Form 4 branches: `in State when <guard> edit` → field names, `in State when <guard>` (complete) → `[edit]`, `in State when` (in progress) → field completions. Updated `in StateName` action list to include `WhenItem` alongside assert/edit/→.
+- Branch ordering verified: more-specific `when`-containing patterns placed before less-specific base patterns in all four form groups.
+- Build: 0 errors. LanguageServer tests: all pass.
+
 ### 2026-04-11 — Slices 4+5: Language Server completions + grammar (integer/decimal/choice)
 
 - Grammar (`precept.tmLanguage.json`): added `integer|decimal|choice` to `typeKeywords` alternation; added `maxplaces|ordered` to `constraintKeywords`; updated `fieldScalarDeclaration` regex capture group to include `integer|decimal` (choice falls through to generic patterns safely since its `(...)` args are already caught by the string literal pattern).
