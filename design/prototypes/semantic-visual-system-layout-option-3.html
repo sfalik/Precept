@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Precept - Semantic Visual System Layout Option 3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&family=Geist:wght@400;500;600;700&display=swap">
+<style>
+:root {
+  --bg: #040506;
+  --panel: #090b0e;
+  --panel-2: #0d1014;
+  --panel-3: #11151b;
+  --panel-4: #151a24;
+  --line: rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --text: #f1f3f6;
+  --muted: #a7afbb;
+  --soft: #687281;
+  --structure-d: #4338ca;
+  --structure: #6366f1;
+  --state: #a898f5;
+  --event: #30b8e8;
+  --data: #b0bec5;
+  --data-t: #9aa8b5;
+  --data-v: #84929f;
+  --rule: #fbbf24;
+  --valid: #34d399;
+  --warn: #fde047;
+  --violated: #f87171;
+  --mono: "Geist Mono", "Cascadia Code", Consolas, monospace;
+  --sans: "Geist", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(99,102,241,0.12), transparent 24%),
+    radial-gradient(circle at 85% 12%, rgba(48,184,232,0.08), transparent 18%),
+    linear-gradient(180deg, rgba(255,255,255,0.025), transparent 16%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+a {
+  color: inherit;
+}
+
+.page {
+  width: min(1540px, calc(100vw - 40px));
+  margin: 0 auto;
+  padding: 26px 0 96px;
+}
+
+.page-head {
+  display: grid;
+  gap: 22px;
+  padding: 18px 0 36px;
+}
+
+.meta-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  color: var(--soft);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.lead-frame {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+  gap: 1px;
+  border: 1px solid var(--line-strong);
+  background: var(--line);
+}
+
+.lead-copy,
+.lead-map {
+  min-width: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.01));
+}
+
+.lead-copy {
+  padding: 34px 34px 36px;
+  display: grid;
+  gap: 18px;
+}
+
+.lead-map {
+  padding: 28px 28px 30px;
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.eyebrow,
+.kicker,
+.band-meta,
+.mini-label,
+.pill,
+.rail-label,
+.chip,
+.diagram-label,
+.code-bar span,
+.runtime-bar span {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.eyebrow,
+.band-meta,
+.mini-label,
+.rail-label,
+.code-bar span,
+.runtime-bar span {
+  color: var(--soft);
+}
+
+.display-title {
+  margin: 0;
+  max-width: 11ch;
+  font-size: clamp(42px, 7vw, 92px);
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+
+.lead-copy p,
+.summary-card p,
+.editorial-columns p,
+.editorial-note,
+.construct-card p,
+.construct-proof li,
+.sidebar p,
+.spec-note,
+.runtime-copy,
+.layout-callout p,
+.tier-note,
+.note-grid p {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.72;
+  color: var(--muted);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid var(--line);
+  background: var(--line);
+}
+
+.summary-card {
+  display: grid;
+  gap: 8px;
+  padding: 18px 18px 20px;
+  background: var(--panel);
+}
+
+.summary-value {
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tier-map {
+  display: grid;
+  gap: 10px;
+}
+
+.tier-map-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.tier-map-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.tier-letter {
+  color: var(--structure);
+  font-size: 26px;
+  line-height: 1;
+}
+
+.tier-map h2,
+.band-title,
+.section-title,
+.construct-title,
+.sidebar h3,
+.split-head h3,
+.runtime-title,
+.layout-callout h3 {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 40px);
+  line-height: 0.96;
+  letter-spacing: -0.02em;
+}
+
+.band {
+  position: relative;
+  margin-top: 28px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0.01));
+  overflow: hidden;
+}
+
+.band::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 1px;
+  background: linear-gradient(180deg, rgba(99,102,241,0.42), rgba(255,255,255,0.02));
+}
+
+.band-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.015);
+}
+
+.band-shell {
+  padding: 34px 24px 40px;
+}
+
+.tier-a-shell {
+  width: min(910px, calc(100% - 24px));
+  margin: 0 auto;
+}
+
+.tier-b-shell {
+  width: min(1360px, 100%);
+  margin: 0 auto;
+}
+
+.tier-c-shell {
+  width: min(1448px, 100%);
+  margin: 0 auto;
+}
+
+.layout-callout {
+  display: grid;
+  gap: 14px;
+  padding: 20px 22px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(99,102,241,0.24);
+  background: linear-gradient(180deg, rgba(67,56,202,0.16), rgba(9,11,14,0.82));
+}
+
+.layout-callout-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.callout-cell {
+  padding: 12px 14px 14px;
+  border: 1px solid var(--line);
+  background: rgba(4,5,6,0.34);
+}
+
+.callout-cell strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  font-size: clamp(30px, 4vw, 54px);
+}
+
+.editorial-stack {
+  display: grid;
+  gap: 26px;
+}
+
+.editorial-head {
+  display: grid;
+  gap: 14px;
+}
+
+.editorial-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.editorial-note {
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.note-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid var(--line);
+  background: var(--line);
+}
+
+.note-card {
+  padding: 18px;
+  background: var(--panel);
+}
+
+.reference-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 18px;
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(13,16,20,0.98), rgba(9,11,14,1));
+}
+
+.sidebar-list,
+.sidebar-signals,
+.construct-proof {
+  display: grid;
+  gap: 10px;
+}
+
+.sidebar-list a,
+.signal-row,
+.proof-row,
+.rail-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar-list a {
+  padding: 10px 0;
+  text-decoration: none;
+  border-top: 1px solid var(--line);
+  color: var(--text);
+}
+
+.sidebar-list a:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.sidebar-token {
+  color: var(--structure);
+}
+
+.signal-row {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.signal-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.signal-name {
+  color: var(--text);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.signal-value {
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 14px;
+}
+
+.reference-rail {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.rail-toolbar {
+  padding: 0 2px;
+}
+
+.scroll-rail {
+  max-height: 780px;
+  overflow-y: auto;
+  padding-right: 8px;
+  display: grid;
+  gap: 14px;
+}
+
+.scroll-rail::-webkit-scrollbar {
+  width: 10px;
+}
+
+.scroll-rail::-webkit-scrollbar-thumb {
+  background: rgba(99,102,241,0.28);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.construct-card {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.012));
+}
+
+.construct-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.construct-title {
+  font-size: 24px;
+}
+
+.pill,
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+}
+
+.pill {
+  color: var(--soft);
+}
+
+.construct-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 16px;
+}
+
+.construct-slot {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  background: rgba(4,5,6,0.34);
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip--state {
+  color: var(--state);
+  border-color: rgba(168,152,245,0.28);
+}
+
+.chip--event {
+  color: var(--event);
+  border-color: rgba(48,184,232,0.28);
+}
+
+.chip--data {
+  color: var(--data);
+  border-color: rgba(176,190,197,0.24);
+}
+
+.chip--rule {
+  color: var(--rule);
+  border-color: rgba(251,191,36,0.26);
+}
+
+.chip--structure {
+  color: var(--structure);
+  border-color: rgba(99,102,241,0.26);
+}
+
+.proof-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.proof-row {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: rgba(4,5,6,0.4);
+}
+
+.split-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.98fr) minmax(0, 1.02fr);
+  gap: 1px;
+  border: 1px solid var(--line-strong);
+  background: var(--line);
+}
+
+.split-pane {
+  min-width: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.01));
+}
+
+.split-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: start;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.split-body {
+  padding: 18px 20px 20px;
+}
+
+.code-shell,
+.runtime-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.code-frame,
+.runtime-frame,
+.runtime-note,
+.diagram-shell {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(13,16,20,0.98), rgba(9,11,14,1));
+}
+
+.code-bar,
+.runtime-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.018);
+}
+
+pre {
+  margin: 0;
+  padding: 14px 16px 18px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.78;
+  color: #eef3f8;
+}
+
+.s {
+  color: var(--structure-d);
+  font-weight: 700;
+}
+
+.sg {
+  color: var(--structure);
+}
+
+.st {
+  color: var(--state);
+}
+
+.ev {
+  color: var(--event);
+}
+
+.da {
+  color: var(--data);
+}
+
+.dt {
+  color: var(--data-t);
+}
+
+.dv {
+  color: var(--data-v);
+}
+
+.ru {
+  color: var(--rule);
+}
+
+.ok {
+  color: var(--valid);
+}
+
+.no {
+  color: var(--violated);
+}
+
+.diagram-shell {
+  padding: 14px;
+}
+
+.diagram-stage {
+  position: relative;
+  min-height: 540px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, rgba(99,102,241,0.05), transparent 34%),
+    #000;
+}
+
+.diagram-axis {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.diagram-axis::before {
+  content: "";
+  position: absolute;
+  top: 34px;
+  bottom: 34px;
+  left: 50%;
+  width: 1px;
+  background: linear-gradient(180deg, rgba(99,102,241,0.18), rgba(99,102,241,0.02));
+}
+
+.diagram-node,
+.diagram-event {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+
+.diagram-node {
+  min-width: 164px;
+  min-height: 54px;
+  padding: 12px 16px;
+  border: 1px solid rgba(168,152,245,0.34);
+  background: #07090d;
+  color: var(--state);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+
+.diagram-node em {
+  font-style: italic;
+}
+
+.diagram-node--initial::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 999px;
+  background: var(--structure);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.14);
+}
+
+.diagram-node--current {
+  background: #241d37;
+  border-color: rgba(168,152,245,0.48);
+  box-shadow:
+    inset 0 0 0 1px rgba(168,152,245,0.18),
+    0 0 0 1px rgba(99,102,241,0.22);
+  color: #e6dcff;
+}
+
+.diagram-node--terminal::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(168,152,245,0.24);
+}
+
+.diagram-node--past {
+  border-style: dashed;
+  color: rgba(168,152,245,0.55);
+}
+
+.diagram-edge {
+  position: absolute;
+  background: rgba(48,184,232,0.82);
+}
+
+.diagram-edge--v {
+  width: 2px;
+}
+
+.diagram-edge--h {
+  height: 2px;
+}
+
+.diagram-edge--muted {
+  background: rgba(48,184,232,0.34);
+}
+
+.diagram-edge--blocked {
+  background: repeating-linear-gradient(90deg, rgba(48,184,232,0.72) 0 7px, transparent 7px 13px);
+  height: 2px;
+}
+
+.diagram-event {
+  min-height: 26px;
+  padding: 5px 9px;
+  border: 1px solid rgba(48,184,232,0.34);
+  background: rgba(48,184,232,0.05);
+  color: var(--event);
+}
+
+.diagram-event--blocked {
+  border-style: dashed;
+}
+
+.runtime-note {
+  padding: 16px;
+}
+
+.runtime-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.runtime-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.runtime-cell {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: rgba(4,5,6,0.34);
+}
+
+.runtime-state {
+  color: var(--state);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.runtime-state--active {
+  color: #e6dcff;
+}
+
+.tier-note {
+  padding: 14px 16px;
+  border: 1px solid rgba(99,102,241,0.22);
+  background: rgba(67,56,202,0.08);
+}
+
+@media (max-width: 1180px) {
+  .lead-frame,
+  .reference-grid,
+  .construct-grid,
+  .split-grid,
+  .layout-callout-grid,
+  .summary-grid,
+  .note-grid,
+  .runtime-grid,
+  .proof-grid,
+  .editorial-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .scroll-rail {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    width: min(100vw, calc(100vw - 24px));
+    padding: 16px 0 60px;
+  }
+
+  .band-shell,
+  .lead-copy,
+  .lead-map,
+  .split-head,
+  .split-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .band-head,
+  .code-bar,
+  .runtime-bar,
+  .meta-bar {
+    gap: 10px;
+  }
+
+  .display-title,
+  .section-title {
+    max-width: none;
+  }
+
+  .diagram-stage {
+    min-height: 600px;
+  }
+
+  .diagram-node {
+    min-width: 142px;
+  }
+}
+</style>
+</head>
+<body>
+  <main class="page">
+    <header class="page-head">
+      <div class="meta-bar">
+        <span>Precept / Design Prototypes</span>
+        <span>Semantic Visual System / Layout Option 3</span>
+        <span>Three-tier horizontal study</span>
+      </div>
+
+      <section class="lead-frame" aria-label="Prototype overview">
+        <div class="lead-copy">
+          <div class="eyebrow">Semantic Visual System</div>
+          <h1 class="display-title">A Three-Tier Layout For Reading, Scanning, And Proof.</h1>
+          <p>This mock tests a horizontal system for the semantic visual system document rather than rewriting the canonical artifact. The point is to make layout intent legible: editorial sections contract into a centered reading shell, construct reference sections widen into a sidebar plus scanning rail, and specimen pairs expand into a dedicated split surface where authored source can be judged directly against run-time rendering.</p>
+          <div class="summary-grid" aria-label="Option summary">
+            <article class="summary-card">
+              <div class="mini-label">Tier A</div>
+              <div class="summary-value">Centered reading shell</div>
+              <p>Generous prose rhythm for argument, framing, and explanatory passages that need sustained reading.</p>
+            </article>
+            <article class="summary-card">
+              <div class="mini-label">Tier B</div>
+              <div class="summary-value">Sidebar + reference rail</div>
+              <p>Construct galleries move into a scanning posture with stable navigation and a roomy content column.</p>
+            </article>
+            <article class="summary-card">
+              <div class="mini-label">Tier C</div>
+              <div class="summary-value">Dedicated specimen split</div>
+              <p>Design-time and run-time views sit in a controlled seam so translation can be judged at a glance.</p>
+            </article>
+          </div>
+        </div>
+
+        <aside class="lead-map">
+          <div class="eyebrow">Horizontal map</div>
+          <div class="tier-map">
+            <div class="tier-map-row">
+              <div class="tier-letter">A</div>
+              <div>
+                <h2>Editorial</h2>
+                <p>Used when the document is arguing for the system, defining concepts, or setting the semantic contract.</p>
+              </div>
+            </div>
+            <div class="tier-map-row">
+              <div class="tier-letter">B</div>
+              <div>
+                <h2>Reference</h2>
+                <p>Used when readers need orientation, construct-by-construct comparison, and repeated scanning passes.</p>
+              </div>
+            </div>
+            <div class="tier-map-row">
+              <div class="tier-letter">C</div>
+              <div>
+                <h2>Specimen</h2>
+                <p>Used where the document must prove that authored meaning survives translation into a runtime surface.</p>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </section>
+    </header>
+
+    <section class="band" aria-labelledby="tier-a-title">
+      <div class="band-head">
+        <span class="band-meta">Tier A / Editorial section / centered shell</span>
+        <span class="band-meta">Narrow reading width / high prose rhythm</span>
+      </div>
+      <div class="band-shell">
+        <div class="tier-a-shell">
+          <div class="layout-callout">
+            <div class="kicker">Horizontal behavior</div>
+            <h3>The shell deliberately contracts inside the band so the page signals “read” rather than “scan.”</h3>
+            <div class="layout-callout-grid">
+              <div class="callout-cell">
+                <div class="mini-label">Width logic</div>
+                <strong>Centered at editorial measure</strong>
+              </div>
+              <div class="callout-cell">
+                <div class="mini-label">Primary job</div>
+                <strong>State the semantic thesis clearly</strong>
+              </div>
+              <div class="callout-cell">
+                <div class="mini-label">Visual cue</div>
+                <strong>Quiet band, stronger prose cadence</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="editorial-stack">
+            <div class="editorial-head">
+              <div class="eyebrow">Editorial intro</div>
+              <h2 class="section-title" id="tier-a-title">The Semantic World of Precept</h2>
+            </div>
+
+            <div class="editorial-columns">
+              <p>Precept governs the integrity of a business entity’s data and configuration under declared rules. The semantic visual system governs how that governed integrity is read. It establishes a stable visual law for Structure, State, Event, Data, and Rule so a reader can move between authored source, diagrams, forms, and explanation without relearning what each construct means.</p>
+              <p>The contract is continuity, not uniformity. Surface form may adapt to the needs of reading, but construct identity stays fixed. Editorial passages therefore need a narrower shell than the galleries that follow: this tier is where the document makes the argument, states the boundary between authored meaning and run-time verdicts, and sets the expectation that depiction may change while meaning does not.</p>
+            </div>
+
+            <p class="editorial-note">In the current canonical file, long-form narrative and wide specimen material often live inside the same broad sectional rhythm. This option separates them horizontally so conceptual reading can breathe before the document widens into reference behavior.</p>
+
+            <div class="note-grid" aria-label="Editorial summary">
+              <article class="note-card">
+                <div class="mini-label">Authored meaning</div>
+                <p>Five authored constructs remain the stable cast: Structure, State, Event, Data, and Rule.</p>
+              </article>
+              <article class="note-card">
+                <div class="mini-label">Run-time evaluation</div>
+                <p>Verdicts and live status report evaluation without replacing the authored construct being read.</p>
+              </article>
+              <article class="note-card">
+                <div class="mini-label">Cross-surface contract</div>
+                <p>The same construct must stay recognizable across definition, state diagram, data form, and explanation.</p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="tier-b-title">
+      <div class="band-head">
+        <span class="band-meta">Tier B / Reference gallery / sidebar-content pattern</span>
+        <span class="band-meta">Wider shell / stable nav / scrollable rail</span>
+      </div>
+      <div class="band-shell">
+        <div class="tier-b-shell">
+          <div class="layout-callout">
+            <div class="kicker">Horizontal behavior</div>
+            <h3>Reference sections widen into a sidebar plus a content rail so repeated scanning does not fight editorial measure.</h3>
+            <div class="layout-callout-grid">
+              <div class="callout-cell">
+                <div class="mini-label">Sidebar</div>
+                <strong>Orientation and signal legend</strong>
+              </div>
+              <div class="callout-cell">
+                <div class="mini-label">Content rail</div>
+                <strong>Roomy, vertically scrollable construct stack</strong>
+              </div>
+              <div class="callout-cell">
+                <div class="mini-label">Reason</div>
+                <strong>Lets repeated gallery patterns stay legible</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="reference-grid">
+            <aside class="sidebar">
+              <div>
+                <div class="eyebrow">Reference rail</div>
+                <h3 id="tier-b-title">Construct galleries</h3>
+                <p>This tier assumes a reader is navigating deliberately. The left rail keeps orientation, shared rules, and channel meaning visible while the right rail can become tall, repetitive, and scannable without losing structure.</p>
+              </div>
+
+              <nav class="sidebar-list" aria-label="Construct index">
+                <a href="#structure-card"><span>Structure</span><span class="sidebar-token">01</span></a>
+                <a href="#state-card"><span>State</span><span class="sidebar-token">02</span></a>
+                <a href="#event-card"><span>Event</span><span class="sidebar-token">03</span></a>
+                <a href="#data-card"><span>Data</span><span class="sidebar-token">04</span></a>
+                <a href="#rule-card"><span>Rule</span><span class="sidebar-token">05</span></a>
+              </nav>
+
+              <div>
+                <div class="eyebrow">Signal channels</div>
+                <div class="sidebar-signals">
+                  <div class="signal-row"><span class="signal-name">Colour</span><span class="signal-value">Construct family</span></div>
+                  <div class="signal-row"><span class="signal-name">Typography</span><span class="signal-value">Mono for governed identity</span></div>
+                  <div class="signal-row"><span class="signal-name">Form</span><span class="signal-value">Shape + border logic</span></div>
+                  <div class="signal-row"><span class="signal-name">Layout</span><span class="signal-value">Order, grouping, emphasis</span></div>
+                </div>
+              </div>
+
+              <div class="tier-note">
+                The trade is intentional: this tier gives up editorial calm in exchange for faster comparative reading.
+              </div>
+            </aside>
+
+            <div class="reference-rail">
+              <div class="rail-toolbar">
+                <span class="rail-label">Roomy content rail</span>
+                <span class="rail-label">Shared construct template / identity / modifiers / proof</span>
+              </div>
+
+              <div class="scroll-rail">
+                <article class="construct-card" id="structure-card">
+                  <div class="construct-head">
+                    <div>
+                      <div class="eyebrow">01 / Core construct</div>
+                      <h3 class="construct-title">Structure</h3>
+                    </div>
+                    <span class="pill">Grammar scaffold</span>
+                  </div>
+                  <div class="construct-grid">
+                    <div class="construct-slot">
+                      <div class="mini-label">Role</div>
+                      <p>Structure is the ambient law of the page: declaration language, group frames, and the indigo scaffolding that tells a reader where meaning is organized.</p>
+                      <div class="chip-row">
+                        <span class="chip chip--structure">precept</span>
+                        <span class="chip chip--structure">state</span>
+                        <span class="chip chip--structure">from ... on</span>
+                      </div>
+                    </div>
+                    <div class="construct-slot">
+                      <div class="mini-label">Cross-surface proof</div>
+                      <div class="construct-proof">
+                        <div class="proof-row"><span>Editor</span><span>keyword grammar</span></div>
+                        <div class="proof-row"><span>Diagram</span><span>frame and grouping</span></div>
+                        <div class="proof-row"><span>Data form</span><span>panel divisions</span></div>
+                        <div class="proof-row"><span>Docs</span><span>section rails</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="construct-card" id="state-card">
+                  <div class="construct-head">
+                    <div>
+                      <div class="eyebrow">02 / Core construct</div>
+                      <h3 class="construct-title">State</h3>
+                    </div>
+                    <span class="pill">Lifecycle coordinate</span>
+                  </div>
+                  <div class="construct-grid">
+                    <div class="construct-slot">
+                      <div class="mini-label">Modifier logic</div>
+                      <p>State keeps its violet identity while additive signals report initial, terminal, current, constrained, or unreachable status. The modifier never replaces the base construct.</p>
+                      <div class="chip-row">
+                        <span class="chip chip--state">Requested</span>
+                        <span class="chip chip--state"><em>ReadyForPickup</em></span>
+                        <span class="chip chip--state">PickedUp</span>
+                      </div>
+                    </div>
+                    <div class="construct-slot">
+                      <div class="mini-label">Reading promise</div>
+                      <p>A reader should recognize a state name in code, a node in a diagram, and a current-state indicator in runtime as the same semantic thing.</p>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="construct-card" id="event-card">
+                  <div class="construct-head">
+                    <div>
+                      <div class="eyebrow">03 / Core construct</div>
+                      <h3 class="construct-title">Event</h3>
+                    </div>
+                    <span class="pill">Directed action</span>
+                  </div>
+                  <div class="construct-grid">
+                    <div class="construct-slot">
+                      <div class="mini-label">Base depiction</div>
+                      <p>Events are cyan named actions. They read as clauses in authored source and as directed labels or rows when runtime behavior is rendered.</p>
+                      <div class="chip-row">
+                        <span class="chip chip--event">ApproveRequest</span>
+                        <span class="chip chip--event">PrintBadge</span>
+                        <span class="chip chip--event">Expire</span>
+                      </div>
+                    </div>
+                    <div class="construct-slot">
+                      <div class="mini-label">Outcome variants</div>
+                      <p>Live, blocked, unmatched, or rejected event outcomes belong to the runtime layer. They annotate event behavior while event identity stays stable.</p>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="construct-card" id="data-card">
+                  <div class="construct-head">
+                    <div>
+                      <div class="eyebrow">04 / Core construct</div>
+                      <h3 class="construct-title">Data</h3>
+                    </div>
+                    <span class="pill">Governed configuration</span>
+                  </div>
+                  <div class="construct-grid">
+                    <div class="construct-slot">
+                      <div class="mini-label">Identity</div>
+                      <p>Data names, types, and values form a three-part reading pattern. The field remains the semantic anchor; type and value support that reading without overshadowing it.</p>
+                      <div class="chip-row">
+                        <span class="chip chip--data">VisitorName</span>
+                        <span class="chip chip--data">HostConfirmed</span>
+                        <span class="chip chip--data">OutcomeNote</span>
+                      </div>
+                    </div>
+                    <div class="construct-slot">
+                      <div class="mini-label">Operational emphasis</div>
+                      <p>Editable, required, constrained, or violated states belong here because data is what governance most often acts upon.</p>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="construct-card" id="rule-card">
+                  <div class="construct-head">
+                    <div>
+                      <div class="eyebrow">05 / Core construct</div>
+                      <h3 class="construct-title">Rule</h3>
+                    </div>
+                    <span class="pill">Constraint language</span>
+                  </div>
+                  <div class="construct-grid">
+                    <div class="construct-slot">
+                      <div class="mini-label">Base depiction</div>
+                      <p>Rules enter the system as named logic and because/reject language. They read as explicit pressure on what configurations may exist.</p>
+                      <div class="chip-row">
+                        <span class="chip chip--rule">because</span>
+                        <span class="chip chip--rule">reject</span>
+                        <span class="chip chip--rule">assert</span>
+                      </div>
+                    </div>
+                    <div class="construct-slot">
+                      <div class="mini-label">Verdict boundary</div>
+                      <p>When a rule fires, the resulting satisfied or violated callout is a runtime verdict overlay, not a new authored construct family.</p>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="tier-c-title">
+      <div class="band-head">
+        <span class="band-meta">Tier C / Specimen pair / dedicated split layout</span>
+        <span class="band-meta">Wide seam / direct design-time vs run-time comparison</span>
+      </div>
+      <div class="band-shell">
+        <div class="tier-c-shell">
+          <div class="layout-callout">
+            <div class="kicker">Horizontal behavior</div>
+            <h3>The specimen tier spends width on a hard split so authored law and rendered consequence can be judged in one glance.</h3>
+            <div class="layout-callout-grid">
+              <div class="callout-cell">
+                <div class="mini-label">Left pane</div>
+                <strong>Definition / authored source</strong>
+              </div>
+              <div class="callout-cell">
+                <div class="mini-label">Right pane</div>
+                <strong>Runtime / rendered state snapshot</strong>
+              </div>
+              <div class="callout-cell">
+                <div class="mini-label">Reading job</div>
+                <strong>Prove translation, not just describe it</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="split-grid">
+            <section class="split-pane">
+              <div class="split-head">
+                <div>
+                  <div class="eyebrow">Definition</div>
+                  <h3 id="tier-c-title">VisitorBadgePickup</h3>
+                </div>
+                <span class="pill">Design-time specimen</span>
+              </div>
+              <div class="split-body">
+                <div class="code-shell">
+                  <div class="tier-note">This pane is intentionally generous enough for authored rhythm and token color to stay legible without collapsing into a narrow code column.</div>
+                  <div class="code-frame">
+                    <div class="code-bar">
+                      <span>shared specimen</span>
+                      <span>state workflow / compile-valid excerpt</span>
+                    </div>
+                    <pre><span class="s">precept</span> VisitorBadgePickup
+
+<span class="s">field</span> <span class="da">VisitorName</span> <span class="sg">as</span> <span class="dt">string</span> <span class="sg">nullable</span>
+<span class="s">field</span> <span class="da">HostConfirmed</span> <span class="sg">as</span> <span class="dt">boolean</span> <span class="sg">default</span> <span class="dv">false</span>
+<span class="s">field</span> <span class="da">BadgePrinted</span> <span class="sg">as</span> <span class="dt">boolean</span> <span class="sg">default</span> <span class="dv">false</span>
+<span class="s">field</span> <span class="da">PickupWindowOpen</span> <span class="sg">as</span> <span class="dt">boolean</span> <span class="sg">default</span> <span class="dv">true</span>
+
+<span class="s">state</span> <span class="st">Requested</span> <span class="sg">initial</span>
+<span class="s">state</span> <span class="st">Approved</span>
+<span class="s">state</span> <span class="st">ReadyForPickup</span>
+<span class="s">state</span> <span class="st">PickedUp</span>
+<span class="s">state</span> <span class="st">Expired</span>
+<span class="s">state</span> <span class="st">Cancelled</span>
+
+<span class="s">in</span> <span class="st"><em>ReadyForPickup</em></span> <span class="s">assert</span> <span class="da">BadgePrinted</span>
+    <span class="s">because</span> <span class="ru">"Ready badges must already be printed"</span>
+
+<span class="s">event</span> <span class="ev">ApproveRequest</span> <span class="sg">with</span> <span class="da">Name</span> <span class="sg">as</span> <span class="dt">string</span>
+<span class="s">event</span> <span class="ev">PrintBadge</span>
+<span class="s">event</span> <span class="ev">PickUp</span>
+<span class="s">event</span> <span class="ev">Expire</span>
+
+<span class="s">from</span> <span class="st">Requested</span> <span class="s">on</span> <span class="ev">ApproveRequest</span>
+    -&gt; <span class="s">transition</span> <span class="st">Approved</span>
+<span class="s">from</span> <span class="st">Approved</span> <span class="s">on</span> <span class="ev">PrintBadge</span>
+    -&gt; <span class="s">transition</span> <span class="st">ReadyForPickup</span>
+<span class="s">from</span> <span class="st">ReadyForPickup</span> <span class="s">on</span> <span class="ev">PickUp</span> <span class="s">when</span> <span class="da">PickupWindowOpen</span>
+    -&gt; <span class="s">transition</span> <span class="st">PickedUp</span>
+<span class="s">from</span> <span class="st">ReadyForPickup</span> <span class="s">on</span> <span class="ev">Expire</span> <span class="s">when</span> <span class="da">PickupWindowOpen</span> == <span class="dv">false</span>
+    -&gt; <span class="s">transition</span> <span class="st">Expired</span></pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="split-pane">
+              <div class="split-head">
+                <div>
+                  <div class="eyebrow">Runtime</div>
+                  <h3>Snapshot After PrintBadge</h3>
+                </div>
+                <span class="pill">Rendered state review</span>
+              </div>
+              <div class="split-body">
+                <div class="runtime-shell">
+                  <div class="tier-note">The right pane uses the extra width for a diagram stage, event labels, and a compact runtime summary instead of squeezing everything into a tall editorial column.</div>
+
+                  <div class="runtime-frame">
+                    <div class="runtime-bar">
+                      <span>current state / <em>ReadyForPickup</em></span>
+                      <span>PickUp live / Expire blocked</span>
+                    </div>
+                    <div class="diagram-shell">
+                      <div class="diagram-stage" aria-label="Runtime state diagram for VisitorBadgePickup">
+                        <div class="diagram-axis" aria-hidden="true"></div>
+
+                        <div class="diagram-edge diagram-edge--v diagram-edge--muted" style="left: calc(50% - 1px); top: 86px; height: 52px;"></div>
+                        <div class="diagram-edge diagram-edge--v diagram-edge--muted" style="left: calc(50% - 1px); top: 230px; height: 52px;"></div>
+                        <div class="diagram-edge diagram-edge--h diagram-edge--muted" style="left: calc(50% + 82px); top: 255px; width: 92px;"></div>
+                        <div class="diagram-edge diagram-edge--v" style="left: calc(50% - 1px); top: 374px; height: 30px;"></div>
+                        <div class="diagram-edge diagram-edge--h" style="left: calc(50% - 126px); top: 404px; width: 126px;"></div>
+                        <div class="diagram-edge diagram-edge--h diagram-edge--blocked" style="left: calc(50% + 1px); top: 404px; width: 126px;"></div>
+                        <div class="diagram-edge diagram-edge--v" style="left: calc(50% - 126px); top: 404px; height: 44px;"></div>
+                        <div class="diagram-edge diagram-edge--v" style="left: calc(50% + 126px); top: 404px; height: 44px;"></div>
+
+                        <div class="diagram-event" style="left: calc(50% - 56px); top: 106px;">ApproveRequest</div>
+                        <div class="diagram-event" style="left: calc(50% - 42px); top: 250px;">PrintBadge</div>
+                        <div class="diagram-event" style="left: calc(50% - 220px); top: 390px;">PickUp</div>
+                        <div class="diagram-event diagram-event--blocked" style="left: calc(50% + 132px); top: 390px;">Expire</div>
+                        <div class="diagram-event" style="left: calc(50% + 126px); top: 229px;">Cancel</div>
+
+                        <div class="diagram-node diagram-node--initial diagram-node--past" style="left: calc(50% - 82px); top: 32px;">Requested</div>
+                        <div class="diagram-node diagram-node--past" style="left: calc(50% - 82px); top: 176px;">Approved</div>
+                        <div class="diagram-node diagram-node--current" style="left: calc(50% - 82px); top: 320px;"><em>ReadyForPickup</em></div>
+                        <div class="diagram-node diagram-node--terminal diagram-node--past" style="left: calc(50% + 174px); top: 176px;">Cancelled</div>
+                        <div class="diagram-node diagram-node--terminal" style="left: calc(50% - 252px); top: 448px;">PickedUp</div>
+                        <div class="diagram-node diagram-node--terminal diagram-node--past" style="left: calc(50% + 82px); top: 448px;">Expired</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <aside class="runtime-note">
+                    <div class="runtime-copy">
+                      <div class="eyebrow">Runtime readout</div>
+                      <div class="runtime-title">One snapshot, three simultaneous truths</div>
+                      <div class="runtime-grid">
+                        <div class="runtime-cell">
+                          <div class="mini-label">Current</div>
+                          <div class="runtime-state runtime-state--active"><em>ReadyForPickup</em></div>
+                          <p>Currentness is additive: the state stays violet and gains emphasis rather than changing semantic family.</p>
+                        </div>
+                        <div class="runtime-cell">
+                          <div class="mini-label">Live next event</div>
+                          <div class="runtime-state">PickUp</div>
+                          <p>The cyan event remains an event; the live branch is shown by stronger edge treatment and direct position.</p>
+                        </div>
+                        <div class="runtime-cell">
+                          <div class="mini-label">Blocked alternate</div>
+                          <div class="runtime-state">Expire</div>
+                          <p>Blocked status is reported by dashed treatment while the authored event and target state remain intact.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </aside>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
