@@ -27,6 +27,23 @@ internal static class PreceptExpressionRuntimeEvaluator
 
     private static EvaluationResult EvaluateIdentifier(PreceptIdentifierExpression identifier, IReadOnlyDictionary<string, object?> context)
     {
+        // Handle three-level dotted form: EventName.ArgName.length (e.g. Submit.Name.length)
+        if (identifier.Member is not null && identifier.SubMember is not null)
+        {
+            if (identifier.SubMember == "length")
+            {
+                var argKey = $"{identifier.Name}.{identifier.Member}";
+                if (!context.TryGetValue(argKey, out var argStrObj))
+                    return EvaluationResult.Fail($"data key '{argKey}' was not provided.");
+                if (argStrObj is null)
+                    return EvaluationResult.Fail($"'{argKey}.length' failed: arg is null.");
+                if (argStrObj is string argStr)
+                    return EvaluationResult.Ok((double)argStr.Length);
+                return EvaluationResult.Fail($"'{argKey}' is not a string.");
+            }
+            return EvaluationResult.Fail($"unsupported sub-member '{identifier.SubMember}'.");
+        }
+
         // Handle collection property access: Collection.count, Collection.min, Collection.max, Collection.peek
         if (identifier.Member is not null)
         {

@@ -9,6 +9,16 @@
 
 ## Recent Updates
 
+### 2026-04-10 — Structural lifecycle modifiers: second pass (expanded modifier space)
+- Produced comprehensive second pass at `research/language/expressiveness/structural-lifecycle-modifiers.md`.
+- **Scope expansion:** Added 10 event modifier candidates (`entry`, `advancing`, `settling`, `irreversible`, `universal`, `isolated`, `guarded`, `total`, `completing`, `symmetric`), 8 field modifier candidates (`writeonce`, `identity`, `monotonic`, `sensitive`, `derived`, `immutable`, `sealed after <State>`, `audit`), and 6 additional state modifier candidates (`error`, `resting`, `decision`, `guarded` on incoming transitions, `absorbing`, `convergent`).
+- **Key insight reversal:** First pass concluded "event modifiers constrain behavioral properties requiring runtime state." Second pass disproves this — events have rich graph-structural properties (source scope, outcome shape, target scope) that are fully compile-time provable from declared transition rows. The error was conflating "event modifier" with "event firing-history modifier."
+- **Strongest new candidates (Tier 1 additions):** `entry` (intake event pattern), `advancing`/`settling` (routing vs mutation dichotomy), `isolated` (single-state scope), `writeonce` (intake-data immutability), `sealed after <State>` (lifecycle-phase freeze point), `guarded` on states (entry safety).
+- **Most impactful discovery:** The `advancing`/`settling` split is the single most valuable modifier concept — it captures a fundamental domain distinction (routing events vs data-collection events) visible in every sample.
+- **Cross-cutting findings:** Four modifier roles identified (structural constraint, intent declaration, tooling directive, feature gate). Recommended Option C: modifiers must be either compile-time verifiable OR tooling-actionable.
+- **Philosophical question surfaced:** Does the project accept tooling-directive modifiers (`sensitive`, `audit`) or restrict to compile-time-provable properties? Recommended Option C as position; flagged for Shane's decision.
+- Updated recommendation tiers: 8 Tier 1 candidates, 14 Tier 2 candidates, 12 Tier 3 (reject/defer).
+
 ### 2026-04-10 — Structural lifecycle modifiers research
 - Produced comprehensive research document at `research/language/expressiveness/structural-lifecycle-modifiers.md`.
 - **Taxonomy:** Mapped 5 modifier categories (boundary, path, residency, cardinality, safety) covering 6 candidate modifiers: `terminal`, `required`/`milestone`, `transient`, `final`, `once`, `idempotent`.

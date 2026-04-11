@@ -40,19 +40,17 @@ public class StringAccessorTests
     }
 
     [Fact]
-    public void Parse_EventArgLength_InEventAssert_ParsesWithoutError()
+    public void Parse_ThreeLevel_EventArgLength_AcceptsForm()
     {
-        // Field .length in invariant scope. 
-        // NOTE: on-assert scope only allows event-arg identifiers; field .length belongs in invariant.
-        // Three-level event-arg form (Submit.Name.length) requires future parser work.
+        // Three-level dotted form: Submit.Name.length where Submit = event, Name = arg, .length = accessor.
         const string dsl = """
             precept M
-            field Name as string default "Alice"
-            invariant Name.length >= 2 because "Name too short"
+            field Name as string default "x"
             state A initial
             state B
-            event Submit
-            from A on Submit -> transition B
+            event Submit with Name as string
+            from A on Submit when Submit.Name.length >= 3 -> transition B
+            from A on Submit -> reject "too short"
             """;
 
         var act = () => PreceptParser.Parse(dsl);
@@ -88,18 +86,17 @@ public class StringAccessorTests
     }
 
     [Fact]
-    public void Check_Length_OnNonNullableStringField_InEventAssert_NoDiagnostic()
+    public void Check_ThreeLevel_EventArgLength_NonNullable_NoDiagnostic()
     {
-        // Field .length in invariant scope (on-assert scope is event-args only).
-        // NOTE: Three-level event-arg form (Submit.Name.length) requires future parser work.
+        // Three-level dotted form on a non-nullable string arg: no C56 expected.
         const string dsl = """
             precept M
-            field Name as string default "Alice"
-            invariant Name.length >= 2 because "Name too short"
+            field Name as string default "x"
             state A initial
             state B
-            event Submit
-            from A on Submit -> transition B
+            event Submit with Name as string
+            from A on Submit when Submit.Name.length >= 2 -> transition B
+            from A on Submit -> reject "too short"
             """;
 
         var result = Check(dsl);
@@ -227,6 +224,72 @@ public class StringAccessorTests
 
         result.Diagnostics.Should().BeEmpty();
     }
+
+    [Fact]
+    public void Check_Length_OnNullableStringField_InInvariantScope_ProducesC56()
+    {
+        // Regression guard: C56 must fire in invariant scope as well as guard scope.
+        // If Name.length symbol is missing from invariant symbols, TryInferKind emits C38
+        // (unknown identifier) instead of C56 — this test distinguishes the two.
+        const string dsl = """
+            precept M
+            field Name as string nullable
+            state A initial
+            invariant Name.length > 0 because "Name required"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C56");
+        result.Diagnostics[0].DiagnosticCode.Should().Be("PRECEPT056");
+    }
+
+    [Fact]
+    public void Check_ThreeLevel_NullableEventArg_WithoutGuard_ProducesC56()
+    {
+        // Submit.Name.length on a nullable string arg without null guard must emit C56.
+        const string dsl = """
+            precept M
+            field Name as string default "x"
+            state A initial
+            state B
+            event Submit with Name as string nullable
+            from A on Submit when Submit.Name.length >= 2 -> transition B
+            from A on Submit -> reject "blocked"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C56");
+        result.Diagnostics[0].DiagnosticCode.Should().Be("PRECEPT056");
+    }
+
+    [Fact]
+    public void Check_ThreeLevel_NullableEventArg_WithNullGuard_NoC56()
+    {
+        // Submit.Name != null and Submit.Name.length >= 2: null guard on event arg narrows
+        // before .length is evaluated — C56 must not be emitted.
+        const string dsl = """
+            precept M
+            field Name as string default "x"
+            state A initial
+            state B
+            event Submit with Name as string nullable
+            from A on Submit when Submit.Name != null and Submit.Name.length >= 2 -> transition B
+            from A on Submit -> reject "blocked"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    // NOTE: Event args (Submit.Name) are not accessible in invariant scope — invariants operate
+    // exclusively on fields. A three-level dotted form in an invariant would produce a parse or
+    // type error. No test added here; field-level invariant C56 coverage is in
+    // Check_Length_OnNullableStringField_InInvariantScope_ProducesC56.
 
     // ========================================================================================
     // RUNTIME TESTS — string value semantics
@@ -517,6 +580,37 @@ public class StringAccessorTests
 
         fire.Outcome.Should().Be(TransitionOutcome.Transition);
         fire.NewState.Should().Be("StandardReview");
+    }
+
+    [Theory]
+    [InlineData("Bob", true)]   // length 3, satisfies Submit.Name.length >= 3 → transition
+    [InlineData("Bo", false)]   // length 2, does not satisfy → fallback reject
+    public void Fire_ThreeLevel_EventArgLength_GuardRouting(string name, bool shouldTransition)
+    {
+        // Three-level dotted form used as a guard condition routing on event-arg string length.
+        const string dsl = """
+            precept M
+            field Name as string default "x"
+            state A initial
+            state B
+            event Submit with Name as string
+            from A on Submit when Submit.Name.length >= 3 -> transition B
+            from A on Submit -> reject "too short"
+            """;
+
+        var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var instance = workflow.CreateInstance("A");
+        var fire = workflow.Fire(instance, "Submit", new Dictionary<string, object?> { ["Name"] = name });
+
+        if (shouldTransition)
+        {
+            fire.Outcome.Should().Be(TransitionOutcome.Transition);
+            fire.NewState.Should().Be("B");
+        }
+        else
+        {
+            fire.Outcome.Should().Be(TransitionOutcome.Rejected);
+        }
     }
 
     // ========================================================================================

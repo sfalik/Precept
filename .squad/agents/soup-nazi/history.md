@@ -6,6 +6,13 @@
 
 ## Recent Updates
 
+### 2026-04-10 — Issue #10: three-level dotted form tests written
+- Unlocked 2 deferred parser/type-checker tests in `StringAccessorTests.cs` (converted from placeholder invariant-field forms to actual `Submit.Name.length` guard forms): `Parse_ThreeLevel_EventArgLength_AcceptsForm`, `Check_ThreeLevel_EventArgLength_NonNullable_NoDiagnostic`.
+- Added 3 new tests: `Check_ThreeLevel_NullableEventArg_WithoutGuard_ProducesC56` (C56 on nullable event arg — the critical path), `Check_ThreeLevel_NullableEventArg_WithNullGuard_NoC56` (null narrowing removes C56), `Fire_ThreeLevel_EventArgLength_GuardRouting` ([Theory], 2 cases: "Bob" → Transition, "Bo" → Rejected).
+- Invariant scope skipped with note: event args are not accessible in invariant scope.
+- Runtime arg key format confirmed: `["Name"] = value` (arg name only, no event prefix).
+- Decision filed: `.squad/decisions/inbox/soup-nazi-issue10-three-level-tests.md`.
+
 ### 2026-04-10 — Issue #10: string .length accessor test file authored
 - Created `test/Precept.Tests/StringAccessorTests.cs` (23 tests) covering all Issue #10 acceptance criteria.
 - **Test categories:** parser (2), type checker (7 incl. C56/PRECEPT056 and null narrowing), runtime value semantics (4 incl. UTF-16 emoji), null-guard compound evaluation (4), invariant context (2), event assert context (2), guard routing (2), regression (1).

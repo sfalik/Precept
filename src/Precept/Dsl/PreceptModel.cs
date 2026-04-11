@@ -70,7 +70,7 @@ public abstract record PreceptExpression;
 
 public sealed record PreceptLiteralExpression(object? Value) : PreceptExpression;
 
-public sealed record PreceptIdentifierExpression(string Name, string? Member = null) : PreceptExpression;
+public sealed record PreceptIdentifierExpression(string Name, string? Member = null, string? SubMember = null) : PreceptExpression;
 
 public sealed record PreceptUnaryExpression(string Operator, PreceptExpression Operand) : PreceptExpression;
 
