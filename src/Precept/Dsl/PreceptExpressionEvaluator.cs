@@ -12,16 +12,20 @@ internal static class PreceptExpressionRuntimeEvaluator
         internal static EvaluationResult Fail(string error) => new(false, null, error);
     }
 
-    public static EvaluationResult Evaluate(PreceptExpression expression, IReadOnlyDictionary<string, object?> context)
+    public static EvaluationResult Evaluate(
+        PreceptExpression expression,
+        IReadOnlyDictionary<string, object?> context,
+        IReadOnlyDictionary<string, PreceptField>? fieldContracts = null)
     {
         return expression switch
         {
             PreceptLiteralExpression literal => EvaluationResult.Ok(literal.Value),
             PreceptIdentifierExpression identifier => EvaluateIdentifier(identifier, context),
-            PreceptParenthesizedExpression parenthesized => Evaluate(parenthesized.Inner, context),
+            PreceptParenthesizedExpression parenthesized => Evaluate(parenthesized.Inner, context, fieldContracts),
             PreceptUnaryExpression unary => EvaluateUnary(unary, context),
-            PreceptBinaryExpression binary => EvaluateBinary(binary, context),
+            PreceptBinaryExpression binary => EvaluateBinary(binary, context, fieldContracts),
             PreceptRoundExpression round => EvaluateRound(round, context),
+            PreceptChoiceOrdinalExpression ordinal => EvaluateChoiceOrdinal(ordinal, context),
             _ => EvaluationResult.Fail("unsupported expression node.")
         };
     }
@@ -112,14 +116,17 @@ internal static class PreceptExpressionRuntimeEvaluator
         };
     }
 
-    private static EvaluationResult EvaluateBinary(PreceptBinaryExpression binary, IReadOnlyDictionary<string, object?> context)
+    private static EvaluationResult EvaluateBinary(
+        PreceptBinaryExpression binary,
+        IReadOnlyDictionary<string, object?> context,
+        IReadOnlyDictionary<string, PreceptField>? fieldContracts = null)
     {
         if (binary.Operator == "contains")
             return EvaluateContains(binary, context);
 
         if (binary.Operator == "and")
         {
-            var left = Evaluate(binary.Left, context);
+            var left = Evaluate(binary.Left, context, fieldContracts);
             if (!left.Success)
                 return left;
 
@@ -129,7 +136,7 @@ internal static class PreceptExpressionRuntimeEvaluator
             if (!leftBool)
                 return EvaluationResult.Ok(false);
 
-            var right = Evaluate(binary.Right, context);
+            var right = Evaluate(binary.Right, context, fieldContracts);
             if (!right.Success)
                 return right;
 
@@ -140,7 +147,7 @@ internal static class PreceptExpressionRuntimeEvaluator
 
         if (binary.Operator == "or")
         {
-            var left = Evaluate(binary.Left, context);
+            var left = Evaluate(binary.Left, context, fieldContracts);
             if (!left.Success)
                 return left;
 
@@ -150,7 +157,7 @@ internal static class PreceptExpressionRuntimeEvaluator
             if (leftBool)
                 return EvaluationResult.Ok(true);
 
-            var right = Evaluate(binary.Right, context);
+            var right = Evaluate(binary.Right, context, fieldContracts);
             if (!right.Success)
                 return right;
 
@@ -159,11 +166,11 @@ internal static class PreceptExpressionRuntimeEvaluator
                 : EvaluationResult.Fail("operator 'or' requires boolean operands.");
         }
 
-        var leftValue = Evaluate(binary.Left, context);
+        var leftValue = Evaluate(binary.Left, context, fieldContracts);
         if (!leftValue.Success)
             return leftValue;
 
-        var rightValue = Evaluate(binary.Right, context);
+        var rightValue = Evaluate(binary.Right, context, fieldContracts);
         if (!rightValue.Success)
             return rightValue;
 
@@ -243,6 +250,13 @@ internal static class PreceptExpressionRuntimeEvaluator
                 if (TryToNumber(leftOperand, out var leftNumberForGt) && TryToNumber(rightOperand, out var rightNumberForGt))
                     return EvaluationResult.Ok(leftNumberForGt > rightNumberForGt);
 
+                if (TryGetChoiceOrdinals(binary.Left, leftOperand, rightOperand, fieldContracts, out var liGt, out var riGt))
+                {
+                    if (liGt < 0) return EvaluationResult.Fail($"'{leftOperand}' is not a member of the ordered choice set.");
+                    if (riGt < 0) return EvaluationResult.Fail($"'{rightOperand}' is not a member of the ordered choice set.");
+                    return EvaluationResult.Ok(liGt > riGt);
+                }
+
                 return EvaluationResult.Fail("operator '>' requires numeric operands.");
 
             case ">=":
@@ -251,6 +265,13 @@ internal static class PreceptExpressionRuntimeEvaluator
 
                 if (TryToNumber(leftOperand, out var leftNumberForGte) && TryToNumber(rightOperand, out var rightNumberForGte))
                     return EvaluationResult.Ok(leftNumberForGte >= rightNumberForGte);
+
+                if (TryGetChoiceOrdinals(binary.Left, leftOperand, rightOperand, fieldContracts, out var liGte, out var riGte))
+                {
+                    if (liGte < 0) return EvaluationResult.Fail($"'{leftOperand}' is not a member of the ordered choice set.");
+                    if (riGte < 0) return EvaluationResult.Fail($"'{rightOperand}' is not a member of the ordered choice set.");
+                    return EvaluationResult.Ok(liGte >= riGte);
+                }
 
                 return EvaluationResult.Fail("operator '>=' requires numeric operands.");
 
@@ -261,6 +282,13 @@ internal static class PreceptExpressionRuntimeEvaluator
                 if (TryToNumber(leftOperand, out var leftNumberForLt) && TryToNumber(rightOperand, out var rightNumberForLt))
                     return EvaluationResult.Ok(leftNumberForLt < rightNumberForLt);
 
+                if (TryGetChoiceOrdinals(binary.Left, leftOperand, rightOperand, fieldContracts, out var liLt, out var riLt))
+                {
+                    if (liLt < 0) return EvaluationResult.Fail($"'{leftOperand}' is not a member of the ordered choice set.");
+                    if (riLt < 0) return EvaluationResult.Fail($"'{rightOperand}' is not a member of the ordered choice set.");
+                    return EvaluationResult.Ok(liLt < riLt);
+                }
+
                 return EvaluationResult.Fail("operator '<' requires numeric operands.");
 
             case "<=":
@@ -270,11 +298,67 @@ internal static class PreceptExpressionRuntimeEvaluator
                 if (TryToNumber(leftOperand, out var leftNumberForLte) && TryToNumber(rightOperand, out var rightNumberForLte))
                     return EvaluationResult.Ok(leftNumberForLte <= rightNumberForLte);
 
+                if (TryGetChoiceOrdinals(binary.Left, leftOperand, rightOperand, fieldContracts, out var liLte, out var riLte))
+                {
+                    if (liLte < 0) return EvaluationResult.Fail($"'{leftOperand}' is not a member of the ordered choice set.");
+                    if (riLte < 0) return EvaluationResult.Fail($"'{rightOperand}' is not a member of the ordered choice set.");
+                    return EvaluationResult.Ok(liLte <= riLte);
+                }
+
                 return EvaluationResult.Fail("operator '<=' requires numeric operands.");
 
             default:
                 return EvaluationResult.Fail($"unsupported binary operator '{binary.Operator}'.");
         }
+    }
+
+    /// <summary>
+    /// Attempts to resolve declaration-position ordinal indices for an ordered choice field comparison.
+    /// Returns true when the left-side expression is an ordered choice field and both operands are strings.
+    /// </summary>
+    private static bool TryGetChoiceOrdinals(
+        PreceptExpression leftExpr,
+        object? leftOperand,
+        object? rightOperand,
+        IReadOnlyDictionary<string, PreceptField>? fieldContracts,
+        out int leftIdx,
+        out int rightIdx)
+    {
+        leftIdx = rightIdx = -1;
+        if (fieldContracts is null) return false;
+        if (leftOperand is not string leftStr) return false;
+        if (rightOperand is not string rightStr) return false;
+
+        // Strip parentheses to find the underlying identifier.
+        while (leftExpr is PreceptParenthesizedExpression p) leftExpr = p.Inner;
+        if (leftExpr is not PreceptIdentifierExpression { Member: null } leftId) return false;
+        if (!fieldContracts.TryGetValue(leftId.Name, out var field)) return false;
+        if (field.Type != PreceptScalarType.Choice || !field.IsOrdered) return false;
+        if (field.ChoiceValues is not { Count: > 0 } values) return false;
+
+        leftIdx = FindChoiceIndex(values, leftStr);
+        rightIdx = FindChoiceIndex(values, rightStr);
+        return true;
+    }
+
+    private static int FindChoiceIndex(IReadOnlyList<string> values, string target)
+    {
+        for (var i = 0; i < values.Count; i++)
+            if (string.Equals(values[i], target, StringComparison.Ordinal))
+                return i;
+        return -1;
+    }
+
+    private static EvaluationResult EvaluateChoiceOrdinal(
+        PreceptChoiceOrdinalExpression ordinal,
+        IReadOnlyDictionary<string, object?> context)
+    {
+        if (!context.TryGetValue(ordinal.FieldName, out var v) || v is not string s)
+            return EvaluationResult.Fail($"Cannot resolve ordinal for '{ordinal.FieldName}'.");
+        var idx = FindChoiceIndex(ordinal.ChoiceValues, s);
+        if (idx < 0)
+            return EvaluationResult.Fail($"Value '{s}' is not in the ordered choice set for '{ordinal.FieldName}'.");
+        return EvaluationResult.Ok((long)idx);
     }
 
     private static EvaluationResult EvaluateContains(PreceptBinaryExpression binary, IReadOnlyDictionary<string, object?> context)

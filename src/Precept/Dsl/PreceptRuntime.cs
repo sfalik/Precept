@@ -359,7 +359,7 @@ public sealed class PreceptEngine
                 var instanceOnlyContext = BuildEvaluationData(internalData, eventName, null);
                 bool anyGuardPasses = preCheckRows.Any(r =>
                 {
-                    var whenResult = PreceptExpressionRuntimeEvaluator.Evaluate(r.WhenGuard!, instanceOnlyContext);
+                    var whenResult = PreceptExpressionRuntimeEvaluator.Evaluate(r.WhenGuard!, instanceOnlyContext, _fieldMap);
                     return whenResult.Success && whenResult.Value is true;
                 });
                 if (!anyGuardPasses)
@@ -1099,7 +1099,7 @@ public sealed class PreceptEngine
         {
             if (row.WhenGuard is not null)
             {
-                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(row.WhenGuard, evaluationData);
+                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(row.WhenGuard, evaluationData, _fieldMap);
                 if (!guardResult.Success || guardResult.Value is not bool guardBool || !guardBool)
                 {
                     reasons.Add(row.WhenText is not null

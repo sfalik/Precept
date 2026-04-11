@@ -575,8 +575,17 @@ public class CatalogDriftTests
         // C64: default value not in choice set
         ["C64"] = new(H + "field Status as choice(\"Open\",\"Closed\") default \"Pending\"\n" + S, "not a member"),
 
+        // C65: ordinal operator on a choice field that lacks 'ordered'
+        ["C65"] = new(H + "field Status as choice(\"Draft\",\"Active\") default \"Draft\"\n" + S2 +
+            "event Go\nfrom A on Go when Status > \"Active\" -> no transition\n", "ordered' constraint"),
+
         // C66: ordered on a non-choice type
         ["C66"] = new(H + "field Name as string nullable ordered\n" + S, "applies only to choice"),
+
+        // C67: ordinal comparison between two choice fields — rank is field-local
+        ["C67"] = new(H + "field Priority as choice(\"Low\",\"High\") default \"Low\" ordered\n" +
+            "field Severity as choice(\"Low\",\"High\") default \"Low\" ordered\n" + S2 +
+            "event Go\nfrom A on Go when Priority > Severity -> no transition\n", "field-local"),
 
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 

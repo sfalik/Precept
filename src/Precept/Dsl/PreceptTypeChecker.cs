@@ -15,6 +15,8 @@ internal enum StaticValueKind
     Null = 8,
     Integer = 16,   // #29
     Decimal = 32,   // #27 (scaffold)
+    OrderedChoice = 64,    // #25: choice field with 'ordered' modifier; behaves like String for equality/assignment
+    UnorderedChoice = 128, // #25: choice field without 'ordered' modifier; behaves like String for equality/assignment
 }
 
 internal sealed record PreceptValidationDiagnostic(
@@ -115,9 +117,25 @@ internal static class PreceptTypeChecker
         return new TypeCheckResult(diagnostics, new PreceptTypeContext(expressions, scopes));
     }
 
-    internal static StaticValueKind MapFieldContractKind(PreceptField field) => MapKind(field.Type, field.IsNullable);
+    internal static StaticValueKind MapFieldContractKind(PreceptField field)
+    {
+        if (field.Type == PreceptScalarType.Choice)
+        {
+            var choiceKind = field.IsOrdered ? StaticValueKind.OrderedChoice : StaticValueKind.UnorderedChoice;
+            return field.IsNullable ? choiceKind | StaticValueKind.Null : choiceKind;
+        }
+        return MapKind(field.Type, field.IsNullable);
+    }
 
-    internal static StaticValueKind MapFieldContractKind(PreceptEventArg arg) => MapKind(arg.Type, arg.IsNullable);
+    internal static StaticValueKind MapFieldContractKind(PreceptEventArg arg)
+    {
+        if (arg.Type == PreceptScalarType.Choice)
+        {
+            var choiceKind = arg.IsOrdered ? StaticValueKind.OrderedChoice : StaticValueKind.UnorderedChoice;
+            return arg.IsNullable ? choiceKind | StaticValueKind.Null : choiceKind;
+        }
+        return MapKind(arg.Type, arg.IsNullable);
+    }
 
     internal static StaticValueKind MapScalarType(PreceptScalarType type) => MapScalarTypeToKind(type);
 
@@ -146,7 +164,9 @@ internal static class PreceptTypeChecker
             return "unknown";
 
         var labels = new List<string>(6);
-        if (HasFlag(kinds, StaticValueKind.String)) labels.Add("string");
+        if (HasFlag(kinds, StaticValueKind.OrderedChoice)) labels.Add("ordered choice");
+        else if (HasFlag(kinds, StaticValueKind.UnorderedChoice)) labels.Add("choice");
+        else if (HasFlag(kinds, StaticValueKind.String)) labels.Add("string");
         if (HasFlag(kinds, StaticValueKind.Number)) labels.Add("number");
         if (HasFlag(kinds, StaticValueKind.Integer)) labels.Add("integer");
         if (HasFlag(kinds, StaticValueKind.Decimal)) labels.Add("decimal");
@@ -1196,6 +1216,41 @@ internal static class PreceptTypeChecker
                     !TryInferKind(binary.Right, symbols, out var rightKind, out diagnostic))
                     return false;
 
+                // Choice-type ordinal checks apply only to the comparison operators, not arithmetic.
+                if (binary.Operator is ">" or ">=" or "<" or "<=")
+                {
+                    var leftBase = leftKind & ~StaticValueKind.Null;
+                    var rightBase = rightKind & ~StaticValueKind.Null;
+
+                    // SYNC:CONSTRAINT:C65: ordinal operator on a choice field that lacks 'ordered'
+                    if (leftBase == StaticValueKind.UnorderedChoice)
+                    {
+                        diagnostic = new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C65,
+                            DiagnosticCatalog.C65.FormatMessage(("operator", binary.Operator)),
+                            0);
+                        return false;
+                    }
+
+                    // SYNC:CONSTRAINT:C67: ordinal comparison between two choice fields — rank is field-local
+                    if (leftBase == StaticValueKind.OrderedChoice && rightBase == StaticValueKind.OrderedChoice)
+                    {
+                        diagnostic = new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C67,
+                            DiagnosticCatalog.C67.FormatMessage(("operator", binary.Operator)),
+                            0);
+                        return false;
+                    }
+
+                    // Valid ordinal comparison: ordered choice field vs string literal (or plain string)
+                    if (leftBase == StaticValueKind.OrderedChoice
+                        && (rightBase == StaticValueKind.String || rightBase == StaticValueKind.UnorderedChoice))
+                    {
+                        kind = StaticValueKind.Boolean;
+                        return true;
+                    }
+                }
+
                 if (!IsNumericKind(leftKind) || !IsNumericKind(rightKind))
                 {
                     diagnostic = new PreceptValidationDiagnostic(
@@ -1218,8 +1273,10 @@ internal static class PreceptTypeChecker
                     !TryInferKind(binary.Right, symbols, out var rightEqKind, out diagnostic))
                     return false;
 
-                var leftEqFamily = leftEqKind & ~StaticValueKind.Null;
-                var rightEqFamily = rightEqKind & ~StaticValueKind.Null;
+                // Normalize choice kinds to String for equality compatibility:
+                // 'Status == "Active"' is valid whether Status is ordered or unordered choice.
+                var leftEqFamily = NormalizeChoiceKind(leftEqKind & ~StaticValueKind.Null);
+                var rightEqFamily = NormalizeChoiceKind(rightEqKind & ~StaticValueKind.Null);
                 var leftIsNull = leftEqKind == StaticValueKind.Null;
                 var rightIsNull = rightEqKind == StaticValueKind.Null;
 
@@ -1514,8 +1571,24 @@ internal static class PreceptTypeChecker
     private static bool IsExactly(StaticValueKind kind, StaticValueKind expected)
         => kind == expected;
 
+    /// <summary>Normalizes OrderedChoice and UnorderedChoice to String for assignability and equality checks.
+    /// Choice values are strings at runtime; the distinction only matters for ordinal comparison (>/<).
+    /// </summary>
+    private static StaticValueKind NormalizeChoiceKind(StaticValueKind k)
+    {
+        var withoutNull = k & ~StaticValueKind.Null;
+        var nullBit = k & StaticValueKind.Null;
+        if (withoutNull == StaticValueKind.OrderedChoice || withoutNull == StaticValueKind.UnorderedChoice)
+            return StaticValueKind.String | nullBit;
+        return k;
+    }
+
     private static bool IsAssignable(StaticValueKind actual, StaticValueKind expected)
     {
+        // Normalize choice kinds: choice values are strings at runtime and are assignment-compatible with string.
+        actual = NormalizeChoiceKind(actual);
+        expected = NormalizeChoiceKind(expected);
+
         var actualNonNull = actual & ~StaticValueKind.Null;
         var expectedNonNull = expected & ~StaticValueKind.Null;
 
