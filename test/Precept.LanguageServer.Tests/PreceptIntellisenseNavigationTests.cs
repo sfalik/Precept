@@ -147,6 +147,28 @@ public class PreceptIntellisenseNavigationTests
         diagnostics.Should().Contain(diagnostic => diagnostic.Message.Contains("no path forward", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void Hover_StringLengthAccessor_ShowsReturnType()
+    {
+        const string text = """
+            precept M
+            field Name as string default ""
+            state A initial
+            event Go
+            from A on Go when Name.len$$gth >= 1 -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var info = PreceptDocumentIntellisense.Analyze(code);
+
+        var hover = PreceptDocumentIntellisense.CreateHover(info, position);
+
+        hover.Should().NotBeNull("hover over .length must return content");
+        hover!.Contents.ToString().Should().Contain("number",
+            because: ".length returns number (UTF-16 code unit count)");
+        hover.Contents.ToString().Should().Contain("Name.length");
+    }
+
     private static (string text, Position position) ExtractPosition(string textWithMarker)
     {
         var index = textWithMarker.IndexOf("$$", StringComparison.Ordinal);

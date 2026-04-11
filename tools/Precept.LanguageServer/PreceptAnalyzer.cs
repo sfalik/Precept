@@ -820,7 +820,7 @@ internal sealed class PreceptAnalyzer
     private static IReadOnlyList<CompletionItem> BuildStringMemberItems(string fieldName, bool isNullable)
     {
         var doc = isNullable
-            ? "Returns the string's character count (UTF-16 code units). Use 'field != null && field.length ...' for nullable strings."
+            ? "Returns the string's character count (UTF-16 code units). Use 'field != null and field.length ...' for nullable strings."
             : "Returns the string's character count (UTF-16 code units).";
         return
         [

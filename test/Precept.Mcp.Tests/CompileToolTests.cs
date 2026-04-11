@@ -345,4 +345,23 @@ public class CompileToolTests
         amountField.Should().NotBeNull();
         amountField!.Constraints.Should().Contain("maxplaces 2");
     }
+
+    [Fact]
+    public void StringLengthInvariant_CompilesCleanly()
+    {
+        var text = """
+            precept Test
+            field Name as string default ""
+            state A initial
+            state B
+            event Go
+            invariant Name.length <= 100 because "Name must be \u2264100 characters"
+            from A on Go -> transition B
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.Diagnostics.Should().BeEmpty();
+    }
 }

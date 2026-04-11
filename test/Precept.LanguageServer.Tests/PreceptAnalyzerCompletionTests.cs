@@ -892,6 +892,43 @@ public class PreceptAnalyzerCompletionTests
         completions.Should().NotContain("!", "symbolic logical operators were replaced by keyword forms");
     }
 
+    [Fact]
+    public void Completions_StringFieldDotTrigger_SuggestsLength()
+    {
+        const string text = """
+            precept M
+            field Name as string default ""
+            state A initial
+            event Go
+            from A on Go when Name.$$ -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Name.length",
+            because: ".length must be offered after string-typed field identifiers");
+    }
+
+    [Fact]
+    public void Completions_NonStringFieldDotTrigger_DoesNotSuggestLength()
+    {
+        const string text = """
+            precept M
+            field Count as number default 0
+            field Active as boolean default true
+            state A initial
+            event Go
+            from A on Go when Count.$$ -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().NotContain("Count.length",
+            because: ".length must not be offered after non-string identifiers");
+    }
+
     private static (string text, Position position) ExtractPosition(string textWithMarker)
     {
         var index = textWithMarker.IndexOf("$$", StringComparison.Ordinal);
