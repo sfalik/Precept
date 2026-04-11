@@ -39,9 +39,4 @@ Current foundations source of truth:
 
 - [foundations/semantic-visual-system.html](foundations/semantic-visual-system.html) is the canonical output for the shared semantic visual model, reading order, primitives, current surface translation guidance, and cross-surface compliance rules.
 
-Prototype composition experiment:
-
-- [foundations/semantic-visual-system-composed.html](foundations/semantic-visual-system-composed.html) is a non-canonical generated prototype that tests a hybrid markdown plus HTML-islands authoring model.
-- [foundations/source/README.md](foundations/source/README.md) documents the prototype source tree under `foundations/source/` and the local builder at `tools/scripts/build-semantic-visual-system.mjs`.
-
 This scaffold is intentionally small. It establishes ownership and migration direction first; a separate surface-spec split can be reintroduced later when concrete surfaces need durable standalone specs.
