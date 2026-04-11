@@ -6,6 +6,18 @@
 
 ---
 
+### 2026-04-10T22:52:01Z: Architecture identity row restores card treatment with inline square marker
+**By:** Elaine
+**Status:** Applied
+
+The Architecture identity row should keep the full construct-card treatment with role copy intact. The square swatch belongs inline with the construct label inside the card title row rather than floating above it as a separate block.
+
+**Why:** The square is a semantic marker, not an independent content block. Leading the construct name with the swatch makes the marker and label read as one semantic unit while preserving the body copy for the construct role.
+
+**Implementation consequence:** Use a compact `arch-card-title` row that pairs `arch-card-swatch` with `arch-card-name`, preserve the five-card construct layout, and remove filler copy that only existed to support the temporary pill-row treatment.
+
+---
+
 ### 2026-04-10T12:00:00Z: Issue #31 merged — keyword logical operators (and/or/not replace &&/||/!)
 **By:** George (Runtime Dev), Kramer (Tooling Dev), Newman (MCP/AI Dev), Soup Nazi (Tester), Frank (Lead/Architect), Coordinator
 **Status:** Merged — PR #50, main SHA `305ec03`

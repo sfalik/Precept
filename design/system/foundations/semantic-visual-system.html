@@ -133,19 +133,6 @@ body {
 .toc-anchor {
   scroll-margin-top: 24px;
 }
-.nav-font-status {
-  margin-top: auto;
-  padding: 14px 8px 12px;
-  border-top: 1px solid var(--line);
-  font-family: monospace;
-  font-size: 10px;
-  line-height: 1.8;
-  color: var(--soft);
-}
-.nav-rail.collapsed .nav-font-status {
-  opacity: 0;
-  pointer-events: none;
-}
 /* ── PAGE LAYOUT ──────────────────────────── */
 .page {
   margin-left: var(--nav-w);
@@ -158,8 +145,8 @@ body {
 }
 /* ── SHARED ───────────────────────────────── */
 .eyebrow {
-  font-size: 10px;
-  letter-spacing: 0.22em;
+  font-size: 11px;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--soft);
   margin-bottom: 16px;
@@ -242,6 +229,40 @@ pre {
 }
 .intro-body p { max-width: 60ch; }
 .intro-copy-row p { margin: 0; }
+.intro-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 1px;
+  margin-top: 36px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.intro-summary-item {
+  background: var(--panel);
+  padding: 16px 18px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.intro-summary-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.intro-summary-value {
+  font-family: var(--mono);
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.intro-summary-note {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--muted);
+}
 .cast-strip {
   display: flex;
   gap: 10px;
@@ -496,8 +517,8 @@ pre {
 }
 .surface-label {
   font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.18em;
+  font-size: 11px;
+  letter-spacing: 0.20em;
   text-transform: uppercase;
   color: var(--soft);
   margin-bottom: 6px;
@@ -585,6 +606,8 @@ pre {
   .nav-rail { display: none; }
   .page { margin-left: 0; padding: 0 24px 80px; }
   .intro-hero,
+    .intro-copy-row,
+    .intro-summary,
   .section-subgroup,
   .construct-gallery,
   .channels-grid,
@@ -624,7 +647,6 @@ pre {
   <a class="nav-item nav-item--child" href="#docs-notation" data-sec="docs-notation">Notation</a>
   <a class="nav-item nav-item--child" href="#docs-editorial" data-sec="docs-editorial">Editorial Blocks</a>
   <a class="nav-item nav-item--child" href="#docs-specimen" data-sec="docs-specimen">Page Specimen</a>
-  <div class="nav-font-status" id="nav-font-status"></div>
 </nav>
 
 <div class="page">
@@ -639,15 +661,25 @@ pre {
       <p class="intro-wordmark">Semantic Visual System</p>
       <h1 class="intro-h1">The Semantic World of Precept</h1>
       <div class="intro-copy-row">
-        <p>Precept governs the integrity of a business entity's data across its lifecycle. The semantic visual system governs how that governance is communicated on screen: how structure, states, events, data fields, and rules each look in every surface where Precept is present.</p>
-        <p>Five authored semantic families. One separate runtime verdict register that sits on top of them without replacing them. One separate chrome/support layer that scaffolds the surface around them. A stable visual grammar that survives when the context shifts from code editor to topology diagram to data form to public documentation.</p>
+        <p>Precept governs the integrity of a business entity across its lifecycle. This document governs how that integrity reads on screen: which signals belong to structure, state, event, data, and rule, and which signals must remain outside authored meaning.</p>
+        <p>The goal is not decorative consistency. It is semantic consistency. A reader should be able to move from authored DSL to runtime views to documentation and still recognize the same governed parts, the same overlays, and the same boundaries.</p>
       </div>
-      <div class="cast-strip" aria-label="Five core constructs">
-        <span class="cast-pill"><span class="cast-dot" style="background:var(--structure)"></span><span class="s">Structure</span></span>
-        <span class="cast-pill"><span class="cast-dot" style="background:var(--state)"></span><span class="st">State</span></span>
-        <span class="cast-pill"><span class="cast-dot" style="background:var(--event)"></span><span class="ev">Event</span></span>
-        <span class="cast-pill"><span class="cast-dot" style="background:var(--data)"></span><span class="da">Data</span></span>
-        <span class="cast-pill"><span class="cast-dot" style="background:var(--rule)"></span><span class="ru">Rule</span></span>
+      <div class="intro-summary" aria-label="System summary">
+        <div class="intro-summary-item">
+          <span class="intro-summary-label">Authored substrate</span>
+          <span class="intro-summary-value">Five semantic families</span>
+          <p class="intro-summary-note">Structure, State, Event, Data, and Rule keep fixed identity across every surface.</p>
+        </div>
+        <div class="intro-summary-item">
+          <span class="intro-summary-label">Runtime overlay</span>
+          <span class="intro-summary-value">Separate verdict register</span>
+          <p class="intro-summary-note">Allowed, blocked, and warning report evaluation without replacing authored type.</p>
+        </div>
+        <div class="intro-summary-item">
+          <span class="intro-summary-label">Surface scaffolding</span>
+          <span class="intro-summary-value">Chrome outside meaning</span>
+          <p class="intro-summary-note">Canvas, panels, text, and dividers support reading without becoming a sixth semantic lane.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -672,37 +704,41 @@ pre {
   gap: 0;
 }
 .arch-layer-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
   font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.26em;
+  font-size: 10px;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--soft);
-  padding: 10px 20px;
-  background: var(--bg);
+  padding: 12px 18px;
+  background: var(--panel-2);
   border-bottom: 1px solid var(--line);
 }
 .arch-layer-label span {
-  font-family: var(--sans);
-  font-size: 12px;
-  letter-spacing: normal;
-  text-transform: none;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
   color: var(--soft);
-  opacity: 0.6;
-  margin-left: 16px;
+  opacity: 0.78;
+  margin-left: auto;
 }
 
 /* ─ construct cards (Layer 1) ─ */
 .arch-constructs {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 2px;
-  padding: 20px;
+  padding: 18px 20px;
   background: var(--panel);
-  border-bottom: 2px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
 }
 .arch-card {
   position: relative;
-  padding: 28px 20px 24px;
+  padding: 24px 20px 20px;
   border-radius: 4px;
   display: grid;
   gap: 10px;
@@ -720,18 +756,26 @@ pre {
 .arch-card::after {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 3px;
   background: var(--card-color);
   border-radius: 4px 4px 0 0;
 }
-.arch-card-swatch {
-  width: 24px;
-  height: 24px;
-  border-radius: 3px;
-  background: var(--card-color);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+.arch-card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   position: relative;
+}
+.arch-card-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--card-color);
+  position: relative;
+  flex: 0 0 auto;
 }
 .arch-card-name {
   font-family: var(--mono);
@@ -754,14 +798,14 @@ pre {
 .arch-registers {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2px;
+  gap: 1px;
   background: var(--line);
 }
 .arch-reg {
   background: var(--panel);
-  padding: 24px 28px;
+  padding: 18px 20px;
   display: grid;
-  gap: 14px;
+  gap: 12px;
   align-content: start;
 }
 .arch-reg-head {
@@ -777,15 +821,17 @@ pre {
   color: var(--text);
 }
 .arch-reg-tag {
-  font-family: var(--sans);
-  font-size: 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
   color: var(--soft);
 }
 .arch-reg-note {
   font-family: var(--sans);
-  font-size: 14px;
-  line-height: 1.72;
-  color: var(--soft);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
   max-width: 42ch;
 }
 .arch-surfaces {
@@ -802,16 +848,15 @@ pre {
   color: var(--muted);
   padding: 6px 12px;
   border: 1px solid var(--line);
-  border-radius: 2px;
+  border-radius: 0;
   background: var(--panel-2);
 }
 
 /* ─ verdict register (sits alongside registers) ─ */
 .arch-verdict-lane {
-  margin-top: 2px;
-  padding: 18px 28px;
-  background: var(--panel);
-  border-top: 1px solid var(--line);
+  margin-top: 1px;
+  padding: 12px 20px;
+  background: var(--panel-2);
   display: flex;
   align-items: center;
   gap: 24px;
@@ -835,7 +880,7 @@ pre {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   padding: 4px 10px;
-  border-radius: 2px;
+  border-radius: 0;
   border: 1px solid currentColor;
   opacity: 0.85;
 }
@@ -851,18 +896,17 @@ pre {
 .arch-channels {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 0;
-  border-top: 2px solid var(--line-strong);
+  gap: 1px;
+  background: var(--line);
+  border-top: 1px solid var(--line-strong);
 }
 .arch-ch {
-  padding: 24px 22px;
-  background: var(--bg);
-  border-right: 1px solid var(--line);
+  padding: 18px;
+  background: var(--panel);
   display: grid;
   gap: 8px;
   align-content: start;
 }
-.arch-ch:last-child { border-right: none; }
 .arch-ch-num {
   font-family: var(--mono);
   font-size: 9px;
@@ -887,9 +931,10 @@ pre {
 /* ─ chrome/support outer frame ─ */
 .arch-chrome-frame {
   border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  padding: 3px;
+  border-radius: 0;
+  padding: 0;
   position: relative;
+  overflow: hidden;
 }
 
 /* ─ concept annotations ─ */
@@ -917,8 +962,8 @@ pre {
 }
 .cov-concept-role {
   font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.26em;
+  font-size: 10px;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--structure);
   opacity: 0.65;
@@ -926,8 +971,8 @@ pre {
 }
 .cov-concept-lbl {
   font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.18em;
+  font-size: 12px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text);
   display: block;
@@ -947,8 +992,8 @@ pre {
   gap: 10px;
 }
 .cov-concepts-derived .cov-concept-lbl {
-  font-size: 9px;
-  letter-spacing: 0.22em;
+  font-size: 10px;
+  letter-spacing: 0.18em;
   color: var(--soft);
   opacity: 0.85;
 }
@@ -964,14 +1009,20 @@ pre {
 
 /* ─ responsive ─ */
 @media (max-width: 960px) {
-  .arch-constructs { grid-template-columns: repeat(3, 1fr); }
+  .arch-constructs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 16px;
+  }
   .arch-registers { grid-template-columns: 1fr; }
   .arch-channels { grid-template-columns: repeat(2, 1fr); }
   .cov-concept--foundation { grid-template-columns: 1fr; }
   .cov-concepts-derived { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
-  .arch-constructs { grid-template-columns: repeat(2, 1fr); }
+  .arch-constructs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
   .arch-channels { grid-template-columns: 1fr; }
 }
 </style>
@@ -980,7 +1031,7 @@ pre {
   <div class="section-head">
     <div class="eyebrow">02 · Concepts</div>
     <h2>System Architecture</h2>
-    <p>The system has four structural parts. Five semantic families form the identity substrate — the authored vocabulary that stays recognizable wherever it appears. Two depiction registers translate that identity into authored source (Definition) and rendered components (Runtime). A separate runtime verdict register reports evaluation without redefining type. A separate chrome/support layer carries canvas, panel, text, and line scaffolding so the surrounding palette can complement the semantic system without competing with it. Four signal channels encode meaning in both. Four surfaces provide the contexts in which all of this manifests.</p>
+    <p>Five semantic families define identity. Two depiction registers render that identity as authored source and runtime components. A separate verdict register reports evaluation without redefining type. Chrome/support scaffolds the surface around them. Four channels carry the signal grammar across four surfaces.</p>
   </div>
 
   <!-- Architecture diagram ─────────────────────── -->
@@ -992,28 +1043,38 @@ pre {
         <div class="arch-layer-label">Identity <span>stable semantic type across all registers and surfaces</span></div>
         <div class="arch-constructs">
           <div class="arch-card" style="--card-color: var(--structure)">
-            <div class="arch-card-swatch"></div>
-            <div class="arch-card-name s">Structure</div>
+            <div class="arch-card-title">
+              <div class="arch-card-swatch"></div>
+              <div class="arch-card-name s">Structure</div>
+            </div>
             <div class="arch-card-role">Registration, grouping, governed boundaries</div>
           </div>
           <div class="arch-card" style="--card-color: var(--state)">
-            <div class="arch-card-swatch"></div>
-            <div class="arch-card-name st">State</div>
+            <div class="arch-card-title">
+              <div class="arch-card-swatch"></div>
+              <div class="arch-card-name st">State</div>
+            </div>
             <div class="arch-card-role">Where the entity is in its lifecycle</div>
           </div>
           <div class="arch-card" style="--card-color: var(--event)">
-            <div class="arch-card-swatch"></div>
-            <div class="arch-card-name ev">Event</div>
+            <div class="arch-card-title">
+              <div class="arch-card-swatch"></div>
+              <div class="arch-card-name ev">Event</div>
+            </div>
             <div class="arch-card-role">What happens — triggers and transitions</div>
           </div>
           <div class="arch-card" style="--card-color: var(--data)">
-            <div class="arch-card-swatch"></div>
-            <div class="arch-card-name da">Data</div>
+            <div class="arch-card-title">
+              <div class="arch-card-swatch"></div>
+              <div class="arch-card-name da">Data</div>
+            </div>
             <div class="arch-card-role">Fields, types, and values the entity carries</div>
           </div>
           <div class="arch-card" style="--card-color: var(--rule)">
-            <div class="arch-card-swatch"></div>
-            <div class="arch-card-name ru">Rule</div>
+            <div class="arch-card-title">
+              <div class="arch-card-swatch"></div>
+              <div class="arch-card-name ru">Rule</div>
+            </div>
             <div class="arch-card-role">Invariants, assertions, rejection messages</div>
           </div>
         </div>
@@ -1062,6 +1123,7 @@ pre {
       <!-- Layer 3 · Channels ──────────────────── -->
       <div class="arch-layer">
         <div class="arch-layer-label">Channels <span>signal grammar spanning both registers</span></div>
+        <div class="arch-channels">
           <div class="arch-ch">
             <span class="arch-ch-num">01</span>
             <span class="arch-ch-name">Colour</span>
@@ -1071,6 +1133,7 @@ pre {
             <span class="arch-ch-num">02</span>
             <span class="arch-ch-name">Typography</span>
             <p class="arch-ch-note">Mono for all semantic names. Sans for prose and context. Weight and style carry constraint and modification status.</p>
+          </div>
           <div class="arch-ch">
             <span class="arch-ch-num">03</span>
             <span class="arch-ch-name">Form</span>
@@ -1080,6 +1143,7 @@ pre {
             <span class="arch-ch-num">04</span>
             <span class="arch-ch-name">Layout</span>
             <p class="arch-ch-note">Adjacency, ordering, and depth encode relationship, sequence, and structural hierarchy across all surfaces.</p>
+          </div>
         </div>
       </div>
 
@@ -3041,7 +3105,7 @@ pre {
       <div class="surface-label">Surface 01</div>
       <div class="surface-h3">Code Window</div>
       <p class="sf-note">Syntax highlighting renders the full semantic palette. Governing structure words and connective grammar share indigo, with bold reserved for structural drivers and normal weight used for operators like <span class="sg">and</span> / <span class="sg">or</span> / <span class="sg">not</span>. States stay violet. Events stay cyan. Data stays slate. Rule messages stay gold.</p>
-      <pre style="font-size:12px"><span class="s">precept</span> <span class="ru">InsuranceClaim</span>
+      <pre style="font-size:12px"><span class="s">precept</span> <span class="s">InsuranceClaim</span>
 
 <span class="s">field</span> <span class="da">ClaimNumber</span> <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
 <span class="s">field</span> <span class="da">ClaimAmount</span> <span class="s">as</span> <span class="so">number</span> <span class="s">default</span> <span class="so">0</span>
@@ -3349,25 +3413,15 @@ pre {
   gap: 7px;
   align-content: start;
 }
+.doc-callout-accent { background: var(--line-strong); }
 .doc-callout-label {
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
+  color: var(--text);
 }
 .doc-callout p { font-family: var(--sans); font-size: 14px; line-height: 1.65; color: var(--muted); margin: 0; }
-.doc-callout--note    .doc-callout-accent { background: var(--structure); }
-.doc-callout--note    .doc-callout-label  { color: var(--structure); }
-.doc-callout--tip     .doc-callout-accent { background: var(--valid); }
-.doc-callout--tip     .doc-callout-label  { color: var(--valid); }
-.doc-callout--caution .doc-callout-accent { background: var(--warn); }
-.doc-callout--caution .doc-callout-label  { color: var(--warn); }
-.doc-callout--warn    .doc-callout-accent { background: var(--violated); }
-.doc-callout--warn    .doc-callout-label  { color: var(--violated); }
-.doc-callout--note    .doc-callout-body { background: rgba(99,102,241,0.04); }
-.doc-callout--tip     .doc-callout-body { background: rgba(52,211,153,0.04); }
-.doc-callout--caution .doc-callout-body { background: rgba(253,224,71,0.04); }
-.doc-callout--warn    .doc-callout-body { background: rgba(248,113,113,0.04); }
 
 /* ─ code block ─ */
 .doc-code-block { border: 1px solid var(--line-strong); overflow: hidden; }
@@ -3448,8 +3502,9 @@ pre.doc-code-body {
 }
 .doc-sp-link {
   padding: 6px 20px;
-  font-family: var(--sans);
-  font-size: 13px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
   color: var(--muted);
   display: block;
   border-left: 2px solid transparent;
@@ -3461,7 +3516,8 @@ pre.doc-code-body {
 }
 .doc-sp-link.child {
   padding-left: 32px;
-  font-size: 12px;
+  font-size: 10px;
+  letter-spacing: 0.03em;
   color: var(--soft);
 }
 .doc-specimen-sidebar-header {
@@ -3497,8 +3553,9 @@ pre.doc-code-body {
   margin-bottom: 8px;
 }
 .doc-sp-toc-link {
-  font-family: var(--sans);
-  font-size: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
   color: var(--soft);
   display: block;
   padding: 5px 4px 5px 10px;
@@ -3824,7 +3881,7 @@ pre.doc-code-body {
     <div class="doc-code-header">
       <span class="doc-code-lang">precept</span>
     </div>
-    <pre class="doc-code-body"><span style="color:var(--structure);font-weight:bold">precept</span> <span style="color:var(--rule)">LoanApplication</span>
+    <pre class="doc-code-body"><span style="color:var(--structure);font-weight:bold">precept</span> <span style="color:var(--structure)">LoanApplication</span>
   <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">Amount</span>       <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">number</span>
   <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">Applicant</span>    <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">string</span>
 
@@ -4025,7 +4082,7 @@ pre.doc-code-body {
               <div class="dsp-reject-node">&#x2715; Amount = 0</div>
             </div>
           </div>
-          <span style="font-family:var(--sans);font-size:12px;color:var(--soft)">Outlined ring = current state&thinsp;&middot;&thinsp;Blocked row shows guard failure when <span class="doc-ref ru" style="font-size:0.90em">Amount</span> = 0.</span>
+          <span style="font-family:var(--sans);font-size:12px;color:var(--soft)">Outlined ring = current state&thinsp;&middot;&thinsp;Blocked row shows guard failure when <span class="doc-ref da" style="font-size:0.90em">Amount</span> = 0.</span>
         </div>
 
         <!-- H2 + H3 + list -->
@@ -4056,7 +4113,7 @@ pre.doc-code-body {
           <p class="dsp-p">The following declares a <span class="doc-ref s">LoanApplication</span> with two states, one field, and one transition. It is the smallest complete example that demonstrates the full structure.</p>
           <div class="doc-code-block">
             <div class="doc-code-header"><span class="doc-code-lang">precept</span></div>
-            <pre class="doc-code-body"><span style="color:var(--structure);font-weight:bold">precept</span> <span style="color:var(--rule)">LoanApplication</span>
+            <pre class="doc-code-body"><span style="color:var(--structure);font-weight:bold">precept</span> <span style="color:var(--structure)">LoanApplication</span>
   <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">Amount</span>   <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">number</span>
 
   <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Draft</span>    <span style="color:var(--structure);font-weight:bold">initial</span>
@@ -4175,24 +4232,6 @@ pre.doc-code-body {
     setCollapsed(!nav.classList.contains("collapsed"));
   });
 }());
-</script>
-
-<script>
-document.fonts.ready.then(function() {
-  var loaded = [];
-  document.fonts.forEach(function(face) {
-    if (face.status === 'loaded') loaded.push(face.family);
-  });
-  var unique = loaded.filter(function(v,i,a){ return a.indexOf(v)===i; });
-  var mono = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim().split(',')[0].replace(/['"]/g,'').trim();
-  var sans = getComputedStyle(document.documentElement).getPropertyValue('--sans').trim().split(',')[0].replace(/['"]/g,'').trim();
-  var monoLoaded = unique.some(function(f){ return f.toLowerCase().indexOf(mono.toLowerCase()) !== -1; });
-  var sansLoaded = unique.some(function(f){ return f.toLowerCase().indexOf(sans.toLowerCase()) !== -1; });
-  var el = document.getElementById('nav-font-status');
-  if (el) el.innerHTML =
-    '<span style="color:' + (monoLoaded ? '#34D399' : '#F87171') + '">' + (monoLoaded ? '✓' : '✗') + ' ' + mono + '</span><br>' +
-    '<span style="color:' + (sansLoaded ? '#34D399' : '#F87171') + '">' + (sansLoaded ? '✓' : '✗') + ' ' + sans + '</span>';
-});
 </script>
 </body>
 </html>
