@@ -25,7 +25,6 @@ internal static class PreceptExpressionRuntimeEvaluator
             PreceptUnaryExpression unary => EvaluateUnary(unary, context),
             PreceptBinaryExpression binary => EvaluateBinary(binary, context, fieldContracts),
             PreceptRoundExpression round => EvaluateRound(round, context),
-            PreceptChoiceOrdinalExpression ordinal => EvaluateChoiceOrdinal(ordinal, context),
             _ => EvaluationResult.Fail("unsupported expression node.")
         };
     }
@@ -347,18 +346,6 @@ internal static class PreceptExpressionRuntimeEvaluator
             if (string.Equals(values[i], target, StringComparison.Ordinal))
                 return i;
         return -1;
-    }
-
-    private static EvaluationResult EvaluateChoiceOrdinal(
-        PreceptChoiceOrdinalExpression ordinal,
-        IReadOnlyDictionary<string, object?> context)
-    {
-        if (!context.TryGetValue(ordinal.FieldName, out var v) || v is not string s)
-            return EvaluationResult.Fail($"Cannot resolve ordinal for '{ordinal.FieldName}'.");
-        var idx = FindChoiceIndex(ordinal.ChoiceValues, s);
-        if (idx < 0)
-            return EvaluationResult.Fail($"Value '{s}' is not in the ordered choice set for '{ordinal.FieldName}'.");
-        return EvaluationResult.Ok((long)idx);
     }
 
     private static EvaluationResult EvaluateContains(PreceptBinaryExpression binary, IReadOnlyDictionary<string, object?> context)

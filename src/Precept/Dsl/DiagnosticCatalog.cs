@@ -486,7 +486,7 @@ public static class DiagnosticCatalog
         "'maxplaces' constraint applies only to decimal fields. Integer fields cannot have fractional precision.");
 
     // ═══════════════════════════════════════════════════════════════════
-    // Choice type diagnostics (C62–C67)
+    // Choice type diagnostics (C62–C68)
     // ═══════════════════════════════════════════════════════════════════
 
     /// <summary>choice type requires at least one value.</summary>
@@ -524,4 +524,10 @@ public static class DiagnosticCatalog
         "C67", "compile",
         "Ordinal comparison cannot be applied to two choice fields — ordinal rank is field-local.",
         "Ordinal comparison '{operator}' cannot be applied to two choice fields. Ordinal rank is field-local — the two fields have independent orderings. Use '==' / '!=' to compare choice field values.");
+
+    /// <summary>Literal value is not a member of the choice set.</summary>
+    public static readonly LanguageConstraint C68 = Register(
+        "C68", "compile",
+        "Literal value is not a member of the choice set.",
+        "'{value}' is not a member of choice({values}) for '{name}'.");
 }

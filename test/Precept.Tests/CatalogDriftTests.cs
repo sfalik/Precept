@@ -587,6 +587,10 @@ public class CatalogDriftTests
             "field Severity as choice(\"Low\",\"High\") default \"Low\" ordered\n" + S2 +
             "event Go\nfrom A on Go when Priority > Severity -> no transition\n", "field-local"),
 
+        // C68: literal value not in choice set
+        ["C68"] = new(H + "field Status as choice(\"Open\",\"Closed\") default \"Open\"\n" + S2 +
+            "event Go\nfrom A on Go -> set Status = \"Invalid\" -> no transition\n", "not a member"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state

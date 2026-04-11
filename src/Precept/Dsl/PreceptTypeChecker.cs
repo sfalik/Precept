@@ -185,6 +185,9 @@ internal static class PreceptTypeChecker
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
     {
+        var fieldChoiceMap = model.Fields
+            .Where(f => f.Type == PreceptScalarType.Choice && f.ChoiceValues?.Count > 0)
+            .ToDictionary(f => f.Name, f => f.ChoiceValues!, StringComparer.Ordinal);
         var allStates = model.States.Select(static state => state.Name).ToArray();
         var rows = model.TransitionRows ?? Array.Empty<PreceptTransitionRow>();
 
@@ -290,6 +293,21 @@ internal static class PreceptTypeChecker
                             diagnostics,
                             expressions,
                             stateContext: item.State);
+
+                        // SYNC:CONSTRAINT:C68: literal must be a member of the choice set
+                        if (fieldChoiceMap.TryGetValue(assignment.Key, out var choiceVals)
+                            && assignment.Expression is PreceptLiteralExpression { Value: string memberLiteral }
+                            && !choiceVals.Contains(memberLiteral, StringComparer.Ordinal))
+                        {
+                            diagnostics.Add(new PreceptValidationDiagnostic(
+                                DiagnosticCatalog.C68,
+                                DiagnosticCatalog.C68.FormatMessage(
+                                    ("value", memberLiteral),
+                                    ("values", string.Join(", ", choiceVals.Select(v => $"\"{v}\""))),
+                                    ("name", assignment.Key)),
+                                assignment.SourceLine > 0 ? assignment.SourceLine : row.SourceLine,
+                                StateContext: item.State));
+                        }
                     }
 
                     ValidateCollectionMutations(
@@ -318,6 +336,10 @@ internal static class PreceptTypeChecker
     {
         if (model.StateActions is null || model.StateActions.Count == 0)
             return;
+
+        var fieldChoiceMap = model.Fields
+            .Where(f => f.Type == PreceptScalarType.Choice && f.ChoiceValues?.Count > 0)
+            .ToDictionary(f => f.Name, f => f.ChoiceValues!, StringComparer.Ordinal);
 
         foreach (var action in model.StateActions)
         {
@@ -368,6 +390,21 @@ internal static class PreceptTypeChecker
                     diagnostics,
                     expressions,
                     stateContext: action.State);
+
+                // SYNC:CONSTRAINT:C68: literal must be a member of the choice set
+                if (fieldChoiceMap.TryGetValue(assignment.Key, out var choiceVals)
+                    && assignment.Expression is PreceptLiteralExpression { Value: string memberLiteral }
+                    && !choiceVals.Contains(memberLiteral, StringComparer.Ordinal))
+                {
+                    diagnostics.Add(new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C68,
+                        DiagnosticCatalog.C68.FormatMessage(
+                            ("value", memberLiteral),
+                            ("values", string.Join(", ", choiceVals.Select(v => $"\"{v}\""))),
+                            ("name", assignment.Key)),
+                        assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine,
+                        StateContext: action.State));
+                }
             }
 
             ValidateCollectionMutations(
@@ -1491,6 +1528,22 @@ internal static class PreceptTypeChecker
                         expressions,
                         stateContext,
                         eventName);
+
+                    // SYNC:CONSTRAINT:C68: literal must be a member of the choice collection's set
+                    if (mutation.Verb != PreceptCollectionMutationVerb.Remove
+                        && collectionField.ChoiceValues?.Count > 0
+                        && mutation.Expression is PreceptLiteralExpression { Value: string literalMember }
+                        && !collectionField.ChoiceValues.Contains(literalMember, StringComparer.Ordinal))
+                    {
+                        diagnostics.Add(new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C68,
+                            DiagnosticCatalog.C68.FormatMessage(
+                                ("value", literalMember),
+                                ("values", string.Join(", ", collectionField.ChoiceValues.Select(v => $"\"{v}\""))),
+                                ("name", mutation.TargetField)),
+                            line,
+                            StateContext: stateContext));
+                    }
                     break;
 
                 case PreceptCollectionMutationVerb.Dequeue:

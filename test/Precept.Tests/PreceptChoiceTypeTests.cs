@@ -622,4 +622,164 @@ public class PreceptChoiceTypeTests
         afterSet.UpdatedInstance!.InstanceData["Priority"].Should().Be("High");
         afterSet.UpdatedInstance.InstanceData["Priority"].Should().BeOfType<string>();
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // GAP COVERAGE — Issue #25 AC gaps identified in final review
+    // ════════════════════════════════════════════════════════════════════
+
+    // Gap 1: set/queue/stack of choice(…) — collection type parsing
+
+    [Fact]
+    public void Parse_SetOfChoice_Succeeds()
+    {
+        const string dsl = """
+            precept M
+            field Tags as set of choice("Alpha","Beta","Gamma")
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.CollectionFields.Should().ContainSingle();
+        var col = model.CollectionFields[0];
+        col.Name.Should().Be("Tags");
+        col.InnerType.Should().Be(PreceptScalarType.Choice);
+        col.ChoiceValues.Should().BeEquivalentTo(["Alpha", "Beta", "Gamma"], opts => opts.WithStrictOrdering());
+    }
+
+    [Fact]
+    public void Parse_QueueOfChoice_Succeeds()
+    {
+        const string dsl = """
+            precept M
+            field Queue as queue of choice("X","Y","Z")
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.CollectionFields.Should().ContainSingle();
+        var col = model.CollectionFields[0];
+        col.Name.Should().Be("Queue");
+        col.InnerType.Should().Be(PreceptScalarType.Choice);
+        col.ChoiceValues.Should().BeEquivalentTo(["X", "Y", "Z"], opts => opts.WithStrictOrdering());
+    }
+
+    [Fact]
+    public void Parse_StackOfChoice_Succeeds()
+    {
+        const string dsl = """
+            precept M
+            field Stack as stack of choice("P","Q","R")
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.CollectionFields.Should().ContainSingle();
+        var col = model.CollectionFields[0];
+        col.Name.Should().Be("Stack");
+        col.InnerType.Should().Be(PreceptScalarType.Choice);
+        col.ChoiceValues.Should().BeEquivalentTo(["P", "Q", "R"], opts => opts.WithStrictOrdering());
+    }
+
+    // Gap 2: set X = "literal not in choice set" → C68
+
+    [Fact]
+    public void TypeCheck_SetAssignment_LiteralNotInChoiceSet_EmitsC68()
+    {
+        // "Invalid" is not in choice("Open","Closed") → C68
+        const string dsl = """
+            precept M
+            field Status as choice("Open","Closed") default "Open"
+            state A initial
+            state B
+            event Go
+            from A on Go -> set Status = "Invalid" -> transition B
+            """;
+
+        var result = PreceptCompiler.Validate(PreceptParser.Parse(dsl));
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C68",
+            because: "'Invalid' is not a member of the choice set {\"Open\", \"Closed\"}");
+    }
+
+    // Gap 3: add CollectionField "literal not in choice set" → C68
+
+    [Fact]
+    public void TypeCheck_AddToChoiceCollection_LiteralNotInSet_EmitsC68()
+    {
+        // "Unknown" is not in choice("Alpha","Beta") → C68
+        const string dsl = """
+            precept M
+            field Tags as set of choice("Alpha","Beta")
+            state A initial
+            event Tag
+            from A on Tag -> add Tags "Unknown" -> no transition
+            """;
+
+        var result = PreceptCompiler.Validate(PreceptParser.Parse(dsl));
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C68",
+            because: "'Unknown' is not a member of the choice set for the collection");
+    }
+
+    // Gap 4: arithmetic on choice values is a compile-time error
+
+    [Fact]
+    public void TypeCheck_ArithmeticOnChoiceField_EmitsError()
+    {
+        // Status is a choice field — arithmetic '+' on it is not valid
+        const string dsl = """
+            precept M
+            field Status as choice("A","B") default "A"
+            state S initial
+            event Go
+            from S on Go when Status + "X" == "B" -> no transition
+            """;
+
+        var result = PreceptCompiler.Validate(PreceptParser.Parse(dsl));
+
+        result.Diagnostics.Should().NotBeEmpty(
+            because: "arithmetic on a choice field should produce a compile-time diagnostic");
+    }
+
+    // Gap 5: ordered modifier works on choice event args
+
+    [Fact]
+    public void Parse_ChoiceEventArg_WithOrdered_Succeeds()
+    {
+        const string dsl = """
+            precept M
+            state A initial
+            event Assign with Level as choice("Low","High") ordered
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.Events.Should().ContainSingle();
+        var arg = model.Events[0].Args[0];
+        arg.Name.Should().Be("Level");
+        arg.Type.Should().Be(PreceptScalarType.Choice);
+        arg.IsOrdered.Should().BeTrue(because: "'ordered' modifier must be recognised on event args");
+    }
+
+    // Gap 6: ordered composes correctly with nullable on choice fields
+
+    [Fact]
+    public void Parse_ChoiceField_OrderedAndNullable_Succeeds()
+    {
+        const string dsl = """
+            precept M
+            field Priority as choice("Low","High") nullable ordered
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        var f = model.Fields[0];
+        f.Type.Should().Be(PreceptScalarType.Choice);
+        f.IsOrdered.Should().BeTrue(because: "'ordered' must be preserved when combined with 'nullable'");
+        f.IsNullable.Should().BeTrue(because: "'nullable' must be preserved when combined with 'ordered'");
+    }
 }

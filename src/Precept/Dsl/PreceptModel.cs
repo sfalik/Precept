@@ -131,16 +131,6 @@ public sealed record PreceptParenthesizedExpression(PreceptExpression Inner) : P
 /// <summary>round(decimal, places) built-in function call.</summary>
 public sealed record PreceptRoundExpression(PreceptExpression Value, int Places) : PreceptExpression;
 
-/// <summary>
-/// Resolves an ordered choice field value to its declaration-position ordinal index at evaluation time.
-/// Produced when a type-directed elaboration pass rewrites ordinal comparisons on ordered choice fields.
-/// <c>ChoiceValues</c> is captured at elaboration time; the runtime looks up the current field value
-/// in that list and returns its 0-based declaration-order index as a <see cref="long"/>.
-/// </summary>
-public sealed record PreceptChoiceOrdinalExpression(
-    string FieldName,
-    IReadOnlyList<string> ChoiceValues) : PreceptExpression;
-
 public sealed record PreceptSetAssignment(
     string Key,
     string ExpressionText,
