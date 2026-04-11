@@ -264,6 +264,28 @@ internal static class PreceptDocumentIntellisense
             return true;
         }
 
+        if (string.Equals(identifier, "length", StringComparison.Ordinal) &&
+            info.Declarations.Fields.TryGetValue(leftIdentifier, out var stringFieldDecl) &&
+            info.FieldTypeKinds.TryGetValue(leftIdentifier, out var fieldKind) &&
+            (fieldKind & StaticValueKind.String) != 0)
+        {
+            var isNullable = (fieldKind & StaticValueKind.Null) != 0;
+            var doc = isNullable
+                ? $"```precept\n{leftIdentifier}.length\n```\n\nString accessor returning `number` (UTF-16 code unit count).\nRequires null guard: `{leftIdentifier} != null and {leftIdentifier}.length ...`"
+                : $"```precept\n{leftIdentifier}.length\n```\n\nString accessor returning `number` (UTF-16 code unit count).";
+            resolved = new PreceptResolvedSymbol(
+                new PreceptDeclaredSymbol(
+                    $"{leftIdentifier}.length",
+                    PreceptDeclaredSymbolKind.CollectionAccessor,
+                    "number",
+                    stringFieldDecl.Range,
+                    stringFieldDecl.SelectionRange,
+                    stringFieldDecl.ContainerName,
+                    doc),
+                referenceRange);
+            return true;
+        }
+
         return false;
     }
 

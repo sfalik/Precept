@@ -278,4 +278,32 @@ public class InspectToolTests
         result.Error.Should().BeNull();
         result.EditableFields.Should().BeNull();
     }
+
+    [Fact]
+    public void StringLengthConstraint_ShowsViolationInPreview()
+    {
+        const string text = """
+precept Test
+field Name as string default "valid"
+state Open initial
+state Done
+event Update with NewName as string
+invariant Name.length >= 2 because "Name must be at least 2 characters"
+from Open on Update -> set Name = Update.NewName -> transition Done
+""";
+
+        var data = new Dictionary<string, object?> { ["Name"] = "valid" };
+        var eventArgs = new Dictionary<string, Dictionary<string, object?>>
+        {
+            ["Update"] = new() { ["NewName"] = "x" }
+        };
+        var result = InspectTool.Inspect(text, "Open", data, eventArgs);
+
+        result.Error.Should().BeNull();
+        var update = result.Events.FirstOrDefault(e => e.Event == "Update");
+        update.Should().NotBeNull();
+        update!.Outcome.Should().Be("ConstraintFailure");
+        update.Violations.Should().NotBeEmpty();
+        update.Violations[0].Message.Should().Contain("Name must be at least 2 characters");
+    }
 }

@@ -22,6 +22,7 @@ state Rejected
 
 in InterviewLoop assert PendingInterviewers.count > 0 because "Interview loops require at least one pending interviewer"
 in Hired assert OfferAmount > 0 because "Hired candidates must have an offer amount"
+invariant CandidateName == null or CandidateName.length <= 100 because "Candidate name must be ≤100 characters"
 
 event SubmitApplication with Candidate as string notempty, Role as string notempty, Recruiter as string notempty
 
