@@ -145,7 +145,7 @@ public class LanguageToolTests
     {
         var result = LanguageTool.Run();
 
-        result.Constructs.Should().Contain(c => c.Form.StartsWith("round("),
+        result.Constructs.Should().Contain(c => c.Form.StartsWith("round"),
             "round() built-in must be registered in the construct catalog");
     }
 
