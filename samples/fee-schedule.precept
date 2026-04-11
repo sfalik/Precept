@@ -8,17 +8,11 @@ precept FeeSchedule
 # jurisdiction-level settings that must go through a separate administrative
 # approval flow, not direct editing.
 
-field BaseFee as number default 0
-field DiscountPercent as number default 0
-field TaxRate as number default 0.1
-field MinimumCharge as number default 0
+field BaseFee as number default 0 nonnegative
+field DiscountPercent as number default 0 nonnegative max 100
+field TaxRate as number default 0.1 nonnegative
+field MinimumCharge as number default 0 nonnegative
 field CurrencyCode as string default "USD"
-
-invariant BaseFee >= 0 because "Base fee cannot be negative"
-invariant DiscountPercent >= 0 because "Discount percent cannot be negative"
-invariant DiscountPercent <= 100 because "Discount percent cannot exceed 100"
-invariant TaxRate >= 0 because "Tax rate cannot be negative"
-invariant MinimumCharge >= 0 because "Minimum charge cannot be negative"
 
 # Only pricing levers are editable; TaxRate and CurrencyCode are locked.
 edit BaseFee, DiscountPercent, MinimumCharge

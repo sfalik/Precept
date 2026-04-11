@@ -16,6 +16,7 @@ field MissingDocuments as set of string
 invariant ClaimAmount >= 0 because "Claim amounts cannot be negative"
 invariant ApprovedAmount >= 0 because "Approved amounts cannot be negative"
 invariant ApprovedAmount <= ClaimAmount because "Approved amounts cannot exceed the claim"
+invariant DecisionNote == null or DecisionNote.length <= 500 because "Decision notes cannot exceed 500 characters"
 
 state Draft initial
 state Submitted

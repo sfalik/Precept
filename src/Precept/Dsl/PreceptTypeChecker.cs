@@ -107,6 +107,7 @@ internal static class PreceptTypeChecker
         var stateAssertNarrowings = BuildStateAssertNarrowings(model, dataFieldKinds);
         ValidateTransitionRows(model, dataFieldKinds, eventArgKinds, collectionFieldMap, stateAssertNarrowings, diagnostics, expressions, scopes);
         ValidateStateActions(model, dataFieldKinds, collectionFieldMap, stateAssertNarrowings, diagnostics, expressions, scopes);
+        ValidateFieldConstraints(model, diagnostics);
         ValidateRules(model, dataFieldKinds, eventArgKinds, diagnostics, expressions, scopes);
 
         return new TypeCheckResult(diagnostics, new PreceptTypeContext(expressions, scopes));
@@ -316,6 +317,12 @@ internal static class PreceptTypeChecker
                     baseSymbols[$"{col.Name}.peek"] = innerKind;
             }
 
+            foreach (var field in model.Fields)
+            {
+                if (field.Type == PreceptScalarType.String)
+                    baseSymbols[$"{field.Name}.length"] = StaticValueKind.Number;
+            }
+
             scopes.Add(new PreceptTypeScopeInfo(
                 action.SourceLine,
                 "state-action",
@@ -352,6 +359,222 @@ internal static class PreceptTypeChecker
         }
     }
 
+    /// <summary>
+    /// Validates field/arg-level constraint suffixes for type compatibility (C57),
+    /// contradiction/duplicate (C58), and default-value violations (C59).
+    /// Runs before <see cref="ValidateRules"/> so errors are attributed to constraints,
+    /// not to the synthetic invariants they generate.
+    /// </summary>
+    private static void ValidateFieldConstraints(
+        PreceptDefinition model,
+        List<PreceptValidationDiagnostic> diagnostics)
+    {
+        foreach (var field in model.Fields)
+        {
+            if (field.Constraints is not { Count: > 0 }) continue;
+            // SYNC:CONSTRAINT:C57
+            ValidateConstraintTypes(field.Name, field.Type, isCollection: false, field.Constraints, diagnostics);
+            // SYNC:CONSTRAINT:C58
+            ValidateConstraintDuplicates(field.Name, field.Constraints, diagnostics);
+            // SYNC:CONSTRAINT:C59
+            if (field.HasDefaultValue)
+                ValidateConstraintDefault(field.Name, field.DefaultValue, field.Constraints, diagnostics);
+        }
+
+        foreach (var col in model.CollectionFields)
+        {
+            if (col.Constraints is not { Count: > 0 }) continue;
+            // SYNC:CONSTRAINT:C57
+            ValidateConstraintTypes(col.Name, null, isCollection: true, col.Constraints, diagnostics);
+            // SYNC:CONSTRAINT:C58
+            ValidateConstraintDuplicates(col.Name, col.Constraints, diagnostics);
+        }
+
+        foreach (var evt in model.Events)
+        {
+            foreach (var arg in evt.Args)
+            {
+                if (arg.Constraints is not { Count: > 0 }) continue;
+                // SYNC:CONSTRAINT:C57
+                ValidateConstraintTypes(arg.Name, arg.Type, isCollection: false, arg.Constraints, diagnostics);
+                // SYNC:CONSTRAINT:C58
+                ValidateConstraintDuplicates(arg.Name, arg.Constraints, diagnostics);
+                // SYNC:CONSTRAINT:C59
+                if (arg.HasDefaultValue)
+                    ValidateConstraintDefault(arg.Name, arg.DefaultValue, arg.Constraints, diagnostics);
+            }
+        }
+    }
+
+    private static void ValidateConstraintTypes(
+        string name,
+        PreceptScalarType? scalarType,
+        bool isCollection,
+        IReadOnlyList<FieldConstraint> constraints,
+        List<PreceptValidationDiagnostic> diagnostics)
+    {
+        foreach (var c in constraints)
+        {
+            bool valid = (c, isCollection, scalarType) switch
+            {
+                // Number-only constraints
+                (FieldConstraint.Nonnegative, false, PreceptScalarType.Number) => true,
+                (FieldConstraint.Positive,    false, PreceptScalarType.Number) => true,
+                (FieldConstraint.Min,         false, PreceptScalarType.Number) => true,
+                (FieldConstraint.Max,         false, PreceptScalarType.Number) => true,
+                // String-only constraints
+                (FieldConstraint.Notempty,    false, PreceptScalarType.String) => true,
+                (FieldConstraint.Minlength,   false, PreceptScalarType.String) => true,
+                (FieldConstraint.Maxlength,   false, PreceptScalarType.String) => true,
+                // Collection constraints
+                (FieldConstraint.Notempty,    true,  _) => true,
+                (FieldConstraint.Mincount,    true,  _) => true,
+                (FieldConstraint.Maxcount,    true,  _) => true,
+                _ => false
+            };
+
+            if (!valid)
+            {
+                var typeLabel = isCollection ? "collection" : scalarType?.ToString().ToLowerInvariant() ?? "unknown";
+                var constraintLabel = ConstraintLabel(c);
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C57,
+                    DiagnosticCatalog.C57.FormatMessage(
+                        ("constraint", constraintLabel),
+                        ("type", typeLabel)),
+                    0));
+            }
+        }
+    }
+
+    private static void ValidateConstraintDuplicates(
+        string name,
+        IReadOnlyList<FieldConstraint> constraints,
+        List<PreceptValidationDiagnostic> diagnostics)
+    {
+        // Detect same-kind duplicates (e.g., two min constraints regardless of value)
+        var kindSeen = new Dictionary<string, bool>(StringComparer.Ordinal);
+        foreach (var c in constraints)
+        {
+            var kind = ConstraintKindKey(c);
+            if (kindSeen.ContainsKey(kind))
+            {
+                // SYNC:CONSTRAINT:C58
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C58,
+                    DiagnosticCatalog.C58.FormatMessage(
+                        ("message", $"Duplicate constraint '{kind}' on field '{name}'.")),
+                    0));
+            }
+            else
+            {
+                kindSeen[kind] = true;
+            }
+        }
+
+        // Detect subsumption: positive is strictly stronger than nonnegative;
+        // having both means nonnegative can never fire independently — it is dead code.
+        bool hasNonneg = constraints.Any(static c => c is FieldConstraint.Nonnegative);
+        bool hasPositive = constraints.Any(static c => c is FieldConstraint.Positive);
+        if (hasNonneg && hasPositive)
+        {
+            // SYNC:CONSTRAINT:C58
+            diagnostics.Add(new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C58,
+                DiagnosticCatalog.C58.FormatMessage(
+                    ("message", "Constraint 'nonnegative' is subsumed by 'positive'.")) ,
+                0));
+        }
+
+        // Detect contradictory range constraints
+        double? minVal = null, maxVal = null;
+        foreach (var c in constraints)
+        {
+            if (c is FieldConstraint.Min mn) minVal = mn.Value;
+            if (c is FieldConstraint.Max mx) maxVal = mx.Value;
+            if (c is FieldConstraint.Mincount mc) minVal = mc.Value;
+            if (c is FieldConstraint.Maxcount mc2) maxVal = mc2.Value;
+        }
+        if (minVal.HasValue && maxVal.HasValue && minVal.Value > maxVal.Value)
+        {
+            var c1 = constraints.FirstOrDefault(c => c is FieldConstraint.Min or FieldConstraint.Mincount);
+            var c2 = constraints.FirstOrDefault(c => c is FieldConstraint.Max or FieldConstraint.Maxcount);
+            // SYNC:CONSTRAINT:C58
+            diagnostics.Add(new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C58,
+                DiagnosticCatalog.C58.FormatMessage(
+                    ("message", $"Contradictory constraints: '{ConstraintLabel(c1!)}' and '{ConstraintLabel(c2!)}' define an empty valid range.")),
+                0));
+        }
+    }
+
+    private static void ValidateConstraintDefault(
+        string name,
+        object? defaultValue,
+        IReadOnlyList<FieldConstraint> constraints,
+        List<PreceptValidationDiagnostic> diagnostics)
+    {
+        foreach (var c in constraints)
+        {
+            bool violated = (c, defaultValue) switch
+            {
+                (FieldConstraint.Nonnegative, double d) => d < 0,
+                (FieldConstraint.Positive,    double d) => d <= 0,
+                (FieldConstraint.Min mn,      double d) => d < mn.Value,
+                (FieldConstraint.Max mx,      double d) => d > mx.Value,
+                (FieldConstraint.Notempty,    string s) => s.Length == 0,
+                (FieldConstraint.Minlength ml, string s) => s.Length < ml.Value,
+                (FieldConstraint.Maxlength ml, string s) => s.Length > ml.Value,
+                _ => false
+            };
+
+            if (violated)
+            {
+                var valueLabel = defaultValue switch
+                {
+                    string s => $"\"{s}\"",
+                    double d => d.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    _ => defaultValue?.ToString() ?? "null"
+                };
+                // SYNC:CONSTRAINT:C59
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C59,
+                    DiagnosticCatalog.C59.FormatMessage(
+                        ("value", valueLabel),
+                        ("constraint", ConstraintLabel(c))),
+                    0));
+            }
+        }
+    }
+
+    private static string ConstraintKindKey(FieldConstraint c) => c switch
+    {
+        FieldConstraint.Nonnegative => "nonnegative",
+        FieldConstraint.Positive    => "positive",
+        FieldConstraint.Notempty    => "notempty",
+        FieldConstraint.Min         => "min",
+        FieldConstraint.Max         => "max",
+        FieldConstraint.Minlength   => "minlength",
+        FieldConstraint.Maxlength   => "maxlength",
+        FieldConstraint.Mincount    => "mincount",
+        FieldConstraint.Maxcount    => "maxcount",
+        _                           => c.GetType().Name.ToLowerInvariant()
+    };
+
+    private static string ConstraintLabel(FieldConstraint c) => c switch
+    {
+        FieldConstraint.Nonnegative => "nonnegative",
+        FieldConstraint.Positive    => "positive",
+        FieldConstraint.Notempty    => "notempty",
+        FieldConstraint.Min mn      => $"min {mn.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+        FieldConstraint.Max mx      => $"max {mx.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+        FieldConstraint.Minlength ml => $"minlength {ml.Value}",
+        FieldConstraint.Maxlength ml => $"maxlength {ml.Value}",
+        FieldConstraint.Mincount mc  => $"mincount {mc.Value}",
+        FieldConstraint.Maxcount mc  => $"maxcount {mc.Value}",
+        _                           => c.GetType().Name.ToLowerInvariant()
+    };
+
     private static void ValidateRules(
         PreceptDefinition model,
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
@@ -374,6 +597,12 @@ internal static class PreceptTypeChecker
 
             if (col.CollectionKind is PreceptCollectionKind.Queue or PreceptCollectionKind.Stack)
                 dataSymbols[$"{col.Name}.peek"] = innerKind;
+        }
+
+        foreach (var field in model.Fields)
+        {
+            if (field.Type == PreceptScalarType.String)
+                dataSymbols[$"{field.Name}.length"] = StaticValueKind.Number;
         }
 
         scopes.Add(new PreceptTypeScopeInfo(1, "data-rules", new Dictionary<string, StaticValueKind>(dataSymbols, StringComparer.Ordinal)));
@@ -452,6 +681,11 @@ internal static class PreceptTypeChecker
         {
             symbols[pair.Key] = pair.Value;
             symbols[$"{eventName}.{pair.Key}"] = pair.Value;
+            if (HasFlag(pair.Value, StaticValueKind.String))
+            {
+                symbols[$"{pair.Key}.length"] = StaticValueKind.Number;
+                symbols[$"{eventName}.{pair.Key}.length"] = StaticValueKind.Number;
+            }
         }
 
         return symbols;
@@ -506,6 +740,8 @@ internal static class PreceptTypeChecker
                 // Only dotted form (EventName.ArgName) is valid in transition-row scope.
                 // Bare arg names are valid only in event-assert scope (see BuildEventAssertSymbols).
                 symbols[$"{eventName}.{pair.Key}"] = pair.Value;
+                if (HasFlag(pair.Value, StaticValueKind.String))
+                    symbols[$"{eventName}.{pair.Key}.length"] = StaticValueKind.Number;
             }
         }
 
@@ -522,6 +758,12 @@ internal static class PreceptTypeChecker
 
             if (col.CollectionKind is PreceptCollectionKind.Queue or PreceptCollectionKind.Stack)
                 symbols[$"{col.Name}.peek"] = innerKind;
+        }
+
+        foreach (var pair in dataFieldKinds)
+        {
+            if (HasFlag(pair.Value, StaticValueKind.String))
+                symbols[$"{pair.Key}.length"] = StaticValueKind.Number;
         }
 
         return symbols;
@@ -609,7 +851,9 @@ internal static class PreceptTypeChecker
 
             case PreceptIdentifierExpression identifier:
             {
-                var key = identifier.Member is null ? identifier.Name : $"{identifier.Name}.{identifier.Member}";
+                var key = identifier.SubMember is not null
+                    ? $"{identifier.Name}.{identifier.Member}.{identifier.SubMember}"
+                    : identifier.Member is null ? identifier.Name : $"{identifier.Name}.{identifier.Member}";
                 if (!symbols.TryGetValue(key, out kind))
                 {
                     diagnostic = new PreceptValidationDiagnostic(
@@ -617,6 +861,34 @@ internal static class PreceptTypeChecker
                         $"unknown identifier '{key}'.",
                         0);
                     return false;
+                }
+
+                // C56: .length on a nullable string requires an explicit null guard before access.
+                // SYNC:CONSTRAINT:C56
+                if (identifier.Member == "length" &&
+                    symbols.TryGetValue(identifier.Name, out var baseKind) &&
+                    HasFlag(baseKind, StaticValueKind.Null))
+                {
+                    diagnostic = new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C56,
+                        DiagnosticCatalog.C56.FormatMessage(("field", identifier.Name)),
+                        0);
+                    return false;
+                }
+
+                // C56 three-level form: EventName.ArgName.length — nullable arg requires null guard.
+                // SYNC:CONSTRAINT:C56
+                if (identifier.SubMember == "length")
+                {
+                    var argKey = $"{identifier.Name}.{identifier.Member}";
+                    if (symbols.TryGetValue(argKey, out var argKind) && HasFlag(argKind, StaticValueKind.Null))
+                    {
+                        diagnostic = new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C56,
+                            DiagnosticCatalog.C56.FormatMessage(("field", argKey)),
+                            0);
+                        return false;
+                    }
                 }
 
                 return true;

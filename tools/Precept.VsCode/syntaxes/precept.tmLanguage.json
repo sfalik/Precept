@@ -18,11 +18,13 @@
     { "include": "#transitionTarget" },
     { "include": "#eventArgReference" },
     { "include": "#collectionMemberAccess" },
+    { "include": "#stringMemberAccess" },
     { "include": "#rootEditDeclaration" },
     { "include": "#controlKeywords" },
     { "include": "#declarationKeywords" },
     { "include": "#typeKeywords" },
     { "include": "#actionKeywords" },
+    { "include": "#constraintKeywords" },
     { "include": "#outcomeKeywords" },
     { "include": "#arrowOperator" },
     { "include": "#operators" },
@@ -166,6 +168,7 @@
             "8": {
               "patterns": [
                 { "include": "#typeKeywords" },
+                { "include": "#constraintKeywords" },
                 { "include": "#declarationKeywords" },
                 { "include": "#numbers" },
                 { "include": "#booleanNull" },
@@ -262,6 +265,7 @@
             "8": { "name": "storage.type.precept" },
             "9": {
               "patterns": [
+                { "include": "#constraintKeywords" },
                 { "include": "#declarationKeywords" },
                 { "include": "#booleanNull" },
                 { "include": "#numbers" },
@@ -339,10 +343,23 @@
       ]
     },
     "collectionMemberAccess": {
-      "comment": "Collection.count, Collection.min, etc.",
+      "comment": "Dotted collection member accessors: .count, .min, .max, .peek.",
       "patterns": [
         {
           "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)(count|min|max|peek)\\b",
+          "captures": {
+            "1": { "name": "variable.other.field.precept" },
+            "2": { "name": "punctuation.accessor.precept" },
+            "3": { "name": "variable.other.property.precept" }
+          }
+        }
+      ]
+    },
+    "stringMemberAccess": {
+      "comment": "Dotted string member accessors: .length (and future string accessors).",
+      "patterns": [
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)(length)\\b",
           "captures": {
             "1": { "name": "variable.other.field.precept" },
             "2": { "name": "punctuation.accessor.precept" },
@@ -380,7 +397,16 @@
       "patterns": [
         {
           "name": "keyword.other.precept",
-          "match": "\\b(set|add|remove|enqueue|dequeue|push|pop|clear|into|contains|and|or|not)\\b"
+          "match": "\\b(set|add|remove|enqueue|dequeue|push|pop|clear|into|contains)\\b"
+        }
+      ]
+    },
+    "constraintKeywords": {
+      "comment": "Field-level and event-arg-level constraint keywords (type-shape tier, issue #13)",
+      "patterns": [
+        {
+          "name": "keyword.other.precept",
+          "match": "\\b(nonnegative|positive|notempty|min|max|minlength|maxlength|mincount|maxcount)\\b"
         }
       ]
     },
@@ -406,6 +432,10 @@
     },
     "operators": {
       "patterns": [
+        {
+          "name": "keyword.operator.logical.precept",
+          "match": "\\b(and|or|not)\\b"
+        },
         {
           "name": "keyword.operator.comparison.precept",
           "match": "==|!=|>=|<="

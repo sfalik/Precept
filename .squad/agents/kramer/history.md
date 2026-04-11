@@ -62,9 +62,28 @@
 - Build: 0 errors. Tests: 87/87 pass.
 - Commit: `8f3bdab` — "feat(#31): grammar and language server — and/or/not keywords (slice 5)"
 
+### 2026-04-10 — Issue #10: String `.length` completions + grammar (tooling slice)
+
+- Completions (`PreceptAnalyzer.cs`): added string member branch inside the existing `collectionMemberPrefixMatch.Success` block — same regex match, same pattern as collection branch. Checks `info.FieldTypeKinds` for `StaticValueKind.String` flag (covers non-nullable `String` and nullable `String | Null`). Added `BuildStringMemberItems(fieldName, isNullable)` returning one `.length` `Property` item with `Detail = "number"` and documentation that adjusts for nullable fields.
+- Grammar (`precept.tmLanguage.json`): `.length` is NOT naturally caught by the identifier catch-all with the same scoping as `.count`. The `collectionMemberAccess` pattern already explicitly scopes these members as `variable.other.property.precept`. Added `length` to the alternation (`count|min|max|peek|length`) so `.length` gets the same token scope. Updated comment to "Dotted member accessors: collection (.count, .min, .max, .peek) and string (.length)."
+- Build: 0 errors. Tests: 87/87 pass.
+- Key learning: When a grammar already has a named pattern for specific dotted accessors (not relying on catch-all), new accessors must be added explicitly to that pattern — the catch-all produces a semantically different token scope.
+
 ## Learnings
 
 - GitHub README rendering gives reliable control over image assets, not over text-inside-image scaling relative to surrounding prose. If size parity with nearby copy matters, real Markdown text or fenced code is the only robust answer.
 - For image-based README treatments, external SVG rendered through `<img>` with an explicit width is the strongest compromise; PNG plus `<img width>` can be tuned, but it remains more fragile across mobile, zoom, and density changes.
 - GitHub officially supports `<picture>` for light/dark asset swaps, but viewport-specific mobile/desktop swapping and custom CSS/media-query tricks are not a dependable README strategy.
 - Live GitHub repo pages clamp the overall content frame before ultra-wide browsers run out of space: the repo page tops out around a 1280px shell, and the rendered README/article column tops out around 1012px. For README hero images, optimize the meaningful artwork for roughly 880-920 displayed pixels and spend any extra width on whitespace instead of extra content columns.
+
+### 2026-04-10 — Issue #13: Field-level constraints — tooling slice
+
+- Grammar (precept.tmLanguage.json): added constraintKeywords repository entry — all 9 keywords (
+onnegative, positive, 
+otempty, min, max, minlength, maxlength, mincount, maxcount) scoped as keyword.other.precept. Inserted into top-level patterns between ctionKeywords and outcomeKeywords (before identifierReference catch-all). Also included in ieldScalarDeclaration capture 9 and ventWithArgsDeclaration capture 8 so constraints on those lines get keyword scope rather than identifier catch-all.
+- Conflict check: min/max in collectionMemberAccess use dotted form (identifier.min) — no conflict with standalone min/max constraint keywords.
+- Completions (PreceptAnalyzer.cs): replaced the single (?:string|number|boolean) scalar field patterns with type-specific branches for 
+umber, string, and oolean. Returned type-appropriate constraint items (NumberConstraintItems, StringConstraintItems, CollectionConstraintItems) at each field/event-arg declaration zone: after type, after nullable, after default, after existing constraints, and after collection of TYPE. Static arrays carry Detail and Documentation.
+- Tests: updated 2 existing count-sensitive tests; added 7 new constraint zone tests. 94/94 pass.
+- Decision inbox: .squad/decisions/inbox/kramer-issue13-tooling.md
+- Key learning: when splitting a combined type-alternative regex into type-specific branches for richer responses, ensure all three types are covered and that more-specific patterns (with constraints already present) appear BEFORE the base 	ype  patterns in method ordering.

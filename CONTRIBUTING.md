@@ -29,18 +29,18 @@ A proposal that states WHAT without WHY is incomplete. Send it back for rational
 
 Create the issue with labels `proposal` + `language` (and optionally `dsl-expressiveness` or `dsl-compactness`). Add it to the **Precept Language Improvements** project. Assign a wave milestone.
 
-#### 2. Research (`docs/research/`)
+#### 2. Research (`research/`)
 
-Research documents live in `docs/research/` and capture:
+Research documents live in `research/` and capture:
 - Precedent surveys (how other tools solve this)
 - Dead ends explored and why they were rejected
 - Design philosophy and rationale
 
-Research files are linked from the issue, not the other way around. The issue map in `docs/research/language/README.md` connects each proposal to its research starting points.
+Research files are linked from the issue, not the other way around. The issue map in `research/language/README.md` connects each proposal to its research starting points.
 
 **Research is durable.** It explains *why* decisions were made and survives across sessions. When a proposal is revised, update the research doc with the new reasoning.
 
-**Quality bar for rationale:** `docs/research/language/expressiveness/computed-fields.md` and the Issue #17 proposal demonstrate the expected depth — alternatives surveyed with precedent, explicit tradeoff analysis, and design philosophy grounding each locked decision.
+**Quality bar for rationale:** `research/language/expressiveness/computed-fields.md` and the Issue #17 proposal demonstrate the expected depth — alternatives surveyed with precedent, explicit tradeoff analysis, and design philosophy grounding each locked decision.
 
 #### 3. Implementation (Feature Branch + PR)
 
@@ -86,9 +86,9 @@ The table above covers which files to touch during implementation. This table is
 |-----------------|--------------------------|
 | Proposed syntax, behavior, examples | `docs/PreceptLanguageDesign.md` — syntax forms, grammar rules, operator tables, precedence, examples; also `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` for any new keywords or syntax forms |
 | Locked design decisions (the **what**) | `docs/PreceptLanguageDesign.md` — named decisions in the relevant section |
-| Locked design decisions (the **why** / rationale / alternatives rejected) | `docs/research/` — update or create the research doc; if rationale was only in the issue, move it here now |
+| Locked design decisions (the **why** / rationale / alternatives rejected) | `research/` — update or create the research doc; if rationale was only in the issue, move it here now |
 | Explicit exclusions / out of scope | `docs/PreceptLanguageDesign.md` — named as deliberate exclusions so they aren't re-proposed later |
-| Open questions resolved during implementation | Resolved decisions go to `docs/research/`; if they changed the design, update the design doc too |
+| Open questions resolved during implementation | Resolved decisions go to `research/`; if they changed the design, update the design doc too |
 | Acceptance criteria | Verified by the test suite — tests passing *is* the living acceptance criteria; no separate doc needed |
 | Implementation scope checklist | PR body — ephemeral, discarded after merge |
 | Dependencies / related issues | Tracked in the issues themselves — no migration needed |
@@ -125,7 +125,7 @@ Language proposals are assigned to wave milestones that reflect priority and dep
 | What the DSL syntax IS | `docs/PreceptLanguageDesign.md` | Permanent — tracks reality |
 | What the C# API IS | `docs/RuntimeApiDesign.md` | Permanent — tracks reality |
 | What a feature SHOULD BE | GitHub issue body | Until implemented |
-| WHY a decision was made | Issue body (per-decision rationale) + `docs/research/` (full evidence base) | Permanent — rationale lives in both places |
+| WHY a decision was made | Issue body (per-decision rationale) + `research/` (full evidence base) | Permanent — rationale lives in both places |
 | HOW to implement (checklist) | PR body | Ephemeral — dies with the PR |
 | AI agent directives | `.github/copilot-instructions.md` | Permanent — updated as process evolves |
 

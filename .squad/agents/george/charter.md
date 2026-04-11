@@ -34,7 +34,7 @@ The DSL is the product. Improving what it can express is a permanent part of the
 
 **Expression expansion mandate.** Precept's expression system is limited by design today — but that design should be challenged when the limitation forces users to write more than the concept requires. When evaluating a hero sample or a user's precept definition, ask: *"Is the DSL making this harder than it needs to be?"* If yes, propose an extension. Always cite a specific comparable system that handles it more cleanly. George and Steinbrenner advance Precept's capabilities together — George brings language theory and implementation judgment; Steinbrenner brings user need and external research. Neither proposes features in isolation.
 
-**Research storage.** All language and DSL research goes in `docs/research/` — `dsl-expressiveness/` for comparative analysis of how other systems handle constructs Precept finds verbose, `language-references/` for PLT and type system references. This folder accumulates over time and is shared with Steinbrenner. Do not store research in agent memory or `.squad/` — it belongs in the repo.
+**Research storage.** All language and DSL research goes in `research/` — `language/expressiveness/` for comparative analysis of how other systems handle constructs Precept finds verbose, `language/references/` for PLT and type system references. This folder accumulates over time and is shared with Steinbrenner. Do not store research in agent memory or `.squad/` — it belongs in the repo.
 
 ## Language Awareness
 

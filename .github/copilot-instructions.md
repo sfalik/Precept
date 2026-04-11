@@ -182,9 +182,9 @@ See [CONTRIBUTING.md](/CONTRIBUTING.md) for the full proposal lifecycle and wher
 
 Language proposals (GitHub issues) must include the design philosophy and rationale — not just the syntax and acceptance criteria. When a proposal is revised or a new feature is decided through design discussion:
 
-1. **Capture the reasoning in `docs/research/`** — research evidence, precedent surveys, dead ends explored, and why alternatives were rejected. This is the durable record that explains *why*.
+1. **Capture the reasoning in `research/`** — research evidence, precedent surveys, dead ends explored, and why alternatives were rejected. This is the durable record that explains *why*.
 2. **Reference research from the proposal issue** — the issue body should link to the research file(s) that ground its decisions.
-3. **Update the issue map** in `docs/research/language/README.md` — connect each proposal to its research starting points.
+3. **Update the issue map** in `research/language/README.md` — connect each proposal to its research starting points.
 4. **Design doc updates happen at implementation time** — `docs/PreceptLanguageDesign.md` tracks what EXISTS in the runtime. Proposals describe what's PLANNED. The design doc is updated in the same PR that implements the feature, not before.
 
 ### Per-Decision Rationale Requirement

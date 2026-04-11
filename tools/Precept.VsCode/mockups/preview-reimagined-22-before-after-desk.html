@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 22: Before / After Desk - Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <script src="preview-reimagined-maintenance-work-order.js"></script>
+  <style>
+    body { display: flex; flex-direction: column; background: linear-gradient(180deg, #09090c 0%, #0d0d11 100%); }
+    .header, .toolbar { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+    .header { background: rgba(12, 12, 15, 0.95); }
+    .toolbar { background: rgba(18, 18, 22, 0.92); }
+    .header-left, .toolbar-left, .toolbar-actions { display: flex; align-items: center; gap: 10px; }
+    .header-title { font-size: 13px; font-weight: 700; }
+    .header-file, .toolbar-copy { font-size: 11px; color: var(--slate-val); }
+    button, input { font: inherit; }
+    button { appearance: none; border: 1px solid var(--border); background: transparent; color: var(--text); padding: 4px 10px; border-radius: 5px; cursor: pointer; }
+    button:hover { border-color: rgba(99, 102, 241, 0.45); background: rgba(99, 102, 241, 0.10); }
+    .shell { flex: 1; min-height: 0; display: grid; grid-template-rows: 1fr auto; gap: 12px; padding: 12px; }
+    .desk { min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .panel { min-width: 0; min-height: 0; border: 1px solid rgba(39, 39, 42, 0.88); border-radius: 16px; background: linear-gradient(180deg, rgba(20, 20, 24, 0.96), rgba(14, 14, 18, 0.98)); overflow: auto; }
+    .panel-head { padding: 16px; border-bottom: 1px solid rgba(39, 39, 42, 0.86); }
+    .panel-kicker { font-size: 10px; text-transform: uppercase; letter-spacing: 1.3px; color: var(--gold); }
+    .panel-title { font-size: 15px; font-weight: 700; margin-top: 5px; }
+    .panel-copy { font-size: 11px; color: var(--slate-val); line-height: 1.6; margin-top: 5px; }
+    .snapshot { padding: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .snapshot-card { padding: 12px; border-radius: 12px; border: 1px solid rgba(39, 39, 42, 0.78); background: rgba(17, 17, 20, 0.84); }
+    .snapshot-card.changed { border-color: rgba(52, 211, 153, 0.34); background: rgba(52, 211, 153, 0.06); }
+    .snapshot-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+    .snapshot-value { font-size: 13px; font-weight: 700; margin-top: 4px; }
+    .snapshot-meta { font-size: 10px; color: var(--slate-val); margin-top: 3px; }
+    .desk-note { margin: 0 16px 16px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(168, 152, 245, 0.26); background: rgba(168, 152, 245, 0.08); font-size: 11px; line-height: 1.7; color: var(--slate-val); }
+    .action-strip { border: 1px solid rgba(39, 39, 42, 0.88); border-radius: 16px; background: rgba(17, 17, 20, 0.96); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+    .action-top { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+    .action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+    .action-card { padding: 12px; border-radius: 12px; border: 1px solid rgba(39, 39, 42, 0.82); background: rgba(22, 22, 26, 0.86); cursor: pointer; }
+    .action-card.selected { border-color: rgba(99, 102, 241, 0.44); background: rgba(99, 102, 241, 0.08); }
+    .action-card.disabled { opacity: 0.5; }
+    .action-name { font-size: 13px; font-weight: 700; }
+    .action-reason { font-size: 11px; color: var(--slate-val); line-height: 1.6; margin-top: 5px; }
+    .action-footer { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+    .state-strip { display: flex; gap: 8px; flex-wrap: wrap; }
+    .state-node { padding: 7px 10px; border-radius: 999px; border: 1px solid rgba(39, 39, 42, 0.82); color: var(--slate-val); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+    .state-node.current { border-color: rgba(168, 152, 245, 0.42); color: var(--violet); }
+    .state-node.visited:not(.current) { border-color: rgba(48, 184, 232, 0.24); color: var(--cyan); }
+    @media (max-width: 1080px) { .desk { grid-template-columns: 1fr; } .snapshot { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <span class="concept-badge">22 - BEFORE / AFTER DESK</span>
+      <span class="header-title">MaintenanceWorkOrder</span>
+      <span class="sep">.</span>
+      <span class="header-file">maintenance-work-order.precept</span>
+    </div>
+    <div class="toolbar-actions">
+      <button id="undoBtn">Undo</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <div>
+        <div class="panel-kicker">Predictive workspace</div>
+        <div class="header-title">Put the committed state and the proposed next state on the desk at the same time.</div>
+      </div>
+    </div>
+    <div class="toolbar-copy">This variant makes every event choice feel like an explicit compare-before-you-commit decision.</div>
+  </div>
+
+  <div class="shell">
+    <div class="desk">
+      <section class="panel">
+        <div class="panel-head">
+          <div class="panel-kicker">Before</div>
+          <div class="panel-title">Committed snapshot</div>
+          <div class="panel-copy">The left side is the truth the runtime is holding right now.</div>
+        </div>
+        <div id="beforeDesk" class="snapshot"></div>
+        <div class="desk-note">Use this side to understand the current state diagram position, the active data contract, and the last committed field provenance.</div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div class="panel-kicker">After</div>
+          <div class="panel-title">Projected result</div>
+          <div class="panel-copy">Selecting an action stages a future snapshot before anything commits.</div>
+        </div>
+        <div id="afterDesk" class="snapshot"></div>
+        <div id="afterNote" class="desk-note"></div>
+      </section>
+    </div>
+
+    <section class="action-strip">
+      <div class="action-top">
+        <div>
+          <div class="panel-kicker">Action tray</div>
+          <div class="panel-title">Choose a move, inspect the diff, then commit.</div>
+        </div>
+        <div class="toolbar-actions">
+          <button id="toggleUrgentBtn">Toggle Urgent</button>
+          <input id="estimateInput" type="number" min="1" style="width:80px;border:1px solid var(--border);background:rgba(12,12,15,0.85);color:var(--text);border-radius:5px;padding:4px 6px;" />
+          <button id="applyBtn">Apply Selected</button>
+        </div>
+      </div>
+      <div id="stateStrip" class="state-strip"></div>
+      <div id="actionGrid" class="action-grid"></div>
+    </section>
+  </div>
+
+  <script>
+    const demo = window.createMaintenanceWorkOrderDemo();
+    const esc = window.mwoEsc;
+    const fmt = window.mwoFormatValue;
+    let latestView = null;
+
+    document.getElementById("undoBtn").onclick = () => demo.undo();
+    document.getElementById("resetBtn").onclick = () => demo.reset();
+    document.getElementById("toggleUrgentBtn").onclick = () => demo.toggleUrgent();
+    document.getElementById("applyBtn").onclick = () => { if (latestView && latestView.selectedAction) demo.commitAction(latestView.selectedAction); };
+
+    function renderSnapshot(targetId, fields, changedLookup, provenanceLookup) {
+      document.getElementById(targetId).innerHTML = fields.map((field) => `
+        <div class="snapshot-card ${changedLookup(field.name) ? "changed" : ""}">
+          <div class="snapshot-label">${esc(field.label)}</div>
+          <div class="snapshot-value">${esc(fmt(field.value))}</div>
+          <div class="snapshot-meta">${esc(provenanceLookup(field.name))}</div>
+        </div>
+      `).join("");
+    }
+
+    function render(view) {
+      latestView = view;
+      document.getElementById("estimateInput").value = view.sim.data.EstimatedHours;
+      document.getElementById("estimateInput").onchange = (event) => demo.setEstimate(event.target.value);
+
+      renderSnapshot(
+        "beforeDesk",
+        view.fields,
+        (name) => view.fields.find((field) => field.name === name).changed,
+        (name) => view.fields.find((field) => field.name === name).provenance
+      );
+
+      const preview = view.preview;
+      const afterFields = view.fields.map((field) => ({
+        ...field,
+        value: preview ? preview.nextData[field.name] : field.value,
+      }));
+      renderSnapshot(
+        "afterDesk",
+        afterFields,
+        (name) => !!preview && preview.changes.some((change) => change.field === name),
+        (name) => {
+          if (!preview) return view.fields.find((field) => field.name === name).provenance;
+          const change = preview.changes.find((entry) => entry.field === name);
+          return change ? `Will change via ${preview.label}` : view.fields.find((field) => field.name === name).provenance;
+        }
+      );
+
+      document.getElementById("afterNote").textContent = preview
+        ? `${preview.label} would move the order to ${preview.nextState}. ${preview.reason}`
+        : "Pick an action to stage a projected after state.";
+
+      document.getElementById("stateStrip").innerHTML = view.stateNodes.map((state) => `
+        <span class="state-node ${state.current ? "current" : ""} ${state.visited ? "visited" : ""}">${esc(state.name)}</span>
+      `).join("");
+
+      document.getElementById("actionGrid").innerHTML = view.actions.map((action) => `
+        <article class="action-card ${action.id === view.selectedAction ? "selected" : ""} ${action.enabled ? "" : "disabled"}" onclick="demo.setSelectedAction('${action.id}')">
+          <div class="action-name">${esc(action.label)}</div>
+          <div class="action-reason">${esc(action.reason)}</div>
+          <div class="action-footer">
+            <span class="mini-tag">${esc(action.nextState)}</span>
+            <span class="mini-tag">${esc(action.kind)}</span>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    demo.subscribe(render);
+  </script>
+</body>
+</html>

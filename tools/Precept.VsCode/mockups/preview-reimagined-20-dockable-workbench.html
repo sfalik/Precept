@@ -1,0 +1,2791 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concept 20: Dockable Workbench - Precept Preview Reimagined</title>
+  <link rel="stylesheet" href="preview-reimagined-shared.css" />
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at top left, rgba(99, 102, 241, 0.08), transparent 34%),
+        radial-gradient(circle at top right, rgba(48, 184, 232, 0.06), transparent 26%),
+        linear-gradient(180deg, #09090c 0%, #0c0c0f 100%);
+    }
+
+    .toast {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 50;
+      min-width: 220px;
+      max-width: 360px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(99, 102, 241, 0.28);
+      background: rgba(12, 12, 15, 0.94);
+      color: var(--text);
+      font-size: 11px;
+      line-height: 1.5;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+      opacity: 0;
+      transform: translateY(-8px);
+      pointer-events: none;
+      transition: opacity 160ms ease, transform 160ms ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast.transition-toast {
+      border-color: rgba(52, 211, 153, 0.35);
+    }
+
+    .toast.rejected-toast {
+      border-color: rgba(251, 113, 133, 0.35);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px;
+      background: rgba(12, 12, 15, 0.92);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .header-file {
+      color: var(--dusk);
+      font-size: 11px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .header-actions button,
+    .toolbar-actions button,
+    .panel-action,
+    .dock-button,
+    .axis-button,
+    .stack-button,
+    .ec-fire-btn,
+    .dp-edit-btn,
+    .dp-save-btn,
+    .dp-cancel-btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      cursor: pointer;
+      transition: background 120ms ease, border-color 120ms ease, color 120ms ease, transform 120ms ease;
+    }
+
+    .header-actions button,
+    .toolbar-actions button {
+      font-size: 10px;
+      padding: 4px 10px;
+      border-radius: 5px;
+    }
+
+    .header-actions button:hover,
+    .toolbar-actions button:hover,
+    .panel-action:hover,
+    .dock-button:hover,
+    .axis-button:hover,
+    .stack-button:hover,
+    .dp-edit-btn:hover,
+    .dp-save-btn:hover,
+    .dp-cancel-btn:hover {
+      border-color: rgba(99, 102, 241, 0.42);
+      color: #cfd3ff;
+      background: rgba(99, 102, 241, 0.12);
+    }
+
+    .header-actions button:active,
+    .toolbar-actions button:active,
+    .panel-action:active,
+    .dock-button:active,
+    .axis-button:active,
+    .stack-button:active,
+    .ec-fire-btn:active,
+    .dp-edit-btn:active,
+    .dp-save-btn:active,
+    .dp-cancel-btn:active {
+      transform: scale(0.97);
+    }
+
+    .workspace-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 12px 16px 10px 16px;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.9);
+      background: rgba(17, 17, 20, 0.76);
+      backdrop-filter: blur(14px);
+      flex-shrink: 0;
+    }
+
+    .toolbar-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .toolbar-kicker {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.3px;
+      color: var(--cyan);
+      font-weight: 700;
+    }
+
+    .toolbar-title {
+      font-size: 14px;
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .toolbar-summary {
+      font-size: 11px;
+      color: var(--slate-val);
+      line-height: 1.6;
+    }
+
+    .toolbar-summary strong {
+      color: var(--text);
+    }
+
+    .toolbar-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .toolbar-actions button.active {
+      border-color: rgba(48, 184, 232, 0.4);
+      color: var(--cyan);
+      background: rgba(48, 184, 232, 0.1);
+    }
+
+    .workbench-shell {
+      flex: 1;
+      min-height: 0;
+      padding: 12px;
+    }
+
+    .workbench-grid {
+      display: grid;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      min-width: 0;
+    }
+
+    .zone {
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+      background: rgba(20, 20, 24, 0.72);
+      border: 1px solid rgba(39, 39, 42, 0.86);
+      border-radius: 14px;
+      padding: 10px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02), 0 20px 50px rgba(0, 0, 0, 0.22);
+    }
+
+    .zone-hidden {
+      display: none;
+    }
+
+    .panel-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 100%;
+    }
+
+    .panel-stack-bottom {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 10px;
+      align-content: start;
+      min-height: 100%;
+    }
+
+    .empty-zone {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 1px dashed rgba(99, 102, 241, 0.22);
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(99, 102, 241, 0.05), rgba(99, 102, 241, 0.02));
+      color: var(--slate-val);
+      text-align: center;
+      padding: 20px;
+    }
+
+    .empty-zone-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.3px;
+      color: var(--violet);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .empty-zone-hint {
+      font-size: 12px;
+      line-height: 1.6;
+      max-width: 240px;
+    }
+
+    .zone-resizer {
+      position: relative;
+      border-radius: 999px;
+      background: transparent;
+    }
+
+    .zone-resizer::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      background: rgba(99, 102, 241, 0.14);
+      opacity: 0.5;
+      transition: opacity 120ms ease, background 120ms ease;
+    }
+
+    .zone-resizer:hover::before {
+      opacity: 1;
+      background: rgba(99, 102, 241, 0.3);
+    }
+
+    .zone-resizer.vertical {
+      cursor: col-resize;
+      margin: 0 2px;
+    }
+
+    .zone-resizer.horizontal {
+      cursor: row-resize;
+      margin: 2px 0;
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: linear-gradient(180deg, rgba(24, 24, 28, 0.95), rgba(17, 17, 20, 0.96));
+      border: 1px solid rgba(39, 39, 42, 0.9);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .panel.collapsed {
+      min-height: 0;
+    }
+
+    .panel-chrome {
+      padding: 10px 12px 12px 12px;
+      border-bottom: 1px solid rgba(39, 39, 42, 0.95);
+      background: linear-gradient(180deg, rgba(30, 30, 36, 0.92), rgba(18, 18, 21, 0.9));
+    }
+
+    .panel-kicker-row,
+    .panel-header-row,
+    .panel-controls-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .panel-kicker-row {
+      margin-bottom: 8px;
+    }
+
+    .panel-zone-kicker {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .panel-meta-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(48, 184, 232, 0.08);
+      border: 1px solid rgba(48, 184, 232, 0.16);
+      color: var(--cyan);
+      font-size: 10px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .panel-title-wrap {
+      min-width: 0;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .panel-subtitle {
+      margin-top: 2px;
+      font-size: 11px;
+      color: var(--slate-val);
+    }
+
+    .panel-header-actions,
+    .dock-group,
+    .axis-group,
+    .stack-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .panel-action,
+    .dock-button,
+    .axis-button,
+    .stack-button {
+      font-size: 10px;
+      padding: 3px 7px;
+      border-radius: 5px;
+      color: var(--dusk);
+    }
+
+    .panel-action.active,
+    .dock-button.active,
+    .axis-button.active {
+      border-color: rgba(99, 102, 241, 0.42);
+      background: rgba(99, 102, 241, 0.16);
+      color: #d8dbff;
+    }
+
+    .stack-button[disabled] {
+      opacity: 0.32;
+      cursor: not-allowed;
+    }
+
+    .control-group-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      font-weight: 700;
+      margin-right: 2px;
+    }
+
+    .panel-body {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 12px 14px 14px 14px;
+    }
+
+    .panel.collapsed .panel-body {
+      display: none;
+    }
+
+    .panel-collapsed-note {
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--dim);
+    }
+
+    .data-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .dp-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .dp-header-left,
+    .dp-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .dp-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .dp-count {
+      font-size: 10px;
+      color: var(--dim);
+    }
+
+    .dp-dirty-badge {
+      font-size: 8px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.24);
+      color: var(--gold);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      animation: dirtyPulse 1.5s ease-in-out infinite;
+    }
+
+    .dp-edit-btn,
+    .dp-save-btn,
+    .dp-cancel-btn {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 5px;
+    }
+
+    .dp-edit-btn {
+      border-color: rgba(99, 102, 241, 0.28);
+      color: var(--indigo);
+      background: rgba(99, 102, 241, 0.06);
+    }
+
+    .dp-save-btn {
+      border-color: rgba(52, 211, 153, 0.32);
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.08);
+    }
+
+    .dp-save-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .dp-cancel-btn {
+      color: var(--dim);
+    }
+
+    .dp-field-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 8px;
+    }
+
+    .dp-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: rgba(14, 14, 18, 0.78);
+      border: 1px solid rgba(39, 39, 42, 0.76);
+      transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    }
+
+    .dp-field.recently-changed {
+      border-color: rgba(52, 211, 153, 0.32);
+      background: rgba(52, 211, 153, 0.05);
+      animation: dataFlash 700ms ease-out;
+    }
+
+    .dp-field.editable {
+      border-color: rgba(99, 102, 241, 0.22);
+    }
+
+    .dp-field.editing {
+      border-color: rgba(99, 102, 241, 0.4);
+      background: rgba(99, 102, 241, 0.05);
+      box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.08);
+    }
+
+    .dp-field.dirty {
+      border-color: rgba(251, 191, 36, 0.34);
+      background: rgba(251, 191, 36, 0.05);
+    }
+
+    .dp-field-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .dp-field-name {
+      font-size: 11px;
+      color: var(--slate);
+      font-weight: 600;
+    }
+
+    .dp-field-type {
+      font-size: 9px;
+      color: var(--slate-type);
+      opacity: 0.85;
+    }
+
+    .dp-field-value {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--slate-val);
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .dp-field-value.null {
+      color: var(--muted);
+      font-style: italic;
+      font-weight: 500;
+    }
+
+    .dp-field-value.bool-true {
+      color: var(--enabled);
+    }
+
+    .dp-field-value.bool-false {
+      color: var(--blocked);
+      opacity: 0.72;
+    }
+
+    .dp-edit-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--indigo);
+      background: rgba(99, 102, 241, 0.1);
+      border: 1px solid rgba(99, 102, 241, 0.18);
+      border-radius: 999px;
+      padding: 1px 6px;
+    }
+
+    .dp-edit-input,
+    .ec-arg input,
+    .ec-arg select {
+      width: 100%;
+      background: rgba(12, 12, 15, 0.92);
+      border: 1px solid rgba(63, 63, 70, 0.86);
+      color: var(--text);
+      font: inherit;
+      font-size: 11px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    .dp-edit-input:focus,
+    .ec-arg input:focus,
+    .ec-arg select:focus {
+      border-color: rgba(99, 102, 241, 0.62);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+    }
+
+    .dp-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-track {
+      position: relative;
+      width: 34px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(251, 113, 133, 0.28);
+      background: rgba(251, 113, 133, 0.14);
+      transition: background 180ms ease, border-color 180ms ease;
+    }
+
+    .toggle-track::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--blocked);
+      opacity: 0.7;
+      transition: transform 180ms ease, background 180ms ease, opacity 180ms ease;
+    }
+
+    .dp-toggle.on .toggle-track {
+      background: rgba(52, 211, 153, 0.2);
+      border-color: rgba(52, 211, 153, 0.3);
+    }
+
+    .dp-toggle.on .toggle-track::after {
+      transform: translateX(14px);
+      background: var(--enabled);
+      opacity: 1;
+    }
+
+    .dp-toggle-label {
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .dp-constraints-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(39, 39, 42, 0.9);
+    }
+
+    .dp-constraint-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 220px;
+    }
+
+    .dp-constraint-group-title {
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .dp-inv-item,
+    .dp-assert-item {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 10px;
+      color: var(--slate-val);
+    }
+
+    .dp-inv-item.ok,
+    .dp-assert-item.ok {
+      color: var(--enabled);
+    }
+
+    .dp-inv-item.violated,
+    .dp-assert-item.violated {
+      color: var(--blocked);
+    }
+
+    .dp-constraint-target {
+      display: inline-flex;
+      align-items: center;
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: rgba(176, 190, 197, 0.08);
+      border: 1px solid rgba(176, 190, 197, 0.16);
+      color: var(--slate);
+      font-weight: 700;
+    }
+
+    .topology-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: 100%;
+    }
+
+    .topology-summary,
+    .timeline-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 10px;
+      color: var(--dusk);
+    }
+
+    .summary-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(99, 102, 241, 0.08);
+      border: 1px solid rgba(99, 102, 241, 0.14);
+      color: var(--violet);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .diagram-surface {
+      flex: 1;
+      min-height: 0;
+      border-radius: 10px;
+      border: 1px solid rgba(39, 39, 42, 0.78);
+      background: radial-gradient(circle at top left, rgba(99, 102, 241, 0.06), transparent 34%), rgba(10, 10, 13, 0.82);
+      padding: 10px;
+      overflow: auto;
+    }
+
+    .diagram-surface svg {
+      width: 100%;
+      height: auto;
+      min-width: 260px;
+      display: block;
+    }
+
+    .sd-connector {
+      stroke: rgba(48, 184, 232, 0.62);
+      stroke-width: 1.4;
+      stroke-linecap: round;
+      fill: none;
+      transition: stroke 180ms ease, stroke-width 180ms ease, opacity 180ms ease;
+    }
+
+    .sd-edge-active {
+      stroke: rgba(52, 211, 153, 0.94);
+      stroke-width: 2.2;
+    }
+
+    .sd-edge-traced {
+      stroke: rgba(99, 102, 241, 0.86);
+    }
+
+    .sd-edge-hover {
+      stroke: rgba(251, 191, 36, 0.96);
+      stroke-width: 2.2;
+    }
+
+    .sd-arrow {
+      fill: rgba(48, 184, 232, 0.78);
+    }
+
+    .sd-arrow-active {
+      fill: rgba(52, 211, 153, 0.96);
+    }
+
+    .sd-arrow-traced {
+      fill: rgba(99, 102, 241, 0.9);
+    }
+
+    .sd-edge-label {
+      fill: var(--dusk);
+      font-size: 7px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-anchor: middle;
+      transition: fill 180ms ease;
+    }
+
+    .sd-edge-label-active,
+    .sd-edge-label-hover {
+      fill: var(--gold);
+    }
+
+    .sd-node,
+    .sd-node-current,
+    .sd-node-visited,
+    .sd-node-terminal {
+      fill: transparent;
+      stroke: #4338ca;
+      stroke-width: 1.6;
+      transition: fill 200ms ease, stroke 200ms ease, stroke-width 200ms ease;
+    }
+
+    .sd-node-visited {
+      stroke: #818cf8;
+    }
+
+    .sd-node-current {
+      fill: rgba(99, 102, 241, 0.16);
+      stroke: #a898f5;
+      stroke-width: 2.2;
+    }
+
+    .sd-node-terminal-outer {
+      fill: transparent;
+      stroke: rgba(168, 152, 245, 0.36);
+      stroke-width: 1;
+    }
+
+    .sd-glow {
+      fill: rgba(99, 102, 241, 0.12);
+      stroke: rgba(168, 152, 245, 0.22);
+      stroke-width: 1;
+    }
+
+    .sd-initial-dot {
+      fill: var(--violet);
+    }
+
+    .sd-label {
+      fill: var(--slate);
+      font-size: 8px;
+      font-weight: 700;
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+
+    .sd-label-current {
+      fill: #f5f6ff;
+    }
+
+    .sd-label-visited {
+      fill: #d5d8ff;
+    }
+
+    .sd-node-hover {
+      stroke: var(--gold);
+      stroke-width: 2.2;
+    }
+
+    .timeline-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: 100%;
+    }
+
+    .timeline-vertical,
+    .timeline-horizontal {
+      border-radius: 10px;
+      border: 1px solid rgba(39, 39, 42, 0.78);
+      background: rgba(10, 10, 13, 0.82);
+      padding: 10px;
+    }
+
+    .timeline-vertical {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .timeline-section-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .timeline-section-head .label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .timeline-section-head .line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(99, 102, 241, 0.4), transparent);
+    }
+
+    .past-column {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .history-card,
+    .present-card,
+    .future-state-card,
+    .future-state-card-h,
+    .event-card,
+    .origin-card,
+    .terminal-message,
+    .terminal-message-h {
+      border-radius: 10px;
+      border: 1px solid rgba(39, 39, 42, 0.82);
+      background: rgba(17, 17, 20, 0.9);
+    }
+
+    .history-card,
+    .present-card,
+    .future-state-card,
+    .future-state-card-h,
+    .origin-card,
+    .terminal-message,
+    .terminal-message-h {
+      padding: 10px 12px;
+    }
+
+    .history-card {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .history-top,
+    .present-top,
+    .future-state-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .history-step,
+    .history-outcome,
+    .history-event,
+    .pc-step,
+    .pc-event,
+    .pc-outcome {
+      font-size: 10px;
+    }
+
+    .history-event,
+    .pc-event,
+    .present-state-name,
+    .pm-h-state-name,
+    .future-state-name,
+    .future-state-name-h {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .history-step,
+    .pc-step {
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .history-outcome.transition,
+    .pc-outcome.transition {
+      color: var(--enabled);
+    }
+
+    .history-outcome.no-transition,
+    .pc-outcome.no-transition {
+      color: var(--cyan);
+    }
+
+    .history-delta,
+    .pc-delta {
+      font-size: 10px;
+      color: var(--slate-val);
+      line-height: 1.5;
+    }
+
+    .present-card {
+      background: linear-gradient(180deg, rgba(99, 102, 241, 0.12), rgba(20, 20, 24, 0.92));
+      border-color: rgba(99, 102, 241, 0.28);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .present-card.terminal-state {
+      border-color: rgba(52, 211, 153, 0.32);
+      background: linear-gradient(180deg, rgba(52, 211, 153, 0.12), rgba(20, 20, 24, 0.92));
+    }
+
+    .present-badges,
+    .pm-h-badges {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .present-badge,
+    .pm-h-badge,
+    .self-loop-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .present-badge.current,
+    .pm-h-badge.current {
+      background: rgba(99, 102, 241, 0.12);
+      color: var(--violet);
+      border: 1px solid rgba(99, 102, 241, 0.24);
+    }
+
+    .present-badge.terminal,
+    .pm-h-badge.terminal {
+      background: rgba(52, 211, 153, 0.12);
+      color: var(--enabled);
+      border: 1px solid rgba(52, 211, 153, 0.24);
+    }
+
+    .present-badge.step-badge,
+    .pm-h-badge.step-badge,
+    .self-loop-badge {
+      background: rgba(48, 184, 232, 0.1);
+      color: var(--cyan);
+      border: 1px solid rgba(48, 184, 232, 0.18);
+    }
+
+    .present-subtitle,
+    .pm-h-subtitle,
+    .future-state-sub,
+    .future-state-sub-h {
+      font-size: 11px;
+      color: var(--slate-val);
+      line-height: 1.6;
+    }
+
+    .future-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .future-pair {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 116px;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .future-pair .future-state-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .future-state-sources,
+    .future-state-sources-h {
+      margin-top: 6px;
+      font-size: 10px;
+      color: var(--dusk);
+      line-height: 1.5;
+    }
+
+    .source-event {
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    .event-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 10px 12px;
+      border-color: rgba(39, 39, 42, 0.9);
+      transition: border-color 160ms ease, transform 160ms ease, background 160ms ease;
+    }
+
+    .event-card.can-fire {
+      border-color: rgba(52, 211, 153, 0.24);
+    }
+
+    .event-card.blocked-card {
+      border-color: rgba(251, 113, 133, 0.24);
+      background: rgba(30, 13, 18, 0.88);
+    }
+
+    .event-card-hover {
+      border-color: rgba(251, 191, 36, 0.42);
+      transform: translateY(-1px);
+    }
+
+    .ec-name-row,
+    .ec-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .ec-name {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .ec-guard {
+      font-size: 10px;
+      color: var(--slate-val);
+    }
+
+    .ec-guard-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+
+    .ec-guard-status.pass {
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.1);
+    }
+
+    .ec-guard-status.fail {
+      color: var(--blocked);
+      background: rgba(251, 113, 133, 0.1);
+    }
+
+    .ec-mutations,
+    .ec-rejection-msg,
+    .ec-asserts {
+      font-size: 10px;
+      line-height: 1.55;
+      color: var(--slate-val);
+    }
+
+    .ec-rejection-msg {
+      color: var(--gold);
+    }
+
+    .ec-args {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 8px;
+      width: 100%;
+    }
+
+    .ec-arg {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .ec-arg label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .ec-fire-btn {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border-color: rgba(52, 211, 153, 0.3);
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.08);
+      white-space: nowrap;
+    }
+
+    .ec-fire-btn.blocked {
+      border-color: rgba(251, 113, 133, 0.25);
+      color: var(--blocked);
+      background: rgba(251, 113, 133, 0.08);
+      cursor: not-allowed;
+    }
+
+    .timeline-horizontal {
+      overflow: auto;
+    }
+
+    .tl-horizontal-flow {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+      min-width: max-content;
+    }
+
+    .past-trail-h,
+    .future-events-h {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+    }
+
+    .origin-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-width: 92px;
+      gap: 4px;
+    }
+
+    .oc-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--violet);
+      box-shadow: 0 0 0 5px rgba(168, 152, 245, 0.12);
+    }
+
+    .oc-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .oc-sub {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--dim);
+    }
+
+    .h-connector {
+      width: 46px;
+      align-self: center;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(99, 102, 241, 0.4), rgba(48, 184, 232, 0.25));
+    }
+
+    .past-card {
+      min-width: 170px;
+      padding: 10px 12px;
+    }
+
+    .present-marker-h,
+    .future-state-card-h,
+    .terminal-message-h {
+      min-width: 200px;
+    }
+
+    .terminal-message,
+    .terminal-message-h {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--slate-val);
+      line-height: 1.6;
+    }
+
+    .tm-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: var(--enabled);
+      background: rgba(52, 211, 153, 0.12);
+      border: 1px solid rgba(52, 211, 153, 0.22);
+      flex-shrink: 0;
+    }
+
+    .state-card-hover {
+      border-color: rgba(251, 191, 36, 0.42);
+      box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.14);
+    }
+
+    .no-past,
+    .no-past-h {
+      font-size: 11px;
+      color: var(--dim);
+      line-height: 1.6;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px dashed rgba(99, 102, 241, 0.22);
+      background: rgba(99, 102, 241, 0.04);
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 6px 16px;
+      border-top: 1px solid var(--border);
+      background: rgba(12, 12, 15, 0.95);
+      color: var(--dim);
+      font-size: 10px;
+      flex-shrink: 0;
+    }
+
+    .status-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .status-ok {
+      color: var(--enabled);
+    }
+
+    .status-warn {
+      color: var(--gold);
+    }
+
+    @keyframes dirtyPulse {
+      0%, 100% { opacity: 0.72; }
+      50% { opacity: 1; }
+    }
+
+    @keyframes dataFlash {
+      0% { background: rgba(52, 211, 153, 0.14); }
+      100% { background: rgba(52, 211, 153, 0.05); }
+    }
+
+    @media (max-width: 1120px) {
+      .workspace-toolbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .toolbar-actions {
+        justify-content: flex-start;
+      }
+
+      .future-pair {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .workbench-shell {
+        padding: 10px;
+      }
+
+      .status-bar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .dp-field-grid,
+      .ec-args,
+      .panel-stack-bottom {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+
+  <div class="header">
+    <div class="header-left">
+      <span class="concept-badge">20 · DOCKABLE WORKBENCH</span>
+      <span class="header-title">MaintenanceWorkOrder</span>
+      <span class="sep">·</span>
+      <span class="header-file">maintenance-work-order.precept</span>
+    </div>
+    <div class="header-actions">
+      <button onclick="undoStep()">Undo</button>
+      <button onclick="resetSimulation()">Reset</button>
+    </div>
+  </div>
+
+  <div class="workspace-toolbar">
+    <div class="toolbar-left">
+      <div class="toolbar-kicker">Concept 20 · Elaine UX mockup</div>
+      <div class="toolbar-title">Dock the three surfaces into a real workbench instead of a single locked layout.</div>
+      <div id="layoutSummary" class="toolbar-summary"></div>
+    </div>
+    <div class="toolbar-actions">
+      <button id="preset-balanced" onclick="applyPreset('balanced')">Balanced</button>
+      <button id="preset-compare" onclick="applyPreset('compare')">Compare</button>
+      <button id="preset-operator" onclick="applyPreset('operator')">Operator</button>
+    </div>
+  </div>
+
+  <div class="workbench-shell">
+    <div id="workbenchGrid" class="workbench-grid"></div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-left">
+      <span id="statusStep">Step 0</span>
+      <span class="sep">·</span>
+      <span id="statusInvariants" class="status-ok">2 invariants ok</span>
+      <span class="sep">·</span>
+      <span id="statusInfo">6 states · 7 events · 10 fields</span>
+    </div>
+    <div>
+      Dock with panel buttons, resize the workspace gutters, and switch Topology or Timeline between vertical and horizontal flow.
+    </div>
+  </div>
+
+  <script>
+    const STATES = ["Draft", "Open", "Scheduled", "InProgress", "Completed", "Cancelled"];
+
+    const STATE_META = {
+      Draft:      { initial: true, terminal: false },
+      Open:       { initial: false, terminal: false },
+      Scheduled:  { initial: false, terminal: false },
+      InProgress: { initial: false, terminal: false },
+      Completed:  { initial: false, terminal: true },
+      Cancelled:  { initial: false, terminal: true },
+    };
+
+    const FIELD_DEFS = {
+      RequesterName:      { type: "string", nullable: true, default: null },
+      Location:           { type: "string", nullable: true, default: null },
+      IssueSummary:       { type: "string", nullable: true, default: null },
+      AssignedTechnician: { type: "string", nullable: true, default: null },
+      EstimatedHours:     { type: "number", nullable: false, default: 0 },
+      ActualHours:        { type: "number", nullable: false, default: 0 },
+      Urgent:             { type: "boolean", nullable: false, default: false },
+      PartsApproved:      { type: "boolean", nullable: false, default: false },
+      CompletionNote:     { type: "string", nullable: true, default: null },
+      CancellationReason: { type: "string", nullable: true, default: null },
+    };
+
+    const INVARIANTS = [
+      {
+        expr: "EstimatedHours >= 0",
+        msg: "Estimated hours cannot be negative",
+        targets: ["EstimatedHours"],
+        check: data => data.EstimatedHours >= 0,
+      },
+      {
+        expr: "ActualHours >= 0",
+        msg: "Actual hours cannot be negative",
+        targets: ["ActualHours"],
+        check: data => data.ActualHours >= 0,
+      },
+    ];
+
+    const EDITABLE_FIELDS = {
+      Draft: ["Location", "IssueSummary", "Urgent"],
+    };
+
+    const STATE_ASSERTIONS = {
+      Scheduled: [{ expr: "AssignedTechnician != null", msg: "Scheduled work must have an assigned technician", targets: ["AssignedTechnician"], check: data => data.AssignedTechnician !== null }],
+      Completed: [{ expr: "CompletionNote != null", msg: "Completed work orders need a completion note", targets: ["CompletionNote"], check: data => data.CompletionNote !== null }],
+    };
+
+    const FROM_ASSERTIONS = {
+      InProgress: [{ expr: "AssignedTechnician != null", msg: "Active work cannot finish without a technician", targets: ["AssignedTechnician"], check: data => data.AssignedTechnician !== null }],
+    };
+
+    const PANEL_META = {
+      data: {
+        title: "Data",
+        subtitle: "Field snapshot, edit mode, invariants, and state constraints.",
+      },
+      topology: {
+        title: "Topology",
+        subtitle: "State machine structure with current, visited, and active transition emphasis.",
+      },
+      timeline: {
+        title: "Timeline",
+        subtitle: "Past to present to future simulation flow with event firing and guard feedback.",
+      },
+    };
+
+    const ZONES = ["left", "center", "right", "bottom"];
+    const ZONE_LABELS = {
+      left: "Left Dock",
+      center: "Center Canvas",
+      right: "Right Dock",
+      bottom: "Bottom Dock",
+    };
+
+    let activePreset = "balanced";
+    let panelLayout = {
+      data: { zone: "left", collapsed: false },
+      topology: { zone: "center", collapsed: false, orientation: "vertical" },
+      timeline: { zone: "bottom", collapsed: false, orientation: "horizontal" },
+    };
+
+    let zoneOrder = {
+      left: ["data"],
+      center: ["topology"],
+      right: [],
+      bottom: ["timeline"],
+    };
+
+    const sizes = {
+      left: 360,
+      right: 320,
+      bottom: 290,
+    };
+
+    let activeResizer = null;
+    let toastTimer = null;
+    let eventArgDrafts = {};
+    let isEditing = false;
+    let draftData = null;
+    let dirtyFields = new Set();
+
+    function getAvailableEvents(state, data) {
+      const events = [];
+
+      if (state === "Draft") {
+        events.push({
+          name: "Submit",
+          args: [
+            { name: "Requester", type: "string", placeholder: "Jane Doe" },
+            { name: "WorkLocation", type: "string", placeholder: "Building A, Room 204" },
+            { name: "Summary", type: "string", placeholder: "HVAC not cooling" },
+            { name: "IsUrgent", type: "boolean", default: false },
+          ],
+          rows: [{
+            guard: null,
+            guardDisplay: null,
+            outcome: "transition",
+            target: "Open",
+            mutations: ["RequesterName = Requester", "Location = WorkLocation", "IssueSummary = Summary", "Urgent = IsUrgent"],
+            eventAsserts: [
+              { expr: "Requester != ''", msg: "A requester name is required", check: args => args.Requester && args.Requester !== "" },
+              { expr: "WorkLocation != ''", msg: "A location is required", check: args => args.WorkLocation && args.WorkLocation !== "" },
+              { expr: "Summary != ''", msg: "An issue summary is required", check: args => args.Summary && args.Summary !== "" },
+            ],
+            canFire: args => args.Requester && args.Requester !== "" && args.WorkLocation && args.WorkLocation !== "" && args.Summary && args.Summary !== "",
+            blockReason: args => {
+              if (!args.Requester || args.Requester === "") return "A requester name is required";
+              if (!args.WorkLocation || args.WorkLocation === "") return "A location is required";
+              if (!args.Summary || args.Summary === "") return "An issue summary is required";
+              return "";
+            },
+            apply: (currentData, args) => ({
+              ...currentData,
+              RequesterName: args.Requester,
+              Location: args.WorkLocation,
+              IssueSummary: args.Summary,
+              Urgent: !!args.IsUrgent,
+            }),
+          }],
+        });
+      }
+
+      if (state === "Open") {
+        events.push({
+          name: "Assign",
+          args: [
+            { name: "Technician", type: "string", placeholder: "Bob Smith" },
+            { name: "Estimate", type: "number", placeholder: "4" },
+          ],
+          rows: [{
+            guard: null,
+            guardDisplay: null,
+            outcome: "transition",
+            target: "Scheduled",
+            mutations: ["AssignedTechnician = Technician", "EstimatedHours = Estimate"],
+            eventAsserts: [
+              { expr: "Technician != ''", msg: "A technician is required", check: args => args.Technician && args.Technician !== "" },
+              { expr: "Estimate > 0", msg: "Estimated hours must be positive", check: args => Number(args.Estimate) > 0 },
+            ],
+            canFire: args => args.Technician && args.Technician !== "" && Number(args.Estimate) > 0,
+            blockReason: args => {
+              if (!args.Technician || args.Technician === "") return "A technician is required";
+              if (!Number(args.Estimate) || Number(args.Estimate) <= 0) return "Estimated hours must be positive";
+              return "";
+            },
+            apply: (currentData, args) => ({
+              ...currentData,
+              AssignedTechnician: args.Technician,
+              EstimatedHours: Number(args.Estimate),
+            }),
+          }],
+        });
+
+        events.push({
+          name: "Cancel",
+          args: [{ name: "Reason", type: "string", placeholder: "No longer needed", nullable: true, default: "" }],
+          rows: [{
+            guard: null,
+            guardDisplay: null,
+            outcome: "transition",
+            target: "Cancelled",
+            mutations: ["CancellationReason = Reason"],
+            eventAsserts: [{ expr: "Reason == null || Reason != ''", msg: "A supplied cancellation reason cannot be blank", check: args => !args.Reason || args.Reason === "" || args.Reason.trim() !== "" }],
+            canFire: () => true,
+            blockReason: () => "",
+            apply: (currentData, args) => ({ ...currentData, CancellationReason: args.Reason || null }),
+          }],
+        });
+      }
+
+      if (state === "Scheduled") {
+        events.push({
+          name: "ApproveParts",
+          args: [],
+          rows: [{
+            guard: null,
+            guardDisplay: null,
+            outcome: "no-transition",
+            target: null,
+            mutations: ["PartsApproved = true"],
+            eventAsserts: [],
+            canFire: () => true,
+            blockReason: () => "",
+            apply: currentData => ({ ...currentData, PartsApproved: true }),
+          }],
+        });
+
+        events.push({
+          name: "StartWork",
+          args: [],
+          rows: [
+            {
+              guard: "!Urgent || PartsApproved",
+              guardDisplay: "!Urgent || PartsApproved",
+              outcome: "transition",
+              target: "InProgress",
+              mutations: [],
+              eventAsserts: [],
+              canFire: (args, currentData) => !currentData.Urgent || currentData.PartsApproved,
+              blockReason: () => "Urgent work must have parts approved before it starts",
+              apply: currentData => currentData,
+            },
+            {
+              guard: null,
+              guardDisplay: null,
+              outcome: "rejected",
+              target: null,
+              rejectMsg: "Urgent work must have parts approved before it starts",
+              eventAsserts: [],
+              canFire: () => false,
+              apply: currentData => currentData,
+            },
+          ],
+        });
+
+        events.push({
+          name: "Cancel",
+          args: [{ name: "Reason", type: "string", placeholder: "Budget cut", nullable: true, default: "" }],
+          rows: [{
+            guard: null,
+            guardDisplay: null,
+            outcome: "transition",
+            target: "Cancelled",
+            mutations: ["CancellationReason = Reason"],
+            eventAsserts: [{ expr: "Reason == null || Reason != ''", msg: "A supplied cancellation reason cannot be blank", check: args => !args.Reason || args.Reason === "" || args.Reason.trim() !== "" }],
+            canFire: () => true,
+            blockReason: () => "",
+            apply: (currentData, args) => ({ ...currentData, CancellationReason: args.Reason || null }),
+          }],
+        });
+      }
+
+      if (state === "InProgress") {
+        events.push({
+          name: "RecordProgress",
+          args: [{ name: "Hours", type: "number", placeholder: "2" }],
+          rows: [{
+            guard: null,
+            guardDisplay: null,
+            outcome: "no-transition",
+            target: null,
+            mutations: ["ActualHours = ActualHours + Hours"],
+            eventAsserts: [{ expr: "Hours > 0", msg: "Progress entries must be positive", check: args => Number(args.Hours) > 0 }],
+            canFire: args => Number(args.Hours) > 0,
+            blockReason: () => "Progress entries must be positive",
+            apply: (currentData, args) => ({ ...currentData, ActualHours: currentData.ActualHours + Number(args.Hours) }),
+          }],
+        });
+
+        events.push({
+          name: "Complete",
+          args: [{ name: "Note", type: "string", placeholder: "Fixed compressor unit" }],
+          rows: [
+            {
+              guard: "ActualHours <= EstimatedHours + 4",
+              guardDisplay: "ActualHours <= EstimatedHours + 4",
+              outcome: "transition",
+              target: "Completed",
+              mutations: ["CompletionNote = Note"],
+              eventAsserts: [{ expr: "Note != ''", msg: "A completion note is required", check: args => args.Note && args.Note !== "" }],
+              canFire: (args, currentData) => args.Note && args.Note !== "" && currentData.ActualHours <= currentData.EstimatedHours + 4,
+              blockReason: (args, currentData) => {
+                if (!args.Note || args.Note === "") return "A completion note is required";
+                return "Work orders that exceed the estimate by more than four hours need review first";
+              },
+              apply: (currentData, args) => ({ ...currentData, CompletionNote: args.Note }),
+            },
+            {
+              guard: null,
+              guardDisplay: null,
+              outcome: "rejected",
+              target: null,
+              rejectMsg: "Work orders that exceed the estimate by more than four hours need review first",
+              eventAsserts: [],
+              canFire: () => false,
+              apply: currentData => currentData,
+            },
+          ],
+        });
+      }
+
+      return events;
+    }
+
+    function getDefaultData() {
+      const currentData = {};
+      Object.entries(FIELD_DEFS).forEach(([key, def]) => {
+        currentData[key] = def.default;
+      });
+      return currentData;
+    }
+
+    function getInitialSimulation() {
+      return {
+        currentState: "Draft",
+        data: getDefaultData(),
+        history: [],
+        stepCount: 0,
+        visitedStates: new Set(["Draft"]),
+        changedFields: new Set(),
+      };
+    }
+
+    let sim = getInitialSimulation();
+
+    function deepClone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function escHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;");
+    }
+
+    function formatVal(value) {
+      if (value === null || value === undefined) return "null";
+      if (typeof value === "boolean") return String(value);
+      return escHtml(String(value));
+    }
+
+    function humanizePanel(panelId) {
+      return PANEL_META[panelId].title;
+    }
+
+    function zoneDisplay(zone) {
+      return ZONE_LABELS[zone];
+    }
+
+    function getStateDescription(state) {
+      return {
+        Draft: "New work order. Fill in the details before the machine can accept it.",
+        Open: "Submitted and waiting for a technician to own the work.",
+        Scheduled: "Technician assigned. Parts approval and work start now matter.",
+        InProgress: "Work is underway. Progress can accumulate or completion can be attempted.",
+        Completed: "Work finished and closed.",
+        Cancelled: "Work order closed without execution.",
+      }[state] || "";
+    }
+
+    function getPanelMetaText(panelId) {
+      if (panelId === "data") return `${Object.keys(FIELD_DEFS).length} fields · ${sim.currentState}`;
+      if (panelId === "topology") return `${STATES.length} states · ${panelLayout.topology.orientation} axis`;
+      return `${sim.history.length} steps · ${panelLayout.timeline.orientation} axis`;
+    }
+
+    function removePanelFromZones(panelId) {
+      Object.keys(zoneOrder).forEach(zone => {
+        zoneOrder[zone] = zoneOrder[zone].filter(id => id !== panelId);
+      });
+    }
+
+    function setPanelZone(panelId, zone) {
+      if (!ZONES.includes(zone)) return;
+      if (panelLayout[panelId].zone === zone && zoneOrder[zone].includes(panelId)) return;
+      removePanelFromZones(panelId);
+      zoneOrder[zone].push(panelId);
+      panelLayout[panelId].zone = zone;
+      activePreset = "custom";
+      render();
+      showToast(`${humanizePanel(panelId)} docked to ${zoneDisplay(zone)}`, "transition");
+    }
+
+    function movePanelWithinZone(panelId, direction) {
+      const zone = panelLayout[panelId].zone;
+      const index = zoneOrder[zone].indexOf(panelId);
+      const targetIndex = index + direction;
+      if (index === -1 || targetIndex < 0 || targetIndex >= zoneOrder[zone].length) return;
+      const next = [...zoneOrder[zone]];
+      next[index] = next[targetIndex];
+      next[targetIndex] = panelId;
+      zoneOrder[zone] = next;
+      activePreset = "custom";
+      render();
+      showToast(`${humanizePanel(panelId)} reordered in ${zoneDisplay(zone)}`, "no-transition");
+    }
+
+    function togglePanelCollapse(panelId) {
+      panelLayout[panelId].collapsed = !panelLayout[panelId].collapsed;
+      activePreset = "custom";
+      render();
+    }
+
+    function setPanelOrientation(panelId, orientation) {
+      if ((panelId !== "topology" && panelId !== "timeline") || panelLayout[panelId].orientation === orientation) return;
+      panelLayout[panelId].orientation = orientation;
+      activePreset = "custom";
+      render();
+      showToast(`${humanizePanel(panelId)} switched to ${orientation} flow`, "transition");
+    }
+
+    function applyPreset(name) {
+      if (name === "balanced") {
+        panelLayout = {
+          data: { zone: "left", collapsed: false },
+          topology: { zone: "center", collapsed: false, orientation: "vertical" },
+          timeline: { zone: "bottom", collapsed: false, orientation: "horizontal" },
+        };
+        zoneOrder = {
+          left: ["data"],
+          center: ["topology"],
+          right: [],
+          bottom: ["timeline"],
+        };
+      }
+
+      if (name === "compare") {
+        panelLayout = {
+          data: { zone: "right", collapsed: false },
+          topology: { zone: "center", collapsed: false, orientation: "horizontal" },
+          timeline: { zone: "bottom", collapsed: false, orientation: "vertical" },
+        };
+        zoneOrder = {
+          left: [],
+          center: ["topology"],
+          right: ["data"],
+          bottom: ["timeline"],
+        };
+      }
+
+      if (name === "operator") {
+        panelLayout = {
+          data: { zone: "center", collapsed: false },
+          topology: { zone: "left", collapsed: false, orientation: "vertical" },
+          timeline: { zone: "right", collapsed: false, orientation: "horizontal" },
+        };
+        zoneOrder = {
+          left: ["topology"],
+          center: ["data"],
+          right: ["timeline"],
+          bottom: [],
+        };
+      }
+
+      activePreset = name;
+      render();
+      showToast(`${name.charAt(0).toUpperCase() + name.slice(1)} preset applied`, "transition");
+    }
+
+    function showToast(message, type) {
+      const toast = document.getElementById("toast");
+      toast.className = `toast ${type}-toast show`;
+      toast.textContent = message;
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove("show");
+      }, 2200);
+    }
+
+    function startEditing() {
+      if (!EDITABLE_FIELDS[sim.currentState]) return;
+      isEditing = true;
+      draftData = deepClone(sim.data);
+      dirtyFields = new Set();
+      render();
+    }
+
+    function cancelEditing() {
+      isEditing = false;
+      draftData = null;
+      dirtyFields = new Set();
+      render();
+    }
+
+    function updateDraftField(fieldName, value) {
+      if (!draftData) return;
+      draftData[fieldName] = value;
+      if (JSON.stringify(value) !== JSON.stringify(sim.data[fieldName])) dirtyFields.add(fieldName);
+      else dirtyFields.delete(fieldName);
+      render();
+    }
+
+    function toggleDraftBool(fieldName) {
+      if (!draftData) return;
+      updateDraftField(fieldName, !draftData[fieldName]);
+    }
+
+    function saveDraftEdits() {
+      if (!isEditing || dirtyFields.size === 0) return;
+      const deltas = [];
+
+      Array.from(dirtyFields).forEach(field => {
+        const before = sim.data[field];
+        const after = draftData[field];
+        if (JSON.stringify(before) !== JSON.stringify(after)) {
+          deltas.push({ field, before, after });
+          sim.data[field] = after;
+        }
+      });
+
+      if (deltas.length > 0) {
+        sim.stepCount += 1;
+        sim.history.push({
+          stepNum: sim.stepCount,
+          fromState: sim.currentState,
+          event: `edit ${Array.from(dirtyFields).join(', ')}`,
+          args: {},
+          toState: sim.currentState,
+          outcome: "no-transition",
+          deltas,
+          dataSnapshot: deepClone(sim.data),
+        });
+        sim.changedFields = new Set(deltas.map(delta => delta.field));
+      }
+
+      isEditing = false;
+      draftData = null;
+      dirtyFields = new Set();
+      render();
+      showToast(`Saved ${deltas.length} field${deltas.length === 1 ? "" : "s"}`, "no-transition");
+    }
+
+    function updateEventArg(eventName, argName, rawValue, type) {
+      const key = `${eventName}.${argName}`;
+      if (type === "boolean") eventArgDrafts[key] = rawValue === true || rawValue === "true";
+      else eventArgDrafts[key] = rawValue;
+    }
+
+    function getEventArgValue(eventName, argDef) {
+      const key = `${eventName}.${argDef.name}`;
+      if (Object.prototype.hasOwnProperty.call(eventArgDrafts, key)) return eventArgDrafts[key];
+      if (argDef.default !== undefined) return argDef.default;
+      return "";
+    }
+
+    function clearEventArgDrafts(eventName) {
+      Object.keys(eventArgDrafts).forEach(key => {
+        if (key.startsWith(`${eventName}.`)) delete eventArgDrafts[key];
+      });
+    }
+
+    function gatherArgs(evt) {
+      const args = {};
+      evt.args.forEach(arg => {
+        const rawValue = getEventArgValue(evt.name, arg);
+        if (arg.type === "boolean") args[arg.name] = rawValue === true || rawValue === "true";
+        else if (arg.type === "number") args[arg.name] = rawValue === "" || rawValue === null || rawValue === undefined ? 0 : Number(rawValue);
+        else args[arg.name] = rawValue || "";
+      });
+      return args;
+    }
+
+    function fireEvent(eventName, rowIndex) {
+      if (isEditing) cancelEditing();
+
+      const events = getAvailableEvents(sim.currentState, sim.data);
+      const evt = events.find(entry => entry.name === eventName);
+      if (!evt) return;
+
+      const args = gatherArgs(evt);
+      const selectedRow = rowIndex !== undefined ? evt.rows[rowIndex] : (evt.rows.find(row => row.canFire(args, sim.data)) || evt.rows[0]);
+
+      if (selectedRow.eventAsserts) {
+        for (const assertion of selectedRow.eventAsserts) {
+          if (!assertion.check(args)) {
+            showToast(assertion.msg, "rejected");
+            return;
+          }
+        }
+      }
+
+      if (!selectedRow.canFire(args, sim.data)) {
+        showToast(selectedRow.blockReason ? selectedRow.blockReason(args, sim.data) : (selectedRow.rejectMsg || "Guard failed"), "rejected");
+        return;
+      }
+
+      const previousData = deepClone(sim.data);
+      const previousState = sim.currentState;
+      sim.data = selectedRow.apply(deepClone(sim.data), args);
+
+      const deltas = [];
+      Object.keys(FIELD_DEFS).forEach(field => {
+        const before = previousData[field];
+        const after = sim.data[field];
+        if (JSON.stringify(before) !== JSON.stringify(after)) {
+          deltas.push({ field, before, after });
+        }
+      });
+
+      sim.changedFields = new Set(deltas.map(delta => delta.field));
+      const nextState = selectedRow.target || sim.currentState;
+      sim.stepCount += 1;
+      sim.history.push({
+        stepNum: sim.stepCount,
+        fromState: previousState,
+        event: eventName,
+        args: deepClone(args),
+        toState: nextState,
+        outcome: selectedRow.outcome,
+        deltas,
+        dataSnapshot: deepClone(sim.data),
+      });
+      sim.currentState = nextState;
+      sim.visitedStates.add(nextState);
+      clearEventArgDrafts(eventName);
+      render();
+      showToast(selectedRow.outcome === "transition" ? `${eventName} -> ${nextState}` : `${eventName} stayed in ${sim.currentState}`, selectedRow.outcome === "transition" ? "transition" : "no-transition");
+    }
+
+    function resetSimulation() {
+      isEditing = false;
+      draftData = null;
+      dirtyFields = new Set();
+      eventArgDrafts = {};
+      sim = getInitialSimulation();
+      render();
+      showToast("Reset to Draft", "transition");
+    }
+
+    function undoStep() {
+      if (sim.history.length === 0) return;
+      isEditing = false;
+      draftData = null;
+      dirtyFields = new Set();
+      eventArgDrafts = {};
+
+      sim.history.pop();
+      sim.stepCount = sim.history.length;
+
+      if (sim.history.length > 0) {
+        const last = sim.history[sim.history.length - 1];
+        sim.currentState = last.toState;
+        sim.data = deepClone(last.dataSnapshot);
+      } else {
+        sim.currentState = "Draft";
+        sim.data = getDefaultData();
+      }
+
+      sim.visitedStates = new Set(["Draft"]);
+      sim.history.forEach(step => {
+        sim.visitedStates.add(step.fromState);
+        sim.visitedStates.add(step.toState);
+      });
+      sim.visitedStates.add(sim.currentState);
+      sim.changedFields = new Set();
+      render();
+      showToast(`Undid back to ${sim.currentState}`, "no-transition");
+    }
+
+    function render() {
+      renderWorkbench();
+      renderStatus();
+      renderPresetState();
+    }
+
+    function renderPresetState() {
+      ["balanced", "compare", "operator"].forEach(name => {
+        const button = document.getElementById(`preset-${name}`);
+        if (button) button.classList.toggle("active", activePreset === name);
+      });
+    }
+
+    function renderWorkbench() {
+      const grid = document.getElementById("workbenchGrid");
+      const leftVisible = zoneOrder.left.length > 0;
+      const rightVisible = zoneOrder.right.length > 0;
+      const bottomVisible = zoneOrder.bottom.length > 0;
+
+      grid.style.gridTemplateColumns = `${leftVisible ? sizes.left + "px" : "0px"} ${leftVisible ? "8px" : "0px"} minmax(360px, 1fr) ${rightVisible ? "8px" : "0px"} ${rightVisible ? sizes.right + "px" : "0px"}`;
+      grid.style.gridTemplateRows = `minmax(280px, 1fr) ${bottomVisible ? "8px" : "0px"} ${bottomVisible ? sizes.bottom + "px" : "0px"}`;
+
+      grid.innerHTML = `
+        <section class="zone ${leftVisible ? "" : "zone-hidden"}" style="grid-column: 1; grid-row: 1;">${leftVisible ? renderZone("left") : ""}</section>
+        ${leftVisible ? '<div class="zone-resizer vertical" data-resizer="left" style="grid-column: 2; grid-row: 1;"></div>' : ""}
+        <section class="zone" style="grid-column: 3; grid-row: 1;">${renderZone("center")}</section>
+        ${rightVisible ? '<div class="zone-resizer vertical" data-resizer="right" style="grid-column: 4; grid-row: 1;"></div>' : ""}
+        <section class="zone ${rightVisible ? "" : "zone-hidden"}" style="grid-column: 5; grid-row: 1;">${rightVisible ? renderZone("right") : ""}</section>
+        ${bottomVisible ? '<div class="zone-resizer horizontal" data-resizer="bottom" style="grid-column: 1 / 6; grid-row: 2;"></div>' : ""}
+        <section class="zone zone-bottom ${bottomVisible ? "" : "zone-hidden"}" style="grid-column: 1 / 6; grid-row: 3;">${bottomVisible ? renderZone("bottom") : ""}</section>
+      `;
+
+      attachResizers();
+      renderPanelBodies();
+      updateLayoutSummary();
+    }
+
+    function renderZone(zone) {
+      const stackClass = zone === "bottom" ? "panel-stack panel-stack-bottom" : "panel-stack";
+      const items = zoneOrder[zone];
+      if (!items.length) {
+        return `
+          <div class="empty-zone">
+            <div class="empty-zone-label">${zoneDisplay(zone)}</div>
+            <div class="empty-zone-hint">Use the dock buttons on any panel header to move a surface into this zone.</div>
+          </div>
+        `;
+      }
+      return `<div class="${stackClass}">${items.map(panelId => renderPanelShell(panelId)).join("")}</div>`;
+    }
+
+    function renderPanelShell(panelId) {
+      const panel = panelLayout[panelId];
+      const zone = panel.zone;
+      const index = zoneOrder[zone].indexOf(panelId);
+      const canMoveUp = index > 0;
+      const canMoveDown = index < zoneOrder[zone].length - 1;
+      const canRotate = panelId === "topology" || panelId === "timeline";
+
+      return `
+        <article class="panel ${panel.collapsed ? "collapsed" : ""}" data-panel="${panelId}">
+          <div class="panel-chrome">
+            <div class="panel-kicker-row">
+              <div class="panel-zone-kicker">${zoneDisplay(zone)}</div>
+              <div class="panel-meta-chip">${getPanelMetaText(panelId)}</div>
+            </div>
+            <div class="panel-header-row">
+              <div class="panel-title-wrap">
+                <div class="panel-title">${PANEL_META[panelId].title}</div>
+                <div class="panel-subtitle">${PANEL_META[panelId].subtitle}</div>
+              </div>
+              <div class="panel-header-actions">
+                <button class="panel-action" onclick="togglePanelCollapse('${panelId}')">${panel.collapsed ? "Expand" : "Collapse"}</button>
+              </div>
+            </div>
+            <div class="panel-controls-row">
+              <div class="dock-group">
+                <span class="control-group-label">Dock</span>
+                ${ZONES.map(zoneName => `<button class="dock-button ${zoneName === zone ? "active" : ""}" onclick="setPanelZone('${panelId}', '${zoneName}')">${zoneName.charAt(0).toUpperCase()}</button>`).join("")}
+              </div>
+              ${canRotate ? `
+                <div class="axis-group">
+                  <span class="control-group-label">Axis</span>
+                  <button class="axis-button ${panel.orientation === "vertical" ? "active" : ""}" onclick="setPanelOrientation('${panelId}', 'vertical')">Vertical</button>
+                  <button class="axis-button ${panel.orientation === "horizontal" ? "active" : ""}" onclick="setPanelOrientation('${panelId}', 'horizontal')">Horizontal</button>
+                </div>
+              ` : ""}
+              <div class="stack-group">
+                <span class="control-group-label">Order</span>
+                <button class="stack-button" onclick="movePanelWithinZone('${panelId}', -1)" ${canMoveUp ? "" : "disabled"}>Up</button>
+                <button class="stack-button" onclick="movePanelWithinZone('${panelId}', 1)" ${canMoveDown ? "" : "disabled"}>Down</button>
+              </div>
+            </div>
+            ${panel.collapsed ? `<div class="panel-collapsed-note">Collapsed. Keep the header visible while you re-balance the workspace.</div>` : ""}
+          </div>
+          <div class="panel-body" id="panel-body-${panelId}"></div>
+        </article>
+      `;
+    }
+
+    function attachResizers() {
+      document.querySelectorAll(".zone-resizer").forEach(handle => {
+        handle.onmousedown = event => {
+          event.preventDefault();
+          activeResizer = handle.dataset.resizer;
+        };
+      });
+    }
+
+    function renderPanelBodies() {
+      renderDataPanel();
+      renderTopologyPanel();
+      renderTimelinePanel();
+    }
+
+    function updateLayoutSummary() {
+      const segments = ZONES.filter(zone => zoneOrder[zone].length > 0).map(zone => {
+        const labels = zoneOrder[zone].map(panelId => {
+          const panel = panelLayout[panelId];
+          const axis = panel.orientation ? ` (${panel.orientation})` : "";
+          return `${humanizePanel(panelId)}${axis}`;
+        }).join(", ");
+        return `<strong>${zoneDisplay(zone)}:</strong> ${labels}`;
+      });
+      const summary = document.getElementById("layoutSummary");
+      summary.innerHTML = `Three persistent panels, each with their own identity, but no single privileged slot. ${segments.join(" · ")}. Resize gutters to rebalance the workbench without leaving the simulation.`;
+    }
+
+    function renderDataPanel() {
+      const el = document.getElementById("panel-body-data");
+      if (!el) return;
+
+      const editableFields = new Set(EDITABLE_FIELDS[sim.currentState] || []);
+      const displayData = isEditing ? draftData : sim.data;
+
+      let html = `
+        <div class="data-panel">
+          <div class="dp-header">
+            <div class="dp-header-left">
+              <span class="dp-title">Current data surface</span>
+              <span class="dp-count">${Object.keys(FIELD_DEFS).length} fields · ${sim.currentState}</span>
+              ${isEditing && dirtyFields.size > 0 ? `<span class="dp-dirty-badge">${dirtyFields.size} unsaved</span>` : ""}
+            </div>
+            <div class="dp-header-actions">
+              ${editableFields.size > 0 && !isEditing ? '<button class="dp-edit-btn" onclick="startEditing()">Edit</button>' : ""}
+              ${isEditing ? '<button class="dp-cancel-btn" onclick="cancelEditing()">Cancel</button>' : ""}
+              ${isEditing ? `<button class="dp-save-btn" onclick="saveDraftEdits()" ${dirtyFields.size === 0 ? "disabled" : ""}>Save</button>` : ""}
+            </div>
+          </div>
+          <div class="dp-field-grid">
+      `;
+
+      Object.entries(FIELD_DEFS).forEach(([name, def]) => {
+        const value = displayData[name];
+        const editable = editableFields.has(name);
+        const changed = sim.changedFields.has(name) && !isEditing;
+        const dirty = isEditing && dirtyFields.has(name);
+        let className = "dp-field";
+        if (editable && !isEditing) className += " editable";
+        if (changed) className += " recently-changed";
+        if (editable && isEditing) className += " editing";
+        if (dirty) className += " dirty";
+
+        html += `
+          <div class="${className}">
+            <div class="dp-field-header">
+              <span class="dp-field-name">${name}</span>
+              <span class="dp-field-type">${def.type}${def.nullable ? "?" : ""}</span>
+              ${editable ? '<span class="dp-edit-badge">editable</span>' : ""}
+            </div>
+        `;
+
+        if (isEditing && editable && def.type === "boolean") {
+          html += `
+            <div class="dp-toggle ${value ? "on" : ""}" onclick="toggleDraftBool('${name}')">
+              <div class="toggle-track"></div>
+              <span class="dp-toggle-label" style="color: ${value ? "var(--enabled)" : "var(--blocked)"};">${value}</span>
+            </div>
+          `;
+        } else if (isEditing && editable && def.type === "string") {
+          html += `<input class="dp-edit-input" type="text" value="${value !== null ? escHtml(String(value)) : ""}" placeholder="${def.nullable ? "null" : ""}" oninput="updateDraftField('${name}', this.value || null)" />`;
+        } else {
+          html += renderFieldValue(value, def);
+        }
+
+        html += "</div>";
+      });
+
+      html += `
+          </div>
+          <div class="dp-constraints-strip">
+            <div class="dp-constraint-group">
+              <div class="dp-constraint-group-title">Invariants</div>
+              ${INVARIANTS.map(inv => {
+                const ok = inv.check(displayData);
+                return `
+                  <div class="dp-inv-item ${ok ? "ok" : "violated"}">
+                    <span>${ok ? "OK" : "Fail"}</span>
+                    <span>${inv.msg}</span>
+                    ${inv.targets.map(target => `<span class="dp-constraint-target">${target}</span>`).join("")}
+                  </div>
+                `;
+              }).join("")}
+            </div>
+            ${renderConstraintGroup(displayData)}
+          </div>
+        </div>
+      `;
+
+      el.innerHTML = html;
+    }
+
+    function renderConstraintGroup(currentData) {
+      const stateAssertions = STATE_ASSERTIONS[sim.currentState] || [];
+      const fromAssertions = FROM_ASSERTIONS[sim.currentState] || [];
+      const assertions = [...stateAssertions, ...fromAssertions];
+      if (assertions.length === 0) return "";
+      return `
+        <div class="dp-constraint-group">
+          <div class="dp-constraint-group-title">State constraints · ${sim.currentState}</div>
+          ${assertions.map(assertion => {
+            const ok = assertion.check(currentData);
+            return `
+              <div class="dp-assert-item ${ok ? "ok" : "violated"}">
+                <span>${ok ? "OK" : "Fail"}</span>
+                <span>${assertion.msg}</span>
+                ${(assertion.targets || []).map(target => `<span class="dp-constraint-target">${target}</span>`).join("")}
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function renderFieldValue(value, def) {
+      if (value === null || value === undefined) return '<div class="dp-field-value null">null</div>';
+      if (def.type === "boolean") return `<div class="dp-field-value ${value ? "bool-true" : "bool-false"}">${value}</div>`;
+      return `<div class="dp-field-value">${escHtml(String(value))}</div>`;
+    }
+
+    function renderTopologyPanel() {
+      const el = document.getElementById("panel-body-topology");
+      if (!el) return;
+      const orientation = panelLayout.topology.orientation;
+      el.innerHTML = `
+        <div class="topology-panel">
+          <div class="topology-summary">
+            <span>The active state is spotlighted. Hover states or event labels to bridge topology with future actions.</span>
+            <span class="summary-chip">${orientation} flow</span>
+          </div>
+          <div class="diagram-surface">${orientation === "horizontal" ? renderTopologyHorizontal() : renderTopologyVertical()}</div>
+        </div>
+      `;
+    }
+
+    function renderTopologyVertical() {
+      const nodes = [
+        { id: "Draft", x: 110, y: 34 },
+        { id: "Open", x: 110, y: 92 },
+        { id: "Scheduled", x: 110, y: 150 },
+        { id: "InProgress", x: 110, y: 208 },
+        { id: "Completed", x: 110, y: 266 },
+        { id: "Cancelled", x: 256, y: 120 },
+      ];
+      return renderTopologySvg(nodes, "vertical");
+    }
+
+    function renderTopologyHorizontal() {
+      const nodes = [
+        { id: "Draft", x: 70, y: 56 },
+        { id: "Open", x: 190, y: 56 },
+        { id: "Scheduled", x: 310, y: 56 },
+        { id: "InProgress", x: 430, y: 56 },
+        { id: "Completed", x: 550, y: 56 },
+        { id: "Cancelled", x: 310, y: 122 },
+      ];
+      return renderTopologySvg(nodes, "horizontal");
+    }
+
+    function renderTopologySvg(nodes, axis) {
+      const nodeWidth = 88;
+      const nodeHeight = 28;
+      const nodeRadius = 14;
+      const edges = [
+        { from: "Draft", to: "Open", label: "Submit" },
+        { from: "Open", to: "Scheduled", label: "Assign" },
+        { from: "Open", to: "Cancelled", label: "Cancel" },
+        { from: "Scheduled", to: "InProgress", label: "StartWork" },
+        { from: "Scheduled", to: "Cancelled", label: "Cancel" },
+        { from: "InProgress", to: "Completed", label: "Complete" },
+      ];
+      const selfLoops = {
+        Scheduled: ["ApproveParts"],
+        InProgress: ["RecordProgress"],
+      };
+      const nodeMap = {};
+      nodes.forEach(node => {
+        nodeMap[node.id] = node;
+      });
+
+      const lastStep = sim.history.length > 0 ? sim.history[sim.history.length - 1] : null;
+      const lastEdge = lastStep && lastStep.fromState !== lastStep.toState ? `${lastStep.fromState}->${lastStep.toState}` : null;
+      const lastSelfLoop = lastStep && lastStep.fromState === lastStep.toState && !lastStep.event.startsWith("edit") ? lastStep.fromState : null;
+      const viewBox = axis === "horizontal" ? "0 0 620 170" : "0 0 330 300";
+
+      function arrowPath(x1, y1, x2, y2, size) {
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        return `M${x2.toFixed(1)},${y2.toFixed(1)} L${(x2 - size * Math.cos(angle - 0.45)).toFixed(1)},${(y2 - size * Math.sin(angle - 0.45)).toFixed(1)} L${(x2 - size * Math.cos(angle + 0.45)).toFixed(1)},${(y2 - size * Math.sin(angle + 0.45)).toFixed(1)} Z`;
+      }
+
+      let svg = `<svg viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg">`;
+
+      edges.forEach(edge => {
+        const fromNode = nodeMap[edge.from];
+        const toNode = nodeMap[edge.to];
+        let x1 = fromNode.x;
+        let y1 = fromNode.y;
+        let x2 = toNode.x;
+        let y2 = toNode.y;
+
+        if (toNode.y > fromNode.y) {
+          y1 = fromNode.y + nodeHeight / 2;
+          y2 = toNode.y - nodeHeight / 2;
+        } else if (toNode.y < fromNode.y) {
+          y1 = fromNode.y - nodeHeight / 2;
+          y2 = toNode.y + nodeHeight / 2;
+        } else if (toNode.x > fromNode.x) {
+          x1 = fromNode.x + nodeWidth / 2;
+          x2 = toNode.x - nodeWidth / 2;
+        } else {
+          x1 = fromNode.x - nodeWidth / 2;
+          x2 = toNode.x + nodeWidth / 2;
+        }
+
+        const edgeKey = `${edge.from}->${edge.to}`;
+        const traced = sim.history.some(step => step.fromState === edge.from && step.toState === edge.to);
+        const active = edgeKey === lastEdge;
+        let lineClass = "sd-connector";
+        let arrowClass = "sd-arrow";
+        let labelClass = "sd-edge-label";
+        if (active) {
+          lineClass += " sd-edge-active";
+          arrowClass += " sd-arrow-active";
+          labelClass += " sd-edge-label-active";
+        } else if (traced) {
+          lineClass += " sd-edge-traced";
+          arrowClass += " sd-arrow-traced";
+        }
+
+        let labelX = (x1 + x2) / 2;
+        let labelY = (y1 + y2) / 2 - 8;
+        if (toNode.y !== fromNode.y) {
+          labelX += axis === "horizontal" ? 26 : 34;
+          labelY = (y1 + y2) / 2;
+        }
+
+        svg += `<line class="${lineClass}" data-event="${edge.label}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" onmouseenter="setHoverEvent('${edge.label}')" onmouseleave="clearHoverEvent()"></line>`;
+        svg += `<path class="${arrowClass}" d="${arrowPath(x1, y1, x2, y2, 5)}"></path>`;
+        svg += `<text class="${labelClass}" data-event="${edge.label}" x="${labelX}" y="${labelY}" onmouseenter="setHoverEvent('${edge.label}')" onmouseleave="clearHoverEvent()">${edge.label}</text>`;
+      });
+
+      Object.entries(selfLoops).forEach(([state, labels]) => {
+        const node = nodeMap[state];
+        const flash = state === lastSelfLoop;
+        if (axis === "horizontal") {
+          const topY = node.y - nodeHeight / 2 - 2;
+          svg += `<path class="sd-connector ${flash ? "sd-edge-active" : ""}" data-event="${labels[0]}" d="M${node.x - 14},${topY} C${node.x - 14},${topY - 16} ${node.x + 14},${topY - 16} ${node.x + 14},${topY}" onmouseenter="setHoverEvent('${labels[0]}')" onmouseleave="clearHoverEvent()"></path>`;
+          svg += `<text class="sd-edge-label" data-event="${labels[0]}" x="${node.x}" y="${topY - 16}" onmouseenter="setHoverEvent('${labels[0]}')" onmouseleave="clearHoverEvent()">${labels[0]}</text>`;
+        } else {
+          const leftX = node.x - nodeWidth / 2 - 2;
+          svg += `<path class="sd-connector ${flash ? "sd-edge-active" : ""}" data-event="${labels[0]}" d="M${leftX},${node.y - 10} C${leftX - 18},${node.y - 10} ${leftX - 18},${node.y + 10} ${leftX},${node.y + 10}" onmouseenter="setHoverEvent('${labels[0]}')" onmouseleave="clearHoverEvent()"></path>`;
+          svg += `<text class="sd-edge-label" data-event="${labels[0]}" x="${leftX - 22}" y="${node.y + 4}" onmouseenter="setHoverEvent('${labels[0]}')" onmouseleave="clearHoverEvent()">${labels[0]}</text>`;
+        }
+      });
+
+      nodes.forEach(node => {
+        const current = sim.currentState === node.id;
+        const visited = sim.visitedStates.has(node.id);
+        const meta = STATE_META[node.id];
+        const nodeClass = current ? "sd-node-current" : (visited ? "sd-node-visited" : "sd-node");
+        const labelClass = current ? "sd-label sd-label-current" : (visited ? "sd-label sd-label-visited" : "sd-label");
+        const hoverAttrs = `data-state="${node.id}" onmouseenter="setHoverState('${node.id}')" onmouseleave="clearHoverState()"`;
+
+        if (current) {
+          if (meta.initial) svg += `<circle class="sd-glow" cx="${node.x}" cy="${node.y}" r="${nodeRadius + 6}"></circle>`;
+          else svg += `<rect class="sd-glow" x="${node.x - nodeWidth / 2 - 4}" y="${node.y - nodeHeight / 2 - 4}" width="${nodeWidth + 8}" height="${nodeHeight + 8}" rx="${nodeRadius + 3}"></rect>`;
+        }
+
+        if (meta.initial) {
+          svg += `<circle class="${nodeClass}" cx="${node.x}" cy="${node.y}" r="${nodeRadius}" ${hoverAttrs}></circle>`;
+          svg += `<circle class="sd-initial-dot" cx="${node.x}" cy="${node.y}" r="4"></circle>`;
+        } else if (meta.terminal) {
+          svg += `<rect class="sd-node-terminal-outer" x="${node.x - nodeWidth / 2 - 3}" y="${node.y - nodeHeight / 2 - 3}" width="${nodeWidth + 6}" height="${nodeHeight + 6}" rx="${nodeRadius + 2}"></rect>`;
+          svg += `<rect class="${nodeClass} sd-node-terminal" x="${node.x - nodeWidth / 2}" y="${node.y - nodeHeight / 2}" width="${nodeWidth}" height="${nodeHeight}" rx="${nodeRadius}" ${hoverAttrs}></rect>`;
+        } else {
+          svg += `<rect class="${nodeClass}" x="${node.x - nodeWidth / 2}" y="${node.y - nodeHeight / 2}" width="${nodeWidth}" height="${nodeHeight}" rx="${nodeRadius}" ${hoverAttrs}></rect>`;
+        }
+
+        svg += `<text class="${labelClass}" x="${node.x}" y="${node.y + 1}">${node.id}</text>`;
+      });
+
+      svg += "</svg>";
+      return svg;
+    }
+
+    function renderTimelinePanel() {
+      const el = document.getElementById("panel-body-timeline");
+      if (!el) return;
+      const orientation = panelLayout.timeline.orientation;
+      el.innerHTML = `
+        <div class="timeline-panel">
+          <div class="timeline-summary">
+            <span>Fire events from the future lane, watch history accumulate, and keep the state machine context visible while layout changes around it.</span>
+            <span class="summary-chip">${orientation} flow</span>
+          </div>
+          ${orientation === "horizontal" ? renderTimelineHorizontal() : renderTimelineVertical()}
+        </div>
+      `;
+    }
+
+    function renderTimelineVertical() {
+      const terminal = STATE_META[sim.currentState].terminal;
+      const events = getAvailableEvents(sim.currentState, sim.data);
+      const selfLoopEvents = events.filter(evt => evt.rows[0].outcome === "no-transition" || !evt.rows[0].target);
+      const transitionEvents = events.filter(evt => evt.rows[0].outcome === "transition" && evt.rows[0].target);
+      const groups = {};
+
+      transitionEvents.forEach(evt => {
+        const target = evt.rows[0].target;
+        if (!groups[target]) groups[target] = [];
+        groups[target].push(evt);
+      });
+
+      return `
+        <div class="timeline-vertical">
+          <section>
+            <div class="timeline-section-head"><span class="label">Past</span><span class="line"></span></div>
+            ${sim.history.length === 0 ? '<div class="no-past">No events fired yet. Use the future cards to begin the run.</div>' : `<div class="past-column">${renderHistoryCards()}</div>`}
+          </section>
+          <section>
+            <div class="timeline-section-head"><span class="label">Present</span><span class="line"></span></div>
+            ${renderPresentCard()}
+          </section>
+          <section>
+            <div class="timeline-section-head"><span class="label">Future</span><span class="line"></span></div>
+            ${terminal ? renderTerminalCard() : `
+              <div class="future-section">
+                ${selfLoopEvents.map(evt => renderEventCard(evt)).join("")}
+                ${Object.entries(groups).map(([target, evts]) => `
+                  <div class="future-pair">
+                    <div>${evts.map(evt => renderEventCard(evt)).join("")}</div>
+                    ${renderFutureStateCard(target, evts, false)}
+                  </div>
+                `).join("")}
+              </div>
+            `}
+          </section>
+        </div>
+      `;
+    }
+
+    function renderTimelineHorizontal() {
+      const terminal = STATE_META[sim.currentState].terminal;
+      const events = getAvailableEvents(sim.currentState, sim.data);
+      const selfLoopEvents = events.filter(evt => evt.rows[0].outcome === "no-transition" || !evt.rows[0].target);
+      const transitionEvents = events.filter(evt => evt.rows[0].outcome === "transition" && evt.rows[0].target);
+      const groups = {};
+
+      transitionEvents.forEach(evt => {
+        const target = evt.rows[0].target;
+        if (!groups[target]) groups[target] = [];
+        groups[target].push(evt);
+      });
+
+      return `
+        <div class="timeline-horizontal">
+          <div class="tl-horizontal-flow">
+            ${sim.history.length === 0 ? '<div class="no-past-h">No past steps yet</div><div class="h-connector"></div>' : `<div class="past-trail-h"><div class="origin-card"><div class="oc-dot"></div><div class="oc-label">Draft</div><div class="oc-sub">origin</div></div>${sim.history.map(step => `<div class="h-connector"></div>${renderHistoryCardHorizontal(step)}`).join("")}</div><div class="h-connector"></div>`}
+            ${renderPresentCardHorizontal()}
+            <div class="h-connector"></div>
+            ${terminal ? renderTerminalCard(true) : `
+              <div class="future-events-h">
+                ${selfLoopEvents.map(evt => renderEventCard(evt)).join("")}
+                ${transitionEvents.map(evt => renderEventCard(evt)).join("")}
+              </div>
+              ${Object.keys(groups).length > 0 ? '<div class="h-connector"></div>' : ""}
+              <div class="future-events-h">
+                ${Object.entries(groups).map(([target, evts]) => renderFutureStateCard(target, evts, true)).join("")}
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHistoryCards() {
+      return sim.history.map(step => `
+        <div class="history-card">
+          <div class="history-top">
+            <span class="history-step">Step ${step.stepNum}</span>
+            <span class="history-outcome ${step.outcome}">${step.outcome === "transition" ? `-> ${step.toState}` : `stay in ${step.toState}`}</span>
+          </div>
+          <div class="history-event">${escHtml(step.event)}</div>
+          ${step.deltas.length > 0 ? `<div class="history-delta">${step.deltas.map(delta => `${delta.field}: ${formatVal(delta.before)} -> ${formatVal(delta.after)}`).join(" · ")}</div>` : ""}
+        </div>
+      `).join("");
+    }
+
+    function renderHistoryCardHorizontal(step) {
+      return `
+        <div class="past-card">
+          <div class="pc-step">Step ${step.stepNum}</div>
+          <div class="pc-event">${escHtml(step.event)}</div>
+          <div class="pc-outcome ${step.outcome}">${step.outcome === "transition" ? `-> ${step.toState}` : `stay in ${step.toState}`}</div>
+          ${step.deltas.length > 0 ? `<div class="pc-delta">${step.deltas[0].field}: ${formatVal(step.deltas[0].after)}${step.deltas.length > 1 ? ` +${step.deltas.length - 1}` : ""}</div>` : ""}
+        </div>
+      `;
+    }
+
+    function renderPresentCard() {
+      const terminal = STATE_META[sim.currentState].terminal;
+      return `
+        <div class="present-card ${terminal ? "terminal-state" : ""}" data-state="${sim.currentState}" onmouseenter="setHoverState('${sim.currentState}')" onmouseleave="clearHoverState()">
+          <div class="present-top">
+            <div class="present-state-name">${sim.currentState}</div>
+            <div class="present-badges">
+              <span class="present-badge current">current</span>
+              <span class="present-badge step-badge">step ${sim.stepCount}</span>
+              ${terminal ? '<span class="present-badge terminal">terminal</span>' : ""}
+              ${EDITABLE_FIELDS[sim.currentState] ? '<span class="present-badge step-badge">editable</span>' : ""}
+            </div>
+          </div>
+          <div class="present-subtitle">${getStateDescription(sim.currentState)}</div>
+        </div>
+      `;
+    }
+
+    function renderPresentCardHorizontal() {
+      const terminal = STATE_META[sim.currentState].terminal;
+      return `
+        <div class="present-card present-marker-h ${terminal ? "terminal-state" : ""}" data-state="${sim.currentState}" onmouseenter="setHoverState('${sim.currentState}')" onmouseleave="clearHoverState()">
+          <div class="present-top">
+            <div class="pm-h-state-name">${sim.currentState}</div>
+            <div class="pm-h-badges">
+              <span class="pm-h-badge current">current</span>
+              <span class="pm-h-badge step-badge">step ${sim.stepCount}</span>
+              ${terminal ? '<span class="pm-h-badge terminal">terminal</span>' : ""}
+            </div>
+          </div>
+          <div class="pm-h-subtitle">${getStateDescription(sim.currentState)}</div>
+        </div>
+      `;
+    }
+
+    function renderTerminalCard(horizontal) {
+      return `
+        <div class="${horizontal ? "terminal-message-h" : "terminal-message"}">
+          <div class="tm-icon">${sim.currentState === "Completed" ? "OK" : "X"}</div>
+          <div>${sim.currentState} is terminal. The workbench stays stable, but the event lane is done.</div>
+        </div>
+      `;
+    }
+
+    function renderFutureStateCard(target, events, horizontal) {
+      return `
+        <div class="${horizontal ? "future-state-card-h" : "future-state-card"} ${sim.currentState === target ? "state-card-hover" : ""}" data-state="${target}" onmouseenter="setHoverState('${target}')" onmouseleave="clearHoverState()">
+          <div class="future-state-top">
+            <div class="${horizontal ? "future-state-name-h" : "future-state-name"}">${target}</div>
+          </div>
+          <div class="${horizontal ? "future-state-sub-h" : "future-state-sub"}">${getStateDescription(target)}</div>
+          ${events.length > 1 ? `<div class="${horizontal ? "future-state-sources-h" : "future-state-sources"}">via ${events.map(evt => `<span class="source-event">${evt.name}</span>`).join(" or ")}</div>` : ""}
+        </div>
+      `;
+    }
+
+    function renderEventCard(evt) {
+      const primary = evt.rows[0];
+      const blocked = !primary.canFire(gatherArgs(evt), sim.data) && !!primary.guard;
+      return `
+        <div class="event-card ${blocked ? "blocked-card" : "can-fire"}" data-event="${evt.name}" onmouseenter="setHoverEvent('${evt.name}')" onmouseleave="clearHoverEvent()">
+          <div class="ec-name-row">
+            <span class="ec-name">${evt.name}</span>
+            ${primary.outcome === "no-transition" ? '<span class="self-loop-badge">stays</span>' : ""}
+          </div>
+          ${primary.guardDisplay ? `<div><span class="ec-guard">guard: ${primary.guardDisplay}</span> <span class="ec-guard-status ${primary.canFire(gatherArgs(evt), sim.data) ? "pass" : "fail"}">${primary.canFire(gatherArgs(evt), sim.data) ? "pass" : "blocked"}</span></div>` : ""}
+          ${primary.mutations && primary.mutations.length > 0 ? `<div class="ec-mutations">${primary.mutations.map(mutation => `set ${mutation}`).join("<br>")}</div>` : ""}
+          ${evt.rows.length > 1 && evt.rows[1].outcome === "rejected" && blocked ? `<div class="ec-rejection-msg">${evt.rows[1].rejectMsg}</div>` : ""}
+          ${primary.eventAsserts && primary.eventAsserts.length > 0 ? `<div class="ec-asserts">${primary.eventAsserts.map(assertion => `assert: ${assertion.msg}`).join("<br>")}</div>` : ""}
+          <div class="ec-actions">
+            <div class="ec-args">${renderEventArgs(evt)}</div>
+            ${blocked ? `<button class="ec-fire-btn blocked">${evt.name}</button>` : `<button class="ec-fire-btn" onclick="fireEvent('${evt.name}')">${evt.name}</button>`}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderEventArgs(evt) {
+      return evt.args.map(arg => {
+        const value = getEventArgValue(evt.name, arg);
+        if (arg.type === "boolean") {
+          return `
+            <div class="ec-arg">
+              <label>${arg.name}</label>
+              <select onchange="updateEventArg('${evt.name}', '${arg.name}', this.value, 'boolean')">
+                <option value="false" ${value === false || value === "false" ? "selected" : ""}>false</option>
+                <option value="true" ${value === true || value === "true" ? "selected" : ""}>true</option>
+              </select>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="ec-arg">
+            <label>${arg.name}</label>
+            <input type="${arg.type === "number" ? "number" : "text"}" value="${escHtml(String(value))}" placeholder="${arg.placeholder || ""}" oninput="updateEventArg('${evt.name}', '${arg.name}', this.value, '${arg.type}')" />
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderStatus() {
+      document.getElementById("statusStep").textContent = `Step ${sim.stepCount}`;
+      const ok = INVARIANTS.every(inv => inv.check(sim.data));
+      const invariants = document.getElementById("statusInvariants");
+      invariants.className = ok ? "status-ok" : "status-warn";
+      invariants.textContent = ok ? `${INVARIANTS.length} invariants ok` : "Invariant violated";
+    }
+
+    function setHoverEvent(name) {
+      document.querySelectorAll("[data-event]").forEach(el => {
+        const match = el.dataset.event === name;
+        if (el.classList.contains("sd-edge-label")) el.classList.toggle("sd-edge-label-hover", match);
+        if (el.classList.contains("sd-connector")) el.classList.toggle("sd-edge-hover", match);
+        if (el.classList.contains("event-card")) el.classList.toggle("event-card-hover", match);
+      });
+    }
+
+    function clearHoverEvent() {
+      document.querySelectorAll(".sd-edge-label-hover, .sd-edge-hover, .event-card-hover").forEach(el => {
+        el.classList.remove("sd-edge-label-hover", "sd-edge-hover", "event-card-hover");
+      });
+    }
+
+    function setHoverState(name) {
+      document.querySelectorAll("[data-state]").forEach(el => {
+        const match = el.dataset.state === name;
+        if (el.classList.contains("present-card") || el.classList.contains("future-state-card") || el.classList.contains("future-state-card-h")) {
+          el.classList.toggle("state-card-hover", match);
+        }
+        if (el.classList.contains("sd-node") || el.classList.contains("sd-node-current") || el.classList.contains("sd-node-visited") || el.classList.contains("sd-node-terminal")) {
+          el.classList.toggle("sd-node-hover", match);
+        }
+      });
+    }
+
+    function clearHoverState() {
+      document.querySelectorAll(".state-card-hover, .sd-node-hover").forEach(el => {
+        el.classList.remove("state-card-hover", "sd-node-hover");
+      });
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    document.addEventListener("mousemove", event => {
+      if (!activeResizer) return;
+      const grid = document.getElementById("workbenchGrid");
+      const rect = grid.getBoundingClientRect();
+      if (activeResizer === "left") sizes.left = clamp(event.clientX - rect.left, 240, 520);
+      if (activeResizer === "right") sizes.right = clamp(rect.right - event.clientX, 240, 480);
+      if (activeResizer === "bottom") sizes.bottom = clamp(rect.bottom - event.clientY, 180, 420);
+      renderWorkbench();
+    });
+
+    document.addEventListener("mouseup", () => {
+      activeResizer = null;
+    });
+
+    render();
+  </script>
+</body>
+</html>

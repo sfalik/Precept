@@ -6,6 +6,35 @@
 
 ## Recent Updates
 
+### 2026-04-10 — Issue #13: field-level constraints test strategy + scaffold written
+- Created `test/Precept.Tests/FieldConstraintTests.cs` — 37 tests: 3 ready (pass now) + 34 stubs (NotImplementedException until George's implementation lands).
+- **3 baseline ready tests** confirm the desugar destination works today: invariant-expressed nonnegative/positive/min-max semantics already produce ConstraintFailure at runtime.
+- **34 stubs** cover: parser acceptance (12), C57 type mismatch (4), C58 contradictory/duplicate (3), C59 default-violates-constraint (6), nullable semantics (2), runtime desugaring verification (8), event arg constraint outcome verification (1).
+- **Design decision flagged:** `nonnegative positive` combined → recommend C58 (subsumed constraint). `positive` strictly subsumes `nonnegative`; the weaker constraint is dead code. Documented in scaffold and decision file. Needs George + Shane sign-off.
+- **Key distinction documented:** field constraints desugar to invariants (→ ConstraintFailure); event arg constraints desugar to on-event asserts (→ Rejected). Test `Fire_EventArgNotempty_EmptyString_ProducesRejected` pins this semantics gap.
+- **CatalogDriftTests entries noted:** C57, C58, C59 require three new entries in `CatalogDriftTests.cs` using `-> no transition` targets (documented in scaffold and decision file).
+- Decision filed: `.squad/decisions/inbox/soup-nazi-issue13-test-strategy.md`.
+- Key learning: the `TypeCheckResult.Diagnostics[n].Constraint.Id` + `.DiagnosticCode` pattern from StringAccessorTests.cs is the established assertion form for new diagnostic codes. The commented-out assertions in stubs follow this pattern for easy activation.
+
+### 2026-04-10 — Issue #10: three-level dotted form tests written
+- Unlocked 2 deferred parser/type-checker tests in `StringAccessorTests.cs` (converted from placeholder invariant-field forms to actual `Submit.Name.length` guard forms): `Parse_ThreeLevel_EventArgLength_AcceptsForm`, `Check_ThreeLevel_EventArgLength_NonNullable_NoDiagnostic`.
+- Added 3 new tests: `Check_ThreeLevel_NullableEventArg_WithoutGuard_ProducesC56` (C56 on nullable event arg — the critical path), `Check_ThreeLevel_NullableEventArg_WithNullGuard_NoC56` (null narrowing removes C56), `Fire_ThreeLevel_EventArgLength_GuardRouting` ([Theory], 2 cases: "Bob" → Transition, "Bo" → Rejected).
+- Invariant scope skipped with note: event args are not accessible in invariant scope.
+- Runtime arg key format confirmed: `["Name"] = value` (arg name only, no event prefix).
+- Decision filed: `.squad/decisions/inbox/soup-nazi-issue10-three-level-tests.md`.
+
+### 2026-04-10 — Issue #10: string .length accessor test file authored
+- Created `test/Precept.Tests/StringAccessorTests.cs` (23 tests) covering all Issue #10 acceptance criteria.
+- **Test categories:** parser (2), type checker (7 incl. C56/PRECEPT056 and null narrowing), runtime value semantics (4 incl. UTF-16 emoji), null-guard compound evaluation (4), invariant context (2), event assert context (2), guard routing (2), regression (1).
+- **Key learnings:**
+  - Event arg access in transition guards uses dotted form `EventName.ArgName` (e.g. `Submit.Note`); appending `.length` produces a three-level dotted form `EventName.ArgName.length` that George's parser extension must handle.
+  - Event asserts (`on Submit assert`) support both bare arg names and dotted prefix; three-level dotted form (`Submit.Name.length`) follows the same pattern.
+  - The `and`/`or` null-narrowing precedent already exists for C42 (nullable scalar in set context); C56 follows the same narrowing contract.
+  - Literal `set Field = ""` with a `Name.length >= 1` invariant throws at compile time (literal invariant check). Use a non-literal event arg as set source to defeat compile-time check and test runtime invariant enforcement.
+  - UTF-16 emoji "💀" has `.Length == 2` in .NET strings; test explicitly documents this as the platform-consistent semantics decision.
+  - Type error codes for `.length` on non-string types are unknown pre-implementation — tests assert `HasErrors` + `NotBeEmpty()` with TODO for specific code pinning.
+  - Regression guard: `Regression_CollectionCount_ParsesAndCompiles_Unaffected` verifies `.count` is unaffected by the `.length` addition.
+
 ### 2026-04-10 — Issue #31 shipped
 - PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
 

@@ -1,0 +1,4054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Precept — Semantic Visual System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&family=Geist:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #040506;
+  --panel: #090b0e;
+  --panel-2: #0d1014;
+  --line: rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --text: #f1f3f6;
+  --muted: #a7afbb;
+  --soft: #687281;
+  --structure-d: #4338CA;
+  --structure: #6366F1;
+  --state: #A898F5;
+  --event: #30B8E8;
+  --data: #B0BEC5;
+  --data-t: #9AA8B5;
+  --data-v: #84929F;
+  --rule: #FBBF24;
+  --comment: #9096A6;
+  --valid: #34D399;
+  --violated: #F87171;
+  --warn: #FDE047;
+  --mono: "Geist Mono","Cascadia Code",Consolas,monospace;
+  --sans: "Geist","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+  --nav-w: 196px;
+  --nav-w-collapsed: 36px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  min-height: 100vh;
+}
+/* ── NAV RAIL ─────────────────────────────── */
+.nav-rail {
+  position: fixed;
+  top: 0; left: 0;
+  width: var(--nav-w);
+  height: 100vh;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  padding: 28px 16px;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 100;
+  transition: width 0.2s ease;
+}
+.nav-rail.collapsed {
+  width: var(--nav-w-collapsed);
+  padding: 28px 0;
+}
+.nav-rail.collapsed .nav-wordmark,
+.nav-rail.collapsed .nav-item,
+.nav-rail.collapsed .nav-section-meta {
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.nav-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--nav-w-collapsed);
+  flex-shrink: 0;
+  height: 28px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--soft);
+  font-size: 14px;
+  margin-bottom: 12px;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.nav-toggle:hover { color: var(--text); }
+.nav-rail.collapsed .nav-toggle { margin-bottom: 0; }
+.nav-wordmark {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+  padding: 0 4px 18px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.nav-item {
+  display: block;
+  padding: 6px 8px;
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--soft);
+  text-decoration: none;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.nav-item:hover { color: var(--text); }
+.nav-item.active { color: var(--structure); }
+.nav-section-meta {
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(103,114,129,0.55);
+  padding: 14px 8px 4px;
+}
+.nav-font-status {
+  margin-top: auto;
+  padding: 14px 8px 12px;
+  border-top: 1px solid var(--line);
+  font-family: monospace;
+  font-size: 10px;
+  line-height: 1.8;
+  color: var(--soft);
+}
+.nav-rail.collapsed .nav-font-status {
+  opacity: 0;
+  pointer-events: none;
+}
+/* ── PAGE LAYOUT ──────────────────────────── */
+.page {
+  margin-left: var(--nav-w);
+  padding: 0 56px 120px;
+  max-width: 1320px;
+  transition: margin-left 0.2s ease;
+}
+.nav-rail.collapsed ~ .page {
+  margin-left: var(--nav-w-collapsed);
+}
+/* ── SHARED ───────────────────────────────── */
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 16px;
+}
+p, li {
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.76;
+  color: var(--muted);
+}
+strong { color: var(--text); }
+pre {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.9;
+  color: #eef3f8;
+}
+.s  { color: var(--structure); font-weight: bold; }
+.sd { color: var(--structure-d); font-weight: bold; }
+  .sg { color: var(--structure); font-weight: 400; }
+.st { color: var(--state); }
+.ev { color: var(--event); }
+.da { color: var(--data); }
+.dt { color: var(--data-t); }
+.dv { color: var(--data-v); }
+.ru { color: var(--rule); }
+.cm { color: var(--comment); font-style: italic; }
+.ctx { color: var(--soft); }
+.ok { color: var(--valid); }
+.no { color: var(--violated); }
+.so { color: var(--data-t); }
+/* ── SECTION SHELL ────────────────────────── */
+.section {
+  padding: 80px 0 64px;
+  border-bottom: 1px solid var(--line);
+}
+.section:last-child { border-bottom: none; }
+.section-head {
+  margin-bottom: 56px;
+}
+.section-head h2 {
+  font-family: var(--mono);
+  font-size: clamp(28px, 4vw, 58px);
+  line-height: 0.96;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 20px;
+  max-width: 22ch;
+}
+.section-head p { max-width: 62ch; }
+/* ── 01 INTRO ─────────────────────────────── */
+.intro-hero {
+  display: grid;
+  gap: 56px;
+}
+.intro-wordmark {
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 32px;
+}
+.intro-h1 {
+  font-family: var(--mono);
+  font-size: clamp(40px, 6vw, 88px);
+  line-height: 0.92;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 32px;
+  max-width: 20ch;
+}
+.intro-copy-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  align-items: start;
+  gap: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.intro-body p { max-width: 60ch; }
+.intro-copy-row p { margin: 0; }
+.cast-strip {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 36px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.cast-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.cast-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+.intro-specimen {
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+}
+.specimen-bar {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--soft);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.specimen-dots { display: flex; gap: 6px; }
+.specimen-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
+.specimen-body { padding: 20px; }
+/* ── 02 CONCEPTS ──────────────────────────── */
+.concepts-grid {
+  display: grid;
+  gap: 1px;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.concept-cell {
+  padding: 26px;
+  background: var(--panel);
+}
+.concept-cell h3 {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.concept-cell p { font-size: 15px; }
+.channels-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  margin-top: 1px;
+}
+.channel {
+  padding: 24px;
+  background: var(--panel-2);
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+.channel-name {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.channel h3 {
+  font-family: var(--mono);
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.channel p { font-size: 15px; }
+/* ── 03 SYSTEM ────────────────────────────── */
+.construct-gallery {
+  padding: 56px 0;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: 200px minmax(0,1fr);
+  gap: 40px;
+  align-items: start;
+}
+.construct-gallery:last-of-type { border-bottom: none; }
+.construct-sidebar { position: sticky; top: 32px; }
+.construct-index {
+  font-size: 52px;
+  line-height: 1;
+  color: rgba(255,255,255,0.06);
+  margin-bottom: 12px;
+  font-family: var(--mono);
+}
+.construct-name {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.construct-body { display: grid; gap: 32px; }
+.construct-specimen {
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.construct-specimen-inner { padding: 20px; }
+.construct-modifiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 16px;
+}
+.modifier-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  color: var(--soft);
+}
+.cross-surface-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.surface-chip {
+  padding: 14px 16px;
+  background: var(--panel-2);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.surface-chip span { display: block; margin-top: 6px; font-size: 11px; color: var(--text); }
+.field-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.field-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--soft);
+  border-bottom: 1px solid var(--line);
+}
+.field-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.field-table tr:last-child td { border-bottom: none; }
+.verdict-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  margin-top: 48px;
+}
+.verdict-cell { padding: 22px; background: var(--panel-2); }
+.verdict-name {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+/* ── 04 SURFACES ──────────────────────────── */
+.surfaces-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.surface-specimen {
+  background: var(--panel);
+  padding: 26px;
+}
+.surface-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 6px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.surface-h3 {
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin: 14px 0 6px;
+}
+.sf-note {
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.72;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+.panel-inner {
+  border: 1px solid var(--line);
+  padding: 16px;
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 130px minmax(0,1fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 13px;
+  align-items: baseline;
+}
+.form-row:last-child { border-bottom: none; }
+.form-lbl { color: var(--soft); font-size: 11px; letter-spacing: 0.10em; }
+.evt-btn {
+  padding: 6px 14px;
+  border: 1px solid rgba(48,184,232,0.35);
+  background: rgba(48,184,232,0.05);
+  color: var(--event);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.evt-btn[disabled] {
+  border-color: var(--line);
+  background: none;
+  color: var(--soft);
+  opacity: 0.5;
+  cursor: default;
+}
+.timeline-row {
+  display: grid;
+  grid-template-columns: 90px 14px minmax(0,1fr);
+  gap: 12px;
+  padding: 8px 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  align-items: start;
+}
+.tl-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 1px solid;
+  margin-top: 2px;
+}
+.rule-callout {
+  padding: 12px 16px;
+  border-left: 3px solid var(--violated);
+  background: rgba(248,113,113,0.05);
+  margin: 6px 0;
+}
+.rule-callout p {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--violated);
+}
+/* ── RESPONSIVE ───────────────────────────── */
+@media (max-width: 960px) {
+  .nav-rail { display: none; }
+  .page { margin-left: 0; padding: 0 24px 80px; }
+  .intro-hero,
+  .construct-gallery,
+  .channels-grid,
+  .surfaces-grid,
+  .cross-surface-strip,
+  .verdict-strip { grid-template-columns: 1fr; }
+  .concepts-grid { grid-template-columns: 1fr; }
+  .construct-sidebar { position: static; }
+}
+</style>
+</head>
+<body>
+
+<!-- ─── Nav rail ─────────────────────────────────── -->
+<nav class="nav-rail" id="navRail" aria-label="Document navigation">
+  <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation" title="Toggle navigation">&#8250;</button>
+  <div class="nav-wordmark">Precept</div>
+  <a class="nav-item active" href="#intro"     data-sec="intro">Intro</a>
+  <a class="nav-item"        href="#concepts"  data-sec="concepts">Concepts</a>
+  <a class="nav-item"        href="#typography" data-sec="typography">Typography</a>
+  <a class="nav-item"        href="#colors"     data-sec="colors">Colors</a>
+  <a class="nav-item"        href="#constructs" data-sec="constructs">Constructs</a>
+  <span class="nav-section-meta">Families</span>
+  <a class="nav-item"        href="#structure" data-sec="structure" style="padding-left:18px">Structure</a>
+  <a class="nav-item"        href="#state"     data-sec="state"     style="padding-left:18px">State</a>
+  <a class="nav-item"        href="#event"     data-sec="event"     style="padding-left:18px">Event</a>
+  <a class="nav-item"        href="#data-c"    data-sec="data-c"    style="padding-left:18px">Data</a>
+  <a class="nav-item"        href="#rule"      data-sec="rule"      style="padding-left:18px">Rule</a>
+  <span class="nav-section-meta" style="margin-top:6px"></span>
+  <a class="nav-item"        href="#surfaces"  data-sec="surfaces">Surfaces</a>
+  <span class="nav-section-meta" style="margin-top:6px"></span>
+  <a class="nav-item"        href="#docs"       data-sec="docs">Docs</a>
+  <div class="nav-font-status" id="nav-font-status"></div>
+</nav>
+
+<div class="page">
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 01 · INTRO                                      -->
+<!-- ═══════════════════════════════════════════════ -->
+<section class="section" id="intro">
+  <div class="eyebrow">Precept / Design System</div>
+  <div class="intro-hero">
+    <div class="intro-body">
+      <p class="intro-wordmark">Semantic Visual System</p>
+      <h1 class="intro-h1">The Semantic World of Precept</h1>
+      <div class="intro-copy-row">
+        <p>Precept governs the integrity of a business entity's data across its lifecycle. The semantic visual system governs how that governance is communicated on screen: how structure, states, events, data fields, and rules each look in every surface where Precept is present.</p>
+        <p>Five authored semantic families. One separate runtime verdict register that sits on top of them without replacing them. One separate chrome/support layer that scaffolds the surface around them. A stable visual grammar that survives when the context shifts from code editor to topology diagram to data form to public documentation.</p>
+      </div>
+      <div class="cast-strip" aria-label="Five core constructs">
+        <span class="cast-pill"><span class="cast-dot" style="background:var(--structure)"></span><span class="s">Structure</span></span>
+        <span class="cast-pill"><span class="cast-dot" style="background:var(--state)"></span><span class="st">State</span></span>
+        <span class="cast-pill"><span class="cast-dot" style="background:var(--event)"></span><span class="ev">Event</span></span>
+        <span class="cast-pill"><span class="cast-dot" style="background:var(--data)"></span><span class="da">Data</span></span>
+        <span class="cast-pill"><span class="cast-dot" style="background:var(--rule)"></span><span class="ru">Rule</span></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 02 · CONCEPTS                                   -->
+<!-- ═══════════════════════════════════════════════ -->
+<style>
+/* ── § 02 CONCEPTS · layered architecture diagram ────────────── */
+
+/* ─ diagram frame ─ */
+.arch-diagram {
+  display: grid;
+  gap: 0;
+  position: relative;
+}
+
+/* ─ layer labels (left edge) ─ */
+.arch-layer {
+  display: grid;
+  gap: 0;
+}
+.arch-layer-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--soft);
+  padding: 10px 20px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.arch-layer-label span {
+  font-family: var(--sans);
+  font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--soft);
+  opacity: 0.6;
+  margin-left: 16px;
+}
+
+/* ─ construct cards (Layer 1) ─ */
+.arch-constructs {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2px;
+  padding: 20px;
+  background: var(--panel);
+  border-bottom: 2px solid var(--line-strong);
+}
+.arch-card {
+  position: relative;
+  padding: 28px 20px 24px;
+  border-radius: 4px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  overflow: hidden;
+}
+.arch-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  background: var(--card-color);
+  opacity: 0.10;
+}
+.arch-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--card-color);
+  border-radius: 4px 4px 0 0;
+}
+.arch-card-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
+  background: var(--card-color);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  position: relative;
+}
+.arch-card-name {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--card-color);
+  position: relative;
+}
+.arch-card-role {
+  font-family: var(--sans);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--soft);
+  position: relative;
+}
+
+/* ─ registers band (Layer 2) ─ */
+.arch-registers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  background: var(--line);
+}
+.arch-reg {
+  background: var(--panel);
+  padding: 24px 28px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+.arch-reg-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+.arch-reg-name {
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.arch-reg-tag {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--soft);
+}
+.arch-reg-note {
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.72;
+  color: var(--soft);
+  max-width: 42ch;
+}
+.arch-surfaces {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.arch-sf {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--panel-2);
+}
+
+/* ─ verdict register (sits alongside registers) ─ */
+.arch-verdict-lane {
+  margin-top: 2px;
+  padding: 18px 28px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.arch-verdict-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.arch-verdict-chips {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.arch-verdict-chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  opacity: 0.85;
+}
+.arch-verdict-note {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--soft);
+  opacity: 0.6;
+  margin-left: auto;
+}
+
+/* ─ channels band (Layer 3 — spans full width) ─ */
+.arch-channels {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  border-top: 2px solid var(--line-strong);
+}
+.arch-ch {
+  padding: 24px 22px;
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.arch-ch:last-child { border-right: none; }
+.arch-ch-num {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.arch-ch-name {
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.arch-ch-note {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--soft);
+}
+
+/* ─ chrome/support outer frame ─ */
+.arch-chrome-frame {
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 3px;
+  position: relative;
+}
+
+/* ─ concept annotations ─ */
+.cov-concepts {
+  margin-top: 32px;
+  border: 1px solid var(--line-strong);
+  display: grid;
+  gap: 0;
+}
+.cov-concept--foundation {
+  padding: 30px 32px 28px;
+  background: var(--panel);
+  border-left: 2px solid var(--structure);
+  border-bottom: 1px solid var(--line-strong);
+  display: grid;
+  grid-template-columns: 200px minmax(0,1fr);
+  gap: 28px;
+  align-items: start;
+}
+.cov-concept-left {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding-top: 3px;
+}
+.cov-concept-role {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--structure);
+  opacity: 0.65;
+  display: block;
+}
+.cov-concept-lbl {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text);
+  display: block;
+  line-height: 1.4;
+}
+.cov-concepts-derived {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--line);
+}
+.cov-concepts-derived .cov-concept {
+  padding: 24px 22px;
+  background: var(--bg);
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+.cov-concepts-derived .cov-concept-lbl {
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: var(--soft);
+  opacity: 0.85;
+}
+.cov-concept p {
+  font-size: 13px;
+  line-height: 1.72;
+  color: var(--muted);
+}
+.cov-concept--foundation p {
+  font-size: 14px;
+  line-height: 1.76;
+}
+
+/* ─ responsive ─ */
+@media (max-width: 960px) {
+  .arch-constructs { grid-template-columns: repeat(3, 1fr); }
+  .arch-registers { grid-template-columns: 1fr; }
+  .arch-channels { grid-template-columns: repeat(2, 1fr); }
+  .cov-concept--foundation { grid-template-columns: 1fr; }
+  .cov-concepts-derived { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .arch-constructs { grid-template-columns: repeat(2, 1fr); }
+  .arch-channels { grid-template-columns: 1fr; }
+}
+</style>
+
+<section class="section" id="concepts">
+  <div class="section-head">
+    <div class="eyebrow">02 · Concepts</div>
+    <h2>Five constructs&thinsp;·&thinsp;Two registers&thinsp;·&thinsp;Four channels</h2>
+    <p>The system has four structural parts. Five semantic families form the identity substrate — the authored vocabulary that stays recognizable wherever it appears. Two depiction registers translate that identity into authored source (Definition) and rendered components (Runtime). A separate runtime verdict register reports evaluation without redefining type. A separate chrome/support layer carries canvas, panel, text, and line scaffolding so the surrounding palette can complement the semantic system without competing with it. Four signal channels encode meaning in both. Four surfaces provide the contexts in which all of this manifests.</p>
+  </div>
+
+  <!-- Architecture diagram ─────────────────────── -->
+  <div class="arch-chrome-frame" role="img" aria-label="System architecture: five constructs across two depiction registers, four signal channels spanning both">
+    <div class="arch-diagram">
+
+      <!-- Layer 1 · Constructs ─────────────────── -->
+      <div class="arch-layer">
+        <div class="arch-layer-label">Constructs <span>stable semantic identity across all registers and surfaces</span></div>
+        <div class="arch-constructs">
+          <div class="arch-card" style="--card-color: var(--structure)">
+            <div class="arch-card-swatch"></div>
+            <div class="arch-card-name s">Structure</div>
+            <div class="arch-card-role">Registration, grouping, governed boundaries</div>
+          </div>
+          <div class="arch-card" style="--card-color: var(--state)">
+            <div class="arch-card-swatch"></div>
+            <div class="arch-card-name st">State</div>
+            <div class="arch-card-role">Where the entity is in its lifecycle</div>
+          </div>
+          <div class="arch-card" style="--card-color: var(--event)">
+            <div class="arch-card-swatch"></div>
+            <div class="arch-card-name ev">Event</div>
+            <div class="arch-card-role">What happens — triggers and transitions</div>
+          </div>
+          <div class="arch-card" style="--card-color: var(--data)">
+            <div class="arch-card-swatch"></div>
+            <div class="arch-card-name da">Data</div>
+            <div class="arch-card-role">Fields, types, and values the entity carries</div>
+          </div>
+          <div class="arch-card" style="--card-color: var(--rule)">
+            <div class="arch-card-swatch"></div>
+            <div class="arch-card-name ru">Rule</div>
+            <div class="arch-card-role">Invariants, assertions, rejection messages</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Layer 2 · Registers ──────────────────── -->
+      <div class="arch-layer">
+        <div class="arch-layer-label">Registers <span>same five constructs, two depiction modes</span></div>
+        <div class="arch-registers">
+          <div class="arch-reg">
+            <div class="arch-reg-head">
+              <span class="arch-reg-name">Definition</span>
+              <span class="arch-reg-tag">authored DSL&thinsp;·&thinsp;what it is</span>
+            </div>
+            <p class="arch-reg-note">The token form in the DSL editor. Syntax colour, monospaced weight, and keyword grammar carry each construct's authored identity — the stable visual form before any runtime evaluation.</p>
+            <div class="arch-surfaces">
+              <span class="arch-sf">Code</span>
+            </div>
+          </div>
+          <div class="arch-reg">
+            <div class="arch-reg-head">
+              <span class="arch-reg-name">Runtime</span>
+              <span class="arch-reg-tag">rendered components&thinsp;·&thinsp;what is happening now</span>
+            </div>
+            <p class="arch-reg-note">The component form in rendered views. Same identity as Definition; three distinct visual conventions suited to each surface.</p>
+            <div class="arch-surfaces">
+              <span class="arch-sf">Diagram</span>
+              <span class="arch-sf">Data Form</span>
+              <span class="arch-sf">Timeline</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Verdict register -->
+        <div class="arch-verdict-lane">
+          <span class="arch-verdict-label">Verdict Register</span>
+          <div class="arch-verdict-chips">
+            <span class="arch-verdict-chip" style="color:var(--valid)">Enabled</span>
+            <span class="arch-verdict-chip" style="color:var(--violated)">Blocked</span>
+            <span class="arch-verdict-chip" style="color:var(--warn)">Warning</span>
+          </div>
+          <span class="arch-verdict-note">runtime evaluation only — never redefines type identity</span>
+        </div>
+      </div>
+
+      <!-- Layer 3 · Channels ──────────────────── -->
+      <div class="arch-layer">
+        <div class="arch-layer-label">Channels <span>signal grammar spanning both registers</span></div>
+        <div class="arch-channels">
+          <div class="arch-ch">
+            <span class="arch-ch-num">01</span>
+            <span class="arch-ch-name">Colour</span>
+            <p class="arch-ch-note">Five semantic families encode type identity. Chrome/support tones scaffold the surface around them so the complementary palette never redefines semantic meaning.</p>
+          </div>
+          <div class="arch-ch">
+            <span class="arch-ch-num">02</span>
+            <span class="arch-ch-name">Typography</span>
+            <p class="arch-ch-note">Mono for all semantic names. Sans for prose and context. Weight and style carry constraint and modification status.</p>
+          </div>
+          <div class="arch-ch">
+            <span class="arch-ch-num">03</span>
+            <span class="arch-ch-name">Form</span>
+            <p class="arch-ch-note">Stable base shapes encode construct type. Modifier signals layer additively without displacing the base.</p>
+          </div>
+          <div class="arch-ch">
+            <span class="arch-ch-num">04</span>
+            <span class="arch-ch-name">Layout</span>
+            <p class="arch-ch-note">Adjacency, ordering, and depth encode relationship, sequence, and structural hierarchy across all surfaces.</p>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /.arch-diagram -->
+  </div><!-- /.arch-chrome-frame -->
+
+  <!-- Concept definitions ─────────────────────── -->
+  <div class="cov-concepts">
+
+    <!-- Foundation concept -->
+    <div class="cov-concept cov-concept--foundation">
+      <div class="cov-concept-left">
+        <span class="cov-concept-role">Foundation</span>
+        <span class="cov-concept-lbl">Semantic Identity</span>
+      </div>
+      <div class="cov-concept-body">
+        <p>Each construct carries a stable type classification that persists regardless of surface. Structure is always indigo, State always violet, Event always cyan, Data always steel, Rule always amber. Moving from code editor to diagram to data form to timeline, the same construct speaks in the same visual register&thinsp;—&thinsp;the medium adapts, the identity does not.</p>
+      </div>
+    </div>
+
+    <!-- Derived concepts -->
+    <div class="cov-concepts-derived">
+      <div class="cov-concept">
+        <span class="cov-concept-lbl">Authored vs Runtime Meaning</span>
+        <p>Definition captures what a construct <em>is</em>&thinsp;—&thinsp;its place in the governed schema, independent of any live instance. Runtime captures what is <em>happening</em> to it now&thinsp;—&thinsp;current lifecycle position, field values, evaluation results. These two readings are formally distinct. The same construct identity underlies both; the register changes, the identity holds. Verdict hues report runtime outcome in their own register rather than becoming new semantic families.</p>
+      </div>
+      <div class="cov-concept">
+        <span class="cov-concept-lbl">Additive Modifiers &amp; Runtime Overlays</span>
+        <p>Runtime state and constraint status are expressed as signals layered onto the base depiction&thinsp;—&thinsp;never as replacements. A blocked transition marks the event; it does not erase it. A violated rule flags the field row; it does not suppress it. Evaluation output&thinsp;—&thinsp;allowed, blocked, warning&thinsp;—&thinsp;is drawn on top. Overlay reveals; it does not displace.</p>
+      </div>
+      <div class="cov-concept">
+        <span class="cov-concept-lbl">Cross-Surface Translation</span>
+        <p>Moving from code editor to diagram to data form to timeline, a construct adopts different visual conventions appropriate to each medium. What remains invariant is its semantic identity: colour family, name form, and the modifier logic that applies to it. Chrome/support tokens stay outside that identity and handle scaffolding instead, which means a surface can choose a complementary chrome palette without inventing new semantic meaning. The system defines what stays constant so nothing needs to be relearned as surfaces change.</p>
+      </div>
+    </div>
+
+  </div>
+
+</section>
+<!-- 03 · TYPOGRAPHY                               -->
+<!-- ═══════════════════════════════════════════════════ -->
+<style>
+/* ── 03 Typography ───────────────────────────── */
+.typography-band {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+}
+.typography-band + .typography-band {
+  margin-top: 12px;
+}
+.typography-band--rules {
+  background: var(--panel-2);
+}
+.typography-kicker,
+.typography-card-kicker,
+.typography-rule-label,
+.typography-specimen-bar span {
+  font-family: var(--mono);
+}
+.typography-kicker {
+  padding: 16px 20px 0;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.typography-header,
+.typography-rules-head {
+  display: grid;
+  grid-template-columns: minmax(0,1.2fr) minmax(300px,0.9fr);
+  gap: 28px;
+  align-items: end;
+  padding: 18px 20px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.typography-header h3,
+.typography-rules-head h3 {
+  font-family: var(--mono);
+  font-size: clamp(24px,3.2vw,38px);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  max-width: 18ch;
+  margin-bottom: 14px;
+}
+.typography-header p,
+.typography-rules-head p,
+.typography-card p,
+.typography-rule-card p {
+  font-size: 15px;
+}
+.typography-rules-head p {
+  max-width: 58ch;
+}
+.typography-summary {
+  display: grid;
+  gap: 10px;
+}
+.typography-summary-item {
+  padding: 14px 14px 12px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.018);
+}
+.typography-summary-item span,
+.typography-summary-item small {
+  display: block;
+  font-family: var(--mono);
+}
+.typography-summary-item span {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 10px;
+}
+.typography-summary-item strong {
+  display: block;
+  font-family: var(--mono);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.typography-summary-item small {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.typography-stage,
+.typography-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0,1fr));
+  gap: 12px;
+  padding: 20px;
+}
+.typography-card,
+.typography-rule-card {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.typography-rule-card {
+  background: rgba(255,255,255,0.018);
+}
+.typography-card--mono,
+.typography-card--pressure {
+  grid-column: span 7;
+}
+.typography-card--sans,
+.typography-card--wordmark {
+  grid-column: span 5;
+}
+.typography-rule-card--compact {
+  grid-column: span 4;
+}
+.typography-rule-card--wide {
+  grid-column: span 6;
+}
+.typography-card-kicker,
+.typography-rule-label {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.typography-card h3,
+.typography-rule-card h3 {
+  font-family: var(--mono);
+  font-size: 24px;
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.typography-card-head {
+  display: grid;
+  gap: 10px;
+}
+.typography-specimen {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.02);
+}
+.typography-specimen--tight {
+  gap: 12px;
+}
+.typography-specimen-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.typography-specimen-bar span {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.typography-wordmark-display,
+.typography-wordmark-hero,
+.typography-token,
+.typography-keywords,
+.typography-keywords-soft,
+.typography-inline-label {
+  font-family: var(--mono);
+}
+.typography-wordmark-display,
+.typography-wordmark-hero {
+  font-variant: small-caps;
+  letter-spacing: 0.14em;
+  line-height: 0.92;
+  color: var(--text);
+}
+.typography-wordmark-display {
+  font-size: clamp(32px,4.8vw,64px);
+}
+.typography-wordmark-hero {
+  font-size: clamp(28px,4.2vw,48px);
+}
+.typography-mono-subtitle {
+  font-family: var(--mono);
+  font-size: 18px;
+  line-height: 1.2;
+  color: var(--text);
+}
+.typography-construct-line,
+.typography-inline-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.typography-prose-sample {
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.typography-wordmark-stack {
+  display: grid;
+  gap: 14px;
+}
+.typography-compare {
+  display: grid;
+  gap: 10px;
+}
+.typography-compare-row {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.typography-inline-name {
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.typography-pressure-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.typography-token {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.02);
+  font-size: 13px;
+  line-height: 1;
+}
+.typography-token--state {
+  font-style: italic;
+  color: var(--state);
+}
+.typography-token--event {
+  font-style: italic;
+  color: var(--event);
+}
+.typography-token--data {
+  font-style: italic;
+  color: var(--data);
+}
+.typography-token--annotation {
+  font-style: italic;
+  color: var(--comment);
+}
+.typography-pressure-note {
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--soft);
+}
+.typography-keyword-sample {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.typography-keywords,
+.typography-keywords-soft {
+  display: block;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.typography-keywords {
+  font-weight: 700;
+  color: var(--structure-d);
+}
+.typography-keywords-soft {
+  color: var(--structure);
+}
+@media (max-width: 1180px) {
+  .typography-header,
+  .typography-rules-head {
+    grid-template-columns: 1fr;
+  }
+  .typography-stage,
+  .typography-rules-grid {
+    grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+  .typography-card,
+  .typography-card--mono,
+  .typography-card--sans,
+  .typography-card--wordmark,
+  .typography-card--pressure,
+  .typography-rule-card,
+  .typography-rule-card--compact,
+  .typography-rule-card--wide {
+    grid-column: auto;
+  }
+}
+@media (max-width: 720px) {
+  .typography-kicker {
+    padding: 14px 16px 0;
+  }
+  .typography-header,
+  .typography-rules-head {
+    padding: 16px;
+  }
+  .typography-stage,
+  .typography-rules-grid,
+  .typography-summary {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+  .typography-stage,
+  .typography-rules-grid {
+    gap: 10px;
+  }
+  .typography-card,
+  .typography-rule-card {
+    padding: 16px;
+  }
+  .typography-specimen-bar {
+    display: grid;
+  }
+}
+</style>
+<section class="section" id="typography">
+  <div class="section-head">
+    <div class="eyebrow">03 · Typography</div>
+    <h2>Two faces. One rule each.</h2>
+    <p>Typography governs how identity, prose, and semantic pressure are read across all five constructs. Geist Mono carries structural identity. Geist carries reading prose. No serifs. Italic marks semantic pressure, not emphasis.</p>
+  </div>
+
+  <div class="typography-band">
+    <div class="typography-kicker">Primary split</div>
+    <div class="typography-header">
+      <div>
+        <h3>Type separates authored identity from reading voice.</h3>
+        <p>Typography in Precept is not a styling layer. It divides structural naming from explanatory reading, then reserves a third move for semantic pressure. The section needs to read as a system of roles, not a list of font choices.</p>
+      </div>
+      <div class="typography-summary" aria-label="Typography system summary">
+        <div class="typography-summary-item">
+          <span>Structural face</span>
+          <strong>Geist Mono</strong>
+          <small>wordmark · headings · labels · tokens · code specimens</small>
+        </div>
+        <div class="typography-summary-item">
+          <span>Reading face</span>
+          <strong>Geist</strong>
+          <small>body copy · concept prose · surface notes · long reading</small>
+        </div>
+        <div class="typography-summary-item">
+          <span>Reserved signal</span>
+          <strong>Italic</strong>
+          <small>semantic pressure only, never generic emphasis or flourish</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="typography-stage">
+      <article class="typography-card typography-card--mono">
+        <div class="typography-card-head">
+          <div class="typography-card-kicker">Identity register</div>
+          <h3>Geist Mono — identity &amp; structure</h3>
+        </div>
+        <p>Used for: wordmark, section headings, labels, chips, nav, construct names, table headers, eyebrows, inline tokens, and all code specimens. Geist Mono is the face of governed structure. When text needs to read as authored or systematic, it is in Geist Mono.</p>
+        <div class="typography-specimen">
+          <div class="typography-specimen-bar">
+            <span>Display lockup</span>
+            <span>hero · headings · tokens</span>
+          </div>
+          <div class="typography-wordmark-display">Precept</div>
+          <div class="typography-mono-subtitle">Semantic Visual System</div>
+          <div class="typography-construct-line">Structure · State · Event · Data · Rule</div>
+        </div>
+      </article>
+
+      <article class="typography-card typography-card--sans">
+        <div class="typography-card-head">
+          <div class="typography-card-kicker">Reading register</div>
+          <h3>Geist — reading prose</h3>
+        </div>
+        <p>Used for: body paragraphs, concept descriptions, surface notes, and any text longer than a label that needs sustained reading. Geist sits beside Geist Mono without competing. Segoe UI Variable and Segoe UI are the system fallbacks on Windows.</p>
+        <div class="typography-specimen">
+          <div class="typography-specimen-bar">
+            <span>Reading sample</span>
+            <span>body · notes · explanation</span>
+          </div>
+          <div class="typography-prose-sample">Precept governs the integrity of a business entity's data across its lifecycle. The semantic visual system governs how that governance is communicated on screen.</div>
+        </div>
+      </article>
+
+      <article class="typography-card typography-card--wordmark">
+        <div class="typography-card-head">
+          <div class="typography-card-kicker">Display scarcity</div>
+          <h3>Wordmark treatment</h3>
+        </div>
+        <p>The identity display — <span class="typography-wordmark-hero">Precept</span> in Geist Mono small caps — is reserved for the hero moment and deliberate brand callouts. Inline prose uses plain title case. Nav and labels are already all-caps mono and need no additional treatment. Scarcity is what makes the wordmark land.</p>
+        <div class="typography-specimen typography-specimen--tight">
+          <div class="typography-specimen-bar">
+            <span>Usage contrast</span>
+            <span>hero vs inline</span>
+          </div>
+          <div class="typography-wordmark-stack">
+            <div class="typography-compare-row">
+              <div class="typography-inline-label">Hero callout</div>
+              <div class="typography-wordmark-hero">Precept</div>
+            </div>
+            <div class="typography-compare-row">
+              <div class="typography-inline-label">Inline prose</div>
+              <div class="typography-inline-name">Precept stays plain title case inside reading copy.</div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="typography-card typography-card--pressure">
+        <div class="typography-card-head">
+          <div class="typography-card-kicker">Constraint signal</div>
+          <h3>Italic — semantic pressure only</h3>
+        </div>
+        <p>Italic belongs to constrained states, constrained events, invariant-guarded data names, and rule-adjacent annotation in code specimens. It marks that something is under explicit rule attention. It is not used for general emphasis, decorative headings, or editorial flourish. If a reader cannot trust italic to mean pressure, the second semantic channel has been wasted.</p>
+        <div class="typography-specimen">
+          <div class="typography-specimen-bar">
+            <span>Pressure markers</span>
+            <span>same family · italic only</span>
+          </div>
+          <div class="typography-pressure-row">
+            <span class="typography-token typography-token--state">Approved</span>
+            <span class="typography-token typography-token--event">Submit</span>
+            <span class="typography-token typography-token--data">PolicyHolder</span>
+            <span class="typography-token typography-token--annotation"># review required above 50k</span>
+          </div>
+          <div class="typography-pressure-note">Pressure is additive. The construct keeps its family; italic reports rule attention without inventing a second lane.</div>
+        </div>
+      </article>
+    </div>
+  </div>
+
+  <div class="typography-band typography-band--rules">
+    <div class="typography-kicker">Discipline</div>
+    <div class="typography-rules-head">
+      <div>
+        <h3>Rules keep the split legible.</h3>
+        <p>Typography only works as a semantic channel if each move stays narrow and repeatable. These rules preserve the distinction between governing language, explanatory prose, and pressure states.</p>
+      </div>
+      <div class="typography-summary" aria-label="Typography rule summary">
+        <div class="typography-summary-item">
+          <span>Do not mix</span>
+          <strong>Mono / Sans</strong>
+          <small>naming and prose stay in separate roles</small>
+        </div>
+        <div class="typography-summary-item">
+          <span>Do not decorate</span>
+          <strong>Italic</strong>
+          <small>reserved for semantic pressure and constraint attention</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="typography-rules-grid">
+      <div class="typography-rule-card typography-rule-card--compact">
+        <span class="typography-rule-label">Rule</span>
+        <h3>No serifs.</h3>
+        <p>Ever. The posture of this document and of Precept's surfaces is architectural, not editorial. Serifs are not part of the system.</p>
+      </div>
+      <div class="typography-rule-card typography-rule-card--compact">
+        <span class="typography-rule-label">Rule</span>
+        <h3>Mono for everything structural.</h3>
+        <p>If it governs, labels, names, or identifies — it is in Geist Mono. This includes headings. Geist Mono at display size reads as specification, not decoration.</p>
+      </div>
+      <div class="typography-rule-card typography-rule-card--compact">
+        <span class="typography-rule-label">Rule</span>
+        <h3>Governing keywords are bold.</h3>
+        <p>Semantic indigo keywords render at font-weight 700. Grammar indigo stays normal for connective tokens and logical operators. Color identifies the family; weight distinguishes governing keywords from connective grammar.</p>
+        <div class="typography-keyword-sample">
+          <span class="typography-keywords">precept field state event from on set transition assert reject when</span>
+          <span class="typography-keywords-soft">as default == and or not</span>
+        </div>
+      </div>
+      <div class="typography-rule-card typography-rule-card--wide">
+        <span class="typography-rule-label">Rule</span>
+        <h3>Sans for reading prose.</h3>
+        <p>Geist carries paragraphs. It does not appear in identity positions, labels, or code. The split is strict. Mono names and governs; sans explains.</p>
+      </div>
+      <div class="typography-rule-card typography-rule-card--wide">
+        <span class="typography-rule-label">Rule</span>
+        <h3>Italic means pressure.</h3>
+        <p>Not emphasis. Not decoration. Italic communicates that a construct is under rule attention. Spend it only where that meaning is true.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+
+<style>
+/* ── § 04–05 Color & Constructs · specimen pair (Definition / Runtime) ─────── */
+.specimen-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--line-strong);
+  border: 1px solid var(--line);
+}
+.specimen-half {
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+}
+.specimen-half-bar {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.specimen-half-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.specimen-half-tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: rgba(103,114,129,0.5);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.specimen-half-inner {
+  padding: 24px 20px;
+  flex: 1;
+}
+/* Rule callout demos ─────────────────────────────────────────── */
+.callout-demo {
+  padding: 10px 14px;
+  border-left: 3px solid;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 3px 0;
+}
+.callout-demo--satisfied {
+  border-color: var(--valid);
+  background: rgba(52,211,153,0.04);
+  color: var(--valid);
+}
+.callout-demo--violated {
+  border-color: var(--violated);
+  background: rgba(248,113,113,0.04);
+  color: var(--violated);
+}
+.callout-demo--warn {
+  border-color: var(--warn);
+  background: rgba(253,224,71,0.04);
+  color: var(--warn);
+}
+/* Data tonal hierarchy demo ──────────────────────────────────── */
+.tonal-demo {
+  display: flex;
+  border: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.tonal-cell {
+  flex: 1;
+  padding: 10px 14px;
+  border-right: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.tonal-cell:last-child { border-right: none; }
+.tonal-cell-lbl {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 7px;
+}
+.tonal-cell--secondary {
+  background: rgba(255,255,255,0.015);
+}
+.tonal-token-secondary {
+  font-size: 12px;
+  opacity: 0.82;
+}
+@media (max-width: 960px) {
+  .specimen-pair { grid-template-columns: 1fr; }
+}
+
+/* ─ Focal strip ───────────────────────────── */
+.cg-focal-strip {
+  border-left: 3px solid var(--fc, rgba(255,255,255,0.15));
+  padding: 5px 10px;
+  margin-bottom: 10px;
+  background: rgba(255,255,255,0.02);
+  display: flex;
+  align-items: center;
+}
+.cg-focal-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+  color: var(--fc, rgba(255,255,255,0.55));
+}
+.cg-inline-note {
+  display: inline-block;
+  margin: 0 8px;
+  padding: 1px 6px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.44);
+  vertical-align: middle;
+}
+.cg-inline-secondary {
+  opacity: 0.78;
+  font-weight: 400;
+}
+/* ─ Channel grid ─────────────────────────── */
+.cg-channels {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  margin-top: 4px;
+}
+@media (max-width: 640px) {
+  .cg-channels { grid-template-columns: repeat(2, 1fr); }
+}
+.cg-channel {
+  background: var(--bg);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.cg-channel-name {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.28);
+}
+.cg-channel-body {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  min-height: 20px;
+}
+.cg-channel-signal {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.5;
+}
+.cg-channel-signal strong {
+  color: rgba(255,255,255,0.72);
+  font-weight: 500;
+}
+.cg-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  background: var(--sw, rgba(255,255,255,0.2));
+}
+.cg-swatch--secondary {
+  width: 8px;
+  height: 8px;
+  opacity: 0.68;
+}
+.cg-family-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+  color: rgba(255,255,255,0.34);
+}
+.cg-family-note code {
+  opacity: 0.78;
+}
+.cg-form {
+  display: inline-block;
+  flex-shrink: 0;
+  color: var(--fc, rgba(255,255,255,0.2));
+}
+.cg-form--frame   { width:22px; height:14px; border:1px solid currentColor; display:inline-block; }
+.cg-form--node    { width:18px; height:14px; border:2px solid currentColor; display:inline-block; }
+.cg-form--pill    { width:28px; height:14px; border:1px solid currentColor; display:inline-block; }
+.cg-form--row     { width:26px; height:10px; border-bottom:1px solid currentColor; display:inline-block; }
+.cg-form--callout { width:24px; height:14px; border-left:3px solid currentColor; display:inline-block; background:rgba(255,255,255,0.02); }
+.color-system-band {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  padding: 24px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.025);
+}
+.color-system-band::before {
+  content: none;
+}
+.color-system-band > * {
+  position: relative;
+  z-index: 1;
+}
+.color-system-band--semantic {
+  background: var(--panel);
+}
+.color-system-kicker {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 16px;
+}
+.color-system-header {
+  display: grid;
+  grid-template-columns: minmax(0,1.3fr) minmax(300px,0.9fr);
+  gap: 28px;
+  align-items: end;
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.color-system-header h3 {
+  font-family: var(--mono);
+  font-size: clamp(24px, 3.2vw, 38px);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  max-width: 18ch;
+  margin-bottom: 14px;
+}
+.color-system-header p {
+  max-width: 58ch;
+  font-size: 15px;
+}
+.color-system-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 10px;
+}
+.color-system-summary-item {
+  padding: 14px 14px 12px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.color-system-summary-item span,
+.color-system-summary-item small {
+  display: block;
+  font-family: var(--mono);
+}
+.color-system-summary-item span {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 10px;
+}
+.color-system-summary-item strong {
+  display: block;
+  font-family: var(--mono);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.color-system-summary-item small {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.color-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0,1fr));
+  gap: 12px;
+}
+.semantic-family-card {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+}
+.semantic-family-card--structure,
+.semantic-family-card--data {
+  grid-column: span 3;
+}
+.semantic-family-card--state,
+.semantic-family-card--event,
+.semantic-family-card--rule {
+  grid-column: span 2;
+}
+.semantic-family-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.semantic-family-card__name,
+.semantic-family-card__count,
+.semantic-family-card__meta,
+.semantic-family-usage,
+.semantic-family-usage-label,
+.semantic-family-usage-subtle,
+.semantic-family-note,
+.semantic-family-swatch div,
+.semantic-family-variant div {
+  font-family: var(--mono);
+}
+.semantic-family-card__name {
+  font-size: 16px;
+  line-height: 1.1;
+  color: var(--text);
+}
+.semantic-family-card__meta {
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-top: 6px;
+}
+.semantic-family-card__count {
+  flex-shrink: 0;
+  padding: 5px 8px;
+  border: 1px solid rgba(255,255,255,0.09);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.semantic-family-swatch,
+.semantic-family-variant {
+  padding: 14px 12px 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--tone-fg, rgba(255,255,255,0.9));
+}
+.semantic-family-swatch {
+  min-height: 98px;
+}
+.semantic-family-swatch div:first-child,
+.semantic-family-variant div:first-child {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--tone-soft, rgba(255,255,255,0.44));
+  margin-bottom: 8px;
+}
+.semantic-family-swatch strong,
+.semantic-family-variant strong {
+  display: block;
+  font-family: var(--mono);
+  font-size: 15px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+.semantic-family-swatch div:last-child,
+.semantic-family-variant div:last-child {
+  font-size: 10px;
+  color: var(--tone-soft, rgba(255,255,255,0.44));
+  margin-top: 6px;
+}
+.semantic-family-variants {
+  display: grid;
+  gap: 8px;
+}
+.semantic-family-variants--double {
+  grid-template-columns: repeat(2, minmax(0,1fr));
+}
+.semantic-family-note {
+  padding: 12px;
+  border: 1px dashed rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.01);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.semantic-family-usage {
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  font-size: 11px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+.semantic-family-usage-label,
+.semantic-family-usage-subtle {
+  display: block;
+}
+.semantic-family-usage-label {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 6px;
+}
+.semantic-family-usage-subtle {
+  margin-top: 6px;
+  color: var(--soft);
+}
+.color-system-bridge {
+  margin-top: 12px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+}
+.color-system-bridge p {
+  max-width: 72ch;
+  font-size: 15px;
+}
+.color-lane-grid {
+  display: grid;
+  grid-template-columns: minmax(0,0.92fr) minmax(0,1.2fr) minmax(0,1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+.color-lane {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.color-lane-label,
+.annotation-tone div,
+.verdict-register-item span,
+.verdict-register-item em,
+.support-token-name,
+.support-token-value {
+  font-family: var(--mono);
+}
+.color-lane-label {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.color-lane h3 {
+  font-family: var(--mono);
+  font-size: 24px;
+  line-height: 0.98;
+  color: var(--text);
+}
+.color-lane p {
+  font-size: 15px;
+}
+.annotation-tone {
+  padding: 16px 14px 14px;
+  border: 1px solid rgba(144,150,166,0.18);
+  background: rgba(255,255,255,0.02);
+  color: var(--comment);
+}
+.annotation-tone div:first-child {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(144,150,166,0.62);
+  margin-bottom: 8px;
+}
+.annotation-tone strong {
+  display: block;
+  font-family: var(--mono);
+  font-size: 15px;
+  line-height: 1;
+  font-style: italic;
+}
+.annotation-tone div:last-child {
+  font-size: 10px;
+  color: rgba(144,150,166,0.68);
+  margin-top: 6px;
+}
+.verdict-register {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 1px;
+  background: var(--line);
+}
+.verdict-register-item {
+  padding: 14px 12px 12px;
+  background: var(--verdict-bg, rgba(255,255,255,0.03));
+}
+.verdict-register-item span,
+.verdict-register-item em {
+  display: block;
+}
+.verdict-register-item span {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--verdict-soft, rgba(255,255,255,0.46));
+  margin-bottom: 8px;
+}
+.verdict-register-item strong {
+  display: block;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--verdict, var(--text));
+}
+.verdict-register-item em {
+  font-size: 10px;
+  font-style: normal;
+  color: var(--verdict-soft, rgba(255,255,255,0.46));
+  margin-top: 6px;
+}
+.support-token-stack {
+  display: grid;
+  gap: 8px;
+}
+.support-token {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.018);
+}
+.support-token-swatch {
+  width: 34px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: var(--swatch, var(--line));
+}
+.support-token-name,
+.support-token-value {
+  font-size: 11px;
+}
+.support-token-name {
+  color: var(--text);
+}
+.support-token-value {
+  color: var(--soft);
+  letter-spacing: 0.08em;
+}
+@media (max-width: 1180px) {
+  .color-system-header,
+  .color-lane-grid {
+    grid-template-columns: 1fr;
+  }
+  .color-stage-grid {
+    grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+  .semantic-family-card,
+  .semantic-family-card--structure,
+  .semantic-family-card--data,
+  .semantic-family-card--state,
+  .semantic-family-card--event,
+  .semantic-family-card--rule {
+    grid-column: auto;
+  }
+}
+@media (max-width: 720px) {
+  .color-system-band {
+    padding: 18px;
+  }
+  .color-system-summary,
+  .color-stage-grid,
+  .semantic-family-variants--double,
+  .verdict-register {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 04 · COLOR SYSTEM                               -->
+<!-- ═══════════════════════════════════════════════ -->
+<section class="section" id="colors">
+  <div class="section-head">
+    <div class="eyebrow">04 · Color System</div>
+    <h2>Five semantic families. Separate outer lanes.</h2>
+    <p>Color defines how authored meaning stays grouped into five families. Structure and Data keep their tonal variants nested inside the parent family. Comments sit in an annotation lane. Runtime verdicts sit in a separate evaluation register. Chrome/support scaffolds the surface around them without becoming a sixth family.</p>
+  </div>
+
+  <div class="color-system-band color-system-band--semantic">
+    <div class="color-system-kicker">Primary meaning</div>
+    <div class="color-system-header">
+      <div>
+        <h3>Semantic families are the first read.</h3>
+        <p>Lead with five grouped families, not a run of eight peers. Secondary tones stay physically nested inside Structure and Data so the model reads as authored identity first, tonal nuance second.</p>
+      </div>
+      <div class="color-system-summary" aria-label="Color system summary">
+        <div class="color-system-summary-item">
+          <span>Primary groups</span>
+          <strong>5 families</strong>
+          <small>Structure · State · Event · Data · Rule</small>
+        </div>
+        <div class="color-system-summary-item">
+          <span>Authored shades</span>
+          <strong>8 tones</strong>
+          <small>Five anchors plus three nested within-family variants</small>
+        </div>
+        <div class="color-system-summary-item">
+          <span>Separate lanes</span>
+          <strong>3 outer layers</strong>
+          <small>Annotation · Runtime verdicts · Chrome/support</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="color-stage-grid" aria-label="Five semantic color families">
+      <div class="semantic-family-card semantic-family-card--structure">
+        <div class="semantic-family-card__head">
+          <div>
+            <div class="semantic-family-card__name">Structure</div>
+            <div class="semantic-family-card__meta">Indigo · 239–245°</div>
+          </div>
+          <div class="semantic-family-card__count">2 tones</div>
+        </div>
+        <div class="semantic-family-swatch" style="background:#4338CA;--tone-fg:#fff;--tone-soft:rgba(255,255,255,0.5)">
+          <div>Primary driver</div>
+          <strong>#4338CA</strong>
+          <div>governing keywords</div>
+        </div>
+        <div class="semantic-family-variants">
+          <div class="semantic-family-variant" style="background:#6366F1;--tone-fg:#fff;--tone-soft:rgba(255,255,255,0.42)">
+            <div>Within family</div>
+            <strong>#6366F1</strong>
+            <div>connective grammar</div>
+          </div>
+        </div>
+        <div class="semantic-family-usage">
+          <span class="semantic-family-usage-label">Carries</span>
+          precept · field · state · event · set · transition
+          <span class="semantic-family-usage-subtle">within family: as · default · == · and · or · not</span>
+        </div>
+      </div>
+
+      <div class="semantic-family-card semantic-family-card--state">
+        <div class="semantic-family-card__head">
+          <div>
+            <div class="semantic-family-card__name">State</div>
+            <div class="semantic-family-card__meta">Violet · 260°</div>
+          </div>
+          <div class="semantic-family-card__count">1 tone</div>
+        </div>
+        <div class="semantic-family-swatch" style="background:#A898F5;--tone-fg:rgba(15,8,40,0.9);--tone-soft:rgba(15,8,40,0.5)">
+          <div>Family anchor</div>
+          <strong>#A898F5</strong>
+          <div>state names</div>
+        </div>
+        <div class="semantic-family-note">Single-shade family</div>
+        <div class="semantic-family-usage">
+          <span class="semantic-family-usage-label">Carries</span>
+          Draft · Submitted · Approved
+          <span class="semantic-family-usage-subtle">italic marks constrained state, not a new hue</span>
+        </div>
+      </div>
+
+      <div class="semantic-family-card semantic-family-card--event">
+        <div class="semantic-family-card__head">
+          <div>
+            <div class="semantic-family-card__name">Event</div>
+            <div class="semantic-family-card__meta">Cyan · 195°</div>
+          </div>
+          <div class="semantic-family-card__count">1 tone</div>
+        </div>
+        <div class="semantic-family-swatch" style="background:#30B8E8;--tone-fg:rgba(0,18,28,0.9);--tone-soft:rgba(0,18,28,0.5)">
+          <div>Family anchor</div>
+          <strong>#30B8E8</strong>
+          <div>event names</div>
+        </div>
+        <div class="semantic-family-note">Single-shade family</div>
+        <div class="semantic-family-usage">
+          <span class="semantic-family-usage-label">Carries</span>
+          Open · Submit · Approve
+          <span class="semantic-family-usage-subtle">italic marks constrained event, not a second lane</span>
+        </div>
+      </div>
+
+      <div class="semantic-family-card semantic-family-card--data">
+        <div class="semantic-family-card__head">
+          <div>
+            <div class="semantic-family-card__name">Data</div>
+            <div class="semantic-family-card__meta">Bright slate · 215°</div>
+          </div>
+          <div class="semantic-family-card__count">3 tones</div>
+        </div>
+        <div class="semantic-family-swatch" style="background:#B0BEC5;--tone-fg:rgba(8,14,18,0.9);--tone-soft:rgba(8,14,18,0.5)">
+          <div>Primary anchor</div>
+          <strong>#B0BEC5</strong>
+          <div>field and argument names</div>
+        </div>
+        <div class="semantic-family-variants semantic-family-variants--double">
+          <div class="semantic-family-variant" style="background:#9AA8B5;--tone-fg:rgba(8,14,18,0.9);--tone-soft:rgba(8,14,18,0.42)">
+            <div>Within family</div>
+            <strong>#9AA8B5</strong>
+            <div>type tone</div>
+          </div>
+          <div class="semantic-family-variant" style="background:#84929F;--tone-fg:rgba(255,255,255,0.82);--tone-soft:rgba(255,255,255,0.38)">
+            <div>Within family</div>
+            <strong>#84929F</strong>
+            <div>value tone</div>
+          </div>
+        </div>
+        <div class="semantic-family-usage">
+          <span class="semantic-family-usage-label">Carries</span>
+          Amount · PolicyHolder · number · 0
+          <span class="semantic-family-usage-subtle">name anchor first, type/value tones nested underneath</span>
+        </div>
+      </div>
+
+      <div class="semantic-family-card semantic-family-card--rule">
+        <div class="semantic-family-card__head">
+          <div>
+            <div class="semantic-family-card__name">Rule</div>
+            <div class="semantic-family-card__meta">Gold · 45°</div>
+          </div>
+          <div class="semantic-family-card__count">1 tone</div>
+        </div>
+        <div class="semantic-family-swatch" style="background:#FBBF24;--tone-fg:rgba(20,12,0,0.9);--tone-soft:rgba(20,12,0,0.5)">
+          <div>Family anchor</div>
+          <strong>#FBBF24</strong>
+          <div>message payloads</div>
+        </div>
+        <div class="semantic-family-note">Single-shade family</div>
+        <div class="semantic-family-usage">
+          <span class="semantic-family-usage-label">Carries</span>
+          because / reject strings only
+          <span class="semantic-family-usage-subtle">the explanation is warm; enforcement keywords stay in Structure</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="color-system-bridge">
+    <div class="color-system-kicker">Outside authored identity</div>
+    <p>Comments annotate authored content. Verdicts report runtime evaluation. Chrome/support holds the surface together. Each lane is adjacent to the semantic families, but none of them rewrite or expand the family model.</p>
+  </div>
+
+  <div class="color-lane-grid">
+    <div class="color-lane">
+      <div class="color-lane-label">Annotation lane</div>
+      <h3>Comments</h3>
+      <p>Editorial annotation inside authored content. Subdued, italic, and separate from both semantic families and generic chrome.</p>
+      <div class="annotation-tone">
+        <div>Annotation tone</div>
+        <strong>#9096A6</strong>
+        <div>italic sideband context</div>
+      </div>
+    </div>
+
+    <div class="color-lane">
+      <div class="color-lane-label">Runtime register</div>
+      <h3>Engine verdicts</h3>
+      <p>Verdict hues answer what the engine just concluded. They overlay runtime surfaces only and never enter syntax or authored identity.</p>
+      <div class="verdict-register" aria-label="Runtime verdict register">
+        <div class="verdict-register-item" style="--verdict:#34D399;--verdict-soft:rgba(52,211,153,0.56);--verdict-bg:rgba(52,211,153,0.06)">
+          <span>Allowed</span>
+          <strong>#34D399</strong>
+          <em>runtime only</em>
+        </div>
+        <div class="verdict-register-item" style="--verdict:#F87171;--verdict-soft:rgba(248,113,113,0.56);--verdict-bg:rgba(248,113,113,0.06)">
+          <span>Blocked</span>
+          <strong>#F87171</strong>
+          <em>runtime only</em>
+        </div>
+        <div class="verdict-register-item" style="--verdict:#FDE047;--verdict-soft:rgba(253,224,71,0.56);--verdict-bg:rgba(253,224,71,0.06)">
+          <span>Warning</span>
+          <strong>#FDE047</strong>
+          <em>runtime only</em>
+        </div>
+      </div>
+    </div>
+
+    <div class="color-lane">
+      <div class="color-lane-label">Support layer</div>
+      <h3>Chrome / support</h3>
+      <p>Canvas, panels, text, and dividers hold the surface together. Their palette is complementary infrastructure, not semantic meaning.</p>
+      <div class="support-token-stack" aria-label="Chrome and support tokens">
+        <div class="support-token">
+          <span class="support-token-swatch" style="--swatch:var(--bg)"></span>
+          <span class="support-token-name">Canvas</span>
+          <span class="support-token-value">#040506</span>
+        </div>
+        <div class="support-token">
+          <span class="support-token-swatch" style="--swatch:var(--panel)"></span>
+          <span class="support-token-name">Panel</span>
+          <span class="support-token-value">#090B0E</span>
+        </div>
+        <div class="support-token">
+          <span class="support-token-swatch" style="--swatch:var(--muted)"></span>
+          <span class="support-token-name">Reading text</span>
+          <span class="support-token-value">#A7AFBB</span>
+        </div>
+        <div class="support-token">
+          <span class="support-token-swatch" style="--swatch:var(--line)"></span>
+          <span class="support-token-name">Divider</span>
+          <span class="support-token-value">line token</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rule channels -->
+  <div class="channels-grid" style="margin-top:1px">
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Every color has a fixed meaning.</h3>
+      <p>Nothing is aesthetic. If a new surface uses color, it must map to an existing semantic family. Local tonal variants may clarify hierarchy inside a family, but they do not create new semantic lanes. Decorative use of any palette color corrupts the signal.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Color says kind. Italic says constrained.</h3>
+      <p>Constraint pressure is expressed through typography, not extra hues. Constrained states, events, and guarded fields are italic within their own family color — same hue, italic only.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Verdicts are runtime only.</h3>
+      <p>Emerald, coral, and yellow appear only when the engine has evaluated something. They are never used in static surfaces, syntax highlighting, or any authoring-time annotation.</p>
+    </div>
+    <div class="channel">
+      <span class="channel-name">Rule</span>
+      <h3>Comments are outside the palette.</h3>
+      <p>Dusk #9096A6 in italic keeps comments legible but structurally separate from the five semantic families. Never repurpose a family color for editorial annotation.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 05 · CONSTRUCTS                                     -->
+<!-- ═══════════════════════════════════════════════ -->
+<section class="section" id="constructs">
+  <div class="section-head">
+    <div class="eyebrow">05 · Constructs</div>
+    <h2>Five constructs, one grammar</h2>
+    <p>The five constructs are the primary reveal. Each gallery establishes the canonical pair first — Definition (how the construct appears as a syntax token in authored code) and Runtime (how it appears as a rendered component) — then shows the channel signals and semantic modifiers that build on top of that base. All five constructs use the same composed structure.</p>
+  </div>
+
+  <!-- STRUCTURE ─────────────────────────────────── -->
+  <div class="construct-gallery" id="structure" style="--fc: var(--structure)">
+    <div class="construct-sidebar">
+      <div class="construct-index">01</div>
+      <div class="construct-name s">Structure</div>
+      <p style="font-size:14px;margin-top:8px">Registration, grouping, and governed boundaries. The perimeter that makes everything inside coherent.</p>
+    </div>
+    <div class="construct-body">
+
+      <div class="specimen-pair">
+        <!-- Definition -->
+        <div class="specimen-half" style="border-top:2px solid var(--structure)">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Definition</span>
+            <span class="specimen-half-tag">authored &middot; syntax token</span>
+          </div>
+          <div class="specimen-half-inner">
+            <div class="cg-focal-strip"><span class="cg-focal-label">Structure family &middot; <span class="sd">precept &middot; field &middot; state &middot; event &middot; in &middot; from&hellip;on &middot; set &middot; transition</span><span class="cg-inline-note">within-family grammar</span><span class="sg cg-inline-secondary">as &middot; default &middot; == &middot; and &middot; or &middot; not</span></span></div>
+            <pre><span class="s">precept</span> Task
+
+<span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
+
+<span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
+
+<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
+  <span class="s">because</span> <span class="ru">"Closed means done"</span>
+
+<span class="s">event</span> <span class="ev">Close</span>
+
+<span class="s">from</span> <span class="st">Open</span> <span class="s">on</span> <span class="ev">Close</span>
+  -&gt; <span class="s">set</span> <span class="da">Done</span> = <span class="dv">true</span>
+  -&gt; <span class="s">transition</span> <span class="st">Closed</span></pre>
+          </div>
+        </div>
+
+        <!-- Runtime -->
+        <div class="specimen-half">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Runtime</span>
+            <span class="specimen-half-tag">rendered &middot; container frame</span>
+          </div>
+          <div class="specimen-half-inner">
+            <div style="border:1px solid rgba(99,102,241,0.45);">
+              <div style="padding:9px 14px;border-bottom:1px solid rgba(99,102,241,0.2);display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--structure)">Task</span>
+                <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.20em;text-transform:uppercase;color:rgba(99,102,241,0.35)">precept</span>
+              </div>
+              <div style="padding:32px 16px;display:flex;align-items:center;justify-content:center;">
+                <span style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:rgba(99,102,241,0.25)">governed contents</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channel signals -->
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Channel signals</div>
+        <div class="cg-channels">
+          <div class="cg-channel">
+            <div class="cg-channel-name">Colour</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--structure-d)"></span><span><strong>Indigo family</strong> &middot; governing emphasis <code>--structure-d</code></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--structure)"></span><span>within-family grammar <code>--structure</code></span></span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Typography</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><code class="sd">set</code><span>Mono &middot; bold for governing words</span><span class="cg-family-note"><code class="sg cg-inline-secondary">and</code><span>within-family connective grammar</span></span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Form</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><div class="cg-form cg-form--frame"></div><span>Indigo border &middot; container frame</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Layout</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span>Outer wrapper &middot; governs all other constructs</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- STATE ─────────────────────────────────────── -->
+  <div class="construct-gallery" id="state" style="--fc: var(--state)">
+    <div class="construct-sidebar">
+      <div class="construct-index">02</div>
+      <div class="construct-name st">State</div>
+      <p style="font-size:14px;margin-top:8px">A named lifecycle position. States describe what is true right now, not how the entity arrived there.</p>
+    </div>
+    <div class="construct-body">
+
+      <div class="specimen-pair">
+        <!-- Definition -->
+        <div class="specimen-half" style="border-top:2px solid var(--state)">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Definition</span>
+            <span class="specimen-half-tag">authored &middot; syntax token</span>
+          </div>
+          <div class="specimen-half-inner">
+            <div class="cg-focal-strip"><span class="cg-focal-label">State names &middot; <span class="st">Open &middot; Closed</span></span></div>
+            <pre><span class="s">precept</span> Task
+
+<span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
+
+<span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
+
+<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
+  <span class="s">because</span> <span class="ru">"Closed means done"</span>
+
+<span class="s">event</span> <span class="ev">Close</span>
+
+<span class="s">from</span> <span class="st">Open</span> <span class="s">on</span> <span class="ev">Close</span>
+  -&gt; <span class="s">set</span> <span class="da">Done</span> = <span class="dv">true</span>
+  -&gt; <span class="s">transition</span> <span class="st">Closed</span></pre>
+          </div>
+        </div>
+
+        <!-- Runtime -->
+        <div class="specimen-half">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Runtime</span>
+            <span class="specimen-half-tag">rendered &middot; state nodes</span>
+          </div>
+          <div class="specimen-half-inner">
+            <div style="display:grid;gap:8px;">
+              <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid rgba(168,152,245,0.35);background:rgba(168,152,245,0.07);font-family:var(--mono);font-size:13px;color:var(--state);width:fit-content;">
+                <span style="width:7px;height:7px;border-radius:50%;background:var(--structure);flex-shrink:0;"></span>
+                Open<span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(168,152,245,0.55);margin-left:6px;">initial &middot; current</span>
+              </div>
+              <div style="display:inline-flex;align-items:center;padding:8px 14px;border:2px solid rgba(168,152,245,0.55);box-shadow:inset 0 0 0 3px rgba(168,152,245,0.12);font-family:var(--mono);font-size:13px;color:var(--state);width:fit-content;">
+                Closed<span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--soft);margin-left:8px;">terminal</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channel signals -->
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Channel signals</div>
+        <div class="cg-channels">
+          <div class="cg-channel">
+            <div class="cg-channel-name">Colour</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--state)"></span><span>Violet &middot; <code>--state</code></span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Typography</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><code class="st">Open</code><span>Mono &middot; PascalCase name</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Form</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><div class="cg-form cg-form--node"></div><span>Rect node &middot; border weight signals lifecycle position</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Layout</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span>Ordered progression &middot; initial first &middot; terminal last</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
+        <div class="construct-modifiers">
+          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.35);display:inline-flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--structure);display:inline-block;flex-shrink:0;"></span>initial &mdash; origin dot</span>
+          <span class="modifier-tag st" style="border-width:2px;border-color:rgba(168,152,245,0.5);box-shadow:inset 0 0 0 2px rgba(168,152,245,0.14);">terminal &mdash; double border</span>
+          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.45);background:rgba(168,152,245,0.10);">current &mdash; active fill</span>
+          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.2);opacity:0.65;">reachable &mdash; dim highlight</span>
+          <span class="modifier-tag" style="font-style:italic;color:var(--state);border-color:rgba(168,152,245,0.2);">constrained &mdash; italic name</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- EVENT ─────────────────────────────────────── -->
+  <div class="construct-gallery" id="event" style="--fc: var(--event)">
+    <div class="construct-sidebar">
+      <div class="construct-index">03</div>
+      <div class="construct-name ev">Event</div>
+      <p style="font-size:14px;margin-top:8px">A discrete trigger. Events carry intent without narrating it. They cause transitions and execute rules.</p>
+    </div>
+    <div class="construct-body">
+
+      <div class="specimen-pair">
+        <!-- Definition -->
+        <div class="specimen-half" style="border-top:2px solid var(--event)">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Definition</span>
+            <span class="specimen-half-tag">authored &middot; syntax token</span>
+          </div>
+          <div class="specimen-half-inner">
+            <div class="cg-focal-strip"><span class="cg-focal-label">Event name &middot; <span class="ev">Close</span></span></div>
+            <pre><span class="s">precept</span> Task
+
+<span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
+
+<span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
+
+<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
+  <span class="s">because</span> <span class="ru">"Closed means done"</span>
+
+<span class="s">event</span> <span class="ev">Close</span>
+
+<span class="s">from</span> <span class="st">Open</span> <span class="s">on</span> <span class="ev">Close</span>
+  -&gt; <span class="s">set</span> <span class="da">Done</span> = <span class="dv">true</span>
+  -&gt; <span class="s">transition</span> <span class="st">Closed</span></pre>
+          </div>
+        </div>
+
+        <!-- Runtime -->
+        <div class="specimen-half">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Runtime</span>
+            <span class="specimen-half-tag">rendered &middot; event tokens</span>
+          </div>
+          <div class="specimen-half-inner">
+            <div style="display:grid;gap:14px;">
+              <div style="display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;">
+                <span style="padding:5px 11px;border:1px solid rgba(48,184,232,0.4);color:var(--event);">Close</span>
+                <span style="color:var(--soft);font-size:12px">&rarr;</span>
+                <span style="padding:5px 11px;border:1px solid rgba(168,152,245,0.3);color:var(--state);font-size:12px">Closed</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channel signals -->
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Channel signals</div>
+        <div class="cg-channels">
+          <div class="cg-channel">
+            <div class="cg-channel-name">Colour</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--event)"></span><span>Cyan &middot; <code>--event</code></span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Typography</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><code class="ev">Close</code><span>Mono &middot; PascalCase name</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Form</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><div class="cg-form cg-form--pill"></div><span>Outlined pill &middot; directional arrow to destination state</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Layout</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span>Paired with destination state via arrow</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
+        <div class="construct-modifiers">
+          <span class="modifier-tag ev" style="border-color:rgba(48,184,232,0.35);">&rarr; transition &mdash; directional arrow</span>
+          <span class="modifier-tag ev" style="border-color:rgba(48,184,232,0.2);opacity:0.7;">&empty; no-transition &mdash; no destination</span>
+          <span class="modifier-tag ev" style="font-style:italic;border-color:rgba(48,184,232,0.22);color:var(--event);">guarded &mdash; italic name</span>
+          <span class="modifier-tag no" style="border-style:dashed;border-color:rgba(248,113,113,0.45);">blocked &mdash; dashed violated border</span>
+          <span class="modifier-tag" style="color:var(--warn);border-color:rgba(253,224,71,0.3);">unmatched &mdash; warning colour</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DATA ──────────────────────────────────────── -->
+  <div class="construct-gallery" id="data-c" style="--fc: var(--data)">
+    <div class="construct-sidebar">
+      <div class="construct-index">04</div>
+      <div class="construct-name da">Data</div>
+      <p style="font-size:14px;margin-top:8px">The factual payload under governance. Data fields carry the matter that business rules act on and protect.</p>
+    </div>
+    <div class="construct-body">
+
+      <div class="specimen-pair">
+        <!-- Definition -->
+        <div class="specimen-half" style="border-top:2px solid var(--data)">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Definition</span>
+            <span class="specimen-half-tag">authored &middot; syntax token</span>
+          </div>
+          <div class="specimen-half-inner">
+            <div class="cg-focal-strip"><span class="cg-focal-label">Field token &middot; <span class="da">Done</span><span class="cg-inline-note">within-family type/value</span><span class="dt cg-inline-secondary">boolean</span> &middot; <span class="dv cg-inline-secondary">false</span></span></div>
+            <pre><span class="s">precept</span> Task
+
+<span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
+
+<span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
+
+<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
+  <span class="s">because</span> <span class="ru">"Closed means done"</span>
+
+<span class="s">event</span> <span class="ev">Close</span>
+
+<span class="s">from</span> <span class="st">Open</span> <span class="s">on</span> <span class="ev">Close</span>
+  -&gt; <span class="s">set</span> <span class="da">Done</span> = <span class="dv">true</span>
+  -&gt; <span class="s">transition</span> <span class="st">Closed</span></pre>
+          </div>
+        </div>
+
+        <!-- Runtime -->
+        <div class="specimen-half">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Runtime</span>
+            <span class="specimen-half-tag">rendered &middot; field table</span>
+          </div>
+          <div class="specimen-half-inner" style="padding:0;">
+            <table class="field-table">
+              <thead>
+                <tr><th>Field</th><th>Type</th><th>Value</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="da">Done</td>
+                  <td class="dt">boolean</td>
+                  <td class="dv">false</td>
+                  <td><span style="color:var(--soft);font-size:11px">editable</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channel signals -->
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Channel signals</div>
+        <div class="cg-channels">
+          <div class="cg-channel">
+            <div class="cg-channel-name">Colour</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--data)"></span><span><strong>Slate family</strong> &middot; field and argument names <code>--data</code></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--data-t)"></span><span>type tone <code>--data-t</code></span></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--data-v)"></span><span>value tone <code>--data-v</code></span></span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Typography</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><code class="da">Done</code><span>Mono &middot; three tonal tiers</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Form</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><div class="cg-form cg-form--row"></div><span>Table row &middot; name &middot; type &middot; value columns</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Layout</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span>Tabular &middot; vertically stacked field rows</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
+        <div class="tonal-demo">
+          <div class="tonal-cell">
+            <span class="tonal-cell-lbl">Name</span>
+            <span class="da">Done</span>
+          </div>
+          <div class="tonal-cell tonal-cell--secondary">
+            <span class="tonal-cell-lbl">Within-family type</span>
+            <span class="dt tonal-token-secondary">boolean</span>
+          </div>
+          <div class="tonal-cell tonal-cell--secondary">
+            <span class="tonal-cell-lbl">Within-family value</span>
+            <span class="dv tonal-token-secondary">false</span>
+          </div>
+        </div>
+        <div class="construct-modifiers" style="padding-top:0;">
+          <span class="modifier-tag ok" style="border-color:rgba(52,211,153,0.3);">valid &mdash; check mark</span>
+          <span class="modifier-tag no" style="border-color:rgba(248,113,113,0.3);">violated &mdash; mark</span>
+          <span class="modifier-tag da" style="font-style:italic;border-color:rgba(176,190,197,0.25);">constrained &mdash; italic name</span>
+          <span class="modifier-tag" style="color:var(--soft);">editable</span>
+          <span class="modifier-tag" style="color:rgba(255,255,255,0.22);">locked</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RULE ──────────────────────────────────────── -->
+  <div class="construct-gallery" id="rule" style="--fc: var(--rule)">
+    <div class="construct-sidebar">
+      <div class="construct-index">05</div>
+      <div class="construct-name ru">Rule</div>
+      <p style="font-size:14px;margin-top:8px">Causal language. The because and why of Precept&rsquo;s governance. Rules interrupt &mdash; they do not narrate.</p>
+    </div>
+    <div class="construct-body">
+
+      <div class="specimen-pair">
+        <!-- Definition -->
+        <div class="specimen-half" style="border-top:2px solid var(--rule)">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Definition</span>
+            <span class="specimen-half-tag">authored &middot; syntax token</span>
+          </div>
+          <div class="specimen-half-inner">
+            <div class="cg-focal-strip"><span class="cg-focal-label">Rule string &middot; <span class="ru">"Closed means done"</span></span></div>
+            <pre><span class="s">precept</span> Task
+
+<span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
+
+<span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
+
+<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
+  <span class="s">because</span> <span class="ru">"Closed means done"</span>
+
+<span class="s">event</span> <span class="ev">Close</span>
+
+<span class="s">from</span> <span class="st">Open</span> <span class="s">on</span> <span class="ev">Close</span>
+  -&gt; <span class="s">set</span> <span class="da">Done</span> = <span class="dv">true</span>
+  -&gt; <span class="s">transition</span> <span class="st">Closed</span></pre>
+          </div>
+        </div>
+
+        <!-- Runtime -->
+        <div class="specimen-half">
+          <div class="specimen-half-bar">
+            <span class="specimen-half-label">Runtime</span>
+            <span class="specimen-half-tag">rendered &middot; verdict callouts</span>
+          </div>
+          <div class="specimen-half-inner">
+            <div style="display:grid;gap:4px;">
+              <div style="padding:11px 14px;border-left:3px solid var(--valid);background:rgba(52,211,153,0.04);font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--valid);">&checkmark; Closed means done <span style="color:rgba(52,211,153,0.45);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;">&mdash; satisfied</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channel signals -->
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Channel signals</div>
+        <div class="cg-channels">
+          <div class="cg-channel">
+            <div class="cg-channel-name">Colour</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--rule)"></span><span>Gold &middot; <code>--rule</code></span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Typography</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><code class="ru">"Closed means done"</code><span>Mono &middot; quoted string &middot; interrupt</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Form</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><div class="cg-form cg-form--callout"></div><span>Left-border callout &middot; verdict signal</span></div>
+            </div>
+          </div>
+          <div class="cg-channel">
+            <div class="cg-channel-name">Layout</div>
+            <div class="cg-channel-body">
+              <div class="cg-channel-signal"><span>Appears below the triggering field or event</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
+        <div class="construct-modifiers">
+          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35);">assert / because &mdash; rule keyword</span>
+        </div>
+        <div style="margin-top:8px;display:grid;gap:4px;">
+          <div class="callout-demo callout-demo--satisfied">&checkmark; satisfied &mdash; condition met, transition allowed</div>
+          <div class="callout-demo callout-demo--violated">&oslash; violated &mdash; condition failed, transition blocked</div>
+          <div class="callout-demo callout-demo--warn">&#9889; unmatched &mdash; guard not evaluated for current state</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Adjacent semantics ─────────────────────────── -->
+  <div class="verdict-strip" aria-label="Adjacent semantic vocabulary">
+    <div class="verdict-cell">
+      <div class="verdict-name ok">Allowed</div>
+      <p style="font-size:14px">The event would transition successfully with the current data and state. Runtime-only — never an authored construct property.</p>
+    </div>
+    <div class="verdict-cell">
+      <div class="verdict-name no">Blocked</div>
+      <p style="font-size:14px">One or more rules prevent the event from proceeding. The blocking rule should be surfaced alongside the verdict, not withheld.</p>
+    </div>
+    <div class="verdict-cell">
+      <div class="verdict-name" style="color:var(--warn)">Warning</div>
+      <p style="font-size:14px">The event would proceed but with a condition worth noting — an unmatched guard, a near-boundary value, a missing optional field.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- 06 · SURFACES                                   -->
+<!-- ═══════════════════════════════════════════════ -->
+<section class="section" id="surfaces">
+  <div class="section-head">
+    <div class="eyebrow">06 · Surfaces</div>
+    <h2>Where the system lands</h2>
+    <p>Each surface realizes the same semantic vocabulary through its own conventions of density, layout, and workflow context. The meaning is fixed. The surface solves for its own needs.</p>
+  </div>
+
+  <div class="surfaces-grid">
+
+    <!-- Surface 01: Code Window -->
+    <div class="surface-specimen">
+      <div class="surface-label">Surface 01</div>
+      <div class="surface-h3">Code Window</div>
+      <p class="sf-note">Syntax highlighting renders the full semantic palette. Governing structure words and connective grammar share indigo, with bold reserved for structural drivers and normal weight used for operators like <span class="sg">and</span> / <span class="sg">or</span> / <span class="sg">not</span>. States stay violet. Events stay cyan. Data stays slate. Rule messages stay gold.</p>
+      <pre style="font-size:12px"><span class="s">precept</span> <span class="ru">InsuranceClaim</span>
+
+<span class="s">field</span> <span class="da">ClaimNumber</span> <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">ClaimAmount</span> <span class="s">as</span> <span class="so">number</span> <span class="s">default</span> <span class="so">0</span>
+<span class="s">field</span> <span class="da">PolicyHolder</span> <span class="s">as</span> <span class="so">string</span> <span class="s">nullable</span>
+
+<span class="s">state</span> <span class="st">Filed</span> <span class="s">initial</span>
+<span class="s">state</span> <span class="st">UnderReview</span>
+<span class="s">state</span> <span class="st">Settled</span>
+
+<span class="s">event</span> <span class="ev">OpenReview</span>
+
+<span class="s">on</span> <span class="ev">OpenReview</span> <span class="s">assert</span> <span class="da">ClaimAmount</span> &gt; <span class="so">0</span> <span class="sg">and</span> <span class="da">PolicyHolder</span> != <span class="so">null</span> <span class="s">because</span> <span class="ru">"Claim must be complete"</span>
+
+<span class="s">from</span> <span class="st">Filed</span> <span class="s">on</span> <span class="ev">OpenReview</span> -> <span class="s">transition</span> <span class="st">UnderReview</span></pre>
+    </div>
+
+    <!-- Surface 02: State Diagram -->
+    <div class="surface-specimen">
+      <div class="surface-label">Surface 02</div>
+      <div class="surface-h3">State Diagram</div>
+      <p class="sf-note">Shape before colour. States are equal hard rectangles distinguished by role modifier — initial origin dot, terminal double border. Events label transition arrows.</p>
+      <div class="panel-inner">
+        <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+          <span style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid rgba(168,152,245,0.4);font-family:var(--mono);font-size:12px">
+            <span style="width:7px;height:7px;border-radius:50%;background:var(--structure)"></span>
+            <span class="st">Filed</span>
+          </span>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--event)">── OpenReview ──&gt;</span>
+          <span style="padding:8px 16px;border:1px solid rgba(168,152,245,0.35);font-family:var(--mono);font-size:12px;color:var(--state)">UnderReview</span>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--event)">── Settle ──&gt;</span>
+          <span style="padding:8px 16px;border:2px solid rgba(168,152,245,0.5);font-family:var(--mono);font-size:12px;color:var(--state)">Settled</span>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--soft);text-transform:uppercase;letter-spacing:0.12em">
+          Initial ● &nbsp; Active ─── &nbsp; Terminal ⬡ &nbsp; Blocked ╳
+        </div>
+      </div>
+    </div>
+
+    <!-- Surface 03: Data Form -->
+    <div class="surface-specimen">
+      <div class="surface-label">Surface 03</div>
+      <div class="surface-h3">Data Form</div>
+      <p class="sf-note">The data form composes structure sections, editable data fields, a state badge, and available event buttons into one governed interaction surface.</p>
+      <div class="panel-inner">
+        <div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
+          <span style="font-family:var(--mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--soft)">InsuranceClaim #1042</span>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--state);border:1px solid rgba(168,152,245,0.35);padding:3px 9px">UnderReview</span>
+        </div>
+        <div class="form-row"><span class="form-lbl">ClaimNumber</span><span style="color:var(--text)">"CLM-2024-0042"</span></div>
+        <div class="form-row"><span class="form-lbl">ClaimAmount</span><span style="color:var(--text)">12500</span></div>
+        <div class="form-row"><span class="form-lbl da" style="font-style:italic">PolicyHolder</span><span style="color:var(--violated)">— required</span></div>
+        <div style="margin-top:14px;display:flex;gap:8px">
+          <button class="evt-btn">Settle</button>
+          <button class="evt-btn" disabled>Override</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Surface 04: Timeline -->
+    <div class="surface-specimen">
+      <div class="surface-label">Surface 04</div>
+      <div class="surface-h3">Operation Timeline</div>
+      <p class="sf-note">Timeline orders events chronologically. Each entry shows the event (cyan), the transition outcome (state colours), and any rule evaluation result.</p>
+      <div style="padding:6px 0">
+        <div class="timeline-row">
+          <span class="so" style="font-size:11px">2024-03-01</span>
+          <span class="tl-dot" style="border-color:var(--structure);background:var(--structure)"></span>
+          <span><span class="ev">Submit</span> <span class="so">→</span> <span class="st">UnderReview</span></span>
+        </div>
+        <div class="timeline-row">
+          <span class="so" style="font-size:11px">2024-03-04</span>
+          <span class="tl-dot" style="border-color:var(--violated)"></span>
+          <span><span class="ev">Approve</span> <span class="no">blocked</span> <span class="so">— PolicyHolder required</span></span>
+        </div>
+        <div class="timeline-row">
+          <span class="so" style="font-size:11px">2024-03-05</span>
+          <span class="tl-dot" style="border-color:var(--valid);background:var(--valid)"></span>
+          <span><span class="ev">Approve</span> <span class="ok">→</span> <span class="st">Approved</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Surface 05: Docs -->
+    <div class="surface-specimen">
+      <div class="surface-label">Surface 05</div>
+      <div class="surface-h3">Explanatory Docs</div>
+      <p class="sf-note">Documentation uses the reading typeface for prose and mono for named constructs, with semantic colour in inline references and rule callouts.</p>
+      <p style="font-size:14px;margin-bottom:10px">The <span class="ev">Submit</span> event transitions a <span class="st">Draft</span> loan to <span class="st">UnderReview</span>. Two rules govern the transition:</p>
+      <div class="rule-callout" style="margin-bottom:6px"><p>on Submit assert ApplicantName != null</p></div>
+      <div class="rule-callout"><p>on Submit assert RequestedAmount &gt; 0</p></div>
+      <p style="font-size:14px;margin-top:10px">If either rule fails, the event is blocked and the entity remains in <span class="st">Draft</span>.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- 07 · DOCS                                       -->
+<!-- ═══════════════════════════════════════════════════ -->
+<style>
+/* ── § 07 DOCS · representation in documentation ──────────────────────── */
+
+/* ─ inline construct references ─ */
+.doc-ref {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  padding: 0.05em 0.35em;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+.doc-ref.s  { color: var(--structure); }
+.doc-ref.st { color: var(--state); }
+.doc-ref.ev { color: var(--event); }
+.doc-ref.da { color: var(--data); }
+.doc-ref.ru { color: var(--rule); }
+
+/* ─ construct pills ─ */
+.doc-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+}
+.doc-pill::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+  background: currentColor;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+.doc-pill.s  { color: var(--structure); }
+.doc-pill.st { color: var(--state); }
+.doc-pill.ev { color: var(--event); }
+.doc-pill.da { color: var(--data); }
+.doc-pill.ru { color: var(--rule); }
+
+/* ─ reference table ─ */
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.doc-table th {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+  text-align: left;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--bg);
+}
+.doc-table td {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  vertical-align: middle;
+}
+.doc-table tr:last-child td { border-bottom: none; }
+.doc-table .doc-name {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.doc-table .doc-desc {
+  font-family: var(--sans);
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ─ chrome token strip ─ */
+.doc-tokens {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line-strong);
+}
+.doc-token {
+  padding: 16px 14px;
+  display: grid;
+  gap: 5px;
+  align-content: start;
+}
+.doc-token-name {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.doc-token-value {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.doc-token-role {
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--soft);
+}
+
+/* ─ font assignment ─ */
+.doc-font-assign {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line-strong);
+}
+.doc-fa-cell {
+  padding: 24px 26px;
+  background: var(--panel);
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.doc-fa-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.doc-fa-specimen { line-height: 1.3; color: var(--text); }
+.doc-fa-uses {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.doc-fa-rule {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--soft);
+  line-height: 1.5;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+/* ─ heading scale ─ */
+.doc-heading-scale { border: 1px solid var(--line-strong); overflow: hidden; }
+.doc-hs-row {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 220px;
+  align-items: center;
+  gap: 24px;
+  padding: 18px 28px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.doc-hs-row:last-child { border-bottom: none; }
+.doc-hs-meta { text-align: right; display: grid; gap: 3px; }
+.doc-hs-level {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.doc-hs-spec { font-family: var(--mono); font-size: 11px; color: var(--muted); opacity: 0.6; }
+
+/* ─ product name ─ */
+.doc-precept-name {
+  font-family: var(--mono);
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.12em;
+  color: var(--text);
+}
+
+/* ─ callouts ─ */
+.doc-callout {
+  display: grid;
+  grid-template-columns: 4px minmax(0,1fr);
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+.doc-callout:last-child { border-bottom: none; }
+.doc-callout-body {
+  padding: 14px 20px;
+  background: var(--panel);
+  display: grid;
+  gap: 7px;
+  align-content: start;
+}
+.doc-callout-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+.doc-callout p { font-family: var(--sans); font-size: 14px; line-height: 1.65; color: var(--muted); margin: 0; }
+.doc-callout--note    .doc-callout-accent { background: var(--structure); }
+.doc-callout--note    .doc-callout-label  { color: var(--structure); }
+.doc-callout--tip     .doc-callout-accent { background: var(--valid); }
+.doc-callout--tip     .doc-callout-label  { color: var(--valid); }
+.doc-callout--caution .doc-callout-accent { background: var(--warn); }
+.doc-callout--caution .doc-callout-label  { color: var(--warn); }
+.doc-callout--warn    .doc-callout-accent { background: var(--violated); }
+.doc-callout--warn    .doc-callout-label  { color: var(--violated); }
+.doc-callout--note    .doc-callout-body { background: rgba(99,102,241,0.04); }
+.doc-callout--tip     .doc-callout-body { background: rgba(52,211,153,0.04); }
+.doc-callout--caution .doc-callout-body { background: rgba(253,224,71,0.04); }
+.doc-callout--warn    .doc-callout-body { background: rgba(248,113,113,0.04); }
+
+/* ─ code block ─ */
+.doc-code-block { border: 1px solid var(--line-strong); overflow: hidden; }
+.doc-code-header {
+  padding: 8px 18px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.doc-code-lang {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+pre.doc-code-body {
+  background: var(--panel-2);
+  margin: 0;
+  padding: 20px 24px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.9;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* ─ page specimen ─ */
+.doc-specimen-frame {
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.doc-specimen-chrome {
+  background: var(--bg);
+  border-bottom: 1px solid var(--line-strong);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.doc-specimen-dot { width:10px;height:10px;border-radius:50%; }
+.doc-specimen-url {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 3px 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--soft);
+  flex: 1;
+  max-width: 360px;
+}
+.doc-specimen-body {
+  display: grid;
+  grid-template-columns: 240px minmax(0,1fr) 180px;
+  min-height: 640px;
+  background: var(--bg);
+}
+.doc-specimen-sidebar {
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  padding: 0;
+  display: grid;
+  align-content: start;
+  gap: 0;
+}
+.doc-sp-section {
+  padding: 6px 20px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-top: 16px;
+}
+.doc-sp-link {
+  padding: 6px 20px;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--muted);
+  display: block;
+  border-left: 2px solid transparent;
+}
+.doc-sp-link.active {
+  color: var(--text);
+  border-left-color: var(--structure);
+  background: rgba(99,102,241,0.06);
+}
+.doc-sp-link.child {
+  padding-left: 32px;
+  font-size: 12px;
+  color: var(--soft);
+}
+.doc-specimen-sidebar-header {
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--line-strong);
+  display: grid;
+  gap: 3px;
+}
+.doc-specimen-sidebar-ver {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+/* right-rail TOC */
+.doc-specimen-toc {
+  border-left: 1px solid var(--line);
+  padding: 28px 18px;
+  display: grid;
+  align-content: start;
+  gap: 0;
+  background: var(--bg);
+}
+.doc-sp-toc-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+.doc-sp-toc-link {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--soft);
+  display: block;
+  padding: 5px 4px 5px 10px;
+  border-left: 2px solid transparent;
+  line-height: 1.3;
+}
+.doc-sp-toc-link.active {
+  color: var(--muted);
+  border-left-color: var(--state);
+}
+.doc-specimen-content {
+  padding: 48px 52px;
+  display: grid;
+  gap: 32px;
+  align-content: start;
+  overflow: hidden;
+}
+
+/* type scale within specimen */
+.dsp-eyebrow {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: -20px;
+}
+.dsp-h1 {
+  font-family: var(--mono);
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.18;
+  color: var(--text);
+}
+.dsp-h2 {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--text);
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.dsp-h3 {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+  margin-bottom: -20px;
+}
+.dsp-p {
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--muted);
+  max-width: 62ch;
+}
+.dsp-lead {
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--muted);
+  max-width: 58ch;
+}
+
+/* diagram in specimen */
+.dsp-diagram {
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: var(--panel-2);
+  overflow-x: auto;
+}
+.dsp-flow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 14px 20px;
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+.dsp-flow + .dsp-flow {
+  border-top: 1px solid var(--line);
+}
+.dsp-flow-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  min-width: 68px;
+  flex-shrink: 0;
+  margin-right: 12px;
+  padding-right: 12px;
+  border-right: 1px solid var(--line);
+}
+.dsp-flow--allowed .dsp-flow-label { color: var(--valid); }
+.dsp-flow--blocked .dsp-flow-label { color: var(--violated); }
+.dsp-arrow--blocked .dsp-arrow-label { color: var(--violated); }
+.dsp-arrow--blocked .dsp-arrow-line  { color: var(--violated); }
+.dsp-arrow--blocked .dsp-arrow-shaft {
+  background: none;
+  height: 0;
+  border-top: 1px dashed var(--violated);
+  opacity: 0.6;
+}
+.dsp-reject-node {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--violated);
+  background: rgba(248,113,113,0.08);
+  border: 1px dashed rgba(248,113,113,0.3);
+  padding: 7px 14px;
+  border-radius: 3px;
+}
+.dsp-state {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 7px 14px;
+  border-radius: 3px;
+  border: 1px solid var(--state);
+  color: var(--state);
+  background: rgba(168,152,245,0.08);
+  white-space: nowrap;
+}
+.dsp-state.current {
+  background: rgba(168,152,245,0.18);
+  box-shadow: 0 0 0 1px var(--state);
+}
+.dsp-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 0 12px;
+}
+.dsp-arrow-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--event);
+}
+.dsp-arrow-line {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  color: var(--event);
+  font-size: 14px;
+}
+.dsp-arrow-shaft {
+  width: 36px;
+  height: 1px;
+  background: var(--event);
+  opacity: 0.6;
+}
+
+/* lists */
+.dsp-list {
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--muted);
+  padding-left: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  max-width: 64ch;
+}
+.dsp-list li { display: flex; gap: 10px; align-items: baseline; }
+.dsp-list li::before {
+  content: '—';
+  color: var(--soft);
+  font-family: var(--mono);
+  flex-shrink: 0;
+}
+.dsp-olist { counter-reset: dsp-ol; }
+.dsp-olist li::before {
+  counter-increment: dsp-ol;
+  content: counter(dsp-ol) '.';
+  color: var(--structure);
+  font-family: var(--mono);
+  font-size: 12px;
+  min-width: 18px;
+  flex-shrink: 0;
+}
+
+/* responsive */
+@media (max-width: 960px) {
+  .doc-tokens      { grid-template-columns: repeat(2, 1fr); }
+  .doc-font-assign { grid-template-columns: 1fr; }
+  .doc-hs-row      { grid-template-columns: 1fr; }
+  .doc-hs-meta     { text-align: left; }
+  .doc-specimen-body { grid-template-columns: 1fr; }
+  .doc-specimen-sidebar { display: none; }
+  .doc-specimen-toc { display: none; }
+  .doc-specimen-content { padding: 28px 24px; }
+}
+</style>
+
+<section class="section" id="docs">
+  <div class="section-head">
+    <div class="eyebrow">07 · Docs</div>
+    <h2>How Precept appears in writing</h2>
+    <p>Documentation surfaces — README files, guides, reference tables, conceptual explanations — have their own representational conventions. Construct names appear inline in prose, in comparison tables, and in annotated examples. These conventions keep semantic identity legible in text without requiring a rendered UI.</p>
+  </div>
+
+  <!-- Inline references -->
+  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none">
+    <span class="cov-z-label">Inline References</span>
+    <span class="cov-z-note">construct names embedded in prose</span>
+  </div>
+  <div style="border:1px solid var(--line-strong);padding:28px 32px;background:var(--panel)">
+    <p style="font-family:var(--sans);font-size:15px;line-height:2.0;color:var(--muted)">
+      When the <span class="doc-ref s">LoanApplication</span> precept enters the
+      <span class="doc-ref st">Draft</span> state, the
+      <span class="doc-ref ev">Submit</span> event becomes available. Firing it transitions the entity
+      to <span class="doc-ref st">Submitted</span>. The <span class="doc-ref da">Amount</span> field
+      must satisfy the <span class="doc-ref ru">minimum-amount</span> invariant before
+      <span class="doc-ref ev">Submit</span> is allowed.
+    </p>
+    <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--line);display:flex;gap:24px;align-items:baseline;flex-wrap:wrap">
+      <div style="display:grid;gap:6px;align-content:start">
+        <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.22em;text-transform:uppercase;color:var(--soft)">Convention</span>
+        <span style="font-family:var(--sans);font-size:13px;color:var(--muted)">Mono, construct family color, subtle background + border</span>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <span class="doc-ref s">structure</span>
+        <span class="doc-ref st">state</span>
+        <span class="doc-ref ev">event</span>
+        <span class="doc-ref da">data</span>
+        <span class="doc-ref ru">rule</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pills -->
+  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+    <span class="cov-z-label">Type Pills</span>
+    <span class="cov-z-note">compact identity badges for tables and reference lists</span>
+  </div>
+  <div style="border:1px solid var(--line-strong);padding:24px 32px;background:var(--panel);display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+    <span class="doc-pill s">Structure</span>
+    <span class="doc-pill st">State</span>
+    <span class="doc-pill ev">Event</span>
+    <span class="doc-pill da">Data</span>
+    <span class="doc-pill ru">Rule</span>
+  </div>
+
+  <!-- Reference table -->
+  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+    <span class="cov-z-label">Reference Table</span>
+    <span class="cov-z-note">anatomy of a construct reference row</span>
+  </div>
+  <div style="border:1px solid var(--line-strong);overflow:hidden">
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th style="width:40%">Name</th>
+          <th style="width:15%">Kind</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="doc-name s">LoanApplication</span></td>
+          <td><span class="doc-pill s" style="font-size:10px">Structure</span></td>
+          <td class="doc-desc">The governing precept. Defines fields, states, events, and transition rules for a loan request.</td>
+        </tr>
+        <tr>
+          <td><span class="doc-name st">Draft</span></td>
+          <td><span class="doc-pill st" style="font-size:10px">State</span></td>
+          <td class="doc-desc">Initial state. The applicant can edit fields. <span class="doc-ref ev" style="font-size:0.88em">Submit</span> becomes available once required fields are valid.</td>
+        </tr>
+        <tr>
+          <td><span class="doc-name ev">Submit</span></td>
+          <td><span class="doc-pill ev" style="font-size:10px">Event</span></td>
+          <td class="doc-desc">Transitions from <span class="doc-ref st" style="font-size:0.88em">Draft</span> to <span class="doc-ref st" style="font-size:0.88em">Submitted</span>. Blocked if <span class="doc-ref da" style="font-size:0.88em">Amount</span> fails invariant.</td>
+        </tr>
+        <tr>
+          <td><span class="doc-name da">Amount</span></td>
+          <td><span class="doc-pill da" style="font-size:10px">Data</span></td>
+          <td class="doc-desc">Loan amount requested. Type <span class="doc-ref da" style="font-size:0.88em">number</span>. Must be greater than 0.</td>
+        </tr>
+        <tr>
+          <td><span class="doc-name ru">minimum-amount</span></td>
+          <td><span class="doc-pill ru" style="font-size:10px">Rule</span></td>
+          <td class="doc-desc">Invariant on <span class="doc-ref da" style="font-size:0.88em">Amount</span>. Enforced before any transition that reads the field.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Code blocks -->
+  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+    <span class="cov-z-label">Code Blocks</span>
+    <span class="cov-z-note">DSL snippets as they appear in documentation</span>
+  </div>
+  <div class="doc-code-block">
+    <div class="doc-code-header">
+      <span class="doc-code-lang">precept</span>
+    </div>
+    <pre class="doc-code-body"><span style="color:var(--structure);font-weight:bold">precept</span> <span style="color:var(--rule)">LoanApplication</span>
+  <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">Amount</span>       <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">number</span>
+  <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">Applicant</span>    <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">string</span>
+
+  <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Draft</span>        <span style="color:var(--structure);font-weight:bold">initial</span>
+  <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Submitted</span>
+
+  <span style="color:var(--structure);font-weight:bold">on</span>     <span style="color:var(--event)">Submit</span>   <span style="color:var(--structure)">from</span> <span style="color:var(--state)">Draft</span>
+    <span style="color:var(--structure);font-weight:bold">rule</span>  <span style="color:var(--data)">Amount</span> <span style="color:var(--structure)">&gt;</span> <span style="color:var(--data-v)">0</span>  <span style="color:var(--structure);font-weight:bold">because</span> <span style="color:var(--rule)">&quot;Amount must be positive&quot;</span>
+    <span style="color:var(--structure);font-weight:bold">transition</span> <span style="color:var(--structure)">to</span> <span style="color:var(--state)">Submitted</span></pre>
+  </div>
+  <div style="padding:12px 18px;background:var(--panel);border:1px solid var(--line-strong);border-top:none">
+    <span style="font-family:var(--sans);font-size:13px;color:var(--soft)">Code blocks carry full syntax coloring — same as the editor. Language tab identifies the dialect. Background is <code style="font-family:var(--mono);font-size:0.88em;color:var(--muted)">--panel-2</code>. Never strip coloring for documentation use.</span>
+  </div>
+
+  <!-- Callouts -->
+  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+    <span class="cov-z-label">Callouts</span>
+    <span class="cov-z-note">notes, tips, cautions, and warnings</span>
+  </div>
+  <div style="border:1px solid var(--line-strong);overflow:hidden">
+    <div class="doc-callout doc-callout--note">
+      <div class="doc-callout-accent"></div>
+      <div class="doc-callout-body">
+        <span class="doc-callout-label">Note</span>
+        <p>Precept does not evaluate transitions at author time. The <span class="doc-ref ev">Submit</span> event only executes when explicitly fired via the runtime API or MCP tool.</p>
+      </div>
+    </div>
+    <div class="doc-callout doc-callout--tip">
+      <div class="doc-callout-accent"></div>
+      <div class="doc-callout-body">
+        <span class="doc-callout-label">Tip</span>
+        <p>Use <span class="doc-ref ev">precept_inspect</span> to preview all available transitions for a given state without modifying any data.</p>
+      </div>
+    </div>
+    <div class="doc-callout doc-callout--caution">
+      <div class="doc-callout-accent"></div>
+      <div class="doc-callout-body">
+        <span class="doc-callout-label">Caution</span>
+        <p>Field values passed to <span class="doc-ref ev">precept_fire</span> must match declared field types. Type mismatches are caught at evaluation time, not authoring time.</p>
+      </div>
+    </div>
+    <div class="doc-callout doc-callout--warn">
+      <div class="doc-callout-accent"></div>
+      <div class="doc-callout-body">
+        <span class="doc-callout-label">Warning</span>
+        <p>Removing a state referenced by an active transition causes a compile error. All references must be updated before the precept can be re-evaluated.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chrome tokens -->
+  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+    <span class="cov-z-label">Chrome / Support Tokens</span>
+    <span class="cov-z-note">separate support layer for text, surfaces, and line scaffolding</span>
+  </div>
+  <div style="padding:18px 20px;border:1px solid var(--line-strong);border-top:none;background:var(--panel)">
+    <p>These tokens are not a sixth semantic family. They are the support layer that holds the reading environment together: canvas, panels, prose tone, and dividers. Because they do not encode construct identity, the chrome palette can be tuned to complement the semantic system and the needs of a given surface without competing with Precept's authored meaning.</p>
+  </div>
+  <div class="doc-tokens">
+    <div class="doc-token" style="background:var(--panel-2)">
+      <span class="doc-token-name">--text</span>
+      <span class="doc-token-value" style="color:var(--text)">#f1f3f6</span>
+      <span class="doc-token-role">Primary prose &amp; labels</span>
+    </div>
+    <div class="doc-token" style="background:var(--panel-2)">
+      <span class="doc-token-name">--muted</span>
+      <span class="doc-token-value" style="color:var(--muted)">#a7afbb</span>
+      <span class="doc-token-role">Descriptions &amp; body copy</span>
+    </div>
+    <div class="doc-token" style="background:var(--panel-2)">
+      <span class="doc-token-name">--soft</span>
+      <span class="doc-token-value" style="color:var(--soft)">#687281</span>
+      <span class="doc-token-role">Eyebrows, captions, tertiary labels</span>
+    </div>
+    <div class="doc-token" style="background:var(--panel-2)">
+      <span class="doc-token-name">--line</span>
+      <span class="doc-token-value" style="color:var(--muted)">rgba(255,255,255,0.08)</span>
+      <span class="doc-token-role">Dividers &amp; row borders</span>
+      <div style="margin-top:10px;height:1px;background:var(--line)"></div>
+    </div>
+    <div class="doc-token" style="background:var(--bg);border:1px solid var(--line)">
+      <span class="doc-token-name">--bg</span>
+      <span class="doc-token-value" style="color:var(--muted)">#040506</span>
+      <span class="doc-token-role">Base canvas</span>
+    </div>
+    <div class="doc-token" style="background:var(--panel)">
+      <span class="doc-token-name">--panel</span>
+      <span class="doc-token-value" style="color:var(--muted)">#090b0e</span>
+      <span class="doc-token-role">Cards &amp; inset blocks</span>
+    </div>
+    <div class="doc-token" style="background:var(--panel-2)">
+      <span class="doc-token-name">--panel-2</span>
+      <span class="doc-token-value" style="color:var(--muted)">#0d1014</span>
+      <span class="doc-token-role">Elevated cells &amp; specimens</span>
+    </div>
+    <div class="doc-token" style="background:var(--panel-2)">
+      <span class="doc-token-name">--line-strong</span>
+      <span class="doc-token-value" style="color:var(--muted)">rgba(255,255,255,0.16)</span>
+      <span class="doc-token-role">Section borders &amp; strong dividers</span>
+      <div style="margin-top:10px;height:1px;background:var(--line-strong)"></div>
+    </div>
+  </div>
+
+  <!-- Page specimen -->
+  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+    <span class="cov-z-label">Page Specimen</span>
+    <span class="cov-z-note">realistic docs page in context&thinsp;·&thinsp;headings, prose, diagram, lists, callout, code, table</span>
+  </div>
+  <div class="doc-specimen-frame">
+
+    <!-- browser chrome -->
+    <div class="doc-specimen-chrome">
+      <div class="doc-specimen-dot" style="background:#F87171;opacity:0.7"></div>
+      <div class="doc-specimen-dot" style="background:#FDE047;opacity:0.7"></div>
+      <div class="doc-specimen-dot" style="background:#34D399;opacity:0.7"></div>
+      <div class="doc-specimen-url">precept.dev/docs/guides/defining-precepts</div>
+    </div>
+
+    <div class="doc-specimen-body">
+
+      <!-- sidebar nav -->
+      <div class="doc-specimen-sidebar">
+        <div class="doc-specimen-sidebar-header">
+          <span class="doc-precept-name" style="font-size:14px">Precept</span>
+          <span class="doc-specimen-sidebar-ver">v1 &middot; Documentation</span>
+        </div>
+        <span class="doc-sp-section">Getting Started</span>
+        <a class="doc-sp-link" href="#">Installation</a>
+        <a class="doc-sp-link" href="#">Quick Start</a>
+        <span class="doc-sp-section">Guides</span>
+        <a class="doc-sp-link active" href="#">Defining Precepts</a>
+        <a class="doc-sp-link child" href="#">Fields</a>
+        <a class="doc-sp-link child" href="#">States</a>
+        <a class="doc-sp-link child" href="#">Events &amp; Transitions</a>
+        <a class="doc-sp-link child" href="#">Rules &amp; Invariants</a>
+        <a class="doc-sp-link" href="#">Runtime API</a>
+        <a class="doc-sp-link" href="#">MCP Tools</a>
+        <span class="doc-sp-section">Reference</span>
+        <a class="doc-sp-link" href="#">Language</a>
+        <a class="doc-sp-link" href="#">API</a>
+      </div>
+
+      <!-- page content -->
+      <div class="doc-specimen-content">
+
+        <div>
+          <div class="dsp-eyebrow">Guide</div>
+          <h1 class="dsp-h1">Defining Precepts</h1>
+        </div>
+
+        <p class="dsp-lead">A precept is a governed schema that defines what a business entity is allowed to become. It declares fields, names the states it can occupy, and specifies which events drive transitions between them. Everything the entity can do &thinsp;—&thinsp; and everything it cannot &thinsp;—&thinsp; is declared here.</p>
+
+        <!-- H2 + prose -->
+        <div style="display:grid;gap:14px">
+          <h2 class="dsp-h2">States</h2>
+          <p class="dsp-p">A state is a named position in the entity’s lifecycle. Every precept has at least one state marked <span class="doc-ref s">initial</span> &thinsp;—&thinsp; this is where a new instance begins. States are declared with the <span class="doc-ref s">state</span> keyword and a name drawn from the <span class="doc-ref st">State</span> construct family.</p>
+          <p class="dsp-p">Nothing happens to an entity unless an event fires. States are inert until an event arrives. This is what makes Precept deterministic: the current state and the fired event fully determine the outcome.</p>
+        </div>
+
+        <!-- Diagram -->
+        <div style="display:grid;gap:10px">
+          <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.22em;text-transform:uppercase;color:var(--soft)">State diagram &thinsp;·&thinsp; LoanApplication lifecycle</span>
+          <div class="dsp-diagram">
+            <!-- Allowed path row -->
+            <div class="dsp-flow dsp-flow--allowed">
+              <span class="dsp-flow-label">Allowed</span>
+              <div class="dsp-state">Draft</div>
+              <div class="dsp-arrow">
+                <span class="dsp-arrow-label">Submit</span>
+                <div class="dsp-arrow-line"><div class="dsp-arrow-shaft"></div><span>&#x203a;</span></div>
+              </div>
+              <div class="dsp-state current">Submitted</div>
+              <div class="dsp-arrow">
+                <span class="dsp-arrow-label">Approve</span>
+                <div class="dsp-arrow-line"><div class="dsp-arrow-shaft"></div><span>&#x203a;</span></div>
+              </div>
+              <div class="dsp-state">Approved</div>
+            </div>
+            <!-- Guard-blocked row -->
+            <div class="dsp-flow dsp-flow--blocked">
+              <span class="dsp-flow-label">Blocked</span>
+              <div class="dsp-state">Draft</div>
+              <div class="dsp-arrow dsp-arrow--blocked">
+                <span class="dsp-arrow-label">Submit</span>
+                <div class="dsp-arrow-line"><div class="dsp-arrow-shaft"></div><span>&#x203a;</span></div>
+              </div>
+              <div class="dsp-reject-node">&#x2715; Amount = 0</div>
+            </div>
+          </div>
+          <span style="font-family:var(--sans);font-size:12px;color:var(--soft)">Outlined ring = current state&thinsp;&middot;&thinsp;Blocked row shows guard failure when <span class="doc-ref ru" style="font-size:0.90em">Amount</span> = 0.</span>
+        </div>
+
+        <!-- H2 + H3 + list -->
+        <div style="display:grid;gap:14px">
+          <h2 class="dsp-h2">Events &amp; Transitions</h2>
+          <p class="dsp-p">Events are the only mechanism that advances state. An event declared under a specific source state can only fire from that state. Attempting to fire it from any other state has no effect &thinsp;—&thinsp; Precept does not throw; it simply finds no matching transition.</p>
+          <h3 class="dsp-h3">What a transition block does</h3>
+          <ul class="dsp-list">
+            <li>Evaluates all <span class="doc-ref ru">rule</span> guards in declaration order &thinsp;—&thinsp; first failure blocks the whole event</li>
+            <li>Applies all <span class="doc-ref s">set</span> expressions to produce the next field snapshot</li>
+            <li>Moves the entity to the target state declared by <span class="doc-ref s">transition to</span></li>
+            <li>Returns the outcome: <span class="doc-ref ev">allowed</span>, <span class="doc-ref ru">blocked</span>, or <span class="doc-ref st">rejected</span></li>
+          </ul>
+        </div>
+
+        <!-- Callout -->
+        <div class="doc-callout doc-callout--note" style="border:1px solid var(--line)">
+          <div class="doc-callout-accent"></div>
+          <div class="doc-callout-body">
+            <span class="doc-callout-label">Note</span>
+            <p>Rules inside a transition block are scoped to that event. Invariants declared at the precept level are evaluated on every transition, regardless of which event fired.</p>
+          </div>
+        </div>
+
+        <!-- H2 + code -->
+        <div style="display:grid;gap:14px">
+          <h2 class="dsp-h2">A minimal precept</h2>
+          <p class="dsp-p">The following declares a <span class="doc-ref s">LoanApplication</span> with two states, one field, and one transition. It is the smallest complete example that demonstrates the full structure.</p>
+          <div class="doc-code-block">
+            <div class="doc-code-header"><span class="doc-code-lang">precept</span></div>
+            <pre class="doc-code-body"><span style="color:var(--structure);font-weight:bold">precept</span> <span style="color:var(--rule)">LoanApplication</span>
+  <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">Amount</span>   <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">number</span>
+
+  <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Draft</span>    <span style="color:var(--structure);font-weight:bold">initial</span>
+  <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Submitted</span>
+
+  <span style="color:var(--structure);font-weight:bold">on</span>  <span style="color:var(--event)">Submit</span>  <span style="color:var(--structure)">from</span> <span style="color:var(--state)">Draft</span>
+    <span style="color:var(--structure);font-weight:bold">rule</span>  <span style="color:var(--data)">Amount</span> <span style="color:var(--structure)">&gt;</span> <span style="color:var(--data-v)">0</span>  <span style="color:var(--structure);font-weight:bold">because</span> <span style="color:var(--rule)">&quot;Amount must be positive&quot;</span>
+    <span style="color:var(--structure);font-weight:bold">transition</span>  <span style="color:var(--structure)">to</span> <span style="color:var(--state)">Submitted</span></pre>
+          </div>
+        </div>
+
+        <!-- H2 + table -->
+        <div style="display:grid;gap:14px">
+          <h2 class="dsp-h2">Transition reference</h2>
+          <div style="border:1px solid var(--line-strong);overflow:hidden">
+            <table class="doc-table">
+              <thead>
+                <tr>
+                  <th style="width:22%">Event</th>
+                  <th style="width:20%">From</th>
+                  <th style="width:20%">To</th>
+                  <th>Guards</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="doc-name ev">Submit</span></td>
+                  <td><span class="doc-name st">Draft</span></td>
+                  <td><span class="doc-name st">Submitted</span></td>
+                  <td class="doc-desc"><span class="doc-ref da" style="font-size:0.88em">Amount</span> &gt; 0</td>
+                </tr>
+                <tr>
+                  <td><span class="doc-name ev">Approve</span></td>
+                  <td><span class="doc-name st">Submitted</span></td>
+                  <td><span class="doc-name st">Approved</span></td>
+                  <td class="doc-desc">None</td>
+                </tr>
+                <tr>
+                  <td><span class="doc-name ev">Decline</span></td>
+                  <td><span class="doc-name st">Submitted</span></td>
+                  <td><span class="doc-name st">Declined</span></td>
+                  <td class="doc-desc">None</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Next steps -->
+        <div style="display:grid;gap:12px;padding:20px 24px;background:var(--panel);border:1px solid var(--line)">
+          <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.22em;text-transform:uppercase;color:var(--soft)">Next</span>
+          <ol class="dsp-list dsp-olist" style="margin:0">
+            <li>Add invariants to enforce field constraints across all transitions</li>
+            <li>Use <span class="doc-ref ev">precept_inspect</span> to preview what events are available from any state</li>
+            <li>Connect the precept to a host application via the Runtime API</li>
+          </ol>
+        </div>
+
+      </div><!-- /.doc-specimen-content -->
+
+      <!-- right-rail TOC -->
+      <div class="doc-specimen-toc">
+        <span class="doc-sp-toc-label">On this page</span>
+        <a class="doc-sp-toc-link" href="#">States</a>
+        <a class="doc-sp-toc-link active" href="#">Events &amp; Transitions</a>
+        <a class="doc-sp-toc-link" href="#">A minimal precept</a>
+        <a class="doc-sp-toc-link" href="#">Transition reference</a>
+      </div>
+
+    </div><!-- /.doc-specimen-body -->
+  </div><!-- /.doc-specimen-frame -->
+
+</section>
+
+<script>
+(function () {
+  var items = document.querySelectorAll(".nav-item[data-sec]");
+  var anchors = Array.from(document.querySelectorAll("section[id], .construct-gallery[id]")).filter(function(el){ return el.id !== ""; });
+
+  function update() {
+    var active = anchors[0];
+    for (var i = 0; i < anchors.length; i++) {
+      if (anchors[i].getBoundingClientRect().top <= 80) active = anchors[i];
+    }
+    var id = active ? active.id : "";
+    items.forEach(function (item) {
+      item.classList.toggle("active", item.dataset.sec === id);
+    });
+  }
+
+  document.addEventListener("scroll", update, { passive: true });
+  update();
+}());
+
+// ── Nav collapse ────────────────────────────────────────
+(function() {
+  const nav    = document.getElementById("navRail");
+  const toggle = document.getElementById("navToggle");
+  const STORE  = "precept-nav-collapsed";
+
+  function setCollapsed(collapsed) {
+    nav.classList.toggle("collapsed", collapsed);
+    toggle.textContent = collapsed ? "\u203a" : "\u2039";
+    toggle.setAttribute("title", collapsed ? "Expand navigation" : "Collapse navigation");
+    try { localStorage.setItem(STORE, collapsed ? "1" : "0"); } catch(e) {}
+  }
+
+  // Default: collapsed
+  const stored = (() => { try { return localStorage.getItem(STORE); } catch(e) { return null; } })();
+  setCollapsed(stored === null ? true : stored === "1");
+
+  toggle.addEventListener("click", function() {
+    setCollapsed(!nav.classList.contains("collapsed"));
+  });
+}());
+</script>
+
+<script>
+document.fonts.ready.then(function() {
+  var loaded = [];
+  document.fonts.forEach(function(face) {
+    if (face.status === 'loaded') loaded.push(face.family);
+  });
+  var unique = loaded.filter(function(v,i,a){ return a.indexOf(v)===i; });
+  var mono = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim().split(',')[0].replace(/['"]/g,'').trim();
+  var sans = getComputedStyle(document.documentElement).getPropertyValue('--sans').trim().split(',')[0].replace(/['"]/g,'').trim();
+  var monoLoaded = unique.some(function(f){ return f.toLowerCase().indexOf(mono.toLowerCase()) !== -1; });
+  var sansLoaded = unique.some(function(f){ return f.toLowerCase().indexOf(sans.toLowerCase()) !== -1; });
+  var el = document.getElementById('nav-font-status');
+  if (el) el.innerHTML =
+    '<span style="color:' + (monoLoaded ? '#34D399' : '#F87171') + '">' + (monoLoaded ? '✓' : '✗') + ' ' + mono + '</span><br>' +
+    '<span style="color:' + (sansLoaded ? '#34D399' : '#F87171') + '">' + (sansLoaded ? '✓' : '✗') + ' ' + sans + '</span>';
+});
+</script>
+</body>
+</html>

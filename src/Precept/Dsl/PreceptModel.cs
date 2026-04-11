@@ -36,19 +36,22 @@ public sealed record PreceptEventArg(
     PreceptScalarType Type,
     bool IsNullable,
     bool HasDefaultValue = false,
-    object? DefaultValue = null);
+    object? DefaultValue = null,
+    IReadOnlyList<FieldConstraint>? Constraints = null);
 
 public sealed record PreceptField(
     string Name,
     PreceptScalarType Type,
     bool IsNullable,
     bool HasDefaultValue = false,
-    object? DefaultValue = null);
+    object? DefaultValue = null,
+    IReadOnlyList<FieldConstraint>? Constraints = null);
 
 public sealed record PreceptCollectionField(
     string Name,
     PreceptCollectionKind CollectionKind,
-    PreceptScalarType InnerType);
+    PreceptScalarType InnerType,
+    IReadOnlyList<FieldConstraint>? Constraints = null);
 
 
 public enum PreceptCollectionKind
@@ -56,6 +59,42 @@ public enum PreceptCollectionKind
     Set,
     Queue,
     Stack
+}
+
+/// <summary>
+/// A single declaration-level constraint attached to a field, collection field, or event argument.
+/// Constraints desugar to <c>invariant</c> / <c>on E assert</c> at parse time.
+/// </summary>
+public abstract record FieldConstraint
+{
+    private FieldConstraint() { }
+
+    /// <summary>Value must be &gt;= 0.</summary>
+    public sealed record Nonnegative : FieldConstraint;
+
+    /// <summary>Value must be &gt; 0.</summary>
+    public sealed record Positive : FieldConstraint;
+
+    /// <summary>Value must be &gt;= <see cref="Value"/>.</summary>
+    public sealed record Min(double Value) : FieldConstraint;
+
+    /// <summary>Value must be &lt;= <see cref="Value"/>.</summary>
+    public sealed record Max(double Value) : FieldConstraint;
+
+    /// <summary>String or collection must not be empty.</summary>
+    public sealed record Notempty : FieldConstraint;
+
+    /// <summary>String length must be &gt;= <see cref="Value"/>.</summary>
+    public sealed record Minlength(int Value) : FieldConstraint;
+
+    /// <summary>String length must be &lt;= <see cref="Value"/>.</summary>
+    public sealed record Maxlength(int Value) : FieldConstraint;
+
+    /// <summary>Collection count must be &gt;= <see cref="Value"/>.</summary>
+    public sealed record Mincount(int Value) : FieldConstraint;
+
+    /// <summary>Collection count must be &lt;= <see cref="Value"/>.</summary>
+    public sealed record Maxcount(int Value) : FieldConstraint;
 }
 
 public enum PreceptScalarType
@@ -70,7 +109,7 @@ public abstract record PreceptExpression;
 
 public sealed record PreceptLiteralExpression(object? Value) : PreceptExpression;
 
-public sealed record PreceptIdentifierExpression(string Name, string? Member = null) : PreceptExpression;
+public sealed record PreceptIdentifierExpression(string Name, string? Member = null, string? SubMember = null) : PreceptExpression;
 
 public sealed record PreceptUnaryExpression(string Operator, PreceptExpression Operand) : PreceptExpression;
 
@@ -138,7 +177,8 @@ public sealed record PreceptInvariant(
     string ExpressionText,
     PreceptExpression Expression,
     string Reason,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    bool IsSynthetic = false);
 
 /// <summary>
 /// A state-scoped assert: <c>in/to/from &lt;State&gt; assert &lt;expr&gt; because "reason"</c>.

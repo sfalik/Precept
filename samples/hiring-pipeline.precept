@@ -6,14 +6,11 @@ precept HiringPipeline
 field CandidateName as string nullable
 field RoleName as string nullable
 field RecruiterName as string nullable
-field FeedbackCount as number default 0
-field OfferAmount as number default 0
-field FinalNote as string nullable
+field FeedbackCount as number default 0 nonnegative
+field OfferAmount as number default 0 nonnegative
+field FinalNote as string nullable maxlength 500
 
 field PendingInterviewers as set of string
-
-invariant FeedbackCount >= 0 because "Feedback count cannot be negative"
-invariant OfferAmount >= 0 because "Offer amounts cannot be negative"
 
 state Draft initial
 state Screening
@@ -26,26 +23,19 @@ state Rejected
 in InterviewLoop assert PendingInterviewers.count > 0 because "Interview loops require at least one pending interviewer"
 in Hired assert OfferAmount > 0 because "Hired candidates must have an offer amount"
 
-event SubmitApplication with Candidate as string, Role as string, Recruiter as string
-on SubmitApplication assert Candidate != "" because "A candidate name is required"
-on SubmitApplication assert Role != "" because "A role name is required"
-on SubmitApplication assert Recruiter != "" because "A recruiter name is required"
+event SubmitApplication with Candidate as string notempty, Role as string notempty, Recruiter as string notempty
 
-event AddInterviewer with Name as string
-on AddInterviewer assert Name != "" because "An interviewer name is required"
+event AddInterviewer with Name as string notempty
 
 event PassScreen
 
-event RecordInterviewFeedback with Interviewer as string
-on RecordInterviewFeedback assert Interviewer != "" because "The interviewer must be identified"
+event RecordInterviewFeedback with Interviewer as string notempty
 
-event ExtendOffer with Amount as number
-on ExtendOffer assert Amount > 0 because "Offer amounts must be positive"
+event ExtendOffer with Amount as number positive
 
 event AcceptOffer
 
-event RejectCandidate with Note as string
-on RejectCandidate assert Note != "" because "A rejection note is required"
+event RejectCandidate with Note as string notempty
 
 from Draft on SubmitApplication -> set CandidateName = SubmitApplication.Candidate -> set RoleName = SubmitApplication.Role -> set RecruiterName = SubmitApplication.Recruiter -> transition Screening
 

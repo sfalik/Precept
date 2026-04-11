@@ -27,6 +27,23 @@ internal static class PreceptExpressionRuntimeEvaluator
 
     private static EvaluationResult EvaluateIdentifier(PreceptIdentifierExpression identifier, IReadOnlyDictionary<string, object?> context)
     {
+        // Handle three-level dotted form: EventName.ArgName.length (e.g. Submit.Name.length)
+        if (identifier.Member is not null && identifier.SubMember is not null)
+        {
+            if (identifier.SubMember == "length")
+            {
+                var argKey = $"{identifier.Name}.{identifier.Member}";
+                if (!context.TryGetValue(argKey, out var argStrObj))
+                    return EvaluationResult.Fail($"data key '{argKey}' was not provided.");
+                if (argStrObj is null)
+                    return EvaluationResult.Fail($"'{argKey}.length' failed: arg is null.");
+                if (argStrObj is string argStr)
+                    return EvaluationResult.Ok((double)argStr.Length);
+                return EvaluationResult.Fail($"'{argKey}' is not a string.");
+            }
+            return EvaluationResult.Fail($"unsupported sub-member '{identifier.SubMember}'.");
+        }
+
         // Handle collection property access: Collection.count, Collection.min, Collection.max, Collection.peek
         if (identifier.Member is not null)
         {
@@ -53,6 +70,17 @@ internal static class PreceptExpressionRuntimeEvaluator
                         : EvaluationResult.Fail($"'{identifier.Name}.peek' is only valid on queue<T> or stack<T> fields."),
                     _ => EvaluationResult.Fail($"unknown collection property '{identifier.Member}'.")
                 };
+            }
+
+            // Handle string .length accessor: returns UTF-16 code unit count (matches .NET string.Length).
+            if (identifier.Member == "length")
+            {
+                if (!context.TryGetValue(identifier.Name, out var strObj))
+                    return EvaluationResult.Fail($"data key '{identifier.Name}' was not provided.");
+                if (strObj is null)
+                    return EvaluationResult.Fail($"'{identifier.Name}.length' failed: field is null.");
+                if (strObj is string str)
+                    return EvaluationResult.Ok((double)str.Length);
             }
         }
 
