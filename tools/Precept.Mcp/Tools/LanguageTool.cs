@@ -31,6 +31,7 @@ public static class LanguageTool
         var grammarKeywords = new List<string>();
         var outcomeKeywords = new List<string>();
         var typeKeywords = new List<string>();
+        var constraintKeywords = new List<string>();
         var literalKeywords = new List<string>();
         var operators = new List<OperatorDto>();
 
@@ -61,6 +62,9 @@ public static class LanguageTool
                     case TokenCategory.Grammar when symbol is not null:
                         grammarKeywords.Add(symbol);
                         break;
+                    case TokenCategory.Constraint when symbol is not null:
+                        constraintKeywords.Add(symbol);
+                        break;
                     case TokenCategory.Type when symbol is not null:
                         typeKeywords.Add(symbol);
                         break;
@@ -82,6 +86,7 @@ public static class LanguageTool
                     grammarKeywords,
                     outcomeKeywords,
                     typeKeywords,
+                    constraintKeywords,
                     literalKeywords,
                     operators);
     }
@@ -152,6 +157,7 @@ public sealed record VocabularyDto(
     IReadOnlyList<string> GrammarKeywords,
     IReadOnlyList<string> OutcomeKeywords,
     IReadOnlyList<string> TypeKeywords,
+    IReadOnlyList<string> ConstraintKeywords,
     IReadOnlyList<string> LiteralKeywords,
     IReadOnlyList<OperatorDto> Operators);
 

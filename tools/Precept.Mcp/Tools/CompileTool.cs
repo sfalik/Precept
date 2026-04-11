@@ -28,16 +28,19 @@ public static class CompileTool
             .ToList();
 
         var fields = model.Fields
-            .Select(f => new FieldDto(f.Name, f.Type.ToString().ToLowerInvariant(), f.IsNullable, FormatDefault(f)))
+            .Select(f => new FieldDto(f.Name, f.Type.ToString().ToLowerInvariant(), f.IsNullable, FormatDefault(f),
+                f.Constraints?.Select(FormatConstraint).ToList()))
             .ToList();
 
         var collectionFields = model.CollectionFields
-            .Select(cf => new CollectionFieldDto(cf.Name, cf.CollectionKind.ToString().ToLowerInvariant(), cf.InnerType.ToString().ToLowerInvariant()))
+            .Select(cf => new CollectionFieldDto(cf.Name, cf.CollectionKind.ToString().ToLowerInvariant(), cf.InnerType.ToString().ToLowerInvariant(),
+                cf.Constraints?.Select(FormatConstraint).ToList()))
             .ToList();
 
         var events = model.Events
             .Select(e => new EventDto(e.Name,
-                e.Args.Select(a => new EventArgDto(a.Name, a.Type.ToString().ToLowerInvariant(), a.IsNullable, !a.HasDefaultValue && !a.IsNullable)).ToList()))
+                e.Args.Select(a => new EventArgDto(a.Name, a.Type.ToString().ToLowerInvariant(), a.IsNullable, !a.HasDefaultValue && !a.IsNullable,
+                    a.Constraints?.Select(FormatConstraint).ToList())).ToList()))
             .ToList();
 
         var transitions = (model.TransitionRows ?? [])
@@ -78,6 +81,20 @@ public static class CompileTool
         return null;
     }
 
+    private static string FormatConstraint(FieldConstraint c) => c switch
+    {
+        FieldConstraint.Nonnegative => "nonnegative",
+        FieldConstraint.Positive => "positive",
+        FieldConstraint.Notempty => "notempty",
+        FieldConstraint.Min m => $"min {m.Value}",
+        FieldConstraint.Max m => $"max {m.Value}",
+        FieldConstraint.Minlength m => $"minlength {m.Value}",
+        FieldConstraint.Maxlength m => $"maxlength {m.Value}",
+        FieldConstraint.Mincount m => $"mincount {m.Value}",
+        FieldConstraint.Maxcount m => $"maxcount {m.Value}",
+        _ => c.GetType().Name.ToLowerInvariant()
+    };
+
     private static BranchDto MapBranch(PreceptTransitionRow row)
     {
         var (outcome, target, reason) = row.Outcome switch
@@ -115,9 +132,9 @@ public sealed record CompileResult(
 public sealed record DiagnosticDto(int Line, int Column, string Message, string? Code, string Severity);
 
 public sealed record StateDto(string Name, IReadOnlyList<string> Rules);
-public sealed record FieldDto(string Name, string Type, bool Nullable, object? Default);
-public sealed record CollectionFieldDto(string Name, string Kind, string InnerType);
+public sealed record FieldDto(string Name, string Type, bool Nullable, object? Default, IReadOnlyList<string>? Constraints = null);
+public sealed record CollectionFieldDto(string Name, string Kind, string InnerType, IReadOnlyList<string>? Constraints = null);
 public sealed record EventDto(string Name, IReadOnlyList<EventArgDto> Args);
-public sealed record EventArgDto(string Name, string Type, bool Nullable, bool Required);
+public sealed record EventArgDto(string Name, string Type, bool Nullable, bool Required, IReadOnlyList<string>? Constraints = null);
 public sealed record TransitionDto(string From, string On, IReadOnlyList<BranchDto> Branches);
 public sealed record BranchDto(string? Guard, string Outcome, string? Target, string? Reason);
