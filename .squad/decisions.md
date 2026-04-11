@@ -6,26 +6,30 @@
 
 ---
 
-### 2026-04-11T00:00:00Z: Issue #14 — `when <guard>` on declarations — design review complete, BLOCKED
-**By:** George (runtime), Kramer (tooling), Newman (MCP), Soup Nazi (testability); Frank review pending
-**Status:** BLOCKED — three independent blockers, Frank sign-off outstanding
+### 2026-04-11T00:00:00Z: Issue #14 — `when <guard>` on declarations — design review complete, APPROVED Forms 1–3 / Form 4 deferred
+**By:** George (runtime), Kramer (tooling), Newman (MCP), Soup Nazi (testability), Frank (design/architecture)
+**Status:** APPROVED — Forms 1–3 cleared for implementation. Form 4 deferred to follow-on issue.
 
-Design review of Issue #14 (`when <guard>` conditional invariants, state asserts, event asserts, conditional edit eligibility). Four of five reviewers filed. Aggregate verdict: blocked — do not proceed to implementation.
+Design review of Issue #14 (`when <guard>` conditional invariants, state asserts, event asserts, conditional edit eligibility). All five reviewers filed. **Frank's verdict (design/architecture sign-off — filed 2026-04-11):** APPROVED — Forms 1–3. The design is philosophically grounded (`docs/philosophy.md` explicitly describes guarded invariants), language-principled (all six locked decisions defensible against `docs/PreceptLanguageDesign.md`), research-backed (both research files confirmed present at correct paths), and grammar-implementable with zero new keywords.
 
-**Blocker 1 — Narrowing unsoundness (George — HIGH):** `BuildStateAssertNarrowings` (line 876) unconditionally includes all `in State assert` expressions in per-state narrowing used by transition row type-checking. A guarded assertion only holds when the guard is true — unconditional narrowing from it is semantically unsound. Must add `WhenGuard is null` check before any guarded assertions are included in narrowing. Unsound narrowing can suppress valid diagnostics on transition rows.
+**Key findings (Frank):**
+- **B3 CLEARED:** Both cited research files confirmed present. Issue body had incorrect `docs/research/language/...` path prefixes — corrected to `research/language/...` in the same session.
+- **All six locked decisions upheld as sound:** `when not` negation, `if`/`when` distinction, scope-inherited guard scope, collect-all violation reporting, `when` on all declaration types (including event asserts with arg-only scope), cross-scope → transition-row routing as preferred form.
+- **Remaining blockers are implementation prerequisites, not design flaws:** B1 (narrowing unsoundness) and B2 (DTO gap) are well-defined, mechanical fixes. Form 4 mismatch is a scope split, not a design rejection.
+- **Pre-implementation prerequisites:** (1) Newman — build `invariants`, `stateAsserts`, `eventAsserts`, `editBlocks` structured DTOs in `precept_compile` output with nullable `"when": string | null`. (2) George — add `WhenGuard is null` check in `BuildStateAssertNarrowings` before Forms 2–3 implementation.
 
-**Blocker 2 — Compile DTO gap (Newman — structural prerequisite):** Invariants, event asserts, and edit blocks are absent from `precept_compile` output today. `StateDto.Rules` carries only reason strings (no expression, anchor, or guard). The `when` field cannot be added to DTOs that don't exist. New structured top-level arrays (`invariants`, `stateAsserts`, `eventAsserts`, `editBlocks`) with nullable `"when": string | null` must be built first. `StateDto.rules: string[]` must be preserved alongside new arrays — not replaced.
+**B1 — Narrowing unsoundness (George — HIGH, implementation prerequisite):** `BuildStateAssertNarrowings` (line 876) unconditionally includes all `in State assert` expressions in per-state narrowing used by transition row type-checking. A guarded assertion only holds when the guard is true — unconditional narrowing from it is semantically unsound. Must add `WhenGuard is null` check before any guarded assertions are included in narrowing. Unsound narrowing can suppress valid diagnostics on transition rows. Implementation constraint, not a design flaw.
 
-**Blocker 3 — Form 4 architectural mismatch (George — MEDIUM):** `in State when guard edit` requires per-call guard evaluation against live data. `_editableFieldsByState` is a static `Dictionary<string, HashSet<string>>` built at construction time (line 108–133). Cannot precompute. Breaks `Update`, `Inspect(patch)`, and `BuildEditableFieldInfos`. **Form 4 must be split to a separate follow-on issue.**
+**B2 — Compile DTO gap (Newman — structural prerequisite):** Invariants, event asserts, and edit blocks are absent from `precept_compile` output today. `StateDto.Rules` carries only reason strings (no expression, anchor, or guard). The `when` field cannot be added to DTOs that don't exist. New structured top-level arrays (`invariants`, `stateAsserts`, `eventAsserts`, `editBlocks`) with nullable `"when": string | null` must be built first. `StateDto.rules: string[]` must be preserved alongside new arrays — not replaced. Prerequisite work item, not a design flaw.
 
-**Blocker 4 — Frank review not filed:** Design/philosophy sign-off from Frank is required before implementation is authorized.
+**Form 4 (deferred to follow-on issue):** `in State when guard edit` requires per-call guard evaluation against live data. `_editableFieldsByState` is a static `Dictionary<string, HashSet<string>>` built at construction time (line 108–133). Cannot precompute. Breaks `Update`, `Inspect(patch)`, and `BuildEditableFieldInfos`. Concept is philosophically grounded and architecturally coherent — scope split, not a design rejection. File as separate follow-on issue.
 
 **Non-blocking findings:**
 - **George:** New diagnostic C69 needed (cross-scope guard reference — better message than C38). C29/C30 compile-time check must evaluate guard against defaults before body (guard false → skip). Synthetic invariant desugaring must never attach `WhenGuard`. Silent skip (no guard-skipped annotation) is sufficient for v1.
 - **Kramer:** Zero grammar changes needed (`when` catch-all already in `controlKeywords`). Semantic tokens and hover require zero changes. Completions: ~14 mechanical additions (~9 new branches + ~4 `BecauseItem` → `[WhenItem, BecauseItem]` modifications + ~1 state-action list addition). Branch ordering critical: `when`-in-guard branches must precede base branches.
 - **Soup Nazi (CRITICAL edge cases):** EC-3 — C29/C30 must evaluate guards at defaults to avoid spurious precompile violations (test: `Check_Invariant_WhenGuardFalse_AtDefaultData_NoPrecompileViolation`). EC-2 — narrowing propagation from guard to body must be explicitly decided and tested. EC-9 — double `when` (`invariant X > 0 when A when B`) must parse-error. EC-11 — boolean guard info diagnostic fires only for bare boolean-field guards, not comparison expressions. 60+ test cases + 11 edge case categories scoped.
 
-**Forms 1–3 scope (when blockers are resolved):** Invariant guard (`invariant <expr> when <guard> because "..."`), state assert guard (`in/to/from <State> assert <expr> when <guard> because "..."`), event assert guard (`on <Event> assert <expr> when <guard> because "..."`). Parser injection is 1 line per site via existing `OptionalWhenGuardParser`. Model changes are 4 records with identical optional tail-parameter pattern.
+**Forms 1–3 scope:** Invariant guard (`invariant <expr> when <guard> because "..."`), state assert guard (`in/to/from <State> assert <expr> when <guard> because "..."`), event assert guard (`on <Event> assert <expr> when <guard> because "..."`). Parser injection is 1 line per site via existing `OptionalWhenGuardParser`. Model changes are 4 records with identical optional tail-parameter pattern.
 
 ---
 
