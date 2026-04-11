@@ -29,7 +29,9 @@ public static class CompileTool
 
         var fields = model.Fields
             .Select(f => new FieldDto(f.Name, f.Type.ToString().ToLowerInvariant(), f.IsNullable, FormatDefault(f),
-                f.Constraints?.Select(FormatConstraint).ToList()))
+                f.Constraints?.Select(FormatConstraint).ToList(),
+                f.ChoiceValues is { Count: > 0 } ? f.ChoiceValues : null,
+                f.IsOrdered ? (bool?)true : null))
             .ToList();
 
         var collectionFields = model.CollectionFields
@@ -40,7 +42,9 @@ public static class CompileTool
         var events = model.Events
             .Select(e => new EventDto(e.Name,
                 e.Args.Select(a => new EventArgDto(a.Name, a.Type.ToString().ToLowerInvariant(), a.IsNullable, !a.HasDefaultValue && !a.IsNullable,
-                    a.Constraints?.Select(FormatConstraint).ToList())).ToList()))
+                    a.Constraints?.Select(FormatConstraint).ToList(),
+                    a.ChoiceValues is { Count: > 0 } ? a.ChoiceValues : null,
+                    a.IsOrdered ? (bool?)true : null)).ToList()))
             .ToList();
 
         var transitions = (model.TransitionRows ?? [])
@@ -92,6 +96,7 @@ public static class CompileTool
         FieldConstraint.Maxlength m => $"maxlength {m.Value}",
         FieldConstraint.Mincount m => $"mincount {m.Value}",
         FieldConstraint.Maxcount m => $"maxcount {m.Value}",
+        FieldConstraint.Maxplaces m => $"maxplaces {m.Places}",
         _ => c.GetType().Name.ToLowerInvariant()
     };
 
@@ -132,9 +137,15 @@ public sealed record CompileResult(
 public sealed record DiagnosticDto(int Line, int Column, string Message, string? Code, string Severity);
 
 public sealed record StateDto(string Name, IReadOnlyList<string> Rules);
-public sealed record FieldDto(string Name, string Type, bool Nullable, object? Default, IReadOnlyList<string>? Constraints = null);
+public sealed record FieldDto(string Name, string Type, bool Nullable, object? Default,
+    IReadOnlyList<string>? Constraints = null,
+    IReadOnlyList<string>? ChoiceValues = null,
+    bool? IsOrdered = null);
 public sealed record CollectionFieldDto(string Name, string Kind, string InnerType, IReadOnlyList<string>? Constraints = null);
 public sealed record EventDto(string Name, IReadOnlyList<EventArgDto> Args);
-public sealed record EventArgDto(string Name, string Type, bool Nullable, bool Required, IReadOnlyList<string>? Constraints = null);
+public sealed record EventArgDto(string Name, string Type, bool Nullable, bool Required,
+    IReadOnlyList<string>? Constraints = null,
+    IReadOnlyList<string>? ChoiceValues = null,
+    bool? IsOrdered = null);
 public sealed record TransitionDto(string From, string On, IReadOnlyList<BranchDto> Branches);
 public sealed record BranchDto(string? Guard, string Outcome, string? Target, string? Reason);

@@ -86,10 +86,44 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
 | `GrammarKeywords` | `Grammar` | `as`, `with`, `nullable`, `default`, `because`, `any`, `all`, `of`, `into`, `initial` |
 | `ActionKeywords` | `Action` | `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear` |
 | `OutcomeKeywords` | `Outcome` | `transition`, `no`, `reject` |
-| `TypeKeywords` | `Type` | `set`, `string`, `number`, `boolean`, `queue`, `stack` |
+| `TypeKeywords` | `Type` | `set`, `string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `queue`, `stack` |
+| `ConstraintKeywords` | `Constraint` | `nonnegative`, `positive`, `min`, `max`, `notempty`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` |
 | `LiteralKeywords` | `Literal` | `true`, `false`, `null` |
 
 `GrammarKeywords` contains connective and modifier keywords that serve a structural grammar role — they join, qualify, or introduce parts of declarations — rather than performing computation or control flow.
+
+**Scalar type reference** — the `typeKeywords` list includes:
+
+| Type | Description |
+|---|---|
+| `string` | UTF-16 string value |
+| `number` | 64-bit floating-point (IEEE 754) |
+| `boolean` | `true` or `false` |
+| `integer` | Whole number, no decimal component. Supports arithmetic and numeric range constraints (`nonnegative`, `positive`, `min`, `max`). |
+| `decimal` | Exact base-10 decimal. Supports `maxplaces` constraint and the `round()` built-in function. |
+| `choice("A","B","C")` | Constrained string value set. Use `ordered` to enable ordinal comparison operators (`<`, `<=`, `>`, `>=`). |
+
+**Constraint keyword reference** — the `constraintKeywords` list includes:
+
+| Constraint | Applies to | Description |
+|---|---|---|
+| `nonnegative` | `number`, `integer`, `decimal` | Value must be ≥ 0 |
+| `positive` | `number`, `integer`, `decimal` | Value must be > 0 |
+| `min N` | `number`, `integer`, `decimal` | Value must be ≥ N |
+| `max N` | `number`, `integer`, `decimal` | Value must be ≤ N |
+| `notempty` | `string`, collections | Value must not be empty |
+| `minlength N` | `string` | String length must be ≥ N |
+| `maxlength N` | `string` | String length must be ≤ N |
+| `mincount N` | collections | Collection element count must be ≥ N |
+| `maxcount N` | collections | Collection element count must be ≤ N |
+| `maxplaces N` | `decimal` | Caps decimal places to N (e.g. `maxplaces 2` ensures at most 2 decimal digits) |
+| `ordered` | `choice` | Enables ordinal comparison operators on choice fields; values compare in declaration order |
+
+**Built-in function reference** — built-in functions are not keywords but appear in the `constructs` catalog:
+
+| Function | Description |
+|---|---|
+| `round(expr, N)` | Rounds a decimal expression to N decimal places (banker's rounding / MidpointRounding.ToEven). Valid in `set` RHS and invariant/assert expressions. |
 
 **Implementation:** Serializes `ConstructCatalog.Constructs` + `DiagnosticCatalog.Diagnostics` + reflected `PreceptToken` vocabulary. No MCP-specific data — everything comes from core infrastructure.
 

@@ -122,6 +122,34 @@ public class LanguageToolTests
     }
 
     [Fact]
+    public void TypeKeywordsIncludeIntegerDecimalChoice()
+    {
+        var result = LanguageTool.Run();
+
+        result.Vocabulary.TypeKeywords.Should().Contain("integer");
+        result.Vocabulary.TypeKeywords.Should().Contain("decimal");
+        result.Vocabulary.TypeKeywords.Should().Contain("choice");
+    }
+
+    [Fact]
+    public void ConstraintKeywordsIncludeMaxplacesAndOrdered()
+    {
+        var result = LanguageTool.Run();
+
+        result.Vocabulary.ConstraintKeywords.Should().Contain("maxplaces");
+        result.Vocabulary.ConstraintKeywords.Should().Contain("ordered");
+    }
+
+    [Fact]
+    public void ConstructsIncludeRoundFunction()
+    {
+        var result = LanguageTool.Run();
+
+        result.Constructs.Should().Contain(c => c.Form.StartsWith("round("),
+            "round() built-in must be registered in the construct catalog");
+    }
+
+    [Fact]
     public void ResultIsSerializable()
     {
         var result = LanguageTool.Run();

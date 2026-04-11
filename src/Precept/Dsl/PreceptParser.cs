@@ -300,7 +300,14 @@ public static class PreceptParser
          from _rp in Token.EqualTo(PreceptToken.RightParen)
          let raw = n.ToNumericLiteralValue()
          let places = raw is long l ? (int)l : (int)(double)raw
-         select (PreceptExpression)new PreceptRoundExpression(val, places)).Try();
+         select (PreceptExpression)new PreceptRoundExpression(val, places))
+        .Try()
+        .Register(new ConstructInfo(
+            "round-function",
+            "round(<Expr>, <N>)",
+            "expression",
+            "Rounds a decimal expression to N decimal places (banker's rounding). Valid in set RHS and invariant/assert expressions.",
+            "set Total = round(Amount * Rate, 2)"));
 
     private static readonly TokenListParser<PreceptToken, PreceptExpression> Atom =
         NumberAtom
