@@ -93,7 +93,7 @@ public enum PreceptToken
     [TokenSymbol("because")]
     Because,
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Declares a state")]
     [TokenSymbol("state")]
     State,
@@ -125,22 +125,22 @@ public enum PreceptToken
 
     // ═══ Keywords: prepositions + modifiers ═══
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("While residing in a state")]
     [TokenSymbol("in")]
     In,
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Crossing into a state")]
     [TokenSymbol("to")]
     To,
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Crossing out of a state")]
     [TokenSymbol("from")]
     From,
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("When an event fires")]
     [TokenSymbol("on")]
     On,

@@ -81,8 +81,8 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
 
 | Property | `TokenCategory` | Keywords |
 |---|---|---|
-| `ControlKeywords` | `Control` | `state`, `in`, `to`, `from`, `on`, `when` |
-| `DeclarationKeywords` | `Declaration` | `precept`, `field`, `invariant`, `event`, `assert`, `edit` |
+| `ControlKeywords` | `Control` | `when` |
+| `DeclarationKeywords` | `Declaration` | `precept`, `field`, `invariant`, `state`, `event`, `assert`, `edit`, `in`, `to`, `from`, `on` |
 | `GrammarKeywords` | `Grammar` | `as`, `with`, `nullable`, `default`, `because`, `any`, `all`, `of`, `into`, `initial` |
 | `ActionKeywords` | `Action` | `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear` |
 | `OutcomeKeywords` | `Outcome` | `transition`, `no`, `reject` |
@@ -91,6 +91,8 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
 | `LiteralKeywords` | `Literal` | `true`, `false`, `null` |
 
 `GrammarKeywords` contains connective and modifier keywords that serve a structural grammar role — they join, qualify, or introduce parts of declarations — rather than performing computation or control flow.
+
+`ControlKeywords` is intentionally narrow: it is reserved for actual guard/control-flow tokens. Statement anchors such as `state`, `in`, `to`, `from`, and `on` are emitted under `DeclarationKeywords` so the vocabulary mirrors the runtime token metadata used by syntax highlighting and semantic tokens.
 
 **Scalar type reference** — the `typeKeywords` list includes:
 

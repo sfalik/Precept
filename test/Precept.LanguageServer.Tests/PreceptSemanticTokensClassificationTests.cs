@@ -56,6 +56,54 @@ public class PreceptSemanticTokensClassificationTests
     }
 
     [Fact]
+    public void GetClassifiedTokens_GrammarKeywords_ArePreceptKeywordGrammar()
+    {
+        const string dsl = """
+            precept M
+            field Note as string default "pending"
+            state Active initial
+            event Go with Reason as string
+            from any on Go -> no transition
+            """;
+
+        var tokens = PreceptSemanticTokensHandler.GetClassifiedTokens(dsl);
+
+        tokens.Should().Contain(t =>
+            t.Text == "default" &&
+            t.Type == "preceptKeywordGrammar");
+
+        tokens.Should().Contain(t =>
+            t.Text == "initial" &&
+            t.Type == "preceptKeywordGrammar");
+
+        tokens.Should().Contain(t =>
+            t.Text == "with" &&
+            t.Type == "preceptKeywordGrammar");
+
+        tokens.Should().Contain(t =>
+            t.Text == "any" &&
+            t.Type == "preceptKeywordGrammar");
+    }
+
+    [Fact]
+    public void GetClassifiedTokens_ConstraintKeyword_IsPreceptKeywordGrammar()
+    {
+        const string dsl = """
+            precept M
+            field Count as number nonnegative
+            state Active initial
+            event Go
+            from Active on Go -> no transition
+            """;
+
+        var tokens = PreceptSemanticTokensHandler.GetClassifiedTokens(dsl);
+
+        tokens.Should().Contain(t =>
+            t.Text == "nonnegative" &&
+            t.Type == "preceptKeywordGrammar");
+    }
+
+    [Fact]
     public void GetClassifiedTokens_PreceptName_IsPreceptMessage()
     {
         const string dsl = """
