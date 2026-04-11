@@ -93,6 +93,10 @@ public class CatalogDriftTests
             "transition-row" =>
                 $"{header}\n{string.Join("\n", states)}\nevent Submit\n{construct.Example}",
 
+            "round-function" =>
+                // round() needs a decimal field and an event to be valid in a transition context
+                $"{header}\nfield Rate as decimal default 0.0\n{string.Join("\n", states)}\nevent Apply with Amount as number\n{construct.Example}",
+
             _ =>
                 // Generic fallback: include everything
                 $"{header}\n{string.Join("\n", fields)}\n{string.Join("\n", states)}\n{string.Join("\n", events)}\n{construct.Example}"

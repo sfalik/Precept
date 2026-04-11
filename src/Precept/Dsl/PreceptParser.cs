@@ -304,10 +304,10 @@ public static class PreceptParser
         .Try()
         .Register(new ConstructInfo(
             "round-function",
-            "round(<Expr>, <N>)",
+            "round (<Expr>, <N>)",
             "expression",
             "Rounds a decimal expression to N decimal places (banker's rounding). Valid in set RHS and invariant/assert expressions.",
-            "set Total = round(Amount * Rate, 2)"));
+            "from Idle on Apply -> set Rate = round(Apply.Amount, 2) -> no transition"));
 
     private static readonly TokenListParser<PreceptToken, PreceptExpression> Atom =
         NumberAtom

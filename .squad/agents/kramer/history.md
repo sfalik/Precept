@@ -6,6 +6,15 @@
 
 ## Recent Updates
 
+### 2026-04-11 — Slices 4+5: Language Server completions + grammar (integer/decimal/choice)
+
+- Grammar (`precept.tmLanguage.json`): added `integer|decimal|choice` to `typeKeywords` alternation; added `maxplaces|ordered` to `constraintKeywords`; updated `fieldScalarDeclaration` regex capture group to include `integer|decimal` (choice falls through to generic patterns safely since its `(...)` args are already caught by the string literal pattern).
+- Completions (`PreceptAnalyzer.cs`): extended `TypeItems` with `integer` (TypeParameter), `decimal` (TypeParameter), and `choice(...)` snippet. Added `DecimalConstraintItems` (nonneg, pos, min, max, maxplaces snippet) and `ChoiceConstraintItems` (ordered). Added per-type branches for `nullable`, `default VALUE`, and "already has constraints" zones for integer and decimal. Added `choice(...)` base-type branch returning `[NullableItem, ..ChoiceConstraintItems]`. Added `round(expr, N)` snippet to `ExpressionOperatorItems` (appears in all expression positions — set RHS and guard).
+- Hover: verified automatic via `TokenDescription` attributes on `IntegerType`, `DecimalType`, `ChoiceType`, `Maxplaces`, `Ordered` — no handler changes needed.
+- Pre-existing catalog drift failures: `CatalogDriftTests.AllConstructExamples_ParseSuccessfully` and `SampleFiles_CoverAllConstructs` were ALREADY failing before this slice due to a `round-function` construct entry with a bad example. Confirmed by stash + test run.
+- Build: 0 errors. LanguageServer tests: 94/94 pass. Core tests: 743/745 (2 pre-existing catalog drift failures).
+- Key learning: `TypeItems` uses `SnippetItem()` for `choice(...)` because the type has required argument syntax — this correctly presents as a snippet, not a bare keyword. Constraint completions for `integer` can reuse `NumberConstraintItems` directly (they share nonneg/pos/min/max). The `fieldScalarDeclaration` grammar pattern uses a simple `|` alternation — `choice(...)` cannot fit there due to `(...)` syntax, and the task explicitly says no special named pattern is needed for it.
+
 ### 2026-04-05 - Comprehensive tooling knowledge refresh
 - Consolidated the current toolchain, build/test commands, and major extension/MCP/plugin responsibilities.
 - Key learning: the fastest tooling documentation win is precise, executable instructions with no stale paths.

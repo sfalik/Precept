@@ -16,13 +16,14 @@
 ### 2026-04-10 — Issue #31 shipped
 - PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
 
-### Issue #31 Slice 6 — Operator Inventory (2026-04-10)
+### Issue #27/#25/#29 Slice 6 — MCP Vocabulary + Spec (2026-04-11)
 
-- `LanguageTool.cs` is fully catalog-driven via `PreceptTokenMeta.GetSymbol(token)`. When George updates token symbols in `PreceptToken.cs`, the `precept_language` operator inventory updates automatically — no MCP code changes required.
-- The MCP tool layer had zero hardcoded DSL operator strings (verified `CompileTool.cs`, `InspectTool.cs`, `FireTool.cs`, `UpdateTool.cs`). The thin-wrapper rule held perfectly.
-- `docs/McpServerDesign.md` already used `and` in expression text examples — no doc changes needed.
-- Sync work for a George runtime change = add a regression test asserting the new contract; don't touch tool code.
-- New test pattern: `LogicalOperatorsAreKeywordForms` — assert specific operator symbols are present AND assert old symbolic forms are absent. Dual-assertion approach locks both sides of the rename.
+- `LanguageTool.cs` needed zero code changes for `integer`/`decimal`/`choice`/`maxplaces`/`ordered`. All five tokens already existed in `PreceptToken` with correct `TokenCategory` attributes — the catalog-driven vocabulary mechanism picked them up automatically.
+- `round()` is not a token (recognized by identifier name in the parser). Registered it in `ConstructCatalog` via `.Register(new ConstructInfo(...))` on the `RoundAtom` parser combinator so it surfaces in `precept_language.constructs`. This is the canonical pattern for non-keyword DSL constructs.
+- `CompileTool.cs` `FormatConstraint` had no `Maxplaces` case — it fell through to the catch-all `.GetType().Name.ToLowerInvariant()` producing `"maxplaces"` without the places value. Fixed to `$"maxplaces {m.Places}"` to match the constraint authoring syntax.
+- `FieldDto` and `EventArgDto` gained `ChoiceValues` (`IReadOnlyList<string>?`) and `IsOrdered` (`bool?`). Used nullable bool for `IsOrdered` so `false` is omitted from JSON output (only populated when true), keeping choice-less field output clean.
+- `McpServerDesign.md` was missing a `ConstraintKeywords` row entirely in the vocabulary table. Added it. Also added scalar type reference table, constraint reference table, and built-in function reference table for `round()`.
+- 9 new MCP tests added (65 total, 0 failed).
 
 
 ### MCP Tool Surface (5 Tools — Final Design)
