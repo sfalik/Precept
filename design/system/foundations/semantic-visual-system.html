@@ -113,12 +113,15 @@ body {
 .nav-item.active { color: var(--structure); }
 .nav-item--child {
   padding-left: 18px;
+  margin-left: 8px;
+  border-left: 1px solid rgba(255,255,255,0.08);
   font-size: 10px;
   letter-spacing: 0.08em;
   color: rgba(167,175,187,0.82);
 }
 .nav-item--child.active {
   color: var(--text);
+  border-left-color: rgba(99,102,241,0.42);
 }
 .nav-section-meta {
   font-size: 9px;
@@ -346,19 +349,58 @@ pre {
 .construct-gallery:last-of-type { border-bottom: none; }
 .construct-sidebar { position: sticky; top: 32px; }
 .construct-index {
-  font-size: 52px;
-  line-height: 1;
-  color: rgba(255,255,255,0.06);
-  margin-bottom: 12px;
+  display: none;
+}
+.construct-name,
+.section-subgroup-name {
   font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.05;
+  text-transform: uppercase;
 }
 .construct-name {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.20em;
-  text-transform: uppercase;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
+.section-subgroup {
+  display: grid;
+  grid-template-columns: 200px minmax(0,1fr);
+  gap: 40px;
+  align-items: start;
+  padding-top: 56px;
+  margin-top: 40px;
+  border-top: 1px solid var(--line);
+}
+.section-head + .section-subgroup {
+  margin-top: 24px;
+}
+.section-subgroup-sidebar {
+  position: sticky;
+  top: 32px;
+  display: grid;
+  gap: 12px;
+  padding-left: 16px;
+  border-left: 1px solid var(--line-strong);
+}
+.section-subgroup-index {
+  display: none;
+}
+.section-subgroup-name {
+  color: var(--text);
+}
+.section-subgroup-desc {
+  font-size: 14px;
+  line-height: 1.72;
+  color: var(--muted);
+  margin: 0;
+}
+.section-subgroup-body {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.section-subgroup-body > * { min-width: 0; }
 .construct-body { display: grid; gap: 32px; }
 .construct-specimen {
   border: 1px solid var(--line);
@@ -444,6 +486,9 @@ pre {
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
+}
+.surfaces-grid--single {
+  grid-template-columns: 1fr;
 }
 .surface-specimen {
   background: var(--panel);
@@ -540,13 +585,15 @@ pre {
   .nav-rail { display: none; }
   .page { margin-left: 0; padding: 0 24px 80px; }
   .intro-hero,
+  .section-subgroup,
   .construct-gallery,
   .channels-grid,
   .surfaces-grid,
   .cross-surface-strip,
   .verdict-strip { grid-template-columns: 1fr; }
   .concepts-grid { grid-template-columns: 1fr; }
-  .construct-sidebar { position: static; }
+  .construct-sidebar,
+  .section-subgroup-sidebar { position: static; }
 }
 </style>
 </head>
@@ -558,9 +605,6 @@ pre {
   <div class="nav-wordmark">Precept</div>
   <a class="nav-item active" href="#intro"     data-sec="intro">Intro</a>
   <a class="nav-item"        href="#concepts"  data-sec="concepts">Architecture</a>
-  <a class="nav-item nav-item--child" href="#architecture-identity" data-sec="architecture-identity">Identity</a>
-  <a class="nav-item nav-item--child" href="#architecture-registers" data-sec="architecture-registers">Registers</a>
-  <a class="nav-item nav-item--child" href="#architecture-channels" data-sec="architecture-channels">Channels</a>
   <a class="nav-item"        href="#typography" data-sec="typography">Typography</a>
   <a class="nav-item nav-item--child" href="#typography-roles" data-sec="typography-roles">Roles</a>
   <a class="nav-item nav-item--child" href="#typography-rules" data-sec="typography-rules">Rules</a>
@@ -574,18 +618,11 @@ pre {
   <a class="nav-item nav-item--child" href="#data-c"    data-sec="data-c">Data</a>
   <a class="nav-item nav-item--child" href="#rule"      data-sec="rule">Rule</a>
   <a class="nav-item"        href="#surfaces"  data-sec="surfaces">Surfaces</a>
-  <a class="nav-item nav-item--child" href="#surface-code" data-sec="surface-code">Code Window</a>
-  <a class="nav-item nav-item--child" href="#surface-diagram" data-sec="surface-diagram">State Diagram</a>
-  <a class="nav-item nav-item--child" href="#surface-form" data-sec="surface-form">Data Form</a>
-  <a class="nav-item nav-item--child" href="#surface-timeline" data-sec="surface-timeline">Timeline</a>
-  <a class="nav-item nav-item--child" href="#surface-guide" data-sec="surface-guide">Guide Page</a>
+  <a class="nav-item nav-item--child" href="#surface-operational" data-sec="surface-operational">Operational</a>
+  <a class="nav-item nav-item--child" href="#surface-editorial" data-sec="surface-editorial">Editorial</a>
   <a class="nav-item"        href="#docs"       data-sec="docs">Documentation</a>
-  <a class="nav-item nav-item--child" href="#docs-inline" data-sec="docs-inline">Inline References</a>
-  <a class="nav-item nav-item--child" href="#docs-pills" data-sec="docs-pills">Type Pills</a>
-  <a class="nav-item nav-item--child" href="#docs-reference" data-sec="docs-reference">Reference Table</a>
-  <a class="nav-item nav-item--child" href="#docs-code" data-sec="docs-code">Code Blocks</a>
-  <a class="nav-item nav-item--child" href="#docs-callouts" data-sec="docs-callouts">Callouts</a>
-  <a class="nav-item nav-item--child" href="#docs-chrome" data-sec="docs-chrome">Chrome Tokens</a>
+  <a class="nav-item nav-item--child" href="#docs-notation" data-sec="docs-notation">Notation</a>
+  <a class="nav-item nav-item--child" href="#docs-editorial" data-sec="docs-editorial">Editorial Blocks</a>
   <a class="nav-item nav-item--child" href="#docs-specimen" data-sec="docs-specimen">Page Specimen</a>
   <div class="nav-font-status" id="nav-font-status"></div>
 </nav>
@@ -951,7 +988,7 @@ pre {
     <div class="arch-diagram">
 
       <!-- Layer 1 · Constructs ─────────────────── -->
-      <div class="arch-layer toc-anchor" id="architecture-identity">
+      <div class="arch-layer">
         <div class="arch-layer-label">Identity <span>stable semantic type across all registers and surfaces</span></div>
         <div class="arch-constructs">
           <div class="arch-card" style="--card-color: var(--structure)">
@@ -983,7 +1020,7 @@ pre {
       </div>
 
       <!-- Layer 2 · Registers ──────────────────── -->
-      <div class="arch-layer toc-anchor" id="architecture-registers">
+      <div class="arch-layer">
         <div class="arch-layer-label">Registers <span>same five constructs, two depiction modes</span></div>
         <div class="arch-registers">
           <div class="arch-reg">
@@ -1023,9 +1060,8 @@ pre {
       </div>
 
       <!-- Layer 3 · Channels ──────────────────── -->
-      <div class="arch-layer toc-anchor" id="architecture-channels">
+      <div class="arch-layer">
         <div class="arch-layer-label">Channels <span>signal grammar spanning both registers</span></div>
-        <div class="arch-channels">
           <div class="arch-ch">
             <span class="arch-ch-num">01</span>
             <span class="arch-ch-name">Colour</span>
@@ -1035,7 +1071,6 @@ pre {
             <span class="arch-ch-num">02</span>
             <span class="arch-ch-name">Typography</span>
             <p class="arch-ch-note">Mono for all semantic names. Sans for prose and context. Weight and style carry constraint and modification status.</p>
-          </div>
           <div class="arch-ch">
             <span class="arch-ch-num">03</span>
             <span class="arch-ch-name">Form</span>
@@ -1045,7 +1080,6 @@ pre {
             <span class="arch-ch-num">04</span>
             <span class="arch-ch-name">Layout</span>
             <p class="arch-ch-note">Adjacency, ordering, and depth encode relationship, sequence, and structural hierarchy across all surfaces.</p>
-          </div>
         </div>
       </div>
 
@@ -1055,7 +1089,6 @@ pre {
   <!-- Concept definitions ─────────────────────── -->
   <div class="cov-concepts">
 
-    <!-- Foundation concept -->
     <div class="cov-concept cov-concept--foundation">
       <div class="cov-concept-left">
         <span class="cov-concept-role">Foundation</span>
@@ -1065,7 +1098,6 @@ pre {
         <p>Each construct carries a stable type classification that persists regardless of surface. Structure is always indigo, State always violet, Event always cyan, Data always steel, Rule always amber. Moving from code editor to diagram to data form to timeline, the same construct speaks in the same visual register&thinsp;—&thinsp;the medium adapts, the identity does not.</p>
       </div>
     </div>
-
     <!-- Derived concepts -->
     <div class="cov-concepts-derived">
       <div class="cov-concept">
@@ -1085,7 +1117,6 @@ pre {
   </div>
 
 </section>
-<!-- 03 · TYPOGRAPHY                               -->
 <!-- ═══════════════════════════════════════════════════ -->
 <style>
 /* ── 03 Typography ───────────────────────────── */
@@ -1093,9 +1124,6 @@ pre {
   border: 1px solid var(--line);
   background: var(--panel);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
-}
-.typography-band + .typography-band {
-  margin-top: 12px;
 }
 .typography-band--rules {
   background: var(--panel-2);
@@ -1420,162 +1448,180 @@ pre {
     <p>Typography governs how identity, prose, and semantic pressure are read across all five constructs. Geist Mono carries structural identity. Geist carries reading prose. No serifs. Italic marks semantic pressure, not emphasis.</p>
   </div>
 
-  <div class="typography-band toc-anchor" id="typography-roles">
-    <div class="typography-kicker">Primary split</div>
-    <div class="typography-header">
-      <div>
-        <h3>Type separates authored identity from reading voice.</h3>
-        <p>Typography in Precept is not a styling layer. It divides structural naming from explanatory reading, then reserves a third move for semantic pressure. The section needs to read as a system of roles, not a list of font choices.</p>
-      </div>
-      <div class="typography-summary" aria-label="Typography system summary">
-        <div class="typography-summary-item">
-          <span>Structural face</span>
-          <strong>Geist Mono</strong>
-          <small>wordmark · headings · labels · tokens · code specimens</small>
-        </div>
-        <div class="typography-summary-item">
-          <span>Reading face</span>
-          <strong>Geist</strong>
-          <small>body copy · concept prose · surface notes · long reading</small>
-        </div>
-        <div class="typography-summary-item">
-          <span>Reserved signal</span>
-          <strong>Italic</strong>
-          <small>semantic pressure only, never generic emphasis or flourish</small>
-        </div>
-      </div>
+  <div class="section-subgroup toc-anchor" id="typography-roles">
+    <div class="section-subgroup-sidebar">
+      <div class="section-subgroup-index">01</div>
+      <div class="section-subgroup-name">Roles</div>
+      <p class="section-subgroup-desc">Typography has three jobs here: authored identity, reading voice, and semantic pressure. The split only works if each role stays narrow.</p>
     </div>
-
-    <div class="typography-stage">
-      <article class="typography-card typography-card--mono">
-        <div class="typography-card-head">
-          <div class="typography-card-kicker">Identity register</div>
-          <h3>Geist Mono — identity &amp; structure</h3>
-        </div>
-        <p>Used for: wordmark, section headings, labels, chips, nav, construct names, table headers, eyebrows, inline tokens, and all code specimens. Geist Mono is the face of governed structure. When text needs to read as authored or systematic, it is in Geist Mono.</p>
-        <div class="typography-specimen">
-          <div class="typography-specimen-bar">
-            <span>Display lockup</span>
-            <span>hero · headings · tokens</span>
+    <div class="section-subgroup-body">
+      <div class="typography-band">
+        <div class="typography-kicker">Primary split</div>
+        <div class="typography-header">
+          <div>
+            <h3>Type separates authored identity from reading voice.</h3>
+            <p>Typography in Precept is not a styling layer. It divides structural naming from explanatory reading, then reserves a third move for semantic pressure. The section needs to read as a system of roles, not a list of font choices.</p>
           </div>
-          <div class="typography-wordmark-display">Precept</div>
-          <div class="typography-mono-subtitle">Semantic Visual System</div>
-          <div class="typography-construct-line">Structure · State · Event · Data · Rule</div>
-        </div>
-      </article>
-
-      <article class="typography-card typography-card--sans">
-        <div class="typography-card-head">
-          <div class="typography-card-kicker">Reading register</div>
-          <h3>Geist — reading prose</h3>
-        </div>
-        <p>Used for: body paragraphs, concept descriptions, surface notes, and any text longer than a label that needs sustained reading. Geist sits beside Geist Mono without competing. Segoe UI Variable and Segoe UI are the system fallbacks on Windows.</p>
-        <div class="typography-specimen">
-          <div class="typography-specimen-bar">
-            <span>Reading sample</span>
-            <span>body · notes · explanation</span>
-          </div>
-          <div class="typography-prose-sample">Precept governs the integrity of a business entity's data across its lifecycle. The semantic visual system governs how that governance is communicated on screen.</div>
-        </div>
-      </article>
-
-      <article class="typography-card typography-card--wordmark">
-        <div class="typography-card-head">
-          <div class="typography-card-kicker">Display scarcity</div>
-          <h3>Wordmark treatment</h3>
-        </div>
-        <p>The identity display — <span class="typography-wordmark-hero">Precept</span> in Geist Mono small caps — is reserved for the hero moment and deliberate brand callouts. Inline prose uses plain title case. Nav and labels are already all-caps mono and need no additional treatment. Scarcity is what makes the wordmark land.</p>
-        <div class="typography-specimen typography-specimen--tight">
-          <div class="typography-specimen-bar">
-            <span>Usage contrast</span>
-            <span>hero vs inline</span>
-          </div>
-          <div class="typography-wordmark-stack">
-            <div class="typography-compare-row">
-              <div class="typography-inline-label">Hero callout</div>
-              <div class="typography-wordmark-hero">Precept</div>
+          <div class="typography-summary" aria-label="Typography system summary">
+            <div class="typography-summary-item">
+              <span>Structural face</span>
+              <strong>Geist Mono</strong>
+              <small>wordmark · headings · labels · tokens · code specimens</small>
             </div>
-            <div class="typography-compare-row">
-              <div class="typography-inline-label">Inline prose</div>
-              <div class="typography-inline-name">Precept stays plain title case inside reading copy.</div>
+            <div class="typography-summary-item">
+              <span>Reading face</span>
+              <strong>Geist</strong>
+              <small>body copy · concept prose · surface notes · long reading</small>
+            </div>
+            <div class="typography-summary-item">
+              <span>Reserved signal</span>
+              <strong>Italic</strong>
+              <small>semantic pressure only, never generic emphasis or flourish</small>
             </div>
           </div>
         </div>
-      </article>
 
-      <article class="typography-card typography-card--pressure">
-        <div class="typography-card-head">
-          <div class="typography-card-kicker">Constraint signal</div>
-          <h3>Italic — semantic pressure only</h3>
+        <div class="typography-stage">
+          <article class="typography-card typography-card--mono">
+            <div class="typography-card-head">
+              <div class="typography-card-kicker">Identity register</div>
+              <h3>Geist Mono — identity &amp; structure</h3>
+            </div>
+            <p>Used for: wordmark, section headings, labels, chips, nav, construct names, table headers, eyebrows, inline tokens, and all code specimens. Geist Mono is the face of governed structure. When text needs to read as authored or systematic, it is in Geist Mono.</p>
+            <div class="typography-specimen">
+              <div class="typography-specimen-bar">
+                <span>Display lockup</span>
+                <span>hero · headings · tokens</span>
+              </div>
+              <div class="typography-wordmark-display">Precept</div>
+              <div class="typography-mono-subtitle">Semantic Visual System</div>
+              <div class="typography-construct-line">Structure · State · Event · Data · Rule</div>
+            </div>
+          </article>
+
+          <article class="typography-card typography-card--sans">
+            <div class="typography-card-head">
+              <div class="typography-card-kicker">Reading register</div>
+              <h3>Geist — reading prose</h3>
+            </div>
+            <p>Used for: body paragraphs, concept descriptions, surface notes, and any text longer than a label that needs sustained reading. Geist sits beside Geist Mono without competing. Segoe UI Variable and Segoe UI are the system fallbacks on Windows.</p>
+            <div class="typography-specimen">
+              <div class="typography-specimen-bar">
+                <span>Reading sample</span>
+                <span>body · notes · explanation</span>
+              </div>
+              <div class="typography-prose-sample">Precept governs the integrity of a business entity's data across its lifecycle. The semantic visual system governs how that governance is communicated on screen.</div>
+            </div>
+          </article>
+
+          <article class="typography-card typography-card--wordmark">
+            <div class="typography-card-head">
+              <div class="typography-card-kicker">Display scarcity</div>
+              <h3>Wordmark treatment</h3>
+            </div>
+            <p>The identity display — <span class="typography-wordmark-hero">Precept</span> in Geist Mono small caps — is reserved for the hero moment and deliberate brand callouts. Inline prose uses plain title case. Nav and labels are already all-caps mono and need no additional treatment. Scarcity is what makes the wordmark land.</p>
+            <div class="typography-specimen typography-specimen--tight">
+              <div class="typography-specimen-bar">
+                <span>Usage contrast</span>
+                <span>hero vs inline</span>
+              </div>
+              <div class="typography-wordmark-stack">
+                <div class="typography-compare-row">
+                  <div class="typography-inline-label">Hero callout</div>
+                  <div class="typography-wordmark-hero">Precept</div>
+                </div>
+                <div class="typography-compare-row">
+                  <div class="typography-inline-label">Inline prose</div>
+                  <div class="typography-inline-name">Precept stays plain title case inside reading copy.</div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="typography-card typography-card--pressure">
+            <div class="typography-card-head">
+              <div class="typography-card-kicker">Constraint signal</div>
+              <h3>Italic — semantic pressure only</h3>
+            </div>
+            <p>Italic belongs to constrained states, constrained events, invariant-guarded data names, and rule-adjacent annotation in code specimens. It marks that something is under explicit rule attention. It is not used for general emphasis, decorative headings, or editorial flourish. If a reader cannot trust italic to mean pressure, the second semantic channel has been wasted.</p>
+            <div class="typography-specimen">
+              <div class="typography-specimen-bar">
+                <span>Pressure markers</span>
+                <span>same family · italic only</span>
+              </div>
+              <div class="typography-pressure-row">
+                <span class="typography-token typography-token--state">Approved</span>
+                <span class="typography-token typography-token--event">Submit</span>
+                <span class="typography-token typography-token--data">PolicyHolder</span>
+                <span class="typography-token typography-token--annotation"># review required above 50k</span>
+              </div>
+              <div class="typography-pressure-note">Pressure is additive. The construct keeps its family; italic reports rule attention without inventing a second lane.</div>
+            </div>
+          </article>
         </div>
-        <p>Italic belongs to constrained states, constrained events, invariant-guarded data names, and rule-adjacent annotation in code specimens. It marks that something is under explicit rule attention. It is not used for general emphasis, decorative headings, or editorial flourish. If a reader cannot trust italic to mean pressure, the second semantic channel has been wasted.</p>
-        <div class="typography-specimen">
-          <div class="typography-specimen-bar">
-            <span>Pressure markers</span>
-            <span>same family · italic only</span>
-          </div>
-          <div class="typography-pressure-row">
-            <span class="typography-token typography-token--state">Approved</span>
-            <span class="typography-token typography-token--event">Submit</span>
-            <span class="typography-token typography-token--data">PolicyHolder</span>
-            <span class="typography-token typography-token--annotation"># review required above 50k</span>
-          </div>
-          <div class="typography-pressure-note">Pressure is additive. The construct keeps its family; italic reports rule attention without inventing a second lane.</div>
-        </div>
-      </article>
+      </div>
     </div>
   </div>
 
-  <div class="typography-band typography-band--rules toc-anchor" id="typography-rules">
-    <div class="typography-kicker">Discipline</div>
-    <div class="typography-rules-head">
-      <div>
-        <h3>Rules keep the split legible.</h3>
-        <p>Typography only works as a semantic channel if each move stays narrow and repeatable. These rules preserve the distinction between governing language, explanatory prose, and pressure states.</p>
-      </div>
-      <div class="typography-summary" aria-label="Typography rule summary">
-        <div class="typography-summary-item">
-          <span>Do not mix</span>
-          <strong>Mono / Sans</strong>
-          <small>naming and prose stay in separate roles</small>
-        </div>
-        <div class="typography-summary-item">
-          <span>Do not decorate</span>
-          <strong>Italic</strong>
-          <small>reserved for semantic pressure and constraint attention</small>
-        </div>
-      </div>
+  <div class="section-subgroup toc-anchor" id="typography-rules">
+    <div class="section-subgroup-sidebar">
+      <div class="section-subgroup-index">02</div>
+      <div class="section-subgroup-name">Rules</div>
+      <p class="section-subgroup-desc">The channel stays trustworthy only if type is disciplined. These rules stop typography from turning into generic emphasis.</p>
     </div>
-
-    <div class="typography-rules-grid">
-      <div class="typography-rule-card typography-rule-card--compact">
-        <span class="typography-rule-label">Rule</span>
-        <h3>No serifs.</h3>
-        <p>Ever. The posture of this document and of Precept's surfaces is architectural, not editorial. Serifs are not part of the system.</p>
-      </div>
-      <div class="typography-rule-card typography-rule-card--compact">
-        <span class="typography-rule-label">Rule</span>
-        <h3>Mono for everything structural.</h3>
-        <p>If it governs, labels, names, or identifies — it is in Geist Mono. This includes headings. Geist Mono at display size reads as specification, not decoration.</p>
-      </div>
-      <div class="typography-rule-card typography-rule-card--compact">
-        <span class="typography-rule-label">Rule</span>
-        <h3>Governing keywords are bold.</h3>
-        <p>Semantic indigo keywords render at font-weight 700. Grammar indigo stays normal for connective tokens and logical operators. Color identifies the family; weight distinguishes governing keywords from connective grammar.</p>
-        <div class="typography-keyword-sample">
-          <span class="typography-keywords">precept field state event from on set transition assert reject when</span>
-          <span class="typography-keywords-soft">as default == and or not</span>
+    <div class="section-subgroup-body">
+      <div class="typography-band typography-band--rules">
+        <div class="typography-kicker">Discipline</div>
+        <div class="typography-rules-head">
+          <div>
+            <h3>Rules keep the split legible.</h3>
+            <p>Typography only works as a semantic channel if each move stays narrow and repeatable. These rules preserve the distinction between governing language, explanatory prose, and pressure states.</p>
+          </div>
+          <div class="typography-summary" aria-label="Typography rule summary">
+            <div class="typography-summary-item">
+              <span>Do not mix</span>
+              <strong>Mono / Sans</strong>
+              <small>naming and prose stay in separate roles</small>
+            </div>
+            <div class="typography-summary-item">
+              <span>Do not decorate</span>
+              <strong>Italic</strong>
+              <small>reserved for semantic pressure and constraint attention</small>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="typography-rule-card typography-rule-card--wide">
-        <span class="typography-rule-label">Rule</span>
-        <h3>Sans for reading prose.</h3>
-        <p>Geist carries paragraphs. It does not appear in identity positions, labels, or code. The split is strict. Mono names and governs; sans explains.</p>
-      </div>
-      <div class="typography-rule-card typography-rule-card--wide">
-        <span class="typography-rule-label">Rule</span>
-        <h3>Italic means pressure.</h3>
-        <p>Not emphasis. Not decoration. Italic communicates that a construct is under rule attention. Spend it only where that meaning is true.</p>
+
+        <div class="typography-rules-grid">
+          <div class="typography-rule-card typography-rule-card--compact">
+            <span class="typography-rule-label">Rule</span>
+            <h3>No serifs.</h3>
+            <p>Ever. The posture of this document and of Precept's surfaces is architectural, not editorial. Serifs are not part of the system.</p>
+          </div>
+          <div class="typography-rule-card typography-rule-card--compact">
+            <span class="typography-rule-label">Rule</span>
+            <h3>Mono for everything structural.</h3>
+            <p>If it governs, labels, names, or identifies — it is in Geist Mono. This includes headings. Geist Mono at display size reads as specification, not decoration.</p>
+          </div>
+          <div class="typography-rule-card typography-rule-card--compact">
+            <span class="typography-rule-label">Rule</span>
+            <h3>Governing keywords are bold.</h3>
+            <p>Semantic indigo keywords render at font-weight 700. Grammar indigo stays normal for connective tokens and logical operators. Color identifies the family; weight distinguishes governing keywords from connective grammar.</p>
+            <div class="typography-keyword-sample">
+              <span class="typography-keywords">precept field state event from on set transition assert reject when</span>
+              <span class="typography-keywords-soft">as default == and or not</span>
+            </div>
+          </div>
+          <div class="typography-rule-card typography-rule-card--wide">
+            <span class="typography-rule-label">Rule</span>
+            <h3>Sans for reading prose.</h3>
+            <p>Geist carries paragraphs. It does not appear in identity positions, labels, or code. The split is strict. Mono names and governs; sans explains.</p>
+          </div>
+          <div class="typography-rule-card typography-rule-card--wide">
+            <span class="typography-rule-label">Rule</span>
+            <h3>Italic means pressure.</h3>
+            <p>Not emphasis. Not decoration. Italic communicates that a construct is under rule attention. Spend it only where that meaning is true.</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -2182,33 +2228,40 @@ pre {
     <p>Color defines how authored meaning stays grouped into five families. Structure and Data keep their tonal variants nested inside the parent family. Comments sit in an annotation lane. Runtime verdicts sit in a separate evaluation register. Chrome/support scaffolds the surface around them without becoming a sixth family.</p>
   </div>
 
-  <div class="color-system-band color-system-band--semantic toc-anchor" id="color-families">
-    <div class="color-system-kicker">Primary meaning</div>
-    <div class="color-system-header">
-      <div>
-        <h3>Semantic families are the first read.</h3>
-        <p>Lead with five grouped families, not a run of eight peers. Secondary tones stay physically nested inside Structure and Data so the model reads as authored identity first, tonal nuance second.</p>
-      </div>
-      <div class="color-system-summary" aria-label="Color system summary">
-        <div class="color-system-summary-item">
-          <span>Primary groups</span>
-          <strong>5 families</strong>
-          <small>Structure · State · Event · Data · Rule</small>
-        </div>
-        <div class="color-system-summary-item">
-          <span>Authored shades</span>
-          <strong>8 tones</strong>
-          <small>Five anchors plus three nested within-family variants</small>
-        </div>
-        <div class="color-system-summary-item">
-          <span>Separate lanes</span>
-          <strong>3 outer layers</strong>
-          <small>Annotation · Runtime verdicts · Chrome/support</small>
-        </div>
-      </div>
+  <div class="section-subgroup toc-anchor" id="color-families">
+    <div class="section-subgroup-sidebar">
+      <div class="section-subgroup-index">01</div>
+      <div class="section-subgroup-name">Families</div>
+      <p class="section-subgroup-desc">Authored meaning should read as five grouped families, not a pile of unrelated swatches. Tonal nuance stays nested under the family that owns it.</p>
     </div>
+    <div class="section-subgroup-body">
+      <div class="color-system-band color-system-band--semantic">
+        <div class="color-system-kicker">Primary meaning</div>
+        <div class="color-system-header">
+          <div>
+            <h3>Semantic families are the first read.</h3>
+            <p>Lead with five grouped families, not a run of eight peers. Secondary tones stay physically nested inside Structure and Data so the model reads as authored identity first, tonal nuance second.</p>
+          </div>
+          <div class="color-system-summary" aria-label="Color system summary">
+            <div class="color-system-summary-item">
+              <span>Primary groups</span>
+              <strong>5 families</strong>
+              <small>Structure · State · Event · Data · Rule</small>
+            </div>
+            <div class="color-system-summary-item">
+              <span>Authored shades</span>
+              <strong>8 tones</strong>
+              <small>Five anchors plus three nested within-family variants</small>
+            </div>
+            <div class="color-system-summary-item">
+              <span>Separate lanes</span>
+              <strong>3 outer layers</strong>
+              <small>Annotation · Runtime verdicts · Chrome/support</small>
+            </div>
+          </div>
+        </div>
 
-    <div class="color-stage-grid" aria-label="Five semantic color families">
+        <div class="color-stage-grid" aria-label="Five semantic color families">
       <div class="semantic-family-card semantic-family-card--structure">
         <div class="semantic-family-card__head">
           <div>
@@ -2330,99 +2383,109 @@ pre {
           <span class="semantic-family-usage-subtle">the explanation is warm; enforcement keywords stay in Structure</span>
         </div>
       </div>
-    </div>
-  </div>
-
-  <div class="color-system-bridge toc-anchor" id="color-outer-lanes">
-    <div class="color-system-kicker">Outside authored identity</div>
-    <p>Comments annotate authored content. Verdicts report runtime evaluation. Chrome/support holds the surface together. Each lane is adjacent to the semantic families, but none of them rewrite or expand the family model.</p>
-  </div>
-
-  <div class="color-lane-grid">
-    <div class="color-lane">
-      <div class="color-lane-label">Annotation lane</div>
-      <h3>Comments</h3>
-      <p>Editorial annotation inside authored content. Subdued, italic, and separate from both semantic families and generic chrome.</p>
-      <div class="annotation-tone">
-        <div>Annotation tone</div>
-        <strong>#9096A6</strong>
-        <div>italic sideband context</div>
-      </div>
-    </div>
-
-    <div class="color-lane">
-      <div class="color-lane-label">Runtime register</div>
-      <h3>Engine verdicts</h3>
-      <p>Verdict hues answer what the engine just concluded. They overlay runtime surfaces only and never enter syntax or authored identity.</p>
-      <div class="verdict-register" aria-label="Runtime verdict register">
-        <div class="verdict-register-item" style="--verdict:#34D399;--verdict-soft:rgba(52,211,153,0.56);--verdict-bg:rgba(52,211,153,0.06)">
-          <span>Allowed</span>
-          <strong>#34D399</strong>
-          <em>runtime only</em>
-        </div>
-        <div class="verdict-register-item" style="--verdict:#F87171;--verdict-soft:rgba(248,113,113,0.56);--verdict-bg:rgba(248,113,113,0.06)">
-          <span>Blocked</span>
-          <strong>#F87171</strong>
-          <em>runtime only</em>
-        </div>
-        <div class="verdict-register-item" style="--verdict:#FDE047;--verdict-soft:rgba(253,224,71,0.56);--verdict-bg:rgba(253,224,71,0.06)">
-          <span>Warning</span>
-          <strong>#FDE047</strong>
-          <em>runtime only</em>
-        </div>
-      </div>
-    </div>
-
-    <div class="color-lane">
-      <div class="color-lane-label">Support layer</div>
-      <h3>Chrome / support</h3>
-      <p>Canvas, panels, text, and dividers hold the surface together. Their palette is complementary infrastructure, not semantic meaning.</p>
-      <div class="support-token-stack" aria-label="Chrome and support tokens">
-        <div class="support-token">
-          <span class="support-token-swatch" style="--swatch:var(--bg)"></span>
-          <span class="support-token-name">Canvas</span>
-          <span class="support-token-value">#040506</span>
-        </div>
-        <div class="support-token">
-          <span class="support-token-swatch" style="--swatch:var(--panel)"></span>
-          <span class="support-token-name">Panel</span>
-          <span class="support-token-value">#090B0E</span>
-        </div>
-        <div class="support-token">
-          <span class="support-token-swatch" style="--swatch:var(--muted)"></span>
-          <span class="support-token-name">Reading text</span>
-          <span class="support-token-value">#A7AFBB</span>
-        </div>
-        <div class="support-token">
-          <span class="support-token-swatch" style="--swatch:var(--line)"></span>
-          <span class="support-token-name">Divider</span>
-          <span class="support-token-value">line token</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Rule channels -->
-  <div class="channels-grid" style="margin-top:1px">
-    <div class="channel">
-      <span class="channel-name">Rule</span>
-      <h3>Every color has a fixed meaning.</h3>
-      <p>Nothing is aesthetic. If a new surface uses color, it must map to an existing semantic family. Local tonal variants may clarify hierarchy inside a family, but they do not create new semantic lanes. Decorative use of any palette color corrupts the signal.</p>
+  <div class="section-subgroup toc-anchor" id="color-outer-lanes">
+    <div class="section-subgroup-sidebar">
+      <div class="section-subgroup-index">02</div>
+      <div class="section-subgroup-name">Outer Lanes</div>
+      <p class="section-subgroup-desc">Annotation, runtime verdicts, and support chrome sit beside authored identity. They clarify the system without expanding the family model.</p>
     </div>
-    <div class="channel">
-      <span class="channel-name">Rule</span>
-      <h3>Color says kind. Italic says constrained.</h3>
-      <p>Constraint pressure is expressed through typography, not extra hues. Constrained states, events, and guarded fields are italic within their own family color — same hue, italic only.</p>
-    </div>
-    <div class="channel">
-      <span class="channel-name">Rule</span>
-      <h3>Verdicts are runtime only.</h3>
-      <p>Emerald, coral, and yellow appear only when the engine has evaluated something. They are never used in static surfaces, syntax highlighting, or any authoring-time annotation.</p>
-    </div>
-    <div class="channel">
-      <span class="channel-name">Rule</span>
-      <h3>Comments are outside the palette.</h3>
-      <p>Dusk #9096A6 in italic keeps comments legible but structurally separate from the five semantic families. Never repurpose a family color for editorial annotation.</p>
+    <div class="section-subgroup-body">
+      <div class="color-system-bridge">
+        <div class="color-system-kicker">Outside authored identity</div>
+        <p>Comments annotate authored content. Verdicts report runtime evaluation. Chrome/support holds the surface together. Each lane is adjacent to the semantic families, but none of them rewrite or expand the family model.</p>
+      </div>
+
+      <div class="color-lane-grid">
+        <div class="color-lane">
+          <div class="color-lane-label">Annotation lane</div>
+          <h3>Comments</h3>
+          <p>Editorial annotation inside authored content. Subdued, italic, and separate from both semantic families and generic chrome.</p>
+          <div class="annotation-tone">
+            <div>Annotation tone</div>
+            <strong>#9096A6</strong>
+            <div>italic sideband context</div>
+          </div>
+        </div>
+
+        <div class="color-lane">
+          <div class="color-lane-label">Runtime register</div>
+          <h3>Engine verdicts</h3>
+          <p>Verdict hues answer what the engine just concluded. They overlay runtime surfaces only and never enter syntax or authored identity.</p>
+          <div class="verdict-register" aria-label="Runtime verdict register">
+            <div class="verdict-register-item" style="--verdict:#34D399;--verdict-soft:rgba(52,211,153,0.56);--verdict-bg:rgba(52,211,153,0.06)">
+              <span>Allowed</span>
+              <strong>#34D399</strong>
+              <em>runtime only</em>
+            </div>
+            <div class="verdict-register-item" style="--verdict:#F87171;--verdict-soft:rgba(248,113,113,0.56);--verdict-bg:rgba(248,113,113,0.06)">
+              <span>Blocked</span>
+              <strong>#F87171</strong>
+              <em>runtime only</em>
+            </div>
+            <div class="verdict-register-item" style="--verdict:#FDE047;--verdict-soft:rgba(253,224,71,0.56);--verdict-bg:rgba(253,224,71,0.06)">
+              <span>Warning</span>
+              <strong>#FDE047</strong>
+              <em>runtime only</em>
+            </div>
+          </div>
+        </div>
+
+        <div class="color-lane">
+          <div class="color-lane-label">Support layer</div>
+          <h3>Chrome / support</h3>
+          <p>Canvas, panels, text, and dividers hold the surface together. Their palette is complementary infrastructure, not semantic meaning.</p>
+          <div class="support-token-stack" aria-label="Chrome and support tokens">
+            <div class="support-token">
+              <span class="support-token-swatch" style="--swatch:var(--bg)"></span>
+              <span class="support-token-name">Canvas</span>
+              <span class="support-token-value">#040506</span>
+            </div>
+            <div class="support-token">
+              <span class="support-token-swatch" style="--swatch:var(--panel)"></span>
+              <span class="support-token-name">Panel</span>
+              <span class="support-token-value">#090B0E</span>
+            </div>
+            <div class="support-token">
+              <span class="support-token-swatch" style="--swatch:var(--muted)"></span>
+              <span class="support-token-name">Reading text</span>
+              <span class="support-token-value">#A7AFBB</span>
+            </div>
+            <div class="support-token">
+              <span class="support-token-swatch" style="--swatch:var(--line)"></span>
+              <span class="support-token-name">Divider</span>
+              <span class="support-token-value">line token</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="channels-grid" style="margin-top:1px">
+        <div class="channel">
+          <span class="channel-name">Rule</span>
+          <h3>Every color has a fixed meaning.</h3>
+          <p>Nothing is aesthetic. If a new surface uses color, it must map to an existing semantic family. Local tonal variants may clarify hierarchy inside a family, but they do not create new semantic lanes. Decorative use of any palette color corrupts the signal.</p>
+        </div>
+        <div class="channel">
+          <span class="channel-name">Rule</span>
+          <h3>Color says kind. Italic says constrained.</h3>
+          <p>Constraint pressure is expressed through typography, not extra hues. Constrained states, events, and guarded fields are italic within their own family color — same hue, italic only.</p>
+        </div>
+        <div class="channel">
+          <span class="channel-name">Rule</span>
+          <h3>Verdicts are runtime only.</h3>
+          <p>Emerald, coral, and yellow appear only when the engine has evaluated something. They are never used in static surfaces, syntax highlighting, or any authoring-time annotation.</p>
+        </div>
+        <div class="channel">
+          <span class="channel-name">Rule</span>
+          <h3>Comments are outside the palette.</h3>
+          <p>Dusk #9096A6 in italic keeps comments legible but structurally separate from the five semantic families. Never repurpose a family color for editorial annotation.</p>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -2964,10 +3027,17 @@ pre {
     <p>These are representative rendered surfaces. Each one translates the same semantic vocabulary into a different operational or editorial context. The meaning stays fixed; the surface adapts to its job.</p>
   </div>
 
-  <div class="surfaces-grid">
+  <div class="section-subgroup toc-anchor" id="surface-operational">
+    <div class="section-subgroup-sidebar">
+      <div class="section-subgroup-index">01</div>
+      <div class="section-subgroup-name">Operational</div>
+      <p class="section-subgroup-desc">Authoring, inspection, editing, and runtime feedback all use the same vocabulary. The surface changes shape, but not meaning.</p>
+    </div>
+    <div class="section-subgroup-body">
+      <div class="surfaces-grid">
 
     <!-- Surface 01: Code Window -->
-    <div class="surface-specimen toc-anchor" id="surface-code">
+    <div class="surface-specimen">
       <div class="surface-label">Surface 01</div>
       <div class="surface-h3">Code Window</div>
       <p class="sf-note">Syntax highlighting renders the full semantic palette. Governing structure words and connective grammar share indigo, with bold reserved for structural drivers and normal weight used for operators like <span class="sg">and</span> / <span class="sg">or</span> / <span class="sg">not</span>. States stay violet. Events stay cyan. Data stays slate. Rule messages stay gold.</p>
@@ -2989,7 +3059,7 @@ pre {
     </div>
 
     <!-- Surface 02: State Diagram -->
-    <div class="surface-specimen toc-anchor" id="surface-diagram">
+    <div class="surface-specimen">
       <div class="surface-label">Surface 02</div>
       <div class="surface-h3">State Diagram</div>
       <p class="sf-note">Shape before colour. States are equal hard rectangles distinguished by role modifier — initial origin dot, terminal double border. Events label transition arrows.</p>
@@ -3011,7 +3081,7 @@ pre {
     </div>
 
     <!-- Surface 03: Data Form -->
-    <div class="surface-specimen toc-anchor" id="surface-form">
+    <div class="surface-specimen">
       <div class="surface-label">Surface 03</div>
       <div class="surface-h3">Data Form</div>
       <p class="sf-note">The data form composes structure sections, editable data fields, a state badge, and available event buttons into one governed interaction surface.</p>
@@ -3031,7 +3101,7 @@ pre {
     </div>
 
     <!-- Surface 04: Timeline -->
-    <div class="surface-specimen toc-anchor" id="surface-timeline">
+    <div class="surface-specimen">
       <div class="surface-label">Surface 04</div>
       <div class="surface-h3">Operation Timeline</div>
       <p class="sf-note">Timeline orders events chronologically. Each entry shows the event (cyan), the transition outcome (state colours), and any rule evaluation result.</p>
@@ -3054,8 +3124,19 @@ pre {
       </div>
     </div>
 
-    <!-- Surface 05: Docs -->
-    <div class="surface-specimen toc-anchor" id="surface-guide">
+      </div>
+    </div>
+  </div>
+
+  <div class="section-subgroup toc-anchor" id="surface-editorial">
+    <div class="section-subgroup-sidebar">
+      <div class="section-subgroup-index">02</div>
+      <div class="section-subgroup-name">Editorial</div>
+      <p class="section-subgroup-desc">Guide pages are still surfaces. They translate the same vocabulary for explanation and onboarding instead of direct interaction.</p>
+    </div>
+    <div class="section-subgroup-body">
+      <div class="surfaces-grid surfaces-grid--single">
+        <div class="surface-specimen">
       <div class="surface-label">Surface 05</div>
       <div class="surface-h3">Guide Page</div>
       <p class="sf-note">Editorial documentation is also a rendered surface. It uses the reading typeface for prose and mono for named constructs, with semantic colour in inline references and rule callouts.</p>
@@ -3065,6 +3146,8 @@ pre {
       <p style="font-size:14px;margin-top:10px">If either rule fails, the event is blocked and the entity remains in <span class="st">Draft</span>.</p>
     </div>
 
+      </div>
+    </div>
   </div>
 </section>
 
@@ -3627,8 +3710,16 @@ pre.doc-code-body {
     <p>This section defines documentation notation rather than documentation as a surface mockup. Construct names appear inline in prose, in comparison tables, and in annotated examples. These conventions keep semantic identity legible in text without requiring a rendered UI.</p>
   </div>
 
+  <div class="section-subgroup toc-anchor" id="docs-notation">
+    <div class="section-subgroup-sidebar">
+      <div class="section-subgroup-index">01</div>
+      <div class="section-subgroup-name">Notation</div>
+      <p class="section-subgroup-desc">Inline references, pills, and tables are the compact documentation forms. They keep construct identity legible inside prose-heavy material.</p>
+    </div>
+    <div class="section-subgroup-body">
+
   <!-- Inline references -->
-  <div class="cov-zone-hdr toc-anchor" id="docs-inline" style="border:1px solid var(--line-strong);border-bottom:none">
+  <div class="cov-zone-hdr" id="docs-inline" style="border:1px solid var(--line-strong);border-bottom:none">
     <span class="cov-z-label">Inline References</span>
     <span class="cov-z-note">construct names embedded in prose</span>
   </div>
@@ -3657,7 +3748,7 @@ pre.doc-code-body {
   </div>
 
   <!-- Pills -->
-  <div class="cov-zone-hdr toc-anchor" id="docs-pills" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+  <div class="cov-zone-hdr" id="docs-pills" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
     <span class="cov-z-label">Type Pills</span>
     <span class="cov-z-note">compact identity badges for tables and reference lists</span>
   </div>
@@ -3670,7 +3761,7 @@ pre.doc-code-body {
   </div>
 
   <!-- Reference table -->
-  <div class="cov-zone-hdr toc-anchor" id="docs-reference" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+  <div class="cov-zone-hdr" id="docs-reference" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
     <span class="cov-z-label">Reference Table</span>
     <span class="cov-z-note">anatomy of a construct reference row</span>
   </div>
@@ -3713,8 +3804,19 @@ pre.doc-code-body {
     </table>
   </div>
 
+    </div>
+  </div>
+
+  <div class="section-subgroup toc-anchor" id="docs-editorial">
+    <div class="section-subgroup-sidebar">
+      <div class="section-subgroup-index">02</div>
+      <div class="section-subgroup-name">Editorial Blocks</div>
+      <p class="section-subgroup-desc">Long-form docs need more than inline notation. Code, callouts, and support tokens carry the system into explanatory blocks and reading scaffolds.</p>
+    </div>
+    <div class="section-subgroup-body">
+
   <!-- Code blocks -->
-  <div class="cov-zone-hdr toc-anchor" id="docs-code" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+  <div class="cov-zone-hdr" id="docs-code" style="border:1px solid var(--line-strong);border-bottom:none">
     <span class="cov-z-label">Code Blocks</span>
     <span class="cov-z-note">DSL snippets as they appear in documentation</span>
   </div>
@@ -3738,7 +3840,7 @@ pre.doc-code-body {
   </div>
 
   <!-- Callouts -->
-  <div class="cov-zone-hdr toc-anchor" id="docs-callouts" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+  <div class="cov-zone-hdr" id="docs-callouts" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
     <span class="cov-z-label">Callouts</span>
     <span class="cov-z-note">notes, tips, cautions, and warnings</span>
   </div>
@@ -3774,7 +3876,7 @@ pre.doc-code-body {
   </div>
 
   <!-- Chrome tokens -->
-  <div class="cov-zone-hdr toc-anchor" id="docs-chrome" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+  <div class="cov-zone-hdr" id="docs-chrome" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
     <span class="cov-z-label">Chrome / Support Tokens</span>
     <span class="cov-z-note">separate support layer for text, surfaces, and line scaffolding</span>
   </div>
@@ -3826,8 +3928,19 @@ pre.doc-code-body {
     </div>
   </div>
 
+    </div>
+  </div>
+
+  <div class="section-subgroup toc-anchor" id="docs-specimen">
+    <div class="section-subgroup-sidebar">
+      <div class="section-subgroup-index">03</div>
+      <div class="section-subgroup-name">Page Specimen</div>
+      <p class="section-subgroup-desc">The full guide view shows how notation, prose, diagrams, callouts, and chrome combine inside an actual documentation page.</p>
+    </div>
+    <div class="section-subgroup-body">
+
   <!-- Page specimen -->
-  <div class="cov-zone-hdr toc-anchor" id="docs-specimen" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
+  <div class="cov-zone-hdr" style="border:1px solid var(--line-strong);border-bottom:none">
     <span class="cov-z-label">Page Specimen</span>
     <span class="cov-z-note">realistic docs page in context&thinsp;·&thinsp;headings, prose, diagram, lists, callout, code, table</span>
   </div>
@@ -4015,6 +4128,9 @@ pre.doc-code-body {
 
     </div><!-- /.doc-specimen-body -->
   </div><!-- /.doc-specimen-frame -->
+
+    </div>
+  </div>
 
 </section>
 
