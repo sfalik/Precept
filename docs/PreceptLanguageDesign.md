@@ -573,8 +573,10 @@ Constraint keywords may appear on field declarations and event argument declarat
 - **C62** — `choice` type declared with no members.
 - **C63** — `choice` type contains a duplicate member value.
 - **C64** — the declared `default` value is not in the `choice` member set.
-- **C65** — (reserved) ordinal comparison without `ordered` constraint; not yet emitted.
+- **C65** — Ordinal comparison operator (`<`, `<=`, `>`, `>=`) used on a `choice` field that lacks the `ordered` constraint.
 - **C66** — `ordered` constraint applied to a non-`choice` field.
+- **C67** — Ordinal comparison between two `choice` fields — ordinal rank is field-local and the two fields have independent orderings.
+- **C68** — Literal value assigned to a `choice` field (or added to a `choice` collection) is not a member of the declared value set.
 
 Examples:
 

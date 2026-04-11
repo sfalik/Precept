@@ -471,6 +471,72 @@ public class PreceptChoiceTypeTests
     }
 
     // ════════════════════════════════════════════════════════════════════
+    // RUNTIME — equality / inequality operators on choice fields
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Runtime_Choice_InequalityComparison_Works()
+    {
+        // != on a choice field: guard passes when values differ, fails when equal
+        const string dsl = """
+            precept M
+            field Status as choice("Open","Closed") default "Open"
+            state S initial
+            event Check
+            from S on Check when Status != "Closed" -> no transition
+            """;
+
+        var engine = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var inst = engine.CreateInstance();
+
+        // Status is "Open" (default); "Open" != "Closed" → guard matches
+        var fired = engine.Fire(inst, "Check");
+        fired.Outcome.Should().Be(TransitionOutcome.NoTransition,
+            because: "'Open' != 'Closed' is true — guard should match");
+
+        // Change Status to "Closed" via a separate set
+        const string setDsl = """
+            precept M
+            field Status as choice("Open","Closed") default "Open"
+            state S initial
+            event Close
+            event Check
+            from S on Close -> set Status = "Closed" -> no transition
+            from S on Check when Status != "Closed" -> no transition
+            """;
+        var engine2 = PreceptCompiler.Compile(PreceptParser.Parse(setDsl));
+        var inst2 = engine2.CreateInstance();
+        var afterClose = engine2.Fire(inst2, "Close");
+        var checked2 = engine2.Fire(afterClose.UpdatedInstance!, "Check");
+        checked2.Outcome.Should().Be(TransitionOutcome.Unmatched,
+            because: "'Closed' != 'Closed' is false — guard should not match");
+    }
+
+    [Fact]
+    public void Runtime_Choice_AddValidMember_Succeeds()
+    {
+        // Adding a valid choice member to a set of choice succeeds and the value is present
+        const string dsl = """
+            precept M
+            field Tags as set of choice("Alpha","Beta","Gamma")
+            state S initial
+            event Tag
+            from S on Tag -> add Tags "Beta" -> no transition
+            """;
+
+        var engine = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var inst = engine.CreateInstance();
+        var fired = engine.Fire(inst, "Tag");
+
+        fired.Outcome.Should().Be(TransitionOutcome.NoTransition,
+            because: "'Beta' is a valid member of choice('Alpha','Beta','Gamma')");
+        (fired.UpdatedInstance!.InstanceData["Tags"] as System.Collections.Generic.List<object>)
+            .Should().NotBeNull()
+            .And.Contain("Beta",
+            because: "the value should have been added to the collection");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
     // RUNTIME — ordinal comparison for ordered choice fields
     //
     // canonical set: choice("Low","Med","High") ordered
@@ -608,6 +674,38 @@ public class PreceptChoiceTypeTests
 
         fired.Outcome.Should().Be(TransitionOutcome.NoTransition,
             because: "'Med' (index 1) >= 'Med' (index 1)");
+    }
+
+    [Fact]
+    public void Runtime_OrderedChoice_LessThanOrEqual_MatchesByDeclarationOrder()
+    {
+        // "Med" <= "High" by declaration order (1 <= 2) → should match.
+        // Alphabetically: "Med" > "High" (M > H) → would NOT match (wrong).
+        // This case exposes the divergence between alphabetical and declaration order.
+        var engine = PreceptCompiler.Compile(PreceptParser.Parse("""
+            precept M
+            field Priority as choice("Low","Med","High") default "Low" ordered
+            state S initial
+            event SetPriority with Level as choice("Low","Med","High")
+            event CheckMedOrBelow
+            from S on SetPriority -> set Priority = SetPriority.Level -> no transition
+            from S on CheckMedOrBelow when Priority <= "High" -> no transition
+            """));
+
+        var inst = engine.CreateInstance();
+        var afterSet = engine.Fire(inst, "SetPriority", new Dictionary<string, object?> { ["Level"] = "Med" });
+
+        // Priority = "Med" → Med <= "High"?
+        // Declaration order: Med (1) <= High (2) → should MATCH.
+        // Alphabetical: "Med" > "High" (M > H) → would NOT match (wrong).
+        var fired = engine.Fire(afterSet.UpdatedInstance!, "CheckMedOrBelow");
+        fired.Outcome.Should().Be(TransitionOutcome.NoTransition,
+            because: "'Med' (index 1) <= 'High' (index 2) in declaration order");
+
+        // Also verify equal-rank case: Low <= Low → should match
+        var checkLow = engine.Fire(inst, "CheckMedOrBelow");
+        checkLow.Outcome.Should().Be(TransitionOutcome.NoTransition,
+            because: "'Low' (index 0) <= 'High' (index 2) — lower boundary also matches");
     }
 
     [Fact]

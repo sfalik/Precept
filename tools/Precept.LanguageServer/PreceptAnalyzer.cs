@@ -586,9 +586,19 @@ internal sealed class PreceptAnalyzer
             collectionKinds);
         var dataFieldNames = model.Fields.Select(static field => field.Name).ToHashSet(StringComparer.Ordinal);
 
-        return DistinctAndSort(baseline.Where(item =>
+        var filtered = baseline.Where(item =>
             item.Kind is CompletionItemKind.Operator or CompletionItemKind.Snippet ||
-            IsTypedExpressionCompletionItem(item, scope.Symbols, expectedKind, dataFieldNames, eventName, collectionKinds)));
+            IsTypedExpressionCompletionItem(item, scope.Symbols, expectedKind, dataFieldNames, eventName, collectionKinds));
+
+        // For choice fields, also offer the declared member values as string literal completions
+        if (target.Type == PreceptScalarType.Choice && target.ChoiceValues?.Count > 0)
+        {
+            var choiceLiterals = target.ChoiceValues.Select(static v =>
+                new CompletionItem { Label = $"\"{v}\"", Kind = CompletionItemKind.EnumMember, Detail = "choice value" });
+            return DistinctAndSort(filtered.Concat(choiceLiterals));
+        }
+
+        return DistinctAndSort(filtered);
     }
 
     private static IReadOnlyList<CompletionItem>? TryBuildTypedCollectionMutationExpressionCompletions(
@@ -642,9 +652,19 @@ internal sealed class PreceptAnalyzer
             collectionKinds);
         var dataFieldNames = model.Fields.Select(static field => field.Name).ToHashSet(StringComparer.Ordinal);
 
-        return DistinctAndSort(baseline.Where(item =>
+        var filtered = baseline.Where(item =>
             item.Kind is CompletionItemKind.Operator or CompletionItemKind.Snippet ||
-            IsTypedExpressionCompletionItem(item, scope.Symbols, expectedKind, dataFieldNames, eventName, collectionKinds)));
+            IsTypedExpressionCompletionItem(item, scope.Symbols, expectedKind, dataFieldNames, eventName, collectionKinds));
+
+        // For choice collections, also offer the declared member values as string literal completions
+        if (target.InnerType == PreceptScalarType.Choice && target.ChoiceValues?.Count > 0)
+        {
+            var choiceLiterals = target.ChoiceValues.Select(static v =>
+                new CompletionItem { Label = $"\"{v}\"", Kind = CompletionItemKind.EnumMember, Detail = "choice value" });
+            return DistinctAndSort(filtered.Concat(choiceLiterals));
+        }
+
+        return DistinctAndSort(filtered);
     }
 
     private static IReadOnlyList<CompletionItem>? TryBuildTypedDequeuePopIntoCompletions(

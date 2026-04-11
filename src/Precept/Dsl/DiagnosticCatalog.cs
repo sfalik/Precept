@@ -477,7 +477,7 @@ public static class DiagnosticCatalog
     public static readonly LanguageConstraint C60 = Register(
         "C60", "compile",
         "Narrowing assignment: cannot assign non-integer value to integer field without explicit conversion.",
-        "Narrowing assignment: cannot assign '{actual}' to integer field '{name}' without explicit conversion. Use truncate(), floor(), or ceil().");
+        "Narrowing assignment: cannot assign '{actual}' to integer field '{name}' without explicit conversion. An explicit integer conversion function is planned; see documentation.");
 
     /// <summary>'maxplaces' constraint applies only to decimal fields.</summary>
     public static readonly LanguageConstraint C61 = Register(

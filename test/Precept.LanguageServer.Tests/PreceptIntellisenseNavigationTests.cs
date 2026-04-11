@@ -33,6 +33,28 @@ public class PreceptIntellisenseNavigationTests
     }
 
     [Fact]
+    public void Hover_OrderedChoiceField_ShowsValuesAndOrderedMarker()
+    {
+        const string text = """
+            precept M
+            field Prior$$ity as choice("Low","Med","High") default "Low" ordered
+            state A initial
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var info = PreceptDocumentIntellisense.Analyze(code);
+
+        var hover = PreceptDocumentIntellisense.CreateHover(info, position);
+
+        hover.Should().NotBeNull();
+        hover!.Contents.ToString().Should().Contain("Priority");
+        hover.Contents.ToString().Should().Contain("ordered",
+            because: "the hover for an ordered choice field must surface the ordering flag");
+        hover.Contents.ToString().Should().ContainAny(new[] { "Low", "Med", "High" },
+            "the hover must show the declared choice value set");
+    }
+
+    [Fact]
     public void Hover_Keyword_ShowsConstructForm()
     {
         const string text = """

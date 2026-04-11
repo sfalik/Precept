@@ -17,8 +17,9 @@ internal static class PreceptDocumentIntellisense
     private static readonly Regex PreceptDeclRegex = new("^\\s*precept\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex StateDeclRegex = new("^\\s*state\\s+(?<rest>.+)$", RegexOptions.Compiled);
     private static readonly Regex EventDeclRegex = new("^\\s*event\\s+(?<rest>.+)$", RegexOptions.Compiled);
-    private static readonly Regex FieldDeclRegex = new("^\\s*field\\s+(?<rest>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?<type>string|number|boolean)(?:\\s|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex CollectionFieldDeclRegex = new("^\\s*field\\s+(?<rest>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?<kind>set|queue|stack)\\s+of\\s+(?<type>string|number|boolean)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex FieldDeclRegex = new("^\\s*field\\s+(?<rest>(?:[A-Za-z_]\\w*\\s*,\\s*)*[A-Za-z_]\\w*)\\s+as\\s+(?<type>string|number|boolean|integer|decimal)(?:\\s|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex ChoiceFieldDeclRegex = new("^\\s*field\\s+(?<rest>(?:[A-Za-z_]\\w*\\s*,\\s*)*[A-Za-z_]\\w*)\\s+as\\s+choice\\(", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex CollectionFieldDeclRegex = new("^\\s*field\\s+(?<rest>(?:[A-Za-z_]\\w*\\s*,\\s*)*[A-Za-z_]\\w*)\\s+as\\s+(?<kind>set|queue|stack)\\s+of\\s+(?<type>string|number|boolean|integer|decimal|choice)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EventWithArgsRegex = new("^\\s*event\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+with\\s+(?<args>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex IdentifierPattern = new("[A-Za-z_][A-Za-z0-9_]*", RegexOptions.Compiled);
     private static readonly HashSet<string> StateKeywords = new(StringComparer.Ordinal) { "initial" };
@@ -452,6 +453,30 @@ internal static class PreceptDocumentIntellisense
                 continue;
             }
 
+            var choiceFieldMatch = ChoiceFieldDeclRegex.Match(line);
+            if (choiceFieldMatch.Success)
+            {
+                var namesGroup = choiceFieldMatch.Groups["rest"];
+                foreach (Match nameMatch in IdentifierPattern.Matches(namesGroup.Value))
+                {
+                    var name = nameMatch.Value;
+                    fieldsByName.TryGetValue(name, out var field);
+                    var detail = field is not null ? FormatScalarFieldDetail(field) : "choice";
+                    var nameStart = namesGroup.Index + nameMatch.Index;
+                    var symbol = new PreceptDeclaredSymbol(
+                        name,
+                        PreceptDeclaredSymbolKind.Field,
+                        detail,
+                        CreateLineRange(lineIndex, line),
+                        CreateRange(lineIndex, nameStart, nameStart + name.Length),
+                        null,
+                        BuildFieldMarkdown(name, field));
+                    fields[name] = symbol;
+                    ordered.Add(symbol);
+                }
+                continue;
+            }
+
             var stateMatch = StateDeclRegex.Match(line);
             if (stateMatch.Success)
             {
@@ -664,12 +689,24 @@ internal static class PreceptDocumentIntellisense
         if (field is null)
             return $"```precept\nfield {name}\n```\n\nField declaration.";
 
+        var typeLabel = field.Type == PreceptScalarType.Choice && field.ChoiceValues?.Count > 0
+            ? $"choice({string.Join(", ", field.ChoiceValues.Select(v => $"\"{v}\""))})"
+            : FormatScalarType(field.Type, field.IsNullable);
+
+        var suffix = new System.Text.StringBuilder();
+        if (field.IsNullable) suffix.Append(" nullable");
+        if (field.IsOrdered) suffix.Append(" ordered");
+        if (field.HasDefaultValue) suffix.Append($" default {field.DefaultValue}");
+
         var lines = new List<string>
         {
-            $"```precept\nfield {name} as {FormatScalarType(field.Type, field.IsNullable)}{(field.HasDefaultValue ? $" default {field.DefaultValue}" : string.Empty)}\n```",
+            $"```precept\nfield {name} as {typeLabel}{suffix}\n```",
             string.Empty,
-            $"Type: `{FormatScalarType(field.Type, field.IsNullable)}`"
+            $"Type: `{typeLabel}`"
         };
+
+        if (field.IsOrdered)
+            lines.Add($"Ordered: values compare in declaration order");
 
         if (field.HasDefaultValue)
             lines.Add($"Default: `{field.DefaultValue ?? "null"}`");
