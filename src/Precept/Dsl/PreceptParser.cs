@@ -233,7 +233,13 @@ public static class PreceptParser
             .Then(id =>
                 Token.EqualTo(PreceptToken.Dot)
                     .IgnoreThen(Token.EqualTo(PreceptToken.Identifier))
-                    .Select(member => (PreceptExpression)new PreceptIdentifierExpression(id.ToText(), member.ToText()))
+                    .Then(member =>
+                        Token.EqualTo(PreceptToken.Dot)
+                            .IgnoreThen(Token.EqualTo(PreceptToken.Identifier))
+                            .Select(subMember => (PreceptExpression)new PreceptIdentifierExpression(id.ToText(), member.ToText(), subMember.ToText()))
+                        .Try()
+                        .Or(Superpower.Parse.Return<PreceptToken, PreceptExpression>(
+                            new PreceptIdentifierExpression(id.ToText(), member.ToText()))))
                 .Try()
                 .Or(Superpower.Parse.Return<PreceptToken, PreceptExpression>(
                     new PreceptIdentifierExpression(id.ToText()))));
@@ -553,7 +559,9 @@ public static class PreceptParser
                 string s => $"\"{s}\"",
                 _ => lit.Value.ToString() ?? "null"
             },
-            PreceptIdentifierExpression id => id.Member is not null ? $"{id.Name}.{id.Member}" : id.Name,
+            PreceptIdentifierExpression id => id.SubMember is not null
+                ? $"{id.Name}.{id.Member}.{id.SubMember}"
+                : id.Member is not null ? $"{id.Name}.{id.Member}" : id.Name,
             PreceptUnaryExpression un => $"{un.Operator}{ReconstituteExpr(un.Operand)}",
             PreceptBinaryExpression bin => $"{ReconstituteExpr(bin.Left)} {bin.Operator} {ReconstituteExpr(bin.Right)}",
             PreceptParenthesizedExpression paren => $"({ReconstituteExpr(paren.Inner)})",

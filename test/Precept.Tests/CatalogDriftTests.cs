@@ -342,6 +342,12 @@ public class CatalogDriftTests
     private const string S = "state A initial\n";
     private const string S2 = "state A initial\nstate B\n";
 
+    // AUTHORING NOTE: DSL rules for trigger entries
+    //   - Compile-phase constraints that fire in a `when` guard MUST use `-> no transition`
+    //     as the row target. Using `-> transition B` (where B is not declared) triggers C54
+    //     (undeclared state) before the intended constraint fires, masking the correct error.
+    //   - When adding a new compile-phase constraint, verify the trigger DSL produces ONLY
+    //     that constraint — run the entry in isolation and assert Diagnostics.Count == 1.
     private static readonly Dictionary<string, TriggerInput> ConstraintTriggers = new()
     {
         // ── Parse-phase (C1–C25) ──────────────────────────────────────
@@ -511,6 +517,9 @@ public class CatalogDriftTests
 
         // C55: Root-level edit with states declared
         ["C55"] = new(H + "field Priority as number default 1\n" + S + "edit Priority\n", "Root-level"),
+
+        // C56: .length on nullable string without null guard
+        ["C56"] = new(H + "field Note as string nullable\n" + S + "event Go\nfrom A on Go when Note.length > 0 -> no transition\n", "requires a null check"),
 
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 

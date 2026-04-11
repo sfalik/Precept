@@ -62,6 +62,13 @@
 - Build: 0 errors. Tests: 87/87 pass.
 - Commit: `8f3bdab` — "feat(#31): grammar and language server — and/or/not keywords (slice 5)"
 
+### 2026-04-10 — Issue #10: String `.length` completions + grammar (tooling slice)
+
+- Completions (`PreceptAnalyzer.cs`): added string member branch inside the existing `collectionMemberPrefixMatch.Success` block — same regex match, same pattern as collection branch. Checks `info.FieldTypeKinds` for `StaticValueKind.String` flag (covers non-nullable `String` and nullable `String | Null`). Added `BuildStringMemberItems(fieldName, isNullable)` returning one `.length` `Property` item with `Detail = "number"` and documentation that adjusts for nullable fields.
+- Grammar (`precept.tmLanguage.json`): `.length` is NOT naturally caught by the identifier catch-all with the same scoping as `.count`. The `collectionMemberAccess` pattern already explicitly scopes these members as `variable.other.property.precept`. Added `length` to the alternation (`count|min|max|peek|length`) so `.length` gets the same token scope. Updated comment to "Dotted member accessors: collection (.count, .min, .max, .peek) and string (.length)."
+- Build: 0 errors. Tests: 87/87 pass.
+- Key learning: When a grammar already has a named pattern for specific dotted accessors (not relying on catch-all), new accessors must be added explicitly to that pattern — the catch-all produces a semantically different token scope.
+
 ## Learnings
 
 - GitHub README rendering gives reliable control over image assets, not over text-inside-image scaling relative to surrounding prose. If size parity with nearby copy matters, real Markdown text or fenced code is the only robust answer.

@@ -310,6 +310,19 @@ Domains without an open proposal are included when the language surface, sample 
 
 ---
 
+### 23. Structural Lifecycle Modifiers
+
+| Aspect | Detail |
+|---|---|
+| **Surface covered** | Declarative keyword modifiers on state (and potentially event) declarations that constrain graph-structural roles: lifecycle boundaries (`terminal`), path obligations (`required`/`milestone`), residency properties (`transient`), event cardinality (`once`), and event safety (`final`, `idempotent`). |
+| **Existing research** | `structural-lifecycle-modifiers.md` — **strong.** Full modifier taxonomy (5 categories), 8-system comparative survey (XState, Step Functions, BPMN, Stateless, TLA+/Alloy, Temporal, UML, Cedar/OPA), Precept fit analysis per design principle, state-vs-event asymmetry analysis, 3-tier recommendation framework, diagnostic interaction analysis (C48–C52), dead ends explored (state-type system, event lifecycle annotations, temporal properties, hierarchical modifiers). |
+| **Strength** | **Good.** Meets the `computed-fields.md` quality bar: cross-category precedent survey, philosophy fit analysis, dead ends, and clear tier recommendations. |
+| **Missing / Upgrade needed** | None for the research itself. If `terminal` advances to a proposal, the open questions section identifies 5 design decisions that need answers (edit interaction, entry/exit actions, grammar position, stateless precepts, C50 message upgrade). |
+| **Proposals informed** | None (horizon domain). `terminal` is Tier 1 strong candidate; `required`/`transient` are Tier 2; event modifiers are Tier 3 (reject/defer). |
+| **Why it matters** | The author-intent gap is real: the tooling detects terminal states, dead-end states, and unreachable states, but the author cannot declare intent. `terminal` would let the compiler distinguish intentionally-terminal from accidentally-dead-end, turning C50 from a soft warning into a stronger signal. `initial` already proves the modifier pattern works. |
+
+---
+
 ## Comparative Library Studies — Status Assessment
 
 The `expressiveness/` folder contains six library comparison studies. These informed early proposals but vary in quality and coverage:
@@ -392,6 +405,7 @@ Domains ranked by research urgency — how badly we need the research to exist b
 | **P4 — Horizon** | Cross-Entity References (#20) | Deliberately bounded. Research when domain systems require it. |
 | **P4 — Horizon** | Schema Evolution (#21) | No research. Critical at production adoption, not during language design. |
 | **P4 — Horizon** | AI Legibility Research (#22) | Empirical research when plugin usage data exists. |
+| **P4 — Horizon** | Structural Lifecycle Modifiers (#23) | Research complete. `terminal` is Tier 1 ready for proposal when demand arises. |
 | **Low** | Division Safety (#17) | Evaluator fix, minimal research needed. |
 | **Low** | Keyword Surface (#12) | Well-covered. Minor reorganization. |
 | **Low** | State Machine Advanced (#18) | Deliberately excluded. Serves as "why not" reference. |

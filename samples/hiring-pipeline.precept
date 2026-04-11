@@ -14,6 +14,7 @@ field PendingInterviewers as set of string
 
 invariant FeedbackCount >= 0 because "Feedback count cannot be negative"
 invariant OfferAmount >= 0 because "Offer amounts cannot be negative"
+invariant FinalNote == null or FinalNote.length <= 500 because "Final notes cannot exceed 500 characters"
 
 state Draft initial
 state Screening

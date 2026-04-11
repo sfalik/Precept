@@ -102,7 +102,7 @@ The `union` merge driver keeps all lines from both sides, which is correct for a
 This repository's canonical workflow lives in [CONTRIBUTING.md](/CONTRIBUTING.md). Squad must follow it.
 
 - Treat `CONTRIBUTING.md` as the source of truth for proposal lifecycle, artifact placement, and implementation workflow.
-- Treat GitHub issues as the canonical proposal body, `docs/research/` as durable rationale, PR bodies as ephemeral implementation checklists, and spec docs in `docs/` as the record of implemented behavior.
+- Treat GitHub issues as the canonical proposal body, `research/` as durable rationale, PR bodies as ephemeral implementation checklists, and spec docs in `docs/` as the record of implemented behavior.
 - For any implementation task, require documentation sync in the same PR unless the user explicitly says otherwise.
 - Before declaring implementation work complete, verify whether `README.md`, relevant `docs/*.md` files, syntax grammar, language-server completions, samples, and MCP docs need updates. If none are needed, say so explicitly.
 - When spawning agents for implementation work in this repo, instruct them to read `CONTRIBUTING.md` before coding if the task changes language surface, runtime behavior, tooling behavior, or public documentation.

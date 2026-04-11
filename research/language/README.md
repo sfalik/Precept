@@ -26,6 +26,7 @@ This folder is the durable, domain-first research map for Precept language work.
 | Entity-modeling surface | `#17`, `#22` | [expressiveness/entity-modeling-surface.md](./expressiveness/entity-modeling-surface.md), [expressiveness/computed-fields.md](./expressiveness/computed-fields.md), [expressiveness/data-only-precepts-research.md](./expressiveness/data-only-precepts-research.md) | [references/expression-evaluation.md](./references/expression-evaluation.md) | Governs stored-vs-derived facts and lifecycle-light entities. |
 | Transition shorthand | — | [expressiveness/transition-shorthand.md](./expressiveness/transition-shorthand.md) | [references/multi-event-shorthand.md](./references/multi-event-shorthand.md), [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md) | Horizon domain with no open proposal yet. |
 | Static reasoning expansion | — | [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) | [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) | Horizon domain; currently theory-first rather than proposal-first. |
+| Structural lifecycle modifiers | — | [expressiveness/structural-lifecycle-modifiers.md](./expressiveness/structural-lifecycle-modifiers.md) | [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md), [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) | Horizon domain. `terminal` is the strong Tier 1 candidate; `required`/`transient` are Tier 2. |
 | Type-system follow-ons | — | [expressiveness/type-system-follow-ons.md](./expressiveness/type-system-follow-ons.md) | [references/type-system-survey.md](./references/type-system-survey.md) | Residual type pressure after the main type wave; no active proposal yet. |
 
 ## Open proposal issue map
@@ -68,6 +69,7 @@ These docs are deliberate horizon groundwork, not orphaned notes:
 - [expressiveness/transition-shorthand.md](./expressiveness/transition-shorthand.md)
 - [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md)
 - [expressiveness/type-system-follow-ons.md](./expressiveness/type-system-follow-ons.md)
+- [expressiveness/structural-lifecycle-modifiers.md](./expressiveness/structural-lifecycle-modifiers.md)
 
 ## Workflow reminder
 

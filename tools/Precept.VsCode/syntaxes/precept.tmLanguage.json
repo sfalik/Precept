@@ -18,6 +18,7 @@
     { "include": "#transitionTarget" },
     { "include": "#eventArgReference" },
     { "include": "#collectionMemberAccess" },
+    { "include": "#stringMemberAccess" },
     { "include": "#rootEditDeclaration" },
     { "include": "#controlKeywords" },
     { "include": "#declarationKeywords" },
@@ -339,10 +340,23 @@
       ]
     },
     "collectionMemberAccess": {
-      "comment": "Collection.count, Collection.min, etc.",
+      "comment": "Dotted collection member accessors: .count, .min, .max, .peek.",
       "patterns": [
         {
           "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)(count|min|max|peek)\\b",
+          "captures": {
+            "1": { "name": "variable.other.field.precept" },
+            "2": { "name": "punctuation.accessor.precept" },
+            "3": { "name": "variable.other.property.precept" }
+          }
+        }
+      ]
+    },
+    "stringMemberAccess": {
+      "comment": "Dotted string member accessors: .length (and future string accessors).",
+      "patterns": [
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(\\.)(length)\\b",
           "captures": {
             "1": { "name": "variable.other.field.precept" },
             "2": { "name": "punctuation.accessor.precept" },

@@ -26,7 +26,7 @@ How to decide who handles what.
 - `design/system/foundations/semantic-visual-system.html` routes to Elaine as both owner and maintainer.
 - The two canonical design HTML artifacts should be treated as a coordinated pair and reviewed together for visual consistency.
 - `design/prototypes/` routes to the owner of the surface or domain being explored; if unclear, start with Elaine.
-- `docs/research/` stays technical and cross-domain; route by subject matter rather than treating it as a design bucket.
+- `research/` stays technical and cross-domain; route by subject matter rather than treating it as a design bucket.
 - Changes that alter both brand meaning and reusable visual-system rules should involve both Peterman and Elaine, with Frank arbitrating boundary questions.
 
 ## Issue Routing
