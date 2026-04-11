@@ -87,8 +87,6 @@ body {
   transition: color 0.15s;
   flex-shrink: 0;
 }
-.nav-toggle:hover { color: var(--text); }
-.nav-toggle:focus-visible,
 .nav-item:focus-visible {
   outline: 1px solid rgba(99,102,241,0.6);
   outline-offset: 2px;
@@ -98,7 +96,6 @@ body {
   font-size: 11px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--soft);
   padding: 0 4px 18px;
   border-bottom: 1px solid var(--line);
   margin-bottom: 10px;
@@ -106,7 +103,6 @@ body {
 .nav-item {
   display: block;
   padding: 6px 8px;
-  font-size: 11px;
   letter-spacing: 0.10em;
   text-transform: uppercase;
   color: var(--soft);
@@ -121,7 +117,6 @@ body {
   margin-left: 8px;
   border-left: 1px solid rgba(255,255,255,0.08);
   font-size: 10px;
-  letter-spacing: 0.08em;
   color: rgba(167,175,187,0.82);
 }
 .nav-item--child.active {
@@ -140,13 +135,15 @@ body {
 }
 /* ── PAGE LAYOUT ──────────────────────────── */
 .page {
-  margin-left: var(--nav-w);
+  --page-offset: var(--nav-w);
+  --page-shell-w: min(calc(100vw - var(--page-offset)), 1320px);
+  width: var(--page-shell-w);
+  margin-left: calc(var(--page-offset) + max(0px, (100vw - var(--page-offset) - var(--page-shell-w)) / 2));
   padding: 0 56px 120px;
-  max-width: 1320px;
-  transition: margin-left 0.2s ease;
+  transition: margin-left 0.2s ease, width 0.2s ease;
 }
 .nav-rail.collapsed ~ .page {
-  margin-left: var(--nav-w-collapsed);
+  --page-offset: var(--nav-w-collapsed);
 }
 /* ── SHARED ───────────────────────────────── */
 .eyebrow {
@@ -444,10 +441,15 @@ pre {
   gap: 12px;
   align-content: start;
 }
-.cg-channel-caption {
+.cg-channel-caption,
+.cg-combination-intro,
+.cg-combination-reading {
+  margin: 0;
+  font-family: var(--sans);
   font-size: 14px;
   line-height: 1.68;
   color: var(--muted);
+  text-align: left;
 }
 .cg-modifier-stack {
   display: flex;
@@ -458,6 +460,38 @@ pre {
 .cg-modifier-arrow {
   font-family: var(--mono);
   font-size: 14px;
+  color: var(--soft);
+}
+.cg-modifier-compare {
+  display: grid;
+  gap: 6px;
+}
+.cg-modifier-compare-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cg-modifier-compare--state {
+  width: min(100%, 18rem);
+  gap: 8px;
+}
+.cg-modifier-compare--state .cg-modifier-compare-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+}
+.cg-modifier-compare--state .cg-modifier-token {
+  min-width: 96px;
+  justify-content: center;
+}
+.cg-modifier-note {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  line-height: 1.45;
+  text-transform: uppercase;
   color: var(--soft);
 }
 .cg-modifier-token {
@@ -499,7 +533,7 @@ pre {
   --modifier-border: rgba(168,152,245,0.45);
   --modifier-bg: rgba(168,152,245,0.10);
 }
-.cg-modifier-token--state-reachable {
+.cg-modifier-token--state-not-reachable {
   --modifier-border: rgba(168,152,245,0.2);
   --modifier-opacity: 0.65;
 }
@@ -515,19 +549,10 @@ pre {
   --modifier-border: rgba(176,190,197,0.25);
   --modifier-text: var(--data);
 }
-.cg-modifier-token--type {
-  --modifier-border: rgba(154,168,181,0.28);
-  --modifier-bg: rgba(255,255,255,0.015);
-  --modifier-text: var(--data-t);
-}
-.cg-modifier-token--value {
-  --modifier-border: rgba(132,146,159,0.28);
-  --modifier-bg: rgba(255,255,255,0.015);
-  --modifier-text: var(--data-v);
-}
-.cg-modifier-token--rule {
+.cg-modifier-token--structure {
   --modifier-border: rgba(99,102,241,0.35);
   --modifier-text: var(--structure);
+  font-weight: 700;
 }
 .cg-modifier-token--valid {
   --modifier-border: rgba(52,211,153,0.3);
@@ -544,15 +569,243 @@ pre {
 .cg-modifier-token--soft {
   --modifier-text: var(--soft);
 }
-.cg-modifier-token--locked {
-  --modifier-border: rgba(255,255,255,0.08);
-  --modifier-text: rgba(255,255,255,0.22);
-}
 .cg-modifier-token--italic {
   --modifier-style: italic;
 }
 .cg-modifier-token--dashed {
   border-style: dashed;
+}
+.cg-combination-matrix {
+  margin-top: 32px;
+  display: grid;
+  gap: 12px;
+}
+.cg-combination-head {
+  display: grid;
+  gap: 10px;
+}
+.cg-combination-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.cg-combination-intro {
+  max-width: 62ch;
+}
+.cg-combination-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.cg-combination-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  align-items: start;
+  align-content: start;
+  padding: 14px 16px;
+  background: var(--bg);
+}
+.cg-combination-example {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+.cg-combination-specimen {
+  display: inline-grid;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 9px 11px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+}
+.cg-combination-specimen--structure {
+  width: 100%;
+}
+.cg-combination-specimen--rule {
+  width: 100%;
+}
+.cg-mini-structure {
+  border: 1px solid rgba(99,102,241,0.24);
+  background: rgba(4,5,6,0.35);
+}
+.cg-mini-structure-head {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(99,102,241,0.18);
+  color: var(--structure);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+.cg-mini-structure-body {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+}
+.cg-mini-structure-line {
+  height: 6px;
+  background: linear-gradient(90deg, rgba(99,102,241,0.28), rgba(255,255,255,0.04));
+}
+.cg-mini-structure-line:nth-child(2) {
+  width: 82%;
+}
+.cg-mini-structure-line:nth-child(3) {
+  width: 68%;
+}
+.cg-mini-flow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+  .cg-mini-state-node,
+  .cg-mini-state-chip,
+  .cg-mini-event-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 5px 9px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    line-height: 1;
+  }
+  .cg-mini-state-node,
+  .cg-mini-state-chip {
+    border: 1px solid rgba(168,152,245,0.32);
+    color: var(--state);
+  }
+  .cg-mini-state-node {
+    background: rgba(168,152,245,0.04);
+  }
+  .cg-mini-state-node-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--structure);
+    flex-shrink: 0;
+  }
+  .cg-mini-state-node--current {
+    border-color: rgba(168,152,245,0.46);
+    background: rgba(168,152,245,0.10);
+  }
+  .cg-mini-state-node--terminal {
+    border-width: 2px;
+    box-shadow: inset 0 0 0 1px rgba(168,152,245,0.14);
+  }
+  .cg-mini-state-node--not-reachable {
+    border-color: rgba(168,152,245,0.22);
+    background: rgba(168,152,245,0.02);
+    opacity: 0.58;
+  }
+  .cg-mini-state-node--constrained,
+  .cg-mini-data-name--constrained {
+    font-style: italic;
+  }
+  .cg-mini-state-chip--ghost {
+    opacity: 0.72;
+  }
+  .cg-mini-event-pill {
+    border: 1px solid rgba(48,184,232,0.35);
+    background: rgba(48,184,232,0.04);
+    color: var(--event);
+  }
+  .cg-mini-event-pill--muted {
+    border-color: rgba(48,184,232,0.22);
+    opacity: 0.72;
+  }
+  .cg-mini-event-pill--rejected {
+    border-color: rgba(248,113,113,0.45);
+    border-style: dashed;
+    background: rgba(248,113,113,0.04);
+    color: var(--violated);
+  }
+  .cg-mini-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 3px 7px;
+    border: 1px solid rgba(255,255,255,0.08);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    line-height: 1;
+    color: var(--soft);
+  }
+  .cg-mini-badge--warn {
+    border-color: rgba(253,224,71,0.32);
+    color: var(--warn);
+  }
+  .cg-mini-badge--violated {
+    border-color: rgba(248,113,113,0.38);
+    color: var(--violated);
+  }
+  .cg-mini-data-row {
+    display: grid;
+    gap: 8px;
+  }
+  .cg-mini-data-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .cg-mini-data-name,
+  .cg-mini-data-type,
+  .cg-mini-data-value {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    line-height: 1;
+  }
+  .cg-mini-data-name {
+    color: var(--data);
+  }
+  .cg-mini-data-type {
+    color: var(--data-t);
+  }
+  .cg-mini-data-value {
+    color: var(--data-v);
+  }
+  .cg-mini-data-flags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .cg-mini-callout {
+    padding: 7px 10px;
+    border-left: 3px solid;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .cg-mini-callout--satisfied {
+    border-color: var(--valid);
+    background: rgba(52,211,153,0.04);
+    color: var(--valid);
+  }
+  .cg-mini-callout--violated {
+    border-color: var(--violated);
+    background: rgba(248,113,113,0.04);
+    color: var(--violated);
+  }
+@media (max-width: 860px) {
+  .cg-combination-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .cross-surface-strip {
   display: grid;
@@ -732,7 +985,7 @@ pre {
     margin-bottom: 6px;
   }
   .page,
-  .nav-rail.collapsed ~ .page { margin-left: 0; padding: 24px 20px 80px; }
+  .nav-rail.collapsed ~ .page { width: auto; margin-left: 0; padding: 24px 20px 80px; }
   .intro-hero,
     .intro-copy-row,
     .intro-summary,
@@ -745,6 +998,16 @@ pre {
   .concepts-grid { grid-template-columns: 1fr; }
   .construct-sidebar,
   .section-subgroup-sidebar { position: static; }
+  .cg-combination-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .cg-combination-grid {
+    grid-template-columns: 1fr;
+  }
+  .cg-combination-row {
+    gap: 8px;
+  }
 }
 </style>
 </head>
@@ -1737,7 +2000,7 @@ pre {
               <div class="typography-card-kicker">Constraint signal</div>
               <h3>Italic — constraint emphasis only</h3>
             </div>
-            <p>Within the five construct colors, italic belongs to constrained states, constrained events, and invariant-guarded data names. The only editorial exception is comments, which stay outside the construct color model. It is never used for generic emphasis, decorative headings, or flourish. If a reader cannot trust italic inside a construct color to mean constraint emphasis, the second visual cue has been wasted.</p>
+            <p>Within the five construct colors, italic belongs to constrained states and invariant-guarded data names. The only editorial exception is comments, which stay outside the construct color model. It is never used for generic emphasis, decorative headings, or flourish. If a reader cannot trust italic inside a construct color to mean constraint emphasis, the second visual cue has been wasted.</p>
             <div class="typography-specimen">
               <div class="typography-specimen-bar">
                 <span>Pressure markers</span>
@@ -1772,15 +2035,16 @@ pre {
             <p>Typography only works as a visual cue if each move stays narrow and repeatable. These guidelines preserve the distinction between governing language, explanatory prose, and constrained states.</p>
           </div>
           <div class="typography-summary" aria-label="Typography guidance summary">
+            <p>Within the five construct colors, italic belongs to constrained states and invariant-guarded data names. The only editorial exception is comments, which stay outside the construct color model. It is never used for generic emphasis, decorative headings, or flourish. If a reader cannot trust italic inside a construct color to mean constraint emphasis, the second visual cue has been wasted.</p>
             <div class="typography-summary-item">
               <span>Do not mix</span>
               <strong>Mono / Sans</strong>
-              <small>naming and prose stay in separate functions</small>
+              <small>Constraint emphasis is expressed through typography, not extra hues. Constrained states and guarded data names are italic within their own construct color — same hue, italic only.</small>
             </div>
             <div class="typography-summary-item">
               <span>Do not decorate</span>
               <strong>Italic</strong>
-              <small>reserved for constraint emphasis and constraint attention</small>
+              <small>Run-time outcomes layer onto event tokens without introducing a second event hue.</small>
             </div>
           </div>
         </div>
@@ -1951,11 +2215,10 @@ pre {
   color: rgba(255,255,255,0.28);
 }
 .cg-channel-body {
-  display: flex;
-  align-items: flex-start;
-   gap: 12px;
-  flex-wrap: wrap;
-   min-height: 40px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-height: 40px;
 }
 .cg-channel-signal {
   display: inline-flex;
@@ -1969,12 +2232,20 @@ pre {
    line-height: 1.7;
    row-gap: 8px;
 }
+.cg-channel-signal--state-compare {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+}
   .cg-channel-signal code {
     font-size: 13px;
   }
 .cg-channel-signal strong {
   color: rgba(255,255,255,0.72);
   font-weight: 500;
+}
+.cg-channel-caption--state-compare {
+  max-width: 44ch;
 }
 .cg-swatch {
   display: inline-block;
@@ -2504,7 +2775,7 @@ pre {
         <div class="semantic-family-usage">
           <span class="semantic-family-usage-label">Carries</span>
           Open · Submit · Approve
-          <span class="semantic-family-usage-subtle">italic marks constrained event, not a second color</span>
+          <span class="semantic-family-usage-subtle">runtime outcomes layer onto event tokens without introducing a second event hue</span>
         </div>
       </div>
 
@@ -2650,7 +2921,7 @@ pre {
         <div class="channel">
           <span class="channel-name">Guideline</span>
           <h3>Color says kind. Italic says constrained.</h3>
-          <p>Constraint emphasis is expressed through typography, not extra hues. Constrained states, events, and guarded fields are italic within their own construct color — same hue, italic only.</p>
+          <p>Constraint emphasis is expressed through typography, not extra hues. Constrained states and guarded data names are italic within their own construct color — same hue, italic only.</p>
         </div>
         <div class="channel">
           <span class="channel-name">Guideline</span>
@@ -2739,25 +3010,53 @@ pre {
           <div class="cg-channel">
             <div class="cg-channel-name">Colour</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--structure-d)"></span><span><strong>Indigo construct color</strong> &middot; governing emphasis <code>--structure-d</code></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--structure)"></span><span>related grammar <code>--structure</code></span></span></div>
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--structure-d)"></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--structure)"></span><span>Related grammar</span></span></div>
+              <p class="cg-channel-caption">Deep indigo marks governing structure, while the lighter indigo marks related grammar.</p>
             </div>
           </div>
           <div class="cg-channel">
             <div class="cg-channel-name">Typography</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><code class="sd">set</code><span>Mono &middot; bold for governing words</span><span class="cg-family-note"><code class="sg cg-inline-secondary">and</code><span>related connective grammar</span></span></div>
+              <div class="cg-channel-signal"><code class="sd">set</code><span class="cg-family-note"><code class="sg cg-inline-secondary">and</code><span>Related connective</span></span></div>
+              <p class="cg-channel-caption">Bold mono marks governing keywords, while regular mono carries related connective grammar.</p>
             </div>
           </div>
           <div class="cg-channel">
             <div class="cg-channel-name">Form</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><div class="cg-form cg-form--frame"></div><span>Indigo border &middot; container frame</span></div>
+              <div class="cg-channel-signal"><div class="cg-form cg-form--frame"></div></div>
+              <p class="cg-channel-caption">Container framing marks structure as the governing enclosure.</p>
             </div>
           </div>
           <div class="cg-channel">
             <div class="cg-channel-name">Layout</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span>Outer wrapper &middot; governs all other constructs</span></div>
+              <div class="cg-channel-signal"><span>Outer wrapper</span></div>
+              <p class="cg-channel-caption">Layout keeps structure as the outer boundary around every other construct.</p>
+            </div>
+          </div>
+        </div>
+        <div class="cg-combination-matrix" aria-label="Structure valid combinations">
+          <div class="cg-combination-head">
+            <div class="cg-combination-title">Valid combinations</div>
+            <p class="cg-combination-intro">Structure reads as base-only. Keyword, weight, and frame are constitutive, not additive.</p>
+          </div>
+          <div class="cg-combination-grid">
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Base structure only</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen cg-combination-specimen--structure" aria-hidden="true">
+                  <div class="cg-mini-structure">
+                    <div class="cg-mini-structure-head">precept Task</div>
+                    <div class="cg-mini-structure-body">
+                      <div class="cg-mini-structure-line"></div>
+                      <div class="cg-mini-structure-line"></div>
+                      <div class="cg-mini-structure-line"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">The governing keyword, bold indigo frame, and containment cues are the whole read.</p>
             </div>
           </div>
         </div>
@@ -2828,25 +3127,31 @@ pre {
           <div class="cg-channel">
             <div class="cg-channel-name">Colour</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--state)"></span><span>Violet &middot; <code>--state</code></span></div>
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--state)"></span></div>
+              <p class="cg-channel-caption">Violet marks state names and state nodes across authored and rendered views.</p>
             </div>
           </div>
           <div class="cg-channel">
             <div class="cg-channel-name">Typography</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><code class="st">Open</code><span>Mono &middot; PascalCase name</span></div>
+              <div class="cg-channel-signal"><code class="st">Open</code></div>
+              <p class="cg-channel-caption">Mono PascalCase keeps state names readable as named lifecycle coordinates.</p>
             </div>
           </div>
           <div class="cg-channel">
             <div class="cg-channel-name">Form</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><div class="cg-form cg-form--node"></div><span>Rect node &middot; border treatment signals current, initial, and terminal modifiers</span></div>
+              <div class="cg-channel-signal cg-channel-signal--state-compare">
+                <span class="cg-modifier-token cg-modifier-token--state">Closed</span>
+              </div>
+              <p class="cg-channel-caption cg-channel-caption--state-compare">Plain node is the baseline, then dot, fill, dimming, and double border layer on top.</p>
             </div>
           </div>
           <div class="cg-channel">
             <div class="cg-channel-name">Layout</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span>Ordered progression &middot; initial first &middot; terminal last</span></div>
+              <div class="cg-channel-signal"><span>Ordered flow</span></div>
+              <p class="cg-channel-caption">Ordered flow keeps entry, current position, and unreachable branches legible in sequence.</p>
             </div>
           </div>
         </div>
@@ -2856,16 +3161,16 @@ pre {
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
         <div class="cg-channels cg-channels--modifiers">
           <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Initial</div>
+            <div class="cg-channel-name">initial</div>
             <div class="cg-channel-body">
               <div class="cg-modifier-stack">
                 <span class="cg-modifier-token cg-modifier-token--state"><span class="cg-modifier-token-dot"></span>Open</span>
               </div>
-              <p class="cg-channel-caption">Origin dot marks the entry state in a lifecycle path.</p>
+              <p class="cg-channel-caption">Origin dot marks the entry state in the lifecycle path.</p>
             </div>
           </div>
           <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Terminal</div>
+            <div class="cg-channel-name">terminal</div>
             <div class="cg-channel-body">
               <div class="cg-modifier-stack">
                 <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-terminal">Closed</span>
@@ -2874,30 +3179,135 @@ pre {
             </div>
           </div>
           <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Current</div>
-            <div class="cg-channel-body">
-              <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-current">Open</span>
-              </div>
-              <p class="cg-channel-caption">Active fill identifies the current node in the rendered flow.</p>
-            </div>
-          </div>
-          <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Reachable</div>
-            <div class="cg-channel-body">
-              <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-reachable">Closed</span>
-              </div>
-              <p class="cg-channel-caption">Dimmed treatment shows an available next state that is not active yet.</p>
-            </div>
-          </div>
-          <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Constrained</div>
+            <div class="cg-channel-name">constrained</div>
             <div class="cg-channel-body">
               <div class="cg-modifier-stack">
                 <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--italic">Closed</span>
               </div>
-              <p class="cg-channel-caption">Italic state names signal state-scoped rule pressure.</p>
+              <p class="cg-channel-caption">Italic state name marks state-scoped rule pressure.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">notReachableFromInitial</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-not-reachable">Closed</span>
+              </div>
+              <p class="cg-channel-caption">Dimmed target marks a state with no reachable path from the entry state.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">notReachableFromCurrent</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-not-reachable">Closed</span>
+              </div>
+              <p class="cg-channel-caption">Dimmed target marks a state that cannot be reached from the current position.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">current</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-current">Open</span>
+              </div>
+              <p class="cg-channel-caption">Active fill marks the current node in the rendered flow.</p>
+            </div>
+          </div>
+        </div>
+        <div class="cg-combination-matrix" aria-label="State valid combinations">
+          <div class="cg-combination-head">
+            <div class="cg-combination-title">Valid combinations</div>
+            <p class="cg-combination-intro">Each row shows one valid state stack from a single snapshot.</p>
+          </div>
+          <div class="cg-combination-grid">
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Initial + current</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-node cg-mini-state-node--current"><span class="cg-mini-state-node-dot"></span>Open</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">The active node can also be the entry point.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Initial + constrained</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-node cg-mini-state-node--constrained"><span class="cg-mini-state-node-dot"></span>Intake</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">The entry node can carry rule pressure from the start.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Initial + terminal</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-node cg-mini-state-node--terminal"><span class="cg-mini-state-node-dot"></span>Closed</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">A one-state flow can begin and end on the same node.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Current + constrained</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-node cg-mini-state-node--current cg-mini-state-node--constrained">Review</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">The live node can carry rule pressure without changing family.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Current + terminal</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-node cg-mini-state-node--current cg-mini-state-node--terminal">Closed</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">The active node can also be the end of the live path.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Terminal + constrained</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--constrained">Closed</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">A final state can still sit under rule pressure.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Current + terminal + constrained</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-node cg-mini-state-node--current cg-mini-state-node--terminal cg-mini-state-node--constrained">Closed</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">A live final node can still sit under rule pressure.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Terminal + notReachableFromInitial</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--not-reachable">Archived</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">The entry path can still leave a final node unreachable.</p>
             </div>
           </div>
         </div>
@@ -2966,25 +3376,29 @@ pre {
           <div class="cg-channel">
             <div class="cg-channel-name">Colour</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--event)"></span><span>Cyan &middot; <code>--event</code></span></div>
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--event)"></span></div>
+              <p class="cg-channel-caption">Cyan marks event triggers and event pills across authored and rendered views.</p>
             </div>
           </div>
           <div class="cg-channel">
             <div class="cg-channel-name">Typography</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><code class="ev">Close</code><span>Mono &middot; PascalCase name</span></div>
+              <div class="cg-channel-signal"><code class="ev">Close</code></div>
+              <p class="cg-channel-caption">Mono PascalCase keeps event names terse and action-oriented.</p>
             </div>
           </div>
           <div class="cg-channel">
             <div class="cg-channel-name">Form</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><div class="cg-form cg-form--pill"></div><span>Outlined pill &middot; directional arrow to destination state</span></div>
+              <div class="cg-channel-signal"><div class="cg-form cg-form--pill"></div></div>
+              <p class="cg-channel-caption">Outlined pill marks the trigger, then pairs with state or verdict markers as needed.</p>
             </div>
           </div>
           <div class="cg-channel">
             <div class="cg-channel-name">Layout</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span>Paired with destination state via arrow</span></div>
+              <div class="cg-channel-signal"><span>State context</span></div>
+              <p class="cg-channel-caption">State context sits beside the event when a move matters; otherwise the event stands alone.</p>
             </div>
           </div>
         </div>
@@ -2994,51 +3408,150 @@ pre {
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
         <div class="cg-channels cg-channels--modifiers">
           <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Transition</div>
+            <div class="cg-channel-name">transition</div>
             <div class="cg-channel-body">
               <div class="cg-modifier-stack">
                 <span class="cg-modifier-token cg-modifier-token--event">Close</span>
                 <span class="cg-modifier-arrow">&rarr;</span>
                 <span class="cg-modifier-token cg-modifier-token--state">Closed</span>
               </div>
-              <p class="cg-channel-caption">Directional pairing keeps the trigger and destination legible as one move.</p>
+              <p class="cg-channel-caption">Directional pairing reads the trigger and destination as one move.</p>
             </div>
           </div>
           <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">No Transition</div>
+            <div class="cg-channel-name">self-transition</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--event">Recheck</span>
+                <span class="cg-modifier-arrow">&#8635;</span>
+                <span class="cg-modifier-token cg-modifier-token--state">Open</span>
+              </div>
+              <p class="cg-channel-caption">Loop treatment reads the trigger while the lifecycle coordinate stays the same.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">no-transition</div>
             <div class="cg-channel-body">
               <div class="cg-modifier-stack">
                 <span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--event-muted">Close</span>
                 <span class="cg-modifier-token cg-modifier-token--soft">&empty;</span>
               </div>
-              <p class="cg-channel-caption">No destination marker means the event resolves without changing state.</p>
+              <p class="cg-channel-caption">Empty destination marker reads the event as resolved without a state change.</p>
             </div>
           </div>
           <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Guarded</div>
-            <div class="cg-channel-body">
-              <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--italic">Close</span>
-              </div>
-              <p class="cg-channel-caption">Italic event names signal guard logic attached to the trigger.</p>
-            </div>
-          </div>
-          <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Blocked</div>
+            <div class="cg-channel-name">rejected</div>
             <div class="cg-channel-body">
               <div class="cg-modifier-stack">
                 <span class="cg-modifier-token cg-modifier-token--violated cg-modifier-token--dashed">Close</span>
+                <span class="cg-modifier-token cg-modifier-token--soft">rejected</span>
               </div>
-              <p class="cg-channel-caption">Dashed red treatment carries the blocked verdict into the event view.</p>
+              <p class="cg-channel-caption">Rejection lands on the trigger as a run-time verdict, not a second event family.</p>
             </div>
           </div>
           <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Unmatched</div>
+            <div class="cg-channel-name">constraint failure</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--event">Close</span>
+                <span class="cg-modifier-token cg-modifier-token--violated">constraint failure</span>
+              </div>
+              <p class="cg-channel-caption">Constraint failure sits beside the trigger so the event stays primary.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">unmatched</div>
             <div class="cg-channel-body">
               <div class="cg-modifier-stack">
                 <span class="cg-modifier-token cg-modifier-token--warn">unmatched</span>
               </div>
-              <p class="cg-channel-caption">Warning colour marks guards that do not apply in the current state.</p>
+              <p class="cg-channel-caption">Warning treatment marks a guard that does not apply in the current snapshot.</p>
+            </div>
+          </div>
+        </div>
+        <div class="cg-combination-matrix" aria-label="Event valid combinations">
+          <div class="cg-combination-head">
+            <div class="cg-combination-title">Valid combinations</div>
+            <p class="cg-combination-intro">Each row shows one valid event topology with at most one verdict.</p>
+          </div>
+          <div class="cg-combination-grid">
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Transition</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-event-pill">Close</span>
+                    <span class="cg-modifier-arrow">&rarr;</span>
+                    <span class="cg-mini-state-chip">Closed</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">One trigger pairs to one destination.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Self-transition</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-event-pill">Recheck</span>
+                    <span class="cg-modifier-arrow">&#8635;</span>
+                    <span class="cg-mini-state-chip">Open</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">The trigger fires while the lifecycle coordinate stays put.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">No-transition</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-event-pill cg-mini-event-pill--muted">Refresh</span>
+                    <span class="cg-mini-badge">no transition</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">The event resolves without moving state.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Transition + rejected</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-event-pill cg-mini-event-pill--rejected">Close</span>
+                    <span class="cg-modifier-arrow">&rarr;</span>
+                    <span class="cg-mini-state-chip cg-mini-state-chip--ghost">Closed</span>
+                    <span class="cg-mini-badge cg-mini-badge--violated">rejected</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">The authored move stays visible while one blocking verdict lands on that same read.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Transition + constraint failure</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-event-pill">Close</span>
+                    <span class="cg-modifier-arrow">&rarr;</span>
+                    <span class="cg-mini-state-chip cg-mini-state-chip--ghost">Closed</span>
+                    <span class="cg-mini-badge cg-mini-badge--violated">constraint failure</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">The move is identified, then blocked by failing checks.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Unmatched</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-event-pill">Close</span>
+                    <span class="cg-mini-badge cg-mini-badge--warn">unmatched</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">One warning verdict can sit on the event when no guard applies in the current snapshot.</p>
             </div>
           </div>
         </div>
@@ -3113,25 +3626,29 @@ pre {
           <div class="cg-channel">
             <div class="cg-channel-name">Colour</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--data)"></span><span><strong>Slate construct color</strong> &middot; field and argument names <code>--data</code></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--data-t)"></span><span>type tone <code>--data-t</code></span></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--data-v)"></span><span>value tone <code>--data-v</code></span></span></div>
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--data)"></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--data-t)"></span><span>Type</span></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--data-v)"></span><span>Value</span></span></div>
+              <p class="cg-channel-caption">Slate marks field and argument names, with separate tones for type and value.</p>
             </div>
           </div>
           <div class="cg-channel">
             <div class="cg-channel-name">Typography</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><code class="da">Done</code><span>Mono &middot; three tonal tiers</span></div>
+              <div class="cg-channel-signal"><code class="da">Done</code></div>
+              <p class="cg-channel-caption">Mono keeps name, type, and value in one data stack while preserving tonal separation.</p>
             </div>
           </div>
           <div class="cg-channel">
             <div class="cg-channel-name">Form</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><div class="cg-form cg-form--row"></div><span>Table row &middot; name &middot; type &middot; value columns</span></div>
+              <div class="cg-channel-signal"><div class="cg-form cg-form--row"></div></div>
+              <p class="cg-channel-caption">Row form keeps name, type, and value aligned as one governed record.</p>
             </div>
           </div>
           <div class="cg-channel">
             <div class="cg-channel-name">Layout</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span>Tabular &middot; vertically stacked field rows</span></div>
+              <div class="cg-channel-signal"><span>Table stack</span></div>
+              <p class="cg-channel-caption">Tabular stacking keeps field rows scannable across the set.</p>
             </div>
           </div>
         </div>
@@ -3141,59 +3658,126 @@ pre {
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
         <div class="cg-channels cg-channels--modifiers">
           <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Name Tone</div>
+            <div class="cg-channel-name">editable</div>
             <div class="cg-channel-body">
               <div class="cg-modifier-stack">
                 <span class="cg-modifier-token cg-modifier-token--data">Done</span>
+                <span class="cg-modifier-token cg-modifier-token--soft">editable</span>
               </div>
-              <p class="cg-channel-caption">Primary slate tone is reserved for field and argument names.</p>
+              <p class="cg-channel-caption">Editable status layers onto the field row without changing the data family.</p>
             </div>
           </div>
           <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Type Tone</div>
-            <div class="cg-channel-body">
-              <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--type">boolean</span>
-              </div>
-              <p class="cg-channel-caption">Secondary slate tone carries the declared type without competing with the field name.</p>
-            </div>
-          </div>
-          <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Value Tone</div>
-            <div class="cg-channel-body">
-              <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--value">false</span>
-              </div>
-              <p class="cg-channel-caption">Value tone stays quieter than the name so current facts remain easy to scan.</p>
-            </div>
-          </div>
-          <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Constrained</div>
+            <div class="cg-channel-name">constrained</div>
             <div class="cg-channel-body">
               <div class="cg-modifier-stack">
                 <span class="cg-modifier-token cg-modifier-token--data cg-modifier-token--italic">Done</span>
               </div>
-              <p class="cg-channel-caption">Italic data names signal invariant pressure on the field.</p>
+              <p class="cg-channel-caption">Italic name marks invariant pressure while keeping the field in the data family.</p>
             </div>
           </div>
           <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Validation</div>
+            <div class="cg-channel-name">violated</div>
             <div class="cg-channel-body">
               <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--valid">valid</span>
+                <span class="cg-modifier-token cg-modifier-token--data">Done</span>
                 <span class="cg-modifier-token cg-modifier-token--violated">violated</span>
               </div>
-              <p class="cg-channel-caption">Verdict marks report whether the current value satisfies the governing rules.</p>
+              <p class="cg-channel-caption">Violation overlays the row without replacing the underlying field read.</p>
             </div>
           </div>
           <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Editability</div>
+            <div class="cg-channel-name">required</div>
             <div class="cg-channel-body">
               <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--soft">editable</span>
-                <span class="cg-modifier-token cg-modifier-token--locked">locked</span>
+                <span class="cg-modifier-token cg-modifier-token--data">ApplicantName</span>
+                <span class="cg-modifier-token cg-modifier-token--warn">required</span>
               </div>
-              <p class="cg-channel-caption">Field chrome can stay open for edits or mute itself when the surface is read-only.</p>
+              <p class="cg-channel-caption">Required status marks expected-but-missing data without turning the row into a new construct.</p>
+            </div>
+          </div>
+        </div>
+        <div class="cg-combination-matrix" aria-label="Data valid combinations">
+          <div class="cg-combination-head">
+            <div class="cg-combination-title">Valid combinations</div>
+            <p class="cg-combination-intro">Each row shows one valid field stack from a single snapshot.</p>
+          </div>
+          <div class="cg-combination-grid">
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Required + editable</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-data-row">
+                    <div class="cg-mini-data-meta">
+                      <span class="cg-mini-data-name">ApplicantName</span>
+                      <span class="cg-mini-data-type">string</span>
+                      <span class="cg-mini-data-value">--</span>
+                    </div>
+                    <div class="cg-mini-data-flags">
+                      <span class="cg-mini-badge">editable</span>
+                      <span class="cg-mini-badge cg-mini-badge--warn">required</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">The field is missing but still open for entry.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Editable + constrained</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-data-row">
+                    <div class="cg-mini-data-meta">
+                      <span class="cg-mini-data-name cg-mini-data-name--constrained">ApplicantName</span>
+                      <span class="cg-mini-data-type">string</span>
+                      <span class="cg-mini-data-value">Ada Lovelace</span>
+                    </div>
+                    <div class="cg-mini-data-flags">
+                      <span class="cg-mini-badge">editable</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">Rule pressure can apply while the row remains mutable.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Editable + constrained + violated</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-data-row">
+                    <div class="cg-mini-data-meta">
+                      <span class="cg-mini-data-name cg-mini-data-name--constrained">ApplicantName</span>
+                      <span class="cg-mini-data-type">string</span>
+                      <span class="cg-mini-data-value">Ada123</span>
+                    </div>
+                    <div class="cg-mini-data-flags">
+                      <span class="cg-mini-badge">editable</span>
+                      <span class="cg-mini-badge cg-mini-badge--violated">violated</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">The row keeps its authored state while the current value fails.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Required + editable + constrained + violated</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-data-row">
+                    <div class="cg-mini-data-meta">
+                      <span class="cg-mini-data-name cg-mini-data-name--constrained">ApplicantName</span>
+                      <span class="cg-mini-data-type">string</span>
+                      <span class="cg-mini-data-value">--</span>
+                    </div>
+                    <div class="cg-mini-data-flags">
+                      <span class="cg-mini-badge">editable</span>
+                      <span class="cg-mini-badge cg-mini-badge--warn">required</span>
+                      <span class="cg-mini-badge cg-mini-badge--violated">violated</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">Schema, authorship, and live failure can all stack on one field row.</p>
             </div>
           </div>
         </div>
@@ -3258,25 +3842,29 @@ pre {
           <div class="cg-channel">
             <div class="cg-channel-name">Colour</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--rule)"></span><span>Gold &middot; <code>--rule</code></span></div>
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--rule)"></span></div>
+              <p class="cg-channel-caption">Gold marks rule copy at the interruption point.</p>
             </div>
           </div>
           <div class="cg-channel">
             <div class="cg-channel-name">Typography</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><code class="ru">"Closed means done"</code><span>Mono &middot; quoted string &middot; interrupt</span></div>
+              <div class="cg-channel-signal"><code class="ru">"Closed means done"</code></div>
+              <p class="cg-channel-caption">Quoted mono text keeps the rule message explicit and interruptive.</p>
             </div>
           </div>
           <div class="cg-channel">
             <div class="cg-channel-name">Form</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><div class="cg-form cg-form--callout"></div><span>Left-border callout &middot; verdict signal</span></div>
+              <div class="cg-channel-signal"><div class="cg-form cg-form--callout"></div></div>
+              <p class="cg-channel-caption">Left-border callout frames the rule as an interruption, not a container.</p>
             </div>
           </div>
           <div class="cg-channel">
             <div class="cg-channel-name">Layout</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span>Appears below the triggering field or event</span></div>
+              <div class="cg-channel-signal"><span>Point of interruption</span></div>
+              <p class="cg-channel-caption">Rule copy appears directly beneath the triggering field or event.</p>
             </div>
           </div>
         </div>
@@ -3286,33 +3874,43 @@ pre {
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
         <div class="cg-channels cg-channels--modifiers">
           <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Constraint Keywords</div>
-            <div class="cg-channel-body">
-              <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--rule">assert / because</span>
-              </div>
-              <p class="cg-channel-caption">Structure keywords expose the causal frame around the rule message.</p>
-            </div>
-          </div>
-          <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Satisfied</div>
+            <div class="cg-channel-name">satisfied</div>
             <div class="cg-channel-body">
               <div class="callout-demo callout-demo--satisfied">&checkmark; satisfied &mdash; condition met</div>
-              <p class="cg-channel-caption">Positive verdict callout shows the rule allowed the transition to proceed.</p>
+              <p class="cg-channel-caption">Positive verdict shows the rule allowed the transition to proceed.</p>
             </div>
           </div>
           <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Violated</div>
+            <div class="cg-channel-name">violated</div>
             <div class="cg-channel-body">
               <div class="callout-demo callout-demo--violated">&oslash; violated &mdash; condition failed</div>
-              <p class="cg-channel-caption">Violation callout interrupts the flow and explains why the move is blocked.</p>
+              <p class="cg-channel-caption">Violation verdict interrupts the flow and states why the move is blocked.</p>
             </div>
           </div>
-          <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Unmatched</div>
-            <div class="cg-channel-body">
-              <div class="callout-demo callout-demo--warn">&#9889; unmatched &mdash; guard not evaluated</div>
-              <p class="cg-channel-caption">Warning callout indicates the rule was present but not in play for the current state.</p>
+        </div>
+        <div class="cg-combination-matrix" aria-label="Rule valid combinations">
+          <div class="cg-combination-head">
+            <div class="cg-combination-title">Valid combinations</div>
+            <p class="cg-combination-intro">Each row shows one valid rule outcome for a single snapshot.</p>
+          </div>
+          <div class="cg-combination-grid">
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Satisfied</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen cg-combination-specimen--rule" aria-hidden="true">
+                  <div class="cg-mini-callout cg-mini-callout--satisfied">Closed means done</div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">The rule callout confirms the condition held for this snapshot.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Violated</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen cg-combination-specimen--rule" aria-hidden="true">
+                  <div class="cg-mini-callout cg-mini-callout--violated">Closed means done</div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">The rule callout interrupts the flow with one blocking outcome.</p>
             </div>
           </div>
         </div>
