@@ -1,0 +1,130 @@
+<div class="reference-grid" aria-label="Construct reference gallery">
+  <article class="construct-card">
+    <div class="construct-top">
+      <h3 class="construct-name">Structure</h3>
+      <span class="chip">Grammar</span>
+    </div>
+    <div class="construct-meta">Definition specimen</div>
+    <div class="construct-sample">
+      <pre><span class="tok-sd">precept</span> <span class="tok-da">TravelReimbursement</span>
+<span class="tok-s">state</span> <span class="tok-st">Draft</span>
+<span class="tok-s">event</span> <span class="tok-ev">Submit</span>
+<span class="tok-s">from</span> <span class="tok-st">Draft</span> <span class="tok-s">on</span> <span class="tok-ev">Submit</span> <span class="tok-s">-&gt;</span> <span class="tok-s">transition</span> <span class="tok-st">UnderReview</span></pre>
+    </div>
+    <div class="construct-runtime">
+      <div class="construct-meta">Runtime translation</div>
+      <div class="runtime-lane">
+        <div class="surface-pill-row">
+          <span class="surface-pill">Container frame</span>
+          <span class="surface-pill">Rail labels</span>
+          <span class="surface-pill">Diagram chrome</span>
+        </div>
+        <p>Structure stays ambient. It frames the reading order instead of competing with the constructs it organizes.</p>
+      </div>
+    </div>
+  </article>
+
+  <article class="construct-card">
+    <div class="construct-top">
+      <h3 class="construct-name">State</h3>
+      <span class="chip">Lifecycle</span>
+    </div>
+    <div class="construct-meta">Definition specimen</div>
+    <div class="construct-sample">
+      <pre><span class="tok-s">state</span> <span class="tok-st">Requested</span> <span class="tok-s">initial</span>
+<span class="tok-s">state</span> <span class="tok-st">ReadyForPickup</span>
+<span class="tok-s">state</span> <span class="tok-st">Expired</span></pre>
+    </div>
+    <div class="construct-runtime">
+      <div class="construct-meta">Runtime translation</div>
+      <div class="surface-pill-row">
+        <span class="runtime-chip runtime-chip--state">Initial</span>
+        <span class="runtime-chip runtime-chip--state">Current</span>
+        <span class="runtime-chip runtime-chip--state">Terminal</span>
+      </div>
+      <p>A state name should read as the same semantic thing in source, in topology, and in runtime status readouts.</p>
+    </div>
+  </article>
+
+  <article class="construct-card">
+    <div class="construct-top">
+      <h3 class="construct-name">Event</h3>
+      <span class="chip">Direction</span>
+    </div>
+    <div class="construct-meta">Definition specimen</div>
+    <div class="construct-sample">
+      <pre><span class="tok-s">event</span> <span class="tok-ev">PickUp</span>
+<span class="tok-s">from</span> <span class="tok-st">ReadyForPickup</span> <span class="tok-s">on</span> <span class="tok-ev">PickUp</span>
+  <span class="tok-s">-&gt;</span> <span class="tok-s">transition</span> <span class="tok-st">PickedUp</span></pre>
+    </div>
+    <div class="construct-runtime">
+      <div class="construct-meta">Runtime translation</div>
+      <div class="event-list">
+        <div class="event-row"><span class="event-name">PickUp</span><span>matched</span></div>
+        <div class="event-row event-row--guarded"><span class="event-name">Expire</span><span>guarded</span></div>
+        <div class="event-row event-row--blocked"><span class="event-name">Cancel</span><span>blocked</span></div>
+      </div>
+    </div>
+  </article>
+
+  <article class="construct-card">
+    <div class="construct-top">
+      <h3 class="construct-name">Data</h3>
+      <span class="chip">Configuration</span>
+    </div>
+    <div class="construct-meta">Definition specimen</div>
+    <div class="construct-sample">
+      <pre><span class="tok-s">field</span> <span class="tok-da">OutcomeNote</span> <span class="tok-s">as</span> <span class="tok-dt">string</span> <span class="tok-s">nullable</span>
+<span class="tok-s">field</span> <span class="tok-da">PickupWindowOpen</span> <span class="tok-s">as</span> <span class="tok-dt">boolean</span> <span class="tok-s">default</span> <span class="tok-dv">true</span></pre>
+    </div>
+    <div class="construct-runtime">
+      <div class="construct-meta">Runtime translation</div>
+      <div class="field-table">
+        <div class="field-row">
+          <span class="field-name">VisitorName</span>
+          <span class="field-type">string</span>
+          <span class="field-value">"Ari Chen"</span>
+        </div>
+        <div class="field-row field-row--constrained">
+          <span class="field-name">BadgePrinted</span>
+          <span class="field-type">boolean</span>
+          <span class="field-value">true</span>
+        </div>
+        <div class="field-row field-row--violated">
+          <span class="field-name">OutcomeNote</span>
+          <span class="field-type">string?</span>
+          <span class="field-value">null</span>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <article class="construct-card">
+    <div class="construct-top">
+      <h3 class="construct-name">Rule</h3>
+      <span class="chip">Constraint</span>
+    </div>
+    <div class="construct-meta">Definition specimen</div>
+    <div class="construct-sample">
+      <pre><span class="tok-s">in</span> <span class="tok-st">Expired</span> <span class="tok-s">assert</span> <span class="tok-da">OutcomeNote</span> <span class="tok-s">!=</span> <span class="tok-dv">null</span>
+  <span class="tok-s">because</span> <span class="tok-ru">"Expired pickups must record why the badge was not collected"</span></pre>
+    </div>
+    <div class="construct-runtime">
+      <div class="construct-meta">Runtime translation</div>
+      <div class="verdict-grid">
+        <div class="verdict-card verdict-card--valid">Satisfied: pickup window closed after note capture.</div>
+        <div class="verdict-card verdict-card--violated">Violated: expired badge is missing an outcome note.</div>
+      </div>
+    </div>
+  </article>
+
+  <aside class="runtime-legend">
+    <div class="proof-note-label">Why this stays an island</div>
+    <p>The gallery is not just repeated prose. It is a specific scanning structure with paired specimens, chips, tables, and verdict cards. Authoring that in raw markdown would either collapse the layout or push too much presentational syntax into the prose source.</p>
+  </aside>
+
+  <aside class="band-callout">
+    <div class="proof-note-label">Authoring split</div>
+    <p>Markdown still owns the section frame, tier explanation, and proof notes. The island only owns the dense gallery body.</p>
+  </aside>
+</div>

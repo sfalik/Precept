@@ -1,0 +1,100 @@
+<div class="proof-layout" aria-label="Definition and runtime proof split">
+  <section class="proof-pane">
+    <div class="proof-bar">
+      <span>Definition</span>
+      <span>VisitorBadgePickup</span>
+    </div>
+    <div class="proof-pane-body">
+      <pre><span class="tok-sd">precept</span> VisitorBadgePickup
+
+<span class="tok-s">field</span> <span class="tok-da">VisitorName</span> <span class="tok-s">as</span> <span class="tok-dt">string</span> nullable
+<span class="tok-s">field</span> <span class="tok-da">BadgePrinted</span> <span class="tok-s">as</span> <span class="tok-dt">boolean</span> <span class="tok-s">default</span> <span class="tok-dv">false</span>
+<span class="tok-s">field</span> <span class="tok-da">PickupWindowOpen</span> <span class="tok-s">as</span> <span class="tok-dt">boolean</span> <span class="tok-s">default</span> <span class="tok-dv">true</span>
+<span class="tok-s">field</span> <span class="tok-da">OutcomeNote</span> <span class="tok-s">as</span> <span class="tok-dt">string</span> nullable
+
+<span class="tok-s">state</span> <span class="tok-st">Requested</span> initial
+<span class="tok-s">state</span> <span class="tok-st">Approved</span>
+<span class="tok-s">state</span> <span class="tok-st">ReadyForPickup</span>
+<span class="tok-s">state</span> <span class="tok-st">Expired</span>
+
+<span class="tok-s">event</span> <span class="tok-ev">PrintBadge</span>
+<span class="tok-s">event</span> <span class="tok-ev">Expire</span>
+
+<span class="tok-s">from</span> <span class="tok-st">Approved</span> <span class="tok-s">on</span> <span class="tok-ev">PrintBadge</span>
+  <span class="tok-s">-&gt;</span> <span class="tok-s">set</span> <span class="tok-da">BadgePrinted</span> <span class="tok-s">=</span> <span class="tok-dv">true</span>
+  <span class="tok-s">-&gt;</span> <span class="tok-s">transition</span> <span class="tok-st">ReadyForPickup</span>
+
+<span class="tok-s">from</span> <span class="tok-st">ReadyForPickup</span> <span class="tok-s">on</span> <span class="tok-ev">Expire</span> <span class="tok-s">when</span> <span class="tok-da">PickupWindowOpen</span> <span class="tok-s">==</span> <span class="tok-dv">false</span>
+  <span class="tok-s">-&gt;</span> <span class="tok-s">set</span> <span class="tok-da">OutcomeNote</span> <span class="tok-s">=</span> <span class="tok-ru">"Pickup window closed before collection"</span>
+  <span class="tok-s">-&gt;</span> <span class="tok-s">transition</span> <span class="tok-st">Expired</span></pre>
+
+      <div class="proof-meta">
+        <span class="surface-pill">Authored law</span>
+        <span class="surface-pill">One file</span>
+        <span class="surface-pill">Deterministic reading</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="proof-pane">
+    <div class="proof-bar">
+      <span>Runtime</span>
+      <span>Snapshot</span>
+    </div>
+    <div class="proof-pane-body">
+      <div class="diagram-stage" aria-label="Runtime state diagram snapshot">
+        <div class="state-node">
+          <span class="table-label">Initial</span>
+          <span>Requested</span>
+        </div>
+        <div class="state-node state-node--current">
+          <span class="table-label">Current</span>
+          <em>ReadyForPickup</em>
+        </div>
+        <div class="state-node state-node--terminal">
+          <span class="table-label">Potential</span>
+          <span>Expired</span>
+        </div>
+      </div>
+
+      <div class="runtime-lane">
+        <div class="proof-note-label">Available events</div>
+        <div class="event-list">
+          <div class="event-row"><span class="event-name">PickUp</span><span>enabled</span></div>
+          <div class="event-row event-row--blocked"><span class="event-name">Expire</span><span>blocked while window is open</span></div>
+        </div>
+      </div>
+
+      <div class="runtime-lane">
+        <div class="proof-note-label">Configuration readout</div>
+        <div class="field-table">
+          <div class="field-row">
+            <span class="field-name">VisitorName</span>
+            <span class="field-type">string</span>
+            <span class="field-value">"Ari Chen"</span>
+          </div>
+          <div class="field-row field-row--constrained">
+            <span class="field-name">BadgePrinted</span>
+            <span class="field-type">boolean</span>
+            <span class="field-value">true</span>
+          </div>
+          <div class="field-row">
+            <span class="field-name">PickupWindowOpen</span>
+            <span class="field-type">boolean</span>
+            <span class="field-value">true</span>
+          </div>
+          <div class="field-row field-row--violated">
+            <span class="field-name">OutcomeNote</span>
+            <span class="field-type">string?</span>
+            <span class="field-value">null</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="verdict-grid">
+        <div class="verdict-card verdict-card--valid">Authoring identity remains stable: state and event semantics still read first.</div>
+        <div class="verdict-card verdict-card--violated">Outcome pressure is additive: blocked events and missing notes read as overlays, not as new construct families.</div>
+      </div>
+    </div>
+  </section>
+</div>
