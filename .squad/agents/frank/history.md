@@ -27,6 +27,41 @@
 - **Key insight:** State modifiers constrain graph-structural roles (compile-time provable). Event modifiers constrain behavioral properties (need runtime tracking). The asymmetry is fundamental, not incidental.
 - **Domain taxonomy decision:** Created new domain "Structural lifecycle modifiers" (domain #23 in domain-map). Not an extension of existing domains — it adds *new declarations* that create new provable properties, distinct from constraint composition (value constraints), static reasoning (proving from existing declarations), and entity modeling (data shape).
 - Updated `research/language/README.md` domain index and horizon domains list. Updated `research/language/domain-map.md` with domain #23 entry and priority assessment.
+### 2026-04-11 — Constraint scoping symmetry analysis: full design space exploration
+- Shane asked whether there's a mechanism that would make the scoping model symmetrical across all constraint declarations (invariant, assert, edit), without the problems identified in the `when`-on-assert rejection.
+- **Explored 10 structural alternatives:** (A) invariant with state prefix — collapses invariant/assert, rejected; (B) universal `when` on everything — event asserts don't need it; (C) rename `when` to `where` — cosmetic; (D) block-scoped `when` (FluentValidation pattern) — breaks flat grammar; (E) invariant gains preposition — same as A; (F) extend `when` to assert — RECOMMENDED; (G) prefix/suffix model — same as F; (H) eliminate invariant as `in any assert` — loses Principle #5; (I) scoped blocks with `end` — overengineered; (J) accept asymmetry as-is — creates teaching gap post-#14.
+- **Key structural insight:** The asymmetry isn't between `invariant` and `assert`. It's between **data-truth declarations** and **event-truth declarations**. All data-truth forms (`invariant`, `in/to/from assert`, `in edit`) should accept `when`. Event-truth (`on <Event> assert`) should not — different scope contract (transient input vs. persistent state).
+- **Recommendation: Expand issue #14 to include `when` on `in/to/from <State> assert`.** Completes the data-truth conditional surface. Zero new constructs — reuses `WhenOpt` same grammar production. Marginal implementation cost. Improves teachability ("any data-truth declaration accepts `when`"), readability (replaces implication pattern `not G or X`), and inspectability (inspector shows guard-skipped vs. guard-evaluated).
+- **Sole justified exception:** `on <Event> assert` excluded — scope category mismatch (event args are transient, no persistent data condition should gate input validation). Zero samples need it. Implication pattern is natural for same-scope operands.
+- **Two-axis model:** Scope axis (global / state prefix / event prefix) × Condition axis (unconditional / `when` guard). Every cell is filled or explicitly excluded with principled reason.
+- Decision note filed at `.squad/decisions/inbox/frank-constraint-scoping-symmetry.md`. Awaiting Shane sign-off.
+
+### 2026-04-11 — Should `in <State>` become a general-purpose expression predicate? Analysis and verdict
+- Shane asked whether `in <State>` should be promoted from a declaration-level prefix to a boolean predicate usable in any expression position (guards, `if...then...else`, `set` RHS, invariants).
+- **Verdict: EXPLICITLY REJECT. Do not pursue, not even as a deferred item.**
+- **Three independent disqualifying grounds:** (1) Principle #5 violation — collapses the data-truth/movement-truth boundary by mixing state queries into data expressions; (2) No precedent in comparable systems — state-as-predicate only exists in parallel-region statecharts (Harel, SCXML), which Precept does not support; every declarative rule language comparable to Precept keeps state out of expressions (Cedar, DMN, Drools, OPA, FluentValidation); (3) Every use case has a better targeted solution through existing or planned mechanisms.
+- **Specific confusion identified:** Homophone ambiguity between `in Draft assert X` (declaration scope) and `when in Draft` (boolean test) — same words, different mechanisms. Expression evaluator scope leak — currently pure (fields/args/literals), would need runtime state. Stateless incoherence — state predicate in a stateless precept is a category error. Redundancy — doubles the AI authoring surface.
+- **If state-dependent computed values are needed (issue #17):** The correct answer is `in <State> computed X -> expr` (declaration-scoped derivation, consistent with existing `in <State>` patterns), NOT a general-purpose state predicate.
+- This analysis is adjacent to issue #14; issue #14's locked Decision #3 (field-scope only, no state references in `when` guards) is validated and reinforced by this verdict.
+- Decision note filed at `.squad/decisions/inbox/frank-in-state-predicate-rejection.md`.
+
+### 2026-04-11 — Should `invariant`/`assert` be renamed to `rule`? Analysis and verdict
+- Shane asked whether the current two-keyword system (`invariant` for data constraints, `assert` for state/event constraints) should collapse into a single `rule` keyword.
+- **Verdict: KEEP `invariant` and `assert`. Do NOT unify to `rule`.**
+- Philosophy analysis: `docs/philosophy.md` uses "rules" as the umbrella concept (~47 occurrences) but explicitly distinguishes "invariants" from "assertions" in its own definitions (line 15, line 30, line 48). The two-keyword system IS the philosophy's design.
+- Principle #5 ("Data truth vs movement truth — the keyword tells you the category") is directly encoded in the keyword split. Collapsing to `rule` loses the signal.
+- Grammar test: `assert` is a verb and works after prepositions (`in Approved assert X`). `rule` is a noun and reads awkwardly in the same position (`in Approved rule X`). The keywords are grammatically correct for their syntactic positions.
+- Domain expert test: Domain experts don't say "invariant," but they DO understand "always true" vs "true here." The `because` clause makes intent transparent on first reading. Jargon learned in one example is acceptable; imprecision that causes ongoing confusion is not.
+- Named predicate impact: Keeping the split makes `define` (from the prior recommendation) cleaner — the constraint surface uses `invariant`/`assert`, the naming surface uses `define`. No overlap, no confusion.
+- Addressed all 8 analysis dimensions: philosophy alignment, current semantics, RulesDesign.md history, domain expert test, unified case, split-keyword case, named predicate interaction, principle-by-principle scoring.
+- Decision note filed at `.squad/decisions/inbox/frank-rule-keyword-unification.md`. Awaiting Shane sign-off.
+
+### 2026-04-11 — Issue #8 keyword analysis: `rule` vs `define` for named predicates
+- Shane raised: "Is it confusing to declare a rule that is not really a rule?" — questioning the April 5 convergence on `rule <Name> when <BoolExpr>`.
+- **Critical finding:** `rule` is NOT a current DSL keyword. The `PreceptToken` enum has no `Rule` entry; the parser doesn't recognize it; no sample uses it. The RulesDesign.md concepts were implemented as `invariant`/`assert` per the implementation plan terminology change. The premise of a "keyword split" is factually incorrect — but the naming concern is valid on its own merits.
+- **Analysis:** Named predicates are fundamentally routing conditions (they start false, become true), not data constraints. They cannot be self-enforcing without breaking initial-state validity. The word "rule" implies enforcement; using it for a non-enforcing declaration breaks the pattern that every constraint-shaped keyword in Precept is operative.
+- **Recommendation:** Use `define` instead of `rule`. "define LoanEligible when ..." signals naming, not enforcement. Aligns with Principles #1 (inspectability), #2 (English-ish), #5 (data truth vs movement truth). Compiler should warn on unreferenced definitions (dead-code detection).
+- Decision note filed at `.squad/decisions/inbox/frank-named-rule-keyword-confusion.md`. Awaiting Shane sign-off.
 
 ### 2026-04-10 — Issue #31 shipped
 - PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
@@ -118,6 +153,15 @@
 - Expanded GitHub issues #11, #12, and #13 into fuller proposal narratives with before/after Precept examples, reference-language snippets, and explicit architectural cautions.
 - Logged the wave placement and guardrails in .squad/decisions.md so the issue bodies stay aligned with keyword-anchored flat statements and first-match routing.
 
+### 2026-04-11 — Verdict modifiers research: externally grounded rewrite
+- Completely rewrote `research/language/expressiveness/verdict-modifiers.md` with all comparable-system claims grounded in actual fetched documentation from 7 systems: FluentValidation (docs.fluentvalidation.net), ESLint (eslint.org), XState v5 (stately.ai), BPMN 2.0/Camunda, Kubernetes (kubernetes.io), Cedar (docs.cedarpolicy.com), Roslyn/.NET (learn.microsoft.com).
+- **Major structural additions:** (1) New Cross-System Synthesis section extracting 5 universal patterns from the evidence base. (2) New Architectural Decision section explicitly framing declaration-level vs configuration-level as THE key design choice, recommending Option A (declaration-level) for Precept's one-file-completeness guarantee. (3) External Documentation Sources table with URLs and access dates.
+- **Strongest new finding (Pattern 5):** Zero comparable systems put verdict severity on state declarations. XState has tags/meta but no severity. BPMN applies severity to events, not states. Step Functions' `Succeed`/`Fail` are structural types, not annotations. State verdict is genuinely novel territory — significantly riskier than v1 analysis suggested.
+- **Key analytical upgrade:** FluentValidation's `IsValid`-is-still-false behavior documented as evidence for Pattern 1 (severity is always metadata). Kubernetes evaluation-enforcement separation documented as the purest configuration-level model. BPMN error/escalation distinction documented as the strongest three-tier precedent.
+- **Tier adjustments:** Event verdict remains Tier 1 (now with stronger grounding). State verdict remains Tier 2 but with significantly upgraded caution flag. Rule verdict blocked on enforcement behavior question (does warning block or allow?).
+- **Recommendation unchanged but strengthened:** Start with event verdict only (Tier 1). Declaration-level architecture. One-file completeness is non-negotiable.
+- Decision inbox updated at `.squad/decisions/inbox/frank-verdict-modifier-research.md`.
+
 ### 2026-04-05 - Trunk consolidation dissent logged
 - Audited the repo topology and argued for force-promoting 'feature/language-redesign' to 'main' because 'main' still carries only placeholder history.
 - The team did not adopt that path: Uncle Leo's review blocked direct trunk replacement, so Frank's recommendation now stands as a documented dissent pending Shane sign-off.
@@ -158,7 +202,73 @@
 - The slippery slope concern is acknowledged but self-correcting: the escape hatch is cheap enough that demand for stateless events won't reach critical mass.
 - Decision filed at `.squad/decisions/inbox/frank-stateless-event-boundary.md`.
 
+### 2026-04-11 — Verdict Modifier Design Options (All Tiers)
+
+**Produced:** `research/language/expressiveness/verdict-modifier-design-options.md` + decision note
+
+**Context:** Shane approved moving forward with verdict modifiers across all 3 tiers (events, rules, states) in research mode. Task was to convert the background research into concrete design options (what would implementation look like? what trade-offs?).
+
+**Deliverables:**
+- **Events (Option A Recommended):** Outcome-shape declaration (`event Approve success`). Declares intent; compiler verifies rows match (C58–C59). Precedent strong; philosophy aligned.
+- **Rules (Path 1 Recommended, Path 2 Open):** Warnings block (Path 1, maintains philosophy) or don't block (Path 2, requires philosophy refresh). THIS IS THE CRITICAL OPEN GATE. Shane must choose before rules design finalizes.
+- **States (Option A Recommended):** Endpoint categorization (`state Approved success`). Enables reachability diagnostics (C65–C67); improves visualization. Genuinely novel; no comparable system does this. Value prop requires use-case validation before proposal.
+
+**Architecture decisions locked (declaration-level, metadata-only):**
+- All verdicts are author-declared in `.precept` file (one-file completeness)
+- No runtime behavioral changes (prevention guarantee intact)
+- All impact is styling, diagnostics, and tooling (MCP, diagrams, IDE indicators)
+- Verdicts are intent metadata, not enforcement overrides
+
+**Critical findings:**
+
+1. **The non-blocking warning question cuts to philosophy.** Shane said "if we're doing this, non-error rules should be non-blocking." But non-blocking violates "prevention, not detection." Three paths:
+   - Path 1: Warnings block anyway (maintain philosophy, simpler, but "warning that blocks" is confusing)
+   - Path 2: Warnings don't block (flexible, but requires philosophy refresh downgrading core guarantee)
+   - Path 3: New outcome category (unproven complexity)
+   
+   Recommended Path 1 but flagged as BLOCKING DECISION for Shane. If Path 2 desired, philosophy team must refresh guarantee language first.
+
+2. **State verdicts are novel opportunity.** No comparable DSL annotates states with success/failure verdicts. This is either a differentiator (valuable) or overdesign (not useful). Requires validation: gather 2-3 real `precept` files to demonstrate readability improvement.
+
+3. **Event verdicts are the strong candidate.** Broad precedent (BPMN, FluentValidation, Roslyn); compile-time provable from declared rows; philosophy coherent. Option A has highest confidence.
+
+4. **All options are declaration-level, metadata-only.** Deliberately rejected configuration-level model (ESLint/Kubernetes style) for Precept — violates one-file completeness and is less suitable for non-programmer audience.
+
+**Process learnings:**
+- Architectural options document is distinct from background research. Research answers "how do comparable systems work?" Options answer "what would THIS look like?" Both are needed.
+- Philosophy-level gates (like non-blocking semantics) must be escalated early; they block design finalization.
+- Novel territory (state verdicts) requires post-design evidence collection before proposal stage.
+
+**Next steps:**
+- Shane to resolve non-blocking warnings path (1 vs 2)
+- Gather state verdict use-case validation (3 sample precepts)
+- Route Path 2 (if chosen) to philosophy team for guarantee refresh
+- Once open gates resolved, design can move to proposal stage (#Y) per CONTRIBUTING.md
+
 ## Learnings
+
+### 2026-04-11 — Event assert `when` exclusion stress-tested: CONFIRMED CORRECT
+- Shane requested steel-man counterargument against the exclusion of `when` guards from `on <Event> assert` in issue #14.
+- **Theoretical gap is real.** Domain scenarios exist where event arg validation applicability depends on entity field state (tier-dependent amount caps, config-dependent required fields, urgency-dependent minimums). The original rationale was imprecise: "transient input validation doesn't benefit from persistent-data guards" is slightly wrong — the APPLICABILITY of arg-only validation can depend on persistent data, even though the validation body itself remains arg-only.
+- **Practical gap is minimal.** The `from any on Event when <Guard> -> reject "..."` pattern covers 100% of these cases. Confirmed via MCP compile + fire: `from any` expands correctly, rejection guards combine fields + args, first-match ordering is preserved, and the runtime produces the correct `Rejected` outcome.
+- **Corpus evidence: 0/100+ event asserts across 24 samples need data-conditional applicability.** Every event assert is a universal structural constraint (non-empty, positive, range, modulus) that applies regardless of entity state.
+- **Pipeline distinction confirmed via MCP inspect/fire:** Event assert failures produce `source.kind: "event-assertion"` (pre-routing), while `from any` rejection rows produce `source.kind: "transition-rejection"` (routed). The inspector distinguishes "malformed input" from "routed refusal." This semantic distinction is clean and valuable.
+- **`from any` workaround cost:** C050/C051 diagnostic warnings when `from any` rejection rows expand into states where the event has no success path. This is a real paper cut but a tooling concern (compiler heuristic improvement), not a language surface issue.
+- **Verdict: Exclusion CONFIRMED.** The theoretical gap is too rare, the workaround is complete, and the semantic clarity of "event asserts = context-free well-formedness" outweighs the marginal expressiveness benefit. No change to issue #14.
+- **Precision correction for the rationale:** The exclusion rationale should read: "Event arg validation applicability rarely depends on entity field state, and the `from any on Event when ... -> reject` pattern covers those cases without cracking the event assert's clean scope contract." Not the slightly-wrong "transient input validation doesn't benefit from persistent-data guards."
+
+### 2026-04-11 — Conditional asserts (`when` on `assert`) analyzed and rejected → REVERSED by symmetry analysis
+- Shane asked whether `in <State> assert <Expr> when <Condition> because "..."` belongs in issue #14, as a separate proposal, or should be rejected.
+- **Initial verdict: REJECT.** Six independent arguments against (expressiveness gap absent, double-filter confusion, zero demand, Principle #5 asymmetry correct, reading order degradation, semantic purity).
+- Decision note filed at `.squad/decisions/inbox/frank-conditional-assert-rejection.md`.
+- **REVERSED** by the constraint scoping symmetry analysis (same date). The deeper analysis reframed the asymmetry: it's not between `invariant` and `assert` — it's between **data-truth** and **event-truth** declarations. All data-truth forms (`invariant`, `in/to/from assert`, `in edit`) should accept `when`. Only event-truth (`on <Event> assert`) is excluded — scope category mismatch (transient input vs persistent state).
+- Shane approved the scope expansion. Issue #14 updated to include conditional state asserts as the third declared form.
+
+### 2026-04-11 — Issue #14 scope expansion: conditional state asserts added
+- Shane approved expanding issue #14 based on the constraint scoping symmetry analysis at `.squad/decisions/inbox/frank-constraint-scoping-symmetry.md`.
+- **Surgical additions to issue #14 body:** (1) Summary expanded with third declared form and two-axis model; (2) New "Conditional state asserts" syntax subsection with `in`, `to`, `from` variants; (3) Semantic rule added: `on <Event> assert` does NOT get `when` — principled exception; (4) New locked decision #5: `when` on all data-truth declarations, NOT on event-truth; (5) Implementation scope expanded with parser/type-checker/runtime/LS/grammar/MCP items for conditional asserts; (6) New acceptance criteria subsection for conditional state asserts; (7) Before/after example showing De Morgan's workaround vs `when` form.
+- **Tool limitation:** GitHub MCP tools unavailable in Precept Author mode. Additions composed and presented for manual application.
+- Decision note filed at `.squad/decisions/inbox/frank-issue14-scope-expansion.md`.
 
 ### 2026-04-08 - Warning model research for structurally degenerate precepts
 - Audited the full diagnostic infrastructure: `ConstraintSeverity` enum (Error/Warning/Hint), `DiagnosticCatalog.cs` constraints C48–C53, `PreceptAnalysis.cs` graph analysis, and the language server's `MapValidationDiagnostic` severity mapping. All three tiers are fully wired and operational.
@@ -220,6 +330,19 @@
 - Proposal-specific status labels (`needs-decision`, `decided`, `deferred`) are architectural clutter. A proposal is just an issue type; decision-waiting belongs in board status (`In Review`), and the final outcome belongs in the closing comment plus issue closure.
 - Recommended minimal routing surface for this repo: `squad` as the team inbox and exactly one `squad:{member}` label for direct ownership. Keep priority/blocker/security-style labels optional and special; do not let them become shadow workflow states.
 - Key references for this recommendation: `.squad/templates/issue-lifecycle.md`, `.squad/routing.md`, `docs/research/language/README.md`, and `.copilot/skills/architectural-proposals/SKILL.md`.
+
+### 2026-04-11 — Event assert `when` exclusion overturned: arg-only guards SHOULD be added
+- Shane challenged the exclusion of `when` from `on <Event> assert` in issue #14 on two fronts: (1) whether `from any on Event when Guard -> reject` is a workaround or the preferred form, and (2) whether `when` guards referencing event args (not fields) on event asserts should be supported.
+- **Challenge 1 verdict: CONFIRMED.** `from any on Event when Guard -> reject` is the PREFERRED form, not a workaround. When event arg validation depends on entity field state, it IS contextual routing (cross-scope), and transition rows are the right mechanism. Distinguished from the De Morgan's case: De Morgan's encoded conditional invariants through unconditional invariants (wrong mechanism for the intent); `from any` encodes contextual routing through contextual routing (right mechanism). MCP fire verified: `source.kind: "event-assertion"` vs `source.kind: "transition-rejection"` — distinct inspector categories, correct semantic separation.
+- **Challenge 2 verdict: REVERSE POSITION.** Arg-only `when` guards on event asserts SHOULD be added to issue #14. Three prior exclusion arguments don't survive re-examination:
+  1. "Scope mismatch" → FALSE when guard references args. Both guard and body are arg-only — no cross-boundary mixing.
+  2. "No sample evidence" → Shane is right that the corpus is arbitrary. The principled question: does the mechanism serve a real domain pattern? YES — multi-mode events (draft vs final, internal vs external) where validation requirements differ by the event's own arguments.
+  3. "Implication pattern is natural for same-scope" → WRONG. Same De Morgan's mental gymnastics as the invariant case. Readability benefit of `when` is scope-independent.
+- **Scope rule:** `when` inherits the scope of its parent declaration. Data-truth declarations: field-scoped guards. Event-truth declarations: arg-scoped guards. One rule, no exceptions.
+- **Two-axis model completed.** With this addition, every cell in the scope × condition matrix is filled. No exclusion, no principled exception needed.
+- **Two-mechanism model for conditional event validation:** (1) Same-scope (arg guard + arg assertion) → `on E assert X when G`. (2) Cross-scope (field guard + arg routing) → `from any on E when G -> reject`. Each concern maps to exactly one mechanism.
+- **Self-correction:** I was inconsistent — I accepted "functionally equivalent to implication" as a reason to exclude `when` from event asserts while rejecting that same argument for invariants where `when` was added. The readability, inspectability, and intent-clarity benefits are scope-independent.
+- Decision note filed at `.squad/decisions/inbox/frank-event-assert-when-reversal.md`. Awaiting Shane sign-off.
 
 ### 2026-05-01 - Expression research methodology
 - MCP compile tool is the authoritative way to confirm expression limitations — faster and more reliable than reading parser source. Use `precept_compile` with minimal test precepts to verify each proposed construct before documenting it.
@@ -420,3 +543,17 @@ All proposals are additive and Superpower-compatible. No structural redesign req
 - Updated implementation scope: removed "reject events/transitions in stateless context" parser items, added analysis-phase items for new warning diagnostic and C50 severity upgrade.
 - Updated acceptance criteria: events-without-states produces warning (not error), C50 severity = warning, transitions in stateless fail existing C54.
 - Key writing lesson: conciseness requires structural discipline — say each argument once in the section where it belongs, then reference it elsewhere. The old issue repeated the philosophy argument in Summary, Motivation, Design Philosophy Thread, and Locked Decisions. The rewrite eliminates that redundancy without losing the argument.
+
+### 2026-04-11 — Verdict modifiers research: full design space analysis
+- Shane requested comprehensive analysis of baking verdict categories (success/emerald, warning/amber, error/rose) into the Precept DSL as language-level modifiers.
+- **Produced comprehensive research** at `research/language/expressiveness/verdict-modifiers.md` covering:
+  - 5 application surfaces analyzed (states, events, fields, rules, combinations)
+  - 8 comparable systems surveyed (ESLint, FluentValidation, Kubernetes, BPMN, Cedar/OPA, XState, FEEL/DMN, TLA+/Alloy)
+  - Compile-time provability assessed per surface (event verdict = strong; state/field = weak)
+  - Philosophy alignment checked against all 12 principles (strong fit, soft trade-off on compile-time-first acceptable)
+  - Interaction with existing diagnostics and TransitionOutcome enum modeled
+  - Tiered recommendations: Tier 1 event verdict (propose), Tier 2 rule/state verdicts (explore), Tier 3 field/entity verdicts (defer)
+- **Key insight:** Verdict modifiers are intent declarations + tooling directives, not structural constraints. Similar precedent to `nullable` and `default` (already in DSL).
+- **Strongest candidate:** Event verdict — high compile-time provability (verify outcome shapes match declared intent), high tooling impact (diagram colors, preview, MCP, completions), clear semantics.
+- **Decision note filed** to `.squad/decisions/inbox/frank-verdict-modifier-research.md` with three-tier recommendation and decision points for Shane.
+- **Open question:** Should rule severity be DSL-native (declaration-level) or host-configured (external)? Architectural decision needed before Tier 2 proceeds.

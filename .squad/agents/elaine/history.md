@@ -37,6 +37,19 @@
 
 2026-04-05T03:20:00Z: Steinbrenner applied branch protection to main (pull requests required, force pushes/admin only, no branch deletion).
 
+### 2026-04-11 — Verdict Modifiers UX Perspective Pass
+
+- Created comprehensive UX analysis at `research/language/expressiveness/verdict-modifier-ux-perspective.md`.
+- Key finding: **State verdict modifiers are genuinely novel UX territory** with zero precedent in comparable systems (XState, BPMN, Kubernetes, UML). This is a natural differentiator for Precept's governance positioning.
+- Visual integration: Verdict modifiers layer as authored-intent beneath runtime verdicts. Authored verdicts render at 60% opacity; runtime outcomes overlay at 100% if different. Opacity distinction prevents false confidence.
+- Minimum viable treatment: Small badge glyphs (✓, ✕, ⚠) in node corners, not full fills. Emerald/Rose/Amber from semantic system. No visual noise, high semantic clarity.
+- Interaction pattern established: Completions scaffold verdicts toward consistency (not hard requirement). Authoring suggests `success` for events with only transition outcomes; `error` for events with any rejection rows.
+- Diagnostic code C60 introduces verdict mismatch messaging: "Event declared success, but produced rejection." Educates without blocking; info/warning tier.
+- Ship order recommendation: Events first (strong precedent, low noise), rules second (builds on events), states third (highest novelty, requires post-launch validation).
+- Key UX risks identified and mitigated: visual noise (badges only), precedent confusion (lead with differentiator), authored/runtime distinction (opacity + diagnostics), authoring friction (optional, not required).
+- Decision note filed at `.squad/decisions/inbox/elaine-verdict-ux-perspective.md` for Shane/Frank review.
+- State verdict emerges as the differentiator: diagram tells a governance story (happy paths in green, error paths in red). This is compellingly unique to Precept.
+
 ## Learnings
 
 - 2026-04-06 — The semantic visual system page should frame itself as Precept's strongest live expression of the visual system: still canonical and disciplined, but explicitly allowed to be beautiful enough to prove the system rather than merely police it.

@@ -6,6 +6,140 @@
 
 ---
 
+### 2026-04-11T17:00:00Z: Shane — Verdict modifier research decisions (5 owner answers)
+**By:** Shane (owner)
+**Status:** Captured — team collaboration completed
+
+1. **Proceed:** Yes — take verdict modifiers to the next level of research.
+2. **Scope:** Evolve ALL tiers (events, rules, states), not event-only.
+3. **Non-blocking warnings:** If we do rule severity, non-error rules should become non-blocking. Open question: can this be strictly enforced in keeping with "prevention, not detection"?
+4. **State verdict as differentiator:** The fact that no system does this is an opportunity, not a deterrent. Explore the novel territory.
+5. **Timeline:** Stay in research mode — design options, value proposition, roadmap, not implementation.
+
+Additional directive: involve multiple team members (UX, runtime, PM — not just architecture).
+
+---
+
+### 2026-04-11: Frank — Verdict modifier design options — all 3 tiers
+**By:** Frank (Lead/Architect)
+**Status:** Filed — design options presented, awaiting owner decisions on non-blocking gate and state verdict validation
+
+Produced comprehensive design options for verdict modifiers across events, rules, and states. Deliverable: `research/language/expressiveness/verdict-modifier-design-options.md`.
+
+**Events (Strongest Confidence) — Recommend Option A (outcome-shape declaration):** `event Approve success` / `event Deny error`. Compiler verifies transition row outcomes match declared intent (C58–C59). Broad precedent (FluentValidation, BPMN, Roslyn). Philosophy-aligned (intent only, no runtime changes).
+
+**Rules (CRITICAL NON-BLOCKING DECISION):**
+- Path A1 (blocking warnings, styled as concerns): Both error and warning constraints block. Severity is diagnostic metadata only. Maintains core guarantee.
+- Path A2 (non-blocking warnings): Warnings allow operation to succeed with annotation. Requires philosophy refresh. Owner decision needed.
+
+**States (Novel Territory) — Recommend Option A (endpoint categorization):** `state Approved success` / `state Denied error` / `state OnHold warning`. Neutral/transient states have no modifier. New diagnostics: C65 (success unreachable), C66 (no endpoints declared), C67 (no path to success).
+
+---
+
+### 2026-04-11: Elaine — Verdict modifier UX perspective across all surfaces
+**By:** Elaine (UX Designer)
+**Status:** Filed — awaiting owner review
+
+UX analysis of verdict modifiers across editor, preview, inspector, hover, and completions. Deliverable: `research/language/expressiveness/verdict-modifier-ux-perspective.md`.
+
+**Key findings:** (1) State verdict is genuinely novel UX territory — an opportunity for visual storytelling (happy path vs error path instantly recognizable). (2) Semantic visual system integration requires a two-layer model: authored-intent at 60% opacity beneath runtime-outcome at 100%. (3) Ship order: events first (strongest precedent, lowest noise), rules second, states third (highest novelty). (4) Completions as scaffolding — pre-rank verdict suggestions based on outcome shape analysis. (5) C60 verdict mismatch diagnostic educates rather than blocks. (6) Minimum viable treatment: small badge glyphs (✓/✕/⚠) in node corners.
+
+---
+
+### 2026-04-11: George — Verdict modifier runtime enforceability — non-blocking warnings CAN be strict
+**By:** George (Runtime Dev)
+**Status:** Filed — awaiting Shane sign-off on philosophy reframing
+
+Analyzed four models for non-blocking warning enforcement. Deliverable: `research/language/expressiveness/verdict-modifier-runtime-enforceability.md`.
+
+**Answer to Shane: YES.** Non-blocking warnings can be enforced strictly under Model D (Structural Non-Blocking). Current `EvaluateInvariants()` / `EvaluateStateAssertions()` support partitioning into error-pass and warning-pass with no restructuring. Error precedence is strict (any error-level failure blocks entire operation). Default-to-error preserves backward compatibility. Three new diagnostics: C60 (dead warning rule), C61 (contradictory error+warning), C62 (warning-only event).
+
+**Mandatory gate:** Philosophy reframing from "prevention, not detection" to "error-level rules are PREVENTED; warning-level rules are DETECTED and reported." This is an expansion, not a weakening. Shane decides the philosophy update before implementation.
+
+---
+
+### 2026-04-11: Steinbrenner — Verdict modifier roadmap positioning
+**By:** Steinbrenner (PM)
+**Status:** Filed — positioning complete, awaiting owner direction on philosophy lock and milestone choice
+
+Deliverable: `research/language/expressiveness/verdict-modifier-roadmap-positioning.md`.
+
+**Recommend Option D (phased):** Event verdicts in M2 late (after type system), rule verdicts in M3 early, state verdicts in M3 mid. Timeline: 3 slices (~15% scope addition). MVP = event verdicts only. Philosophy gate required before event verdicts ship: is an "intent-declaration tier" (purely semantic annotations enable rich tooling but don't prevent anything) acceptable?
+
+---
+
+### 2026-04-11: Frank — Reject conditional asserts (`assert ... when`). Do not propose.
+**By:** Frank (Lead/Architect)
+**Status:** Recommendation — awaiting Shane sign-off. **SUPERSEDED same-day by scope expansion below.**
+
+Conditional asserts (`in <State> assert X when G`) initially rejected on 6 grounds: no expressiveness gap, double-filter confusion, zero sample demand, Principle #5 asymmetry, reading order degradation, semantic purity. Later reversed after deeper symmetry analysis.
+
+---
+
+### 2026-04-11: Frank — Constraint scoping symmetry analysis — two-axis model
+**By:** Frank (Lead/Architect)
+**Status:** Recommendation — awaiting Shane sign-off
+
+Evaluated 10 structural alternatives (Options A–J) against design principles. The asymmetry isn't between `invariant` and `assert` — it's between **data-truth declarations** and **event-truth declarations**.
+
+**Recommended: Option F — extend `when` to all data-truth declarations.** `invariant`, `in/to/from assert`, and `in edit` all accept `when` guards. `on <Event> assert` does NOT (event-truth category — separate scope contract). One rule, no exceptions within data-truth. The sole exception is explained by Principle #5.
+
+---
+
+### 2026-04-11: Frank — Event assert `when` guards — position reversal (arg-only scope)
+**By:** Frank (Lead/Architect)
+**Status:** Recommendation — awaiting Shane sign-off
+
+Two challenges from Shane answered: (1) `from any on Event when Guard -> reject` is the PREFERRED form for cross-scope conditioning, not a workaround. (2) **Reversal:** `when` on `on <Event> assert` SHOULD be added to issue #14 — with arg-only guard scope. Prior exclusion was wrong. Arg-only guards maintain scope isolation, provide same readability/inspectability benefits as `when` on invariants, and complete the two-axis model. Every cell in the scope×condition matrix is now filled.
+
+---
+
+### 2026-04-11: Frank — Reject `in <State>` as general-purpose expression predicate
+**By:** Frank (Lead/Architect)
+**Status:** Recommendation — awaiting Shane sign-off
+
+Three independent disqualifying grounds: (1) Principle #5 violation — treats state as data, collapsing the data/lifecycle boundary. (2) Zero precedent — no comparable system (Cedar, DMN, Drools, OPA, FluentValidation, XState, Stateless) allows state-as-predicate. (3) Every use case has a better targeted solution via existing declaration forms. Reinforces issue #14 Decision #3 (field-scope only in `when` guards).
+
+---
+
+### 2026-04-11: Frank — Issue #14 scope expansion — conditional state asserts added
+**By:** Frank (Lead/Architect), approved by Shane
+**Status:** Applied — issue #14 body updated
+
+Expanded issue #14 to include `when` guards on `in/to/from <State> assert` declarations. Three declared forms: (1) conditional invariants, (2) conditional state asserts, (3) conditional edit eligibility. Governing principle: the two-axis model — data-truth declarations accept `when`, event-truth declarations do not. Seven surgical additions to issue #14 body.
+
+Reversal note: reverses Frank's earlier same-day rejection. The six initial arguments dissolve under the correct category analysis (data-truth vs event-truth, not invariant vs assert).
+
+---
+
+### 2026-04-11: Frank — Named rule keyword confusion — `define` recommended over `rule`
+**By:** Frank (Lead/Architect)
+**Status:** Recommendation — awaiting Shane sign-off on keyword choice
+
+Critical finding: `rule` is NOT a current DSL keyword. Issue #8 introduces it fresh. But the naming concern is real: `rule` implies enforcement, named predicates are NOT enforced. An unreferenced named rule is dead code that looks like protection — directly undermines "prevention, not detection."
+
+**Recommend `define`:** No enforcement connotation. "Define LoanEligible when..." reads naturally. Keyword-anchored, unambiguous. Precedent: Drools `declare`, SQL `CREATE VIEW`, Alloy `pred`. Dead-definition detection via compiler warning on unreferenced definitions.
+
+---
+
+### 2026-04-11: Steinbrenner — Named rule keyword confusion — PM perspective
+**By:** Steinbrenner (PM)
+**Status:** Recommendation — awaiting Shane sign-off
+
+Confirms Shane's concern is well-founded. Same keyword for auto-enforced constraints and passive predicates is the worst kind of language confusion. Day-1 learners will believe named rules are enforced. No comparable tool overloads a keyword for both enforcement and passive definition.
+
+**PM Recommendation: `guard`** — strongest signal ("guards route, they don't enforce"), xstate precedent, no enforcement expectation, preserves `rule` for enforcement. Ranked alternatives: `guard` > `predicate` > `define` > `check` > `condition` > `rule`.
+
+---
+
+### 2026-04-11: Frank — Rule keyword unification rejected — keep `invariant` and `assert`
+**By:** Frank (Lead/Architect)
+**Status:** Recommendation — awaiting Shane sign-off. Do not re-open.
+
+Full analysis of whether `invariant`/`assert` should be unified to `rule`. Verdict: KEEP the two-keyword system. The philosophy itself uses two terms with distinct semantics. The split serves 6 of 8 relevant design principles. `assert` works as a verb after prepositions; `rule` (a noun) doesn't. Domain experts learn `invariant` from one `because` clause example. Merging to `rule` loses Principle #5 signaling and grammar correctness. The named predicate slot (`define`) stays cleaner with the split.
+
+---
+
 ### 2026-04-10T21:00:00Z: Issue #10 — String `.length` accessor — fully implemented
 **By:** Frank (design analysis), George (runtime + evaluator), Kramer (grammar + completions), Soup Nazi (tests), Coordinator (integration)
 **Status:** Implemented — branch `squad/10-string-length-accessor`, 800 tests passing
