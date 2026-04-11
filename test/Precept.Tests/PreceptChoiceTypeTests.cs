@@ -360,4 +360,157 @@ public class PreceptChoiceTypeTests
         // "Critical" is not in the choice set for the event arg → rejected
         fired.Outcome.Should().Be(TransitionOutcome.Rejected);
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // RUNTIME — ordinal comparison for ordered choice fields
+    //
+    // canonical set: choice("Low","Med","High") ordered
+    // declaration order:  Low=0, Med=1, High=2
+    // alphabetical order: High < Low < Med
+    //
+    // These two orderings diverge. A correct implementation uses declaration
+    // order. A string-comparison implementation produces wrong answers.
+    // These tests are written to FAIL against current behavior (string comparison).
+    // ════════════════════════════════════════════════════════════════════
+
+    // Helper DSL: Priority starts at "Low", Escalate fires when Priority > threshold
+    private static PreceptEngine BuildPriorityEngine() =>
+        PreceptCompiler.Compile(PreceptParser.Parse("""
+            precept M
+            field Priority as choice("Low","Med","High") default "Low" ordered
+            state S initial
+            event SetPriority with Level as choice("Low","Med","High")
+            event EscalateIfAboveLow
+            event EscalateIfAboveMed
+            from S on SetPriority -> set Priority = SetPriority.Level -> no transition
+            from S on EscalateIfAboveLow when Priority > "Low" -> no transition
+            from S on EscalateIfAboveMed when Priority > "Med" -> no transition
+            """));
+
+    [Fact]
+    public void Runtime_OrderedChoice_GreaterThan_MatchesByDeclarationOrder()
+    {
+        // "High" is at index 2, "Low" is at index 0.
+        // Declaration order: High > Low → guard should MATCH.
+        // Alphabetical order: "High" < "Low" (H < L) → guard would FAIL (wrong).
+        var engine = BuildPriorityEngine();
+        var inst = engine.CreateInstance();
+
+        // Set Priority to "High"
+        engine.Fire(inst, "SetPriority", new Dictionary<string, object?> { ["Level"] = "High" })
+            .UpdatedInstance.Should().NotBeNull();
+        var afterSet = engine.Fire(inst, "SetPriority", new Dictionary<string, object?> { ["Level"] = "High" });
+        var highInst = afterSet.UpdatedInstance!;
+
+        // Fire guard: Priority > "Low" — "High" is above "Low" in declaration order → should match
+        var fired = engine.Fire(highInst, "EscalateIfAboveLow");
+
+        fired.Outcome.Should().Be(TransitionOutcome.NoTransition,
+            because: "'High' (index 2) > 'Low' (index 0) in declaration order");
+    }
+
+    [Fact]
+    public void Runtime_OrderedChoice_GreaterThan_DoesNotMatchWhenEqual()
+    {
+        // Priority == "Low": Low > "Low" is false.
+        var engine = BuildPriorityEngine();
+        var inst = engine.CreateInstance();
+        // Default is already "Low" — fire event directly
+        var fired = engine.Fire(inst, "EscalateIfAboveLow");
+
+        fired.Outcome.Should().Be(TransitionOutcome.Unmatched,
+            because: "'Low' (index 0) is not > 'Low' (index 0)");
+    }
+
+    [Fact]
+    public void Runtime_OrderedChoice_GreaterThan_DoesNotMatchLowerRank()
+    {
+        // Priority = "Low", guard is Priority > "Med".
+        // Declaration order: Low (0) is not > Med (1) → guard should NOT match.
+        // Alphabetical: "Low" > "Med" (L > M is false anyway — same conclusion by accident).
+        // Use Med > High test to expose divergence:
+        var engine = PreceptCompiler.Compile(PreceptParser.Parse("""
+            precept M
+            field Priority as choice("Low","Med","High") default "Low" ordered
+            state S initial
+            event SetPriority with Level as choice("Low","Med","High")
+            event CheckMedAboveHigh
+            from S on SetPriority -> set Priority = SetPriority.Level -> no transition
+            from S on CheckMedAboveHigh when Priority > "High" -> no transition
+            """));
+
+        var inst = engine.CreateInstance();
+        var afterSet = engine.Fire(inst, "SetPriority", new Dictionary<string, object?> { ["Level"] = "Med" });
+
+        // Priority = "Med" → Med > "High"?
+        // Declaration order: Med (1) is NOT > High (2) → should be Unmatched.
+        // Alphabetical: "Med" > "High" (M > H) → would incorrectly match.
+        var fired = engine.Fire(afterSet.UpdatedInstance!, "CheckMedAboveHigh");
+
+        fired.Outcome.Should().Be(TransitionOutcome.Unmatched,
+            because: "'Med' (index 1) is not > 'High' (index 2) in declaration order — alphabetic comparison gives the wrong answer here");
+    }
+
+    [Fact]
+    public void Runtime_OrderedChoice_LessThan_MatchesByDeclarationOrder()
+    {
+        // "Low" < "Med" by declaration order (0 < 1).
+        // Alphabetically: "Low" < "Med" (L < M) — same answer by coincidence.
+        // Use a set where they diverge: check "Med" < "High" alphabetically "Med" > "High" (M > H).
+        var engine = PreceptCompiler.Compile(PreceptParser.Parse("""
+            precept M
+            field Priority as choice("Low","Med","High") default "Low" ordered
+            state S initial
+            event SetPriority with Level as choice("Low","Med","High")
+            event CheckMedBelowHigh
+            from S on SetPriority -> set Priority = SetPriority.Level -> no transition
+            from S on CheckMedBelowHigh when Priority < "High" -> no transition
+            """));
+
+        var inst = engine.CreateInstance();
+        var afterSet = engine.Fire(inst, "SetPriority", new Dictionary<string, object?> { ["Level"] = "Med" });
+
+        // Priority = "Med" → Med < "High"?
+        // Declaration order: Med (1) < High (2) → should MATCH.
+        // Alphabetical: "Med" > "High" (M > H) → would NOT match (wrong).
+        var fired = engine.Fire(afterSet.UpdatedInstance!, "CheckMedBelowHigh");
+
+        fired.Outcome.Should().Be(TransitionOutcome.NoTransition,
+            because: "'Med' (index 1) < 'High' (index 2) in declaration order");
+    }
+
+    [Fact]
+    public void Runtime_OrderedChoice_GreaterThanOrEqual_MatchesEqualRank()
+    {
+        // Priority = "Med", guard Priority >= "Med" → should match (equal rank).
+        var engine = PreceptCompiler.Compile(PreceptParser.Parse("""
+            precept M
+            field Priority as choice("Low","Med","High") default "Low" ordered
+            state S initial
+            event SetPriority with Level as choice("Low","Med","High")
+            event CheckMedOrAbove
+            from S on SetPriority -> set Priority = SetPriority.Level -> no transition
+            from S on CheckMedOrAbove when Priority >= "Med" -> no transition
+            """));
+
+        var inst = engine.CreateInstance();
+        var afterSet = engine.Fire(inst, "SetPriority", new Dictionary<string, object?> { ["Level"] = "Med" });
+        var fired = engine.Fire(afterSet.UpdatedInstance!, "CheckMedOrAbove");
+
+        fired.Outcome.Should().Be(TransitionOutcome.NoTransition,
+            because: "'Med' (index 1) >= 'Med' (index 1)");
+    }
+
+    [Fact]
+    public void Runtime_OrderedChoice_StoredValueIsStillString()
+    {
+        // Ordinal comparison must not change how the value is stored.
+        // InstanceData["Priority"] must remain the string "High", not an index.
+        var engine = BuildPriorityEngine();
+        var inst = engine.CreateInstance();
+        var afterSet = engine.Fire(inst, "SetPriority", new Dictionary<string, object?> { ["Level"] = "High" });
+
+        afterSet.UpdatedInstance!.InstanceData["Priority"].Should().Be("High");
+        afterSet.UpdatedInstance.InstanceData["Priority"].Should().BeOfType<string>();
+    }
 }
