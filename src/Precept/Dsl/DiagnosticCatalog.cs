@@ -446,4 +446,26 @@ public static class DiagnosticCatalog
         "C56", "compile",
         "Member access on nullable string requires explicit null guard before '.length'.",
         "'{field}.length' requires a null check — '{field}' is nullable. Use '{field} != null && {field}.length ...' or '{field} == null || {field}.length ...'.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Field-level constraint diagnostics (C57–C59)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Constraint applied to an incompatible field type.</summary>
+    public static readonly LanguageConstraint C57 = Register(
+        "C57", "compile",
+        "Constraint applied to an incompatible field type.",
+        "Constraint '{constraint}' is not valid for type '{type}'.");
+
+    /// <summary>Contradictory or duplicate constraints on the same field.</summary>
+    public static readonly LanguageConstraint C58 = Register(
+        "C58", "compile",
+        "Contradictory or duplicate constraints on the same field.",
+        "{message}");
+
+    /// <summary>Default value violates a declared constraint.</summary>
+    public static readonly LanguageConstraint C59 = Register(
+        "C59", "compile",
+        "Default value violates a declared constraint.",
+        "Default value '{value}' violates constraint '{constraint}'. The default must satisfy all declared constraints.");
 }

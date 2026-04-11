@@ -246,17 +246,41 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:set|queue|stack)\s+$", RegexOptions.IgnoreCase))
             return [new CompletionItem { Label = "of", Kind = CompletionItemKind.Keyword }];
 
-        // After "field Name as Type nullable " → suggest "default"
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:string|number|boolean)\s+nullable\s+$", RegexOptions.IgnoreCase))
-            return [new CompletionItem { Label = "default", Kind = CompletionItemKind.Keyword, Detail = "Default value" }];
+        // After "field Name as Type nullable " → suggest "default" + type constraints
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+number\s+nullable\s+$", RegexOptions.IgnoreCase))
+            return [DefaultItem, ..NumberConstraintItems];
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+string\s+nullable\s+$", RegexOptions.IgnoreCase))
+            return [DefaultItem, ..StringConstraintItems];
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+boolean\s+nullable\s+$", RegexOptions.IgnoreCase))
+            return [DefaultItem];
 
-        // After "field Name as Type " (scalar type completed) → suggest "nullable", "default"
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:string|number|boolean)\s+$", RegexOptions.IgnoreCase))
-            return
-            [
-                new CompletionItem { Label = "nullable", Kind = CompletionItemKind.Keyword, Detail = "Makes field nullable" },
-                new CompletionItem { Label = "default", Kind = CompletionItemKind.Keyword, Detail = "Default value" }
-            ];
+        // After "field Name as TYPE [nullable] default VALUE " → type constraints only
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+number(?:\s+nullable)?\s+default\s+(?:-?\d+(?:\.\d+)?|true|false|null)\s+$", RegexOptions.IgnoreCase))
+            return NumberConstraintItems;
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+string(?:\s+nullable)?\s+default\s+(?:""[^""\n]*""|\S+)\s+$", RegexOptions.IgnoreCase))
+            return StringConstraintItems;
+
+        // After already having constraints on a number field → offer more
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+number\b.*\b(?:nonnegative|positive|(?:min|max)\s+\S+)\s+$", RegexOptions.IgnoreCase))
+            return NumberConstraintItems;
+        // After already having constraints on a string field → offer more
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+string\b.*\b(?:notempty|(?:minlength|maxlength)\s+\S+)\s+$", RegexOptions.IgnoreCase))
+            return StringConstraintItems;
+
+        // After "field Name as set|queue|stack of TYPE " → collection constraints
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:set|queue|stack)\s+of\s+\w+\s+$", RegexOptions.IgnoreCase))
+            return CollectionConstraintItems;
+        // After already having constraints on a collection field → offer more
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:set|queue|stack)\b.*\b(?:notempty|(?:mincount|maxcount)\s+\S+)\s+$", RegexOptions.IgnoreCase))
+            return CollectionConstraintItems;
+
+        // After "field Name as Type " (scalar type completed) → suggest "nullable", "default", type constraints
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+number\s+$", RegexOptions.IgnoreCase))
+            return [NullableItem, DefaultItem, ..NumberConstraintItems];
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+string\s+$", RegexOptions.IgnoreCase))
+            return [NullableItem, DefaultItem, ..StringConstraintItems];
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+boolean\s+$", RegexOptions.IgnoreCase))
+            return [NullableItem, DefaultItem];
 
         // After "field Name as " (typing type) → suggest type keywords
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+\w*$", RegexOptions.IgnoreCase))
@@ -338,7 +362,12 @@ internal sealed class PreceptAnalyzer
                     .Concat(BuildItems(collectionFields, CompletionItemKind.Field)));
 
         // After "event Name with Arg as Type [nullable] [default Value] " → suggest delimiter / modifiers
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)\\s+nullable\\s+$", RegexOptions.IgnoreCase))
+        // Split by type to include type-appropriate constraint keywords
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+number\\s+nullable\\s+$", RegexOptions.IgnoreCase))
+            return [DefaultItem, ..NumberConstraintItems, CommaItem];
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+string\\s+nullable\\s+$", RegexOptions.IgnoreCase))
+            return [DefaultItem, ..StringConstraintItems, CommaItem];
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+boolean\\s+nullable\\s+$", RegexOptions.IgnoreCase))
             return [DefaultItem, CommaItem];
 
         if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null)\\s*$", RegexOptions.IgnoreCase))
@@ -349,7 +378,11 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+.*\\,\\s*$", RegexOptions.IgnoreCase))
             return Array.Empty<CompletionItem>();
 
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)\\s+$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+number\\s+$", RegexOptions.IgnoreCase))
+            return [NullableItem, DefaultItem, ..NumberConstraintItems, CommaItem];
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+string\\s+$", RegexOptions.IgnoreCase))
+            return [NullableItem, DefaultItem, ..StringConstraintItems, CommaItem];
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+boolean\\s+$", RegexOptions.IgnoreCase))
             return [NullableItem, DefaultItem, CommaItem];
 
         // After "event Name with ArgName as " → suggest type keywords
@@ -1049,6 +1082,28 @@ internal sealed class PreceptAnalyzer
     private static readonly CompletionItem BecauseItem = new() { Label = "because", Kind = CompletionItemKind.Keyword, Detail = "Constraint reason" };
     private static readonly CompletionItem ArrowPipelineItem = new() { Label = "->", Kind = CompletionItemKind.Operator, Detail = "action/outcome pipeline" };
     private static readonly CompletionItem CommaItem = new() { Label = ",", Kind = CompletionItemKind.Operator, Detail = "Next event argument" };
+
+    private static readonly IReadOnlyList<CompletionItem> NumberConstraintItems =
+    [
+        new CompletionItem { Label = "nonnegative", Kind = CompletionItemKind.Keyword, Detail = "number constraint", Documentation = new StringOrMarkupContent("Field must be >= 0") },
+        new CompletionItem { Label = "positive",    Kind = CompletionItemKind.Keyword, Detail = "number constraint", Documentation = new StringOrMarkupContent("Field must be > 0") },
+        new CompletionItem { Label = "min",         Kind = CompletionItemKind.Keyword, Detail = "number constraint", Documentation = new StringOrMarkupContent("Field must be >= value") },
+        new CompletionItem { Label = "max",         Kind = CompletionItemKind.Keyword, Detail = "number constraint", Documentation = new StringOrMarkupContent("Field must be <= value") },
+    ];
+
+    private static readonly IReadOnlyList<CompletionItem> StringConstraintItems =
+    [
+        new CompletionItem { Label = "notempty",   Kind = CompletionItemKind.Keyword, Detail = "string constraint", Documentation = new StringOrMarkupContent("Field must not be empty") },
+        new CompletionItem { Label = "minlength",  Kind = CompletionItemKind.Keyword, Detail = "string constraint", Documentation = new StringOrMarkupContent("Field must have at least N characters") },
+        new CompletionItem { Label = "maxlength",  Kind = CompletionItemKind.Keyword, Detail = "string constraint", Documentation = new StringOrMarkupContent("Field must have at most N characters") },
+    ];
+
+    private static readonly IReadOnlyList<CompletionItem> CollectionConstraintItems =
+    [
+        new CompletionItem { Label = "notempty",  Kind = CompletionItemKind.Keyword, Detail = "collection constraint", Documentation = new StringOrMarkupContent("Collection must not be empty") },
+        new CompletionItem { Label = "mincount",  Kind = CompletionItemKind.Keyword, Detail = "collection constraint", Documentation = new StringOrMarkupContent("Collection must have at least N items") },
+        new CompletionItem { Label = "maxcount",  Kind = CompletionItemKind.Keyword, Detail = "collection constraint", Documentation = new StringOrMarkupContent("Collection must have at most N items") },
+    ];
 
     private static bool EndsWithCompletedExpression(string text)
         => Regex.IsMatch(text, "(?:[A-Za-z0-9_\\)\"]|true|false|null)\\s+$", RegexOptions.IgnoreCase);

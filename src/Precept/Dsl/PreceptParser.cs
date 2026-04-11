@@ -228,11 +228,18 @@ public static class PreceptParser
 
     #pragma warning disable CS8603, CS8620
 
+    // Member tokens: identifiers plus 'min'/'max' which are keywords but also valid
+    // dotted member names (e.g. Tags.min, Tags.max on set fields).
+    private static readonly TokenListParser<PreceptToken, Token<PreceptToken>> AnyMemberToken =
+        Token.EqualTo(PreceptToken.Identifier)
+            .Try().Or(Token.EqualTo(PreceptToken.Min))
+            .Try().Or(Token.EqualTo(PreceptToken.Max));
+
     private static readonly TokenListParser<PreceptToken, PreceptExpression> DottedIdentifier =
         Token.EqualTo(PreceptToken.Identifier)
             .Then(id =>
                 Token.EqualTo(PreceptToken.Dot)
-                    .IgnoreThen(Token.EqualTo(PreceptToken.Identifier))
+                    .IgnoreThen(AnyMemberToken)
                     .Then(member =>
                         Token.EqualTo(PreceptToken.Dot)
                             .IgnoreThen(Token.EqualTo(PreceptToken.Identifier))
@@ -377,7 +384,10 @@ public static class PreceptParser
     // ═══════════════════════════════════════════════════════════════════
 
     private static readonly TokenListParser<PreceptToken, object?> ScalarLiteral =
-        Token.EqualTo(PreceptToken.NumberLiteral).Select(t => (object?)t.ToNumberValue())
+        (from _ in Token.EqualTo(PreceptToken.Minus)
+         from n in Token.EqualTo(PreceptToken.NumberLiteral)
+         select (object?)-n.ToNumberValue()).Try()
+        .Or(Token.EqualTo(PreceptToken.NumberLiteral).Select(t => (object?)t.ToNumberValue()))
             .Try().Or(Token.EqualTo(PreceptToken.StringLiteral).Select(t => (object?)t.ToStringLiteralValue()))
             .Try().Or(Token.EqualTo(PreceptToken.True).Value((object?)true))
             .Try().Or(Token.EqualTo(PreceptToken.False).Value((object?)false))
@@ -407,6 +417,33 @@ public static class PreceptParser
             .IgnoreThen(ScalarLiteral)
             .Select(v => (Specified: true, Value: v))
             .OptionalOrDefault((Specified: false, Value: (object?)null));
+
+    /// <summary>
+    /// Parses a single field/arg constraint suffix keyword (with optional numeric argument).
+    /// Used as <c>ConstraintSuffix.Many()</c> after the default clause.
+    /// </summary>
+    private static readonly TokenListParser<PreceptToken, FieldConstraint> ConstraintSuffix =
+        Token.EqualTo(PreceptToken.Nonnegative).Value((FieldConstraint)new FieldConstraint.Nonnegative()).Try()
+        .Or(Token.EqualTo(PreceptToken.Positive).Value((FieldConstraint)new FieldConstraint.Positive()).Try())
+        .Or(Token.EqualTo(PreceptToken.Notempty).Value((FieldConstraint)new FieldConstraint.Notempty()).Try())
+        .Or((from _ in Token.EqualTo(PreceptToken.Min)
+             from n in Token.EqualTo(PreceptToken.NumberLiteral)
+             select (FieldConstraint)new FieldConstraint.Min(n.ToNumberValue())).Try())
+        .Or((from _ in Token.EqualTo(PreceptToken.Max)
+             from n in Token.EqualTo(PreceptToken.NumberLiteral)
+             select (FieldConstraint)new FieldConstraint.Max(n.ToNumberValue())).Try())
+        .Or((from _ in Token.EqualTo(PreceptToken.Minlength)
+             from n in Token.EqualTo(PreceptToken.NumberLiteral)
+             select (FieldConstraint)new FieldConstraint.Minlength((int)n.ToNumberValue())).Try())
+        .Or((from _ in Token.EqualTo(PreceptToken.Maxlength)
+             from n in Token.EqualTo(PreceptToken.NumberLiteral)
+             select (FieldConstraint)new FieldConstraint.Maxlength((int)n.ToNumberValue())).Try())
+        .Or((from _ in Token.EqualTo(PreceptToken.Mincount)
+             from n in Token.EqualTo(PreceptToken.NumberLiteral)
+             select (FieldConstraint)new FieldConstraint.Mincount((int)n.ToNumberValue())).Try())
+        .Or(from _ in Token.EqualTo(PreceptToken.Maxcount)
+            from n in Token.EqualTo(PreceptToken.NumberLiteral)
+            select (FieldConstraint)new FieldConstraint.Maxcount((int)n.ToNumberValue()));
 
     // ═══════════════════════════════════════════════════════════════════
     // State Target Parser
@@ -585,7 +622,7 @@ public static class PreceptParser
                 "Names the workflow",
                 "precept BugTracker"));
 
-    // field <Name>[, <Name>, ...] as <Type> [nullable] [default <Value>]
+    // field <Name>[, <Name>, ...] as <Type> [nullable] [default <Value>] [constraint...]
     private static readonly TokenListParser<PreceptToken, StatementResult> FieldDecl =
         (from kw in Token.EqualTo(PreceptToken.Field)
          from names in Token.EqualTo(PreceptToken.Identifier)
@@ -594,15 +631,18 @@ public static class PreceptParser
          from typeRef in TypeRef
          from nullable in Token.EqualTo(PreceptToken.Nullable).Value(true).OptionalOrDefault(false)
          from dflt in OptionalDefault
+         from constraints in ConstraintSuffix.Many()
          select typeRef.IsCollection
             ? (StatementResult)new CollectionFieldResult(
                 names.Select(n => new PreceptCollectionField(
-                    n.ToText(), typeRef.CollectionKind!.Value, typeRef.ScalarType)).ToArray())
+                    n.ToText(), typeRef.CollectionKind!.Value, typeRef.ScalarType,
+                    constraints.Length > 0 ? constraints : null)).ToArray())
             : new FieldResult(
                 names.Select(n => new PreceptField(
                     n.ToText(), typeRef.ScalarType, nullable,
                     dflt.Specified || nullable,
-                    dflt.Specified ? dflt.Value : null)).ToArray()))
+                    dflt.Specified ? dflt.Value : null,
+                    constraints.Length > 0 ? constraints : null)).ToArray()))
         .Named("field declaration")
             .Register(new ConstructInfo(
                 "field-declaration",
@@ -651,16 +691,18 @@ public static class PreceptParser
                 "state Idle initial"));
 
     // event <Name> [with <ArgList>]
-    // where ArgList = Name as Type [nullable] [default val] separated by commas
+    // where ArgList = Name as Type [nullable] [default val] [constraint...] separated by commas
     private static readonly TokenListParser<PreceptToken, PreceptEventArg> EventArg =
         from name in Token.EqualTo(PreceptToken.Identifier)
         from _ in Token.EqualTo(PreceptToken.As)
         from type in ScalarType
         from nullable in Token.EqualTo(PreceptToken.Nullable).Value(true).OptionalOrDefault(false)
         from dflt in OptionalScalarDefault
+        from constraints in ConstraintSuffix.Many()
         select new PreceptEventArg(name.ToText(), type, nullable,
             dflt.Specified,
-            dflt.Specified ? dflt.Value : null);
+            dflt.Specified ? dflt.Value : null,
+            constraints.Length > 0 ? constraints : null);
 
     private static readonly TokenListParser<PreceptToken, StatementResult> EventDecl =
         (from kw in Token.EqualTo(PreceptToken.Event)
@@ -1157,6 +1199,9 @@ public static class PreceptParser
                 seenUnguarded.Add(key);
         }
 
+        // Desugar field-level constraints into synthetic invariants and event asserts.
+        DesugarFieldConstraints(fields, collectionFields, events, invariants, eventAsserts);
+
         return new PreceptDefinition(
             name, states, initialState, events,
             fields, collectionFields,
@@ -1169,7 +1214,181 @@ public static class PreceptParser
             sourceLine);
     }
 
-    /// <summary>Expands 'any' to all declared state names, or returns the list as-is.</summary>
+    /// <summary>
+    /// Desugars field/arg-level constraint suffixes into synthetic <see cref="PreceptInvariant"/>
+    /// and <see cref="EventAssertion"/> nodes, appending them to the existing lists.
+    /// Constraint validation (C57/C58/C59) runs later in <see cref="PreceptTypeChecker"/>.
+    /// </summary>
+    private static void DesugarFieldConstraints(
+        List<PreceptField> fields,
+        List<PreceptCollectionField> collectionFields,
+        List<PreceptEvent> events,
+        List<PreceptInvariant> invariants,
+        List<EventAssertion> eventAsserts)
+    {
+        foreach (var field in fields)
+        {
+            if (field.Constraints is not { Count: > 0 }) continue;
+            foreach (var constraint in field.Constraints)
+            {
+                var inv = BuildFieldInvariant(field.Name, field.Type, field.IsNullable, constraint);
+                if (inv is not null) invariants.Add(inv);
+            }
+        }
+
+        foreach (var col in collectionFields)
+        {
+            if (col.Constraints is not { Count: > 0 }) continue;
+            foreach (var constraint in col.Constraints)
+            {
+                var inv = BuildCollectionFieldInvariant(col.Name, constraint);
+                if (inv is not null) invariants.Add(inv);
+            }
+        }
+
+        foreach (var evt in events)
+        {
+            foreach (var arg in evt.Args)
+            {
+                if (arg.Constraints is not { Count: > 0 }) continue;
+                foreach (var constraint in arg.Constraints)
+                {
+                    var assert = BuildEventArgAssert(evt.Name, arg.Name, arg.Type, arg.IsNullable, constraint);
+                    if (assert is not null) eventAsserts.Add(assert);
+                }
+            }
+        }
+    }
+
+    private static PreceptInvariant? BuildFieldInvariant(
+        string name, PreceptScalarType type, bool isNullable, FieldConstraint constraint)
+    {
+        var (exprText, expr, reason) = BuildScalarConstraintExpr(name, type, isNullable, constraint);
+        if (expr is null) return null;
+        return new PreceptInvariant(exprText, expr, reason, IsSynthetic: true);
+    }
+
+    private static PreceptInvariant? BuildCollectionFieldInvariant(string name, FieldConstraint constraint)
+    {
+        var countExpr = new PreceptIdentifierExpression(name, "count");
+        var (exprText, expr, reason) = constraint switch
+        {
+            FieldConstraint.Notempty =>
+                ($"{name}.count > 0",
+                 (PreceptExpression)new PreceptBinaryExpression(">", countExpr, new PreceptLiteralExpression(0.0)),
+                 $"{name} must not be empty (notempty constraint)"),
+            FieldConstraint.Mincount mc =>
+                ($"{name}.count >= {mc.Value}",
+                 (PreceptExpression)new PreceptBinaryExpression(">=", countExpr, new PreceptLiteralExpression((double)mc.Value)),
+                 $"{name} count must be at least {mc.Value} (mincount constraint)"),
+            FieldConstraint.Maxcount mc =>
+                ($"{name}.count <= {mc.Value}",
+                 (PreceptExpression)new PreceptBinaryExpression("<=", countExpr, new PreceptLiteralExpression((double)mc.Value)),
+                 $"{name} count must be at most {mc.Value} (maxcount constraint)"),
+            _ => (string.Empty, null, string.Empty)
+        };
+        if (expr is null) return null;
+        return new PreceptInvariant(exprText, expr, reason, IsSynthetic: true);
+    }
+
+    private static EventAssertion? BuildEventArgAssert(
+        string eventName, string argName,
+        PreceptScalarType type, bool isNullable, FieldConstraint constraint)
+    {
+        var (exprText, expr, reason) = BuildScalarConstraintExpr(argName, type, isNullable, constraint);
+        if (expr is null) return null;
+        return new EventAssertion(eventName, exprText, expr, reason);
+    }
+
+    /// <summary>
+    /// Builds a constraint expression (text + AST) and reason string for a scalar field/arg.
+    /// Returns (string.Empty, null, string.Empty) when the constraint is inapplicable to the type.
+    /// </summary>
+    private static (string ExprText, PreceptExpression? Expr, string Reason) BuildScalarConstraintExpr(
+        string name, PreceptScalarType type, bool isNullable, FieldConstraint constraint)
+    {
+        if (type == PreceptScalarType.Number)
+        {
+            switch (constraint)
+            {
+                case FieldConstraint.Nonnegative:
+                    return MaybeNullGuard(name, isNullable, ">=", new PreceptLiteralExpression(0.0),
+                        $"{name} must be non-negative (nonnegative constraint)");
+                case FieldConstraint.Positive:
+                    return MaybeNullGuard(name, isNullable, ">", new PreceptLiteralExpression(0.0),
+                        $"{name} must be positive (positive constraint)");
+                case FieldConstraint.Min mn:
+                    return MaybeNullGuard(name, isNullable, ">=", new PreceptLiteralExpression(mn.Value),
+                        $"{name} minimum value is {mn.Value.ToString(CultureInfo.InvariantCulture)} (min constraint)");
+                case FieldConstraint.Max mx:
+                    return MaybeNullGuard(name, isNullable, "<=", new PreceptLiteralExpression(mx.Value),
+                        $"{name} maximum value is {mx.Value.ToString(CultureInfo.InvariantCulture)} (max constraint)");
+            }
+        }
+
+        if (type == PreceptScalarType.String)
+        {
+            switch (constraint)
+            {
+                case FieldConstraint.Notempty:
+                    return MaybeNullGuard(name, isNullable, "!=", new PreceptLiteralExpression(""),
+                        $"{name} must not be empty (notempty constraint)");
+                case FieldConstraint.Minlength ml:
+                {
+                    var lenExpr = new PreceptIdentifierExpression(name, "length");
+                    var coreExpr = new PreceptBinaryExpression(">=", lenExpr, new PreceptLiteralExpression((double)ml.Value));
+                    var coreText = $"{name}.length >= {ml.Value}";
+                    if (!isNullable)
+                        return (coreText, coreExpr, $"{name} length must be at least {ml.Value} (minlength constraint)");
+                    var nullCheck = new PreceptBinaryExpression("==",
+                        new PreceptIdentifierExpression(name), new PreceptLiteralExpression(null));
+                    return ($"{name} == null or {coreText}",
+                            new PreceptBinaryExpression("or", nullCheck, coreExpr),
+                            $"{name} length must be at least {ml.Value} (minlength constraint)");
+                }
+                case FieldConstraint.Maxlength ml:
+                {
+                    var lenExpr = new PreceptIdentifierExpression(name, "length");
+                    var coreExpr = new PreceptBinaryExpression("<=", lenExpr, new PreceptLiteralExpression((double)ml.Value));
+                    var coreText = $"{name}.length <= {ml.Value}";
+                    if (!isNullable)
+                        return (coreText, coreExpr, $"{name} length must be at most {ml.Value} (maxlength constraint)");
+                    var nullCheck = new PreceptBinaryExpression("==",
+                        new PreceptIdentifierExpression(name), new PreceptLiteralExpression(null));
+                    return ($"{name} == null or {coreText}",
+                            new PreceptBinaryExpression("or", nullCheck, coreExpr),
+                            $"{name} length must be at most {ml.Value} (maxlength constraint)");
+                }
+            }
+        }
+
+        return (string.Empty, null, string.Empty);
+    }
+
+    /// <summary>
+    /// Builds a comparison expression with an optional <c>null or ...</c> wrapper for nullable fields.
+    /// </summary>
+    private static (string ExprText, PreceptExpression Expr, string Reason) MaybeNullGuard(
+        string name, bool isNullable, string op, PreceptExpression rhs, string reason)
+    {
+        var fieldRef = new PreceptIdentifierExpression(name);
+        var coreExpr = new PreceptBinaryExpression(op, fieldRef, rhs);
+        var coreText = $"{name} {op} {LiteralText(rhs)}";
+        if (!isNullable)
+            return (coreText, coreExpr, reason);
+        var nullCheck = new PreceptBinaryExpression("==", fieldRef, new PreceptLiteralExpression(null));
+        return ($"{name} == null or {coreText}",
+                new PreceptBinaryExpression("or", nullCheck, coreExpr),
+                reason);
+    }
+
+    private static string LiteralText(PreceptExpression expr) => expr switch
+    {
+        PreceptLiteralExpression { Value: double d } => d.ToString(CultureInfo.InvariantCulture),
+        PreceptLiteralExpression { Value: string s } => $"\"{s}\"",
+        PreceptLiteralExpression { Value: null } => "null",
+        _ => ReconstituteExpr(expr)
+    };
     private static List<string> ExpandStateTargets(string[] targets, List<PreceptState> declaredStates)
     {
         if (targets.Length == 1 && targets[0] == "any")

@@ -191,8 +191,12 @@ Statement          := FieldDecl | Invariant | StateDecl | StateAssert | StateAct
                     | EditDecl | EventDecl | EventAssert | TransitionRow
                     | Comment | Blank
 
-FieldDecl          := "field" Identifier ("," Identifier)* "as" TypeRef NullableOpt DefaultOpt
+FieldDecl          := "field" Identifier ("," Identifier)* "as" TypeRef NullableOpt DefaultOpt ConstraintSuffix*
 NullableOpt        := ("nullable")?
+ConstraintSuffix   := "nonnegative" | "positive" | "notempty"
+                    | "min" NumberLiteral | "max" NumberLiteral
+                    | "minlength" IntegerLiteral | "maxlength" IntegerLiteral
+                    | "mincount" IntegerLiteral | "maxcount" IntegerLiteral
 DefaultOpt         := ("default" LiteralOrList)?
 
 Invariant          := "invariant" BoolExpr "because" StringLiteral
@@ -230,7 +234,7 @@ FieldTarget        := "all" | Identifier ("," Identifier)*
 
 EventDecl          := "event" Identifier ("," Identifier)* ("with" ArgList)?
 ArgList            := ArgDecl ("," ArgDecl)*
-ArgDecl            := Identifier "as" TypeRef NullableOpt DefaultOpt
+ArgDecl            := Identifier "as" TypeRef NullableOpt DefaultOpt ConstraintSuffix*
 
 EventAssert        := "on" Identifier "assert" BoolExpr "because" StringLiteral
 
@@ -501,8 +505,8 @@ from Draft on Submit when EmployeeName != null and AccessReason != null and Acce
 
 Forms:
 
-- `field <Name> as <Type> [nullable] [default <Literal>]`
-- `field <Name>, <Name>, ... as <Type> [nullable] [default <Literal>]`
+- `field <Name> as <Type> [nullable] [default <Literal>] [<constraint>...]`
+- `field <Name>, <Name>, ... as <Type> [nullable] [default <Literal>] [<constraint>...]`
 
 Multi-name declarations declare multiple fields sharing the same type, nullability, and default value. The type, `nullable`, and `default` clauses apply uniformly to every name in the list.
 
@@ -535,9 +539,53 @@ field MinAmount, MaxAmount as number default 0
 field FirstName, LastName, MiddleName as string nullable
 ```
 
-### Field invariants (Locked)
+### Field-level constraints (Locked)
 
-Data integrity rules live adjacent to fields.
+Constraint keywords may appear on field declarations and event argument declarations, between the type (and `nullable`) and the `default` clause. They desugar at parse time — field constraints become `invariant` nodes; event-arg constraints become `on E assert` nodes. No new runtime behavior.
+
+| Keyword | Applies to | Desugar |
+|---------|------------|---------|
+| `nonnegative` | number | `Field >= 0` |
+| `positive` | number | `Field > 0` |
+| `min N` | number | `Field >= N` |
+| `max N` | number | `Field <= N` |
+| `notempty` | string, collection | `Field != ""` / `Field.count > 0` |
+| `minlength N` | string | `Field.length >= N` |
+| `maxlength N` | string | `Field.length <= N` |
+| `mincount N` | collection | `Field.count >= N` |
+| `maxcount N` | collection | `Field.count <= N` |
+
+**Nullable interaction:** When a nullable field carries a constraint, the desugared expression gains a null guard: `Field == null or Field >= N`. The constraint is only evaluated when the value is non-null.
+
+**Compile-time diagnostics:**
+- **C57** — constraint applied to an incompatible type (e.g. `notempty` on a number field, `nonnegative` on a string).
+- **C58** — contradictory constraints (`min 10 max 5`), duplicate constraints (`min 5 min 10`), or subsumed constraints (`nonnegative positive` — `positive` already implies `nonnegative`).
+- **C59** — the declared `default` value violates a constraint (`default -1` with `nonnegative`).
+
+Examples:
+
+```precept
+# Numeric boundaries
+field Price as number default 0 nonnegative
+field Weight as number default 1 positive
+field Score as number default 50 min 0 max 100
+
+# String guards
+field Name as string nullable notempty
+field Code as string default "ABC" minlength 3 maxlength 20
+
+# Collection cardinality
+field Tags as set of string notempty
+field Reviewers as set of string mincount 1
+
+# Nullable with constraint — null guard added automatically
+field Discount as number nullable nonnegative
+
+# Event arg constraints
+event Submit with Name as string notempty, Amount as number positive
+```
+
+Data integrity rules live adjacent to fields. For simple per-field bounds, prefer inline constraints (see above) — `invariant` is the right tool for cross-field relationships and expressions that can't be expressed as a single constraint keyword.
 
 Form:
 
