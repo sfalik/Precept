@@ -48,6 +48,12 @@
 - **Cross-scope guard diagnostics must name the preferred form** (e.g., `from S on E when G -> reject`). A generic C038 "unknown identifier" is insufficient — the agent needs to understand it's a mechanism-selection problem, not a typo. Needs a dedicated C6X diagnostic code.
 - **Verdict: Minor update, additive only.** Provided new declaration arrays are added (not replacing existing ones) and `constraintTrace` is treated as an additive nullable field.
 
+### Issue #14 Slice 8 — MCP tool updates for when guards (2026-04-11)
+
+- **8a: CompileTool.cs — 4 new DTO arrays added.** `InvariantDto`, `StateAssertDto`, `EventAssertDto`, `EditBlockDto` with `When` (nullable string) on all four. `CompileResult` expanded from 12 to 16 positional parameters. `DiagnosticsOnly` factory updated with 4 extra `null` args. Synthetic invariants filtered with `!inv.IsSynthetic`. `StateAssertDto.Anchor` lowercased via `.ToString().ToLowerInvariant()`.
+- **8b: LanguageTool.cs — no changes needed.** `ConstructCatalog.Constructs` auto-picks up updated parser `.Register()` descriptions from Slice 2. Verified the dynamic projection in `LanguageTool.Run()` requires zero manual edits.
+- **Validation: 67/67 MCP tests pass, 850/850 core tests pass.** Zero regressions — new DTO fields are additive and don't break existing deserialization.
+
 ### MCP Tool Surface (5 Tools — Final Design)
 
 **Tool philosophy:** One tool per concern. No overlap in reporting. Failure modes reinforce the intended signal chain: `compile → fix → inspect/fire/update`.
