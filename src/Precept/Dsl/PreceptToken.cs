@@ -212,6 +212,16 @@ public enum PreceptToken
     [TokenSymbol("maxcount")]
     Maxcount,
 
+    [TokenCategory(TokenCategory.Constraint)]
+    [TokenDescription("Constraint: maximum decimal places (decimal fields only)")]
+    [TokenSymbol("maxplaces")]
+    Maxplaces,
+
+    [TokenCategory(TokenCategory.Constraint)]
+    [TokenDescription("Constraint: ordinal ordering for choice fields")]
+    [TokenSymbol("ordered")]
+    Ordered,
+
     // ═══ Keywords: actions ═══
 
     [TokenCategory(TokenCategory.Action)]
@@ -298,6 +308,16 @@ public enum PreceptToken
     [TokenDescription("Integer scalar type")]
     [TokenSymbol("integer")]
     IntegerType,
+
+    [TokenCategory(TokenCategory.Type)]
+    [TokenDescription("Decimal scalar type — exact base-10 arithmetic")]
+    [TokenSymbol("decimal")]
+    DecimalType,
+
+    [TokenCategory(TokenCategory.Type)]
+    [TokenDescription("Choice type — constrained value set")]
+    [TokenSymbol("choice")]
+    ChoiceType,
 
     [TokenCategory(TokenCategory.Type)]
     [TokenDescription("Queue collection type")]

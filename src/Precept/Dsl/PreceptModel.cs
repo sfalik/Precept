@@ -128,6 +128,9 @@ public sealed record PreceptBinaryExpression(string Operator, PreceptExpression 
 
 public sealed record PreceptParenthesizedExpression(PreceptExpression Inner) : PreceptExpression;
 
+/// <summary>round(decimal, places) built-in function call.</summary>
+public sealed record PreceptRoundExpression(PreceptExpression Value, int Places) : PreceptExpression;
+
 public sealed record PreceptSetAssignment(
     string Key,
     string ExpressionText,

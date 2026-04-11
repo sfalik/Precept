@@ -549,6 +549,31 @@ public class CatalogDriftTests
             throw new InvalidOperationException(diag.Message);
         }),
 
+        // C62: choice type with no values — constructed directly (parser enforces at least 1 value)
+        ["C62"] = new("_unused_", "at least one value", DirectAction: () =>
+        {
+            var model = new PreceptDefinition(
+                "Test",
+                [new PreceptState("A")],
+                new PreceptState("A"),
+                [],
+                [new PreceptField("Status", PreceptScalarType.Choice, false, false, null, null, [], false)],
+                [], null);
+            var result = PreceptCompiler.Validate(model);
+            var diag = result.Diagnostics.FirstOrDefault(d => d.Constraint.Id == "C62");
+            if (diag is null) throw new InvalidOperationException("C62 was not triggered");
+            throw new InvalidOperationException(diag.Message);
+        }),
+
+        // C63: duplicate value in choice set
+        ["C63"] = new(H + "field Status as choice(\"Open\",\"Open\",\"Closed\") default \"Open\"\n" + S, "Duplicate value"),
+
+        // C64: default value not in choice set
+        ["C64"] = new(H + "field Status as choice(\"Open\",\"Closed\") default \"Pending\"\n" + S, "not a member"),
+
+        // C66: ordered on a non-choice type
+        ["C66"] = new(H + "field Name as string nullable ordered\n" + S, "applies only to choice"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state

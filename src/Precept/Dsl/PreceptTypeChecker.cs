@@ -375,7 +375,28 @@ internal static class PreceptTypeChecker
     {
         foreach (var field in model.Fields)
         {
-            if (field.Constraints is not { Count: > 0 }) continue;
+            // SYNC:CONSTRAINT:C62
+            // SYNC:CONSTRAINT:C63
+            // SYNC:CONSTRAINT:C66
+            ValidateChoiceField(field.Name, field.Type, field.ChoiceValues, field.IsOrdered, diagnostics);
+
+            // SYNC:CONSTRAINT:C64
+            if (field.Type == PreceptScalarType.Choice &&
+                field.HasDefaultValue &&
+                field.DefaultValue is string defaultStr &&
+                field.ChoiceValues is { Count: > 0 } choiceVals &&
+                !choiceVals.Contains(defaultStr, StringComparer.Ordinal))
+            {
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C64,
+                    DiagnosticCatalog.C64.FormatMessage(
+                        ("value", defaultStr),
+                        ("values", string.Join(", ", choiceVals.Select(v => $"\"{v}\""))),
+                        ("name", field.Name)),
+                    0));
+            }
+
+            if (field.Constraints is not { Count: > 0 }) goto ValidateConstraints;
             // SYNC:CONSTRAINT:C57
             ValidateConstraintTypes(field.Name, field.Type, isCollection: false, field.Constraints, diagnostics);
             // SYNC:CONSTRAINT:C58
@@ -383,10 +404,16 @@ internal static class PreceptTypeChecker
             // SYNC:CONSTRAINT:C59
             if (field.HasDefaultValue)
                 ValidateConstraintDefault(field.Name, field.DefaultValue, field.Constraints, diagnostics);
+
+            ValidateConstraints: ;
         }
 
         foreach (var col in model.CollectionFields)
         {
+            // SYNC:CONSTRAINT:C62
+            // SYNC:CONSTRAINT:C63
+            ValidateChoiceField(col.Name, col.InnerType, col.ChoiceValues, isOrdered: false, diagnostics);
+
             if (col.Constraints is not { Count: > 0 }) continue;
             // SYNC:CONSTRAINT:C57
             ValidateConstraintTypes(col.Name, null, isCollection: true, col.Constraints, diagnostics);
@@ -398,6 +425,11 @@ internal static class PreceptTypeChecker
         {
             foreach (var arg in evt.Args)
             {
+                // SYNC:CONSTRAINT:C62
+                // SYNC:CONSTRAINT:C63
+                // SYNC:CONSTRAINT:C66
+                ValidateChoiceField(arg.Name, arg.Type, arg.ChoiceValues, arg.IsOrdered, diagnostics);
+
                 if (arg.Constraints is not { Count: > 0 }) continue;
                 // SYNC:CONSTRAINT:C57
                 ValidateConstraintTypes(arg.Name, arg.Type, isCollection: false, arg.Constraints, diagnostics);
@@ -406,6 +438,53 @@ internal static class PreceptTypeChecker
                 // SYNC:CONSTRAINT:C59
                 if (arg.HasDefaultValue)
                     ValidateConstraintDefault(arg.Name, arg.DefaultValue, arg.Constraints, diagnostics);
+            }
+        }
+    }
+
+    /// <summary>Validates choice type metadata: C62 (empty set), C63 (duplicates), C66 (ordered on non-choice).</summary>
+    private static void ValidateChoiceField(
+        string name,
+        PreceptScalarType type,
+        IReadOnlyList<string>? choiceValues,
+        bool isOrdered,
+        List<PreceptValidationDiagnostic> diagnostics)
+    {
+        // SYNC:CONSTRAINT:C66
+        if (isOrdered && type != PreceptScalarType.Choice)
+        {
+            diagnostics.Add(new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C66,
+                DiagnosticCatalog.C66.FormatMessage(
+                    ("name", name),
+                    ("type", type.ToString().ToLowerInvariant())),
+                0));
+        }
+
+        if (type != PreceptScalarType.Choice)
+            return;
+
+        // SYNC:CONSTRAINT:C62
+        if (choiceValues == null || choiceValues.Count == 0)
+        {
+            diagnostics.Add(new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C62,
+                DiagnosticCatalog.C62.FormatMessage(("name", name)),
+                0));
+            return;
+        }
+
+        // SYNC:CONSTRAINT:C63
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var val in choiceValues)
+        {
+            if (!seen.Add(val))
+            {
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C63,
+                    DiagnosticCatalog.C63.FormatMessage(("value", val), ("name", name)),
+                    0));
+                break; // one diagnostic per field for duplicate
             }
         }
     }
@@ -431,6 +510,11 @@ internal static class PreceptTypeChecker
                 (FieldConstraint.Positive,    false, PreceptScalarType.Integer) => true,
                 (FieldConstraint.Min,         false, PreceptScalarType.Integer) => true,
                 (FieldConstraint.Max,         false, PreceptScalarType.Integer) => true,
+                // Decimal accepts numeric range constraints and maxplaces
+                (FieldConstraint.Nonnegative, false, PreceptScalarType.Decimal) => true,
+                (FieldConstraint.Positive,    false, PreceptScalarType.Decimal) => true,
+                (FieldConstraint.Min,         false, PreceptScalarType.Decimal) => true,
+                (FieldConstraint.Max,         false, PreceptScalarType.Decimal) => true,
                 // Maxplaces only valid on Decimal
                 (FieldConstraint.Maxplaces,   false, PreceptScalarType.Decimal) => true,
                 // String-only constraints
@@ -978,6 +1062,33 @@ internal static class PreceptTypeChecker
             case PreceptBinaryExpression binary:
                 return TryInferBinaryKind(binary, symbols, out kind, out diagnostic);
 
+            case PreceptRoundExpression round:
+            {
+                if (!TryInferKind(round.Value, symbols, out var innerKind, out diagnostic))
+                    return false;
+
+                if (!IsNumericKind(innerKind))
+                {
+                    diagnostic = new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C40,
+                        "round() requires a numeric (integer, decimal, or number) argument.",
+                        0);
+                    return false;
+                }
+
+                if (round.Places < 0)
+                {
+                    diagnostic = new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C40,
+                        "round() places argument must be non-negative.",
+                        0);
+                    return false;
+                }
+
+                kind = StaticValueKind.Decimal;
+                return true;
+            }
+
             default:
                 diagnostic = new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C39,
@@ -1132,7 +1243,12 @@ internal static class PreceptTypeChecker
                 var isIntNumberMix =
                     (leftEqFamily == StaticValueKind.Integer && rightEqFamily == StaticValueKind.Number) ||
                     (leftEqFamily == StaticValueKind.Number  && rightEqFamily == StaticValueKind.Integer);
-                if (!isIntNumberMix && leftEqFamily != StaticValueKind.None && rightEqFamily != StaticValueKind.None && leftEqFamily != rightEqFamily)
+                // Allow Decimal <=> Integer mix (widening) and Decimal <=> Decimal
+                var isDecimalMix =
+                    (leftEqFamily == StaticValueKind.Decimal && rightEqFamily == StaticValueKind.Integer) ||
+                    (leftEqFamily == StaticValueKind.Integer && rightEqFamily == StaticValueKind.Decimal) ||
+                    (leftEqFamily == StaticValueKind.Decimal && rightEqFamily == StaticValueKind.Decimal);
+                if (!isIntNumberMix && !isDecimalMix && leftEqFamily != StaticValueKind.None && rightEqFamily != StaticValueKind.None && leftEqFamily != rightEqFamily)
                 {
                     diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41,
                         $"operator '{binary.Operator}' requires operands of the same type, but found {FormatKinds(leftEqKind)} and {FormatKinds(rightEqKind)}.", 0);
@@ -1423,18 +1539,23 @@ internal static class PreceptTypeChecker
     private static bool HasFlag(StaticValueKind kind, StaticValueKind flag)
         => (kind & flag) == flag;
 
-    /// <summary>Returns true when <paramref name="k"/> is a pure numeric kind (Number or Integer, non-nullable, no other flags).</summary>
+    /// <summary>Returns true when <paramref name="k"/> is a pure numeric kind (Number, Integer, or Decimal, non-nullable, no other flags).</summary>
     private static bool IsNumericKind(StaticValueKind k)
-        => IsExactly(k, StaticValueKind.Number) || IsExactly(k, StaticValueKind.Integer);
+        => IsExactly(k, StaticValueKind.Number) || IsExactly(k, StaticValueKind.Integer) || IsExactly(k, StaticValueKind.Decimal);
 
     /// <summary>
     /// Resolves the result kind for a numeric binary operation.
-    /// Integer × Integer → Integer; anything involving Number → Number.
+    /// Integer × Integer → Integer; Decimal × Decimal|×Integer → Decimal; anything involving Number → Number.
     /// </summary>
     private static StaticValueKind ResolveNumericResultKind(StaticValueKind left, StaticValueKind right)
-        => IsExactly(left, StaticValueKind.Integer) && IsExactly(right, StaticValueKind.Integer)
-            ? StaticValueKind.Integer
-            : StaticValueKind.Number;
+    {
+        if (IsExactly(left, StaticValueKind.Integer) && IsExactly(right, StaticValueKind.Integer))
+            return StaticValueKind.Integer;
+        if ((IsExactly(left, StaticValueKind.Decimal) || IsExactly(left, StaticValueKind.Integer)) &&
+            (IsExactly(right, StaticValueKind.Decimal) || IsExactly(right, StaticValueKind.Integer)))
+            return StaticValueKind.Decimal;
+        return StaticValueKind.Number;
+    }
 
     /// <summary>Returns true when assigning a Number or Decimal to an Integer target (narrowing, requires explicit conversion).</summary>
     private static bool IsNarrowingToInteger(StaticValueKind actual, StaticValueKind expected)

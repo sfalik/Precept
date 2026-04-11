@@ -21,6 +21,7 @@ internal static class PreceptExpressionRuntimeEvaluator
             PreceptParenthesizedExpression parenthesized => Evaluate(parenthesized.Inner, context),
             PreceptUnaryExpression unary => EvaluateUnary(unary, context),
             PreceptBinaryExpression binary => EvaluateBinary(binary, context),
+            PreceptRoundExpression round => EvaluateRound(round, context),
             _ => EvaluationResult.Fail("unsupported expression node.")
         };
     }
@@ -291,6 +292,35 @@ internal static class PreceptExpressionRuntimeEvaluator
             return rightResult;
 
         return EvaluationResult.Ok(collection.Contains(rightResult.Value));
+    }
+
+    private static EvaluationResult EvaluateRound(PreceptRoundExpression round, IReadOnlyDictionary<string, object?> context)
+    {
+        var valResult = Evaluate(round.Value, context);
+        if (!valResult.Success)
+            return valResult;
+
+        if (!TryToDecimal(valResult.Value, out var d))
+            return EvaluationResult.Fail("round() requires a numeric argument.");
+
+        var result = Math.Round(d, round.Places, MidpointRounding.ToEven);
+        return EvaluationResult.Ok(result);
+    }
+
+    private static bool TryToDecimal(object? value, out decimal d)
+    {
+        switch (value)
+        {
+            case decimal dec: d = dec; return true;
+            case double dbl: d = (decimal)dbl; return true;
+            case float flt: d = (decimal)flt; return true;
+            case long l: d = l; return true;
+            case int i: d = i; return true;
+            case short s: d = s; return true;
+            case byte b: d = b; return true;
+            case sbyte sb: d = sb; return true;
+            default: d = default; return false;
+        }
     }
 
     private static bool TryToNumber(object? value, out double number)

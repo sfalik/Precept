@@ -484,4 +484,32 @@ public static class DiagnosticCatalog
         "C61", "compile",
         "'maxplaces' constraint applies only to decimal fields.",
         "'maxplaces' constraint applies only to decimal fields. Integer fields cannot have fractional precision.");
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Choice type diagnostics (C62–C64, C66)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>choice type requires at least one value.</summary>
+    public static readonly LanguageConstraint C62 = Register(
+        "C62", "compile",
+        "choice type requires at least one value.",
+        "choice type on field '{name}' requires at least one value.");
+
+    /// <summary>Duplicate value in choice set.</summary>
+    public static readonly LanguageConstraint C63 = Register(
+        "C63", "compile",
+        "Duplicate value in choice set.",
+        "Duplicate value '{value}' in choice set for field '{name}'.");
+
+    /// <summary>Default value is not a member of the choice set.</summary>
+    public static readonly LanguageConstraint C64 = Register(
+        "C64", "compile",
+        "Default value is not a member of the choice set.",
+        "Default value '{value}' is not a member of choice({values}) for field '{name}'.");
+
+    /// <summary>'ordered' constraint applies only to choice types.</summary>
+    public static readonly LanguageConstraint C66 = Register(
+        "C66", "compile",
+        "'ordered' constraint applies only to choice types.",
+        "'ordered' constraint applies only to choice types. Field '{name}' is '{type}', not a choice field.");
 }
