@@ -853,6 +853,170 @@ pre {
     background: rgba(248,113,113,0.04);
     color: var(--violated);
   }
+  .svs-authored-state-ref {
+    display: inline-flex;
+    align-items: center;
+    margin: 0 -2px;
+    padding: 0 3px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    transition:
+      border-color 140ms ease,
+      background-color 140ms ease,
+      box-shadow 140ms ease,
+      color 140ms ease;
+  }
+  .svs-authored-state-ref:hover,
+  .svs-authored-state-ref:focus-visible,
+  .svs-authored-state-ref.is-linked {
+    outline: none;
+    border-color: rgba(168,152,245,0.42);
+    background: rgba(168,152,245,0.14);
+    box-shadow: inset 0 0 0 1px rgba(168,152,245,0.12);
+    color: #e8e1ff;
+  }
+  .svs-state-review-stage {
+    position: relative;
+    overflow: hidden;
+    min-height: 540px;
+    border: 1px solid var(--line);
+    background: #000;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+    width: min(100%, 640px);
+    margin-inline: auto;
+  }
+  .svs-state-review-stage svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .svs-state-review-stage path {
+    fill: none;
+    stroke: rgba(48,184,232,0.78);
+    stroke-width: 2.25;
+    stroke-linecap: butt;
+    stroke-linejoin: miter;
+    vector-effect: non-scaling-stroke;
+  }
+  .svs-state-review-stage .svs-edge-past {
+    stroke: rgba(48,184,232,0.38);
+  }
+  .svs-state-review-stage .svs-edge-active {
+    stroke: rgba(48,184,232,0.96);
+    stroke-width: 2.5;
+  }
+  .svs-state-review-stage .svs-edge-blocked {
+    stroke: rgba(48,184,232,0.64);
+    stroke-dasharray: 7 7;
+  }
+  .svs-state-node,
+  .svs-edge-label {
+    position: absolute;
+  }
+  .svs-state-node {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 148px;
+    min-width: 148px;
+    min-height: 52px;
+    padding: 12px 14px;
+    border: 1px solid rgba(168,152,245,0.32);
+    background: #050608;
+    color: var(--state);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+    transition:
+      border-color 140ms ease,
+      background-color 140ms ease,
+      box-shadow 140ms ease,
+      transform 140ms ease;
+    z-index: 2;
+  }
+  .svs-state-node em {
+    font-style: italic;
+  }
+  .svs-state-node:hover,
+  .svs-state-node:focus-visible,
+  .svs-state-node.is-linked {
+    outline: none;
+    border-color: rgba(168,152,245,0.74);
+    background: #17111f;
+    box-shadow:
+      inset 0 0 0 1px rgba(168,152,245,0.18),
+      0 0 0 1px rgba(168,152,245,0.28);
+    transform: translateY(-1px);
+  }
+  .svs-state-node--current {
+    background: #251c38;
+    border-color: rgba(168,152,245,0.46);
+    box-shadow:
+      inset 0 0 0 1px rgba(168,152,245,0.22),
+      0 0 0 1px rgba(99,102,241,0.24);
+    color: #ddd6ff;
+  }
+  .svs-state-node--terminal::after {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border: 1px solid rgba(168,152,245,0.28);
+    pointer-events: none;
+  }
+  .svs-state-node--initial .svs-state-node-dot {
+    width: 8px;
+    height: 8px;
+    margin-right: 8px;
+    background: var(--structure);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.16);
+    border-radius: 999px;
+  }
+  .svs-state-node--unreachable-current {
+    color: rgba(168,152,245,0.52);
+    border-style: dashed;
+    border-color: rgba(168,152,245,0.32);
+    background: #050608;
+  }
+  .svs-edge-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--event);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    white-space: nowrap;
+    z-index: 3;
+  }
+  .svs-edge-token {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 5px 9px;
+    border: 1px solid rgba(48,184,232,0.35);
+    background: rgba(48,184,232,0.04);
+    color: var(--event);
+  }
+  .svs-edge-label--muted {
+    opacity: 0.78;
+  }
+  .svs-edge-label--active {
+    filter: drop-shadow(0 0 8px rgba(48,184,232,0.10));
+  }
+  .svs-edge-label--active .svs-edge-token {
+    border-color: rgba(48,184,232,0.48);
+    box-shadow: 0 0 0 1px rgba(48,184,232,0.14);
+  }
+  .svs-edge-label--blocked .svs-edge-token {
+    border-style: dashed;
+  }
   .cg-mini-badge {
     display: inline-flex;
     align-items: center;
@@ -3207,42 +3371,8 @@ pre {
             <span class="specimen-half-tag">authored &middot; compile-valid specimen</span>
           </div>
           <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">State workflow &middot; <span class="st">Intake &middot; Review &middot; Approved &middot; Declined &middot; Archived</span></span></div>
-            <pre><span class="s">precept</span> AccessRequest
-
-<span class="s">field</span> <span class="da">Applicant</span> <span class="s">as</span> <span class="dt">string</span> <span class="s">nullable</span>
-<span class="s">field</span> <span class="da">DecisionNote</span> <span class="s">as</span> <span class="dt">string</span> <span class="s">nullable</span>
-<span class="s">field</span> <span class="da">DocumentsVerified</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
-
-<span class="s">state</span> <span class="st">Intake</span> <span class="s">initial</span>
-<span class="s">state</span> <span class="st">Review</span>
-<span class="s">state</span> <span class="st">Approved</span>
-<span class="s">state</span> <span class="st">Declined</span>
-<span class="s">state</span> <span class="st">Archived</span>
-
-<span class="s">in</span> <span class="st"><em>Review</em></span> <span class="s">assert</span> <span class="da">Applicant</span> != <span class="dv">null</span>
-  <span class="s">because</span> <span class="ru">"Review requires a recorded applicant"</span>
-<span class="s">in</span> <span class="st"><em>Approved</em></span> <span class="s">assert</span> <span class="da">DocumentsVerified</span>
-  <span class="s">because</span> <span class="ru">"Approved requests must have verified documents"</span>
-
-<span class="s">event</span> <span class="ev">Submit</span> <span class="s">with</span> <span class="da">Name</span> <span class="s">as</span> <span class="dt">string</span>
-<span class="s">event</span> <span class="ev">VerifyDocuments</span>
-<span class="s">event</span> <span class="ev">Approve</span>
-<span class="s">event</span> <span class="ev">Decline</span> <span class="s">with</span> <span class="da">Note</span> <span class="s">as</span> <span class="dt">string</span>
-
-<span class="s">from</span> <span class="st">Intake</span> <span class="s">on</span> <span class="ev">Submit</span>
-  -&gt; <span class="s">set</span> <span class="da">Applicant</span> = <span class="ev">Submit</span>.<span class="da">Name</span>
-  -&gt; <span class="s">transition</span> <span class="st">Review</span>
-<span class="s">from</span> <span class="st">Review</span> <span class="s">on</span> <span class="ev">VerifyDocuments</span>
-  -&gt; <span class="s">set</span> <span class="da">DocumentsVerified</span> = <span class="dv">true</span>
-  -&gt; <span class="s">no</span> <span class="s">transition</span>
-<span class="s">from</span> <span class="st">Review</span> <span class="s">on</span> <span class="ev">Approve</span> <span class="s">when</span> <span class="da">DocumentsVerified</span>
-  -&gt; <span class="s">transition</span> <span class="st">Approved</span>
-<span class="s">from</span> <span class="st">Review</span> <span class="s">on</span> <span class="ev">Approve</span>
-  -&gt; <span class="s">reject</span> <span class="ru">"Approval requires verified documents"</span>
-<span class="s">from</span> <span class="st">Review</span> <span class="s">on</span> <span class="ev">Decline</span>
-  -&gt; <span class="s">set</span> <span class="da">DecisionNote</span> = <span class="ev">Decline</span>.<span class="da">Note</span>
-  -&gt; <span class="s">transition</span> <span class="st">Declined</span></pre>
+            <div class="cg-focal-strip"><span class="cg-focal-label">State workflow &middot; <span class="st">Requested &middot; Approved &middot; ReadyForPickup &middot; PickedUp &middot; Expired &middot; Cancelled</span></span></div>
+            <pre id="state-design-sample" data-source="semantic-visual-system-state-review.precept"></pre>
           </div>
         </div>
 
@@ -3253,50 +3383,60 @@ pre {
             <span class="specimen-half-tag">rendered &middot; compact state diagram</span>
           </div>
           <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">Snapshot after <span class="ev">VerifyDocuments</span> &middot; current <span class="st"><em>Review</em></span></span></div>
+            <div class="cg-focal-strip"><span class="cg-focal-label">Snapshot after <span class="ev">PrintBadge</span> &middot; current <span class="st"><em>ReadyForPickup</em></span></span></div>
             <div class="cg-state-diagram">
               <div class="cg-state-diagram-head">
                 <div>
-                  <div class="cg-state-diagram-title">AccessRequest flow</div>
-                  <p class="cg-state-diagram-copy">One live snapshot shows the current review node, the reachable terminal outcomes ahead, the initial state now behind the flow, and an authored dead branch with no path from entry.</p>
+                  <div class="cg-state-diagram-title">VisitorBadgePickup flow</div>
+                  <p class="cg-state-diagram-copy">One live snapshot shows ReadyForPickup as current, PickUp live, Expire blocked behind its guard, and earlier authored states dimmed because they are now behind the current position.</p>
                 </div>
                 <div class="cg-state-diagram-meta">
                   <span class="cg-mini-badge">shared specimen</span>
-                  <span class="cg-mini-badge">most common stacks</span>
+                  <span class="cg-mini-badge">current + blocked alternate</span>
                 </div>
               </div>
-              <div class="cg-state-lanes">
-                <div class="cg-state-lane-stack">
-                  <div class="cg-state-lane-note">main path</div>
-                  <div class="cg-state-lane">
-                    <span class="cg-mini-state-node cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-current"><span class="cg-mini-state-node-dot"></span>Intake</span>
-                    <span class="cg-state-link" aria-hidden="true"></span>
-                    <span class="cg-mini-event-pill">Submit</span>
-                    <span class="cg-state-link" aria-hidden="true"></span>
-                    <span class="cg-mini-state-node cg-mini-state-node--current cg-mini-state-node--constrained">Review</span>
-                    <span class="cg-state-link" aria-hidden="true"></span>
-                    <span class="cg-mini-event-pill">Approve</span>
-                    <span class="cg-state-link" aria-hidden="true"></span>
-                    <span class="cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--constrained">Approved</span>
-                  </div>
-                  <div class="cg-state-lane-note">alternate live branch</div>
-                  <div class="cg-state-lane">
-                    <span class="cg-mini-badge">from Review</span>
-                    <span class="cg-state-link cg-state-link--branch" aria-hidden="true"></span>
-                    <span class="cg-mini-event-pill">Decline</span>
-                    <span class="cg-state-link cg-state-link--branch" aria-hidden="true"></span>
-                    <span class="cg-mini-state-node cg-mini-state-node--terminal">Declined</span>
-                  </div>
-                </div>
-                <div class="cg-state-side-rail">
-                  <div class="cg-state-side-card">
-                    <div class="cg-state-diagram-title">Disconnected authored branch</div>
-                    <div class="cg-state-lane">
-                      <span class="cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-initial">Archived</span>
-                    </div>
-                    <p class="cg-channel-caption">No transition enters this node from the initial path, so the interior hatch signals an authored dead branch while the terminal outline remains intact.</p>
-                  </div>
-                </div>
+              <div class="svs-state-review-stage" id="state-runtime-review-stage" aria-label="Runtime state diagram for VisitorBadgePickup">
+                <svg viewBox="0 0 760 430" role="img" aria-label="Vertical runtime graph centered on ReadyForPickup with PickUp active and Expire blocked">
+                  <defs>
+                    <marker id="svs-arrow-past" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+                      <path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.38)"></path>
+                    </marker>
+                    <marker id="svs-arrow-blocked" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+                      <path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.64)"></path>
+                    </marker>
+                    <marker id="svs-arrow-active" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+                      <path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.96)"></path>
+                    </marker>
+                  </defs>
+                  <path class="svs-edge-past" data-edge="requested-approved" d="M380 80 V132" marker-end="url(#svs-arrow-past)"></path>
+                  <path class="svs-edge-past" data-edge="approved-ready" d="M380 184 V236" marker-end="url(#svs-arrow-past)"></path>
+                  <path class="svs-edge-past" data-edge="approved-cancelled" d="M454 158 H532" marker-end="url(#svs-arrow-past)"></path>
+                  <path class="svs-edge-active" data-edge="ready-pickedup" d="M380 288 V314 H254 V340" marker-end="url(#svs-arrow-active)"></path>
+                  <path class="svs-edge-blocked" data-edge="ready-expired" d="M380 288 V314 H506 V340" marker-end="url(#svs-arrow-blocked)"></path>
+                </svg>
+
+                <div class="svs-state-node svs-state-node--initial svs-state-node--unreachable-current" data-state="Requested" tabindex="0" style="left:236px; top:32px;"><span class="svs-state-node-dot" aria-hidden="true"></span>Requested</div>
+                <div class="svs-state-node svs-state-node--unreachable-current" data-state="Approved" tabindex="0" style="left:236px; top:176px;">Approved</div>
+                <div class="svs-state-node svs-state-node--current" data-state="ReadyForPickup" tabindex="0" style="left:236px; top:320px;"><em>ReadyForPickup</em></div>
+                <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Cancelled" tabindex="0" style="left:432px; top:176px;">Cancelled</div>
+                <div class="svs-state-node svs-state-node--terminal" data-state="PickedUp" tabindex="0" style="left:110px; top:456px;">PickedUp</div>
+                <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Expired" tabindex="0" style="left:362px; top:456px;">Expired</div>
+
+                <span class="svs-edge-label svs-edge-label--muted" data-edge-label="requested-approved">
+                  <span class="svs-edge-token">ApproveRequest</span>
+                </span>
+                <span class="svs-edge-label svs-edge-label--muted" data-edge-label="approved-ready">
+                  <span class="svs-edge-token">PrintBadge</span>
+                </span>
+                <span class="svs-edge-label svs-edge-label--muted" data-edge-label="approved-cancelled">
+                  <span class="svs-edge-token">Cancel</span>
+                </span>
+                <span class="svs-edge-label svs-edge-label--active" data-edge-label="ready-pickedup">
+                  <span class="svs-edge-token">PickUp</span>
+                </span>
+                <span class="svs-edge-label svs-edge-label--blocked" data-edge-label="ready-expired">
+                  <span class="svs-edge-token">Expire</span>
+                </span>
               </div>
             </div>
           </div>
@@ -5304,6 +5444,251 @@ pre.doc-code-body {
 
   toggle.addEventListener("click", function() {
     setCollapsed(!nav.classList.contains("collapsed"));
+  });
+}());
+
+(function() {
+  var authoredSample = document.getElementById("state-design-sample");
+  var runtimeStage = document.getElementById("state-runtime-review-stage");
+  if (!authoredSample || !runtimeStage) {
+    return;
+  }
+
+  var fallbackPreceptText = `precept VisitorBadgePickup
+
+# State construct specimen: current snapshot is ReadyForPickup with PickupWindowOpen = true.
+
+field VisitorName as string nullable
+field HostConfirmed as boolean default false
+field BadgePrinted as boolean default false
+field PickupWindowOpen as boolean default true
+field OutcomeNote as string nullable
+
+state Requested initial
+state Approved
+state ReadyForPickup
+state PickedUp
+state Expired
+state Cancelled
+
+in Approved assert VisitorName != null 
+    because "Approved pickups must record the visitor"
+in Approved assert HostConfirmed 
+    because "Approved pickups require host confirmation"
+in ReadyForPickup assert VisitorName != null 
+    because "Ready badges must still identify the visitor"
+in ReadyForPickup assert HostConfirmed 
+    because "Ready badges require host confirmation"
+in ReadyForPickup assert BadgePrinted 
+    because "Ready badges must already be printed"
+in Expired assert PickupWindowOpen == false 
+    because "Expired pickups require the pickup window to be closed"
+in Expired assert OutcomeNote != null 
+    because "Expired pickups must record why the badge was not collected"
+
+event ApproveRequest with Name as string
+on ApproveRequest assert Name != "" because "A visitor name is required"
+
+event PrintBadge
+event PickUp
+event Expire
+event Cancel with Reason as string
+on Cancel assert Reason != "" because "A cancellation reason is required"
+
+from Requested on ApproveRequest 
+    -> set VisitorName = ApproveRequest.Name 
+    -> set HostConfirmed = true 
+    -> transition Approved
+from Approved on PrintBadge 
+    -> set BadgePrinted = true 
+    -> transition ReadyForPickup
+from Approved on Cancel 
+    -> set OutcomeNote = Cancel.Reason 
+    -> transition Cancelled
+from ReadyForPickup on PickUp when PickupWindowOpen 
+    -> set OutcomeNote = "Badge collected" 
+    -> transition PickedUp
+from ReadyForPickup on Expire when PickupWindowOpen == false 
+    -> set OutcomeNote = "Pickup window closed before collection" 
+    -> transition Expired`;
+
+  var escapeHtml = function(value) {
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  };
+
+  var primaryKeywords = new Set(["precept", "field", "state", "in", "assert", "because", "event", "on", "from", "set", "transition", "when"]);
+  var secondaryKeywords = new Set(["as", "nullable", "default", "initial", "with"]);
+  var typeKeywords = new Set(["string", "number", "boolean"]);
+  var literalKeywords = new Set(["true", "false", "null"]);
+
+  var collectSymbols = function(text) {
+    var fields = new Set();
+    var states = new Set();
+    var events = new Set();
+
+    text.replace(/\r\n/g, "\n").split("\n").forEach(function(line) {
+      var trimmed = line.trim();
+      var match = /^field\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed);
+      if (match) fields.add(match[1]);
+      match = /^state\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed);
+      if (match) states.add(match[1]);
+      match = /^event\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed);
+      if (match) events.add(match[1]);
+    });
+
+    return { fields: fields, states: states, events: events };
+  };
+
+  var renderToken = function(token, symbols) {
+    if (!token) return "";
+    if (/^\s+$/.test(token)) return token;
+    if (/^"(?:[^"\\]|\\.)*"$/.test(token)) return '<span class="ru">' + escapeHtml(token) + '</span>';
+    if (/^[0-9]+$/.test(token) || literalKeywords.has(token)) return '<span class="dv">' + escapeHtml(token) + '</span>';
+    if (symbols.states.has(token)) return '<span class="svs-authored-state-ref st" data-state="' + escapeHtml(token) + '" tabindex="0">' + escapeHtml(token) + '</span>';
+    if (symbols.events.has(token)) return '<span class="ev">' + escapeHtml(token) + '</span>';
+    if (symbols.fields.has(token)) return '<span class="da">' + escapeHtml(token) + '</span>';
+    if (typeKeywords.has(token)) return '<span class="dt">' + escapeHtml(token) + '</span>';
+    if (primaryKeywords.has(token)) return '<span class="s">' + escapeHtml(token) + '</span>';
+    if (secondaryKeywords.has(token)) return '<span class="sg">' + escapeHtml(token) + '</span>';
+    return escapeHtml(token);
+  };
+
+  var renderPreceptHtml = function(text) {
+    var normalized = text.replace(/\r\n/g, "\n");
+    var symbols = collectSymbols(normalized);
+    var tokenPattern = /"(?:[^"\\]|\\.)*"|==|!=|->|\|\||&&|[A-Za-z_][A-Za-z0-9_]*|\s+|./g;
+
+    return normalized.split("\n").map(function(line) {
+      if (line.trimStart().startsWith("#")) {
+        return '<span class="cm">' + escapeHtml(line) + '</span>';
+      }
+      var tokens = line.match(tokenPattern) || [];
+      return tokens.map(function(token) { return renderToken(token, symbols); }).join("");
+    }).join("\n");
+  };
+
+  var loadPreceptText = async function() {
+    var sourcePath = authoredSample.dataset.source;
+    try {
+      var response = await fetch(sourcePath, { cache: "no-store" });
+      if (response.ok) {
+        return await response.text();
+      }
+    } catch (e) {}
+    return fallbackPreceptText;
+  };
+
+  var formatCoord = function(value) { return Math.round(value * 10) / 10; };
+  var getNodeBox = function(element) {
+    var left = element.offsetLeft;
+    var top = element.offsetTop;
+    var width = element.offsetWidth;
+    var height = element.offsetHeight;
+    return {
+      left: left,
+      top: top,
+      width: width,
+      height: height,
+      right: left + width,
+      bottom: top + height,
+      centerX: left + (width / 2),
+      centerY: top + (height / 2)
+    };
+  };
+  var buildVerticalPath = function(fromBox, toBox) { return "M" + formatCoord(fromBox.centerX) + " " + formatCoord(fromBox.centerY) + " V" + formatCoord(toBox.centerY); };
+  var buildHorizontalPath = function(fromBox, toBox) { return "M" + formatCoord(fromBox.centerX) + " " + formatCoord(fromBox.centerY) + " H" + formatCoord(toBox.centerX); };
+  var buildBranchPath = function(fromBox, toBox, splitY) {
+    return "M" + formatCoord(fromBox.centerX) + " " + formatCoord(fromBox.centerY) + " V" + formatCoord(splitY) + " H" + formatCoord(toBox.centerX) + " V" + formatCoord(toBox.centerY);
+  };
+  var positionLabel = function(element, left, top) {
+    if (!element) return;
+    element.style.left = formatCoord(left - (element.offsetWidth / 2)) + "px";
+    element.style.top = formatCoord(top - (element.offsetHeight / 2)) + "px";
+  };
+
+  var routeRuntimeDiagram = function() {
+    var svg = runtimeStage.querySelector("svg");
+    if (!svg) return;
+
+    var nodesByState = new Map(Array.from(runtimeStage.querySelectorAll(".svs-state-node[data-state]")).map(function(node) {
+      return [node.dataset.state, node];
+    }));
+    var boxes = new Map(Array.from(nodesByState.entries()).map(function(entry) {
+      return [entry[0], getNodeBox(entry[1])];
+    }));
+    var labelsByEdge = new Map(Array.from(runtimeStage.querySelectorAll(".svs-edge-label[data-edge-label]")).map(function(label) {
+      return [label.dataset.edgeLabel, label];
+    }));
+
+    var requested = boxes.get("Requested");
+    var approved = boxes.get("Approved");
+    var readyForPickup = boxes.get("ReadyForPickup");
+    var cancelled = boxes.get("Cancelled");
+    var pickedUp = boxes.get("PickedUp");
+    var expired = boxes.get("Expired");
+    if (!requested || !approved || !readyForPickup || !cancelled || !pickedUp || !expired) return;
+
+    svg.setAttribute("viewBox", "0 0 " + runtimeStage.clientWidth + " " + runtimeStage.clientHeight);
+    var closestBranchCenter = Math.min(pickedUp.centerY, expired.centerY);
+    var branchGap = Math.max(closestBranchCenter - readyForPickup.centerY, 48);
+    var splitY = readyForPickup.bottom + Math.min(32, Math.max(20, branchGap / 2));
+
+    var pathUpdates = new Map([
+      ["requested-approved", buildVerticalPath(requested, approved)],
+      ["approved-ready", buildVerticalPath(approved, readyForPickup)],
+      ["approved-cancelled", buildHorizontalPath(approved, cancelled)],
+      ["ready-pickedup", buildBranchPath(readyForPickup, pickedUp, splitY)],
+      ["ready-expired", buildBranchPath(readyForPickup, expired, splitY)]
+    ]);
+
+    pathUpdates.forEach(function(pathValue, edgeKey) {
+      var path = svg.querySelector('path[data-edge="' + edgeKey + '"]');
+      if (path) path.setAttribute("d", pathValue);
+    });
+
+    positionLabel(labelsByEdge.get("requested-approved"), requested.centerX, (requested.centerY + approved.centerY) / 2);
+    positionLabel(labelsByEdge.get("approved-ready"), approved.centerX, (approved.centerY + readyForPickup.centerY) / 2);
+    positionLabel(labelsByEdge.get("approved-cancelled"), (approved.centerX + cancelled.centerX) / 2, approved.centerY);
+    positionLabel(labelsByEdge.get("ready-pickedup"), (readyForPickup.centerX + pickedUp.centerX) / 2, splitY);
+    positionLabel(labelsByEdge.get("ready-expired"), (readyForPickup.centerX + expired.centerX) / 2, splitY);
+  };
+
+  loadPreceptText().then(function(preceptText) {
+    authoredSample.innerHTML = renderPreceptHtml(preceptText);
+
+    var authoredRefs = Array.from(authoredSample.querySelectorAll(".svs-authored-state-ref[data-state]"));
+    var diagramNodes = Array.from(runtimeStage.querySelectorAll(".svs-state-node[data-state]"));
+    var syncTargets = authoredRefs.concat(diagramNodes);
+    var clearLinked = function() {
+      syncTargets.forEach(function(element) { element.classList.remove("is-linked"); });
+    };
+    var applyLinked = function(state) {
+      syncTargets.forEach(function(element) {
+        element.classList.toggle("is-linked", element.dataset.state === state);
+      });
+    };
+
+    syncTargets.forEach(function(element) {
+      var handleEnter = function() { applyLinked(element.dataset.state); };
+      element.addEventListener("mouseenter", handleEnter);
+      element.addEventListener("mouseleave", clearLinked);
+      element.addEventListener("focus", handleEnter);
+      element.addEventListener("blur", clearLinked);
+    });
+
+    routeRuntimeDiagram();
+    if ("ResizeObserver" in window) {
+      var resizeObserver = new ResizeObserver(function() { routeRuntimeDiagram(); });
+      resizeObserver.observe(runtimeStage);
+    } else {
+      window.addEventListener("resize", routeRuntimeDiagram);
+    }
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function() { routeRuntimeDiagram(); });
+    }
   });
 }());
 </script>

@@ -1,6 +1,6 @@
 precept VisitorBadgePickup
 
-# Runtime-diagram prototype: main snapshot is ReadyForPickup with PickupWindowOpen = true.
+# State construct specimen: current snapshot is ReadyForPickup with PickupWindowOpen = true.
 
 field VisitorName as string nullable
 field HostConfirmed as boolean default false

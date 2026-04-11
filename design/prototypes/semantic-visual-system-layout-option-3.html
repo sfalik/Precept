@@ -30,6 +30,15 @@
   --valid: #34d399;
   --warn: #fde047;
   --violated: #f87171;
+  --page-max: 1780px;
+  --page-inline-pad: clamp(18px, 2.2vw, 36px);
+  --band-inline-pad: clamp(18px, 1.8vw, 30px);
+  --panel-inline-pad: clamp(18px, 1.7vw, 28px);
+  --shell-gap: clamp(18px, 1.9vw, 30px);
+  --panel-gap: clamp(14px, 1.4vw, 22px);
+  --section-rail-height: 58px;
+  --sidebar-width: clamp(232px, 17vw, 272px);
+  --editorial-width: 980px;
   --mono: "Geist Mono", "Cascadia Code", Consolas, monospace;
   --sans: "Geist", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
 }
@@ -52,21 +61,22 @@ body {
     var(--bg);
   color: var(--text);
   font-family: var(--mono);
-}
+  top: calc(var(--section-rail-height) + 18px);
 
 a {
   color: inherit;
 }
 
 .page {
-  width: min(1540px, calc(100vw - 40px));
+  width: min(var(--page-max), calc(100% - (var(--page-inline-pad) * 2)));
+  max-width: 100%;
   margin: 0 auto;
   padding: 26px 0 96px;
 }
 
 .page-head {
   display: grid;
-  gap: 22px;
+  gap: var(--shell-gap);
   padding: 18px 0 36px;
 }
 
@@ -81,9 +91,92 @@ a {
   text-transform: uppercase;
 }
 
+.section-rail {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: minmax(172px, auto) minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  margin: 0 0 28px;
+  padding: 12px 16px;
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, rgba(13,16,20,0.92), rgba(9,11,14,0.9));
+  backdrop-filter: blur(18px);
+}
+
+.section-rail-meta {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.section-rail-current {
+  color: var(--text);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.section-rail-mode {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.section-rail-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: center;
+}
+
+.section-rail-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 0 0 4px;
+  border-bottom: 1px solid transparent;
+  color: var(--soft);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.section-rail-link:hover,
+.section-rail-link:focus-visible {
+  color: var(--text);
+}
+
+.section-rail-link:focus-visible {
+  outline: none;
+  border-bottom-color: rgba(99,102,241,0.34);
+}
+
+.section-rail-link.active {
+  color: var(--text);
+  border-bottom-color: rgba(99,102,241,0.52);
+}
+
+.section-rail-index {
+  color: rgba(99,102,241,0.82);
+}
+
+.section-rail-link.active .section-rail-index {
+  color: var(--structure);
+}
+
+[data-section-anchor] {
+  scroll-margin-top: calc(var(--section-rail-height) + 28px);
+}
+
 .lead-frame {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--sidebar-width));
   gap: 1px;
   border: 1px solid var(--line-strong);
   background: var(--line);
@@ -96,16 +189,24 @@ a {
 }
 
 .lead-copy {
-  padding: 34px 34px 36px;
+  padding: 34px var(--panel-inline-pad) 36px;
   display: grid;
   gap: 18px;
 }
 
 .lead-map {
-  padding: 28px 28px 30px;
+  padding: 28px var(--panel-inline-pad) 30px;
   display: grid;
   gap: 18px;
   align-content: start;
+}
+
+.lead-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--panel-gap);
+  align-items: start;
+  flex-wrap: wrap;
 }
 
 .eyebrow,
@@ -221,10 +322,10 @@ a {
 
 .band {
   position: relative;
-  margin-top: 28px;
+  margin-top: var(--shell-gap);
   border: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0.01));
-  overflow: hidden;
+  overflow: visible;
 }
 
 .band::before {
@@ -238,29 +339,29 @@ a {
 .band-head {
   display: flex;
   justify-content: space-between;
-  gap: 18px;
+  gap: var(--panel-gap);
   flex-wrap: wrap;
-  padding: 16px 20px;
+  padding: 16px var(--panel-inline-pad);
   border-bottom: 1px solid var(--line);
   background: rgba(255,255,255,0.015);
 }
 
 .band-shell {
-  padding: 34px 24px 40px;
+  padding: 34px var(--band-inline-pad) 40px;
 }
 
 .tier-a-shell {
-  width: min(910px, calc(100% - 24px));
+  width: min(var(--editorial-width), 100%);
   margin: 0 auto;
 }
 
 .tier-b-shell {
-  width: min(1360px, 100%);
+  width: 100%;
   margin: 0 auto;
 }
 
 .tier-c-shell {
-  width: min(1448px, 100%);
+  width: 100%;
   margin: 0 auto;
 }
 
@@ -273,10 +374,31 @@ a {
   background: linear-gradient(180deg, rgba(67,56,202,0.16), rgba(9,11,14,0.82));
 }
 
+.layout-callout-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px 18px;
+  flex-wrap: wrap;
+}
+
+.layout-callout-title {
+  color: rgba(241,243,246,0.9);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.layout-callout-copy {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
 .layout-callout-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--panel-gap);
 }
 
 .callout-cell {
@@ -299,7 +421,7 @@ a {
 
 .editorial-stack {
   display: grid;
-  gap: 26px;
+  gap: calc(var(--shell-gap) - 2px);
 }
 
 .editorial-head {
@@ -310,7 +432,7 @@ a {
 .editorial-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
+  gap: var(--shell-gap);
 }
 
 .editorial-note {
@@ -333,19 +455,66 @@ a {
 
 .reference-grid {
   display: grid;
-  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: minmax(220px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: var(--shell-gap);
   align-items: start;
 }
 
 .sidebar {
   position: sticky;
-  top: 18px;
+  top: calc(var(--section-rail-height) + 18px);
   display: grid;
   gap: 18px;
-  padding: 20px;
+  padding: 20px var(--panel-inline-pad);
   border: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(13,16,20,0.98), rgba(9,11,14,1));
+}
+
+.sidebar-panel {
+  min-width: 0;
+}
+
+.sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  align-self: start;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  background: rgba(255,255,255,0.028);
+  color: var(--soft);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.sidebar-toggle::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-top: -1px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.sidebar-toggle:hover,
+.sidebar-toggle:focus-visible {
+  color: var(--text);
+  border-color: rgba(99,102,241,0.34);
+  background: rgba(255,255,255,0.04);
+}
+
+.sidebar-toggle:focus-visible {
+  outline: none;
+}
+
+.sidebar-toggle__text {
+  color: var(--text);
 }
 
 .sidebar-list,
@@ -407,29 +576,26 @@ a {
 .reference-rail {
   min-width: 0;
   display: grid;
-  gap: 14px;
+  gap: var(--panel-gap);
 }
 
 .rail-toolbar {
   padding: 0 2px;
+  flex-wrap: wrap;
+}
+
+.rail-toolbar-copy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
 }
 
 .scroll-rail {
-  max-height: 780px;
-  overflow-y: auto;
-  padding-right: 8px;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
   display: grid;
-  gap: 14px;
-}
-
-.scroll-rail::-webkit-scrollbar {
-  width: 10px;
-}
-
-.scroll-rail::-webkit-scrollbar-thumb {
-  background: rgba(99,102,241,0.28);
-  border: 2px solid transparent;
-  background-clip: padding-box;
+  gap: var(--panel-gap);
 }
 
 .construct-card {
@@ -467,7 +633,7 @@ a {
 .construct-grid {
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
-  gap: 16px;
+  gap: var(--panel-gap);
 }
 
 .construct-slot {
@@ -527,6 +693,24 @@ a {
   gap: 1px;
   border: 1px solid var(--line-strong);
   background: var(--line);
+}
+
+.lead-frame.is-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.lead-frame.is-collapsed .lead-map,
+.reference-grid.is-collapsed .sidebar {
+  display: none;
+}
+
+.reference-grid.is-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.lead-frame.is-collapsed .sidebar-toggle::before,
+.reference-grid.is-collapsed .sidebar-toggle::before {
+  transform: rotate(-135deg);
 }
 
 .split-pane {
@@ -783,6 +967,11 @@ pre {
 }
 
 @media (max-width: 1180px) {
+  .section-rail {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
   .lead-frame,
   .reference-grid,
   .construct-grid,
@@ -800,6 +989,10 @@ pre {
     position: static;
   }
 
+  [data-section-anchor] {
+    scroll-margin-top: calc(var(--section-rail-height) + 28px);
+  }
+
   .scroll-rail {
     max-height: none;
     overflow: visible;
@@ -809,8 +1002,29 @@ pre {
 
 @media (max-width: 760px) {
   .page {
-    width: min(100vw, calc(100vw - 24px));
+    width: calc(100% - 24px);
     padding: 16px 0 60px;
+  }
+
+  .section-rail {
+    top: 0;
+    gap: 10px;
+    margin-bottom: 22px;
+    padding: 10px 14px;
+  }
+
+  .section-rail-links {
+    gap: 8px 14px;
+  }
+
+  .section-rail-link {
+    gap: 8px;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+  }
+
+  [data-section-anchor] {
+    scroll-margin-top: calc(var(--section-rail-height) + 24px);
   }
 
   .band-shell,
@@ -846,6 +1060,20 @@ pre {
 </head>
 <body>
   <main class="page">
+    <nav class="section-rail" aria-label="Mock section index" data-section-rail>
+      <div class="section-rail-meta">
+        <span class="rail-label">Current location</span>
+        <span class="section-rail-current" data-section-current>Overview</span>
+        <span class="section-rail-mode" data-section-mode>Map and framing</span>
+      </div>
+      <div class="section-rail-links">
+        <a class="section-rail-link active" href="#lead-layout" data-sec="lead-layout" data-label="Overview" data-mode="Map and framing" aria-current="true"><span class="section-rail-index">00</span><span>Overview</span></a>
+        <a class="section-rail-link" href="#editorial-band" data-sec="editorial-band" data-label="Tier A / Editorial" data-mode="Centered reading shell"><span class="section-rail-index">01</span><span>Editorial</span></a>
+        <a class="section-rail-link" href="#reference-band" data-sec="reference-band" data-label="Tier B / Reference" data-mode="Sidebar plus scanning rail"><span class="section-rail-index">02</span><span>Reference</span></a>
+        <a class="section-rail-link" href="#specimen-band" data-sec="specimen-band" data-label="Tier C / Specimen" data-mode="Definition and runtime split"><span class="section-rail-index">03</span><span>Specimen</span></a>
+      </div>
+    </nav>
+
     <header class="page-head">
       <div class="meta-bar">
         <span>Precept / Design Prototypes</span>
@@ -853,9 +1081,25 @@ pre {
         <span>Three-tier horizontal study</span>
       </div>
 
-      <section class="lead-frame" aria-label="Prototype overview">
+      <section class="lead-frame" id="lead-layout" data-section-anchor aria-label="Prototype overview">
         <div class="lead-copy">
-          <div class="eyebrow">Semantic Visual System</div>
+          <div class="lead-head">
+            <div class="eyebrow">Semantic Visual System</div>
+            <button
+              class="sidebar-toggle"
+              type="button"
+              data-sidebar-toggle
+              data-sidebar-root="lead-layout"
+              data-storage-key="svs-layout-option-3:lead-map"
+              data-expanded-label="Hide map"
+              data-collapsed-label="Show map"
+              aria-expanded="true"
+              aria-controls="lead-map-panel"
+            >
+              <span>Map rail</span>
+              <span class="sidebar-toggle__text">Hide map</span>
+            </button>
+          </div>
           <h1 class="display-title">A Three-Tier Layout For Reading, Scanning, And Proof.</h1>
           <p>This mock tests a horizontal system for the semantic visual system document rather than rewriting the canonical artifact. The point is to make layout intent legible: editorial sections contract into a centered reading shell, construct reference sections widen into a sidebar plus scanning rail, and specimen pairs expand into a dedicated split surface where authored source can be judged directly against run-time rendering.</p>
           <div class="summary-grid" aria-label="Option summary">
@@ -877,7 +1121,7 @@ pre {
           </div>
         </div>
 
-        <aside class="lead-map">
+        <aside class="lead-map sidebar-panel" id="lead-map-panel">
           <div class="eyebrow">Horizontal map</div>
           <div class="tier-map">
             <div class="tier-map-row">
@@ -906,7 +1150,7 @@ pre {
       </section>
     </header>
 
-    <section class="band" aria-labelledby="tier-a-title">
+    <section class="band" id="editorial-band" data-section-anchor aria-labelledby="tier-a-title">
       <div class="band-head">
         <span class="band-meta">Tier A / Editorial section / centered shell</span>
         <span class="band-meta">Narrow reading width / high prose rhythm</span>
@@ -914,20 +1158,25 @@ pre {
       <div class="band-shell">
         <div class="tier-a-shell">
           <div class="layout-callout">
-            <div class="kicker">Horizontal behavior</div>
-            <h3>The shell deliberately contracts inside the band so the page signals “read” rather than “scan.”</h3>
-            <div class="layout-callout-grid">
-              <div class="callout-cell">
-                <div class="mini-label">Width logic</div>
-                <strong>Centered at editorial measure</strong>
-              </div>
-              <div class="callout-cell">
-                <div class="mini-label">Primary job</div>
-                <strong>State the semantic thesis clearly</strong>
-              </div>
-              <div class="callout-cell">
-                <div class="mini-label">Visual cue</div>
-                <strong>Quiet band, stronger prose cadence</strong>
+            <div class="layout-callout-header">
+              <div class="kicker">Horizontal behavior</div>
+              <div class="layout-callout-title">Tier A / Editorial shell</div>
+            </div>
+            <div class="layout-callout-copy">
+              <h3>The shell deliberately contracts inside the band so the page signals “read” rather than “scan.”</h3>
+              <div class="layout-callout-grid">
+                <div class="callout-cell">
+                  <div class="mini-label">Width logic</div>
+                  <strong>Centered at editorial measure</strong>
+                </div>
+                <div class="callout-cell">
+                  <div class="mini-label">Primary job</div>
+                  <strong>State the semantic thesis clearly</strong>
+                </div>
+                <div class="callout-cell">
+                  <div class="mini-label">Visual cue</div>
+                  <strong>Quiet band, stronger prose cadence</strong>
+                </div>
               </div>
             </div>
           </div>
@@ -964,7 +1213,7 @@ pre {
       </div>
     </section>
 
-    <section class="band" aria-labelledby="tier-b-title">
+    <section class="band" id="reference-band" data-section-anchor aria-labelledby="tier-b-title">
       <div class="band-head">
         <span class="band-meta">Tier B / Reference gallery / sidebar-content pattern</span>
         <span class="band-meta">Wider shell / stable nav / scrollable rail</span>
@@ -972,26 +1221,31 @@ pre {
       <div class="band-shell">
         <div class="tier-b-shell">
           <div class="layout-callout">
-            <div class="kicker">Horizontal behavior</div>
-            <h3>Reference sections widen into a sidebar plus a content rail so repeated scanning does not fight editorial measure.</h3>
-            <div class="layout-callout-grid">
-              <div class="callout-cell">
-                <div class="mini-label">Sidebar</div>
-                <strong>Orientation and signal legend</strong>
-              </div>
-              <div class="callout-cell">
-                <div class="mini-label">Content rail</div>
-                <strong>Roomy, vertically scrollable construct stack</strong>
-              </div>
-              <div class="callout-cell">
-                <div class="mini-label">Reason</div>
-                <strong>Lets repeated gallery patterns stay legible</strong>
+            <div class="layout-callout-header">
+              <div class="kicker">Horizontal behavior</div>
+              <div class="layout-callout-title">Tier B / Reference rail</div>
+            </div>
+            <div class="layout-callout-copy">
+              <h3>Reference sections widen into a sidebar plus a content rail so repeated scanning does not fight editorial measure.</h3>
+              <div class="layout-callout-grid">
+                <div class="callout-cell">
+                  <div class="mini-label">Sidebar</div>
+                  <strong>Orientation and signal legend</strong>
+                </div>
+                <div class="callout-cell">
+                  <div class="mini-label">Content rail</div>
+                  <strong>Roomy, vertically scrollable construct stack</strong>
+                </div>
+                <div class="callout-cell">
+                  <div class="mini-label">Reason</div>
+                  <strong>Lets repeated gallery patterns stay legible</strong>
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="reference-grid">
-            <aside class="sidebar">
+          <div class="reference-grid" id="reference-layout">
+            <aside class="sidebar sidebar-panel" id="reference-sidebar-panel">
               <div>
                 <div class="eyebrow">Reference rail</div>
                 <h3 id="tier-b-title">Construct galleries</h3>
@@ -1023,8 +1277,24 @@ pre {
 
             <div class="reference-rail">
               <div class="rail-toolbar">
-                <span class="rail-label">Roomy content rail</span>
-                <span class="rail-label">Shared construct template / identity / modifiers / proof</span>
+                <div class="rail-toolbar-copy">
+                  <span class="rail-label">Roomy content rail</span>
+                  <span class="rail-label">Shared construct template / identity / modifiers / proof</span>
+                </div>
+                <button
+                  class="sidebar-toggle"
+                  type="button"
+                  data-sidebar-toggle
+                  data-sidebar-root="reference-layout"
+                  data-storage-key="svs-layout-option-3:reference-sidebar"
+                  data-expanded-label="Hide rail"
+                  data-collapsed-label="Show rail"
+                  aria-expanded="true"
+                  aria-controls="reference-sidebar-panel"
+                >
+                  <span>Sidebar</span>
+                  <span class="sidebar-toggle__text">Hide rail</span>
+                </button>
               </div>
 
               <div class="scroll-rail">
@@ -1164,7 +1434,7 @@ pre {
       </div>
     </section>
 
-    <section class="band" aria-labelledby="tier-c-title">
+    <section class="band" id="specimen-band" data-section-anchor aria-labelledby="tier-c-title">
       <div class="band-head">
         <span class="band-meta">Tier C / Specimen pair / dedicated split layout</span>
         <span class="band-meta">Wide seam / direct design-time vs run-time comparison</span>
@@ -1172,20 +1442,25 @@ pre {
       <div class="band-shell">
         <div class="tier-c-shell">
           <div class="layout-callout">
-            <div class="kicker">Horizontal behavior</div>
-            <h3>The specimen tier spends width on a hard split so authored law and rendered consequence can be judged in one glance.</h3>
-            <div class="layout-callout-grid">
-              <div class="callout-cell">
-                <div class="mini-label">Left pane</div>
-                <strong>Definition / authored source</strong>
-              </div>
-              <div class="callout-cell">
-                <div class="mini-label">Right pane</div>
-                <strong>Runtime / rendered state snapshot</strong>
-              </div>
-              <div class="callout-cell">
-                <div class="mini-label">Reading job</div>
-                <strong>Prove translation, not just describe it</strong>
+            <div class="layout-callout-header">
+              <div class="kicker">Horizontal behavior</div>
+              <div class="layout-callout-title">Tier C / Specimen split</div>
+            </div>
+            <div class="layout-callout-copy">
+              <h3>The specimen tier spends width on a hard split so authored law and rendered consequence can be judged in one glance.</h3>
+              <div class="layout-callout-grid">
+                <div class="callout-cell">
+                  <div class="mini-label">Left pane</div>
+                  <strong>Definition / authored source</strong>
+                </div>
+                <div class="callout-cell">
+                  <div class="mini-label">Right pane</div>
+                  <strong>Runtime / rendered state snapshot</strong>
+                </div>
+                <div class="callout-cell">
+                  <div class="mini-label">Reading job</div>
+                  <strong>Prove translation, not just describe it</strong>
+                </div>
               </div>
             </div>
           </div>
@@ -1319,5 +1594,113 @@ pre {
       </div>
     </section>
   </main>
+  <script>
+    (function () {
+      var rail = document.querySelector("[data-section-rail]");
+
+      if (!rail) {
+        return;
+      }
+
+      var items = Array.from(rail.querySelectorAll(".section-rail-link[data-sec]"));
+      var currentLabel = rail.querySelector("[data-section-current]");
+      var currentMode = rail.querySelector("[data-section-mode]");
+      var anchors = items.map(function (item) {
+        return document.getElementById(item.dataset.sec);
+      }).filter(function (anchor) {
+        return Boolean(anchor);
+      });
+
+      function updateSectionRail() {
+        if (!anchors.length) {
+          return;
+        }
+
+        document.documentElement.style.setProperty("--section-rail-height", rail.offsetHeight + "px");
+
+        var active = anchors[0];
+        var threshold = Math.max(84, rail.getBoundingClientRect().bottom + 18);
+
+        for (var i = 0; i < anchors.length; i += 1) {
+          if (anchors[i].getBoundingClientRect().top <= threshold) {
+            active = anchors[i];
+          }
+        }
+
+        var id = active ? active.id : "";
+
+        items.forEach(function (item) {
+          var isActive = item.dataset.sec === id;
+
+          item.classList.toggle("active", isActive);
+
+          if (isActive) {
+            item.setAttribute("aria-current", "true");
+
+            if (currentLabel) {
+              currentLabel.textContent = item.dataset.label || item.textContent.trim();
+            }
+
+            if (currentMode) {
+              currentMode.textContent = item.dataset.mode || "";
+            }
+          } else {
+            item.removeAttribute("aria-current");
+          }
+        });
+      }
+
+      document.addEventListener("scroll", updateSectionRail, { passive: true });
+      window.addEventListener("resize", updateSectionRail);
+      updateSectionRail();
+    }());
+
+    (function () {
+      function applySidebarState(button, root, collapsed) {
+        root.classList.toggle("is-collapsed", collapsed);
+        button.setAttribute("aria-expanded", String(!collapsed));
+
+        var label = collapsed ? button.dataset.collapsedLabel : button.dataset.expandedLabel;
+        var labelNode = button.querySelector(".sidebar-toggle__text");
+
+        if (labelNode && label) {
+          labelNode.textContent = label;
+        }
+      }
+
+      document.querySelectorAll("[data-sidebar-toggle]").forEach(function (button) {
+        var rootId = button.dataset.sidebarRoot;
+        var storageKey = button.dataset.storageKey;
+        var root = document.getElementById(rootId);
+        var collapsed = false;
+
+        if (!root) {
+          return;
+        }
+
+        try {
+          collapsed = storageKey ? window.localStorage.getItem(storageKey) === "collapsed" : false;
+        } catch (error) {
+          collapsed = false;
+        }
+
+        applySidebarState(button, root, collapsed);
+
+        button.addEventListener("click", function () {
+          var nextCollapsed = !root.classList.contains("is-collapsed");
+
+          applySidebarState(button, root, nextCollapsed);
+
+          try {
+            if (storageKey) {
+              window.localStorage.setItem(storageKey, nextCollapsed ? "collapsed" : "expanded");
+            }
+          } catch (error) {
+          }
+        });
+      });
+    }());
+
+  </script>
 </body>
 </html>
