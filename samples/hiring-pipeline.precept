@@ -6,7 +6,7 @@ precept HiringPipeline
 field CandidateName as string nullable
 field RoleName as string nullable
 field RecruiterName as string nullable
-field FeedbackCount as number default 0 nonnegative
+field FeedbackCount as integer default 0 nonnegative
 field OfferAmount as number default 0 nonnegative
 field FinalNote as string nullable maxlength 500
 

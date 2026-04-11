@@ -5,8 +5,8 @@ precept CrosswalkSignal
 # with a decreasing countdown before returning to DontWalk.
 
 field RequestPending as boolean default false
-field CycleCount as number default 0
-field CountdownSeconds as number default 0
+field CycleCount as integer default 0
+field CountdownSeconds as integer default 0
 
 invariant CycleCount >= 0 because "Cycle count cannot be negative"
 invariant CountdownSeconds >= 0 because "Countdown seconds cannot be negative"
