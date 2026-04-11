@@ -530,12 +530,45 @@ pre {
   --modifier-shadow: inset 0 0 0 2px rgba(168,152,245,0.14);
 }
 .cg-modifier-token--state-current {
-  --modifier-border: rgba(168,152,245,0.45);
-  --modifier-bg: rgba(168,152,245,0.10);
+  --modifier-border: rgba(168,152,245,0.72);
+  --modifier-bg: linear-gradient(180deg, rgba(168,152,245,0.28), rgba(168,152,245,0.18));
+  --modifier-shadow: inset 0 0 0 1px rgba(168,152,245,0.16), 0 0 0 1px rgba(168,152,245,0.10);
 }
+ .cg-state-baseline {
+   margin: 24px 0 28px;
+   padding: 16px 18px;
+   border: 1px solid var(--line);
+   background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+   display: grid;
+   gap: 14px;
+ }
+ .cg-state-baseline-head {
+   display: grid;
+   gap: 6px;
+ }
+ .cg-state-baseline-examples {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 18px;
+ }
+ .cg-state-baseline-sample {
+   display: grid;
+   gap: 8px;
+   align-content: start;
+ }
 .cg-modifier-token--state-not-reachable {
-  --modifier-border: rgba(168,152,245,0.2);
-  --modifier-opacity: 0.65;
+  --modifier-text: rgba(168,152,245,0.54);
+  --modifier-bg: rgba(168,152,245,0.012);
+}
+.cg-modifier-token--state-not-reachable-initial {
+  --modifier-border: rgba(168,152,245,0.16);
+  --modifier-bg:
+    repeating-linear-gradient(135deg, rgba(168,152,245,0.08) 0 1px, transparent 1px 7px),
+    rgba(168,152,245,0.012);
+}
+.cg-modifier-token--state-not-reachable-current {
+  --modifier-border: rgba(168,152,245,0.22);
+  border-style: dashed;
 }
 .cg-modifier-token--event {
   --modifier-border: rgba(48,184,232,0.35);
@@ -697,17 +730,27 @@ pre {
     flex-shrink: 0;
   }
   .cg-mini-state-node--current {
-    border-color: rgba(168,152,245,0.46);
-    background: rgba(168,152,245,0.10);
+    border-color: rgba(168,152,245,0.72);
+    background: linear-gradient(180deg, rgba(168,152,245,0.28), rgba(168,152,245,0.18));
+    box-shadow: inset 0 0 0 1px rgba(168,152,245,0.16), 0 0 0 1px rgba(168,152,245,0.10);
   }
   .cg-mini-state-node--terminal {
     border-width: 2px;
     box-shadow: inset 0 0 0 1px rgba(168,152,245,0.14);
   }
   .cg-mini-state-node--not-reachable {
+    color: rgba(168,152,245,0.54);
+    background: rgba(168,152,245,0.012);
+  }
+  .cg-mini-state-node--not-reachable-initial {
+    border-color: rgba(168,152,245,0.16);
+    background:
+      repeating-linear-gradient(135deg, rgba(168,152,245,0.08) 0 1px, transparent 1px 7px),
+      rgba(168,152,245,0.012);
+  }
+  .cg-mini-state-node--not-reachable-current {
     border-color: rgba(168,152,245,0.22);
-    background: rgba(168,152,245,0.02);
-    opacity: 0.58;
+    border-style: dashed;
   }
   .cg-mini-state-node--constrained,
   .cg-mini-data-name--constrained {
@@ -715,6 +758,85 @@ pre {
   }
   .cg-mini-state-chip--ghost {
     opacity: 0.72;
+  }
+  .cg-state-diagram {
+    display: grid;
+    gap: 16px;
+    padding: 16px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0.01));
+  }
+  .cg-state-diagram-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .cg-state-diagram-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    line-height: 1.4;
+    text-transform: uppercase;
+    color: var(--soft);
+  }
+  .cg-state-diagram-copy {
+    margin: 8px 0 0;
+    max-width: 50ch;
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.68;
+    color: var(--muted);
+  }
+  .cg-state-diagram-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .cg-state-lanes {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(220px, 0.85fr);
+    gap: 12px;
+    align-items: start;
+  }
+  .cg-state-lane-stack,
+  .cg-state-side-rail,
+  .cg-state-side-card {
+    display: grid;
+    gap: 10px;
+  }
+  .cg-state-side-card {
+    padding: 12px;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.02);
+  }
+  .cg-state-lane {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .cg-state-lane-note {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    line-height: 1.4;
+    text-transform: uppercase;
+    color: var(--soft);
+  }
+  .cg-state-link {
+    flex: 1 1 26px;
+    min-width: 24px;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(99,102,241,0.28), rgba(99,102,241,0.7));
+  }
+  .cg-state-link--branch {
+    background: linear-gradient(90deg, rgba(99,102,241,0.18), rgba(99,102,241,0.52));
   }
   .cg-mini-event-pill {
     border: 1px solid rgba(48,184,232,0.35);
@@ -804,6 +926,9 @@ pre {
   }
 @media (max-width: 860px) {
   .cg-combination-grid {
+    grid-template-columns: 1fr;
+  }
+  .cg-state-lanes {
     grid-template-columns: 1fr;
   }
 }
@@ -3079,24 +3204,45 @@ pre {
         <div class="specimen-half">
           <div class="specimen-half-bar">
             <span class="specimen-half-label">Design-time view</span>
-            <span class="specimen-half-tag">authored &middot; syntax token</span>
+            <span class="specimen-half-tag">authored &middot; compile-valid specimen</span>
           </div>
           <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">State names &middot; <span class="st">Open &middot; Closed</span></span></div>
-            <pre><span class="s">precept</span> Task
+            <div class="cg-focal-strip"><span class="cg-focal-label">State workflow &middot; <span class="st">Intake &middot; Review &middot; Approved &middot; Declined &middot; Archived</span></span></div>
+            <pre><span class="s">precept</span> AccessRequest
 
-<span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
+<span class="s">field</span> <span class="da">Applicant</span> <span class="s">as</span> <span class="dt">string</span> <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">DecisionNote</span> <span class="s">as</span> <span class="dt">string</span> <span class="s">nullable</span>
+<span class="s">field</span> <span class="da">DocumentsVerified</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
 
-<span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
+<span class="s">state</span> <span class="st">Intake</span> <span class="s">initial</span>
+<span class="s">state</span> <span class="st">Review</span>
+<span class="s">state</span> <span class="st">Approved</span>
+<span class="s">state</span> <span class="st">Declined</span>
+<span class="s">state</span> <span class="st">Archived</span>
 
-<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
-  <span class="s">because</span> <span class="ru">"Closed means done"</span>
+<span class="s">in</span> <span class="st"><em>Review</em></span> <span class="s">assert</span> <span class="da">Applicant</span> != <span class="dv">null</span>
+  <span class="s">because</span> <span class="ru">"Review requires a recorded applicant"</span>
+<span class="s">in</span> <span class="st"><em>Approved</em></span> <span class="s">assert</span> <span class="da">DocumentsVerified</span>
+  <span class="s">because</span> <span class="ru">"Approved requests must have verified documents"</span>
 
-<span class="s">event</span> <span class="ev">Close</span>
+<span class="s">event</span> <span class="ev">Submit</span> <span class="s">with</span> <span class="da">Name</span> <span class="s">as</span> <span class="dt">string</span>
+<span class="s">event</span> <span class="ev">VerifyDocuments</span>
+<span class="s">event</span> <span class="ev">Approve</span>
+<span class="s">event</span> <span class="ev">Decline</span> <span class="s">with</span> <span class="da">Note</span> <span class="s">as</span> <span class="dt">string</span>
 
-<span class="s">from</span> <span class="st">Open</span> <span class="s">on</span> <span class="ev">Close</span>
-  -&gt; <span class="s">set</span> <span class="da">Done</span> = <span class="dv">true</span>
-  -&gt; <span class="s">transition</span> <span class="st">Closed</span></pre>
+<span class="s">from</span> <span class="st">Intake</span> <span class="s">on</span> <span class="ev">Submit</span>
+  -&gt; <span class="s">set</span> <span class="da">Applicant</span> = <span class="ev">Submit</span>.<span class="da">Name</span>
+  -&gt; <span class="s">transition</span> <span class="st">Review</span>
+<span class="s">from</span> <span class="st">Review</span> <span class="s">on</span> <span class="ev">VerifyDocuments</span>
+  -&gt; <span class="s">set</span> <span class="da">DocumentsVerified</span> = <span class="dv">true</span>
+  -&gt; <span class="s">no</span> <span class="s">transition</span>
+<span class="s">from</span> <span class="st">Review</span> <span class="s">on</span> <span class="ev">Approve</span> <span class="s">when</span> <span class="da">DocumentsVerified</span>
+  -&gt; <span class="s">transition</span> <span class="st">Approved</span>
+<span class="s">from</span> <span class="st">Review</span> <span class="s">on</span> <span class="ev">Approve</span>
+  -&gt; <span class="s">reject</span> <span class="ru">"Approval requires verified documents"</span>
+<span class="s">from</span> <span class="st">Review</span> <span class="s">on</span> <span class="ev">Decline</span>
+  -&gt; <span class="s">set</span> <span class="da">DecisionNote</span> = <span class="ev">Decline</span>.<span class="da">Note</span>
+  -&gt; <span class="s">transition</span> <span class="st">Declined</span></pre>
           </div>
         </div>
 
@@ -3104,16 +3250,53 @@ pre {
         <div class="specimen-half">
           <div class="specimen-half-bar">
             <span class="specimen-half-label">Run-time view</span>
-            <span class="specimen-half-tag">rendered &middot; state nodes</span>
+            <span class="specimen-half-tag">rendered &middot; compact state diagram</span>
           </div>
           <div class="specimen-half-inner">
-            <div style="display:grid;gap:8px;">
-              <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid rgba(168,152,245,0.35);background:rgba(168,152,245,0.07);font-family:var(--mono);font-size:13px;color:var(--state);width:fit-content;">
-                <span style="width:7px;height:7px;border-radius:50%;background:var(--structure);flex-shrink:0;"></span>
-                Open
+            <div class="cg-focal-strip"><span class="cg-focal-label">Snapshot after <span class="ev">VerifyDocuments</span> &middot; current <span class="st"><em>Review</em></span></span></div>
+            <div class="cg-state-diagram">
+              <div class="cg-state-diagram-head">
+                <div>
+                  <div class="cg-state-diagram-title">AccessRequest flow</div>
+                  <p class="cg-state-diagram-copy">One live snapshot shows the current review node, the reachable terminal outcomes ahead, the initial state now behind the flow, and an authored dead branch with no path from entry.</p>
+                </div>
+                <div class="cg-state-diagram-meta">
+                  <span class="cg-mini-badge">shared specimen</span>
+                  <span class="cg-mini-badge">most common stacks</span>
+                </div>
               </div>
-              <div style="display:inline-flex;align-items:center;padding:8px 14px;border:2px solid rgba(168,152,245,0.55);box-shadow:inset 0 0 0 3px rgba(168,152,245,0.12);font-family:var(--mono);font-size:13px;color:var(--state);width:fit-content;">
-                Closed
+              <div class="cg-state-lanes">
+                <div class="cg-state-lane-stack">
+                  <div class="cg-state-lane-note">main path</div>
+                  <div class="cg-state-lane">
+                    <span class="cg-mini-state-node cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-current"><span class="cg-mini-state-node-dot"></span>Intake</span>
+                    <span class="cg-state-link" aria-hidden="true"></span>
+                    <span class="cg-mini-event-pill">Submit</span>
+                    <span class="cg-state-link" aria-hidden="true"></span>
+                    <span class="cg-mini-state-node cg-mini-state-node--current cg-mini-state-node--constrained">Review</span>
+                    <span class="cg-state-link" aria-hidden="true"></span>
+                    <span class="cg-mini-event-pill">Approve</span>
+                    <span class="cg-state-link" aria-hidden="true"></span>
+                    <span class="cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--constrained">Approved</span>
+                  </div>
+                  <div class="cg-state-lane-note">alternate live branch</div>
+                  <div class="cg-state-lane">
+                    <span class="cg-mini-badge">from Review</span>
+                    <span class="cg-state-link cg-state-link--branch" aria-hidden="true"></span>
+                    <span class="cg-mini-event-pill">Decline</span>
+                    <span class="cg-state-link cg-state-link--branch" aria-hidden="true"></span>
+                    <span class="cg-mini-state-node cg-mini-state-node--terminal">Declined</span>
+                  </div>
+                </div>
+                <div class="cg-state-side-rail">
+                  <div class="cg-state-side-card">
+                    <div class="cg-state-diagram-title">Disconnected authored branch</div>
+                    <div class="cg-state-lane">
+                      <span class="cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-initial">Archived</span>
+                    </div>
+                    <p class="cg-channel-caption">No transition enters this node from the initial path, so the interior hatch signals an authored dead branch while the terminal outline remains intact.</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -3144,7 +3327,7 @@ pre {
               <div class="cg-channel-signal cg-channel-signal--state-compare">
                 <span class="cg-modifier-token cg-modifier-token--state">Closed</span>
               </div>
-              <p class="cg-channel-caption cg-channel-caption--state-compare">Plain node is the baseline, then dot, fill, dimming, and double border layer on top.</p>
+              <p class="cg-channel-caption cg-channel-caption--state-compare">Plain node is the baseline, then dot, fill, dimmed hatch or dashed edge, and double border layer on top.</p>
             </div>
           </div>
           <div class="cg-channel">
@@ -3158,6 +3341,22 @@ pre {
       </div>
 
       <div>
+        <div class="cg-state-baseline">
+          <div class="cg-state-baseline-head">
+            <div class="cg-channel-name">Base / unmodified state</div>
+            <p class="cg-channel-caption">Start from the plain state token or node. Every semantic modifier below layers onto this baseline rather than replacing it.</p>
+          </div>
+          <div class="cg-state-baseline-examples">
+            <div class="cg-state-baseline-sample">
+              <span class="cg-mini-badge">authored</span>
+              <span class="cg-modifier-token cg-modifier-token--state">Review</span>
+            </div>
+            <div class="cg-state-baseline-sample">
+              <span class="cg-mini-badge">rendered</span>
+              <span class="cg-mini-state-node">Review</span>
+            </div>
+          </div>
+        </div>
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
         <div class="cg-channels cg-channels--modifiers">
           <div class="cg-channel cg-channel--modifier">
@@ -3191,18 +3390,18 @@ pre {
             <div class="cg-channel-name">notReachableFromInitial</div>
             <div class="cg-channel-body">
               <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-not-reachable">Closed</span>
+                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-not-reachable cg-modifier-token--state-not-reachable-initial">Closed</span>
               </div>
-              <p class="cg-channel-caption">Dimmed target marks a state with no reachable path from the entry state.</p>
+              <p class="cg-channel-caption">Stronger dimming plus a quiet interior hatch marks a state with no reachable path from the entry state.</p>
             </div>
           </div>
           <div class="cg-channel cg-channel--modifier">
             <div class="cg-channel-name">notReachableFromCurrent</div>
             <div class="cg-channel-body">
               <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-not-reachable">Closed</span>
+                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-not-reachable cg-modifier-token--state-not-reachable-current">Closed</span>
               </div>
-              <p class="cg-channel-caption">Dimmed target marks a state that cannot be reached from the current position.</p>
+              <p class="cg-channel-caption">Stronger dimming plus a dashed perimeter marks a state that cannot be reached from the current position.</p>
             </div>
           </div>
           <div class="cg-channel cg-channel--modifier">
@@ -3211,14 +3410,14 @@ pre {
               <div class="cg-modifier-stack">
                 <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-current">Open</span>
               </div>
-              <p class="cg-channel-caption">Active fill marks the current node in the rendered flow.</p>
+              <p class="cg-channel-caption">Stronger fill over outline marks the current node without leaving the state family.</p>
             </div>
           </div>
         </div>
         <div class="cg-combination-matrix" aria-label="State valid combinations">
           <div class="cg-combination-head">
             <div class="cg-combination-title">Valid combinations</div>
-            <p class="cg-combination-intro">Each row shows one valid state stack from a single snapshot.</p>
+            <p class="cg-combination-intro">The shared workflow above carries the primary read. Keep the compact cards below for the remaining valid stacks that are harder to fit into one coherent diagram.</p>
           </div>
           <div class="cg-combination-grid">
             <div class="cg-combination-row">
@@ -3231,28 +3430,6 @@ pre {
                 </div>
               </div>
               <p class="cg-combination-reading">The active node can also be the entry point.</p>
-            </div>
-            <div class="cg-combination-row">
-              <div class="cg-channel-name">Initial + constrained</div>
-              <div class="cg-combination-example">
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-node cg-mini-state-node--constrained"><span class="cg-mini-state-node-dot"></span>Intake</span>
-                  </div>
-                </div>
-              </div>
-              <p class="cg-combination-reading">The entry node can carry rule pressure from the start.</p>
-            </div>
-            <div class="cg-combination-row">
-              <div class="cg-channel-name">Initial + terminal</div>
-              <div class="cg-combination-example">
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-node cg-mini-state-node--terminal"><span class="cg-mini-state-node-dot"></span>Closed</span>
-                  </div>
-                </div>
-              </div>
-              <p class="cg-combination-reading">A one-state flow can begin and end on the same node.</p>
             </div>
             <div class="cg-combination-row">
               <div class="cg-channel-name">Current + constrained</div>
@@ -3277,6 +3454,17 @@ pre {
               <p class="cg-combination-reading">The active node can also be the end of the live path.</p>
             </div>
             <div class="cg-combination-row">
+              <div class="cg-channel-name">Initial + constrained</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-node cg-mini-state-node--constrained"><span class="cg-mini-state-node-dot"></span>Intake</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">The entry node can carry rule pressure from the start.</p>
+            </div>
+            <div class="cg-combination-row">
               <div class="cg-channel-name">Terminal + constrained</div>
               <div class="cg-combination-example">
                 <div class="cg-combination-specimen" aria-hidden="true">
@@ -3286,6 +3474,17 @@ pre {
                 </div>
               </div>
               <p class="cg-combination-reading">A final state can still sit under rule pressure.</p>
+            </div>
+            <div class="cg-combination-row">
+              <div class="cg-channel-name">Initial + terminal</div>
+              <div class="cg-combination-example">
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-node cg-mini-state-node--terminal"><span class="cg-mini-state-node-dot"></span>Closed</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-combination-reading">A one-state flow can begin and end on the same node.</p>
             </div>
             <div class="cg-combination-row">
               <div class="cg-channel-name">Current + terminal + constrained</div>
@@ -3303,7 +3502,7 @@ pre {
               <div class="cg-combination-example">
                 <div class="cg-combination-specimen" aria-hidden="true">
                   <div class="cg-mini-flow">
-                    <span class="cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--not-reachable">Archived</span>
+                    <span class="cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-initial">Archived</span>
                   </div>
                 </div>
               </div>
