@@ -6,6 +6,29 @@
 
 ---
 
+### 2026-04-11T00:00:00Z: Issue #14 — `when <guard>` on declarations — design review complete, BLOCKED
+**By:** George (runtime), Kramer (tooling), Newman (MCP), Soup Nazi (testability); Frank review pending
+**Status:** BLOCKED — three independent blockers, Frank sign-off outstanding
+
+Design review of Issue #14 (`when <guard>` conditional invariants, state asserts, event asserts, conditional edit eligibility). Four of five reviewers filed. Aggregate verdict: blocked — do not proceed to implementation.
+
+**Blocker 1 — Narrowing unsoundness (George — HIGH):** `BuildStateAssertNarrowings` (line 876) unconditionally includes all `in State assert` expressions in per-state narrowing used by transition row type-checking. A guarded assertion only holds when the guard is true — unconditional narrowing from it is semantically unsound. Must add `WhenGuard is null` check before any guarded assertions are included in narrowing. Unsound narrowing can suppress valid diagnostics on transition rows.
+
+**Blocker 2 — Compile DTO gap (Newman — structural prerequisite):** Invariants, event asserts, and edit blocks are absent from `precept_compile` output today. `StateDto.Rules` carries only reason strings (no expression, anchor, or guard). The `when` field cannot be added to DTOs that don't exist. New structured top-level arrays (`invariants`, `stateAsserts`, `eventAsserts`, `editBlocks`) with nullable `"when": string | null` must be built first. `StateDto.rules: string[]` must be preserved alongside new arrays — not replaced.
+
+**Blocker 3 — Form 4 architectural mismatch (George — MEDIUM):** `in State when guard edit` requires per-call guard evaluation against live data. `_editableFieldsByState` is a static `Dictionary<string, HashSet<string>>` built at construction time (line 108–133). Cannot precompute. Breaks `Update`, `Inspect(patch)`, and `BuildEditableFieldInfos`. **Form 4 must be split to a separate follow-on issue.**
+
+**Blocker 4 — Frank review not filed:** Design/philosophy sign-off from Frank is required before implementation is authorized.
+
+**Non-blocking findings:**
+- **George:** New diagnostic C69 needed (cross-scope guard reference — better message than C38). C29/C30 compile-time check must evaluate guard against defaults before body (guard false → skip). Synthetic invariant desugaring must never attach `WhenGuard`. Silent skip (no guard-skipped annotation) is sufficient for v1.
+- **Kramer:** Zero grammar changes needed (`when` catch-all already in `controlKeywords`). Semantic tokens and hover require zero changes. Completions: ~14 mechanical additions (~9 new branches + ~4 `BecauseItem` → `[WhenItem, BecauseItem]` modifications + ~1 state-action list addition). Branch ordering critical: `when`-in-guard branches must precede base branches.
+- **Soup Nazi (CRITICAL edge cases):** EC-3 — C29/C30 must evaluate guards at defaults to avoid spurious precompile violations (test: `Check_Invariant_WhenGuardFalse_AtDefaultData_NoPrecompileViolation`). EC-2 — narrowing propagation from guard to body must be explicitly decided and tested. EC-9 — double `when` (`invariant X > 0 when A when B`) must parse-error. EC-11 — boolean guard info diagnostic fires only for bare boolean-field guards, not comparison expressions. 60+ test cases + 11 edge case categories scoped.
+
+**Forms 1–3 scope (when blockers are resolved):** Invariant guard (`invariant <expr> when <guard> because "..."`), state assert guard (`in/to/from <State> assert <expr> when <guard> because "..."`), event assert guard (`on <Event> assert <expr> when <guard> because "..."`). Parser injection is 1 line per site via existing `OptionalWhenGuardParser`. Model changes are 4 records with identical optional tail-parameter pattern.
+
+---
+
 ### 2026-04-10T21:00:00Z: Issue #10 — String `.length` accessor — fully implemented
 **By:** Frank (design analysis), George (runtime + evaluator), Kramer (grammar + completions), Soup Nazi (tests), Coordinator (integration)
 **Status:** Implemented — branch `squad/10-string-length-accessor`, 800 tests passing

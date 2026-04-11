@@ -26,6 +26,15 @@
 - 9 new MCP tests added (65 total, 0 failed).
 
 
+### Issue #14 — `when` guards MCP contract assessment (2026-04-11)
+
+- **Current compile output is nearly empty of declaration structure.** Invariants, event asserts, and edit blocks are entirely absent. State asserts appear only as `StateDto.rules: string[]` (reason text only — no expression, no anchor, no guard field). This is the most important finding: #14 cannot "add a guard field to existing declaration DTOs" because most declaration DTOs don't exist yet in the compile output.
+- **Correct compile expansion:** Add new top-level arrays (`invariants`, `stateAsserts`, `eventAsserts`, `editBlocks`) each with a `when: string?` property. Do NOT replace `StateDto.rules: string[]` — that would break existing consumers. Keep the string array; add structured arrays alongside it.
+- **Inspect trace requires runtime support.** The `constraintTrace` (#14's "skipped/applied/violated" requirement) doesn't exist at the core runtime layer — violations only, no full evaluation trace. George needs to surface guard evaluation results via `InspectionResult` before the MCP DTO can carry them. This is the highest-effort item.
+- **`when` is already in `controlKeywords`.** It appears there because of transition row guards (`from S on E when G ->`). No new vocabulary additions needed for #14 — just construct catalog entry updates.
+- **Cross-scope guard diagnostics must name the preferred form** (e.g., `from S on E when G -> reject`). A generic C038 "unknown identifier" is insufficient — the agent needs to understand it's a mechanism-selection problem, not a typo. Needs a dedicated C6X diagnostic code.
+- **Verdict: Minor update, additive only.** Provided new declaration arrays are added (not replacing existing ones) and `constraintTrace` is treated as an additive nullable field.
+
 ### MCP Tool Surface (5 Tools — Final Design)
 
 **Tool philosophy:** One tool per concern. No overlap in reporting. Failure modes reinforce the intended signal chain: `compile → fix → inspect/fire/update`.

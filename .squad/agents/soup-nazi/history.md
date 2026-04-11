@@ -6,6 +6,18 @@
 
 ## Recent Updates
 
+### 2026-04-11 — Issue #14: `when` guard testability assessment
+- Probed all 4 guard forms via precept_compile: invariant, state assert, event assert, conditional edit — ALL are parse errors today. `when` is recognized only in transition rows.
+- PRECEPT029/030 compile-time violation check must also evaluate the guard at default field values — if guard is false at defaults, no spurious pre-compile error. This is EC-3 and the first correctness gate.
+- The info diagnostic for boolean-field guards (suggesting choice type #25) needs a new diagnostic code → CatalogDriftTests entry required.
+- `in any when <guard> edit` is an undefined combination — `any` + guard needs a design decision before tests can be written.
+- Collect-all semantics (multiple guarded invariants) must be tested explicitly: all applicable checked in one pass, failures collected together.
+- Guard scope inheritance is novel territory for the type checker — need separate scope routing for field-scoped (data-truth) vs arg-scoped (event-truth) guard expressions.
+- Inspector output must extend with skipped/applied/violated status — needs new MCP DTO fields, not just runtime behavior.
+- Test count estimate: ~118 new tests across parser, type checker, runtime, LS, MCP, and CatalogDrift.
+- Verdict: HIGH-RISK. Red-first test authoring mandatory before implementation work begins.
+- Decision filed: `.squad/decisions/inbox/soup-nazi-issue14-testability.md`.
+
 ### 2026-04-11 — Issue #29 (Slice 7): integer type test suite written
 - Created `test/Precept.Tests/PreceptIntegerTypeTests.cs` — 34 tests: 31 passing, 3 skipped.
 - **Test categories:** parser (8: field declarations, long literal semantics, double vs long distinction, nullable, large literal, set/queue/stack of integer), type-checker coercion (8: C60 narrowing, C61 maxplaces, widening to number, no-error cases, Theory x3), runtime arithmetic (8: +/-/\*//, negative division truncation, %, ==, widened to number), runtime event args (2: long, coerce int→long), runtime guards (1: comparison routing), collections (1: set<integer> min/max via guard routing).

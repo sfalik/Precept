@@ -130,3 +130,20 @@
 - Reviewed issue #22 semantic rule about "states, events, and transitions forbidden in stateless precepts" against actual parser/type-checker code.
 - Key findings from parser source: (1) C12 fires at the *end* of AssembleModel — adding a `state` to a definition doesn't violate anything, it just makes it stateful. The "prohibition" is tautological. (2) `EventDecl` parser has zero state dependencies — events parse fine without states, but have no dispatch surface. The type checker would need a *new* diagnostic to reject them. (3) C54 already rejects transition rows referencing undeclared states, making an explicit "transitions forbidden" rule structurally redundant.
 - Recommended the issue reframe: remove tautological "states forbidden" rule, add explicit "events forbidden in stateless" as a new type-checker diagnostic (not parser), and note that transitions are already structurally impossible via C54.
+
+## Learnings
+
+### 2026-04-11 — Issue #14 runtime feasibility assessment (when-guards on constraint declarations)
+
+- `OptionalWhenGuardParser` (PreceptParser.cs line 909) is already generic and reusable — no tokenizer changes needed for any of the four proposed forms.
+- `BoolExpr` terminates before `when` naturally because `when` is a keyword token, not an `Identifier`. This is the same mechanism that already works in transition rows.
+- Parser injection point for forms 1–3 (invariant, state assert, event assert): between `from expr in BoolExpr` and `from _ in Token.EqualTo(PreceptToken.Because)` in each declaration. One-liner change per form.
+- Parser injection point for form 4 (edit guard): between `StateTarget` and `Token.EqualTo(PreceptToken.Edit)`. Statement union ordering is safe — `EditDecl.Try()` already precedes `StateAssertDecl.Try()` (line 964 vs 973 in statement union).
+- Model records need only `WhenGuard = null, WhenText = null` as optional tail parameters on `PreceptInvariant`, `StateAssertion`, `EventAssertion`, `PreceptEditBlock` — same shape as existing `PreceptTransitionRow.WhenGuard/WhenText`.
+- Type checker: use existing `dataSymbols` for invariant/state assert guards; use `BuildEventAssertSymbols` result for event assert guards. No new scope infrastructure needed. Cross-scope violations produce C38 by default; C69 (new) would give a targeted message.
+- CRITICAL — narrowing exclusion: Guarded state asserts must be excluded from `BuildStateAssertNarrowings`. Add `WhenGuard is null` check before contributing to narrowing. If missed, type-checker over-narrows transition row types based on conditionally-true assertions.
+- CRITICAL — edit guard runtime scope: `in State when <guard> edit <fields>` (form 4) breaks the static `_editableFieldsByState` HashSet built at construction time. Guard evaluation is per-instance and per-call. This is a qualitatively different implementation scope — recommend a separate sub-feature or defer.
+- C29/C30 (compile-time invariant/assert checks against defaults): must evaluate guard first; if guard is false for defaults, skip the body check.
+- `not` dependency (issue #31): SHIPPED April 10. Not a blocker.
+- No existing "guard-skipped" status in engine output. Silent skip (no violation) is correct for v1. "Guard-skipped" as a distinct inspect annotation is an optional enhancement, not a gating requirement.
+- Synthetic invariant flag (`IsSynthetic = true`) must be checked: field constraint desugaring should never attach a WhenGuard to synthetic invariants.

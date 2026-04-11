@@ -80,6 +80,17 @@
 
 ## Learnings
 
+### 2026-04-11 — Issue #14 tooling feasibility: `when <guard>` on declaration forms
+
+- Grammar: `when` is already a global catch-all in `controlKeywords` (`\bwhen\b` → `keyword.control.precept`). Zero grammar changes needed for all four declaration forms (invariant, state assert, event assert, in-state edit).
+- `rootEditDeclaration` is anchored to `edit` at line start — does NOT conflict with `in State when guard edit` (which starts with `in`). Safe.
+- Completions: all four declaration contexts are already detected in `PreceptAnalyzer.cs`. The work is ~14 targeted branches: modifying 4 `[BecauseItem]` returns to `[WhenItem, BecauseItem]`, adding 2 branches per declaration for guard-expression and guard-completed states.
+- Scope differentiation (data fields vs event args for guards) is already handled: `BuildDataExpressionCompletions` covers invariant/state-assert/edit guards; `BuildEventAssertCompletions` covers event-assert guards. Zero new helpers needed.
+- `in State when guard edit` is the unique structural form (guard precedes action keyword). Requires a new intermediate "guard completed → offer `edit`" branch — the only novel pattern in the whole feature.
+- `when not` is zero additional work — `not` already in `ExpressionOperatorItems` since #31 slice.
+- Semantic tokens and hover: zero changes. `when` is already in `PreceptToken` enum and auto-discovered by `BuildSemanticTypeMap()`.
+- Verdict: Medium effort. Grammar is free; completions are ~14 mechanical branches using existing infrastructure.
+
 - GitHub README rendering gives reliable control over image assets, not over text-inside-image scaling relative to surrounding prose. If size parity with nearby copy matters, real Markdown text or fenced code is the only robust answer.
 - For image-based README treatments, external SVG rendered through `<img>` with an explicit width is the strongest compromise; PNG plus `<img width>` can be tuned, but it remains more fragile across mobile, zoom, and density changes.
 - GitHub officially supports `<picture>` for light/dark asset swaps, but viewport-specific mobile/desktop swapping and custom CSS/media-query tricks are not a dependable README strategy.
