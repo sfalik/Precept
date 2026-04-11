@@ -78,6 +78,18 @@
 - Golden-path suggestion: data-driven SUGGESTED_JOURNEY array maps state → recommended next event. Generates "▶ suggested next" badge on event cards and contextual step hints after each fire. Non-blocking — users can diverge freely.
 - Welcome banner on first load explains the interaction model and offers two CTAs: "Got it" (dismiss) and "🎓 Take the tour" (start coach marks). Disappears after first event is fired.
 - All guidance elements are independently dismissible and session-scoped (no persistence). Appropriate for a prototype.
+
+### 2026-04-11 — State Diagram Specimen: Prototype-to-Specimen Redesign
+
+- Redesigned `design/prototypes/state-diagram-runtime-options.html` from a dense 1557-line prototype comparison board into a ~905-line design-system specimen page.
+- Removed: hero section, Option 01/02/03 headers and numbering, secondary-section mini-cards, commentary grid, footnote, snapshot comparison cards, annotation strip, legend, surface stats, surface controls, meta cards, all prototype labels/kickers/status badges. Removed ~60 CSS rules that no longer had referencing HTML.
+- Preserved: authored-file renderer (JS tokenizer + data-source fetch), routeLeadRuntimeDiagram() SVG path routing, hover sync (mouseenter/mouseleave/focus/blur → is-linked class), black diagram stage, current-state violet fill, terminal double-border, initial node-dot, unreachable-current dashed treatment, unreachable-initial hatched treatment, tightened canvas max-width, responsive stacking media queries.
+- New specimen header: single `h1` in 11px/0.2em uppercase Geist Mono — vanishingly quiet so the split surface is the hero.
+- Surface bar labels now carry data context ("VisitorBadgePickup" / "ReadyForPickup · PickupWindowOpen = true") instead of prototype framing text.
+- Code pane simplified: code-frame with code-head (filename + pills) directly — no pane-kicker, no pane-copy, no pane-head wrapper.
+- Runtime pane simplified: diagram-surface → diagram-stage only — no surface-topline, no annotations, no snapshots, no caption, no legend.
+- CSS variables pruned: removed --panel, --panel-2, --panel-3, --valid, --warn (no remaining consumers).
+- Key design decision: a specimen page should let the surface speak. Every removed element was a justification layer that a specimen doesn't need — the split surface IS the argument.
 - Updated index page Concept 17 card to mention guided tour and suggested-next badges.
 - Decision record at `.squad/decisions/inbox/elaine-guided-journey.md`.
 - 2026-05-02 — DMN decision-table editors (Camunda, Trisotech) validate the Decision Matrix concept but show that multi-guard cells need sub-table rendering and hit-policy indicators — not just a single outcome badge.

@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Precept — State Diagram Specimen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&family=Geist:wght@400;500;600;700&display=swap">
+<style>
+:root {
+  --bg: #040506;
+  --line: rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --text: #f1f3f6;
+  --muted: #a7afbb;
+  --soft: #687281;
+  --structure-d: #4338ca;
+  --structure: #6366f1;
+  --state: #a898f5;
+  --event: #30b8e8;
+  --data: #b0bec5;
+  --data-t: #9aa8b5;
+  --data-v: #84929f;
+  --rule: #fbbf24;
+  --comment: #9096a6;
+  --mono: "Geist Mono", "Cascadia Code", Consolas, monospace;
+  --sans: "Geist", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(99,102,241,0.11), transparent 24%),
+    radial-gradient(circle at top right, rgba(168,152,245,0.08), transparent 30%),
+    linear-gradient(180deg, rgba(255,255,255,0.03), transparent 18%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+a { color: inherit; }
+
+.page {
+  width: min(1440px, calc(100vw - 48px));
+  margin: 0 auto;
+  padding: 36px 0 96px;
+}
+
+/* ── Specimen header ── */
+
+.specimen-header {
+  padding-bottom: 24px;
+}
+
+.specimen-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+/* ── Split surface ── */
+
+.split-surface {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+}
+
+.surface-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(4,5,6,0.32);
+}
+
+.bar-label {
+  color: var(--soft);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.bar-meta {
+  color: var(--soft);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.split-grid {
+  display: grid;
+  grid-template-columns: minmax(290px, 0.8fr) minmax(500px, 1.2fr);
+  min-width: 0;
+}
+
+.pane {
+  min-width: 0;
+}
+
+.pane + .pane {
+  border-left: 1px solid var(--line);
+}
+
+.pane-shell {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+/* ── Code frame ── */
+
+.code-frame {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(13,16,20,0.98), rgba(9,11,14,1));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+.code-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.02);
+}
+
+.code-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.pill--structure { color: var(--structure); }
+.pill--event { color: var(--event); }
+
+/* ── Authored code ── */
+
+pre {
+  margin: 0;
+  padding: 14px 16px 18px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.76;
+  color: #eef3f8;
+}
+
+.s { color: var(--structure-d); font-weight: 700; }
+.sg { color: var(--structure); }
+.st { color: var(--state); }
+.ev { color: var(--event); }
+.da { color: var(--data); }
+.dt { color: var(--data-t); }
+.dv { color: var(--data-v); }
+.ru { color: var(--rule); }
+.cm { color: var(--comment); font-style: italic; }
+
+.authored-state-line {
+  display: contents;
+}
+
+.authored-state-ref {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 -2px;
+  padding: 0 3px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease;
+}
+
+.authored-state-ref:hover,
+.authored-state-ref:focus-visible,
+.authored-state-ref.is-linked {
+  outline: none;
+  border-color: rgba(168,152,245,0.42);
+  background: rgba(168,152,245,0.14);
+  box-shadow: inset 0 0 0 1px rgba(168,152,245,0.12);
+  color: #e8e1ff;
+}
+
+/* ── Diagram ── */
+
+.diagram-surface {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.diagram-stage {
+  position: relative;
+  overflow: hidden;
+  min-height: 540px;
+  border: 1px solid var(--line);
+  background: #000;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+
+.diagram-stage[data-diagram="lead-runtime"] {
+  width: min(100%, 640px);
+  margin-inline: auto;
+}
+
+.diagram-stage svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.diagram-stage path {
+  fill: none;
+  stroke: rgba(48,184,232,0.78);
+  stroke-width: 2.25;
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
+  vector-effect: non-scaling-stroke;
+}
+
+.diagram-stage .edge-past {
+  stroke: rgba(48,184,232,0.38);
+}
+
+.diagram-stage .edge-active {
+  stroke: rgba(48,184,232,0.96);
+  stroke-width: 2.5;
+}
+
+.diagram-stage .edge-blocked {
+  stroke: rgba(48,184,232,0.64);
+  stroke-dasharray: 7 7;
+}
+
+/* ── Nodes ── */
+
+.node,
+.edge-label {
+  position: absolute;
+}
+
+.node {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 148px;
+  min-width: 148px;
+  min-height: 52px;
+  padding: 12px 14px;
+  border: 1px solid rgba(168,152,245,0.32);
+  background: #050608;
+  color: var(--state);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+  z-index: 2;
+}
+
+.node em {
+  font-style: italic;
+}
+
+.diagram-node:focus-visible,
+.diagram-node:hover,
+.diagram-node.is-linked {
+  outline: none;
+  border-color: rgba(168,152,245,0.74);
+  background: #17111f;
+  box-shadow:
+    inset 0 0 0 1px rgba(168,152,245,0.18),
+    0 0 0 1px rgba(168,152,245,0.28);
+  transform: translateY(-1px);
+}
+
+.node--current {
+  background: #251c38;
+  border-color: rgba(168,152,245,0.46);
+  box-shadow:
+    inset 0 0 0 1px rgba(168,152,245,0.22),
+    0 0 0 1px rgba(99,102,241,0.24);
+  color: #ddd6ff;
+}
+
+.node--terminal::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(168,152,245,0.28);
+  border-radius: 0;
+  pointer-events: none;
+}
+
+.node--initial .node-dot {
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  background: var(--structure);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.16);
+  border-radius: 999px;
+}
+
+.node--unreachable-current {
+  color: rgba(168,152,245,0.52);
+  border-style: dashed;
+  border-color: rgba(168,152,245,0.32);
+  background: #050608;
+}
+
+.node--unreachable-initial {
+  color: rgba(168,152,245,0.50);
+  border-color: rgba(168,152,245,0.22);
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(168,152,245,0.06),
+      rgba(168,152,245,0.06) 8px,
+      rgba(168,152,245,0.015) 8px,
+      rgba(168,152,245,0.015) 16px
+    ),
+    #050608;
+}
+
+/* ── Edge labels ── */
+
+.edge-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  color: var(--event);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: nowrap;
+  z-index: 3;
+}
+
+.edge-flow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.edge-token,
+.edge-target,
+.edge-verdict {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 5px 9px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.edge-token {
+  border: 1px solid rgba(48,184,232,0.35);
+  background: rgba(48,184,232,0.04);
+  color: var(--event);
+}
+
+.edge-target {
+  border: 1px solid rgba(168,152,245,0.32);
+  background: rgba(168,152,245,0.04);
+  color: var(--state);
+}
+
+.edge-arrow {
+  color: rgba(48,184,232,0.74);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.edge-verdict {
+  border: 1px solid rgba(48,184,232,0.22);
+  background: rgba(48,184,232,0.03);
+  color: rgba(48,184,232,0.76);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.edge-label--muted {
+  opacity: 0.78;
+}
+
+.edge-label--muted .edge-target {
+  opacity: 0.72;
+}
+
+.edge-label--active {
+  filter: drop-shadow(0 0 8px rgba(48,184,232,0.10));
+}
+
+.edge-label--active .edge-token {
+  border-color: rgba(48,184,232,0.48);
+  box-shadow: 0 0 0 1px rgba(48,184,232,0.14);
+}
+
+.edge-label--blocked .edge-token,
+.edge-label--blocked .edge-target,
+.edge-label--blocked .edge-verdict {
+  border-style: dashed;
+}
+
+.edge-label--blocked .edge-target {
+  opacity: 0.68;
+}
+
+.edge-label--blocked .edge-verdict {
+  border-color: rgba(48,184,232,0.34);
+  color: rgba(48,184,232,0.90);
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 1180px) {
+  .split-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pane + .pane {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 900px) {
+  .page {
+    width: min(100vw, calc(100vw - 24px));
+    padding: 20px 12px 72px;
+  }
+
+  .pane-shell,
+  .diagram-surface {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+@media (max-width: 760px) {
+  .diagram-stage {
+    min-height: 560px;
+  }
+
+  .node {
+    width: 132px;
+    min-width: 132px;
+    min-height: 48px;
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+
+  .edge-label {
+    transform: scale(0.94);
+    transform-origin: top left;
+  }
+}
+</style>
+</head>
+<body>
+  <div class="page">
+    <header class="specimen-header">
+      <h1 class="specimen-title">Precept — State Diagram Specimen</h1>
+    </header>
+
+    <div class="split-surface">
+      <div class="surface-bar">
+        <span class="bar-label">VisitorBadgePickup</span>
+        <span class="bar-meta">ReadyForPickup · PickupWindowOpen = true</span>
+      </div>
+
+      <div class="split-grid">
+        <div class="pane code-pane">
+          <div class="pane-shell">
+            <div class="code-frame">
+              <div class="code-head">
+                <span class="bar-label">VisitorBadgePickup.precept</span>
+                <div class="code-meta">
+                  <span class="pill pill--structure">6 states</span>
+                  <span class="pill pill--event">5 events</span>
+                </div>
+              </div>
+              <pre id="authored-sample" data-source="state-diagram-runtime-sample.precept"></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="pane runtime-pane">
+          <div class="pane-shell">
+            <div class="diagram-surface">
+              <div class="diagram-stage" data-diagram="lead-runtime" aria-label="Runtime state diagram for VisitorBadgePickup">
+                <svg viewBox="0 0 760 430" role="img" aria-label="Vertical runtime graph centered on ReadyForPickup with PickUp active and Expire blocked">
+                  <defs>
+                    <marker id="arrow-past" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+                      <path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.38)"></path>
+                    </marker>
+                    <marker id="arrow-blocked" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+                      <path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.64)"></path>
+                    </marker>
+                    <marker id="arrow-active" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+                      <path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.96)"></path>
+                    </marker>
+                  </defs>
+                  <path class="edge-past" data-edge="requested-approved" d="M380 80 V132" marker-end="url(#arrow-past)"></path>
+                  <path class="edge-past" data-edge="approved-ready" d="M380 184 V236" marker-end="url(#arrow-past)"></path>
+                  <path class="edge-past" data-edge="approved-cancelled" d="M454 158 H532" marker-end="url(#arrow-past)"></path>
+                  <path class="edge-active" data-edge="ready-pickedup" d="M380 288 V314 H254 V340" marker-end="url(#arrow-active)"></path>
+                  <path class="edge-blocked" data-edge="ready-expired" d="M380 288 V314 H506 V340" marker-end="url(#arrow-blocked)"></path>
+                </svg>
+
+                <div class="node diagram-node node--initial node--unreachable-current" data-state="Requested" tabindex="0" style="left:236px; top:32px;"><span class="node-dot" aria-hidden="true"></span>Requested</div>
+                <div class="node diagram-node node--unreachable-current" data-state="Approved" tabindex="0" style="left:236px; top:176px;">Approved</div>
+                <div class="node diagram-node node--current" data-state="ReadyForPickup" tabindex="0" style="left:236px; top:320px;"><em>ReadyForPickup</em></div>
+                <div class="node diagram-node node--terminal node--unreachable-current" data-state="Cancelled" tabindex="0" style="left:432px; top:176px;">Cancelled</div>
+                <div class="node diagram-node node--terminal" data-state="PickedUp" tabindex="0" style="left:110px; top:456px;">PickedUp</div>
+                <div class="node diagram-node node--terminal node--unreachable-current" data-state="Expired" tabindex="0" style="left:362px; top:456px;">Expired</div>
+
+                <span class="edge-label edge-label--muted" data-edge-label="requested-approved">
+                  <span class="edge-token">ApproveRequest</span>
+                </span>
+                <span class="edge-label edge-label--muted" data-edge-label="approved-ready">
+                  <span class="edge-token">PrintBadge</span>
+                </span>
+                <span class="edge-label edge-label--muted" data-edge-label="approved-cancelled">
+                  <span class="edge-token">Cancel</span>
+                </span>
+                <span class="edge-label edge-label--active" data-edge-label="ready-pickedup">
+                  <span class="edge-token">PickUp</span>
+                </span>
+                <span class="edge-label edge-label--blocked" data-edge-label="ready-expired">
+                  <span class="edge-token">Expire</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+      (async () => {
+        const authoredSample = document.getElementById('authored-sample');
+        const leadRuntimeStage = document.querySelector('.diagram-stage[data-diagram="lead-runtime"]');
+
+        const fallbackPreceptText = `precept VisitorBadgePickup
+
+# Runtime-diagram prototype: main snapshot is ReadyForPickup with PickupWindowOpen = true.
+
+field VisitorName as string nullable
+field HostConfirmed as boolean default false
+field BadgePrinted as boolean default false
+field PickupWindowOpen as boolean default true
+field OutcomeNote as string nullable
+
+state Requested initial
+state Approved
+state ReadyForPickup
+state PickedUp
+state Expired
+state Cancelled
+
+in Approved assert VisitorName != null because "Approved pickups must record the visitor"
+in Approved assert HostConfirmed because "Approved pickups require host confirmation"
+in ReadyForPickup assert VisitorName != null because "Ready badges must still identify the visitor"
+in ReadyForPickup assert HostConfirmed because "Ready badges require host confirmation"
+in ReadyForPickup assert BadgePrinted because "Ready badges must already be printed"
+in Expired assert PickupWindowOpen == false because "Expired pickups require the pickup window to be closed"
+in Expired assert OutcomeNote != null because "Expired pickups must record why the badge was not collected"
+
+event ApproveRequest with Name as string
+on ApproveRequest assert Name != "" because "A visitor name is required"
+
+event PrintBadge
+event PickUp
+event Expire
+event Cancel with Reason as string
+on Cancel assert Reason != "" because "A cancellation reason is required"
+
+from Requested on ApproveRequest -> set VisitorName = ApproveRequest.Name -> set HostConfirmed = true -> transition Approved
+from Approved on PrintBadge -> set BadgePrinted = true -> transition ReadyForPickup
+from Approved on Cancel -> set OutcomeNote = Cancel.Reason -> transition Cancelled
+from ReadyForPickup on PickUp when PickupWindowOpen -> set OutcomeNote = "Badge collected" -> transition PickedUp
+from ReadyForPickup on Expire when PickupWindowOpen == false -> set OutcomeNote = "Pickup window closed before collection" -> transition Expired`;
+
+        const escapeHtml = (value) => value
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+
+        const primaryKeywords = new Set(['precept', 'field', 'state', 'in', 'assert', 'because', 'event', 'on', 'from', 'set', 'transition', 'when']);
+        const secondaryKeywords = new Set(['as', 'nullable', 'default', 'initial', 'with']);
+        const typeKeywords = new Set(['string', 'number', 'boolean']);
+        const literalKeywords = new Set(['true', 'false', 'null']);
+
+        const collectSymbols = (text) => {
+          const fields = new Set();
+          const states = new Set();
+          const events = new Set();
+
+          text.replace(/\r\n/g, '\n').split('\n').forEach((line) => {
+            const trimmed = line.trim();
+
+            let match = /^field\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed);
+            if (match) {
+              fields.add(match[1]);
+            }
+
+            match = /^state\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed);
+            if (match) {
+              states.add(match[1]);
+            }
+
+            match = /^event\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed);
+            if (match) {
+              events.add(match[1]);
+            }
+          });
+
+          return { fields, states, events };
+        };
+
+        const renderToken = (token, symbols) => {
+          if (!token) {
+            return '';
+          }
+
+          if (/^\s+$/.test(token)) {
+            return token;
+          }
+
+          if (/^"(?:[^"\\]|\\.)*"$/.test(token)) {
+            return `<span class="ru">${escapeHtml(token)}</span>`;
+          }
+
+          if (/^[0-9]+$/.test(token) || literalKeywords.has(token)) {
+            return `<span class="dv">${escapeHtml(token)}</span>`;
+          }
+
+          if (symbols.states.has(token)) {
+            return `<span class="authored-state-ref st" data-state="${escapeHtml(token)}" tabindex="0">${escapeHtml(token)}</span>`;
+          }
+
+          if (symbols.events.has(token)) {
+            return `<span class="ev">${escapeHtml(token)}</span>`;
+          }
+
+          if (symbols.fields.has(token)) {
+            return `<span class="da">${escapeHtml(token)}</span>`;
+          }
+
+          if (typeKeywords.has(token)) {
+            return `<span class="dt">${escapeHtml(token)}</span>`;
+          }
+
+          if (primaryKeywords.has(token)) {
+            return `<span class="s">${escapeHtml(token)}</span>`;
+          }
+
+          if (secondaryKeywords.has(token)) {
+            return `<span class="sg">${escapeHtml(token)}</span>`;
+          }
+
+          return escapeHtml(token);
+        };
+
+        const renderPreceptHtml = (text) => {
+          const normalized = text.replace(/\r\n/g, '\n');
+          const symbols = collectSymbols(normalized);
+          const tokenPattern = /"(?:[^"\\]|\\.)*"|==|!=|->|\|\||&&|[A-Za-z_][A-Za-z0-9_]*|\s+|./g;
+
+          return normalized.split('\n').map((line) => {
+            if (line.trimStart().startsWith('#')) {
+              return `<span class="cm">${escapeHtml(line)}</span>`;
+            }
+
+            const tokens = line.match(tokenPattern) || [];
+            return tokens.map((token) => renderToken(token, symbols)).join('');
+          }).join('\n');
+        };
+
+        const loadPreceptText = async () => {
+          if (!authoredSample) {
+            return fallbackPreceptText;
+          }
+
+          const sourcePath = authoredSample.dataset.source;
+
+          try {
+            const response = await fetch(sourcePath, { cache: 'no-store' });
+            if (response.ok) {
+              return await response.text();
+            }
+          } catch {
+          }
+
+          return fallbackPreceptText;
+        };
+
+        if (authoredSample) {
+          const preceptText = await loadPreceptText();
+          authoredSample.innerHTML = renderPreceptHtml(preceptText);
+        }
+
+        const authoredRefs = Array.from(document.querySelectorAll('.authored-state-ref[data-state]'));
+        const diagramNodes = Array.from(document.querySelectorAll('.diagram-node[data-state]'));
+        const syncTargets = [...authoredRefs, ...diagramNodes];
+
+        const formatCoord = (value) => Math.round(value * 10) / 10;
+
+        const getNodeBox = (element) => {
+          const left = element.offsetLeft;
+          const top = element.offsetTop;
+          const width = element.offsetWidth;
+          const height = element.offsetHeight;
+
+          return {
+            left,
+            top,
+            width,
+            height,
+            right: left + width,
+            bottom: top + height,
+            centerX: left + (width / 2),
+            centerY: top + (height / 2)
+          };
+        };
+
+        const buildVerticalPath = (fromBox, toBox) => `M${formatCoord(fromBox.centerX)} ${formatCoord(fromBox.centerY)} V${formatCoord(toBox.centerY)}`;
+        const buildHorizontalPath = (fromBox, toBox) => `M${formatCoord(fromBox.centerX)} ${formatCoord(fromBox.centerY)} H${formatCoord(toBox.centerX)}`;
+        const buildBranchPath = (fromBox, toBox, splitY) => (
+          `M${formatCoord(fromBox.centerX)} ${formatCoord(fromBox.centerY)} ` +
+          `V${formatCoord(splitY)} H${formatCoord(toBox.centerX)} V${formatCoord(toBox.centerY)}`
+        );
+        const positionLabel = (element, left, top) => {
+          if (!element) {
+            return;
+          }
+
+          const width = element.offsetWidth;
+          const height = element.offsetHeight;
+
+          element.style.left = `${formatCoord(left - (width / 2))}px`;
+          element.style.top = `${formatCoord(top - (height / 2))}px`;
+        };
+
+        const routeLeadRuntimeDiagram = () => {
+          if (!leadRuntimeStage) {
+            return;
+          }
+
+          const svg = leadRuntimeStage.querySelector('svg');
+          if (!svg) {
+            return;
+          }
+
+          const nodesByState = new Map(
+            Array.from(leadRuntimeStage.querySelectorAll('.diagram-node[data-state]')).map((node) => [node.dataset.state, node])
+          );
+
+          const boxes = new Map(
+            Array.from(nodesByState.entries()).map(([state, node]) => [state, getNodeBox(node)])
+          );
+          const labelsByEdge = new Map(
+            Array.from(leadRuntimeStage.querySelectorAll('.edge-label[data-edge-label]')).map((label) => [label.dataset.edgeLabel, label])
+          );
+
+          const requested = boxes.get('Requested');
+          const approved = boxes.get('Approved');
+          const readyForPickup = boxes.get('ReadyForPickup');
+          const cancelled = boxes.get('Cancelled');
+          const pickedUp = boxes.get('PickedUp');
+          const expired = boxes.get('Expired');
+
+          if (!requested || !approved || !readyForPickup || !cancelled || !pickedUp || !expired) {
+            return;
+          }
+
+          svg.setAttribute('viewBox', `0 0 ${leadRuntimeStage.clientWidth} ${leadRuntimeStage.clientHeight}`);
+
+          const closestBranchCenter = Math.min(pickedUp.centerY, expired.centerY);
+          const branchGap = Math.max(closestBranchCenter - readyForPickup.centerY, 48);
+          const splitY = readyForPickup.bottom + Math.min(32, Math.max(20, branchGap / 2));
+
+          const pathUpdates = new Map([
+            ['requested-approved', buildVerticalPath(requested, approved)],
+            ['approved-ready', buildVerticalPath(approved, readyForPickup)],
+            ['approved-cancelled', buildHorizontalPath(approved, cancelled)],
+            ['ready-pickedup', buildBranchPath(readyForPickup, pickedUp, splitY)],
+            ['ready-expired', buildBranchPath(readyForPickup, expired, splitY)]
+          ]);
+
+          pathUpdates.forEach((pathValue, edgeKey) => {
+            const path = svg.querySelector(`path[data-edge="${edgeKey}"]`);
+            if (path) {
+              path.setAttribute('d', pathValue);
+            }
+          });
+
+          positionLabel(
+            labelsByEdge.get('requested-approved'),
+            requested.centerX,
+            (requested.centerY + approved.centerY) / 2
+          );
+
+          positionLabel(
+            labelsByEdge.get('approved-ready'),
+            approved.centerX,
+            (approved.centerY + readyForPickup.centerY) / 2
+          );
+
+          positionLabel(
+            labelsByEdge.get('approved-cancelled'),
+            (approved.centerX + cancelled.centerX) / 2,
+            approved.centerY
+          );
+
+          positionLabel(
+            labelsByEdge.get('ready-pickedup'),
+            (readyForPickup.centerX + pickedUp.centerX) / 2,
+            splitY
+          );
+
+          positionLabel(
+            labelsByEdge.get('ready-expired'),
+            (readyForPickup.centerX + expired.centerX) / 2,
+            splitY
+          );
+        };
+
+        const clearLinked = () => {
+          syncTargets.forEach((element) => element.classList.remove('is-linked'));
+        };
+
+        const applyLinked = (state) => {
+          syncTargets.forEach((element) => {
+            element.classList.toggle('is-linked', element.dataset.state === state);
+          });
+
+        };
+
+        syncTargets.forEach((element) => {
+          const handleEnter = () => applyLinked(element.dataset.state);
+          const handleLeave = () => clearLinked();
+
+          element.addEventListener('mouseenter', handleEnter);
+          element.addEventListener('mouseleave', handleLeave);
+          element.addEventListener('focus', handleEnter);
+          element.addEventListener('blur', handleLeave);
+        });
+
+        routeLeadRuntimeDiagram();
+
+        if ('ResizeObserver' in window && leadRuntimeStage) {
+          const resizeObserver = new ResizeObserver(() => routeLeadRuntimeDiagram());
+          resizeObserver.observe(leadRuntimeStage);
+        } else {
+          window.addEventListener('resize', routeLeadRuntimeDiagram);
+        }
+
+        if (document.fonts && document.fonts.ready) {
+          document.fonts.ready.then(() => routeLeadRuntimeDiagram());
+        }
+      })();
+    </script>
+</body>
+</html>
