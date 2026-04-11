@@ -9,6 +9,15 @@
 
 ## Recent Updates
 
+### 2026-04-10 — Structural lifecycle modifiers research
+- Produced comprehensive research document at `research/language/expressiveness/structural-lifecycle-modifiers.md`.
+- **Taxonomy:** Mapped 5 modifier categories (boundary, path, residency, cardinality, safety) covering 6 candidate modifiers: `terminal`, `required`/`milestone`, `transient`, `final`, `once`, `idempotent`.
+- **Survey:** Compared 8 systems (XState, Step Functions, BPMN, Stateless, TLA+/Alloy, Temporal, UML, Cedar/OPA). Terminal/final states are the only modifier with broad cross-system precedent.
+- **Tiers:** `terminal` is Tier 1 (strong candidate — compile-time provable, clear `initial` parallel, zero runtime cost). `required`/`transient` are Tier 2 (interesting but guard-dependent false positives or weaker-than-expected guarantees). Event modifiers (`final`, `once`, `idempotent`) are Tier 3 (reject/defer — require runtime state or break row independence).
+- **Key insight:** State modifiers constrain graph-structural roles (compile-time provable). Event modifiers constrain behavioral properties (need runtime tracking). The asymmetry is fundamental, not incidental.
+- **Domain taxonomy decision:** Created new domain "Structural lifecycle modifiers" (domain #23 in domain-map). Not an extension of existing domains — it adds *new declarations* that create new provable properties, distinct from constraint composition (value constraints), static reasoning (proving from existing declarations), and entity modeling (data shape).
+- Updated `research/language/README.md` domain index and horizon domains list. Updated `research/language/domain-map.md` with domain #23 entry and priority assessment.
+
 ### 2026-04-10 — Issue #31 shipped
 - PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
 

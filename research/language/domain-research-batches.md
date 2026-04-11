@@ -87,7 +87,7 @@ A domain is fully researched only when the corpus covers all four of these:
 
 | Domain | Open proposals | Current research status | Batch |
 |---|---|---|---|
-| Type system expansion | `#25`, `#26`, `#27`, `#29` | **Weak / missing.** Proposal bodies reference type-system research files that are not currently present under `docs/research/language/`. | **Batch 1** |
+| Type system expansion | `#25`, `#26`, `#27`, `#29` | **Weak / missing.** Proposal bodies reference type-system research files that are not currently present under `research/language/`. | **Batch 1** |
 | Event ingestion shorthand | `#11` | **Weak.** Strong internal corpus evidence, but no dedicated external precedent sweep or philosophy-fit writeup. | **Batch 1** |
 | Constraint composition | `#8`, `#13`, `#14` | **Partial, but Batch-1 relevant.** Good fragments exist, but `#13` keeps the whole shared-precedent lane in the open-proposal / incomplete-domain packet until the validator / rule / declaration research is normalized together. | **Batch 1** |
 | Expression expansion | `#9`, `#10`, `#15`, `#16`, `#31` | **Partial.** The expression audit is strong, but string operations, logical keywords, and function-surface decisions still need one joined precedent pass. | **Batch 2** |

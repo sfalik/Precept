@@ -18,7 +18,7 @@ Research lives in this repository. Proposal decisions and canonical proposal bod
 
 ## Storage Rule
 
-Use `docs/research/` for:
+Use `research/` for:
 
 - technical research
 - architecture and tooling research
@@ -26,7 +26,7 @@ Use `docs/research/` for:
 - cross-domain synthesis that affects more than one domain
 - temporary incubation work that does not yet have a clear long-term owner
 
-Do not use `docs/research/` as a catch-all for brand or UX research.
+Do not use `research/` as a catch-all for brand or UX research.
 
 - Brand research belongs in `design/brand/research/`.
 - Design-system and UX research belongs in `design/system/research/`.
@@ -35,7 +35,7 @@ Do not use `docs/research/` as a catch-all for brand or UX research.
 
 ## Working model
 
-1. Capture technical and cross-domain research in `docs/research/`.
+1. Capture technical and cross-domain research in `research/`.
 2. Capture proposal framing, scope, and status in GitHub issues.
 3. Promote accepted conclusions into decisions or specs; do not let research become shadow policy.
 4. Keep repo docs evidence-oriented; link out when a reader needs the proposal body.
