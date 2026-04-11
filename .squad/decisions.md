@@ -6,6 +6,538 @@
 
 ---
 
+## Imported Inbox Records — 2026-04-11T03:48:54Z
+
+These records were merged from `.squad/decisions/inbox/` into the canonical ledger in this pass. No effective duplicates were detected while reconciling the current inbox against `decisions.md`.
+
+---
+
+### 2026-04-10T23:35:00Z: User directive
+**By:** Shane (via Copilot)
+**What:** For the philosophy pass on `design/system/foundations/semantic-visual-system.html`, Frank drafts the philosophy corrections, Shane reviews them, and only then does Elaine apply them.
+**Why:** User request — captured for team memory.
+
+---
+
+## Imported Inbox Records — 2026-04-11T03:25:49Z
+
+These records were merged from `.squad/decisions/inbox/` into the canonical ledger in this pass. No effective duplicates were detected while reconciling the current inbox against `decisions.md`.
+
+---
+
+### 2026-04-06T00:00:00Z: User directive
+**By:** shane (via Copilot)
+**What:** When there is a disagreement on design, Elaine has final say.
+**Why:** User request — captured for team memory.
+
+---
+
+### 2026-04-06T00:05:00Z: User directive
+**By:** shane (via Copilot)
+**What:** Elaine is in charge of design. Design by committee should be avoided. Peterman is responsible for brand, not design.
+**Why:** User request — captured for team memory.
+
+---
+
+### 2026-04-06T00:10:00Z: User directive
+**By:** shane (via Copilot)
+**What:** Elaine's scope is extended to design for all surfaces, including in-app surfaces and public-facing surfaces.
+**Why:** User request — captured for team memory.
+
+---
+
+### 2026-04-06T00:15:00Z: User directive
+**By:** shane (via Copilot)
+**What:** Avoid serif typography for Precept design work; the user dislikes serifs.
+**Why:** User request — captured for team memory.
+
+---
+
+### 2026-04-06T00:20:00Z: User directive
+**By:** shane (via Copilot)
+**What:** The semantic visual system page should not frame itself as a hard-edged editorial control surface opposed to marketing softness. It should show off the beautiful visual system, dogfood it to some extent, and serve as the ultimate embodiment of Precept.
+**Why:** User request — captured for team memory.
+
+---
+
+### 2026-04-06T21:11:15-04:00: User directive
+**By:** shane (via Copilot)
+**What:** Do not promote Transition to a sixth core construct; return to team consensus because promotion would require its own color family.
+**Why:** User wants to preserve the existing semantic color model and resume the table under the prior consensus.
+
+---
+
+### 2026-04-06T21:13:39-04:00: User directive
+**By:** shane (via Copilot)
+**What:** Do not change the doc right now. Return to discussion mode and resume the five-construct model using Identity, Visual Depiction, and Semantic Modifiers.
+**Why:** User wants to avoid losing prior discussion state and continue the taxonomy conversation without editing files.
+
+---
+
+### 2026-04-06T21:23:11-04:00: User directive
+**By:** shane (via Copilot)
+**What:** When discussing depicted transition semantics, consider self-transition as a fourth outcome alongside direction + trigger + target + outcome kind.
+**Why:** User believes self-transition may deserve explicit semantic treatment on surfaces.
+
+---
+
+### 2026-04-06T21:26:34-04:00: User directive
+**By:** shane (via Copilot)
+**What:** When depicting transition outcomes on surfaces, distinguish rejected from constraint failure, rather than collapsing them into one blocked bucket.
+**Why:** User wants transition outcome semantics to preserve the difference between explicit rejection and constraint failure.
+
+---
+
+### 2026-04-07T00:02:00-04:00: User directive
+**By:** shane (via Copilot)
+**What:** The new semantic visual system work stays in brainstorm mode first; do not start drafting the new HTML yet. The document intent is a strong consolidated definition of Precept's semantic visual system based on prior explorations and prototypes. It must be beautiful, should dogfood the design system so it embodies Precept, and should follow this design conviction: "this document should be the fullest embodiment of Precept's visual system: rigorous enough to govern the system, expressive enough to prove it. It should dogfood the semantic language it defines so the page feels unmistakably Precept while still functioning as the canonical reference."
+**Why:** User request — captured for team memory.
+
+---
+
+### 2026-04-07T00:32:22-04:00: User directive
+**By:** shane (via Copilot)
+**What:** Transitions are purposely not a core construct in the semantic visual system. They participate in the system, but they should remain outside the core construct set.
+**Why:** User request — captured for team memory.
+
+---
+
+### 2026-04-07T00:34:35-04:00: User directive
+**By:** shane (via Copilot)
+**What:** Verdicts are adjacent semantics rather than core constructs. They are typically applied at runtime and are related to rule execution. Rules are attached to some of the core constructs as defined in the runtime.
+**Why:** User request — captured for team memory.
+
+---
+
+### 2026-04-07T00:46:30-04:00: User directive
+**By:** shane (via Copilot)
+**What:** Before discussing the overall table of contents for the new semantic visual system document, the team should absorb the current intent and ground themselves in previous explorations and prototypes from their respective areas.
+**Why:** User request — captured for team memory.
+
+---
+
+### 2026-04-07T00:59:48-04:00: User directive
+**By:** shane (via Copilot)
+**What:** The semantic visual system document should be highly visual, beautiful, inspiring, and should embody the visual system and the concepts and philosophy of Precept. Governance, change control, scope, and authority are not important for the main document and should not drive its structure.
+**Why:** User request — captured for team memory.
+
+---
+
+### 2026-04-07T01:04:52-04:00: User directive
+**By:** shane (via Copilot)
+**What:** Do not open the semantic visual system document with a section framed as "Why This System Exists." The document should not begin by justifying itself.
+**Why:** User request — captured for team memory.
+
+---
+
+### 2026-04-07T01:40:14-04:00: User directive
+**By:** shane (via Copilot)
+**What:** The semantic visual system document should be a visual tour de force rather than a primer on how Precept works. It may assume the reader already understands Precept; readers who need conceptual or runtime explanation should use other documentation first.
+**Why:** User request — captured for team memory.
+
+---
+
+### 2026-04-08T17:58:05-04:00: User directive
+**By:** Shane (via Copilot)
+**What:** Keep the semantic visual system construct emphasis evenly balanced overall, with only a slight lean toward Data and Rule rather than making them overwhelmingly dominant.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-08T18:05:24-04:00: User directive
+**By:** Shane (via Copilot)
+**What:** In the semantic visual system document, the five core construct galleries should use the same structural template rather than giving Data and Rule a distinct gallery format.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-08T18:08:35-04:00: User directive
+**By:** Shane (via Copilot)
+**What:** Use the shared five-slot construct template as internal composition scaffolding, but do not present the final System section as visibly templated with repeated labeled subheads for every construct.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-08T18:13:09-04:00: User directive
+**By:** Shane (via Copilot)
+**What:** The semantic visual system page must be beautiful, highly visual, and an embodiment of the Precept system rather than reading like a dry reference or mechanical spec.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-08T18:37:03-04:00: User directive
+**By:** Shane (via Copilot)
+**What:** Posture study B — the stricter architectural/austere variant — is the preferred visual direction for the semantic visual system page. By far the preferred option over A and C.
+**Why:** User selection — captured for team memory
+
+---
+
+### 2026-04-10T23:10:00Z: User directive
+**By:** Shane (via Copilot)
+**What:** Treat `warning` as an engine-level verdict, treat Geist as approved for this document even though brand docs will be updated later, and require documentation DSL examples in this artifact to be compile-valid.
+**Why:** User request — captured for team memory
+
+---
+
+### 2026-04-10: Architecture construct cards keep the square as an inline leading marker
+**By:** Elaine
+**Status:** Proposed
+
+**What:** In the Architecture identity row, each construct card should keep the prior card treatment with role copy, but the square swatch should sit inline with the construct label at the top of the card rather than floating as a separate block above it.
+
+**Why:** The square is functioning as a semantic marker, not as an independent content block. When it sits above the label, it reads like detached ornament. When it leads the construct name on the same line, the reader parses the swatch and label as one unit while still keeping the card body free for the role description.
+
+**Implementation consequence:** Use a compact title row inside each `arch-card` that pairs `arch-card-swatch` with `arch-card-name`, preserve the five-card construct layout, and remove explanatory filler copy that was only compensating for the temporary pill-row treatment.
+
+---
+
+# Decision: "carrier" → "signal" terminology rename
+
+**Filed by:** Elaine
+**Date:** 2026-04-06
+**Status:** Executed
+
+## Decision
+
+The term "carrier" has been replaced with "signal" throughout `design/system/foundations/semantic-visual-system.html`.
+
+## Rationale
+
+"Carrier" is a logistics/transmission metaphor that describes the mechanism by which meaning travels, but it is passive and container-like. "Signal" is active, intentional, and better aligns with Precept's vocabulary of runtime verdicts, semantic lanes, and observable meaning. A signal does something; a carrier just holds something.
+
+## Special Cases
+
+- **Hero conviction:** "Carriers may adapt." → **"Forms may adapt."**
+   The signal is stable by definition. It is the form (shape, weight, chip, badge) that adapts to local context. Saying "Signals may adapt" would contradict the stable-signal principle. The conviction now names the thing that actually changes.
+
+- **Stance-words definition:** "carrier = visual form inside that context" → **"signal = visual mechanism inside that context"**
+   "Mechanism" is more precise than "form" — it describes what the signal does (express semantic meaning), not just what it looks like.
+
+## Scope
+
+All visible-text instances in `design/system/foundations/semantic-visual-system.html` were updated, including:
+- Hero conviction card and stance-words definition
+- Nav link and section `id` attribute (`#carriers` → `#signals`)
+- Manifesto, foundation rules, typography section
+- Signal Grammar section (eyebrow, heading, body)
+- Invariants section (mandatory rules cards)
+- Surface Translation matrix
+- Inheritance Checklist ("Carrier medium" → "Signal medium")
+- Boundary Note card ("Carrier rules" → "Signal rules")
+- Footer footnote
+
+CSS class names (e.g. `.hero-signals`) were intentionally left unchanged as they are code identifiers, not visible text.
+
+---
+
+### 2026-04-10T17:49:42-04:00: Chrome/support tokens framed as a separate layer, not a semantic family
+**By:** Elaine (UX Designer)
+**Why:** User direction to clarify that chrome/support colors scaffold the surface rather than introducing another semantic lane.
+
+**What:**
+- Do not add a dedicated chrome family to the semantic color system.
+- Keep the model as separate layers:
+- Five semantic families define authored meaning: structure, state, event, data, rule.
+- Runtime verdict colors remain a separate evaluation register.
+- Support/chrome tokens cover neutral text, surface, and line scaffolding for navigation, borders, backgrounds, tables, and page furniture.
+- Structure color may accent chrome only when the UI element is actually expressing structure or governance, not when it is generic scaffolding.
+- Editorial/docs callouts should default to support/chrome treatment. Semantic or verdict colors should appear only when the callout is conveying real semantic meaning or runtime outcome.
+
+**Applied in this pass:**
+- Updated the semantic visual system document to describe five semantic families, a separate runtime verdict register, and a separate chrome/support layer.
+- Tightened the existing Chrome Tokens section so it explicitly states chrome/support tokens are chosen to complement the semantic palette without redefining semantic meaning.
+
+**Rationale:** Promoting chrome to a family would make non-semantic scaffolding look equivalent to meaning-bearing lanes. The current system already has a better shape: semantic families for meaning, verdicts for runtime evaluation, and chrome tokens for support.
+
+---
+
+### 2026-04-10T00:00:00Z: Chrome/support is a small neutral role palette, not a single color
+**By:** Elaine (UX Designer)
+**What:**
+- Chrome/support is the non-semantic UI infrastructure around Precept meaning: canvas, panels, prose text roles, and dividers.
+- Chrome should not collapse to one color. It needs a small neutral token set with distinct roles so surfaces can preserve hierarchy without inventing semantic meaning.
+- Baseline chrome roles are: base canvas, panel, elevated panel/cell, primary text, muted text, soft/meta text, divider, and strong divider.
+- Chrome may be used for browser/frame UI, sidebars, section shells, tables, card backgrounds, captions, and other non-meaning-bearing scaffolding.
+- Chrome must not be used to encode construct identity, runtime outcome, or editorial annotation.
+- Comments remain a separate annotation lane, not chrome and not a semantic family.
+
+**Why:**
+- A single chrome color is too blunt. It cannot support readable depth, separation, and text hierarchy across docs, diagrams, inspectors, and forms.
+- A small neutral role palette gives enough structural control while staying visually subordinate to semantic families and runtime verdicts.
+- Keeping comments separate prevents support text from being confused with general UI scaffolding.
+
+---
+
+### 2026-04-10T00:00:00Z: Semantic color family emphasis rule
+**By:** Elaine
+**What:** Within-family tonal variants in the semantic visual system must read as subordinate to the parent family, not as peer semantic families. In canonical specs, use explicit "within family" labeling plus lighter typography or narrower layout treatment for secondary shades.
+**Why:** The system has five semantic families. Secondary tones inside Structure and Data need to stay visible for grammar and hierarchy, but equal visual treatment makes them compete with the top-level family model.
+
+### 2026-04-10T00:30:00Z: Canonical palette grouping rule
+**By:** Elaine
+**What:** In canonical palette presentations, the first authoring-time view must show five discrete parent family blocks. Secondary tones for Structure and Data should be nested inside those parent blocks as subordinate children, not placed as adjacent peer columns in the primary row.
+**Why:** Softer labels and smaller cards still let the eye read eight separate swatches. Physical nesting makes the five-family model legible first while keeping all eight shades visible and named.
+
+---
+
+### 2026-04-10T00:00:00Z: Color System section now stages semantic families before outer lanes
+**By:** Elaine (UX Designer)
+**Why:** The previous row still read like a flat palette strip. The page needed the model to read in the intended order: primary semantic meaning first, then annotation, runtime verdicts, and chrome/support as separate outer lanes.
+
+**What:**
+- Reframed the Color System section as a two-stage composition.
+- Stage 1 presents the five semantic families as the primary visual read, with Structure and Data variants physically nested inside their parent family cards.
+- Stage 2 presents three distinct outer lanes: comments/annotation, runtime verdict register, and chrome/support infrastructure.
+- Kept chrome explicitly outside the family model and kept comments distinct from chrome.
+
+**Rationale:** The system is easier to understand when grouping and physical containment do the explanatory work. The viewer should read family identity first, then understand which colors are adjacent registers or scaffolding instead of peers in the same palette.
+
+### 2026-04-10T00:30:00Z: Color System surface language aligned to document chrome
+**By:** Elaine (UX Designer)
+**Why:** The redesigned section structure was working, but the gradient wash made the Color System block feel visually detached from the rest of the document.
+
+**What:**
+- Removed the atmospheric gradient treatment from the main semantic band.
+- Reframed the section with restrained dark panels, stronger line work, and flatter internal surfaces.
+- Kept richness in hierarchy, spacing, and containment instead of background effects.
+
+**Rationale:** This section should feel like part of the document's native surface language, not a special hero moment. The semantic model remains prominent, but the surrounding treatment now supports it with the same controlled contrast and panel discipline used elsewhere.
+
+---
+
+### 2026-04-10T18:20:00-04:00: Comments are editorial annotation, not chrome scaffolding
+**By:** Elaine (UX Designer)
+**Why:** User asked whether comments belong to chrome/support or should be treated as a separate boundary case in the semantic visual system.
+
+**What:**
+- Comments are not part of the five semantic families.
+- Comments are not part of the runtime verdict register.
+- Comments should not be collapsed into generic chrome/support scaffolding such as canvas, panels, dividers, or navigation furniture.
+- Treat comments as a separate editorial annotation lane outside the semantic palette: adjacent to support, but not identical to chrome.
+- Visually, comments should stay subdued, italic, and non-competitive: dusk tone, annotation posture, no family hue, no verdict hue, no scaffold emphasis.
+
+**Rationale:** Chrome/support exists to hold the reading environment together. Comments are different: they are authored annotations embedded inside the reading content. They carry sideband explanatory context, not construct identity and not runtime outcome, but they still read as content rather than furniture. That makes them a separate annotation lane rather than chrome proper.
+
+---
+
+### 2026-04-10: Construct markers should not become iconography
+**By:** Elaine
+**Status:** Proposed
+
+**What:** Do not introduce construct-specific icons for Structure, State, Event, Data, and Rule at this stage. The current issue is not a lack of differentiation; it is that the small colored dot is being asked to do two different jobs: overview/category bullet in the construct introductions and semantic modifier for the initial state origin dot. Solve this by changing the overview marker system, not by adding a fifth visual channel.
+
+**Why:** In the semantic visual system, construct identity is already carried by colour family, naming, typography, and runtime form. Adding bespoke icons would introduce a new parallel code the user must learn, and those icons would have to survive across authored syntax, runtime renderings, diagrams, tables, and docs to be worth the cost. The stronger system move is to reserve the circular dot for actual semantic modifiers like state origin, and give construct overviews a non-semantic index treatment instead: for example a thin color rail, square swatch, or numbered/tab-like chip that reads as cataloguing rather than meaning-bearing symbol.
+
+**Implementation consequence:** The construct overview markers in the intro cast strip and concepts system map should use a square swatch treatment so circular dots remain reserved for modifier-level state semantics like the initial origin dot.
+
+---
+
+### 2026-04-10: Docs cohesion without semantic-color misuse
+**By:** Elaine (UX Designer)
+**What:**
+- Docs should not use construct-family or runtime-semantic colors for generic editorial chrome.
+- Visual cohesion in docs should come primarily from neutral structure, typography, spacing rhythm, component shape, and a restrained global brand accent rather than from assigning different semantic hues to navigation, dividers, pills, or section wrappers.
+- Semantic colors remain reserved for places where docs are showing actual Precept meaning: syntax-highlighted code, construct references, diagrams, runtime facts, status/verdict signals, and callouts whose content is explicitly about a real Precept semantic category.
+- Recommended compromise: allow one subdued global accent lane for docs chrome, preferably the structural brand anchor, for selected global affordances such as active navigation, links, focus states, and occasional section emphasis, as long as it is treated as brand framing rather than as a construct-family label.
+**Why:**
+- This keeps docs visually coherent with the semantic system without training readers to attach false meaning to decorative color.
+- It preserves semantic contrast so real construct and runtime colors still feel informative when they appear.
+- It avoids the ugliness problem by moving cohesion onto stronger cross-document channels than hue assignment alone.
+
+---
+
+### 2026-04-10: Semantic visual system fix pass
+**By:** Elaine (via Copilot)
+**What:** Standardized runtime-facing verdict language to Enabled / Blocked / Warning, kept `reject` as authored DSL syntax, styled MCP tool names as neutral tool references instead of Event-family tokens, and made the cross-surface LoanApplication specimens compile-valid and scenario-consistent.
+**Why:** The review findings were about semantic consistency, not redesign. Runtime verdicts, product tool names, and DSL specimens need one coherent model across architecture, surfaces, and docs.
+
+---
+
+# UX Decision: Docs Page Specimen Design
+**By:** Elaine (UX Designer)
+**Date:** 2026-04-09
+**Status:** Applied
+**File:** `design/system/foundations/semantic-visual-system.html` — `<section id="docs">` Page Specimen
+
+---
+
+## Context
+
+The Page Specimen in § 07 · Docs was a mechanical coordinator placeholder. This record captures the design decisions made in the redesign and why, so they can be applied consistently to future docs surface work.
+
+---
+
+## Decisions
+
+### 1. Docs page layout is three-column: sidebar · content · right-rail TOC
+- **Sidebar: 240px** — Widened from the original 200px. Real docs nav (Docusaurus, GitBook, ReadTheDocs) rarely goes narrower than 220px. 240px gives section labels and link text enough room to breathe without being truncated.
+- **Content: `minmax(0, 1fr)`** — Fills available space. Prose within content is constrained by `max-width: 62ch` on `.dsp-p` so line length stays readable regardless of viewport.
+- **Right-rail TOC: 180px** — A compact "On this page" column anchors the reader within a long guide page. It's always visible in the specimen to show the three-column full-page posture. Both sidebar and TOC hide at ≤960px.
+
+### 2. Sidebar always has a product header at the top
+- The sidebar top slot shows the `doc-precept-name` wordmark (small-caps Geist Mono, 14px) plus a version/section tag below it.
+- This is separated from the nav links by a `--line-strong` border, making it the stable identity anchor for the entire navigation column.
+- Pattern: `doc-specimen-sidebar-header` div → wordmark span + version span.
+
+### 3. Right-rail TOC uses state-color active indicator, not structure-color
+- The active TOC link uses `border-left-color: var(--state)` (#A898F5 purple) rather than `var(--structure)` (indigo).
+- Rationale: The sidebar nav uses `--structure` for the active page link. Using `--state` for the TOC active item keeps the two navigation layers visually distinct at a glance.
+
+### 4. State diagram shows both the allowed path and a guard-blocked path
+- The diagram is split into two labeled rows inside a flex-column container:
+   - **Allowed row** (labeled in `--valid` green): Happy path — Draft → Submit → Submitted → Approve → Approved
+   - **Blocked row** (labeled in `--violated` red): Same entry state (Draft), same event (Submit), but with Amount = 0 → guard failure → `.dsp-reject-node` instead of a destination state
+- This directly communicates Precept's core guarantee: the same event from the same state produces a different outcome depending on guard evaluation.
+- The reject node uses dashed border + red tint. The blocked arrow shaft uses `border-top: 1px dashed` to visually distinguish it from solid allowed arrows.
+- Row separators use `border-top: 1px solid var(--line)` inside the diagram container.
+
+### 5. Callout accent column is 4px, not 3px
+- Increased from 3px to 4px. At small viewport scales 3px rendered borderline invisible. 4px is the minimum for the left accent to read as intentional emphasis rather than an artifact.
+- Color-family tinted backgrounds added to `.doc-callout-body` per type (4% opacity: structure for Note, valid for Tip, warn for Caution, violated for Warning). These add subtle semantic temperature to the callout without screaming.
+
+### 6. H1 in the specimen is 32px, not 28px
+- Bumped from 28px to 32px with tighter letter-spacing (-0.02em). At 28px the H1 felt like an oversized H2. At 32px it commands the page without competing with the product name in the sidebar header.
+
+---
+
+## Reusable Classes Established
+
+| Class | Where | Purpose |
+|-------|--------|---------|
+| `.doc-specimen-sidebar-header` | Sidebar top | Product name + version header slot |
+| `.doc-specimen-sidebar-ver` | Sidebar header | Version/section label beneath wordmark |
+| `.doc-specimen-toc` | Third grid column | Right-rail "On this page" container |
+| `.doc-sp-toc-label` | TOC | Section label ("On this page") |
+| `.doc-sp-toc-link` | TOC | Individual anchor link |
+| `.doc-sp-toc-link.active` | TOC | Current-section indicator (--state accent) |
+| `.dsp-flow` | Diagram | A single labeled horizontal path row |
+| `.dsp-flow-label` | Diagram | Row label (Allowed / Blocked) with right border |
+| `.dsp-flow--allowed` | Diagram | Styles label in --valid green |
+| `.dsp-flow--blocked` | Diagram | Styles label in --violated red |
+| `.dsp-arrow--blocked` | Diagram | Dashed red arrow variant for guard failures |
+| `.dsp-reject-node` | Diagram | Terminal non-state node for blocked paths |
+
+---
+
+### 2026-04-06: Non-serif reading face for semantic visual system page
+**By:** Elaine
+**What:** Use `"Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif` as the paragraph reading stack on `design/system/foundations/semantic-visual-system.html`, while preserving Cascadia for identity, headings, labels, tables, and other system-coded roles.
+**Why:** The page needed a mature paragraph face that stays compatible with Cascadia and Precept's editor-adjacent character. Segoe UI Variable Text keeps the tone technical and restrained without reintroducing serif contrast or forcing a webfont dependency.
+
+---
+
+### 2026-04-10T00:00:00Z: Semantic visual system reading order now reveals constructs before downstream channels
+**By:** Elaine (UX Designer)
+**What:** Re-sequenced `design/system/foundations/semantic-visual-system.html` to read `Intro -> Concepts -> System -> Typography -> Color System -> Surfaces -> Docs`.
+**Why:** The five canonical constructs are the primary semantic reveal. Typography and color are downstream foundational channels that should be explained after the construct grammar is visible.
+
+### 2026-04-10T00:00:00Z: Canonical system-doc section layering rule
+**By:** Elaine
+**What:** In canonical semantic-system documents, keep three layers structurally distinct: (1) conceptual model, which explains the ontology and invariants of the system; (2) foundational system rules, which define the cross-surface operating constraints for channels like color and typography; and (3) surface guidance, which shows how those rules materialize in specific contexts such as code, diagrams, forms, timelines, and docs. In the semantic visual system artifact, that means the reader should encounter Concepts first, then Typography and Color System, then the System reveal, then surface examples.
+**Why:** When Color and Typography are folded fully into Concepts, the document blurs model and policy. Readers lose the clean progression from what the system is, to how it must behave, to how it appears in use. Concepts should stay compact and explanatory; rules sections should carry normative detail.
+
+---
+
+### 2026-04-10T00:00:00Z: Documentation may use semantic construct color only for denotation, not editorial chrome
+**By:** Elaine (via Copilot)
+**What:** In documentation surfaces, structure indigo, data slate, and the other construct-family colors are valid only when the element is directly denoting an actual governed construct or governed runtime concept. They are not valid for document self-organization, reader navigation, editorial callout taxonomy, browser chrome, or generic emphasis.
+**Why:** "Document structure" and "document data" are editorial concepts, not Precept constructs. The semantic system stays trustworthy only if construct color means "this mark refers to a Precept construct" rather than "this part of the page feels structural". In the current audit, classes like `.doc-ref.s`, `.doc-ref.da`, `.doc-pill.s`, `.doc-pill.da`, and construct rows in the reference table are legitimate because they point at governed entities. Classes like `.doc-callout--note`, `.doc-sp-link.active`, `.doc-sp-toc-link.active`, and similar navigation or chrome states are misuse because they describe the document's own interface rather than the modeled system.
+
+---
+
+### 2026-04-10T00:00:00Z: Semantic markers must not be reused as document chrome
+**By:** Elaine (via Copilot)
+**What:** In semantic-system artifacts, construct-family colors, runtime verdict colors, and construct-specific markers or shapes must not be reused for generic document chrome or organizational UI. That includes legend bullets, badge dots, navigation active states, browser chrome, editorial callouts, and list numbering unless the marker is depicting its actual semantic meaning.
+**Why:** The semantic misuse audit found that reusing existing signals for generic UI weakens the one-meaning-per-marker rule and makes cross-surface semantics less trustworthy.
+
+---
+
+### 2026-04-06T00:00:00Z: Semantic visual system corrective pass
+**By:** Elaine
+**What:** Flattened the semantic-system foundation page to a true black-field treatment, introduced the brand-aligned reading-face split for paragraph prose, and made the Peterman/Elaine authority boundary explicit inside the document.
+**Why:** Shane called out remaining gradients, the missing second font system, and the missing visible ownership split from the previous pass.
+
+---
+
+### 2026-04-06T00:00:00Z: Semantic visual system page posture
+**By:** Elaine
+**Status:** Proposed
+
+The semantic visual system page should present itself as Precept's fullest embodiment of the visual system rather than as an anti-marketing or purely hard-edged control document.
+
+**Decision:**
+- Keep the page canonical and rigorous.
+- Let it visibly dogfood the system it defines.
+- Frame beauty and expressiveness as proof of the system's strength, not as dilution of authority.
+
+**Why:**
+- Shane explicitly directed that the page should show off the visual system and serve as the ultimate embodiment of Precept.
+- The previous posture over-indexed on rejecting softness instead of demonstrating the system's character in use.
+
+---
+
+### 2026-04-06: Semantic page redesign follow-up
+**By:** Elaine
+**Status:** Proposed
+
+**What:** Canonical design-system foundation pages should use a black-field editorial control-surface layout rather than a softened product-doc card stack. The repeatable pattern is: one manifesto statement, one semantic specimen, one sticky rule rail, and section rhythm driven by indigo structure rather than decorative gradients.
+
+**Why:** These pages are not marketing surfaces and not product UI. They are operating documents for how Precept means things on screen. Giving them a harder editorial form makes the guidance feel canonical, improves scan speed, and keeps the surface recognizably Precept instead of collapsing into generic dark-mode documentation.
+
+---
+
+### 2026-04-06T00:00:00Z: Semantic visual system page redesign
+**By:** Elaine
+**Status:** Proposed
+
+Canonical design-system foundation pages for Precept should use a black-field editorial-spec layout rather than a floating marketing-panel layout.
+
+**Rule:**
+- Use a near-solid black field with restrained indigo structure cues.
+- Give long system pages a sticky utility rail for section navigation and locked semantic reminders.
+- Organize the body as stacked spec shells with one primary specimen in the hero instead of several competing visual moments.
+- Keep Cascadia-led typography throughout; reserve small-caps display treatment for the actual Precept wordmark/display moment.
+- Reserve gold for explanatory rule moments and never as a general accent lane.
+
+**Why:**
+The page is canonical system guidance, not a landing page. Editorial-spec structure makes it feel more authoritative, more editor-adjacent, and more recognizably Precept while improving scannability on desktop and mobile.
+
+---
+
+### 2026-04-06: Semantic visual system page aligns to Precept black-field + Cascadia hierarchy
+**By:** Elaine
+**What:** The `design/system/` semantic-system foundation page should use a restrained black-field treatment with minimal indigo structure cues and a Cascadia-led hierarchy. Remove serif editorial styling, atmospheric gradients, and blur-heavy panel treatments from this surface.
+**Why:** This page is a product-facing system reference, not an atmospheric brand exploration. The active exploration files and the legacy brand references all point back to Precept's editor-adjacent identity: mono-led typography, dark surfaces, and meaning carried by semantic color rather than decorative background effects.
+
+---
+
+### 2026-04-06: Typography role split for the semantic visual system
+**By:** Elaine
+**Status:** Proposed
+
+The semantic visual system now carries an explicit typography role map:
+- the Cascadia stack is canonical for identity and system-facing roles, including the wordmark, section headings, labels, chips, navigation, matrix headers, inline tokens, specimens, and code
+- Segoe UI Variable Text with Segoe UI fallback is the canonical paragraph reading face for explanatory prose on system pages and other reading-heavy surfaces
+- italic remains a semantic pressure signal for constrained states, constrained events, guarded names, and adjacent comment-lane annotation, not a general-purpose emphasis style
+
+Why: the split preserves Precept's editor-adjacent identity while keeping long-form explanation readable and keeping typography usable as a second semantic channel.
+
+---
+
+### 2026-04-10: Doc snippet sync for semantic visual system
+**By:** George (via Copilot)
+**What:** Updated the HTML's touched LoanApplication snippets to compile-valid guarded rows that avoid stale `&&` notation while keeping the existing cross-surface scenario intact.
+**Why:** The active compiler rejects the checked-in keyword-form boolean guards, so equivalent branch-ordered rows preserve correctness for rendered examples without broadening the revision scope.
+
+---
+
+### 2026-04-10: Logical keywords should only get a dedicated scope inside the existing Structure family
+**By:** Scribe
+**What:** For issue #31, the standing recommendation is to give `and`, `or`, and `not` a dedicated operator-like highlighting scope only if that scope maps to the existing Structure/grammar visual family rather than a new semantic color family. If the implementation would introduce a distinct sixth color family, keep these keywords in the current Structure/action treatment instead of moving them into `controlKeywords`.
+**Why:** Frank's constraint was that logical keywords remain in the Structure/grammar family and never create a sixth color family. Kramer and Uncle Leo both argued that a dedicated operator-like scope is the correct classification because action/control misclassify these tokens; Kramer also noted that `contains` is an odd precedent rather than a model, and Uncle Leo noted that broad highlighting changes are risky if the language surface has not been updated consistently everywhere. Elaine agreed that a dedicated scope is visually best, but only as a Structure-family treatment rather than a separate semantic lane.
+
+---
+
 ### 2026-04-10T22:52:01Z: Architecture identity row restores card treatment with inline square marker
 **By:** Elaine
 **Status:** Applied
@@ -10246,3 +10778,16 @@ All 5 blocking findings trace directly to semantic contracts the research docume
 ## Recommendation
 
 The proposal is close. The core design is sound, the syntax is well-grounded, and the locked decisions are solid. What's missing is the second half of the research's output — the semantic contracts and open questions section. A single editing pass addressing Findings 1–5 would resolve all blocking issues. The advisory findings can be addressed in the same pass or during implementation.
+
+---
+
+## Imported Inbox Records — 2026-04-11T03:56:07Z
+
+These records were merged from `.squad/decisions/inbox/` into the canonical ledger in this pass. One net-new record was added and one duplicate inbox record was skipped because it was already present in `decisions.md`.
+
+---
+
+### 2026-04-10T00:00:00Z: Intro opens on the cross-surface reading contract before taxonomy
+**By:** Elaine
+**What:** The semantic visual system intro should establish governed integrity and the cross-surface reading contract first, then name the five authored semantic families and the separate runtime verdict register.
+**Why:** Opening on continuity makes the document's responsibility clear immediately: this system governs how Precept meaning stays legible across source, docs, diagrams, and runtime views. Taxonomy follows from that contract instead of reading like a cleanup exercise.
