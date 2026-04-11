@@ -164,6 +164,53 @@ public enum PreceptToken
     [TokenSymbol("of")]
     Of,
 
+    // ═══ Keywords: field-level constraints ═══
+
+    [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Constraint: value must be >= 0")]
+    [TokenSymbol("nonnegative")]
+    Nonnegative,
+
+    [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Constraint: value must be > 0")]
+    [TokenSymbol("positive")]
+    Positive,
+
+    [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Constraint: minimum value (number) or minimum count (collection)")]
+    [TokenSymbol("min")]
+    Min,
+
+    [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Constraint: maximum value (number) or maximum count (collection)")]
+    [TokenSymbol("max")]
+    Max,
+
+    [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Constraint: string or collection must not be empty")]
+    [TokenSymbol("notempty")]
+    Notempty,
+
+    [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Constraint: minimum string length")]
+    [TokenSymbol("minlength")]
+    Minlength,
+
+    [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Constraint: maximum string length")]
+    [TokenSymbol("maxlength")]
+    Maxlength,
+
+    [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Constraint: minimum collection element count")]
+    [TokenSymbol("mincount")]
+    Mincount,
+
+    [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Constraint: maximum collection element count")]
+    [TokenSymbol("maxcount")]
+    Maxcount,
+
     // ═══ Keywords: actions ═══
 
     [TokenCategory(TokenCategory.Action)]

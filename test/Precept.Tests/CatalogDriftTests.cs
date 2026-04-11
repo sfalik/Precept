@@ -521,6 +521,15 @@ public class CatalogDriftTests
         // C56: .length on nullable string without null guard
         ["C56"] = new(H + "field Note as string nullable\n" + S + "event Go\nfrom A on Go when Note.length > 0 -> no transition\n", "requires a null check"),
 
+        // C57: Constraint applied to incompatible type (nonnegative on a string field)
+        ["C57"] = new(H + "field Name as string default \"\" nonnegative\n" + S, "not valid for type"),
+
+        // C58: Duplicate constraint on same field (min 1 appears twice)
+        ["C58"] = new(H + "field Amount as number default 5 min 1 min 1\n" + S, "Duplicate constraint"),
+
+        // C59: Default value violates constraint (0 is not positive)
+        ["C59"] = new(H + "field Amount as number default 0 positive\n" + S, "violates constraint"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state

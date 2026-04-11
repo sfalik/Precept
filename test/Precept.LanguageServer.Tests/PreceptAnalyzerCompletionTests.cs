@@ -455,7 +455,7 @@ public class PreceptAnalyzerCompletionTests
     }
 
     [Fact]
-    public void Completions_AfterFieldScalarType_SuggestsNullableAndDefault()
+    public void Completions_AfterFieldScalarType_SuggestsNullableDefaultAndConstraints()
     {
         const string text = """
             precept M
@@ -470,11 +470,15 @@ public class PreceptAnalyzerCompletionTests
 
         completions.Should().Contain("nullable");
         completions.Should().Contain("default");
-        completions.Should().HaveCount(2);
+        completions.Should().Contain("notempty");
+        completions.Should().Contain("minlength");
+        completions.Should().Contain("maxlength");
+        completions.Should().NotContain("nonnegative", "number constraints should not appear on string fields");
+        completions.Should().HaveCount(5);
     }
 
     [Fact]
-    public void Completions_AfterFieldNullable_SuggestsDefault()
+    public void Completions_AfterFieldNullable_SuggestsDefaultAndConstraints()
     {
         const string text = """
             precept M
@@ -488,7 +492,11 @@ public class PreceptAnalyzerCompletionTests
         var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
 
         completions.Should().Contain("default");
-        completions.Should().HaveCount(1);
+        completions.Should().Contain("notempty");
+        completions.Should().Contain("minlength");
+        completions.Should().Contain("maxlength");
+        completions.Should().NotContain("nullable", "nullable already set");
+        completions.Should().HaveCount(4);
     }
 
     [Fact]
@@ -679,6 +687,147 @@ public class PreceptAnalyzerCompletionTests
 
         completions.Should().Contain("Result");
         completions.Should().Contain("Exact");
+    }
+
+    // ── Constraint zone completions (issue #13) ──────────────────────────
+
+    [Fact]
+    public void Completions_NumberFieldAfterType_SuggestsNullableDefaultAndNumberConstraints()
+    {
+        const string text = """
+            precept M
+            field Amount as number $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable");
+        completions.Should().Contain("default");
+        completions.Should().Contain("nonnegative");
+        completions.Should().Contain("positive");
+        completions.Should().Contain("min");
+        completions.Should().Contain("max");
+        completions.Should().NotContain("notempty", "string constraints should not appear on number fields");
+        completions.Should().NotContain("mincount", "collection constraints should not appear on number fields");
+    }
+
+    [Fact]
+    public void Completions_NumberFieldAfterDefault_SuggestsNumberConstraints()
+    {
+        const string text = """
+            precept M
+            field Amount as number default 0 $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nonnegative");
+        completions.Should().Contain("positive");
+        completions.Should().Contain("min");
+        completions.Should().Contain("max");
+        completions.Should().NotContain("nullable");
+        completions.Should().NotContain("default");
+        completions.Should().NotContain("notempty");
+    }
+
+    [Fact]
+    public void Completions_NumberFieldAfterConstraint_SuggestsMoreNumberConstraints()
+    {
+        const string text = """
+            precept M
+            field Amount as number nonnegative $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nonnegative");
+        completions.Should().Contain("positive");
+        completions.Should().Contain("min");
+        completions.Should().Contain("max");
+        completions.Should().NotContain("notempty");
+    }
+
+    [Fact]
+    public void Completions_StringFieldAfterDefault_SuggestsStringConstraints()
+    {
+        const string text = """
+            precept M
+            field Name as string default "" $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("notempty");
+        completions.Should().Contain("minlength");
+        completions.Should().Contain("maxlength");
+        completions.Should().NotContain("nullable");
+        completions.Should().NotContain("default");
+        completions.Should().NotContain("nonnegative");
+    }
+
+    [Fact]
+    public void Completions_CollectionFieldAfterType_SuggestsCollectionConstraints()
+    {
+        const string text = """
+            precept M
+            field Tags as set of string $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("notempty");
+        completions.Should().Contain("mincount");
+        completions.Should().Contain("maxcount");
+        completions.Should().NotContain("nonnegative");
+        completions.Should().NotContain("minlength");
+    }
+
+    [Fact]
+    public void Completions_EventArgNumberType_SuggestsNumberConstraints()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Score with Value as number $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable");
+        completions.Should().Contain("default");
+        completions.Should().Contain("nonnegative");
+        completions.Should().Contain("positive");
+        completions.Should().Contain("min");
+        completions.Should().Contain("max");
+        completions.Should().Contain(",");
+        completions.Should().NotContain("notempty");
+    }
+
+    [Fact]
+    public void Completions_EventArgStringType_SuggestsStringConstraints()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Submit with Comment as string $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable");
+        completions.Should().Contain("default");
+        completions.Should().Contain("notempty");
+        completions.Should().Contain("minlength");
+        completions.Should().Contain("maxlength");
+        completions.Should().Contain(",");
+        completions.Should().NotContain("nonnegative");
     }
 
     private static (string text, Position position) ExtractPosition(string textWithMarker)

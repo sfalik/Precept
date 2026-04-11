@@ -24,6 +24,7 @@
     { "include": "#declarationKeywords" },
     { "include": "#typeKeywords" },
     { "include": "#actionKeywords" },
+    { "include": "#constraintKeywords" },
     { "include": "#outcomeKeywords" },
     { "include": "#arrowOperator" },
     { "include": "#operators" },
@@ -167,6 +168,7 @@
             "8": {
               "patterns": [
                 { "include": "#typeKeywords" },
+                { "include": "#constraintKeywords" },
                 { "include": "#declarationKeywords" },
                 { "include": "#numbers" },
                 { "include": "#booleanNull" },
@@ -263,6 +265,7 @@
             "8": { "name": "storage.type.precept" },
             "9": {
               "patterns": [
+                { "include": "#constraintKeywords" },
                 { "include": "#declarationKeywords" },
                 { "include": "#booleanNull" },
                 { "include": "#numbers" },
@@ -395,6 +398,15 @@
         {
           "name": "keyword.other.precept",
           "match": "\\b(set|add|remove|enqueue|dequeue|push|pop|clear|into|contains)\\b"
+        }
+      ]
+    },
+    "constraintKeywords": {
+      "comment": "Field-level and event-arg-level constraint keywords (type-shape tier, issue #13)",
+      "patterns": [
+        {
+          "name": "keyword.other.precept",
+          "match": "\\b(nonnegative|positive|notempty|min|max|minlength|maxlength|mincount|maxcount)\\b"
         }
       ]
     },
