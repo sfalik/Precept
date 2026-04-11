@@ -6,6 +6,15 @@
 
 ## Learnings
 
+### 2026-04-11 — Issue #14 Slice 9: Parser + Type Checker test batch written
+
+- **15 new tests total:** 8 parser tests in `NewSyntaxParserTests.cs`, 7 type checker tests in `PreceptTypeCheckerTests.cs` (including the EC-3 gate).
+- **13 of 15 pass.** 1 failure: EC-3 (`Check_Invariant_WhenGuardFalse_AtDefaultData_NoPrecompileViolation`).
+- **EC-3 root cause:** `CollectCompileTimeDiagnostics` in `PreceptRuntime.cs` (line ~2053) evaluates invariant body against default data without checking `WhenGuard` first. When `Active` is `false` at defaults, the guard should suppress the C29 check, but the code unconditionally evaluates `X > 100` → spurious C29. This is an implementation gap, not a test bug.
+- **Parser tests confirmed:** All 4 when-guard forms parse correctly (invariant, state assert, event assert, conditional edit). `when not` parses as `PreceptUnaryExpression`. `in any when Guard edit` expands to per-state guarded blocks. Regression tests confirm unguarded forms retain `null` WhenGuard.
+- **Type checker tests confirmed:** C46 fires for non-boolean guard fields. C69 fires for cross-scope references (event arg in invariant guard, entity field in event assert guard). Guarded state asserts are excluded from type narrowing (BuildStateAssertNarrowings filters on `WhenGuard is null`).
+- **Action needed:** George must add guard-aware logic to `CollectCompileTimeDiagnostics` before EC-3 can pass. Pattern: `if (inv.WhenGuard is not null) { evaluate guard against defaultData; if guard is false, skip body check }`.
+
 ### 2026-04-11 — Issue #14: Form 4 complete test matrix
 
 - Form 4 adds +42 tests across all layers: 5 parser, 7 type-checker, 22 runtime (new `GuardedEditTests.cs`), 3 LS completions, 4 MCP tools, 1 CatalogDrift. Total: ~154 (up from ~112 for Forms 1–3 only).

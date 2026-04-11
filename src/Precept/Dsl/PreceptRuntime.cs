@@ -2050,6 +2050,15 @@ public static class PreceptCompiler
             foreach (var inv in model.Invariants)
             {
                 if (inv.IsSynthetic) continue;
+
+                // Guard pre-flight: skip guarded invariants whose guard is false at defaults
+                if (inv.WhenGuard is not null)
+                {
+                    var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(inv.WhenGuard, defaultData);
+                    if (!guardResult.Success || guardResult.Value is not true)
+                        continue;
+                }
+
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, defaultData);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
                 {
@@ -2073,6 +2082,14 @@ public static class PreceptCompiler
                     continue;
                 if (sa.Anchor is not (AssertAnchor.In or AssertAnchor.To))
                     continue;
+
+                // Guard pre-flight: skip guarded state asserts whose guard is false at defaults
+                if (sa.WhenGuard is not null)
+                {
+                    var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(sa.WhenGuard, defaultData);
+                    if (!guardResult.Success || guardResult.Value is not true)
+                        continue;
+                }
 
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(sa.Expression, defaultData);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
@@ -2119,6 +2136,14 @@ public static class PreceptCompiler
 
                 if (!allArgsHaveDefaults)
                     continue;
+
+                // Guard pre-flight: skip guarded event asserts whose guard is false at defaults
+                if (ea.WhenGuard is not null)
+                {
+                    var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(ea.WhenGuard, eventDefaults);
+                    if (!guardResult.Success || guardResult.Value is not true)
+                        continue;
+                }
 
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(ea.Expression, eventDefaults);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)

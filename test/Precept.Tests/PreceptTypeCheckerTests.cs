@@ -691,4 +691,155 @@ public class PreceptTypeCheckerTests
         var model = PreceptParser.Parse(dsl);
         return PreceptTypeChecker.Check(model);
     }
+
+    // ─── Issue #14 Slice 9: When-guard type checker tests ───────────
+
+    [Fact]
+    public void Check_Invariant_WhenGuardFalse_AtDefaultData_NoPrecompileViolation()
+    {
+        // EC-3: A guarded invariant whose guard is false at default data
+        // should NOT produce a pre-compile violation.
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            state A initial
+            invariant X > 100 when Active because "X must be high when active"
+            from A on Go -> no transition
+            event Go
+            """;
+
+        // This should compile clean — the invariant body (X > 100) fails at defaults,
+        // but the guard (Active == false at defaults) means it's skipped.
+        var compiled = PreceptCompiler.CompileFromText(dsl);
+        compiled.HasErrors.Should().BeFalse("guarded invariant with false guard should not trigger pre-compile violation");
+    }
+
+    [Fact]
+    public void TypeCheck_InvariantGuard_ValidBooleanField_NoDiagnostic()
+    {
+        const string dsl = """
+            precept M
+            field X as number default 0
+            field Active as boolean default false
+            state A initial
+            invariant X >= 0 when Active because "guarded"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TypeCheck_InvariantGuard_NonBooleanField_DiagnosticEmitted()
+    {
+        const string dsl = """
+            precept M
+            field X as number default 0
+            field Count as number default 0
+            state A initial
+            invariant X >= 0 when Count because "count is not boolean"
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C46");
+    }
+
+    [Fact]
+    public void TypeCheck_EventAssertGuard_ValidArgReference_NoDiagnostic()
+    {
+        const string dsl = """
+            precept M
+            state A initial
+            state B
+            event Submit with Amount as number, Priority as number
+            on Submit assert Amount > 0 when Priority > 1 because "high priority needs amount"
+            from A on Submit -> transition B
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TypeCheck_C69_InvariantGuard_EventArgReference_Emitted()
+    {
+        const string dsl = """
+            precept M
+            field X as number default 0
+            state A initial
+            state B
+            event Go with Amount as number
+            invariant X >= 0 when Go.Amount > 0 because "bad guard"
+            from A on Go -> transition B
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C69");
+    }
+
+    [Fact]
+    public void TypeCheck_C69_EventAssertGuard_EntityFieldReference_Emitted()
+    {
+        const string dsl = """
+            precept M
+            field Total as number default 0
+            state A initial
+            state B
+            event Submit with Amount as number
+            on Submit assert Amount > 0 when Total > 0 because "bad guard scope"
+            from A on Submit -> transition B
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C69");
+    }
+
+    [Fact]
+    public void TypeCheck_EditGuard_ValidFieldReference_NoDiagnostic()
+    {
+        const string dsl = """
+            precept M
+            field Priority as number default 0
+            field Active as boolean default false
+            state Open initial
+            in Open when Active edit Priority
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TypeCheck_GuardedStateAssert_ExcludedFromNarrowing()
+    {
+        // A guarded state assert should NOT contribute to type narrowing.
+        // Without the guard filter, the assert "MaybeNull != null" would narrow
+        // MaybeNull to non-nullable, making `set Value = MaybeNull` pass.
+        // With the filter, it remains nullable → C42.
+        const string dsl = """
+            precept M
+            field Value as number default 0
+            field MaybeNull as number nullable
+            field Active as boolean default false
+            state Open initial
+            state Closed
+            in Closed assert MaybeNull != null when Active because "conditional guarantee"
+            event Close
+            from Open on Close -> transition Closed
+            to Closed -> set Value = MaybeNull
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle();
+        result.Diagnostics[0].Constraint.Id.Should().Be("C42");
+    }
 }
