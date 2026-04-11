@@ -870,6 +870,28 @@ public class PreceptAnalyzerCompletionTests
         completions.Should().Contain("\"Closed\"");
     }
 
+    [Fact]
+    public void Completions_GuardExpression_SuggestsKeywordLogicalOperators()
+    {
+        const string text = """
+            precept M
+            field Active as boolean default true
+            state A initial
+            event Go
+            from A on Go when $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("and");
+        completions.Should().Contain("or");
+        completions.Should().Contain("not");
+        completions.Should().NotContain("&&", "symbolic logical operators were replaced by keyword forms");
+        completions.Should().NotContain("||", "symbolic logical operators were replaced by keyword forms");
+        completions.Should().NotContain("!", "symbolic logical operators were replaced by keyword forms");
+    }
+
     private static (string text, Position position) ExtractPosition(string textWithMarker)
     {
         var index = textWithMarker.IndexOf("$$", StringComparison.Ordinal);

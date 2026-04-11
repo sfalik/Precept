@@ -445,7 +445,7 @@ public static class DiagnosticCatalog
     public static readonly LanguageConstraint C56 = Register(
         "C56", "compile",
         "Member access on nullable string requires explicit null guard before '.length'.",
-        "'{field}.length' requires a null check — '{field}' is nullable. Use '{field} != null && {field}.length ...' or '{field} == null || {field}.length ...'.");
+        "'{field}.length' requires a null check — '{field}' is nullable. Use '{field} != null and {field}.length ...' or '{field} == null or {field}.length ...'.");
 
     // ═══════════════════════════════════════════════════════════════
     // Field-level constraint diagnostics (C57–C59)
