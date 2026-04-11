@@ -21,6 +21,15 @@ Complete spec written covering all 4 forms and 19 change sites across 5 files. F
 
 ### 2026-04-11 — Form 4 simplicity analysis (Issue #14 follow-up)
 
+### 2026-04-11 — Slice 5: Runtime Form 4 (conditional edit with additive approach)
+- Added `_guardedEditBlocks` field (`IReadOnlyList<PreceptEditBlock>`) to `PreceptEngine`. Constructor now routes `block.WhenGuard is not null` edit blocks to this list; unconditional blocks continue to `_editableFieldsByState` unchanged.
+- New private helper `EvaluateGuardedEditFields(state, data)`: iterates guarded blocks, evaluates guards via `PreceptExpressionRuntimeEvaluator.Evaluate`, fail-closed (any error/non-true → field not granted), returns union of passing field names.
+- Updated 4 call sites: `Update` (Stage 1 editability check — moved `HydrateInstanceData` up for guard eval), `Inspect(patch)` editability check, `BuildEditableFieldInfos`, `GetEditableFieldNames` (added optional `instanceData` parameter).
+- All copy-on-read pattern: static editable sets copied to new `HashSet` before union with guarded fields — `_editableFieldsByState` dictionary never mutated.
+- Build clean. All 1,045 tests pass (850 core + 128 LS + 67 MCP). Zero regressions — no existing tests use guarded edit blocks.
+
+## Learnings
+
 ### 2026-04-11 — Slice 4: Runtime engine guard pre-flight for Forms 1–3
 - Added guard pre-flight to `EvaluateInvariants`, `EvaluateStateAssertions`, and `EvaluateEventAssertions` in `PreceptRuntime.cs`.
 - Pattern: if `WhenGuard is not null`, evaluate against the same data dictionary as the body expression. If guard fails or evaluates to non-true, `continue` (skip the declaration). Collect-all semantics preserved — no caller changes needed.
