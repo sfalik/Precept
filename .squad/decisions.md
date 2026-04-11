@@ -6,6 +6,103 @@
 
 ---
 
+### 2026-04-10T21:00:00Z: Issue #10 — String `.length` accessor — fully implemented
+**By:** Frank (design analysis), George (runtime + evaluator), Kramer (grammar + completions), Soup Nazi (tests), Coordinator (integration)
+**Status:** Implemented — branch `squad/10-string-length-accessor`, 800 tests passing
+
+String `.length` accessor fully ships as Issue #10. All design decisions locked.
+
+**Design decisions (from Frank's analysis, approved by Shane):**
+
+- **Q1: Unicode semantics → UTF-16 code units.** `.length` returns `string.Length` (UTF-16 code units), matching .NET. `"💀".length == 2`. Ties Precept string semantics to the host platform for predictability and O(1) performance. Documented in `docs/PreceptLanguageDesign.md`.
+- **Q2: New diagnostic code C56.** `.length` on a nullable string without null narrowing emits **C56** — not C42. Separates "accessor on nullable type without null guard" from C42 ("nullable assigned to non-nullable target"). Null narrowing via `!= null and` or `== null or` removes C56.
+
+**Runtime + evaluator (George):** `.length` evaluator added alongside `.count` pattern. Type checker builds `{field}.length` as `StaticValueKind.Number` in all 4 scope types. C56 registered and emitted in the type-checking pass.
+
+**Grammar + completions (Kramer):**
+- `length` added to the `collectionMemberAccess` alternation in grammar alongside `count|min|max|peek`. Comment updated to cover both collection and string accessors.
+- String-field branch added inside existing `collectionMemberPrefixMatch` block in `PreceptAnalyzer.cs`. Uses `info.FieldTypeKinds & StaticValueKind.String`. `BuildStringMemberItems(fieldName, isNullable)` returns `.length` as `CompletionItemKind.Property`, detail `"number"`. Nullable strings inject null-guard reminder.
+- Build: 0 warnings, 0 errors. 87 language server tests pass.
+
+**Tests (Soup Nazi — `StringAccessorTests.cs`):** 25 tests: parser (2), type checker valid (2), type checker type errors (3), C56 nullable (1), C56 narrowing (2), runtime UTF-16 contract (4), null guard compound (4), invariant context (2), event assert context (2), guard routing (2), regression .count (1). UTF-16 emoji test and three-level dotted form (`Submit.Name.length`) are first-class coverage.
+
+---
+
+### 2026-04-10: Policy — Coordinator must enforce draft PR gate before implementation work
+**By:** Shane (owner directive)
+**Status:** Captured, applied to `.github/agents/squad.agent.md`
+
+Coordinator is accountable for ensuring a draft PR exists before any implementation work is routed to agents. Missed for issue #31 — branch was created and exploratory work started with no PR opened. Coordinator must verify branch + PR existence at start of any "work on issue N" request and open the draft PR itself if missing.
+
+**Basis:** CONTRIBUTING.md §3 ("open a draft PR immediately"). Recovery pattern: if `mcp_github_create_pull_request` fails due to no commits ahead of base, push empty chore commit first, then retry. See issue #31 recovery (2026-04-10) as canonical example.
+
+**Remediation:** `.github/agents/squad.agent.md` updated with explicit "Implementation Gate — Draft PR Required" section.
+
+---
+
+### 2026-04-10: Issue #13 — Constraint consistency analysis v2 — No redesign needed
+**By:** Frank (Lead/Architect)
+**Status:** Analysis complete — no redesign needed. Supersedes v1 (rejected for insufficient research grounding).
+
+Shane's question: "How does this contrast with how we apply constraints to events and states? I don't like that it is not consistent."
+
+**Verdict:** The asymmetry is justified scope segregation, not inconsistency. The constraint surface has two tiers:
+1. **Type-shape tier** (field-local, closed vocabulary): keyword constraints on fields and event args
+2. **Business-rule tier** (cross-field, open expression language): predicate invariants and asserts on states, events, and global scope
+
+**Research grounding (7-category, 30+ system precedent survey):** Zero systems use a single mechanism for both type-shape and cross-entity constraints. States have no type shapes to constrain — state asserts are always bespoke cross-field business rules with no closed keyword vocabulary. `nonnegative`/`min`/`max` address 84% of invariants (46/55 in the corpus), all type-shape bounds. Field constraint suffixes desugar to invariants — one mechanism with two authoring surfaces, connected by the Pombrio & Krishnamurthi resugaring framework with preserved diagnostic fidelity.
+
+**Three unification paths evaluated and rejected:** all-predicate (surrenders most measurable verbosity reduction), all-keyword (states lack type shapes), unified where-clause (still dual mechanism, higher verbosity).
+
+**Action item (non-blocking):** #13 proposal should include an explicit scope-segregation rationale section. See `constraint-composition-domain.md`, `constraint-composition.md`, `internal-verbosity-analysis.md`, `expression-language-audit.md`.
+
+---
+
+### 2026-04-10: Frank — Philosophy refresh assessment — 32 research files surveyed
+**By:** Frank (Lead/Architect)
+**Status:** Filed — awaiting owner direction on refresh order and standalone governance-vs-validation document
+
+Assessment at `docs/research/language/philosophy-refresh-assessment.md`. 32 language research files reviewed against rewritten `docs/philosophy.md`.
+
+**Key findings:** (1) 0/32 files use "governed integrity" — the philosophy's unifying principle. (2) 14/32 do not consider data-only/stateless entities. (3) 2 files need significant refresh: `xstate.md` (outdated product description), `fluent-validation.md` (missing governance-vs-validation distinction — most important positioning claim for the most commercially important comparison). (4) 4 new research gaps: stateless constraint patterns, stateless Inspect/Fire semantics, governance-vs-validation evidence document, MDM/industry-standard positioning depth.
+
+**Owner decision needed:** confirm refresh order (recommended start: `fluent-validation.md`, `xstate.md`, `data-only-precepts-research.md`), batch vs. per-file, and whether `governance-vs-validation.md` is standalone or folded into existing file.
+
+---
+
+### 2026-04-10: Frank — Structural lifecycle modifiers — New research domain #23
+**By:** Frank (Lead/Architect)
+**Status:** Filed — P4 horizon, research-only
+
+Structural lifecycle modifiers (`terminal`, `required`, `transient`, etc.) constitute new domain #23, distinct from constraint composition (#8, #13, #14), static reasoning expansion, and entity modeling (#17, #22). These constrain *graph topology*, not field values. Closest relative: state machine expressiveness, but annotate existing graph features rather than adding new ones.
+
+Document at `research/language/expressiveness/structural-lifecycle-modifiers.md`. Added to `domain-map.md` as domain #23 and to the horizon list in `README.md`. Priority P4 — research complete; `terminal` is Tier 1 ready for proposal when demand arises. No code changes.
+
+---
+
+### 2026-04-10: Research roadmap decisions — Milestones, critical path, type system split
+**By:** Frank (Architect), Steinbrenner (PM), Peterman (Brand/DevRel) — approved by Shane
+**Status:** Accepted
+
+**Three milestones for language expansion roadmap:**
+- **M1 "Governed Integrity"**: #31 + #22 + #13 — category-proving milestone
+- **M2 "Full Entity Surface"**: #8 + #14 + #29 + #25 + #11 — production-credible milestone
+- **M3 "Expression Power"**: #26 + #27 + #16 + #9/#10/#15 + #17 — self-sufficiency milestone
+
+**Critical path:** #31 → #22 → #13 → (#8+#14) → (#29+#25) → #11 → #16 → (#10,#15,#9) → (#26+#27) → #17
+
+**Type system split:** integer (#29) + choice (#25) ship in M2; date (#26) + decimal (#27) defer to M3 (benefit from #16 functions shipping first). **Absorb (#11) promoted** from P3 to late M2 (#1 verbosity pattern, 132 instances, gated on research pass). **Brand sequencing constraint (Peterman):** #22 (data-only) must ship before any type expansion — shipping types on workflow-only precepts reinforces "state machine tool" perception. After M1: update README hero to side-by-side (lifecycle + data-only precept). VS Code extension description to lead with governance identity: "Govern entity integrity — fields, constraints, lifecycle rules — in a single .precept file." **Missing proposal:** file new proposal for inline guard rejection (`else reject "reason"`) — #2 verbosity pattern (20-35% of rule headers), no proposal exists. **Governance-vs-validation positioning:** the failure-mode taxonomy (bypass, timing gap, scattered rules, silent mutation) is the primary competitive weapon; deploy in README, marketplace, and developer communications.
+
+---
+
+### 2026-04-09: Frank — PR #48 final sign-off — APPROVED
+**By:** Frank (Lead/Architect)
+**Status:** Merged — HEAD 6468617
+
+All 756 tests pass (614 Precept.Tests, 55 Precept.Mcp.Tests, 87 Precept.LanguageServer.Tests). All four blocking items from the CHANGES REQUESTED review confirmed resolved: (1) `docs/PreceptLanguageDesign.md` — stateless section, C12/C13/C55/C49 fully documented, root `edit` grammar, `ExpandEditFieldNames()`. (2) `docs/RuntimeApiDesign.md` — `IsStateless`, nullable `InitialState`, both `CreateInstance` overloads. (3) `docs/McpServerDesign.md` — `isStateless` in CompileResult DTO, nullable `currentState` for Inspect/Fire/Update. (4) Placeholder samples (`customer-profile.precept`, `fee-schedule.precept`, `payment-method.precept`) present. Non-blocking recommendations applied at commit 530725d. **APPROVED. PR #48 merge-ready.**
+
+---
+
 ### 2026-04-10T12:00:00Z: Issue #31 merged — keyword logical operators (and/or/not replace &&/||/!)
 **By:** George (Runtime Dev), Kramer (Tooling Dev), Newman (MCP/AI Dev), Soup Nazi (Tester), Frank (Lead/Architect), Coordinator
 **Status:** Merged — PR #50, main SHA `305ec03`
