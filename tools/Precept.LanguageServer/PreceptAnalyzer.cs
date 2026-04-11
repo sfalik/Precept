@@ -253,12 +253,20 @@ internal sealed class PreceptAnalyzer
             return [DefaultItem, ..StringConstraintItems];
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+boolean\s+nullable\s+$", RegexOptions.IgnoreCase))
             return [DefaultItem];
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+integer\s+nullable\s+$", RegexOptions.IgnoreCase))
+            return [DefaultItem, ..NumberConstraintItems];
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+decimal\s+nullable\s+$", RegexOptions.IgnoreCase))
+            return [DefaultItem, ..DecimalConstraintItems];
 
         // After "field Name as TYPE [nullable] default VALUE " → type constraints only
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+number(?:\s+nullable)?\s+default\s+(?:-?\d+(?:\.\d+)?|true|false|null)\s+$", RegexOptions.IgnoreCase))
             return NumberConstraintItems;
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+string(?:\s+nullable)?\s+default\s+(?:""[^""\n]*""|\S+)\s+$", RegexOptions.IgnoreCase))
             return StringConstraintItems;
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+integer(?:\s+nullable)?\s+default\s+(?:-?\d+(?:\.\d+)?|true|false|null)\s+$", RegexOptions.IgnoreCase))
+            return NumberConstraintItems;
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+decimal(?:\s+nullable)?\s+default\s+(?:-?\d+(?:\.\d+)?|true|false|null)\s+$", RegexOptions.IgnoreCase))
+            return DecimalConstraintItems;
 
         // After already having constraints on a number field → offer more
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+number\b.*\b(?:nonnegative|positive|(?:min|max)\s+\S+)\s+$", RegexOptions.IgnoreCase))
@@ -266,6 +274,15 @@ internal sealed class PreceptAnalyzer
         // After already having constraints on a string field → offer more
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+string\b.*\b(?:notempty|(?:minlength|maxlength)\s+\S+)\s+$", RegexOptions.IgnoreCase))
             return StringConstraintItems;
+        // After already having constraints on an integer field → offer more
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+integer\b.*\b(?:nonnegative|positive|(?:min|max)\s+\S+)\s+$", RegexOptions.IgnoreCase))
+            return NumberConstraintItems;
+        // After already having constraints on a decimal field → offer more
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+decimal\b.*\b(?:nonnegative|positive|(?:min|max|maxplaces)\s+\S+)\s+$", RegexOptions.IgnoreCase))
+            return DecimalConstraintItems;
+        // After already having ordered on a choice field → nothing more to offer
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+choice\([^)]*\)\b.*\bordered\s+$", RegexOptions.IgnoreCase))
+            return Array.Empty<CompletionItem>();
 
         // After "field Name as set|queue|stack of TYPE " → collection constraints
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:set|queue|stack)\s+of\s+\w+\s+$", RegexOptions.IgnoreCase))
@@ -281,6 +298,12 @@ internal sealed class PreceptAnalyzer
             return [NullableItem, DefaultItem, ..StringConstraintItems];
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+boolean\s+$", RegexOptions.IgnoreCase))
             return [NullableItem, DefaultItem];
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+integer\s+$", RegexOptions.IgnoreCase))
+            return [NullableItem, DefaultItem, ..NumberConstraintItems];
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+decimal\s+$", RegexOptions.IgnoreCase))
+            return [NullableItem, DefaultItem, ..DecimalConstraintItems];
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+choice\([^)]*\)\s+$", RegexOptions.IgnoreCase))
+            return [NullableItem, ..ChoiceConstraintItems];
 
         // After "field Name as " (typing type) → suggest type keywords
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+\w*$", RegexOptions.IgnoreCase))
@@ -1012,7 +1035,8 @@ internal sealed class PreceptAnalyzer
         new CompletionItem { Label = "and", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "or", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "not", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "contains", Kind = CompletionItemKind.Operator }
+        new CompletionItem { Label = "contains", Kind = CompletionItemKind.Operator },
+        SnippetItem("round(expr, N)", "round(${1:expr}, ${2:2})", "Round a decimal value to N places")
     ];
 
     private static readonly IReadOnlyList<CompletionItem> LiteralItems =
@@ -1053,6 +1077,9 @@ internal sealed class PreceptAnalyzer
         new CompletionItem { Label = "string", Kind = CompletionItemKind.TypeParameter },
         new CompletionItem { Label = "number", Kind = CompletionItemKind.TypeParameter },
         new CompletionItem { Label = "boolean", Kind = CompletionItemKind.TypeParameter },
+        new CompletionItem { Label = "integer", Kind = CompletionItemKind.TypeParameter, Detail = "Whole number (no decimal point)" },
+        new CompletionItem { Label = "decimal", Kind = CompletionItemKind.TypeParameter, Detail = "Exact base-10 decimal number" },
+        SnippetItem("choice(...)", "choice(\"${1:A}\", \"${2:B}\")", "Constrained value from a predefined set"),
         new CompletionItem { Label = "set", Kind = CompletionItemKind.TypeParameter, Detail = "Sorted unique set" },
         new CompletionItem { Label = "queue", Kind = CompletionItemKind.TypeParameter, Detail = "FIFO ordered" },
         new CompletionItem { Label = "stack", Kind = CompletionItemKind.TypeParameter, Detail = "LIFO ordered" }
@@ -1103,6 +1130,20 @@ internal sealed class PreceptAnalyzer
         new CompletionItem { Label = "notempty",  Kind = CompletionItemKind.Keyword, Detail = "collection constraint", Documentation = new StringOrMarkupContent("Collection must not be empty") },
         new CompletionItem { Label = "mincount",  Kind = CompletionItemKind.Keyword, Detail = "collection constraint", Documentation = new StringOrMarkupContent("Collection must have at least N items") },
         new CompletionItem { Label = "maxcount",  Kind = CompletionItemKind.Keyword, Detail = "collection constraint", Documentation = new StringOrMarkupContent("Collection must have at most N items") },
+    ];
+
+    private static readonly IReadOnlyList<CompletionItem> DecimalConstraintItems =
+    [
+        new CompletionItem { Label = "nonnegative", Kind = CompletionItemKind.Keyword, Detail = "decimal constraint", Documentation = new StringOrMarkupContent("Field must be >= 0") },
+        new CompletionItem { Label = "positive",    Kind = CompletionItemKind.Keyword, Detail = "decimal constraint", Documentation = new StringOrMarkupContent("Field must be > 0") },
+        new CompletionItem { Label = "min",         Kind = CompletionItemKind.Keyword, Detail = "decimal constraint", Documentation = new StringOrMarkupContent("Field must be >= value") },
+        new CompletionItem { Label = "max",         Kind = CompletionItemKind.Keyword, Detail = "decimal constraint", Documentation = new StringOrMarkupContent("Field must be <= value") },
+        SnippetItem("maxplaces N", "maxplaces ${1:2}", "Maximum decimal places"),
+    ];
+
+    private static readonly IReadOnlyList<CompletionItem> ChoiceConstraintItems =
+    [
+        new CompletionItem { Label = "ordered", Kind = CompletionItemKind.Keyword, Detail = "choice constraint", Documentation = new StringOrMarkupContent("Enables ordinal comparison of choice values") },
     ];
 
     private static bool EndsWithCompletedExpression(string text)

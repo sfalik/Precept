@@ -246,7 +246,7 @@
       "patterns": [
         {
           "name": "meta.field-declaration.scalar.precept",
-          "match": "^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(string|number|boolean)(.*)",
+          "match": "^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(string|number|boolean|integer|decimal)(.*)",
           "captures": {
             "2": { "name": "keyword.other.precept" },
             "4": {
@@ -389,7 +389,7 @@
       "patterns": [
         {
           "name": "storage.type.precept",
-          "match": "\\b(string|number|boolean|set|queue|stack)\\b"
+          "match": "\\b(string|number|boolean|integer|decimal|choice|set|queue|stack)\\b"
         }
       ]
     },
@@ -406,7 +406,7 @@
       "patterns": [
         {
           "name": "keyword.other.precept",
-          "match": "\\b(nonnegative|positive|notempty|min|max|minlength|maxlength|mincount|maxcount)\\b"
+          "match": "\\b(nonnegative|positive|notempty|min|max|minlength|maxlength|mincount|maxcount|maxplaces|ordered)\\b"
         }
       ]
     },
