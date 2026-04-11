@@ -531,11 +531,7 @@ public class PreceptIntegerTypeTests
     // RUNTIME — integer constraints
     // ════════════════════════════════════════════════════════════════════
 
-    // TODO: enable when George adds Integer branch to BuildScalarConstraintExpr in PreceptParser.cs.
-    // Currently nonnegative/positive/min/max constraints on integer fields are accepted by the
-    // parser and type checker but the desugar to invariant is silently skipped — the constraint
-    // expression builder only handles Number and String types, not Integer.
-    [Fact(Skip = "Integer constraint desugaring not yet implemented — BuildScalarConstraintExpr has no Integer branch")]
+    [Fact]
     public void Runtime_IntegerField_NonnegativeConstraint_EnforcedAtRuntime()
     {
         // nonnegative desugars to `invariant Count >= 0`
@@ -554,8 +550,7 @@ public class PreceptIntegerTypeTests
         fired.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
     }
 
-    // TODO: enable when George adds Integer branch to BuildScalarConstraintExpr in PreceptParser.cs.
-    [Fact(Skip = "Integer constraint desugaring not yet implemented — BuildScalarConstraintExpr has no Integer branch")]
+    [Fact]
     public void Runtime_IntegerField_PositiveConstraint_EnforcedAtRuntime()
     {
         // positive desugars to `invariant Count > 0`; zero is not positive
@@ -574,8 +569,7 @@ public class PreceptIntegerTypeTests
         fired.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
     }
 
-    // TODO: enable when George adds Integer branch to BuildScalarConstraintExpr in PreceptParser.cs.
-    [Fact(Skip = "Integer constraint desugaring not yet implemented — BuildScalarConstraintExpr has no Integer branch")]
+    [Fact]
     public void Runtime_IntegerField_MinMaxConstraint_EnforcedAtRuntime()
     {
         const string dsl = """

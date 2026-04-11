@@ -1389,6 +1389,25 @@ public static class PreceptParser
             }
         }
 
+        if (type is PreceptScalarType.Integer or PreceptScalarType.Decimal)
+        {
+            switch (constraint)
+            {
+                case FieldConstraint.Nonnegative:
+                    return MaybeNullGuard(name, isNullable, ">=", new PreceptLiteralExpression(0.0),
+                        $"{name} must be non-negative (nonnegative constraint)");
+                case FieldConstraint.Positive:
+                    return MaybeNullGuard(name, isNullable, ">", new PreceptLiteralExpression(0.0),
+                        $"{name} must be positive (positive constraint)");
+                case FieldConstraint.Min mn:
+                    return MaybeNullGuard(name, isNullable, ">=", new PreceptLiteralExpression(mn.Value),
+                        $"{name} minimum value is {mn.Value.ToString(CultureInfo.InvariantCulture)} (min constraint)");
+                case FieldConstraint.Max mx:
+                    return MaybeNullGuard(name, isNullable, "<=", new PreceptLiteralExpression(mx.Value),
+                        $"{name} maximum value is {mx.Value.ToString(CultureInfo.InvariantCulture)} (max constraint)");
+            }
+        }
+
         if (type == PreceptScalarType.String)
         {
             switch (constraint)
