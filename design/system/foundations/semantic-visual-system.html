@@ -433,23 +433,126 @@ pre {
   background: var(--panel);
 }
 .construct-specimen-inner { padding: 20px; }
-.construct-modifiers {
+.cg-channels--modifiers {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.cg-channel--modifier {
+  min-height: 100%;
+}
+.cg-channel--modifier .cg-channel-body {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.cg-channel-caption {
+  font-size: 14px;
+  line-height: 1.68;
+  color: var(--muted);
+}
+.cg-modifier-stack {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
-  padding-top: 16px;
 }
-.modifier-tag {
+.cg-modifier-arrow {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--soft);
+}
+.cg-modifier-token {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--modifier-border, var(--line));
+  background: var(--modifier-bg, transparent);
+  box-shadow: var(--modifier-shadow, none);
+  color: var(--modifier-text, var(--soft));
   font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
-  border: 1px solid var(--line);
-  color: var(--soft);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  font-style: var(--modifier-style, normal);
+  opacity: var(--modifier-opacity, 1);
+}
+.cg-modifier-token-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--structure);
+  flex-shrink: 0;
+}
+.cg-modifier-token--state {
+  --modifier-border: rgba(168,152,245,0.35);
+  --modifier-text: var(--state);
+}
+.cg-modifier-token--state-terminal {
+  border-width: 2px;
+  --modifier-border: rgba(168,152,245,0.5);
+  --modifier-shadow: inset 0 0 0 2px rgba(168,152,245,0.14);
+}
+.cg-modifier-token--state-current {
+  --modifier-border: rgba(168,152,245,0.45);
+  --modifier-bg: rgba(168,152,245,0.10);
+}
+.cg-modifier-token--state-reachable {
+  --modifier-border: rgba(168,152,245,0.2);
+  --modifier-opacity: 0.65;
+}
+.cg-modifier-token--event {
+  --modifier-border: rgba(48,184,232,0.35);
+  --modifier-text: var(--event);
+}
+.cg-modifier-token--event-muted {
+  --modifier-border: rgba(48,184,232,0.2);
+  --modifier-opacity: 0.7;
+}
+.cg-modifier-token--data {
+  --modifier-border: rgba(176,190,197,0.25);
+  --modifier-text: var(--data);
+}
+.cg-modifier-token--type {
+  --modifier-border: rgba(154,168,181,0.28);
+  --modifier-bg: rgba(255,255,255,0.015);
+  --modifier-text: var(--data-t);
+}
+.cg-modifier-token--value {
+  --modifier-border: rgba(132,146,159,0.28);
+  --modifier-bg: rgba(255,255,255,0.015);
+  --modifier-text: var(--data-v);
+}
+.cg-modifier-token--rule {
+  --modifier-border: rgba(99,102,241,0.35);
+  --modifier-text: var(--structure);
+}
+.cg-modifier-token--valid {
+  --modifier-border: rgba(52,211,153,0.3);
+  --modifier-text: var(--valid);
+}
+.cg-modifier-token--violated {
+  --modifier-border: rgba(248,113,113,0.45);
+  --modifier-text: var(--violated);
+}
+.cg-modifier-token--warn {
+  --modifier-border: rgba(253,224,71,0.3);
+  --modifier-text: var(--warn);
+}
+.cg-modifier-token--soft {
+  --modifier-text: var(--soft);
+}
+.cg-modifier-token--locked {
+  --modifier-border: rgba(255,255,255,0.08);
+  --modifier-text: rgba(255,255,255,0.22);
+}
+.cg-modifier-token--italic {
+  --modifier-style: italic;
+}
+.cg-modifier-token--dashed {
+  border-style: dashed;
 }
 .cross-surface-strip {
   display: grid;
@@ -1785,35 +1888,6 @@ pre {
   background: rgba(253,224,71,0.04);
   color: var(--warn);
 }
-/* Data tonal hierarchy demo ──────────────────────────────────── */
-.tonal-demo {
-  display: flex;
-  border: 1px solid var(--line);
-  margin-bottom: 12px;
-}
-.tonal-cell {
-  flex: 1;
-  padding: 10px 14px;
-  border-right: 1px solid var(--line);
-  font-family: var(--mono);
-  font-size: 13px;
-}
-.tonal-cell:last-child { border-right: none; }
-.tonal-cell-lbl {
-  display: block;
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--soft);
-  margin-bottom: 7px;
-}
-.tonal-cell--secondary {
-  background: rgba(255,255,255,0.015);
-}
-.tonal-token-secondary {
-  font-size: 12px;
-  opacity: 0.82;
-}
 @media (max-width: 960px) {
   .specimen-pair { grid-template-columns: 1fr; }
 }
@@ -1853,66 +1927,77 @@ pre {
 /* ─ Channel grid ─────────────────────────── */
 .cg-channels {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
-  margin-top: 4px;
+  margin-top: 6px;
 }
 @media (max-width: 640px) {
   .cg-channels { grid-template-columns: repeat(2, 1fr); }
 }
 .cg-channel {
   background: var(--bg);
-  padding: 12px 14px;
+   padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+   gap: 12px;
 }
 .cg-channel-name {
   font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.18em;
+   font-size: 11px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: rgba(255,255,255,0.28);
 }
 .cg-channel-body {
   display: flex;
-  align-items: center;
-  gap: 7px;
+  align-items: flex-start;
+   gap: 12px;
   flex-wrap: wrap;
-  min-height: 20px;
+   min-height: 40px;
 }
 .cg-channel-signal {
+  display: inline-flex;
+  align-items: center;
+   gap: 12px;
+  flex-wrap: wrap;
+  max-width: 100%;
   font-family: var(--mono);
-  font-size: 11px;
-  color: rgba(255,255,255,0.45);
-  line-height: 1.5;
+   font-size: 13px;
+  color: rgba(255,255,255,0.5);
+   line-height: 1.7;
+   row-gap: 8px;
 }
+  .cg-channel-signal code {
+    font-size: 13px;
+  }
 .cg-channel-signal strong {
   color: rgba(255,255,255,0.72);
   font-weight: 500;
 }
 .cg-swatch {
   display: inline-block;
-  width: 10px;
-  height: 10px;
+   width: 20px;
+   height: 20px;
   flex-shrink: 0;
   background: var(--sw, rgba(255,255,255,0.2));
+   box-shadow: 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.18);
 }
 .cg-swatch--secondary {
-  width: 8px;
-  height: 8px;
+   width: 13px;
+   height: 13px;
   opacity: 0.68;
 }
 .cg-family-note {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-left: 8px;
-  padding-left: 8px;
+   gap: 8px;
+   margin-left: 12px;
+   padding-left: 12px;
   border-left: 1px solid var(--line);
   color: rgba(255,255,255,0.34);
+  flex-wrap: wrap;
 }
 .cg-family-note code {
   opacity: 0.78;
@@ -1922,11 +2007,11 @@ pre {
   flex-shrink: 0;
   color: var(--fc, rgba(255,255,255,0.2));
 }
-.cg-form--frame   { width:22px; height:14px; border:1px solid currentColor; display:inline-block; }
-.cg-form--node    { width:18px; height:14px; border:2px solid currentColor; display:inline-block; }
-.cg-form--pill    { width:28px; height:14px; border:1px solid currentColor; display:inline-block; }
-.cg-form--row     { width:26px; height:10px; border-bottom:1px solid currentColor; display:inline-block; }
-.cg-form--callout { width:24px; height:14px; border-left:3px solid currentColor; display:inline-block; background:rgba(255,255,255,0.02); }
+  .cg-form--frame   { width:28px; height:18px; border:1px solid currentColor; display:inline-block; }
+  .cg-form--node    { width:22px; height:18px; border:2px solid currentColor; display:inline-block; }
+  .cg-form--pill    { width:34px; height:18px; border:1px solid currentColor; display:inline-block; }
+  .cg-form--row     { width:32px; height:12px; border-bottom:1px solid currentColor; display:inline-block; }
+  .cg-form--callout { width:28px; height:18px; border-left:4px solid currentColor; display:inline-block; background:rgba(255,255,255,0.02); }
 .color-system-band {
   position: relative;
   overflow: hidden;
@@ -2726,10 +2811,10 @@ pre {
             <div style="display:grid;gap:8px;">
               <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid rgba(168,152,245,0.35);background:rgba(168,152,245,0.07);font-family:var(--mono);font-size:13px;color:var(--state);width:fit-content;">
                 <span style="width:7px;height:7px;border-radius:50%;background:var(--structure);flex-shrink:0;"></span>
-                Open<span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(168,152,245,0.55);margin-left:6px;">initial &middot; current</span>
+                Open
               </div>
               <div style="display:inline-flex;align-items:center;padding:8px 14px;border:2px solid rgba(168,152,245,0.55);box-shadow:inset 0 0 0 3px rgba(168,152,245,0.12);font-family:var(--mono);font-size:13px;color:var(--state);width:fit-content;">
-                Closed<span style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--soft);margin-left:8px;">terminal</span>
+                Closed
               </div>
             </div>
           </div>
@@ -2769,12 +2854,52 @@ pre {
 
       <div>
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
-        <div class="construct-modifiers">
-          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.35);display:inline-flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--structure);display:inline-block;flex-shrink:0;"></span>initial &mdash; origin dot</span>
-          <span class="modifier-tag st" style="border-width:2px;border-color:rgba(168,152,245,0.5);box-shadow:inset 0 0 0 2px rgba(168,152,245,0.14);">terminal &mdash; double border</span>
-          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.45);background:rgba(168,152,245,0.10);">current &mdash; active fill</span>
-          <span class="modifier-tag st" style="border-color:rgba(168,152,245,0.2);opacity:0.65;">reachable &mdash; dim highlight</span>
-          <span class="modifier-tag" style="font-style:italic;color:var(--state);border-color:rgba(168,152,245,0.2);">constrained &mdash; italic name</span>
+        <div class="cg-channels cg-channels--modifiers">
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Initial</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--state"><span class="cg-modifier-token-dot"></span>Open</span>
+              </div>
+              <p class="cg-channel-caption">Origin dot marks the entry state in a lifecycle path.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Terminal</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-terminal">Closed</span>
+              </div>
+              <p class="cg-channel-caption">Double border marks a final state without changing the state family.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Current</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-current">Open</span>
+              </div>
+              <p class="cg-channel-caption">Active fill identifies the current node in the rendered flow.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Reachable</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-reachable">Closed</span>
+              </div>
+              <p class="cg-channel-caption">Dimmed treatment shows an available next state that is not active yet.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Constrained</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--italic">Closed</span>
+              </div>
+              <p class="cg-channel-caption">Italic state names signal state-scoped rule pressure.</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2867,12 +2992,55 @@ pre {
 
       <div>
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
-        <div class="construct-modifiers">
-          <span class="modifier-tag ev" style="border-color:rgba(48,184,232,0.35);">&rarr; transition &mdash; directional arrow</span>
-          <span class="modifier-tag ev" style="border-color:rgba(48,184,232,0.2);opacity:0.7;">&empty; no-transition &mdash; no destination</span>
-          <span class="modifier-tag ev" style="font-style:italic;border-color:rgba(48,184,232,0.22);color:var(--event);">guarded &mdash; italic name</span>
-          <span class="modifier-tag no" style="border-style:dashed;border-color:rgba(248,113,113,0.45);">blocked &mdash; dashed violated border</span>
-          <span class="modifier-tag" style="color:var(--warn);border-color:rgba(253,224,71,0.3);">unmatched &mdash; warning colour</span>
+        <div class="cg-channels cg-channels--modifiers">
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Transition</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--event">Close</span>
+                <span class="cg-modifier-arrow">&rarr;</span>
+                <span class="cg-modifier-token cg-modifier-token--state">Closed</span>
+              </div>
+              <p class="cg-channel-caption">Directional pairing keeps the trigger and destination legible as one move.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">No Transition</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--event-muted">Close</span>
+                <span class="cg-modifier-token cg-modifier-token--soft">&empty;</span>
+              </div>
+              <p class="cg-channel-caption">No destination marker means the event resolves without changing state.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Guarded</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--italic">Close</span>
+              </div>
+              <p class="cg-channel-caption">Italic event names signal guard logic attached to the trigger.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Blocked</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--violated cg-modifier-token--dashed">Close</span>
+              </div>
+              <p class="cg-channel-caption">Dashed red treatment carries the blocked verdict into the event view.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Unmatched</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--warn">unmatched</span>
+              </div>
+              <p class="cg-channel-caption">Warning colour marks guards that do not apply in the current state.</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2971,26 +3139,63 @@ pre {
 
       <div>
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
-        <div class="tonal-demo">
-          <div class="tonal-cell">
-            <span class="tonal-cell-lbl">Name</span>
-            <span class="da">Done</span>
+        <div class="cg-channels cg-channels--modifiers">
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Name Tone</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--data">Done</span>
+              </div>
+              <p class="cg-channel-caption">Primary slate tone is reserved for field and argument names.</p>
+            </div>
           </div>
-          <div class="tonal-cell tonal-cell--secondary">
-            <span class="tonal-cell-lbl">Type tone</span>
-            <span class="dt tonal-token-secondary">boolean</span>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Type Tone</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--type">boolean</span>
+              </div>
+              <p class="cg-channel-caption">Secondary slate tone carries the declared type without competing with the field name.</p>
+            </div>
           </div>
-          <div class="tonal-cell tonal-cell--secondary">
-            <span class="tonal-cell-lbl">Value tone</span>
-            <span class="dv tonal-token-secondary">false</span>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Value Tone</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--value">false</span>
+              </div>
+              <p class="cg-channel-caption">Value tone stays quieter than the name so current facts remain easy to scan.</p>
+            </div>
           </div>
-        </div>
-        <div class="construct-modifiers" style="padding-top:0;">
-          <span class="modifier-tag ok" style="border-color:rgba(52,211,153,0.3);">valid &mdash; check mark</span>
-          <span class="modifier-tag no" style="border-color:rgba(248,113,113,0.3);">violated &mdash; mark</span>
-          <span class="modifier-tag da" style="font-style:italic;border-color:rgba(176,190,197,0.25);">constrained &mdash; italic name</span>
-          <span class="modifier-tag" style="color:var(--soft);">editable</span>
-          <span class="modifier-tag" style="color:rgba(255,255,255,0.22);">locked</span>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Constrained</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--data cg-modifier-token--italic">Done</span>
+              </div>
+              <p class="cg-channel-caption">Italic data names signal invariant pressure on the field.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Validation</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--valid">valid</span>
+                <span class="cg-modifier-token cg-modifier-token--violated">violated</span>
+              </div>
+              <p class="cg-channel-caption">Verdict marks report whether the current value satisfies the governing rules.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Editability</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--soft">editable</span>
+                <span class="cg-modifier-token cg-modifier-token--locked">locked</span>
+              </div>
+              <p class="cg-channel-caption">Field chrome can stay open for edits or mute itself when the surface is read-only.</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -3079,13 +3284,37 @@ pre {
 
       <div>
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
-        <div class="construct-modifiers">
-          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35);">assert / because &mdash; constraint keyword</span>
-        </div>
-        <div style="margin-top:8px;display:grid;gap:4px;">
-          <div class="callout-demo callout-demo--satisfied">&checkmark; satisfied &mdash; condition met, transition enabled</div>
-          <div class="callout-demo callout-demo--violated">&oslash; violated &mdash; condition failed, transition blocked</div>
-          <div class="callout-demo callout-demo--warn">&#9889; unmatched &mdash; guard not evaluated for current state</div>
+        <div class="cg-channels cg-channels--modifiers">
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Constraint Keywords</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <span class="cg-modifier-token cg-modifier-token--rule">assert / because</span>
+              </div>
+              <p class="cg-channel-caption">Structure keywords expose the causal frame around the rule message.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Satisfied</div>
+            <div class="cg-channel-body">
+              <div class="callout-demo callout-demo--satisfied">&checkmark; satisfied &mdash; condition met</div>
+              <p class="cg-channel-caption">Positive verdict callout shows the rule allowed the transition to proceed.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Violated</div>
+            <div class="cg-channel-body">
+              <div class="callout-demo callout-demo--violated">&oslash; violated &mdash; condition failed</div>
+              <p class="cg-channel-caption">Violation callout interrupts the flow and explains why the move is blocked.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Unmatched</div>
+            <div class="cg-channel-body">
+              <div class="callout-demo callout-demo--warn">&#9889; unmatched &mdash; guard not evaluated</div>
+              <p class="cg-channel-caption">Warning callout indicates the rule was present but not in play for the current state.</p>
+            </div>
+          </div>
         </div>
       </div>
 
