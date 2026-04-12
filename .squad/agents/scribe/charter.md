@@ -34,6 +34,78 @@ After every agent work batch, I perform these tasks in order:
 6. **GIT COMMIT** — `git add .squad/ && git commit` (write msg to temp file, use `-F`). Skip if nothing staged.
 7. **HISTORY SUMMARIZATION** — If any `history.md` > 12KB, summarize old entries to `## Core Context`.
 
+## Review Posting Responsibilities
+
+When work includes proposal reviews or PR reviews, the coordinator passes **pre-validated review payloads** in the spawn manifest. Scribe posts them to GitHub as a durable recording step — the same category as git commits and log writes.
+
+### Proposal Reviews (GitHub issue comments)
+
+For each review payload in the manifest:
+1. Write the review body to `temp/{agent-name}-proposal-review.md`.
+2. Post via `gh issue comment {issueNumber} --body-file temp/{agent-name}-proposal-review.md`.
+3. Log the posted URL in the orchestration log entry for that agent.
+
+### PR Reviews (structured JSON via squad-review.js)
+
+For each review payload in the manifest:
+1. Write the review JSON to `temp/{agent-name}-review.json`.
+2. Post via `node tools/scripts/squad-review.js {prNumber} temp/{agent-name}-review.json`.
+3. Log the posted URL in the orchestration log entry for that agent.
+
+### Rules
+
+- **Scribe never modifies review content.** The coordinator quality-checked it before passing it. Scribe posts exactly what was given.
+- **Scribe never generates reviews.** Review content comes from reviewers via the coordinator. Scribe's role is mechanical: write file, post, log.
+- **If posting fails** (auth error, rate limit, network), log the failure and the review content in the orchestration log so the coordinator can retry.
+
+## Project Status Sync Responsibilities
+
+When work transitions through the proposal/implementation lifecycle, Scribe updates the GitHub Projects V2 board status for the affected issue. This is a mechanical state transition — Scribe never decides whether the transition should happen. The coordinator or ceremony trigger tells Scribe which status change to make.
+
+### Lifecycle State Map
+
+| Trigger | New Status | Who Signals |
+|---------|------------|-------------|
+| Design review starts (proposal-review ceremony) | `In Review` | Coordinator (pre-review batch) |
+| Design finalized / approved (all reviewers approve, Shane signs off) | `Ready` | Coordinator (post-review) |
+| Implementation starts (feature branch created or first implementation commit pushed) | `In Progress` | Coordinator (pre-implementation batch) |
+| Implementation completes (PR merged and issue closed) | `Done` | Coordinator (post-merge) |
+
+### How to Update Project Status
+
+1. **Look up the item ID** for the issue on the project board:
+   ```bash
+   gh project item-list 2 --owner sfalik --format json --limit 50
+   ```
+   Match on `content.number` to find the item ID (`PVTI_...`).
+
+2. **Edit the status field** using the item ID:
+   ```bash
+   gh project item-edit --project-id PVT_kwHOAQyRK84BTxO4 --id <item-id> --field-id PVTSSF_lAHOAQyRK84BTxO4zhA94Fw --single-select-option-id <status-option-id>
+   ```
+
+3. **Status option IDs** (project #2 — Precept Language Improvements):
+   | Status | Option ID |
+   |--------|-----------|
+   | Backlog | `86bc9793` |
+   | In Review | `6c1e3216` |
+   | Ready | `732ec1dd` |
+   | In Progress | `f5aee879` |
+   | Done | `f79a3ae0` |
+
+### PR Linking
+
+When a PR is opened for an issue, ensure the PR body contains `Closes #N` (or `Resolves #N`) to create a GitHub-tracked link. This makes the "Linked pull requests" field on the project board populate automatically and ensures the issue closes when the PR merges.
+
+If the coordinator passes a PR body that lacks an issue link, Scribe adds `Closes #N` to the bottom of the body during PR stewardship.
+
+### Rules
+
+- **Scribe never decides status transitions.** The coordinator or ceremony trigger specifies the target status. Scribe executes the update.
+- **If the issue is not on the project board**, Scribe logs a warning and skips. Do not add issues to the board — that's a triage responsibility.
+- **If the status update fails** (auth, network, field mismatch), log the failure and the intended transition in the orchestration log so the coordinator can retry.
+- **Idempotent**: If the issue is already in the target status, the edit is a no-op. Don't log it as an error.
+
 ## PR Stewardship Responsibilities
 
 **This is a first-class responsibility, not an afterthought.**
