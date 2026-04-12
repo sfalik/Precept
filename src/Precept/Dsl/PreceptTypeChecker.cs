@@ -95,6 +95,15 @@ internal static class PreceptTypeChecker
             MapFieldContractKind,
             StringComparer.Ordinal);
 
+        // Inject non-negative proof markers for sqrt() compile-time checking.
+        // Fields with nonnegative, positive, or min >= 0 constraints are provably non-negative.
+        foreach (var field in model.Fields)
+        {
+            if (field.Constraints is not null &&
+                field.Constraints.Any(static c => c is FieldConstraint.Nonnegative or FieldConstraint.Positive or FieldConstraint.Min { Value: >= 0 }))
+                dataFieldKinds[$"$nonneg:{field.Name}"] = StaticValueKind.Boolean;
+        }
+
         var eventArgKinds = model.Events.ToDictionary(
             evt => evt.Name,
             evt => evt.Args.ToDictionary(
@@ -1268,63 +1277,190 @@ internal static class PreceptTypeChecker
         kind = StaticValueKind.None;
         diagnostic = null;
 
+        // SYNC:CONSTRAINT:C71 — unknown function name
         if (!FunctionRegistry.TryGetFunction(fn.Name, out var funcDef))
         {
             diagnostic = new PreceptValidationDiagnostic(
-                DiagnosticCatalog.C39,
-                $"unknown function '{fn.Name}'.",
+                DiagnosticCatalog.C71,
+                $"Unknown function '{fn.Name}'.",
                 0);
             return false;
         }
 
-        // Find overload matching arity (prefer exact match, then variadic)
-        var overload = funcDef.Overloads.FirstOrDefault(o =>
-            o.MinArity.HasValue
-                ? fn.Arguments.Length >= o.MinArity.Value
-                : fn.Arguments.Length == o.Parameters.Length);
-
-        if (overload is null)
+        // Infer all argument kinds before overload resolution.
+        var argKinds = new StaticValueKind[fn.Arguments.Length];
+        for (int i = 0; i < fn.Arguments.Length; i++)
         {
-            diagnostic = new PreceptValidationDiagnostic(
-                DiagnosticCatalog.C40,
-                $"{fn.Name}() called with {fn.Arguments.Length} argument(s), but no matching overload found.",
-                0);
-            return false;
-        }
-
-        // Validate each argument against the overload's parameter types
-        for (int i = 0; i < fn.Arguments.Length && i < overload.Parameters.Length; i++)
-        {
-            var param = overload.Parameters[i];
-
-            // Special constraint: must be a non-negative integer literal
-            if (param.Constraint == FunctionArgConstraint.MustBeIntegerLiteral)
-            {
-                if (fn.Arguments[i] is not PreceptLiteralExpression { Value: long lv } || lv < 0)
-                {
-                    diagnostic = new PreceptValidationDiagnostic(
-                        DiagnosticCatalog.C40,
-                        $"{fn.Name}() {param.Name} argument must be non-negative.",
-                        0);
-                    return false;
-                }
-                continue;
-            }
-
-            if (!TryInferKind(fn.Arguments[i], symbols, out var argKind, out diagnostic))
+            if (!TryInferKind(fn.Arguments[i], symbols, out argKinds[i], out diagnostic))
                 return false;
 
-            if (!IsNumericKind(argKind))
+            // SYNC:CONSTRAINT:C77 — nullable arguments
+            if ((argKinds[i] & StaticValueKind.Null) != 0)
             {
+                var argName = fn.Arguments[i] is PreceptIdentifierExpression id ? id.Name : $"argument {i + 1}";
                 diagnostic = new PreceptValidationDiagnostic(
-                    DiagnosticCatalog.C40,
-                    $"{fn.Name}() requires a numeric (integer, decimal, or number) argument.",
+                    DiagnosticCatalog.C77,
+                    $"Function '{fn.Name}' does not accept nullable arguments. '{argName}' may be null. Add a null check.",
                     0);
                 return false;
             }
         }
 
-        kind = overload.ReturnType;
+        // Find the best matching overload (arity + argument types).
+        FunctionOverload? matched = null;
+        foreach (var overload in funcDef.Overloads)
+        {
+            bool arityOk = overload.MinArity.HasValue
+                ? fn.Arguments.Length >= overload.MinArity.Value
+                : fn.Arguments.Length == overload.Parameters.Length;
+
+            if (!arityOk)
+                continue;
+
+            bool typesOk = true;
+            if (overload.MinArity.HasValue)
+            {
+                // Variadic: single parameter type applies to all arguments.
+                var paramType = overload.Parameters[0].AcceptedTypes;
+                for (int i = 0; i < fn.Arguments.Length; i++)
+                {
+                    if ((argKinds[i] & paramType) == 0)
+                    {
+                        typesOk = false;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < overload.Parameters.Length; i++)
+                {
+                    if ((argKinds[i] & overload.Parameters[i].AcceptedTypes) == 0)
+                    {
+                        typesOk = false;
+                        break;
+                    }
+                }
+            }
+
+            if (typesOk)
+            {
+                matched = overload;
+                break;
+            }
+        }
+
+        if (matched is null)
+        {
+            // SYNC:CONSTRAINT:C75 — pow exponent must be integer
+            if (fn.Name == "pow" && fn.Arguments.Length == 2 &&
+                IsNumericKind(argKinds[1]) && !IsExactly(argKinds[1], StaticValueKind.Integer))
+            {
+                diagnostic = new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C75,
+                    $"pow() exponent must be integer type, but got {KindLabel(argKinds[1])}.",
+                    0);
+                return false;
+            }
+
+            // Try to pinpoint a specific parameter type mismatch (C73).
+            var arityMatch = funcDef.Overloads.LastOrDefault(o =>
+                o.MinArity.HasValue
+                    ? fn.Arguments.Length >= o.MinArity.Value
+                    : fn.Arguments.Length == o.Parameters.Length);
+
+            if (arityMatch is not null)
+            {
+                // SYNC:CONSTRAINT:C73 — argument type mismatch
+                if (arityMatch.MinArity.HasValue)
+                {
+                    var param = arityMatch.Parameters[0];
+                    for (int i = 0; i < fn.Arguments.Length; i++)
+                    {
+                        if ((argKinds[i] & param.AcceptedTypes) == 0)
+                        {
+                            diagnostic = new PreceptValidationDiagnostic(
+                                DiagnosticCatalog.C73,
+                                $"{fn.Name}() no matching overload: {param.Name} argument expects {KindLabel(param.AcceptedTypes)} but got {KindLabel(argKinds[i])}.",
+                                0);
+                            return false;
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < arityMatch.Parameters.Length; i++)
+                    {
+                        var param = arityMatch.Parameters[i];
+                        if ((argKinds[i] & param.AcceptedTypes) == 0)
+                        {
+                            diagnostic = new PreceptValidationDiagnostic(
+                                DiagnosticCatalog.C73,
+                                $"{fn.Name}() no matching overload: {param.Name} argument expects {KindLabel(param.AcceptedTypes)} but got {KindLabel(argKinds[i])}.",
+                                0);
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            // SYNC:CONSTRAINT:C72 — no matching overload
+            diagnostic = new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C72,
+                $"{fn.Name}() called with {fn.Arguments.Length} argument(s), but no matching overload found.",
+                0);
+            return false;
+        }
+
+        // Validate special parameter constraints on the matched overload.
+        var paramLoop = matched.MinArity.HasValue
+            ? Enumerable.Range(0, fn.Arguments.Length).Select(i => (ParamIndex: 0, ArgIndex: i))
+            : Enumerable.Range(0, matched.Parameters.Length).Select(i => (ParamIndex: i, ArgIndex: i));
+
+        foreach (var (paramIndex, argIndex) in paramLoop)
+        {
+            var param = matched.Parameters[paramIndex];
+
+            // SYNC:CONSTRAINT:C74 — round precision must be non-negative integer literal
+            if (param.Constraint == FunctionArgConstraint.MustBeIntegerLiteral)
+            {
+                if (fn.Arguments[argIndex] is not PreceptLiteralExpression { Value: long lv } || lv < 0)
+                {
+                    diagnostic = new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C74,
+                        "round() precision argument must be a non-negative integer literal.",
+                        0);
+                    return false;
+                }
+            }
+
+            // SYNC:CONSTRAINT:C76 — sqrt requires non-negative proof
+            if (param.Constraint == FunctionArgConstraint.RequiresNonNegativeProof)
+            {
+                var arg = fn.Arguments[argIndex];
+                bool isNonNeg = arg switch
+                {
+                    PreceptLiteralExpression { Value: long lval } => lval >= 0,
+                    PreceptLiteralExpression { Value: double dval } => dval >= 0,
+                    PreceptLiteralExpression { Value: decimal mval } => mval >= 0,
+                    PreceptFunctionCallExpression { Name: "abs" } => true,
+                    PreceptIdentifierExpression idArg => symbols.ContainsKey($"$nonneg:{idArg.Name}"),
+                    _ => false,
+                };
+
+                if (!isNonNeg)
+                {
+                    var argName = arg is PreceptIdentifierExpression nid ? nid.Name : "argument";
+                    diagnostic = new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C76,
+                        $"sqrt() requires a non-negative argument. '{argName}' may be negative. Add a 'nonnegative' constraint or guard with '{argName} >= 0 and ...'.",
+                        0);
+                    return false;
+                }
+            }
+        }
+
+        kind = matched.ReturnType;
         return true;
     }
 
@@ -1841,6 +1977,19 @@ internal static class PreceptTypeChecker
     /// <summary>Returns true when <paramref name="k"/> is a pure numeric kind (Number, Integer, or Decimal, non-nullable, no other flags).</summary>
     private static bool IsNumericKind(StaticValueKind k)
         => IsExactly(k, StaticValueKind.Number) || IsExactly(k, StaticValueKind.Integer) || IsExactly(k, StaticValueKind.Decimal);
+
+    /// <summary>Returns a human-readable label for a <see cref="StaticValueKind"/> (used in function diagnostic messages).</summary>
+    private static string KindLabel(StaticValueKind k) => (k & ~StaticValueKind.Null) switch
+    {
+        StaticValueKind.Integer => "integer",
+        StaticValueKind.Decimal => "decimal",
+        StaticValueKind.Number => "number",
+        StaticValueKind.String => "string",
+        StaticValueKind.Boolean => "boolean",
+        StaticValueKind.Number | StaticValueKind.Integer | StaticValueKind.Decimal => "numeric",
+        StaticValueKind.Number | StaticValueKind.Integer => "number or integer",
+        _ => k.ToString().ToLowerInvariant(),
+    };
 
     /// <summary>
     /// Resolves the result kind for a numeric binary operation.

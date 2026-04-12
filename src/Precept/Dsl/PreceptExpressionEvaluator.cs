@@ -369,9 +369,287 @@ internal static class PreceptExpressionRuntimeEvaluator
     {
         return fn.Name switch
         {
+            "abs" => EvaluateAbs(fn, context),
+            "floor" => EvaluateFloor(fn, context),
+            "ceil" => EvaluateCeil(fn, context),
             "round" => EvaluateRound(fn, context),
+            "truncate" => EvaluateTruncate(fn, context),
+            "min" => EvaluateMin(fn, context),
+            "max" => EvaluateMax(fn, context),
+            "clamp" => EvaluateClamp(fn, context),
+            "pow" => EvaluatePow(fn, context),
+            "sqrt" => EvaluateSqrt(fn, context),
+            "toLower" => EvaluateToLower(fn, context),
+            "toUpper" => EvaluateToUpper(fn, context),
+            "trim" => EvaluateTrim(fn, context),
+            "startsWith" => EvaluateStartsWith(fn, context),
+            "endsWith" => EvaluateEndsWith(fn, context),
+            "left" => EvaluateLeft(fn, context),
+            "right" => EvaluateRight(fn, context),
+            "mid" => EvaluateMid(fn, context),
             _ => EvaluationResult.Fail($"unknown function '{fn.Name}'.")
         };
+    }
+
+    private static EvaluationResult EvaluateAbs(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var r = Evaluate(fn.Arguments[0], context);
+        if (!r.Success) return r;
+        return r.Value switch
+        {
+            long l => EvaluationResult.Ok(Math.Abs(l)),
+            decimal d => EvaluationResult.Ok(Math.Abs(d)),
+            double dbl => EvaluationResult.Ok(Math.Abs(dbl)),
+            _ => EvaluationResult.Fail("abs() requires a numeric argument.")
+        };
+    }
+
+    private static EvaluationResult EvaluateFloor(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var r = Evaluate(fn.Arguments[0], context);
+        if (!r.Success) return r;
+        return r.Value switch
+        {
+            long l => EvaluationResult.Ok(l),
+            decimal d => EvaluationResult.Ok((long)Math.Floor(d)),
+            double dbl => EvaluationResult.Ok((long)Math.Floor(dbl)),
+            _ => EvaluationResult.Fail("floor() requires a numeric argument.")
+        };
+    }
+
+    private static EvaluationResult EvaluateCeil(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var r = Evaluate(fn.Arguments[0], context);
+        if (!r.Success) return r;
+        return r.Value switch
+        {
+            long l => EvaluationResult.Ok(l),
+            decimal d => EvaluationResult.Ok((long)Math.Ceiling(d)),
+            double dbl => EvaluationResult.Ok((long)Math.Ceiling(dbl)),
+            _ => EvaluationResult.Fail("ceil() requires a numeric argument.")
+        };
+    }
+
+    private static EvaluationResult EvaluateTruncate(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var r = Evaluate(fn.Arguments[0], context);
+        if (!r.Success) return r;
+        return r.Value switch
+        {
+            long l => EvaluationResult.Ok(l),
+            decimal d => EvaluationResult.Ok((long)Math.Truncate(d)),
+            double dbl => EvaluationResult.Ok((long)Math.Truncate(dbl)),
+            _ => EvaluationResult.Fail("truncate() requires a numeric argument.")
+        };
+    }
+
+    private static EvaluationResult EvaluateMin(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var values = new List<object>();
+        foreach (var arg in fn.Arguments)
+        {
+            var r = Evaluate(arg, context);
+            if (!r.Success) return r;
+            values.Add(r.Value!);
+        }
+        return ReduceComparable(values, (a, b) => a < b, "min");
+    }
+
+    private static EvaluationResult EvaluateMax(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var values = new List<object>();
+        foreach (var arg in fn.Arguments)
+        {
+            var r = Evaluate(arg, context);
+            if (!r.Success) return r;
+            values.Add(r.Value!);
+        }
+        return ReduceComparable(values, (a, b) => a > b, "max");
+    }
+
+    private static EvaluationResult ReduceComparable(List<object> values, Func<double, double, bool> compare, string name)
+    {
+        object best = values[0];
+        if (!TryToNumber(best, out var bestNum))
+            return EvaluationResult.Fail($"{name}() requires numeric arguments.");
+
+        for (int i = 1; i < values.Count; i++)
+        {
+            if (!TryToNumber(values[i], out var current))
+                return EvaluationResult.Fail($"{name}() requires numeric arguments.");
+            if (compare(current, bestNum))
+            {
+                best = values[i];
+                bestNum = current;
+            }
+        }
+
+        return EvaluationResult.Ok(best);
+    }
+
+    private static EvaluationResult EvaluateClamp(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var vr = Evaluate(fn.Arguments[0], context);
+        if (!vr.Success) return vr;
+        var minr = Evaluate(fn.Arguments[1], context);
+        if (!minr.Success) return minr;
+        var maxr = Evaluate(fn.Arguments[2], context);
+        if (!maxr.Success) return maxr;
+
+        if (!TryToNumber(vr.Value, out var val) || !TryToNumber(minr.Value, out var min) || !TryToNumber(maxr.Value, out var max))
+            return EvaluationResult.Fail("clamp() requires numeric arguments.");
+
+        var clamped = Math.Clamp(val, min, max);
+
+        return vr.Value switch
+        {
+            long => EvaluationResult.Ok((long)clamped),
+            decimal => EvaluationResult.Ok((decimal)clamped),
+            _ => EvaluationResult.Ok(clamped)
+        };
+    }
+
+    private static EvaluationResult EvaluatePow(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var br = Evaluate(fn.Arguments[0], context);
+        if (!br.Success) return br;
+        var er = Evaluate(fn.Arguments[1], context);
+        if (!er.Success) return er;
+
+        if (er.Value is not long exp)
+            return EvaluationResult.Fail("pow() exponent must be integer.");
+
+        return br.Value switch
+        {
+            long lb => EvaluationResult.Ok(IntegerPow(lb, exp)),
+            decimal db => EvaluationResult.Ok(DecimalPow(db, exp)),
+            double dbl => EvaluationResult.Ok(Math.Pow(dbl, exp)),
+            _ => EvaluationResult.Fail("pow() requires a numeric base.")
+        };
+    }
+
+    private static long IntegerPow(long b, long exp)
+    {
+        if (exp < 0) return 0;
+        if (exp == 0) return 1;
+        long result = 1;
+        for (long i = 0; i < exp; i++) result *= b;
+        return result;
+    }
+
+    private static decimal DecimalPow(decimal b, long exp)
+    {
+        if (exp < 0) return 1m / DecimalPow(b, -exp);
+        if (exp == 0) return 1m;
+        decimal result = 1m;
+        for (long i = 0; i < exp; i++) result *= b;
+        return result;
+    }
+
+    private static EvaluationResult EvaluateSqrt(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var r = Evaluate(fn.Arguments[0], context);
+        if (!r.Success) return r;
+
+        return r.Value switch
+        {
+            decimal d => EvaluationResult.Ok((decimal)Math.Sqrt((double)d)),
+            double dbl => EvaluationResult.Ok(Math.Sqrt(dbl)),
+            long l => EvaluationResult.Ok(Math.Sqrt(l)),
+            _ => EvaluationResult.Fail("sqrt() requires a numeric argument.")
+        };
+    }
+
+    private static EvaluationResult EvaluateToLower(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var r = Evaluate(fn.Arguments[0], context);
+        if (!r.Success) return r;
+        if (r.Value is not string s) return EvaluationResult.Fail("toLower() requires a string argument.");
+        return EvaluationResult.Ok(s.ToLowerInvariant());
+    }
+
+    private static EvaluationResult EvaluateToUpper(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var r = Evaluate(fn.Arguments[0], context);
+        if (!r.Success) return r;
+        if (r.Value is not string s) return EvaluationResult.Fail("toUpper() requires a string argument.");
+        return EvaluationResult.Ok(s.ToUpperInvariant());
+    }
+
+    private static EvaluationResult EvaluateTrim(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var r = Evaluate(fn.Arguments[0], context);
+        if (!r.Success) return r;
+        if (r.Value is not string s) return EvaluationResult.Fail("trim() requires a string argument.");
+        return EvaluationResult.Ok(s.Trim());
+    }
+
+    private static EvaluationResult EvaluateStartsWith(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var r = Evaluate(fn.Arguments[0], context);
+        if (!r.Success) return r;
+        var pr = Evaluate(fn.Arguments[1], context);
+        if (!pr.Success) return pr;
+        if (r.Value is not string s || pr.Value is not string prefix)
+            return EvaluationResult.Fail("startsWith() requires string arguments.");
+        return EvaluationResult.Ok(s.StartsWith(prefix, StringComparison.Ordinal));
+    }
+
+    private static EvaluationResult EvaluateEndsWith(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var r = Evaluate(fn.Arguments[0], context);
+        if (!r.Success) return r;
+        var sr = Evaluate(fn.Arguments[1], context);
+        if (!sr.Success) return sr;
+        if (r.Value is not string s || sr.Value is not string suffix)
+            return EvaluationResult.Fail("endsWith() requires string arguments.");
+        return EvaluationResult.Ok(s.EndsWith(suffix, StringComparison.Ordinal));
+    }
+
+    private static EvaluationResult EvaluateLeft(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var r = Evaluate(fn.Arguments[0], context);
+        if (!r.Success) return r;
+        var cr = Evaluate(fn.Arguments[1], context);
+        if (!cr.Success) return cr;
+        if (r.Value is not string s) return EvaluationResult.Fail("left() requires a string first argument.");
+        if (!TryToNumber(cr.Value, out var countNum)) return EvaluationResult.Fail("left() count must be numeric.");
+        int count = Math.Max(0, (int)countNum);
+        count = Math.Min(count, s.Length);
+        return EvaluationResult.Ok(s[..count]);
+    }
+
+    private static EvaluationResult EvaluateRight(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var r = Evaluate(fn.Arguments[0], context);
+        if (!r.Success) return r;
+        var cr = Evaluate(fn.Arguments[1], context);
+        if (!cr.Success) return cr;
+        if (r.Value is not string s) return EvaluationResult.Fail("right() requires a string first argument.");
+        if (!TryToNumber(cr.Value, out var countNum)) return EvaluationResult.Fail("right() count must be numeric.");
+        int count = Math.Max(0, (int)countNum);
+        count = Math.Min(count, s.Length);
+        return EvaluationResult.Ok(s[^count..]);
+    }
+
+    private static EvaluationResult EvaluateMid(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var r = Evaluate(fn.Arguments[0], context);
+        if (!r.Success) return r;
+        var sr = Evaluate(fn.Arguments[1], context);
+        if (!sr.Success) return sr;
+        var lr = Evaluate(fn.Arguments[2], context);
+        if (!lr.Success) return lr;
+        if (r.Value is not string s) return EvaluationResult.Fail("mid() requires a string first argument.");
+        if (!TryToNumber(sr.Value, out var startNum)) return EvaluationResult.Fail("mid() start must be numeric.");
+        if (!TryToNumber(lr.Value, out var lenNum)) return EvaluationResult.Fail("mid() length must be numeric.");
+
+        int start = Math.Max(0, (int)startNum - 1);
+        int length = Math.Max(0, (int)lenNum);
+
+        if (start >= s.Length) return EvaluationResult.Ok("");
+        length = Math.Min(length, s.Length - start);
+        return EvaluationResult.Ok(s.Substring(start, length));
     }
 
     private static EvaluationResult EvaluateRound(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
@@ -383,22 +661,32 @@ internal static class PreceptExpressionRuntimeEvaluator
         if (!TryToDecimal(valResult.Value, out var d))
             return EvaluationResult.Fail("round() requires a numeric argument.");
 
-        int places = 0;
+        // 2-arg: precision rounding → always returns decimal
         if (fn.Arguments.Length >= 2)
         {
             var placesResult = Evaluate(fn.Arguments[1], context);
             if (!placesResult.Success)
                 return placesResult;
+            int places;
             if (placesResult.Value is long lv)
                 places = (int)lv;
             else if (placesResult.Value is double dv)
                 places = (int)dv;
             else
                 return EvaluationResult.Fail("round() places argument must be numeric.");
+
+            return EvaluationResult.Ok(Math.Round(d, places, MidpointRounding.ToEven));
         }
 
-        var result = Math.Round(d, places, MidpointRounding.ToEven);
-        return EvaluationResult.Ok(result);
+        // 1-arg: type-preserving banker's rounding
+        var rounded = Math.Round(d, 0, MidpointRounding.ToEven);
+        return valResult.Value switch
+        {
+            long => EvaluationResult.Ok((long)rounded),
+            decimal => EvaluationResult.Ok((long)rounded),
+            double => EvaluationResult.Ok((double)rounded),
+            _ => EvaluationResult.Ok(rounded)
+        };
     }
 
     private static bool TryToDecimal(object? value, out decimal d)

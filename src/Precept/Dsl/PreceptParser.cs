@@ -313,9 +313,16 @@ public static class PreceptParser
         select (PreceptExpression)new PreceptParenthesizedExpression(inner);
 
     // Built-in function call: FunctionName(expr, expr, ...)
-    // Function names are identifiers validated against the FunctionRegistry.
+    // Function names are identifiers validated against the FunctionRegistry,
+    // plus keyword tokens (min/max) that also serve as function names.
+    // This generalizes the AnyMemberToken pattern for function-call position.
+    private static readonly TokenListParser<PreceptToken, string> AnyFunctionName =
+        Token.EqualTo(PreceptToken.Identifier).Where(t => FunctionRegistry.IsFunction(t.ToStringValue())).Select(t => t.ToStringValue())
+            .Try().Or(Token.EqualTo(PreceptToken.Min).Value("min"))
+            .Try().Or(Token.EqualTo(PreceptToken.Max).Value("max"));
+
     private static readonly TokenListParser<PreceptToken, PreceptExpression> FunctionCallAtom =
-        (from name in Token.EqualTo(PreceptToken.Identifier).Where(t => FunctionRegistry.IsFunction(t.ToStringValue()))
+        (from name in AnyFunctionName
          from _lp in Token.EqualTo(PreceptToken.LeftParen)
          from firstArg in Superpower.Parse.Ref(BoolExprRef)
          from restArgs in (
@@ -325,7 +332,7 @@ public static class PreceptParser
          ).Many()
          from _rp in Token.EqualTo(PreceptToken.RightParen)
          select (PreceptExpression)new PreceptFunctionCallExpression(
-             name.ToStringValue(),
+             name,
              new[] { firstArg }.Concat(restArgs).ToArray()))
         .Try()
         .Register(new ConstructInfo(
