@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Precept - Event</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&family=Geist:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #040506;
+  --panel: #090b0e;
+  --line: rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --text: #f1f3f6;
+  --muted: #a7afbb;
+  --soft: #687281;
+  --structure: #6366F1;
+  --state: #A898F5;
+  --event: #30B8E8;
+  --data: #B0BEC5;
+  --data-t: #9AA8B5;
+  --data-v: #84929F;
+  --rule: #FBBF24;
+  --comment: #9096A6;
+  --violated: #F87171;
+  --warn: #FDE047;
+  --mono: "Geist Mono", "Cascadia Code", Consolas, monospace;
+  --sans: "Geist", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --page-max: 1780px;
+  --page-inline-pad: clamp(18px, 2.2vw, 36px);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--mono); min-height: 100vh; }
+.page { width: min(var(--page-max), calc(100% - (var(--page-inline-pad) * 2))); max-width: 100%; margin: 0 auto; padding: 26px 0 120px; }
+.eyebrow { font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--soft); margin-bottom: 16px; }
+p, li { font-family: var(--sans); font-size: 17px; line-height: 1.76; color: var(--muted); }
+pre { margin: 0; font-family: var(--mono); font-size: 13px; line-height: 1.9; color: #eef3f8; overflow: auto; }
+.s { color: var(--structure); font-weight: 700; }
+.sg { color: var(--structure); }
+.st { color: var(--state); }
+.ev { color: var(--event); }
+.da { color: var(--data); }
+.dt { color: var(--data-t); }
+.dv { color: var(--data-v); }
+.ru { color: var(--rule); }
+.cm { color: var(--comment); font-style: italic; }
+.construct-gallery { padding: 56px 0; border-bottom: 1px solid var(--line); display: grid; gap: 32px; }
+.construct-section-head { display: grid; gap: 10px; max-width: 72ch; }
+.construct-section-heading { font-family: var(--mono); font-size: 16px; font-weight: 700; letter-spacing: 0.08em; line-height: 1.05; text-transform: uppercase; color: var(--event); }
+.construct-section-copy { font-size: 14px; color: var(--text); }
+.construct-body { display: grid; gap: 32px; }
+.specimen-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line-strong); border: 1px solid var(--line); border-top: 2px solid var(--event); }
+.specimen-half { background: var(--panel); display: flex; flex-direction: column; min-width: 0; }
+.specimen-half-bar { padding: 10px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.specimen-half-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--muted); }
+.specimen-half-tag { font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; color: rgba(103,114,129,0.5); text-transform: uppercase; white-space: nowrap; }
+.specimen-half-inner { padding: 24px 20px; flex: 1; }
+.cg-focal-strip { border-left: 3px solid var(--event); padding: 5px 10px; margin-bottom: 10px; background: rgba(255,255,255,0.02); display: flex; align-items: center; }
+.cg-focal-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; line-height: 1.4; color: var(--event); }
+.cg-channels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); margin-top: 6px; }
+.cg-channels--modifiers { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.cg-channel { background: var(--bg); padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+.cg-channel-name { font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.28); }
+.cg-channel-body, .cg-combination-head { display: grid; gap: 12px; align-content: start; }
+.cg-channel-signal, .cg-modifier-stack, .cg-mini-flow { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; font-family: var(--mono); font-size: 13px; color: rgba(255,255,255,0.5); line-height: 1.7; }
+.cg-channel-caption, .cg-combination-intro, .cg-combination-reading { font-family: var(--sans); font-size: 14px; line-height: 1.68; color: var(--muted); }
+.cg-swatch { display: inline-block; width: 20px; height: 20px; box-shadow: 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.18); }
+.cg-form { display: inline-block; color: var(--event); }
+.cg-form--pill { display: inline-flex; align-items: center; min-height: 28px; padding: 5px 10px; border: 1px solid rgba(48,184,232,0.36); background: #050608; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; line-height: 1; white-space: nowrap; }
+.cg-form-pair { display: inline-flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+.cg-form-sample { display: grid; gap: 6px; justify-items: start; }
+.cg-form-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.38); }
+.cg-form--transition-line { position: relative; width: 54px; height: 18px; }
+.cg-form--transition-line::before { content: ""; position: absolute; left: 0; right: 8px; top: 50%; border-top: 2px solid rgba(48,184,232,0.78); transform: translateY(-50%); }
+.cg-form--transition-line::after { content: ""; position: absolute; right: 0; top: 50%; width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 8px solid rgba(48,184,232,0.78); transform: translateY(-50%); }
+.cg-modifier-arrow { font-family: var(--mono); font-size: 14px; color: var(--soft); }
+.cg-modifier-token, .cg-mini-state-chip, .cg-mini-event-pill, .cg-mini-badge { display: inline-flex; align-items: center; min-height: 28px; padding: 5px 9px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; line-height: 1; }
+.cg-modifier-token { min-height: 32px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.08); color: var(--soft); }
+.cg-modifier-token--event, .cg-mini-event-pill { border: 1px solid rgba(48,184,232,0.35); background: #050608; color: var(--event); }
+.cg-modifier-token--event-muted, .cg-mini-event-pill--muted { border-color: rgba(48,184,232,0.22); opacity: 0.72; }
+.cg-modifier-token--state, .cg-mini-state-chip { border: 1px solid rgba(168,152,245,0.32); color: var(--state); }
+.cg-modifier-token--violated, .cg-mini-event-pill--rejected, .cg-mini-badge--violated { border: 1px solid rgba(248,113,113,0.38); color: var(--violated); }
+.cg-modifier-token--dashed, .cg-mini-event-pill--rejected { border-style: dashed; background: rgba(248,113,113,0.04); }
+.cg-modifier-token--warn, .cg-mini-badge--warn { border: 1px solid rgba(253,224,71,0.32); color: var(--warn); }
+.cg-mini-state-chip--ghost { opacity: 0.72; }
+.cg-mini-badge { min-height: 22px; padding: 3px 7px; border: 1px solid rgba(255,255,255,0.08); font-size: 10px; color: var(--soft); }
+.cg-combination-matrix { margin-top: 32px; display: grid; gap: 12px; }
+.cg-combination-title { font-family: var(--mono); font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--soft); }
+.cg-combination-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.cg-combination-row { display: grid; gap: 12px; padding: 14px 16px; background: var(--bg); }
+.cg-combination-specimen { display: inline-grid; gap: 8px; padding: 9px 11px; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); }
+.svs-authored-event-ref { display: inline-flex; align-items: center; margin: 0 -2px; padding: 0 3px; border: 1px solid transparent; border-radius: 999px; transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, color 140ms ease; }
+.svs-authored-event-ref:hover, .svs-authored-event-ref:focus-visible, .svs-authored-event-ref.is-linked { outline: none; border-color: rgba(48,184,232,0.42); background: rgba(48,184,232,0.14); box-shadow: inset 0 0 0 1px rgba(48,184,232,0.12); color: #ddf7ff; }
+.svs-event-review-stack { display: grid; gap: 10px; }
+.svs-event-review-row { display: grid; grid-template-columns: minmax(0, auto) auto minmax(0, auto) minmax(0, 1fr); align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, transform 140ms ease; }
+.svs-event-review-row:hover, .svs-event-review-row:focus-visible, .svs-event-review-row.is-linked { outline: none; border-color: rgba(48,184,232,0.44); background: rgba(48,184,232,0.08); box-shadow: inset 0 0 0 1px rgba(48,184,232,0.14); transform: translateY(-1px); }
+.svs-event-review-row--active { background: linear-gradient(180deg, rgba(48,184,232,0.10), rgba(48,184,232,0.04)); }
+.svs-event-review-row--blocked { border-style: dashed; }
+.svs-event-review-pill, .svs-event-review-destination, .svs-event-review-note { display: inline-flex; align-items: center; min-height: 28px; padding: 5px 10px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; line-height: 1; white-space: nowrap; }
+.svs-event-review-pill { border: 1px solid rgba(48,184,232,0.36); background: #050608; color: var(--event); }
+.svs-event-review-arrow { color: var(--soft); font-size: 12px; }
+.svs-event-review-destination { border: 1px solid rgba(168,152,245,0.30); color: var(--state); }
+.svs-event-review-note { justify-self: end; border: 1px solid rgba(255,255,255,0.08); color: var(--soft); }
+.svs-event-review-note--blocked { border-color: rgba(248,113,113,0.30); color: var(--violated); }
+@media (max-width: 960px) { .specimen-pair { grid-template-columns: 1fr; } }
+@media (max-width: 860px) { .cg-combination-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .cg-channels { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .svs-event-review-row { grid-template-columns: minmax(0, 1fr); justify-items: start; } }
+</style>
+</head>
+<body>
+<main class="page">
+  <div class="construct-gallery" id="event">
+    <div class="construct-body">
+      <div class="construct-section-head">
+        <h3 class="construct-section-heading">Event</h3>
+        <p class="construct-section-copy">A discrete trigger. Events carry intent without narrating it. They cause transitions and execute rules.</p>
+      </div>
+      <div class="specimen-pair">
+        <div class="specimen-half">
+          <div class="specimen-half-bar"><span class="specimen-half-label">Design-time view</span><span class="specimen-half-tag">authored &middot; compile-valid specimen</span></div>
+          <div class="specimen-half-inner">
+            <div class="cg-focal-strip"><span class="cg-focal-label">Event topology &middot; <span class="ev">Submit</span> &middot; <span class="ev">Assign</span> &middot; <span class="ev">ApproveParts</span> &middot; <span class="ev">StartWork</span> &middot; <span class="ev">Cancel</span></span></div>
+            <pre id="event-design-sample" data-source="event-runtime-sample.precept"></pre>
+          </div>
+        </div>
+        <div class="specimen-half">
+          <div class="specimen-half-bar"><span class="specimen-half-label">Run-time view</span><span class="specimen-half-tag">rendered &middot; event tokens</span></div>
+          <div class="specimen-half-inner">
+            <div class="cg-focal-strip"><span class="cg-focal-label">Snapshot after <span class="ev">Assign</span> &middot; active <span class="ev">ApproveParts</span> &middot; rejected <span class="ev">StartWork</span></span></div>
+            <div class="svs-event-review-stack" id="event-runtime-review-stage" aria-label="Runtime event topology for MaintenanceWorkOrder">
+              <div class="svs-event-review-row" data-event="Submit" tabindex="0"><span class="svs-event-review-pill">Submit</span><span class="svs-event-review-arrow">&rarr;</span><span class="svs-event-review-destination">Open</span><span class="svs-event-review-note">past</span></div>
+              <div class="svs-event-review-row" data-event="Assign" tabindex="0"><span class="svs-event-review-pill">Assign</span><span class="svs-event-review-arrow">&rarr;</span><span class="svs-event-review-destination">Scheduled</span><span class="svs-event-review-note">past</span></div>
+              <div class="svs-event-review-row" data-event="Cancel" tabindex="0"><span class="svs-event-review-pill">Cancel</span><span class="svs-event-review-arrow">&rarr;</span><span class="svs-event-review-destination">Cancelled</span><span class="svs-event-review-note">alternate</span></div>
+              <div class="svs-event-review-row svs-event-review-row--active" data-event="ApproveParts" tabindex="0"><span class="svs-event-review-pill">ApproveParts</span><span class="svs-event-review-arrow">&rarr;</span><span class="svs-event-review-destination">no transition</span><span class="svs-event-review-note">active</span></div>
+              <div class="svs-event-review-row svs-event-review-row--blocked" data-event="StartWork" tabindex="0"><span class="svs-event-review-pill">StartWork</span><span class="svs-event-review-arrow">&rarr;</span><span class="svs-event-review-destination">InProgress</span><span class="svs-event-review-note svs-event-review-note--blocked">rejected</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Visual cues</div>
+        <div class="cg-channels">
+          <div class="cg-channel"><div class="cg-channel-name">Colour</div><div class="cg-channel-body"><div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--event)"></span></div><p class="cg-channel-caption">Cyan marks event triggers and event tokens across authored and rendered views.</p></div></div>
+          <div class="cg-channel"><div class="cg-channel-name">Typography</div><div class="cg-channel-body"><div class="cg-channel-signal"><code class="ev">Close</code></div><p class="cg-channel-caption">Mono PascalCase keeps event names terse and action-oriented.</p></div></div>
+          <div class="cg-channel"><div class="cg-channel-name">Form</div><div class="cg-channel-body"><div class="cg-channel-signal"><div class="cg-form-pair"><div class="cg-form-sample"><div class="cg-form cg-form--pill">Submit</div><div class="cg-form-label">Token</div></div><div class="cg-form-sample"><div class="cg-form cg-form--transition-line"></div><div class="cg-form-label">Transition line</div></div></div></div><p class="cg-channel-caption">Events use two baseline marks: a token for the event name itself, and a transition line for the path it travels on in state-diagram surfaces.</p></div></div>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
+        <div class="cg-channels cg-channels--modifiers">
+          <div class="cg-channel"><div class="cg-channel-name">transition</div><div class="cg-channel-body"><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event">Close</span><span class="cg-modifier-arrow">&rarr;</span><span class="cg-modifier-token cg-modifier-token--state">Closed</span></div><p class="cg-channel-caption">Directional pairing reads the trigger and destination as one move.</p></div></div>
+          <div class="cg-channel"><div class="cg-channel-name">self-transition</div><div class="cg-channel-body"><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event">Recheck</span><span class="cg-modifier-arrow">&#8635;</span><span class="cg-modifier-token cg-modifier-token--state">Open</span></div><p class="cg-channel-caption">Loop treatment reads the trigger while the lifecycle coordinate stays the same.</p></div></div>
+          <div class="cg-channel"><div class="cg-channel-name">no-transition</div><div class="cg-channel-body"><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--event-muted">Close</span><span class="cg-modifier-token">&empty;</span></div><p class="cg-channel-caption">Empty destination marker reads the event as resolved without a state change.</p></div></div>
+          <div class="cg-channel"><div class="cg-channel-name">rejected</div><div class="cg-channel-body"><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--violated cg-modifier-token--dashed">Close</span><span class="cg-modifier-token">rejected</span></div><p class="cg-channel-caption">Rejection lands on the trigger as a run-time verdict, not a second event family.</p></div></div>
+          <div class="cg-channel"><div class="cg-channel-name">constraint failure</div><div class="cg-channel-body"><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event">Close</span><span class="cg-modifier-token cg-modifier-token--violated">constraint failure</span></div><p class="cg-channel-caption">Constraint failure sits beside the trigger so the event stays primary.</p></div></div>
+          <div class="cg-channel"><div class="cg-channel-name">unmatched</div><div class="cg-channel-body"><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--warn">unmatched</span></div><p class="cg-channel-caption">Warning treatment marks a guard that does not apply in the current snapshot.</p></div></div>
+        </div>
+        <div class="cg-combination-matrix" aria-label="Event valid combinations"><div class="cg-combination-head"><div class="cg-combination-title">Valid combinations</div><p class="cg-combination-intro">Each row shows one valid event topology with at most one verdict.</p></div><div class="cg-combination-grid"><div class="cg-combination-row"><div class="cg-channel-name">Transition</div><div class="cg-combination-specimen"><div class="cg-mini-flow"><span class="cg-mini-event-pill">Close</span><span class="cg-modifier-arrow">&rarr;</span><span class="cg-mini-state-chip">Closed</span></div></div><p class="cg-combination-reading">One trigger pairs to one destination.</p></div><div class="cg-combination-row"><div class="cg-channel-name">Self-transition</div><div class="cg-combination-specimen"><div class="cg-mini-flow"><span class="cg-mini-event-pill">Recheck</span><span class="cg-modifier-arrow">&#8635;</span><span class="cg-mini-state-chip">Open</span></div></div><p class="cg-combination-reading">The trigger fires while the lifecycle coordinate stays put.</p></div><div class="cg-combination-row"><div class="cg-channel-name">No-transition</div><div class="cg-combination-specimen"><div class="cg-mini-flow"><span class="cg-mini-event-pill cg-mini-event-pill--muted">Refresh</span><span class="cg-mini-badge">no transition</span></div></div><p class="cg-combination-reading">The event resolves without moving state.</p></div><div class="cg-combination-row"><div class="cg-channel-name">Transition + rejected</div><div class="cg-combination-specimen"><div class="cg-mini-flow"><span class="cg-mini-event-pill cg-mini-event-pill--rejected">Close</span><span class="cg-modifier-arrow">&rarr;</span><span class="cg-mini-state-chip cg-mini-state-chip--ghost">Closed</span><span class="cg-mini-badge cg-mini-badge--violated">rejected</span></div></div><p class="cg-combination-reading">The authored move stays visible while one blocking verdict lands on that same read.</p></div><div class="cg-combination-row"><div class="cg-channel-name">Transition + constraint failure</div><div class="cg-combination-specimen"><div class="cg-mini-flow"><span class="cg-mini-event-pill">Close</span><span class="cg-modifier-arrow">&rarr;</span><span class="cg-mini-state-chip cg-mini-state-chip--ghost">Closed</span><span class="cg-mini-badge cg-mini-badge--violated">constraint failure</span></div></div><p class="cg-combination-reading">The move is identified, then blocked by failing checks.</p></div><div class="cg-combination-row"><div class="cg-channel-name">Unmatched</div><div class="cg-combination-specimen"><div class="cg-mini-flow"><span class="cg-mini-event-pill">Close</span><span class="cg-mini-badge cg-mini-badge--warn">unmatched</span></div></div><p class="cg-combination-reading">One warning verdict can sit on the event when no guard applies in the current snapshot.</p></div></div></div>
+      </div>
+    </div>
+  </div>
+</main>
+<script>
+(function() {
+  var authoredSample = document.getElementById("event-design-sample");
+  var runtimeStage = document.getElementById("event-runtime-review-stage");
+  if (!authoredSample || !runtimeStage) return;
+  var fallbackPreceptText = `precept MaintenanceWorkOrder
+
+field Location as string nullable
+field AssignedTechnician as string nullable
+field Urgent as boolean default false
+field PartsApproved as boolean default false
+field CancellationReason as string nullable
+
+state Draft initial
+state Open
+state Scheduled
+state InProgress
+state Cancelled
+
+in Scheduled assert AssignedTechnician != null 
+  because "Scheduled work must have an assigned technician"
+
+event Submit with WorkLocation as string, IsUrgent as boolean default false
+on Submit assert WorkLocation != "" 
+  because "A location is required"
+
+event Assign with Technician as string
+on Assign assert Technician != "" 
+  because "A technician is required"
+
+event ApproveParts
+event StartWork
+
+event Cancel with Reason as string
+on Cancel assert Reason != "" 
+  because "A cancellation reason is required"
+
+from Draft on Submit 
+  -> set Location = Submit.WorkLocation 
+  -> set Urgent = Submit.IsUrgent 
+  -> transition Open
+
+from Open on Assign 
+  -> set AssignedTechnician = Assign.Technician 
+  -> transition Scheduled
+from Open on Cancel 
+  -> set CancellationReason = Cancel.Reason 
+  -> transition Cancelled
+
+from Scheduled on ApproveParts 
+  -> set PartsApproved = true 
+  -> no transition
+from Scheduled on StartWork when PartsApproved 
+  -> transition InProgress
+from Scheduled on StartWork when Urgent == false 
+  -> transition InProgress
+from Scheduled on StartWork 
+  -> reject "Urgent work must have parts approved before it starts"
+from Scheduled on Cancel 
+  -> set CancellationReason = Cancel.Reason 
+  -> transition Cancelled`;
+  var escapeHtml = function(value) { return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+  var primaryKeywords = new Set(["precept", "field", "state", "in", "assert", "because", "event", "on", "from", "set", "transition", "when"]);
+  var secondaryKeywords = new Set(["as", "nullable", "default", "initial", "with"]);
+  var typeKeywords = new Set(["string", "number", "boolean"]);
+  var literalKeywords = new Set(["true", "false", "null"]);
+  var collectSymbols = function(text) {
+    var fields = new Set();
+    var states = new Set();
+    var events = new Set();
+    text.replace(/\r\n/g, "\n").split("\n").forEach(function(line) {
+      var trimmed = line.trim();
+      var match = /^field\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed); if (match) fields.add(match[1]);
+      match = /^state\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed); if (match) states.add(match[1]);
+      match = /^event\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed); if (match) events.add(match[1]);
+    });
+    return { fields: fields, states: states, events: events };
+  };
+  var renderToken = function(token, symbols) {
+    if (!token) return "";
+    if (/^\s+$/.test(token)) return token;
+    if (/^"(?:[^"\\]|\\.)*"$/.test(token)) return '<span class="ru">' + escapeHtml(token) + '</span>';
+    if (/^[0-9]+$/.test(token) || literalKeywords.has(token)) return '<span class="dv">' + escapeHtml(token) + '</span>';
+    if (symbols.events.has(token)) return '<span class="svs-authored-event-ref ev" data-event="' + escapeHtml(token) + '" tabindex="0">' + escapeHtml(token) + '</span>';
+    if (symbols.states.has(token)) return '<span class="st">' + escapeHtml(token) + '</span>';
+    if (symbols.fields.has(token)) return '<span class="da">' + escapeHtml(token) + '</span>';
+    if (typeKeywords.has(token)) return '<span class="dt">' + escapeHtml(token) + '</span>';
+    if (primaryKeywords.has(token)) return '<span class="s">' + escapeHtml(token) + '</span>';
+    if (secondaryKeywords.has(token)) return '<span class="sg">' + escapeHtml(token) + '</span>';
+    return escapeHtml(token);
+  };
+  var renderPreceptHtml = function(text) {
+    var normalized = text.replace(/\r\n/g, "\n");
+    var symbols = collectSymbols(normalized);
+    var tokenPattern = /"(?:[^"\\]|\\.)*"|==|!=|->|\|\||&&|[A-Za-z_][A-Za-z0-9_]*|\s+|./g;
+    return normalized.split("\n").map(function(line) {
+      if (line.trimStart().startsWith("#")) return '<span class="cm">' + escapeHtml(line) + '</span>';
+      var tokens = line.match(tokenPattern) || [];
+      return tokens.map(function(token) { return renderToken(token, symbols); }).join("");
+    }).join("\n");
+  };
+  var loadPreceptText = async function() {
+    try {
+      var response = await fetch(authoredSample.dataset.source, { cache: "no-store" });
+      if (response.ok) return await response.text();
+    } catch (e) {}
+    return fallbackPreceptText;
+  };
+  loadPreceptText().then(function(preceptText) {
+    authoredSample.innerHTML = renderPreceptHtml(preceptText);
+    var authoredRefs = Array.from(authoredSample.querySelectorAll(".svs-authored-event-ref[data-event]"));
+    var runtimeRefs = Array.from(runtimeStage.querySelectorAll("[data-event]"));
+    var syncTargets = authoredRefs.concat(runtimeRefs);
+    var clearLinked = function() { syncTargets.forEach(function(element) { element.classList.remove("is-linked"); }); };
+    var applyLinked = function(eventName) { syncTargets.forEach(function(element) { element.classList.toggle("is-linked", element.dataset.event === eventName); }); };
+    syncTargets.forEach(function(element) {
+      var handleEnter = function() { applyLinked(element.dataset.event); };
+      element.addEventListener("mouseenter", handleEnter);
+      element.addEventListener("mouseleave", clearLinked);
+      element.addEventListener("focus", handleEnter);
+      element.addEventListener("blur", clearLinked);
+    });
+  });
+}());
+</script>
+</body>
+</html>

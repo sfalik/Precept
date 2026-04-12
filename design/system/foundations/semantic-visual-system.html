@@ -930,7 +930,7 @@ pre {
     font-size: 12px;
     letter-spacing: 0.05em;
     white-space: nowrap;
-    border-radius: 2px;
+    border-radius: 8px;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
     transition:
       border-color 140ms ease,
@@ -966,6 +966,7 @@ pre {
     position: absolute;
     inset: 4px;
     border: 1px solid rgba(168,152,245,0.28);
+    border-radius: 4px;
     pointer-events: none;
   }
   .svs-state-node--initial .svs-state-node-dot {
@@ -1577,7 +1578,7 @@ pre {
 /* ─ channels band (Layer 3 — spans full width) ─ */
 .arch-channels {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 1px;
   background: var(--line);
   border-top: 1px solid var(--line-strong);
@@ -1713,11 +1714,11 @@ pre {
   <div class="section-head">
     <div class="eyebrow">02 · Concepts</div>
     <h2>System Architecture</h2>
-    <p>Five constructs define authored meaning. Two views render those constructs as authored source and run-time components. Verdicts report evaluation without redefining the construct being read. Chrome/support scaffolds the surface around them. Four visual cues carry that meaning across four surfaces.</p>
+    <p>Five constructs define authored meaning. Two views render those constructs as authored source and run-time components. Verdicts report evaluation without redefining the construct being read. Chrome/support scaffolds the surface around them. Three visual cues carry that meaning across four surfaces.</p>
   </div>
 
   <!-- Architecture diagram ─────────────────────── -->
-  <div class="arch-chrome-frame" role="img" aria-label="System architecture: five constructs across design-time and run-time views, four visual cues spanning both">
+  <div class="arch-chrome-frame" role="img" aria-label="System architecture: five constructs across design-time and run-time views, three visual cues spanning both">
     <div class="arch-diagram">
 
       <!-- Layer 1 · Constructs ─────────────────── -->
@@ -1820,11 +1821,6 @@ pre {
             <span class="arch-ch-num">03</span>
             <span class="arch-ch-name">Form</span>
             <p class="arch-ch-note">Stable base shapes encode construct type. Modifier signals layer additively without displacing the base.</p>
-          </div>
-          <div class="arch-ch">
-            <span class="arch-ch-num">04</span>
-            <span class="arch-ch-name">Layout</span>
-            <p class="arch-ch-note">Adjacency, ordering, and depth encode relationship, sequence, and structural hierarchy across all surfaces.</p>
           </div>
         </div>
       </div>
@@ -2480,7 +2476,7 @@ pre {
 /* ─ Channel grid ─────────────────────────── */
 .cg-channels {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
@@ -3316,13 +3312,6 @@ pre {
               <p class="cg-channel-caption">Container framing marks structure as the governing enclosure.</p>
             </div>
           </div>
-          <div class="cg-channel">
-            <div class="cg-channel-name">Layout</div>
-            <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span>Outer wrapper</span></div>
-              <p class="cg-channel-caption">Layout keeps structure as the outer boundary around every other construct.</p>
-            </div>
-          </div>
         </div>
         <div class="cg-combination-matrix" aria-label="Structure valid combinations">
           <div class="cg-combination-head">
@@ -3416,7 +3405,7 @@ pre {
                 <div class="svs-state-node svs-state-node--initial svs-state-node--unreachable-current" data-state="Requested" tabindex="0" style="left:236px; top:32px;"><span class="svs-state-node-dot" aria-hidden="true"></span>Requested</div>
                 <div class="svs-state-node svs-state-node--unreachable-current" data-state="Approved" tabindex="0" style="left:236px; top:176px;">Approved</div>
                 <div class="svs-state-node svs-state-node--current" data-state="ReadyForPickup" tabindex="0" style="left:236px; top:320px;"><em>ReadyForPickup</em></div>
-                <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Cancelled" tabindex="0" style="left:432px; top:176px;">Cancelled</div>
+                <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Cancelled" tabindex="0" style="left:464px; top:176px;">Cancelled</div>
                 <div class="svs-state-node svs-state-node--terminal" data-state="PickedUp" tabindex="0" style="left:110px; top:456px;">PickedUp</div>
                 <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Expired" tabindex="0" style="left:362px; top:456px;">Expired</div>
 
@@ -3462,39 +3451,14 @@ pre {
           <div class="cg-channel">
             <div class="cg-channel-name">Form</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal cg-channel-signal--state-compare">
-                <span class="cg-modifier-token cg-modifier-token--state">Closed</span>
-              </div>
-              <p class="cg-channel-caption cg-channel-caption--state-compare">Plain node is the baseline, then dot, fill, dimmed hatch or dashed edge, and double border layer on top.</p>
-            </div>
-          </div>
-          <div class="cg-channel">
-            <div class="cg-channel-name">Layout</div>
-            <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span>Ordered flow</span></div>
-              <p class="cg-channel-caption">Ordered flow keeps entry, current position, and unreachable branches legible in sequence.</p>
+              <div class="cg-channel-signal"><span class="cg-modifier-token">Closed</span></div>
+              <p class="cg-channel-caption">Rounded 8px state node is the baseline, then dot, fill, dimmed hatch or dashed edge, and double border layer on top.</p>
             </div>
           </div>
         </div>
       </div>
 
       <div>
-        <div class="cg-state-baseline">
-          <div class="cg-state-baseline-head">
-            <div class="cg-channel-name">Base / unmodified state</div>
-            <p class="cg-channel-caption">Start from the plain state token or node. Every semantic modifier below layers onto this baseline rather than replacing it.</p>
-          </div>
-          <div class="cg-state-baseline-examples">
-            <div class="cg-state-baseline-sample">
-              <span class="cg-mini-badge">authored</span>
-              <span class="cg-modifier-token cg-modifier-token--state">Review</span>
-            </div>
-            <div class="cg-state-baseline-sample">
-              <span class="cg-mini-badge">rendered</span>
-              <span class="cg-mini-state-node">Review</span>
-            </div>
-          </div>
-        </div>
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
         <div class="cg-channels cg-channels--modifiers">
           <div class="cg-channel cg-channel--modifier">
@@ -3728,13 +3692,6 @@ pre {
             <div class="cg-channel-body">
               <div class="cg-channel-signal"><div class="cg-form cg-form--pill"></div></div>
               <p class="cg-channel-caption">Outlined pill marks the trigger, then pairs with state or verdict markers as needed.</p>
-            </div>
-          </div>
-          <div class="cg-channel">
-            <div class="cg-channel-name">Layout</div>
-            <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span>State context</span></div>
-              <p class="cg-channel-caption">State context sits beside the event when a move matters; otherwise the event stands alone.</p>
             </div>
           </div>
         </div>
@@ -3979,13 +3936,6 @@ pre {
               <p class="cg-channel-caption">Row form keeps name, type, and value aligned as one governed record.</p>
             </div>
           </div>
-          <div class="cg-channel">
-            <div class="cg-channel-name">Layout</div>
-            <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span>Table stack</span></div>
-              <p class="cg-channel-caption">Tabular stacking keeps field rows scannable across the set.</p>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -4192,13 +4142,6 @@ pre {
             <div class="cg-channel-body">
               <div class="cg-channel-signal"><div class="cg-form cg-form--callout"></div></div>
               <p class="cg-channel-caption">Left-border callout frames the rule as an interruption, not a container.</p>
-            </div>
-          </div>
-          <div class="cg-channel">
-            <div class="cg-channel-name">Layout</div>
-            <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span>Point of interruption</span></div>
-              <p class="cg-channel-caption">Rule copy appears directly beneath the triggering field or event.</p>
             </div>
           </div>
         </div>

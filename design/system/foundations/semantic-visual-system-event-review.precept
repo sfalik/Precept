@@ -1,0 +1,38 @@
+precept VisitorBadgePickupEventReview
+
+field VisitorName as string nullable
+field BadgePrinted as boolean default false
+field PickupWindowOpen as boolean default true
+field OutcomeNote as string nullable
+
+state Requested initial
+state Approved
+state ReadyForPickup
+state PickedUp
+state Expired
+state Cancelled
+
+event ApproveRequest with Name as string
+on ApproveRequest assert Name != "" because "A visitor name is required"
+
+event PrintBadge
+event PickUp
+event Expire
+event Cancel with Reason as string
+on Cancel assert Reason != "" because "A cancellation reason is required"
+
+from Requested on ApproveRequest
+    -> set VisitorName = ApproveRequest.Name
+    -> transition Approved
+from Approved on PrintBadge
+    -> set BadgePrinted = true
+    -> transition ReadyForPickup
+from Approved on Cancel
+    -> set OutcomeNote = Cancel.Reason
+    -> transition Cancelled
+from ReadyForPickup on PickUp when PickupWindowOpen
+    -> set OutcomeNote = "Badge collected"
+    -> transition PickedUp
+from ReadyForPickup on Expire when PickupWindowOpen == false
+    -> set OutcomeNote = "Pickup window closed before collection"
+    -> transition Expired
