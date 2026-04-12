@@ -7,6 +7,10 @@
 
 ## Recent Updates
 
+### 2026-04-12 - Sticky subsection labels aligned with rail typography reset
+- Removed the remaining small-caps override from the sticky subsection labels in `design/system/foundations/semantic-visual-system.html` so they match the active rail.
+- Preserved sticky placement, left-rail alignment, spacing, and the existing typography scale; the change was limited to the label treatment.
+
 ### 2026-04-05 - Kanban concept decision merged into squad record
 - Moved Concept 11's kanban-board preview decision from .squad/decisions/inbox/elaine-kanban-preview-concept.md into .squad/decisions.md during the proposal-expansion consolidation pass.
 - Preserved the core recommendation: use kanban as a complementary lifecycle-overview mode for simpler linear precepts, not as a replacement for Timeline, Storyboard, or Notebook views.
@@ -180,3 +184,4 @@
 - 2026-05-17 — Frank's architectural analysis of the PNG sizing problem is thorough and correct on the core constraint. His recommendation (fenced code block) is the same as mine, and that tradeoff is now preserved in `.squad/decisions.md`.
 - 2026-05-18 — Regenerated `readme-hero-dsl.png` to match GitHub's 830px max image display width. Previous image (1268px) scaled to 830px, shrinking code text to ~8.5px vs GitHub's ~13.6px code blocks. New approach: capture at 830px viewport with 2× deviceScaleFactor → 1660px image. Code text now renders at ~13px on GitHub. Added `design/brand/capture-hero-dsl.mjs` Playwright script for reproducible regeneration. Final width contract is now preserved in `.squad/decisions.md`.
 - 2026-05-18 — GitHub README image width reference: repo README view caps at 830px (per wh0/banner-width research). The `.markdown-body` container maxes at 980px with 45px padding. Different views have different caps: markdown view 1012px, VS Code extension 882px, VS Marketplace ~711px.
+- 2026-04-12 — Sticky subsection labels in `design/system/foundations/semantic-visual-system.html` should follow the same typography reset as the active rail: no small-caps override and no OpenType small-caps feature. Natural title case keeps the left navigation vocabulary consistent without disturbing the baseline-led alignment model.

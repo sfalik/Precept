@@ -6,6 +6,24 @@
 
 ---
 
+## Imported Inbox Records — 2026-04-12T15:13:42Z
+
+These records were merged from `.squad/decisions/inbox/` into the canonical ledger in this pass. No effective duplicates were detected while reconciling the current inbox against `decisions.md`.
+
+---
+
+### 2026-04-12: Sticky subsection labels drop remaining small-caps treatment
+**By:** Elaine
+**Status:** Executed
+
+**What:** Remove the remaining small-caps treatment from sticky subsection labels in `design/system/foundations/semantic-visual-system.html` so they match the active rail typography reset.
+
+**Why:** After the rail change, the active rail had already dropped small caps, but the sticky subsection labels were still forcing `font-variant-caps: small-caps` with the `smcp` feature enabled. That left two adjacent navigation vocabularies competing with each other even though the underlying alignment model was already correct.
+
+**Implementation consequence:** Keep the sticky subsection labels in natural title case, remove the remaining small-caps override and OpenType small-caps feature, and leave sticky placement, left-rail alignment, spacing, and typography scale unchanged.
+
+---
+
 ## Imported Inbox Records — 2026-04-11T03:48:54Z
 
 These records were merged from `.squad/decisions/inbox/` into the canonical ledger in this pass. No effective duplicates were detected while reconciling the current inbox against `decisions.md`.
