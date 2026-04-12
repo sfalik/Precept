@@ -162,7 +162,7 @@ internal static class FunctionRegistry
 
         // ── String: extraction ──────────────────────────────────
 
-        Register(new FunctionDefinition("left", "Returns the leftmost N characters. 1-indexed, clamping.",
+        Register(new FunctionDefinition("left", "Returns the leftmost N characters. Clamping.",
         [
             new([new("value", StaticValueKind.String), new("count", StaticValueKind.Number | StaticValueKind.Integer)], StaticValueKind.String),
         ]));

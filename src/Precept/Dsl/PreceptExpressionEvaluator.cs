@@ -496,6 +496,9 @@ internal static class PreceptExpressionRuntimeEvaluator
         var maxr = Evaluate(fn.Arguments[2], context);
         if (!maxr.Success) return maxr;
 
+        if (vr.Value is decimal dv && minr.Value is decimal dmin && maxr.Value is decimal dmax)
+            return EvaluationResult.Ok(Math.Clamp(dv, dmin, dmax));
+
         if (!TryToNumber(vr.Value, out var val) || !TryToNumber(minr.Value, out var min) || !TryToNumber(maxr.Value, out var max))
             return EvaluationResult.Fail("clamp() requires numeric arguments.");
 
@@ -504,7 +507,6 @@ internal static class PreceptExpressionRuntimeEvaluator
         return vr.Value switch
         {
             long => EvaluationResult.Ok((long)clamped),
-            decimal => EvaluationResult.Ok((decimal)clamped),
             _ => EvaluationResult.Ok(clamped)
         };
     }

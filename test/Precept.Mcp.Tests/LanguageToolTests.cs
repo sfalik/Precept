@@ -84,6 +84,15 @@ public class LanguageToolTests
     }
 
     [Fact]
+    public void ConstraintsIncludeBuiltInFunctionTypeCheckingRange()
+    {
+        var result = LanguageTool.Run();
+
+        result.Constraints.Select(constraint => constraint.Id)
+            .Should().Contain(["C71", "C72", "C73", "C74", "C75", "C76", "C77"]);
+    }
+
+    [Fact]
     public void ExpressionScopesHasFiveEntries()
     {
         var result = LanguageTool.Run();

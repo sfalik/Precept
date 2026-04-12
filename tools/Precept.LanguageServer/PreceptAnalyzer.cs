@@ -1125,7 +1125,7 @@ internal sealed class PreceptAnalyzer
         FunctionSnippetItem("startsWith(str, prefix)", "startsWith(${1:str}, ${2:prefix})", "Check if string starts with prefix"),
         FunctionSnippetItem("endsWith(str, suffix)", "endsWith(${1:str}, ${2:suffix})", "Check if string ends with suffix"),
         FunctionSnippetItem("trim(expr)", "trim(${1:expr})", "Remove leading/trailing whitespace"),
-        FunctionSnippetItem("left(str, count)", "left(${1:str}, ${2:count})", "First N characters (1-indexed)"),
+        FunctionSnippetItem("left(str, count)", "left(${1:str}, ${2:count})", "First N characters (clamping)"),
         FunctionSnippetItem("right(str, count)", "right(${1:str}, ${2:count})", "Last N characters"),
         FunctionSnippetItem("mid(str, start, count)", "mid(${1:str}, ${2:start}, ${3:count})", "Substring from position (1-indexed)")
     ];

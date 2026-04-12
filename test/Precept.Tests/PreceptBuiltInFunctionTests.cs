@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Threading;
 using FluentAssertions;
 using Xunit;
 
@@ -32,6 +34,18 @@ public class PreceptBuiltInFunctionTests
 
         fire.Outcome.Should().Be(TransitionOutcome.Transition);
         fire.UpdatedInstance!.InstanceData["Output"].Should().Be(5L);
+    }
+
+    [Fact]
+    public void Eval_Abs_NegativeDecimal_ReturnsPositiveDecimal()
+    {
+        var fire = FireForSet(
+            "field Input as decimal default 0\nfield Output as decimal default 0",
+            "Output", "abs(Input)",
+            new Dictionary<string, object?> { ["Input"] = -5.5m, ["Output"] = 0m });
+
+        fire.Outcome.Should().Be(TransitionOutcome.Transition);
+        fire.UpdatedInstance!.InstanceData["Output"].Should().Be(5.5m);
     }
 
     [Fact]
@@ -340,6 +354,18 @@ public class PreceptBuiltInFunctionTests
         fire.UpdatedInstance!.InstanceData["Output"].Should().Be(3.0);
     }
 
+    [Fact]
+    public void Eval_Sqrt_ZeroInput_ReturnsZero()
+    {
+        var fire = FireForSet(
+            "field Input as number nonnegative default 0\nfield Output as number default 0",
+            "Output", "sqrt(Input)",
+            new Dictionary<string, object?> { ["Input"] = 0.0, ["Output"] = 0.0 });
+
+        fire.Outcome.Should().Be(TransitionOutcome.Transition);
+        fire.UpdatedInstance!.InstanceData["Output"].Should().Be(0.0);
+    }
+
     // ─── Parse verification ─────────────────────────────────────────
 
     [Theory]
@@ -369,6 +395,40 @@ public class PreceptBuiltInFunctionTests
     }
 
     // ─── Type checker diagnostics ───────────────────────────────────
+
+    [Fact]
+    public void TypeChecker_C71_UnknownFunction()
+    {
+        // Parser rejects unknown function names, so construct a model directly
+        var model = new PreceptDefinition(
+            "Test",
+            [new PreceptState("A", SourceLine: 2), new PreceptState("B", SourceLine: 3)],
+            new PreceptState("A", SourceLine: 2),
+            [new PreceptEvent("Go", [])],
+            [new PreceptField("X", PreceptScalarType.Number, false, true, 0L)],
+            [],
+            TransitionRows: [new PreceptTransitionRow(
+                "A", "Go",
+                new NoTransition(),
+                [],
+                WhenText: "unknownfn(X) > 0",
+                WhenGuard: new PreceptBinaryExpression(
+                    ">",
+                    new PreceptFunctionCallExpression("unknownfn", [new PreceptIdentifierExpression("X")]),
+                    new PreceptLiteralExpression(0L)),
+                SourceLine: 5)]);
+        var validation = PreceptCompiler.Validate(model);
+        validation.Diagnostics.Should().Contain(d => d.Constraint.Id == "C71");
+    }
+
+    [Fact]
+    public void TypeChecker_C73_ArgTypeMismatch()
+    {
+        var dsl = "precept Test\nfield Name as string default \"\"\nstate A initial\nstate B\nevent Go\nfrom A on Go when abs(Name) > 0 -> no transition\n";
+        var model = PreceptParser.Parse(dsl);
+        var validation = PreceptCompiler.Validate(model);
+        validation.Diagnostics.Should().Contain(d => d.Constraint.Id == "C73");
+    }
 
     [Fact]
     public void TypeChecker_C72_WrongArity_Abs()
@@ -525,6 +585,29 @@ public class PreceptBuiltInFunctionTests
 
         fire.Outcome.Should().Be(TransitionOutcome.Transition);
         fire.UpdatedInstance!.InstanceData["Output"].Should().Be("");
+    }
+
+    [Fact]
+    public void Eval_ToLower_TurkishI_UsesInvariantCulture()
+    {
+        var originalCulture = Thread.CurrentThread.CurrentCulture;
+        try
+        {
+            Thread.CurrentThread.CurrentCulture = new CultureInfo("tr-TR");
+            var fire = FireForSet(
+                "field Input as string default \"\"\nfield Output as string default \"\"",
+                "Output", "toLower(Input)",
+                new Dictionary<string, object?> { ["Input"] = "TITLE", ["Output"] = "" });
+
+            fire.Outcome.Should().Be(TransitionOutcome.Transition);
+            var result = (string)fire.UpdatedInstance!.InstanceData["Output"]!;
+            result.Should().Be("title", "toLower should use invariant culture, not Turkish");
+            result.Should().NotContain("\u0131", "invariant culture should not produce dotless \u0131");
+        }
+        finally
+        {
+            Thread.CurrentThread.CurrentCulture = originalCulture;
+        }
     }
 
     // ─── Evaluation: toUpper ────────────────────────────────────────
@@ -700,6 +783,18 @@ public class PreceptBuiltInFunctionTests
 
         fire.Outcome.Should().Be(TransitionOutcome.Transition);
         fire.UpdatedInstance!.InstanceData["Output"].Should().Be("Hi");
+    }
+
+    [Fact]
+    public void Eval_Right_ZeroCount_ReturnsEmpty()
+    {
+        var fire = FireForSet(
+            "field Input as string default \"\"\nfield Output as string default \"\"",
+            "Output", "right(Input, 0)",
+            new Dictionary<string, object?> { ["Input"] = "Hello", ["Output"] = "" });
+
+        fire.Outcome.Should().Be(TransitionOutcome.Transition);
+        fire.UpdatedInstance!.InstanceData["Output"].Should().Be("");
     }
 
     // ─── Evaluation: mid ────────────────────────────────────────────

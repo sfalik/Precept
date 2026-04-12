@@ -576,7 +576,7 @@ public static class DiagnosticCatalog
     public static readonly LanguageConstraint C73 = Register(
         "C73", "compile",
         "Function argument type mismatch.",
-        "{name}() {param} argument expects {expected} but got {actual}.");
+        "{name}() no matching overload: {param} argument expects {expected} but got {actual}.");
 
     /// <summary>round() precision argument must be a non-negative integer literal.</summary>
     public static readonly LanguageConstraint C74 = Register(
