@@ -1089,4 +1089,319 @@ public class CatalogDriftTests
         PreceptScalarType.Decimal => "0.0",
         _ => throw new ArgumentOutOfRangeException(nameof(type))
     };
+
+    // ════════════════════════════════════════════════════════════════════
+    // Tier 1: Reflection guard — model records must have SourceLine
+    //
+    // Every model record that represents a user-authored declaration must
+    // carry int SourceLine so diagnostics can point to the correct line.
+    // If someone adds PreceptNewThing without SourceLine, this fails.
+    // ════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Model record types that represent user-authored DSL declarations.
+    /// Each must have an <c>int SourceLine</c> property so diagnostics can
+    /// squiggle the correct declaration line.
+    /// </summary>
+    private static readonly Type[] DeclarationRecordTypes =
+    [
+        typeof(PreceptDefinition),
+        typeof(PreceptState),
+        typeof(PreceptEvent),
+        typeof(PreceptEventArg),
+        typeof(PreceptField),
+        typeof(PreceptCollectionField),
+        typeof(PreceptInvariant),
+        typeof(StateAssertion),
+        typeof(EventAssertion),
+        typeof(PreceptTransitionRow),
+        typeof(PreceptEditBlock),
+        typeof(PreceptStateAction),
+        typeof(PreceptSetAssignment),
+        typeof(PreceptCollectionMutation),
+    ];
+
+    [Fact]
+    public void AllDeclarationRecords_HaveSourceLineProperty()
+    {
+        var missing = new List<string>();
+
+        foreach (var type in DeclarationRecordTypes)
+        {
+            var prop = type.GetProperty("SourceLine", BindingFlags.Public | BindingFlags.Instance);
+            if (prop is null || prop.PropertyType != typeof(int))
+                missing.Add(type.Name);
+        }
+
+        missing.Should().BeEmpty(
+            "every model record representing a user-authored declaration must have int SourceLine " +
+            "so constraint violations can squiggle the correct line. " +
+            "Add 'int SourceLine = 0' to the record's trailing parameters.");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Tier 2: Diagnostic line accuracy — must not squiggle the header
+    //
+    // For every parse/compile-phase constraint, constructs a multi-line
+    // DSL where the offending declaration is NOT on line 1. Asserts that
+    // the diagnostic Line > 1 (1-based: line 1 = precept header).
+    //
+    // Piggybacks on the existing ConstraintTriggers infrastructure.
+    // When someone adds C70, the completeness guard below fails if no
+    // line accuracy case is added.
+    // ════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Constraints exempt from the "must not squiggle line 1" invariant.
+    /// Each has a documented reason for landing on line 1.
+    /// </summary>
+    private static readonly HashSet<string> LineAccuracyExemptions = new(StringComparer.Ordinal)
+    {
+        "C1",   // empty input — nothing to point to
+        "C3",   // structurally unparseable — parse failure, no model
+        "C4",   // invalid expression via standalone ParseExpression — DirectAction
+        "C5",   // invalid number literal — DirectAction (unreachable from normal parse)
+        "C12",  // no states or fields — nothing to point to
+        "C26",  // null model — DirectAction (programmatic precondition)
+        "C27",  // blank initial state — DirectAction
+        "C28",  // initial state not in list — DirectAction
+        "C33",  // runtime: CreateInstance with empty state — DirectAction
+        "C34",  // runtime: CreateInstance with bad state — DirectAction
+        "C35",  // runtime: CreateInstance with bad data — DirectAction
+        "C36",  // runtime: empty current state — DirectAction
+        "C37",  // runtime: empty event name — DirectAction
+        "C53",  // empty precept (no events) — legitimately points at precept header
+        "C61",  // maxplaces on non-decimal — DirectAction
+        "C62",  // choice with no values — DirectAction
+    };
+
+    /// <summary>
+    /// DSL snippets for line accuracy testing. Each places the offending declaration
+    /// on line 3+ so we can assert the diagnostic doesn't fall back to line 1.
+    /// Most reuse the ConstraintTriggers DSL with extra padding lines prepended.
+    /// </summary>
+    private static readonly Dictionary<string, (string Dsl, string Phase, int MinExpectedLine)> LineAccuracyCases = new()
+    {
+        // ── Parse-phase: field/state/event violations ──
+
+        // C2: tokenizer error — unrecognized character on line 3
+        ["C2"]  = ("precept Test\nfield X as number default 0\n@invalid\n", "parse", 3),
+
+        // C6: duplicate field — second field decl on line 4
+        ["C6"]  = ("precept Test\nfield Pad as number default 0\nstate A initial\nfield Pad as string nullable\n", "parse", 4),
+
+        // C7: duplicate state — second state decl on line 3
+        ["C7"]  = ("precept Test\nstate A initial\nstate A\n", "parse", 3),
+
+        // C8: duplicate initial — second initial on line 3
+        ["C8"]  = ("precept Test\nstate A initial\nstate B initial\n", "parse", 3),
+
+        // C9: duplicate event — second event on line 4
+        ["C9"]  = ("precept Test\nstate A initial\nevent Go\nevent Go\nfrom A on Go -> no transition\n", "parse", 4),
+
+        // C10: missing outcome — row on line 5
+        ["C10"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = 1\n", "parse", 6),
+
+        // C11: statements after outcome — row on line 5
+        ["C11"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> transition B -> set X = 1\n", "parse", 6),
+
+        // C13: no initial state — state decl on line 3
+        ["C13"] = ("precept Test\nfield X as number default 0\nstate A, B\nevent Go\nfrom A on Go -> transition B\n", "parse", 3),
+
+        // C14: event assert with wrong dotted prefix — assert on line 4
+        ["C14"] = ("precept Test\nstate A initial\nevent Submit with Comment as string default \"x\"\non Submit assert Other.Comment != null because \"bad\"\n", "parse", 4),
+
+        // C15: event assert dotted member not a declared arg — assert on line 4
+        ["C15"] = ("precept Test\nstate A initial\nevent Submit with Comment as string default \"x\"\non Submit assert Submit.Nope != null because \"bad\"\n", "parse", 4),
+
+        // C16: event assert plain identifier not a declared arg — assert on line 4
+        ["C16"] = ("precept Test\nstate A initial\nevent Submit with Comment as string default \"x\"\non Submit assert Nope != null because \"bad\"\n", "parse", 4),
+
+        // C17: non-nullable field without default — field on line 4
+        ["C17"] = ("precept Test\nfield Title as string nullable\nfield Description as string nullable\nfield Blah as string\n", "parse", 4),
+
+        // C18: field default type mismatch — field on line 3
+        ["C18"] = ("precept Test\nstate A initial\nfield X as number default \"hello\"\n", "parse", 3),
+
+        // C19: non-nullable field with null default — field on line 3
+        ["C19"] = ("precept Test\nstate A initial\nfield X as string default null\n", "parse", 3),
+
+        // C20: event arg default type mismatch — event on line 3
+        ["C20"] = ("precept Test\nstate A initial\nevent Submit with X as number default \"hello\"\n", "parse", 3),
+
+        // C21: non-nullable event arg with null default — event on line 3
+        ["C21"] = ("precept Test\nstate A initial\nevent Submit with X as string default null\n", "parse", 3),
+
+        // C22: collection verb on scalar field — row on line 5
+        ["C22"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> add X \"val\" -> transition B\n", "parse", 6),
+
+        // C23: collection verb on unknown field — row on line 4
+        ["C23"] = ("precept Test\nstate A initial\nstate B\nevent Go\nfrom A on Go -> add Unknown \"val\" -> transition B\n", "parse", 5),
+
+        // C24: wrong verb for collection kind — row on line 5
+        ["C24"] = ("precept Test\nfield Tags as set of string\nstate A initial\nstate B\nevent Go\nfrom A on Go -> enqueue Tags \"val\" -> transition B\n", "parse", 6),
+
+        // C25: unreachable duplicate row — second row on line 6
+        ["C25"] = ("precept Test\nstate A initial\nstate B\nevent Go\nfrom A on Go -> transition B\nfrom A on Go -> transition B\n", "parse", 6),
+
+        // C54: undeclared state in transition — row on line 4
+        ["C54"] = ("precept Test\nstate A initial\nevent Go\nfrom A on Go -> transition Nowhere\n", "parse", 4),
+
+        // ── Compile-phase: type checker + analysis ────
+
+        // C29: invariant violated by defaults — invariant on line 3
+        ["C29"] = ("precept Test\nfield Score as number default 0\ninvariant Score > 0 because \"must be positive\"\nstate A initial\n", "compile", 3),
+
+        // C30: state assert on initial state violated by defaults — assert on line 3
+        ["C30"] = ("precept Test\nfield Balance as number default 0\nin Active assert Balance > 0 because \"must be positive\"\nstate Active initial\n", "compile", 3),
+
+        // C31: event assert violated by default arg values — assert on line 3
+        ["C31"] = ("precept Test\nstate A initial\non Submit assert Amount > 0 because \"must be positive\"\nevent Submit with Amount as number default 0\n", "compile", 3),
+
+        // C32: literal set violates invariant — row on line 6
+        ["C32"] = ("precept Test\nfield Balance as number default 100\ninvariant Balance >= 0 because \"no negative\"\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set Balance = -5 -> transition B\n", "compile", 7),
+
+        // C38: unknown identifier in expression — row on line 5
+        ["C38"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = Missing -> transition B\n", "compile", 6),
+
+        // C39: expression type mismatch — row on line 5
+        ["C39"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = \"text\" -> transition B\n", "compile", 6),
+
+        // C40: unary operator type error — row on line 6
+        ["C40"] = ("precept Test\nfield X as boolean default false\nfield Y as string default \"\"\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = not Y -> transition B\n", "compile", 7),
+
+        // C41: binary operator type error — row on line 6
+        ["C41"] = ("precept Test\nfield X as number default 0\nfield Y as string default \"\"\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = Y - 1 -> transition B\n", "compile", 7),
+
+        // C42: null-flow violation — row on line 5
+        ["C42"] = ("precept Test\nfield X as number default 0\nfield Y as number nullable\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = Y -> transition B\n", "compile", 7),
+
+        // C43: collection pop/dequeue into target type mismatch — row on line 5
+        ["C43"] = ("precept Test\nfield X as number default 0\nfield Items as stack of string\nstate A initial\nstate B\nevent Go\nfrom A on Go when Items.count > 0 -> pop Items into X -> transition B\n", "compile", 7),
+
+        // C44: duplicate state assert — second assert on line 5
+        ["C44"] = ("precept Test\nfield X as number default 10\nstate A initial\nstate B\nin B assert X > 0 because \"first\"\nin B assert X > 0 because \"duplicate\"\nevent Go\nfrom A on Go -> transition B\n", "compile", 6),
+
+        // C45: subsumed state assert — redundant assert on line 5
+        ["C45"] = ("precept Test\nfield X as number default 10\nstate A initial\nstate B\nin B assert X > 0 because \"in covers entry\"\nto B assert X > 0 because \"to is redundant\"\nevent Go\nfrom A on Go -> transition B\n", "compile", 6),
+
+        // C46: non-boolean expression in guard — row on line 5
+        ["C46"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when X -> transition B\nfrom A on Go -> reject \"blocked\"\n", "compile", 6),
+
+        // C47: identical guard on duplicate rows — second guarded row on line 6
+        ["C47"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when X > 0 -> transition B\nfrom A on Go when X > 0 -> reject \"blocked\"\n", "compile", 7),
+
+        // C48: unreachable state — state C on line 4
+        ["C48"] = ("precept Test\nstate A initial\nstate B\nstate C\nevent Go\nfrom A on Go -> transition B\n", "compile", 4),
+
+        // C49: orphaned event — unused event on line 4
+        ["C49"] = ("precept Test\nstate A initial\nevent Go\nevent Unused\nfrom A on Go -> no transition\n", "compile", 4),
+
+        // C50: dead-end state — state B on line 3
+        ["C50"] = ("precept Test\nstate A initial\nstate B\nevent Go\nfrom A on Go -> transition B\nfrom B on Go -> reject \"blocked\"\n", "compile", 3),
+
+        // C51: reject-only pair — row on line 3
+        ["C51"] = ("precept Test\nstate A initial\nevent Go\nfrom A on Go -> reject \"blocked\"\n", "compile", 4),
+
+        // C52: event never succeeds — event Stop on line 4
+        ["C52"] = ("precept Test\nstate A initial\nstate B\nevent Move\nevent Stop\nfrom A on Move -> transition B\nfrom A on Stop -> reject \"blocked\"\nfrom B on Stop -> reject \"blocked\"\n", "compile", 5),
+
+        // C55: root-level edit with states declared — edit on line 4
+        ["C55"] = ("precept Test\nfield Priority as number default 1\nstate A initial\nedit Priority\n", "compile", 4),
+
+        // C56: .length on nullable without null guard — row on line 4
+        ["C56"] = ("precept Test\nfield Note as string nullable\nstate A initial\nevent Go\nfrom A on Go when Note.length > 0 -> no transition\n", "compile", 5),
+
+        // C57: constraint on incompatible type — field on line 2
+        ["C57"] = ("precept Test\nfield Name as string default \"\" nonnegative\nstate A initial\n", "compile", 2),
+
+        // C58: duplicate constraint — field on line 2
+        ["C58"] = ("precept Test\nfield Amount as number default 5 min 1 min 1\nstate A initial\n", "compile", 2),
+
+        // C59: default violates constraint — field on line 2
+        ["C59"] = ("precept Test\nfield Amount as number default 0 positive\nstate A initial\n", "compile", 2),
+
+        // C60: narrowing assignment (number → integer) — row on line 5
+        ["C60"] = ("precept Test\nfield Count as integer default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set Count = 3.0 -> no transition\n", "compile", 6),
+
+        // C63: duplicate value in choice set — field on line 2
+        ["C63"] = ("precept Test\nfield Status as choice(\"Open\",\"Open\",\"Closed\") default \"Open\"\nstate A initial\n", "compile", 2),
+
+        // C64: default not in choice set — field on line 2
+        ["C64"] = ("precept Test\nfield Status as choice(\"Open\",\"Closed\") default \"Pending\"\nstate A initial\n", "compile", 2),
+
+        // C65: ordinal operator on unordered choice — row on line 5
+        ["C65"] = ("precept Test\nfield Status as choice(\"Draft\",\"Active\") default \"Draft\"\nstate A initial\nstate B\nevent Go\nfrom A on Go when Status > \"Active\" -> no transition\n", "compile", 6),
+
+        // C66: ordered on non-choice type — field on line 2
+        ["C66"] = ("precept Test\nfield Name as string nullable ordered\nstate A initial\n", "compile", 2),
+
+        // C67: ordinal comparison between two choice fields — row on line 6
+        ["C67"] = ("precept Test\nfield Priority as choice(\"Low\",\"High\") default \"Low\" ordered\nfield Severity as choice(\"Low\",\"High\") default \"Low\" ordered\nstate A initial\nstate B\nevent Go\nfrom A on Go when Priority > Severity -> no transition\n", "compile", 7),
+
+        // C68: literal not in choice set — row on line 5
+        ["C68"] = ("precept Test\nfield Status as choice(\"Open\",\"Closed\") default \"Open\"\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set Status = \"Invalid\" -> no transition\n", "compile", 6),
+
+        // C69: cross-scope guard reference — invariant on line 4
+        ["C69"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go with Amount as number\ninvariant X >= 0 when Go.Amount > 0 because \"bad\"\nfrom A on Go -> no transition\n", "compile", 6),
+    };
+
+    [Theory]
+    [MemberData(nameof(LineAccuracyData))]
+    public void EveryConstraint_DiagnosticDoesNotSquiggleHeaderLine(string constraintId, string phase, int minExpectedLine)
+    {
+        var caseData = LineAccuracyCases[constraintId];
+        int diagnosticLine;
+
+        if (phase == "parse")
+        {
+            var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(caseData.Dsl);
+            diagnostics.Should().NotBeEmpty($"constraint {constraintId} must produce a parse diagnostic");
+            diagnosticLine = diagnostics[0].Line;
+        }
+        else // compile
+        {
+            var (model, parseDiags) = PreceptParser.ParseWithDiagnostics(caseData.Dsl);
+            parseDiags.Should().BeEmpty($"compile-phase trigger for {constraintId} must parse cleanly");
+            model.Should().NotBeNull();
+
+            var validation = PreceptCompiler.Validate(model!);
+            var diagnostic = validation.Diagnostics.FirstOrDefault(d => d.Constraint.Id == constraintId);
+            diagnostic.Should().NotBeNull($"constraint {constraintId} must produce a validation diagnostic");
+            diagnosticLine = diagnostic!.Line;
+        }
+
+        diagnosticLine.Should().BeGreaterThan(1,
+            $"constraint {constraintId} diagnostic should squiggle the offending declaration " +
+            $"(expected line >= {minExpectedLine}), not the precept header (line 1). " +
+            "Did you forget to pass SourceLine to ToException() or the diagnostic constructor?");
+    }
+
+    public static IEnumerable<object[]> LineAccuracyData()
+        => LineAccuracyCases.Select(kv => new object[] { kv.Key, kv.Value.Phase, kv.Value.MinExpectedLine });
+
+    /// <summary>
+    /// Completeness guard: every non-exempt parse/compile-phase constraint
+    /// must have a line accuracy test case. Fails when someone adds C70
+    /// without adding a corresponding LineAccuracyCases entry.
+    /// </summary>
+    [Fact]
+    public void AllNonExemptConstraints_HaveLineAccuracyCase()
+    {
+        var allIds = DiagnosticCatalog.Constraints
+            .Where(c => c.Phase is "parse" or "compile")
+            .Select(c => c.Id)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var covered = LineAccuracyCases.Keys.ToHashSet(StringComparer.Ordinal);
+        var exempt = LineAccuracyExemptions;
+
+        var uncovered = allIds.Except(covered).Except(exempt).ToList();
+        uncovered.Sort(StringComparer.Ordinal);
+
+        uncovered.Should().BeEmpty(
+            "every parse/compile-phase constraint must either have a LineAccuracyCases entry " +
+            "or be listed in LineAccuracyExemptions with a reason. " +
+            $"Missing: {string.Join(", ", uncovered)}");
+    }
 }

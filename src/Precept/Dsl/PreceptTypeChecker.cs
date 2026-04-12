@@ -435,7 +435,7 @@ internal static class PreceptTypeChecker
             // SYNC:CONSTRAINT:C62
             // SYNC:CONSTRAINT:C63
             // SYNC:CONSTRAINT:C66
-            ValidateChoiceField(field.Name, field.Type, field.ChoiceValues, field.IsOrdered, diagnostics);
+            ValidateChoiceField(field.Name, field.Type, field.ChoiceValues, field.IsOrdered, field.SourceLine, diagnostics);
 
             // SYNC:CONSTRAINT:C64
             if (field.Type == PreceptScalarType.Choice &&
@@ -450,17 +450,17 @@ internal static class PreceptTypeChecker
                         ("value", defaultStr),
                         ("values", string.Join(", ", choiceVals.Select(v => $"\"{v}\""))),
                         ("name", field.Name)),
-                    0));
+                    field.SourceLine));
             }
 
             if (field.Constraints is not { Count: > 0 }) goto ValidateConstraints;
             // SYNC:CONSTRAINT:C57
-            ValidateConstraintTypes(field.Name, field.Type, isCollection: false, field.Constraints, diagnostics);
+            ValidateConstraintTypes(field.Name, field.Type, isCollection: false, field.Constraints, field.SourceLine, diagnostics);
             // SYNC:CONSTRAINT:C58
-            ValidateConstraintDuplicates(field.Name, field.Constraints, diagnostics);
+            ValidateConstraintDuplicates(field.Name, field.Constraints, field.SourceLine, diagnostics);
             // SYNC:CONSTRAINT:C59
             if (field.HasDefaultValue)
-                ValidateConstraintDefault(field.Name, field.DefaultValue, field.Constraints, diagnostics);
+                ValidateConstraintDefault(field.Name, field.DefaultValue, field.Constraints, field.SourceLine, diagnostics);
 
             ValidateConstraints: ;
         }
@@ -469,13 +469,13 @@ internal static class PreceptTypeChecker
         {
             // SYNC:CONSTRAINT:C62
             // SYNC:CONSTRAINT:C63
-            ValidateChoiceField(col.Name, col.InnerType, col.ChoiceValues, isOrdered: false, diagnostics);
+            ValidateChoiceField(col.Name, col.InnerType, col.ChoiceValues, isOrdered: false, col.SourceLine, diagnostics);
 
             if (col.Constraints is not { Count: > 0 }) continue;
             // SYNC:CONSTRAINT:C57
-            ValidateConstraintTypes(col.Name, null, isCollection: true, col.Constraints, diagnostics);
+            ValidateConstraintTypes(col.Name, null, isCollection: true, col.Constraints, col.SourceLine, diagnostics);
             // SYNC:CONSTRAINT:C58
-            ValidateConstraintDuplicates(col.Name, col.Constraints, diagnostics);
+            ValidateConstraintDuplicates(col.Name, col.Constraints, col.SourceLine, diagnostics);
         }
 
         foreach (var evt in model.Events)
@@ -485,16 +485,16 @@ internal static class PreceptTypeChecker
                 // SYNC:CONSTRAINT:C62
                 // SYNC:CONSTRAINT:C63
                 // SYNC:CONSTRAINT:C66
-                ValidateChoiceField(arg.Name, arg.Type, arg.ChoiceValues, arg.IsOrdered, diagnostics);
+                ValidateChoiceField(arg.Name, arg.Type, arg.ChoiceValues, arg.IsOrdered, arg.SourceLine, diagnostics);
 
                 if (arg.Constraints is not { Count: > 0 }) continue;
                 // SYNC:CONSTRAINT:C57
-                ValidateConstraintTypes(arg.Name, arg.Type, isCollection: false, arg.Constraints, diagnostics);
+                ValidateConstraintTypes(arg.Name, arg.Type, isCollection: false, arg.Constraints, arg.SourceLine, diagnostics);
                 // SYNC:CONSTRAINT:C58
-                ValidateConstraintDuplicates(arg.Name, arg.Constraints, diagnostics);
+                ValidateConstraintDuplicates(arg.Name, arg.Constraints, arg.SourceLine, diagnostics);
                 // SYNC:CONSTRAINT:C59
                 if (arg.HasDefaultValue)
-                    ValidateConstraintDefault(arg.Name, arg.DefaultValue, arg.Constraints, diagnostics);
+                    ValidateConstraintDefault(arg.Name, arg.DefaultValue, arg.Constraints, arg.SourceLine, diagnostics);
             }
         }
     }
@@ -505,6 +505,7 @@ internal static class PreceptTypeChecker
         PreceptScalarType type,
         IReadOnlyList<string>? choiceValues,
         bool isOrdered,
+        int sourceLine,
         List<PreceptValidationDiagnostic> diagnostics)
     {
         // SYNC:CONSTRAINT:C66
@@ -515,7 +516,7 @@ internal static class PreceptTypeChecker
                 DiagnosticCatalog.C66.FormatMessage(
                     ("name", name),
                     ("type", type.ToString().ToLowerInvariant())),
-                0));
+                sourceLine));
         }
 
         if (type != PreceptScalarType.Choice)
@@ -527,7 +528,7 @@ internal static class PreceptTypeChecker
             diagnostics.Add(new PreceptValidationDiagnostic(
                 DiagnosticCatalog.C62,
                 DiagnosticCatalog.C62.FormatMessage(("name", name)),
-                0));
+                sourceLine));
             return;
         }
 
@@ -540,7 +541,7 @@ internal static class PreceptTypeChecker
                 diagnostics.Add(new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C63,
                     DiagnosticCatalog.C63.FormatMessage(("value", val), ("name", name)),
-                    0));
+                    sourceLine));
                 break; // one diagnostic per field for duplicate
             }
         }
@@ -551,6 +552,7 @@ internal static class PreceptTypeChecker
         PreceptScalarType? scalarType,
         bool isCollection,
         IReadOnlyList<FieldConstraint> constraints,
+        int sourceLine,
         List<PreceptValidationDiagnostic> diagnostics)
     {
         foreach (var c in constraints)
@@ -595,7 +597,7 @@ internal static class PreceptTypeChecker
                     diagnostics.Add(new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C61,
                         DiagnosticCatalog.C61.MessageTemplate,
-                        0));
+                        sourceLine));
                 }
                 // SYNC:CONSTRAINT:C57
                 else
@@ -605,7 +607,7 @@ internal static class PreceptTypeChecker
                         DiagnosticCatalog.C57.FormatMessage(
                             ("constraint", constraintLabel),
                             ("type", typeLabel)),
-                        0));
+                        sourceLine));
                 }
             }
         }
@@ -614,6 +616,7 @@ internal static class PreceptTypeChecker
     private static void ValidateConstraintDuplicates(
         string name,
         IReadOnlyList<FieldConstraint> constraints,
+        int sourceLine,
         List<PreceptValidationDiagnostic> diagnostics)
     {
         // Detect same-kind duplicates (e.g., two min constraints regardless of value)
@@ -628,7 +631,7 @@ internal static class PreceptTypeChecker
                     DiagnosticCatalog.C58,
                     DiagnosticCatalog.C58.FormatMessage(
                         ("message", $"Duplicate constraint '{kind}' on field '{name}'.")),
-                    0));
+                    sourceLine));
             }
             else
             {
@@ -647,7 +650,7 @@ internal static class PreceptTypeChecker
                 DiagnosticCatalog.C58,
                 DiagnosticCatalog.C58.FormatMessage(
                     ("message", "Constraint 'nonnegative' is subsumed by 'positive'.")) ,
-                0));
+                sourceLine));
         }
 
         // Detect contradictory range constraints
@@ -668,7 +671,7 @@ internal static class PreceptTypeChecker
                 DiagnosticCatalog.C58,
                 DiagnosticCatalog.C58.FormatMessage(
                     ("message", $"Contradictory constraints: '{ConstraintLabel(c1!)}' and '{ConstraintLabel(c2!)}' define an empty valid range.")),
-                0));
+                sourceLine));
         }
     }
 
@@ -676,6 +679,7 @@ internal static class PreceptTypeChecker
         string name,
         object? defaultValue,
         IReadOnlyList<FieldConstraint> constraints,
+        int sourceLine,
         List<PreceptValidationDiagnostic> diagnostics)
     {
         foreach (var c in constraints)
@@ -711,7 +715,7 @@ internal static class PreceptTypeChecker
                     DiagnosticCatalog.C59.FormatMessage(
                         ("value", valueLabel),
                         ("constraint", ConstraintLabel(c))),
-                    0));
+                    sourceLine));
             }
         }
     }

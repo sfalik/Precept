@@ -67,7 +67,7 @@ internal sealed class PreceptAnalyzer
             return Array.Empty<Diagnostic>();
 
         var validation = PreceptCompiler.Validate(model);
-        var diagnostics = validation.Diagnostics.Select(MapValidationDiagnostic).ToList();
+        var diagnostics = validation.Diagnostics.Select(d => MapValidationDiagnostic(d, lines)).ToList();
         diagnostics.AddRange(GetSemanticDiagnostics(model, lines));
         return diagnostics.Count == 0 ? Array.Empty<Diagnostic>() : diagnostics;
     }
@@ -963,9 +963,10 @@ internal sealed class PreceptAnalyzer
         return diagnostics;
     }
 
-    private static Diagnostic MapValidationDiagnostic(PreceptValidationDiagnostic diagnostic)
+    private static Diagnostic MapValidationDiagnostic(PreceptValidationDiagnostic diagnostic, string[] lines)
     {
         var lineIndex = Math.Max(0, diagnostic.Line - 1);
+        var lineLength = lineIndex < lines.Length ? lines[lineIndex].Length : 1;
         var message = string.IsNullOrWhiteSpace(diagnostic.StateContext)
             ? diagnostic.Message
             : $"{diagnostic.Message} [state {diagnostic.StateContext}]";
@@ -985,7 +986,7 @@ internal sealed class PreceptAnalyzer
             Code = new DiagnosticCode(diagnostic.DiagnosticCode),
             Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
                 new Position(lineIndex, Math.Max(0, diagnostic.Column)),
-                new Position(lineIndex, Math.Max(1, diagnostic.Column + 1)))
+                new Position(lineIndex, Math.Max(diagnostic.Column + 1, lineLength)))
         };
     }
 

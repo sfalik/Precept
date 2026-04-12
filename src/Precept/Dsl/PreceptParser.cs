@@ -76,7 +76,12 @@ public static class PreceptParser
         catch (Superpower.ParseException ex)
         {
             // SYNC:CONSTRAINT:C2
-            diagnostics.Add(new ParseDiagnostic(1, 0, ex.Message, DiagnosticCatalog.ToDiagnosticCode(DiagnosticCatalog.C2.Id)));
+            var errPos = ex.ErrorPosition;
+            diagnostics.Add(new ParseDiagnostic(
+                errPos.HasValue ? errPos.Line : 1,
+                errPos.HasValue ? errPos.Column : 0,
+                ex.Message,
+                DiagnosticCatalog.ToDiagnosticCode(DiagnosticCatalog.C2.Id)));
             return (null, diagnostics);
         }
 
@@ -888,14 +893,15 @@ public static class PreceptParser
 
     // in <StateTarget> edit <FieldTarget>
     private static readonly TokenListParser<PreceptToken, StatementResult> EditDecl =
-        (from _ in Token.EqualTo(PreceptToken.In)
+        (from kw in Token.EqualTo(PreceptToken.In)
          from states in StateTarget
          from whenGuard in OptionalWhenGuardParser
          from __ in Token.EqualTo(PreceptToken.Edit)
          from fields in FieldTarget
          select (StatementResult)new EditResult(states, fields,
              WhenText: whenGuard is not null ? ReconstituteExpr(whenGuard) : null,
-             WhenGuard: whenGuard))
+             WhenGuard: whenGuard,
+             SourceLine: kw.Span.Position.Line))
         .Named("edit declaration")
             .Register(new ConstructInfo(
                 "edit-declaration",
@@ -910,9 +916,9 @@ public static class PreceptParser
 
     // edit <FieldTarget>  (root-level; valid only when no states declared)
     private static readonly TokenListParser<PreceptToken, StatementResult> RootEditDecl =
-        (from _ in Token.EqualTo(PreceptToken.Edit)
+        (from kw in Token.EqualTo(PreceptToken.Edit)
          from fields in FieldTarget
-         select (StatementResult)new RootEditResult(fields))
+         select (StatementResult)new RootEditResult(fields, SourceLine: kw.Span.Position.Line))
         .Named("root edit declaration")
             .Register(new ConstructInfo(
                 "root-edit-declaration",
@@ -976,8 +982,8 @@ public static class PreceptParser
     private sealed record StateActionResult(AssertAnchor Prep, string[] States,
         ParsedAction[] Actions) : StatementResult;
     private sealed record EditResult(string[] States, string[] Fields,
-        string? WhenText = null, PreceptExpression? WhenGuard = null) : StatementResult;
-    private sealed record RootEditResult(string[] Fields) : StatementResult;
+        string? WhenText = null, PreceptExpression? WhenGuard = null, int SourceLine = 0) : StatementResult;
+    private sealed record RootEditResult(string[] Fields, int SourceLine = 0) : StatementResult;
     private sealed record TransitionRowResult(string[] States, string EventName,
         PreceptExpression? WhenGuard, ParsedAction[] ActionsAndOutcome, int SourceLine = 0) : StatementResult;
 
@@ -1114,11 +1120,12 @@ public static class PreceptParser
                 case EditResult edr:
                     ExpandStateTargets(edr.States, states).ForEach(stateName =>
                         editBlocks.Add(new PreceptEditBlock(stateName, edr.Fields.ToList(),
+                            SourceLine: edr.SourceLine,
                             WhenText: edr.WhenText, WhenGuard: edr.WhenGuard)));
                     break;
 
                 case RootEditResult redr:
-                    editBlocks.Add(new PreceptEditBlock(null, redr.Fields.ToList()));
+                    editBlocks.Add(new PreceptEditBlock(null, redr.Fields.ToList(), SourceLine: redr.SourceLine));
                     break;
 
                 case TransitionRowResult trr:
@@ -1167,7 +1174,7 @@ public static class PreceptParser
             throw DiagnosticCatalog.C12.ToException();
         if (states.Count > 0 && initialState is null)
             // SYNC:CONSTRAINT:C13
-            throw DiagnosticCatalog.C13.ToException();
+            throw DiagnosticCatalog.C13.ToException(states[0].SourceLine);
 
         // Validate event assert scope: expressions may only reference event argument identifiers
         foreach (var ea in eventAsserts)
