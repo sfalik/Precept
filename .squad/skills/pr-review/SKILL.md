@@ -90,6 +90,8 @@ After fixing the code and pushing, the coordinator replies to each original revi
 
 No `event` or `body` — just replies. No review is submitted; this is the dev responding.
 
+**⚠️ NEVER include `resolve: true` in fix replies.** Resolution is the reviewer's job in Phase 3. The dev explains the fix; the reviewer verifies and resolves.
+
 ### How to Post (Dev Fix)
 
 ```
