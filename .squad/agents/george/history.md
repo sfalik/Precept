@@ -7,6 +7,16 @@
 
 ## Recent Updates
 
+### 2026-04-12 — Event hooks runtime implementation impact analysis
+- Analyzed parser, model, type checker, and engine impact for `on <Event> -> <ActionChain>` (Issue A: stateless event hooks).
+- **Parser:** Small. Syntactically unambiguous — `Arrow` after `On + Identifier` distinguishes `EventActionDecl` from `EventAssertDecl`. Reuses existing `ActionChain` unchanged. New `EventActionResult` private record.
+- **Model:** Extra-small. New `PreceptEventAction` record (mirrors `PreceptStateAction`).
+- **Type checker:** Medium. C49 suppression logic (3-case matrix), field-only scope validation.
+- **Engine:** Medium. Hard-abort semantics recommended for hook constraint violations (vs. silent-swallow for state hooks). Execution order: after asserts, before invariants.
+- Full analysis filed at `.squad/decisions/inbox/george-event-hooks-runtime-impact.md` (now merged to decisions.md).
+
+
+
 ### 2026-04-11 — Slice 11: Documentation updates for `when` guards on declarations (Issue #14)
 
 Updated 6 documentation files to sync with the completed `when` guard implementation:
