@@ -473,11 +473,12 @@ public class PreceptAnalyzerCompletionTests
 
         completions.Should().Contain("nullable");
         completions.Should().Contain("default");
+        completions.Should().Contain("->");
         completions.Should().Contain("notempty");
         completions.Should().Contain("minlength");
         completions.Should().Contain("maxlength");
         completions.Should().NotContain("nonnegative", "number constraints should not appear on string fields");
-        completions.Should().HaveCount(5);
+        completions.Should().HaveCount(6);
     }
 
     [Fact]

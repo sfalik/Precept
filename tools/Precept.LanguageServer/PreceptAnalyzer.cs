@@ -113,6 +113,15 @@ internal sealed class PreceptAnalyzer
         var collectionKinds = info.CollectionKinds;
         var currentEvent = FindCurrentEventName(lines, (int)position.Line);
 
+        // Computed fields are excluded from set/edit target positions (they are read-only).
+        var computedFieldNames = info.Model?.Fields
+            .Where(static f => f.IsComputed)
+            .Select(static f => f.Name)
+            .ToHashSet(StringComparer.Ordinal) ?? new HashSet<string>(StringComparer.Ordinal);
+        var editableDataFields = computedFieldNames.Count > 0
+            ? dataFields.Where(f => !computedFieldNames.Contains(f)).ToArray()
+            : dataFields;
+
         // ── Completion suppression: "inventing a name" positions ──
         // When the user is typing a new identifier name, suppress the default keyword list.
         if (Regex.IsMatch(beforeCursor, @"^\s*precept\s+\S*$", RegexOptions.IgnoreCase))
@@ -197,7 +206,7 @@ internal sealed class PreceptAnalyzer
 
         if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*set\\s+[^=\\n]*$", RegexOptions.IgnoreCase) &&
             !beforeCursor.Contains('=', StringComparison.Ordinal))
-            return DistinctAndSort(BuildItems(dataFields, CompletionItemKind.Field).Concat(SetSnippetItems));
+            return DistinctAndSort(BuildItems(editableDataFields, CompletionItemKind.Field).Concat(SetSnippetItems));
 
         if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*set\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*[^\\n]*$", RegexOptions.IgnoreCase))
         {
@@ -276,6 +285,10 @@ internal sealed class PreceptAnalyzer
             return [new CompletionItem { Label = "of", Kind = CompletionItemKind.Keyword }];
 
         // ── Field modifier zone: any-order modifiers after type ──
+        // Computed field derivation: after "field Name as type -> " → suggest field names and collection accessors
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:string|number|boolean|integer|decimal|choice\([^)]*\))\s*->\s+[^\n]*$", RegexOptions.IgnoreCase))
+            return BuildDerivedExpressionCompletions(dataFields, collectionFields, collectionKinds);
+
         // Unified handler for all field modifier completions (nullable, default, constraints, ordered).
         // Detects the field type, scans existing modifiers, offers remaining items.
         var fieldModifiers = TryGetFieldModifierCompletions(beforeCursor);
@@ -337,11 +350,11 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, @"^\s*on\s+\w*$", RegexOptions.IgnoreCase))
             return BuildItems(events, CompletionItemKind.Event);
 
-        // After "in State when <guard> edit " → suggest field names
+        // After "in State when <guard> edit " → suggest field names (excludes computed fields)
         if (Regex.IsMatch(beforeCursor, @"^\s*in\s+[^\n]*\s+when\s+[^\n]+\s+edit\s+[^\n]*$", RegexOptions.IgnoreCase))
             return DistinctAndSort(
                 new CompletionItem[] { new() { Label = "all", Kind = CompletionItemKind.Keyword } }
-                    .Concat(BuildItems(dataFields, CompletionItemKind.Field))
+                    .Concat(BuildItems(editableDataFields, CompletionItemKind.Field))
                     .Concat(BuildItems(collectionFields, CompletionItemKind.Field)));
 
         // After "in State when <guard> " (completed guard) → suggest edit
@@ -394,18 +407,18 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, "\\bbecause\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return [SnippetItem("because reason", "because \"${1:Reason}\"", "Constraint reason")];
 
-        // After root "edit " → suggest 'all' + field names (stateless precept root-level editability)
+        // After root "edit " → suggest 'all' + field names (excludes computed fields)
         if (Regex.IsMatch(beforeCursor, "^\\s*edit\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return DistinctAndSort(
                 new CompletionItem[] { new() { Label = "all", Kind = CompletionItemKind.Keyword } }
-                    .Concat(BuildItems(dataFields, CompletionItemKind.Field))
+                    .Concat(BuildItems(editableDataFields, CompletionItemKind.Field))
                     .Concat(BuildItems(collectionFields, CompletionItemKind.Field)));
 
-        // After "in State edit " → suggest 'all' + field names (in any edit all / in State edit Fields)
+        // After "in State edit " → suggest 'all' + field names (excludes computed fields)
         if (Regex.IsMatch(beforeCursor, "^\\s*in\\s+[^\\n]*\\s+edit\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return DistinctAndSort(
                 new CompletionItem[] { new() { Label = "all", Kind = CompletionItemKind.Keyword } }
-                    .Concat(BuildItems(dataFields, CompletionItemKind.Field))
+                    .Concat(BuildItems(editableDataFields, CompletionItemKind.Field))
                     .Concat(BuildItems(collectionFields, CompletionItemKind.Field)));
 
         // ── Event arg modifier zone: any-order modifiers after type ──
@@ -791,6 +804,24 @@ internal sealed class PreceptAnalyzer
         var items = new List<CompletionItem>();
         items.AddRange(BuildItems(dataFields, CompletionItemKind.Variable));
         items.AddRange(BuildItems(collectionKinds.Keys, CompletionItemKind.Variable));
+        items.AddRange(BuildCollectionScopeItems(collectionKinds));
+        items.AddRange(ExpressionOperatorItems);
+        items.AddRange(LiteralItems);
+        return DistinctAndSort(items);
+    }
+
+    /// <summary>
+    /// Expression completions for the derived field context (after <c>-></c> in a field declaration).
+    /// Includes data fields and collection accessors but excludes event arguments (not in scope).
+    /// </summary>
+    private static IReadOnlyList<CompletionItem> BuildDerivedExpressionCompletions(
+        IReadOnlyList<string> dataFields,
+        IReadOnlyList<string> collectionFields,
+        IReadOnlyDictionary<string, PreceptCollectionKind> collectionKinds)
+    {
+        var items = new List<CompletionItem>();
+        items.AddRange(BuildItems(dataFields, CompletionItemKind.Variable));
+        items.AddRange(BuildItems(collectionFields, CompletionItemKind.Variable));
         items.AddRange(BuildCollectionScopeItems(collectionKinds));
         items.AddRange(ExpressionOperatorItems);
         items.AddRange(LiteralItems);
@@ -1211,6 +1242,7 @@ internal sealed class PreceptAnalyzer
     private static readonly CompletionItem BecauseItem = new() { Label = "because", Kind = CompletionItemKind.Keyword, Detail = "Constraint reason" };
     private static readonly CompletionItem WhenItem = new() { Label = "when", Kind = CompletionItemKind.Keyword, Detail = "Conditional guard" };
     private static readonly CompletionItem ArrowPipelineItem = new() { Label = "->", Kind = CompletionItemKind.Operator, Detail = "action/outcome pipeline" };
+    private static readonly CompletionItem DeriveItem = new() { Label = "->", Kind = CompletionItemKind.Operator, Detail = "computed field derivation" };
     private static readonly CompletionItem CommaItem = new() { Label = ",", Kind = CompletionItemKind.Operator, Detail = "Next event argument" };
 
     internal static readonly IReadOnlyList<CompletionItem> NumberConstraintItems =
@@ -1369,14 +1401,19 @@ internal sealed class PreceptAnalyzer
 
         bool hasNullable = Regex.IsMatch(existingModifierText, @"\bnullable\b", RegexOptions.IgnoreCase);
         bool hasDefault = Regex.IsMatch(existingModifierText, @"\bdefault\b", RegexOptions.IgnoreCase);
+        bool hasDerived = existingModifierText.Contains("->", StringComparison.Ordinal);
 
         var items = new List<CompletionItem>();
 
-        if (!isCollection)
+        if (!isCollection && !hasDerived)
         {
             if (!hasNullable) items.Add(NullableItem);
             if (!hasDefault) items.Add(DefaultItem);
         }
+
+        // Offer derivation operator for scalar fields (not collections, not event args, not already derived)
+        if (!isCollection && !isEventArg && !hasDerived && !hasDefault && !hasNullable)
+            items.Add(DeriveItem);
 
         IReadOnlyList<CompletionItem> constraintPool = normalizedType switch
         {
